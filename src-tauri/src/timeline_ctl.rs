@@ -15,17 +15,19 @@
 //   { id, type, title, description?, timestamp, duration?, path?, thumbnail?,
 //     projectId?, sessionId?, metadata? }   (optional fields absent if unset)
 //
-// CHANNELS PORTED (read/data only):
+// CHANNELS PORTED (read + write, all native via the KV backbone):
 //   - timeline:getEvents (list) -> TimelineEvent[]   (filtered + sorted + paged
 //                                  exactly as Electron's getEvents(options))
 //   - timeline:getEvent  (get)  -> TimelineEvent | null   (find by id, else null)
+//   - timeline:addEvent  (create) -> TimelineEvent   (assign id + default ts,
+//                                  unshift, trim to maxEvents, persist)
+//   - timeline:clearOld  (delete) -> number   (prune events older than the
+//                                  cutoff, persist, return count removed)
 //
-// CHANNELS SKIPPED (heavy / mutating — NOT ported, NOT faked):
-//   - create (timeline:addEvent)  : write path; unshift + trim + persist.
-//   - update (no such channel)    : TimelineController has no update handler.
-//   - delete (timeline:clearOld)  : bulk prune by timestamp + persist.
-// These fall through to Value::Null (the prefix-route honest-degrade), so a
-// caller that hits them over the bridge gets null rather than a fabricated ok.
+// CHANNELS NOT PORTED:
+//   - update : TimelineController.ts has NO update handler / IPC channel. There
+//     is nothing to port; events are immutable once added (only add + clearOld
+//     mutate the store). Reported as degraded with that reason.
 //
 // DIVERGENCES (documented):
 //   - The brief named the storage as `fs-json:timeline.json`, but the ACTUAL
@@ -45,6 +47,8 @@ use serde_json::{json, Value};
 
 const EVENTS_KEY: &str = "timeline:events";
 const DAY_MS: i64 = 86_400_000;
+// Electron's TimelineController.maxEvents — keep last 10k events.
+const MAX_EVENTS: usize = 10_000;
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -131,10 +135,70 @@ fn get_event(app: &tauri::AppHandle, id: &str) -> Value {
         .unwrap_or(Value::Null)
 }
 
+// Persist the events array under the SAME KV key, mirroring saveTimelineData().
+fn save(app: &tauri::AppHandle, events: &[Value]) {
+    crate::kv_set(app, EVENTS_KEY, Value::Array(events.to_vec()));
+}
+
+// timeline:addEvent — addEvent(eventData): spread the caller's fields, assign a
+// fresh id, default the timestamp to now, unshift (prepend), trim to maxEvents,
+// persist, and return the created event. Matches the Electron handler exactly,
+// including the `event-<ts>-<rand>` id shape.
+fn add_event(app: &tauri::AppHandle, event_data: &Value) -> Value {
+    // Start from the caller's object (drop any caller-supplied id, like the
+    // Electron Omit<TimelineEvent,'id'> contract). Non-object input -> {}.
+    let mut event = match event_data {
+        Value::Object(map) => map.clone(),
+        _ => serde_json::Map::new(),
+    };
+
+    let now = now_ms();
+
+    // id = `event-${Date.now()}-${rand}`. The random suffix mirrors Electron's
+    // `Math.random().toString(36).substr(2, 9)` (9 base-36 chars); we reuse the
+    // shared uuid helper for entropy and slice it to keep the same id length.
+    let rand: String = crate::util::pseudo_uuid_v4()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(9)
+        .collect();
+    event.insert("id".to_string(), json!(format!("event-{}-{}", now, rand)));
+
+    // timestamp = eventData.timestamp || Date.now(). Treat absent / null / 0 /
+    // non-numeric as falsy, exactly like the JS `||`.
+    let ts = event.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
+    if ts == 0 {
+        event.insert("timestamp".to_string(), json!(now));
+    }
+
+    let event_val = Value::Object(event);
+
+    // unshift (prepend), then trim to the most-recent maxEvents.
+    let mut events = load(app);
+    events.insert(0, event_val.clone());
+    if events.len() > MAX_EVENTS {
+        events.truncate(MAX_EVENTS);
+    }
+
+    save(app, &events);
+    event_val
+}
+
+// timeline:clearOld — clearOldEvents(olderThan): keep events with
+// timestamp >= olderThan, persist, and return the count removed.
+fn clear_old(app: &tauri::AppHandle, older_than: i64) -> Value {
+    let mut events = load(app);
+    let initial = events.len();
+    events.retain(|e| timestamp_of(e) >= older_than);
+    let removed = initial - events.len();
+    save(app, &events);
+    json!(removed)
+}
+
 /// Route a `timeline:*` channel for the TimelineController data surface. Args are
-/// the positional JSON array the renderer sent (see tauriCompat.ts). Only the two
-/// read channels are handled; everything else (including the heavy write channels
-/// and channels owned by the OTHER `timeline:`-prefixed controllers) returns
+/// the positional JSON array the renderer sent (see tauriCompat.ts). The two read
+/// channels plus addEvent/clearOld are handled; everything else (including
+/// channels owned by the OTHER `timeline:`-prefixed controllers) returns
 /// Value::Null. Because the `timeline:` prefix is SHARED by FileChangeTimeline
 /// and UnifiedMediaTimeline, this dispatch is NOT safe to wire by prefix —
 /// route the two exact channel strings to it instead (prefixRouteSafe = false).
@@ -147,6 +211,16 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "timeline:getEvent" => {
             let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             get_event(app, id)
+        }
+        "timeline:addEvent" => {
+            let event_data = args.get(0).cloned().unwrap_or(Value::Null);
+            add_event(app, &event_data)
+        }
+        "timeline:clearOld" => {
+            // olderThan is an epoch-millis cutoff; absent -> 0 (clears nothing,
+            // since every real event has timestamp >= 0).
+            let older_than = args.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
+            clear_old(app, older_than)
         }
         _ => Value::Null,
     }

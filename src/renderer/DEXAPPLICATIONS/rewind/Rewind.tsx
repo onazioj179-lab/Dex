@@ -1315,7 +1315,7 @@ const timer = setInterval(check, 15000);
                 border: 'none',
                 outline: 'none',
                 color: 'var(--color-text-primary)',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid var(--color-border)',
               }}
             />
 
@@ -2580,7 +2580,7 @@ const timer = setInterval(check, 15000);
                 padding: '6px var(--space-2)',
                 borderRadius: 4,
                 background: 'var(--color-surface-1)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: '1px solid var(--color-border)',
               }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{profile.name}</div>
@@ -2757,7 +2757,7 @@ const timer = setInterval(check, 15000);
 // Status view inline helpers
 const statusCardStyle: React.CSSProperties = {
   background: 'var(--color-surface-1)',
-  border: '1px solid rgba(255,255,255,0.06)',
+  border: '1px solid var(--color-border)',
   borderRadius: 8,
   padding: '14px var(--space-4)',
   display: 'flex',
@@ -2828,7 +2828,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-surface-1)',
     borderRadius: 4,
     padding: 2,
-    border: '1px solid rgba(255,255,255,0.04)',
+    border: '1px solid var(--color-border-subtle)',
     overflowX: 'auto' as const,
     scrollbarWidth: 'none' as const,
     maxWidth: '100%',
@@ -2839,7 +2839,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 3,
     border: 'none',
     background: 'transparent',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--color-text-tertiary)',
     fontSize: 11,
     fontWeight: 500,
     cursor: 'pointer',
@@ -2861,7 +2861,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   sidebarBrand: {
     padding: '0 var(--space-4) var(--space-3)',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--color-border)',
     marginBottom: 'var(--space-3)',
   },
   brandName: {
@@ -2961,7 +2961,7 @@ const S: Record<string, React.CSSProperties> = {
   // Sidebar footer
   sidebarFooter: {
     padding: 'var(--space-3) var(--space-4) 0',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
+    borderTop: '1px solid var(--color-border)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
@@ -3032,9 +3032,9 @@ const S: Record<string, React.CSSProperties> = {
   },
   filterBtn: {
     background: 'var(--color-surface-2)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: 3,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     padding: '5px 10px',
     fontSize: 11,
@@ -3055,7 +3055,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px var(--space-3)',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
-    border: '1px solid rgba(255,255,255,0.04)',
+    border: '1px solid var(--color-border-subtle)',
   },
   entryIcon: {
     width: 32,
@@ -3109,12 +3109,12 @@ const S: Record<string, React.CSSProperties> = {
     padding: '6px 10px',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--color-border)',
   },
   searchInput: {
     flex: 1,
     background: 'var(--color-surface-1)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: 3,
     outline: 'none',
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
@@ -3122,8 +3122,8 @@ const S: Record<string, React.CSSProperties> = {
     padding: '7px 10px',
   },
   searchBtn: {
-    background: 'rgba(74,158,255,0.1)',
-    border: '1px solid rgba(74,158,255,0.2)',
+    background: 'var(--color-accent-light, rgba(74,158,255,0.16))',
+    border: '1px solid var(--color-accent-muted, rgba(74,158,255,0.38))',
     borderRadius: 3,
     color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))',
     cursor: 'pointer',
@@ -3135,7 +3135,7 @@ const S: Record<string, React.CSSProperties> = {
   // Buttons
   headerBtn: {
     background: 'var(--color-surface-2)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: 3,
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
     cursor: 'pointer',
@@ -3148,7 +3148,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) 14px',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle)',
   },
   statBox: {
     display: 'flex',
@@ -3253,7 +3253,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     overflow: 'hidden',
     background: 'var(--color-surface-1)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle)',
     cursor: 'pointer',
   },
   screenshotThumb: {

@@ -26,11 +26,17 @@
 //   - created  : stat.birthtimeMs (float epoch ms)
 //   - content  : present only on readFile (utf-8 file body)
 //
-// HEAVY channels intentionally NOT ported (they mutate the filesystem and/or
-// open native OS dialogs — out of this data-tier's scope):
-//   - code:saveFile   (writes file bytes to disk)
-//   - code:deleteFile (unlinks a file from disk)
-// These are omitted; the namespace prefix route returns Value::Null for them.
+// HEAVY channels NOW ported (real filesystem mutation + recent-list state):
+//   - code:saveFile(file)   -> bool  (writes utf-8 bytes to disk, updates recent)
+//   - code:deleteFile(id)   -> bool  (unlinks the file, drops it from recent)
+// Both persist the recentFiles change back into code-editor-state.json with the
+// SAME shape/keys (recentFiles capped at maxRecent=20, dedup-then-unshift), so
+// they round-trip identically with the Electron controller.
+//
+// Channels still NOT ported (need a focused window + native OS dialog, which is
+// out of this data-tier's reach — saveDialog/openDialog):
+//   - code:createFile (showSaveDialog), code:createFolder (showOpenDialog)
+// They keep falling through to Value::Null (honest degrade).
 //
 // DIVERGENCES (documented):
 //   - id base64: Node's Buffer.from(path,'utf8').toString('base64') is standard
@@ -56,6 +62,8 @@ use tauri::Manager;
 
 const STATE_FILE: &str = "code-editor-state.json";
 const MAX_DEPTH: u32 = 5;
+// CodeControllerClass.maxRecent — the recentFiles list is capped at this length.
+const MAX_RECENT: usize = 20;
 
 // --- state file IO ----------------------------------------------------------
 
@@ -84,6 +92,58 @@ fn tracked_folder_paths(app: &tauri::AppHandle) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+// recentFiles as a Vec<String>; absent/non-array -> [] (mirrors `data.recentFiles || []`).
+fn recent_files(app: &tauri::AppHandle) -> Vec<String> {
+    read_state(app)
+        .get("recentFiles")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|f| f.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// saveState(): rewrite code-editor-state.json as { recentFiles, folders } with
+// 2-space indentation (parity with JSON.stringify(obj, null, 2)). The `folders`
+// array is preserved verbatim from the current on-disk state so we never clobber
+// folder tracking when only the recent list changed. Best-effort, like Electron's
+// try/catch around writeFileSync (a write failure is swallowed, not fatal).
+fn write_state(app: &tauri::AppHandle, recent: &[String]) {
+    let folders = read_state(app)
+        .get("folders")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let state = json!({
+        "recentFiles": recent,
+        "folders": folders,
+    });
+    if let Ok(pretty) = serde_json::to_string_pretty(&state) {
+        let _ = std::fs::write(store_path(app, STATE_FILE), pretty);
+    }
+}
+
+// addToRecentInternal(filePath): dedup, unshift to front, trim to MAX_RECENT,
+// then persist. Matches the Electron list semantics exactly.
+fn add_to_recent(app: &tauri::AppHandle, file_path: &str) {
+    let mut recent = recent_files(app);
+    recent.retain(|f| f != file_path);
+    recent.insert(0, file_path.to_string());
+    if recent.len() > MAX_RECENT {
+        recent.truncate(MAX_RECENT);
+    }
+    write_state(app, &recent);
+}
+
+// deleteFile's recent cleanup: `recentFiles = recentFiles.filter(f => f !== path)`
+// then saveState().
+fn remove_from_recent(app: &tauri::AppHandle, file_path: &str) {
+    let mut recent = recent_files(app);
+    recent.retain(|f| f != file_path);
+    write_state(app, &recent);
 }
 
 // --- base64 (Buffer.from(x).toString('base64') / Buffer.from(x,'base64')) ----
@@ -344,6 +404,55 @@ fn read_file(file_id: &str) -> Value {
     info
 }
 
+// code:saveFile({ id, content, path? }) -> bool
+// Resolve target path: prefer file.path, else decode file.id (base64 -> utf-8),
+// else fail. Write content as utf-8, push onto the recent list. Any IO error ->
+// false (parity with the try/catch returning false).
+fn save_file(app: &tauri::AppHandle, file: &Value) -> Value {
+    let explicit_path = file
+        .get("path")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty());
+    let id = file.get("id").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+
+    let file_path: String = if let Some(p) = explicit_path {
+        p.to_string()
+    } else if let Some(idv) = id {
+        b64_decode_to_utf8(idv)
+    } else {
+        // "no path or id provided" -> false
+        return json!(false);
+    };
+
+    // file.content; treat a missing/non-string content as "" (writeFileSync of
+    // undefined would throw in Node, but the renderer always sends a string).
+    let content = file.get("content").and_then(|v| v.as_str()).unwrap_or("");
+
+    match std::fs::write(&file_path, content.as_bytes()) {
+        Ok(()) => {
+            add_to_recent(app, &file_path);
+            json!(true)
+        }
+        Err(_) => json!(false),
+    }
+}
+
+// code:deleteFile(fileId) -> bool
+// Decode id, bail false if the file is gone, else unlink and drop it from recent.
+fn delete_file(app: &tauri::AppHandle, file_id: &str) -> Value {
+    let file_path = b64_decode_to_utf8(file_id);
+    if !Path::new(&file_path).exists() {
+        return json!(false);
+    }
+    match std::fs::remove_file(&file_path) {
+        Ok(()) => {
+            remove_from_recent(app, &file_path);
+            json!(true)
+        }
+        Err(_) => json!(false),
+    }
+}
+
 /// Route a `code:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). The two DATA channels are handled; the heavy
 /// mutating channels (saveFile/deleteFile) and any unknown channel return
@@ -357,6 +466,14 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "code:readFile" => {
             let file_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             read_file(file_id)
+        }
+        "code:saveFile" => {
+            let file = args.get(0).cloned().unwrap_or(Value::Null);
+            save_file(app, &file)
+        }
+        "code:deleteFile" => {
+            let file_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            delete_file(app, file_id)
         }
         _ => Value::Null,
     }

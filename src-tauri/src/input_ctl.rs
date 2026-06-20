@@ -2,50 +2,43 @@
 // DEX Tauri — Input subsystem (port of the `input:*` IPC handlers in
 // src/main/core/InputLatencyController.ts).
 //
-// PROMPT-vs-REALITY NOTE (read first):
-// The task brief named channel `getState`, a `datastore-kv:input` store, and
-// heavy channels subscribe/unsubscribe/simulate. None of those exist in the
-// codebase. The real `input:*` namespace is the InputLatencyController, which is
-// PURE IN-MEMORY RUNTIME TELEMETRY with NO persistent storage at all. Its IPC
-// surface is:
-//   - input:getSnapshot (handle)  -> InputLatencySnapshot   [DATA]
-//   - input:getTargets  (handle)  -> INPUT_TARGETS constant  [DATA]
-//   - input:shouldDefer (handle)  -> boolean                 [runtime compute]
-//   - input:event       (send)    -> telemetry sink, returns void
-//   - input:latency     (send)    -> telemetry sink, returns void
-// So there is no CRUD/store key to mirror; the "data surface" is two read-only
-// handlers. This module ports those two.
+// The real `input:*` namespace is the InputLatencyController — pure in-memory
+// runtime telemetry with NO persistent storage. Its IPC surface is:
+//   - input:getTargets  (handle)  -> INPUT_TARGETS constant      [DATA]
+//   - input:getSnapshot (handle)  -> InputLatencySnapshot        [runtime read]
+//   - input:shouldDefer (handle)  -> boolean                     [runtime compute]
+//   - input:event       (send)    -> records an InputEvent, void
+//   - input:latency     (send)    -> records a LatencyMeasurement, void
 //
-// PORTED channels & exact shapes:
-//   - input:getTargets  -> the INPUT_TARGETS object, field-for-field (all the
-//                          MAX_*/PRIORITY_*/*_THRESHOLD/*_DEBOUNCE/SAMPLE/REPORT
-//                          numbers). This is a frozen compile-time constant in
-//                          Electron, reproduced verbatim here.
-//   - input:getSnapshot -> InputLatencySnapshot:
-//                          { timestamp, avgTypingLatency, avgScrollLatency,
-//                            avgClickLatency, p99TypingLatency, p99ScrollLatency,
-//                            inputsDeferred, inputsCanceled, isResponsive }
+// HEAVY CHANNELS — now implemented with REAL native state (this round):
+//   Earlier the write channels (input:event / input:latency) were accept-and-
+//   discard sinks and the reads returned a hard-coded empty snapshot. They are
+//   now backed by a process-global singleton (std::sync OnceLock + Mutex; no new
+//   dependency) that mirrors the Electron controller's fields field-for-field:
+//   rolling keyboard/scroll/pointer latency arrays (capped at LATENCY_SAMPLE_SIZE),
+//   lastInputTime/lastInputType, and the inputsDeferred/inputsCanceled counters.
+//   This is the faithful analogue of the Electron `InputLatencyController`
+//   singleton: state persists across IPC calls for the life of the process, and
+//   getSnapshot()/shouldDefer() compute over the LIVE data the renderer feeds in
+//   (not a stubbed zero). `getState` is accepted as an alias for getSnapshot
+//   (the brief's generic read-channel name; the controller's only state read is
+//   the snapshot).
 //
-// DIVERGENCE (documented, honest — no fabricated data):
-//   getSnapshot() is computed from the controller's in-memory latency arrays,
-//   which are filled ONLY by the native collector reacting to input:event /
-//   input:latency. Under Tauri there is no such collector: those two channels
-//   are accept-and-discard telemetry sinks (see rendererShims TELEMETRY_SINKS),
-//   so the latency arrays are always empty. Feeding empty arrays through the
-//   SAME getSnapshot() logic yields, deterministically:
-//     avg* = 0, p99* = 0, inputsDeferred = 0, inputsCanceled = 0, and
-//     isResponsive = true (0 <= every MAX_* target). Only `timestamp` is live.
-//   This is the exact output of the ported function over the state that actually
-//   exists on Tauri — identical to the renderer's own absent-channel fallback —
-//   not an invented value. If a native input collector is added later, swap the
-//   empty-state computation for real rolling-window data.
-//
-//   (input:shouldDefer, input:event, input:latency are NOT ported here — they
-//   are already served by rendererShims as `false` / telemetry sinks, and the
-//   first two need a native runtime collector. They are reported as skipped.)
+// FIDELITY NOTES:
+//   - recordInputEvent mirrors the Electron logic exactly: lastInputTime is set
+//     from the event's own timestamp, then `timeSinceLastInput = Date.now() -
+//     lastInputTime` decides deferral (< DEFER_THRESHOLD_MS) and cancellation
+//     (priority === 1 && < CANCEL_THRESHOLD_MS), bumping the same counters.
+//   - The Electron defer/cancel CALLBACKS are in-process background-task hooks
+//     (deferCallbacks / cancelCallbacks), not renderer sends, so there is no
+//     webContents.send to emit here; faithfully, only the counters move. No
+//     renderer event is fabricated.
+//   - calculateAverage/calculatePercentile reproduce the Electron arithmetic
+//     verbatim (empty -> 0; percentile index = ceil(p/100 * len) - 1, clamped).
 // =============================================================================
 
 use serde_json::{json, Value};
+use std::sync::{Mutex, OnceLock};
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -55,6 +48,13 @@ fn now_ms() -> i64 {
 }
 
 // INPUT_TARGETS — verbatim from InputLatencyController.ts. Frozen constant.
+const MAX_TYPING_LATENCY_MS: f64 = 16.0;
+const MAX_SCROLL_LATENCY_MS: f64 = 8.0;
+const MAX_CLICK_LATENCY_MS: f64 = 16.0;
+const DEFER_THRESHOLD_MS: i64 = 4;
+const CANCEL_THRESHOLD_MS: i64 = 16;
+const LATENCY_SAMPLE_SIZE: usize = 100;
+
 fn get_targets() -> Value {
     json!({
         "MAX_TYPING_LATENCY_MS": 16,
@@ -78,38 +78,172 @@ fn get_targets() -> Value {
     })
 }
 
-// getSnapshot() over the empty latency arrays that exist on Tauri (see header).
-// calculateAverage([]) === 0 and calculatePercentile([], _) === 0, so every
-// latency field is 0; isResponsive is `0 <= MAX_*` for all three checked targets
-// (typing 16, scroll 8, click 16) -> true. Only timestamp is live.
-fn get_snapshot() -> Value {
-    let avg_typing = 0.0_f64;
-    let avg_scroll = 0.0_f64;
-    let avg_click = 0.0_f64;
+// --- process-global controller state (analogue of the Electron singleton) ---
 
-    let is_responsive = avg_typing <= 16.0 && avg_scroll <= 8.0 && avg_click <= 16.0;
+/// The mutable in-memory telemetry the renderer drives via input:event /
+/// input:latency and reads back via getSnapshot / shouldDefer. Persists across
+/// IPC calls for the life of the process, exactly like the Electron
+/// `InputLatencyController` singleton.
+struct Controller {
+    keyboard_latencies: Vec<f64>,
+    scroll_latencies: Vec<f64>,
+    pointer_latencies: Vec<f64>,
+    inputs_deferred: i64,
+    inputs_canceled: i64,
+    last_input_time: i64,
+    last_input_type: Option<String>,
+}
+
+fn controller() -> &'static Mutex<Controller> {
+    static CTL: OnceLock<Mutex<Controller>> = OnceLock::new();
+    CTL.get_or_init(|| {
+        Mutex::new(Controller {
+            keyboard_latencies: Vec::new(),
+            scroll_latencies: Vec::new(),
+            pointer_latencies: Vec::new(),
+            inputs_deferred: 0,
+            inputs_canceled: 0,
+            last_input_time: 0,
+            last_input_type: None,
+        })
+    })
+}
+
+/// Lock the controller, recovering from a poisoned lock (a panic in a prior
+/// holder must not wedge the whole namespace).
+fn lock_ctl() -> std::sync::MutexGuard<'static, Controller> {
+    match controller().lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    }
+}
+
+fn calculate_average(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn calculate_percentile(values: &[f64], percentile: f64) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    // index = ceil((p/100) * len) - 1, clamped to >= 0 (matches Electron)
+    let raw = ((percentile / 100.0) * sorted.len() as f64).ceil() as i64 - 1;
+    let idx = raw.max(0) as usize;
+    let idx = idx.min(sorted.len() - 1);
+    sorted[idx]
+}
+
+// input:event — record an InputEvent. Mirrors recordInputEvent(). Void return.
+//   InputEvent: { type: string, timestamp: number, priority: number }
+fn record_input_event(args: &Value) {
+    let input = args.get(0).cloned().unwrap_or(Value::Null);
+    let ev_type = input
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("other")
+        .to_string();
+    // Electron sets lastInputTime = input.timestamp.
+    let ev_timestamp = input
+        .get("timestamp")
+        .and_then(|v| v.as_i64())
+        .unwrap_or_else(now_ms);
+    let priority = input.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+
+    let mut c = lock_ctl();
+    c.last_input_time = ev_timestamp;
+    c.last_input_type = Some(ev_type);
+
+    // timeSinceLastInput = Date.now() - lastInputTime (verbatim Electron logic).
+    let time_since = now_ms() - c.last_input_time;
+    if time_since < DEFER_THRESHOLD_MS {
+        c.inputs_deferred += 1; // triggerDeferral(): only the counter is process-local
+    }
+    if priority == 1 && time_since < CANCEL_THRESHOLD_MS {
+        c.inputs_canceled += 1; // triggerCancellation(): counter only
+    }
+}
+
+// input:latency — record a LatencyMeasurement. Mirrors recordLatency(). Void.
+//   LatencyMeasurement: { type: string, inputTime, renderTime, latencyMs }
+fn record_latency(args: &Value) {
+    let m = args.get(0).cloned().unwrap_or(Value::Null);
+    let m_type = m.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let latency = m.get("latencyMs").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
+    let mut c = lock_ctl();
+    let bucket = match m_type {
+        "keyboard" => Some(&mut c.keyboard_latencies),
+        "scroll" => Some(&mut c.scroll_latencies),
+        "pointer" => Some(&mut c.pointer_latencies),
+        _ => None,
+    };
+    if let Some(arr) = bucket {
+        arr.push(latency);
+        if arr.len() > LATENCY_SAMPLE_SIZE {
+            arr.remove(0); // .shift()
+        }
+    }
+}
+
+// input:shouldDefer — mirrors shouldDeferWork(). Returns boolean.
+fn should_defer() -> bool {
+    let c = lock_ctl();
+    if c.last_input_time == 0 {
+        return false;
+    }
+    let time_since = now_ms() - c.last_input_time;
+    time_since < DEFER_THRESHOLD_MS
+}
+
+// getSnapshot()/getState — InputLatencySnapshot computed over LIVE arrays.
+fn get_snapshot() -> Value {
+    let c = lock_ctl();
+    let avg_typing = calculate_average(&c.keyboard_latencies);
+    let avg_scroll = calculate_average(&c.scroll_latencies);
+    let avg_click = calculate_average(&c.pointer_latencies);
+    let p99_typing = calculate_percentile(&c.keyboard_latencies, 99.0);
+    let p99_scroll = calculate_percentile(&c.scroll_latencies, 99.0);
+
+    let is_responsive = avg_typing <= MAX_TYPING_LATENCY_MS
+        && avg_scroll <= MAX_SCROLL_LATENCY_MS
+        && avg_click <= MAX_CLICK_LATENCY_MS;
 
     json!({
         "timestamp": now_ms(),
         "avgTypingLatency": avg_typing,
         "avgScrollLatency": avg_scroll,
         "avgClickLatency": avg_click,
-        "p99TypingLatency": 0,
-        "p99ScrollLatency": 0,
-        "inputsDeferred": 0,
-        "inputsCanceled": 0,
+        "p99TypingLatency": p99_typing,
+        "p99ScrollLatency": p99_scroll,
+        "inputsDeferred": c.inputs_deferred,
+        "inputsCanceled": c.inputs_canceled,
         "isResponsive": is_responsive,
     })
 }
 
 /// Route an `input:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Data channels are served; runtime/telemetry
-/// channels that need a native collector return Value::Null (honest degrade —
-/// the renderer already has local fallbacks for them).
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// sent. Read channels return data; write (telemetry) channels mutate the
+/// process-global controller and return Value::Null (void, as in Electron).
+pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "input:getTargets" => get_targets(),
-        "input:getSnapshot" => get_snapshot(),
+        // getState is the brief's generic read name; the controller's sole state
+        // read is the snapshot, so it aliases getSnapshot.
+        "input:getSnapshot" | "input:getState" | "getState" => get_snapshot(),
+        "input:shouldDefer" => Value::Bool(should_defer()),
+        "input:event" => {
+            record_input_event(args);
+            Value::Null
+        }
+        "input:latency" => {
+            record_latency(args);
+            Value::Null
+        }
         _ => Value::Null,
     }
 }

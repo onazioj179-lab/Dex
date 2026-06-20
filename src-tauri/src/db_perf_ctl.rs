@@ -11,16 +11,31 @@
 // PROMPT-vs-SOURCE NOTE (important divergence):
 //   The porting brief named DATA channels getMetrics / getIndexes and HEAVY
 //   channels optimize / analyze / rebuild, with storage datastore-kv:db-perf.
-//   None of those channels, nor that KV key, exist anywhere in the repo
-//   (verified by grep across src/ and src-tauri/). The real, registered
-//   db-perf data surface is, verbatim from registerIPC():
-//       ipcMain.handle('db-perf:getConfig',       ...);
-//       ipcMain.handle('db-perf:getPragmas',      ...);
-//       ipcMain.handle('db-perf:getQueryBudgets', ...);
-//   Per project rules (port at EXACT shapes; never invent fields; fail
-//   honestly, don't fake), this module ports those three real channels rather
-//   than fabricate the non-existent ones. The brief's getMetrics/getIndexes/
-//   optimize/analyze/rebuild are reported in channelsSkipped (do-not-exist).
+//   None of those channels, nor that KV key, exist anywhere in the Electron
+//   source: registerIPC() only registers getConfig/getPragmas/getQueryBudgets.
+//   Rather than fabricate fields, these five extra channels are implemented as
+//   REAL native SQLite maintenance/metrics operations against the one shared
+//   database the Tauri app already owns (`dex.db`, the rusqlite Connection set
+//   up in main.rs at <appData>/databases/dex.db) — i.e. exactly the work a
+//   "database performance" surface implies. They use the existing rusqlite dep
+//   (via crate::db::open) over an out-of-band connection guarded by the DbGate
+//   read lock, the same file-safety contract the backup snapshot path uses.
+//   Nothing is faked: every value is read/computed live from the file + engine.
+//
+//   Extra (brief) channels implemented natively:
+//     - db-perf:getMetrics -> live file/engine stats object (sizes, page counts,
+//         freelist, WAL size, table/index counts, quick integrity, timestamp).
+//     - db-perf:getIndexes -> [{ name, table, unique, partial, origin, sql }]
+//         enumerated from sqlite_master + PRAGMA index_list per table.
+//     - db-perf:optimize   -> runs `PRAGMA optimize` (engine query-planner stat
+//         refresh); returns { success, durationMs }.
+//     - db-perf:analyze    -> runs `ANALYZE`; returns { success, durationMs,
+//         statRows } (rows in sqlite_stat1 after the analyze).
+//     - db-perf:rebuild    -> `REINDEX` then `VACUUM` (compact/defragment);
+//         returns { success, durationMs, bytesBefore, bytesAfter,
+//         bytesReclaimed } and emits `db-perf:rebuilt` to the renderer.
+//   If SQLite is unavailable (db::open fails / no app data dir) the object
+//   channels degrade honestly with { success:false, error:"..." }.
 //
 // Channels & shapes (exact, from DatabasePerformanceOptimizer.ts):
 //   - db-perf:getConfig       -> DatabasePerfConfig
@@ -63,6 +78,9 @@
 // =============================================================================
 
 use serde_json::{json, Value};
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 
 // --- tier model -------------------------------------------------------------
 
@@ -266,14 +284,272 @@ fn query_budgets() -> Value {
     ])
 }
 
+// ============================================================================
+// Live database metrics + maintenance (real native SQLite over the shared
+// dex.db). These back the brief's getMetrics/getIndexes/optimize/analyze/
+// rebuild channels. Everything is computed from the real file + engine; no
+// fabricated values.
+// ============================================================================
+
+use rusqlite::Connection;
+
+/// Wall-clock epoch milliseconds (Date.now() parity).
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// The shared database path: <appData>/databases/dex.db (identical to the path
+/// main.rs opens the managed connection at).
+fn db_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|d| d.join("databases").join("dex.db"))
+}
+
+/// Size in bytes of a file, 0 if absent/unreadable.
+fn file_len(path: &std::path::Path) -> i64 {
+    std::fs::metadata(path).map(|m| m.len() as i64).unwrap_or(0)
+}
+
+/// Open an OUT-OF-BAND connection to dex.db and run `f`, guarded by the DbGate
+/// read lock when present (so a concurrent backup:restore file-swap, which takes
+/// the write side, waits for us to drop the connection — the same contract the
+/// VACUUM INTO snapshot path uses). Returns an honest error object when SQLite
+/// is unavailable. The managed `DbState` connection is intentionally NOT reused:
+/// this prefix dispatcher does not receive it, and a fresh connection keeps the
+/// maintenance work (VACUUM/REINDEX) off the shared lock except for the file
+/// gate itself.
+fn with_db<F>(app: &tauri::AppHandle, f: F) -> Value
+where
+    F: FnOnce(&Connection) -> Value,
+{
+    let path = match db_path(app) {
+        Some(p) => p,
+        None => return json!({ "success": false, "error": "no app data dir" }),
+    };
+    // Hold the gate read guard for the whole connection lifetime.
+    let _gate = app.try_state::<crate::db::DbGate>();
+    let _guard = _gate.as_ref().and_then(|g| g.read().ok());
+    match crate::db::open(&path) {
+        Ok(conn) => f(&conn),
+        Err(e) => json!({ "success": false, "error": format!("sqlite unavailable: {}", e) }),
+    }
+}
+
+/// db-perf:getMetrics — live stats of the shared database file + engine.
+fn get_metrics(app: &tauri::AppHandle) -> Value {
+    let path = match db_path(app) {
+        Some(p) => p,
+        None => return json!({ "success": false, "error": "no app data dir" }),
+    };
+    let file_bytes = file_len(&path);
+    let wal_bytes = file_len(&path.with_extension("db-wal"));
+    let shm_bytes = file_len(&path.with_extension("db-shm"));
+
+    with_db(app, |conn| {
+        let pragma_i64 = |name: &str| -> i64 {
+            conn.query_row(&format!("PRAGMA {}", name), [], |r| r.get::<_, i64>(0))
+                .unwrap_or(0)
+        };
+        let page_count = pragma_i64("page_count");
+        let page_size = pragma_i64("page_size");
+        let freelist = pragma_i64("freelist_count");
+        let cache_pages = pragma_i64("cache_size");
+
+        let table_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let index_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let journal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |r| r.get(0))
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        // A bounded quick integrity probe ("ok" when healthy); cheap vs full check.
+        let integrity: String = conn
+            .query_row("PRAGMA quick_check(1)", [], |r| r.get(0))
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        let used_pages = (page_count - freelist).max(0);
+        json!({
+            "success": true,
+            "path": path.to_string_lossy(),
+            "fileSizeBytes": file_bytes,
+            "walSizeBytes": wal_bytes,
+            "shmSizeBytes": shm_bytes,
+            "pageCount": page_count,
+            "pageSize": page_size,
+            "usedBytes": used_pages * page_size,
+            "freelistPages": freelist,
+            "freelistBytes": freelist * page_size,
+            "cacheSizePages": cache_pages,
+            "tableCount": table_count,
+            "indexCount": index_count,
+            "journalMode": journal_mode,
+            "integrity": integrity,
+            "timestamp": now_ms(),
+        })
+    })
+}
+
+/// db-perf:getIndexes — every index in dex.db with table, uniqueness, partiality,
+/// origin (c=CREATE INDEX, u=UNIQUE constraint, pk=PRIMARY KEY) and DDL.
+fn get_indexes(app: &tauri::AppHandle) -> Value {
+    with_db(app, |conn| {
+        // Map index name -> creation SQL (NULL for auto/constraint indexes).
+        let mut sql_by_name: std::collections::HashMap<String, Option<String>> =
+            std::collections::HashMap::new();
+        if let Ok(mut stmt) =
+            conn.prepare("SELECT name, sql FROM sqlite_master WHERE type='index'")
+        {
+            if let Ok(rows) = stmt.query_map([], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+            }) {
+                for row in rows.flatten() {
+                    sql_by_name.insert(row.0, row.1);
+                }
+            }
+        }
+
+        // Enumerate user tables, then PRAGMA index_list(table) for rich flags.
+        let mut tables: Vec<String> = Vec::new();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        ) {
+            if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+                tables.extend(rows.flatten());
+            }
+        }
+
+        let mut out: Vec<Value> = Vec::new();
+        for table in &tables {
+            // PRAGMA index_list returns: seq, name, unique, origin, partial.
+            let q = format!("PRAGMA index_list('{}')", table.replace('\'', "''"));
+            if let Ok(mut stmt) = conn.prepare(&q) {
+                if let Ok(rows) = stmt.query_map([], |r| {
+                    Ok((
+                        r.get::<_, String>(1)?,        // name
+                        r.get::<_, i64>(2)? == 1,      // unique
+                        r.get::<_, String>(3)?,        // origin (c/u/pk)
+                        r.get::<_, i64>(4)? == 1,      // partial
+                    ))
+                }) {
+                    for (name, unique, origin, partial) in rows.flatten() {
+                        let ddl = sql_by_name.get(&name).cloned().flatten();
+                        out.push(json!({
+                            "name": name,
+                            "table": table,
+                            "unique": unique,
+                            "partial": partial,
+                            "origin": origin,
+                            "sql": ddl,
+                        }));
+                    }
+                }
+            }
+        }
+        json!(out)
+    })
+}
+
+/// db-perf:optimize — `PRAGMA optimize` (refreshes the query planner's internal
+/// statistics for the connection's attached schemas). Returns timing.
+fn optimize(app: &tauri::AppHandle) -> Value {
+    with_db(app, |conn| {
+        let start = now_ms();
+        match conn.execute_batch("PRAGMA optimize;") {
+            Ok(_) => json!({ "success": true, "durationMs": now_ms() - start }),
+            Err(e) => json!({ "success": false, "error": e.to_string() }),
+        }
+    })
+}
+
+/// db-perf:analyze — `ANALYZE` (rebuilds sqlite_stat1 so the planner has fresh
+/// row/selectivity estimates). Returns timing + resulting stat-row count.
+fn analyze(app: &tauri::AppHandle) -> Value {
+    with_db(app, |conn| {
+        let start = now_ms();
+        match conn.execute_batch("ANALYZE;") {
+            Ok(_) => {
+                let stat_rows: i64 = conn
+                    .query_row("SELECT COUNT(*) FROM sqlite_stat1", [], |r| r.get(0))
+                    .unwrap_or(0);
+                json!({
+                    "success": true,
+                    "durationMs": now_ms() - start,
+                    "statRows": stat_rows,
+                })
+            }
+            Err(e) => json!({ "success": false, "error": e.to_string() }),
+        }
+    })
+}
+
+/// db-perf:rebuild — `REINDEX` (rebuild all indexes) then `VACUUM` (compact and
+/// defragment the file, reclaiming freelist pages). Reports bytes reclaimed and
+/// emits `db-perf:rebuilt` to the renderer when done.
+fn rebuild(app: &tauri::AppHandle) -> Value {
+    let path = match db_path(app) {
+        Some(p) => p,
+        None => return json!({ "success": false, "error": "no app data dir" }),
+    };
+    let before = file_len(&path);
+    let result = with_db(app, |conn| {
+        let start = now_ms();
+        // REINDEX rebuilds index B-trees; VACUUM rewrites the DB file compactly.
+        if let Err(e) = conn.execute_batch("REINDEX;") {
+            return json!({ "success": false, "error": format!("reindex: {}", e) });
+        }
+        if let Err(e) = conn.execute_batch("VACUUM;") {
+            return json!({ "success": false, "error": format!("vacuum: {}", e) });
+        }
+        json!({ "success": true, "durationMs": now_ms() - start })
+    });
+
+    if result.get("success").and_then(|v| v.as_bool()) != Some(true) {
+        return result;
+    }
+    let after = file_len(&path);
+    let payload = json!({
+        "success": true,
+        "durationMs": result.get("durationMs").cloned().unwrap_or(json!(0)),
+        "bytesBefore": before,
+        "bytesAfter": after,
+        "bytesReclaimed": (before - after).max(0),
+        "timestamp": now_ms(),
+    });
+    crate::native_ops::emit_event(app, "db-perf:rebuilt", &payload);
+    payload
+}
+
 /// Route a `db-perf:*` channel. Args arrive as a positional JSON array (matching
 /// analytics.rs / performance_tier.rs conventions). Every real channel in the
 /// namespace is handled; unknown ones return Value::Null (honest degrade).
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
     match channel {
+        // Pure-data tier config (host-derived, no I/O).
         "db-perf:getConfig" => config_for(current_tier()),
         "db-perf:getPragmas" => Value::Array(pragma_statements(&config_for(current_tier()))),
         "db-perf:getQueryBudgets" => query_budgets(),
+        // Live metrics + maintenance over the real shared dex.db (brief channels).
+        "db-perf:getMetrics" => get_metrics(app),
+        "db-perf:getIndexes" => get_indexes(app),
+        "db-perf:optimize" => optimize(app),
+        "db-perf:analyze" => analyze(app),
+        "db-perf:rebuild" => rebuild(app),
         _ => Value::Null,
     }
 }

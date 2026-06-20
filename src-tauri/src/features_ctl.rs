@@ -25,6 +25,8 @@
 //   - features:isEnabled(id) -> boolean
 //   - features:getStable     -> FeatureFlag[]  (f.stable === true)
 //   - features:getExperimental -> FeatureFlag[] (f.stable === false)
+//   - features:toggle(id, enabled) -> { success, error? }  (persists override)
+//   - features:resetAll      -> { success }                (clears overrides)
 // where FeatureFlag = { id, name, description, enabled, defaultValue, stable,
 //   minVersion? }.
 //
@@ -35,9 +37,12 @@
 //   - app.getVersion() (used by isEnabled's minVersion gate) is sourced from
 //     env!("CARGO_PKG_VERSION"), the SAME source the house uses for
 //     app:getVersion / corepc:getVersion in this Tauri build.
-//   - HEAVY channels features:toggle and features:resetAll are NOT ported (they
-//     mutate the persisted override map + emit electron-log lines). They fall
-//     through to Value::Null here. See channelsSkipped.
+//   - features:toggle / features:resetAll mutate the persisted override map in
+//     features.json via write_flags() (preserving the other top-level wrappers)
+//     and, in place of the original electron-log lines, push a renderer event
+//     (features:changed / features:reset) through native_ops::emit_event. The
+//     `deprecated` warn-log branch has no effect (no default feature is
+//     deprecated) and is omitted.
 //   - Maintenance/API/migration handlers (maintenance:*, api:*) live in a
 //     different namespace and are out of scope for this `features` port.
 // =============================================================================
@@ -61,6 +66,37 @@ fn read_store(app: &tauri::AppHandle) -> Value {
         Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
         Err(_) => Value::Null,
     }
+}
+
+// store.set('featureFlags', flags): rewrite features.json preserving every other
+// top-level wrapper (maintenance / apiVersion / lastMigration), filling in the
+// electron-store defaults for any wrapper that did not yet exist on disk. This
+// mirrors electron-store's behaviour of persisting the whole object while only
+// the `featureFlags` key changes.
+fn write_flags(app: &tauri::AppHandle, flags: serde_json::Map<String, Value>) -> bool {
+    let mut obj = match read_store(app) {
+        Value::Object(m) => m,
+        _ => serde_json::Map::new(),
+    };
+    // Backfill the electron-store defaults so the file stays well-formed.
+    if !obj.contains_key("maintenance") {
+        obj.insert(
+            "maintenance".into(),
+            json!({ "enabled": false, "disabledFeatures": [] }),
+        );
+    }
+    if !obj.contains_key("apiVersion") {
+        obj.insert("apiVersion".into(), json!("1.1.0"));
+    }
+    if !obj.contains_key("lastMigration") {
+        obj.insert("lastMigration".into(), json!("1.0.0"));
+    }
+    obj.insert("featureFlags".into(), Value::Object(flags));
+    let serialized = match serde_json::to_string_pretty(&Value::Object(obj)) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    std::fs::write(store_path(app), serialized).is_ok()
 }
 
 // store.get('featureFlags') with the electron-store default of {}.
@@ -200,8 +236,9 @@ fn is_enabled(app: &tauri::AppHandle, id: &str) -> bool {
 }
 
 /// Route a `features:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Read-only data channels are ported; the heavy
-/// mutating channels (toggle, resetAll) fall through to Value::Null.
+/// sent (see tauriCompat.ts). Read-only data channels and the mutating
+/// toggle / resetAll channels are all ported; unknown channels fall through
+/// to Value::Null.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "features:getAll" => json!(all_features(app)),
@@ -231,7 +268,56 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
                 .collect();
             json!(exp)
         }
-        // HEAVY (not ported): features:toggle, features:resetAll -> Null.
+        // toggleFeature(id, enabled): validate, version-gate when enabling,
+        // persist the override, push a renderer event, return { success, error? }.
+        "features:toggle" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let enabled = args.get(1).and_then(|v| v.as_bool()).unwrap_or(false);
+
+            // feature lookup (Map.get(id) -> undefined).
+            let def = match DEFAULT_FEATURES.iter().find(|d| d.0 == id) {
+                Some(d) => d,
+                None => return json!({ "success": false, "error": "Feature not found" }),
+            };
+
+            // Version requirement for ENABLING (def.6 is the minVersion, "" = none).
+            if enabled && !def.6.is_empty() {
+                let current = env!("CARGO_PKG_VERSION");
+                if compare_versions(current, def.6) < 0 {
+                    return json!({
+                        "success": false,
+                        "error": format!(
+                            "This feature requires version {} or higher",
+                            def.6
+                        )
+                    });
+                }
+            }
+
+            // Persist: flags[id] = enabled; store.set('featureFlags', flags).
+            let mut flags = saved_flags(app);
+            flags.insert(id.to_string(), json!(enabled));
+            if !write_flags(app, flags) {
+                return json!({ "success": false, "error": "Failed to persist feature flag" });
+            }
+
+            // Renderer push (mirrors electron-log "Feature {id} enabled/disabled").
+            crate::native_ops::emit_event(
+                app,
+                "features:changed",
+                &json!({ "id": id, "enabled": enabled }),
+            );
+
+            json!({ "success": true })
+        }
+        // resetAllFeatures(): store.set('featureFlags', {}) -> { success: true }.
+        "features:resetAll" => {
+            if !write_flags(app, serde_json::Map::new()) {
+                return json!({ "success": false, "error": "Failed to reset feature flags" });
+            }
+            crate::native_ops::emit_event(app, "features:reset", &json!({}));
+            json!({ "success": true })
+        }
         _ => Value::Null,
     }
 }

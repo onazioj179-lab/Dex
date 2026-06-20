@@ -38,15 +38,22 @@
 //                                      no arg, so default 50; we honour an
 //                                      optional positional limit arg too.
 //
-// CHANNELS SKIPPED (heavy — need the live native runtime; NOT faked):
-//   - healing:runCheck      runs every state validator (fs reads, JSON parse,
-//                           process.memoryUsage), attempts recovery actions, and
-//                           mutates the store. Diagnose+heal. Returns Value::Null.
-//   - healing:rollback      copies checkpoint files back over userData stores
-//                           (fs restore / heal). Returns Value::Null.
-//   - healing:updateConfig  mutates config AND re-arms native setInterval health
-//                           timers; the timer side-effect cannot be reproduced
-//                           in this data tier. Returns Value::Null.
+// CHANNELS PORTED (heavy — real native diagnose/heal/mutate):
+//   - healing:runCheck      runs every state validator with REAL native code (fs
+//                           read+JSON-parse of settings.json/workflows.json, RSS
+//                           via sysinfo), attempts real recovery (settings.json
+//                           restore from .backup / fresh `{}`), appends un-
+//                           recovered issues to corruptionHistory (capped 100),
+//                           updates consecutiveFailures + lastHealthCheck, emits
+//                           a `healing:health` push event, returns HealthReport.
+//   - healing:rollback      real fs restore: copies every file in the checkpoint
+//                           dir back over userData, taking a `.pre-rollback` copy
+//                           of each existing target first. Returns bool.
+//   - healing:updateConfig  shallow-merges + persists the config (typed-guarded).
+//                           Returns the merged config. The Electron setInterval
+//                           timer re-arm is a no-op here (checks are on-demand via
+//                           runCheck, no live interval in this tier) — see the
+//                           DIVERGENCE note on update_config.
 //
 // DIVERGENCES (documented):
 //   - TIME: Electron used Date.now(); we use SystemTime epoch millis. The 24h
@@ -54,8 +61,14 @@
 //   - getHealth/getCorruptionHistory are pure reads here. In Electron, getHealth
 //     is also a pure read (it does NOT run validators — that's runCheck), so this
 //     is faithful, not a degrade.
-//   - Heavy channels return Value::Null (the prefix route degrades honestly). The
-//     renderer treats runCheck/rollback as best-effort native operations.
+//   - USERDATA ROOT: Electron used app.getPath('userData'); the faithful Tauri
+//     analog here is app_data_dir() (where self-healing.json already lives), so
+//     the validators/recovery/rollback operate on settings.json, workflows.json,
+//     and checkpoints/ under that same root.
+//   - MEMORY: Electron checked V8 heapUsed; the portable native analog is this
+//     process's resident set size (sysinfo process.memory()), same < 1 GB bound.
+//   - The `global.gc()` memory recovery has no portable native trigger, so it
+//     reports false (faithful to the Electron global.gc-absent branch).
 // =============================================================================
 
 use serde_json::{json, Value};
@@ -85,6 +98,37 @@ fn read_store(app: &tauri::AppHandle) -> Value {
         Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
         Err(_) => Value::Null,
     }
+}
+
+// Persist the full store object back to `self-healing.json` (electron-store
+// writes the entire JSON file on every `.set`). We read-modify-write the same
+// file so the renderer's reads (get_config/get_health/...) observe the change.
+fn write_store(app: &tauri::AppHandle, store: &Value) {
+    if let Ok(s) = serde_json::to_string_pretty(store) {
+        let _ = std::fs::write(store_path(app), s);
+    }
+}
+
+// Mutate one top-level key on the store object, creating the object if the file
+// was missing/non-object. Mirrors `healingStore.set(key, value)`.
+fn store_set(app: &tauri::AppHandle, key: &str, value: Value) {
+    let mut store = read_store(app);
+    if !store.is_object() {
+        store = json!({});
+    }
+    if let Some(obj) = store.as_object_mut() {
+        obj.insert(key.to_string(), value);
+    }
+    write_store(app, &store);
+}
+
+// userData root. Electron used app.getPath('userData'); the store file already
+// lives in app_data_dir(), so that is the faithful root for checkpoints + the
+// settings/workflows stores the validators inspect.
+fn user_data_dir(app: &tauri::AppHandle) -> PathBuf {
+    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
 }
 
 // --- defaults (mirror the electron-store `defaults` block) ------------------
@@ -206,6 +250,257 @@ fn get_corruption_history(app: &tauri::AppHandle, limit: usize) -> Value {
     json!(history[start..].to_vec())
 }
 
+// SelfHealingManager.getSeverity(component).
+fn get_severity(component: &str) -> &'static str {
+    let critical = ["encryption", "auth"];
+    let high = ["settings", "workflows", "automations"];
+    let medium = ["memory", "cache"];
+    if critical.contains(&component) {
+        "critical"
+    } else if high.contains(&component) {
+        "high"
+    } else if medium.contains(&component) {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+// One state validator. Mirrors the three registerDefaultValidators entries:
+//   settings : settings.json must be absent OR parse as JSON.
+//   workflows: workflows.json must be absent OR parse, with `.workflows` (or the
+//              root) being an array.
+//   memory   : this process's RSS must be under 1 GB.
+// Unknown components have no validator (Electron only registered these three) so
+// they are reported valid.
+fn run_validator(app: &tauri::AppHandle, component: &str) -> bool {
+    match component {
+        "settings" => {
+            let p = user_data_dir(app).join("settings.json");
+            match std::fs::read_to_string(&p) {
+                Ok(raw) => serde_json::from_str::<Value>(&raw).is_ok(),
+                // Missing file (or unreadable) -> Electron treats no file as valid.
+                Err(_) => !p.exists(),
+            }
+        }
+        "workflows" => {
+            let p = user_data_dir(app).join("workflows.json");
+            match std::fs::read_to_string(&p) {
+                Ok(raw) => match serde_json::from_str::<Value>(&raw) {
+                    Ok(data) => {
+                        let inner = data.get("workflows").unwrap_or(&data);
+                        inner.is_array()
+                    }
+                    Err(_) => false,
+                },
+                Err(_) => !p.exists(),
+            }
+        }
+        "memory" => {
+            // process.memoryUsage().heapUsed < 1 GB. The portable native analog
+            // is this process's resident set size via sysinfo.
+            use sysinfo::{Pid, System};
+            let mut sys = System::new();
+            sys.refresh_processes();
+            let pid = Pid::from_u32(std::process::id());
+            let rss_bytes = sys.process(pid).map(|p| p.memory()).unwrap_or(0);
+            let rss_mb = rss_bytes as f64 / 1024.0 / 1024.0;
+            rss_mb < 1024.0
+        }
+        _ => true,
+    }
+}
+
+// recoveryActions for a component. Returns true on success.
+//   settings: copy settings.json.backup over settings.json, else write `{}`.
+//   memory  : Electron called global.gc() if exposed; there is no portable
+//             native GC trigger, so this is a no-op that reports false (matches
+//             the Electron branch where global.gc is undefined -> return false).
+// Unknown components have no recovery action -> false.
+fn attempt_recovery(app: &tauri::AppHandle, component: &str) -> bool {
+    match component {
+        "settings" => {
+            let settings = user_data_dir(app).join("settings.json");
+            let backup = user_data_dir(app).join("settings.json.backup");
+            if backup.exists() {
+                std::fs::copy(&backup, &settings).is_ok()
+            } else {
+                std::fs::write(&settings, "{}").is_ok()
+            }
+        }
+        // No portable native GC; honest false (the global.gc-absent branch).
+        "memory" => false,
+        _ => false,
+    }
+}
+
+// healing:runCheck -> runHealthCheck(). Runs every validator, attempts
+// auto-recovery when enabled, appends un-recovered issues to corruptionHistory
+// (capped at 100), updates consecutiveFailures + lastHealthCheck, emits a push
+// event, and returns the same HealthReport shape as getHealth.
+fn run_check(app: &tauri::AppHandle) -> Value {
+    let cfg = get_config(app);
+    let auto_recover = cfg.get("autoRecover").and_then(|v| v.as_bool()).unwrap_or(true);
+
+    // Validator order matches the Map insertion order in Electron.
+    let components = ["settings", "workflows", "memory"];
+    let mut issues: Vec<Value> = Vec::new();
+    let mut status = "healthy";
+    let mut history = corruption_history(app);
+
+    for component in components {
+        let is_valid = run_validator(app, component);
+        if is_valid {
+            continue;
+        }
+        let now = now_ms();
+        let mut report = json!({
+            "id": format!("corruption_{}_{}", now, component),
+            "detectedAt": now,
+            "component": component,
+            "severity": get_severity(component),
+            "description": format!("State validation failed for {}", component),
+            "autoRecovered": false,
+            "recoveryAction": Value::Null,
+        });
+
+        if auto_recover {
+            let recovered = attempt_recovery(app, component);
+            report["autoRecovered"] = json!(recovered);
+            report["recoveryAction"] = if recovered {
+                json!("auto-recovery")
+            } else {
+                Value::Null
+            };
+        }
+
+        let recovered = report.get("autoRecovered").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !recovered {
+            let sev = report.get("severity").and_then(|v| v.as_str()).unwrap_or("low");
+            status = worst_status(status, sev);
+            issues.push(report.clone());
+        }
+
+        // Log corruption regardless of recovery (matches Electron), cap at 100.
+        history.push(report);
+        if history.len() > 100 {
+            let drop = history.len() - 100;
+            history.drain(0..drop);
+        }
+    }
+
+    // Persist the mutated subsystem state.
+    store_set(app, "corruptionHistory", json!(history));
+    let prev_failures = read_store(app)
+        .get("consecutiveFailures")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let consecutive = if issues.is_empty() { 0 } else { prev_failures + 1 };
+    store_set(app, "consecutiveFailures", json!(consecutive));
+    let now = now_ms();
+    store_set(app, "lastHealthCheck", json!(now));
+
+    let auto_recoveries = history
+        .iter()
+        .filter(|c| c.get("autoRecovered").and_then(|v| v.as_bool()).unwrap_or(false))
+        .count();
+
+    let report = json!({
+        "status": status,
+        "lastCheck": now,
+        "checksPerformed": history.len(),
+        "corruptionsDetected": history.len(),
+        "autoRecoveries": auto_recoveries,
+        "currentIssues": issues,
+    });
+
+    // Push the fresh report to the renderer (Electron's health-update channel
+    // analog; renderer subscribers refresh on it). Best-effort.
+    crate::native_ops::emit_event(app, "healing:health", &report);
+
+    report
+}
+
+// healing:rollback -> rollbackToCheckpoint(checkpointId). Restores every file in
+// the checkpoint dir over userData, taking a `.pre-rollback` copy of each
+// existing target first. Returns a bool (Electron returns Promise<boolean>).
+fn rollback(app: &tauri::AppHandle, checkpoint_id: &str) -> Value {
+    let cps = checkpoints(app);
+    let exists = cps
+        .iter()
+        .any(|c| c.get("id").and_then(|v| v.as_str()) == Some(checkpoint_id));
+    if !exists {
+        return json!(false);
+    }
+
+    let user_data = user_data_dir(app);
+    let checkpoint_path = user_data.join("checkpoints").join(checkpoint_id);
+    if !checkpoint_path.exists() {
+        return json!(false);
+    }
+
+    let entries = match std::fs::read_dir(&checkpoint_path) {
+        Ok(e) => e,
+        Err(_) => return json!(false),
+    };
+
+    for entry in entries.flatten() {
+        let source = entry.path();
+        if !source.is_file() {
+            continue;
+        }
+        let file_name = match source.file_name() {
+            Some(n) => n.to_owned(),
+            None => continue,
+        };
+        let dest = user_data.join(&file_name);
+        // Backup current before restoring.
+        if dest.exists() {
+            let mut backup = dest.clone().into_os_string();
+            backup.push(".pre-rollback");
+            let _ = std::fs::copy(&dest, PathBuf::from(backup));
+        }
+        if std::fs::copy(&source, &dest).is_err() {
+            return json!(false);
+        }
+    }
+
+    json!(true)
+}
+
+// healing:updateConfig -> updateConfig(updates). Shallow-merges the partial
+// config over the stored config and persists it, returning the merged config
+// (Electron returns the updated SelfHealingConfig).
+//
+// DIVERGENCE: Electron also re-armed a live setInterval health timer when
+// checkIntervalMs changed. There is no live interval in this data tier (checks
+// are on-demand via runCheck), so the timer re-arm is a no-op here. The config
+// value is persisted faithfully, so the next runCheck honours it.
+fn update_config(app: &tauri::AppHandle, updates: &Value) -> Value {
+    let mut config = get_config(app);
+    if let (Some(cfg_obj), Some(upd_obj)) = (config.as_object_mut(), updates.as_object()) {
+        for (k, v) in upd_obj {
+            // Only merge known config fields with the right type, so a malformed
+            // partial cannot corrupt the stored shape.
+            match k.as_str() {
+                "enabled" | "autoRecover" | "notifyOnRecovery" => {
+                    if v.is_boolean() {
+                        cfg_obj.insert(k.clone(), v.clone());
+                    }
+                }
+                "checkIntervalMs" | "maxCheckpoints" => {
+                    if v.is_i64() || v.is_u64() {
+                        cfg_obj.insert(k.clone(), v.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    store_set(app, "config", config.clone());
+    config
+}
+
 /// Route a `healing:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). Every channel in the namespace is handled; the
 /// heavy/mutating ones degrade to Value::Null (honest, not faked).
@@ -222,8 +517,16 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
                 .unwrap_or(50);
             get_corruption_history(app, limit)
         }
-        // Heavy channels — NOT ported, NOT faked (need the native runtime).
-        "healing:runCheck" | "healing:rollback" | "healing:updateConfig" => Value::Null,
+        // Heavy channels — now ported with real native behaviour.
+        "healing:runCheck" => run_check(app),
+        "healing:rollback" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            rollback(app, id)
+        }
+        "healing:updateConfig" => {
+            let updates = args.get(0).cloned().unwrap_or_else(|| json!({}));
+            update_config(app, &updates)
+        }
         _ => Value::Null,
     }
 }

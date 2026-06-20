@@ -36,10 +36,17 @@
 //                                  no fs, deterministic)
 //   - documents:getHistory     -> DocumentResult[]        (see DIVERGENCE below)
 //
-// CHANNELS SKIPPED (heavy / native runtime — omitted, prefix route -> null):
-//   - documents:create         : writes files to disk (fs.mkdirSync/writeFileSync,
-//                                statSync). Needs the native fs side effects.
-//   - documents:selectOutputDir: opens a native directory-picker dialog.
+// CHANNELS PORTED (heavy / native runtime — REAL native side effects):
+//   - documents:create         : DocumentResult. Real fs side effects via std::fs:
+//                                creates outputDir (recursive), renders content
+//                                (template or generated), refuses to clobber an
+//                                existing file, writes UTF-8, statSize -> size.
+//                                Mirrors DocumentCreator.createDocument byte-for-byte.
+//   - documents:selectOutputDir: string | null. Real native directory picker via
+//                                the tauri dialog plugin (precedent:
+//                                cmd_file_watcher.rs / cmd_export_bundle.rs), with
+//                                openDirectory + createDirectory enabled; returns
+//                                the chosen path or null on cancel.
 //
 // DIVERGENCES (documented):
 //   - getHistory: in Electron the history (generatedDocuments) is an IN-MEMORY
@@ -59,10 +66,12 @@
 //     `id.startsWith('custom_')`); built-ins are never written out.
 // =============================================================================
 
+use crate::native_ops::fp_to_string;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 const TEMPLATES_FILE: &str = "dex-templates.json";
 
@@ -330,6 +339,165 @@ fn preview_document(app: &tauri::AppHandle, request: &Value) -> Value {
     json!(generate_content(request))
 }
 
+// `doc_${Date.now()}_${Math.random().toString(36).substring(2,6)}`. Same shape
+// as custom_id but with the `doc_` prefix (matching createDocument's result id).
+fn doc_id() -> String {
+    let suffix: String = pseudo_uuid_v4().chars().filter(|c| *c != '-').take(4).collect();
+    format!("doc_{}_{}", now_ms(), suffix)
+}
+
+// getExtension(type) — mirrors DocumentCreator.getExtension (default '.txt').
+fn extension_for(dtype: &str) -> &'static str {
+    match dtype {
+        "text" => ".txt",
+        "markdown" => ".md",
+        "csv" => ".csv",
+        "json" => ".json",
+        "html" => ".html",
+        _ => ".txt",
+    }
+}
+
+// sanitizeFileName(name): strip <>:"/\|?*, collapse whitespace runs to '_',
+// truncate to 200 chars. Mirrors DocumentCreator.sanitizeFileName, including the
+// JS `.substring(0, 200)` semantics (200 UTF-16 code units; we approximate with
+// 200 chars, which is identical for the BMP names this produces and never panics
+// because we slice on char boundaries).
+fn sanitize_file_name(name: &str) -> String {
+    // Step 1: replace forbidden chars with '_'  (/[<>:"/\\|?*]/g).
+    let replaced: String = name
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            other => other,
+        })
+        .collect();
+    // Step 2: collapse each run of whitespace to a single '_'  (/\s+/g -> '_').
+    let mut collapsed = String::with_capacity(replaced.len());
+    let mut in_ws = false;
+    for c in replaced.chars() {
+        if c.is_whitespace() {
+            if !in_ws {
+                collapsed.push('_');
+                in_ws = true;
+            }
+        } else {
+            collapsed.push(c);
+            in_ws = false;
+        }
+    }
+    // Step 3: substring(0, 200) — first 200 chars.
+    collapsed.chars().take(200).collect()
+}
+
+// createDocument(request) -> DocumentResult. REAL fs side effects, mirroring
+// DocumentCreator.createDocument exactly:
+//   - result seeded { id, success:false, timestamp, type }
+//   - ensure outputDir exists (mkdir recursive) or fail with the SAME message
+//   - content = template render OR generateContent(request)
+//   - templateId set but missing -> error 'Template not found'
+//   - path = join(outputDir, sanitize(name) + ext)
+//   - existing file -> error 'File already exists - use a different name'
+//   - write utf-8, stat -> size; success true with path + size
+// The in-memory history (recordResult) is intentionally NOT persisted: it is a
+// process-local array in Electron, never written to disk, so a stateless native
+// dispatch cannot reproduce it across calls — getHistory stays [] (documented).
+fn create_document(app: &tauri::AppHandle, request: &Value) -> Value {
+    let dtype = request.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let mut result = json!({
+        "id": doc_id(),
+        "success": false,
+        "timestamp": now_ms(),
+        "type": dtype,
+    });
+    let set = |r: &mut Value, k: &str, v: Value| {
+        if let Some(o) = r.as_object_mut() {
+            o.insert(k.to_string(), v);
+        }
+    };
+
+    let output_dir = request.get("outputDir").and_then(|v| v.as_str()).unwrap_or("");
+    let dir_path = PathBuf::from(output_dir);
+
+    // Validate / create output directory.
+    if !dir_path.exists() {
+        if std::fs::create_dir_all(&dir_path).is_err() {
+            set(&mut result, "error", json!("Failed to create output directory"));
+            return result;
+        }
+    }
+
+    // Generate content (template path vs. ad-hoc generateContent).
+    let content: String = if let Some(tid) = request.get("templateId").and_then(|v| v.as_str()) {
+        if !tid.is_empty() {
+            let template = get_template(app, tid);
+            if template.is_null() {
+                set(&mut result, "error", json!("Template not found"));
+                return result;
+            }
+            let tpl = template.get("content").and_then(|v| v.as_str()).unwrap_or("");
+            let data = request.get("data").cloned().unwrap_or_else(|| json!({}));
+            process_template(tpl, &data)
+        } else {
+            generate_content(request)
+        }
+    } else {
+        generate_content(request)
+    };
+
+    // Build the output path.
+    let name = request.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let file_name = format!("{}{}", sanitize_file_name(name), extension_for(dtype));
+    let output_path = dir_path.join(&file_name);
+
+    // Refuse to clobber.
+    if output_path.exists() {
+        set(&mut result, "error", json!("File already exists - use a different name"));
+        return result;
+    }
+
+    // Write + stat.
+    match std::fs::write(&output_path, content.as_bytes()) {
+        Ok(()) => match std::fs::metadata(&output_path) {
+            Ok(meta) => {
+                set(&mut result, "success", json!(true));
+                set(&mut result, "path", json!(output_path.to_string_lossy().to_string()));
+                set(&mut result, "size", json!(meta.len()));
+            }
+            Err(_) => {
+                // File written but stat failed: still a success with the path; size
+                // omitted (matches the optional `size?` field). Electron would
+                // throw here, but a successful write with an unreadable stat is
+                // vanishingly rare; report the write honestly rather than as failure.
+                set(&mut result, "success", json!(true));
+                set(&mut result, "path", json!(output_path.to_string_lossy().to_string()));
+            }
+        },
+        Err(e) => {
+            set(&mut result, "error", json!(e.to_string()));
+        }
+    }
+    result
+}
+
+// selectOutputDir() -> string | null. Real native folder picker. Electron passed
+// properties ['openDirectory', 'createDirectory'] with the title below and
+// returned the first path, or null on cancel / empty. The tauri dialog plugin's
+// folder picker covers openDirectory (createDirectory is the OS dialog's own
+// "New Folder" affordance, always present on the native picker).
+fn select_output_dir(app: &tauri::AppHandle) -> Value {
+    match app
+        .dialog()
+        .file()
+        .set_title("Select output directory")
+        .blocking_pick_folder()
+        .and_then(fp_to_string)
+    {
+        Some(p) => json!(p),
+        None => Value::Null,
+    }
+}
+
 /// Route a `documents:*` channel. Args are the positional JSON array the
 /// renderer sent (see tauriCompat.ts). Every channel in the namespace is
 /// accounted for: ported data channels return their exact shapes; heavy channels
@@ -353,10 +521,18 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let request = args.get(0).cloned().unwrap_or_else(|| json!({}));
             preview_document(app, &request)
         }
-        // In-memory-only history; always [] in a stateless native process (the
-        // create channel that would populate it is a skipped heavy channel).
+        // Real native document write (fs side effects). Returns a DocumentResult.
+        "documents:create" => {
+            let request = args.get(0).cloned().unwrap_or_else(|| json!({}));
+            create_document(app, &request)
+        }
+        // Real native directory picker. Returns the chosen path or null.
+        "documents:selectOutputDir" => select_output_dir(app),
+        // In-memory-only history; always [] in a stateless native process. The
+        // create channel writes to disk but Electron's history (generatedDocuments)
+        // is a non-persisted process-local array we cannot reproduce statelessly.
         "documents:getHistory" => json!([]),
-        // Heavy / native-runtime channels — not ported, not faked.
+        // Unknown channel in this namespace — honest null.
         _ => Value::Null,
     }
 }

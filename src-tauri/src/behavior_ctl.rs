@@ -267,10 +267,237 @@ fn get_contract(id: &str) -> Value {
         .unwrap_or(Value::Null)
 }
 
+// getExpectedOutput(contractId, condition): contract.expectedOutputs.find(o => o.condition === condition) || null.
+fn get_expected(contract_id: &str, condition: &str) -> Value {
+    let contract = get_contract(contract_id);
+    if contract.is_null() {
+        return Value::Null;
+    }
+    contract
+        .get("expectedOutputs")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|o| o.get("condition").and_then(|c| c.as_str()) == Some(condition))
+                .cloned()
+        })
+        .unwrap_or(Value::Null)
+}
+
+// --- native execution state (KV-backed) -------------------------------------
+// The Electron layer held executionHistory and violations in process memory
+// only (Maps that start empty each launch). Porting behavior:record / :verify /
+// :violations natively requires those two structures to be shared across calls,
+// so they live in the native KV store under stable keys. The semantics
+// (per-contract history capped at 100, FIFO violations capped at 100, the
+// same deterministic-hash logic) match the source exactly.
+const HISTORY_KEY: &str = "behavior:executionHistory"; // { "<contractId>": BehaviorExecution[] }
+const VIOLATIONS_KEY: &str = "behavior:violations"; // DeterminismViolation[]
+
+fn load_history_map(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
+    match crate::kv_get(app, HISTORY_KEY) {
+        Value::Object(o) => o,
+        _ => serde_json::Map::new(),
+    }
+}
+
+fn load_violations(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, VIOLATIONS_KEY) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
+// epoch milliseconds — Date.now() equivalent.
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+// deterministicStringify(value) — ported byte-for-byte from the TS source:
+//   - null/undefined  -> "null"
+//   - non-object      -> JSON.stringify(value)
+//   - array           -> "[" + items.join(",") + "]"
+//   - object          -> keys sorted, "{" + `"k":v` pairs joined by "," + "}"
+fn deterministic_stringify(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            let pairs: Vec<String> = keys
+                .iter()
+                .map(|k| {
+                    format!(
+                        "\"{}\":{}",
+                        k,
+                        deterministic_stringify(map.get(*k).unwrap_or(&Value::Null))
+                    )
+                })
+                .collect();
+            format!("{{{}}}", pairs.join(","))
+        }
+        Value::Array(arr) => {
+            let items: Vec<String> = arr.iter().map(deterministic_stringify).collect();
+            format!("[{}]", items.join(","))
+        }
+        // Numbers, strings and booleans serialize like JSON.stringify.
+        other => serde_json::to_string(other).unwrap_or_else(|_| "null".to_string()),
+    }
+}
+
+// hashValue(value): sha256(deterministicStringify(value)) as lowercase hex.
+fn hash_value(value: &Value) -> String {
+    crate::licensing::sha256_hex(deterministic_stringify(value).as_bytes())
+}
+
+// recordExecution(execution) — full native port. Computes input/output hashes,
+// detects non-determinism against prior history for the same input, records a
+// violation (broadcast via behavior:violation) when output diverges, appends to
+// the per-contract history (FIFO cap 100), persists, and returns the full
+// BehaviorExecution { contractId, input, inputHash, output, outputHash,
+// timestamp, duration, deterministic }.
+fn record_execution(app: &tauri::AppHandle, execution: &Value) -> Value {
+    let contract_id = execution
+        .get("contractId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let input = execution.get("input").cloned().unwrap_or(Value::Null);
+    let output = execution.get("output").cloned().unwrap_or(Value::Null);
+    let timestamp = execution
+        .get("timestamp")
+        .and_then(|v| v.as_i64())
+        .unwrap_or_else(now_millis);
+    let duration = execution
+        .get("duration")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+
+    let input_hash = hash_value(&input);
+    let output_hash = hash_value(&output);
+
+    let mut history_map = load_history_map(app);
+    let mut history: Vec<Value> = history_map
+        .get(&contract_id)
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // previousExecution = history.find(e => e.inputHash === inputHash)
+    let previous = history
+        .iter()
+        .find(|e| e.get("inputHash").and_then(|v| v.as_str()) == Some(input_hash.as_str()))
+        .cloned();
+
+    let prev_output_hash = previous
+        .as_ref()
+        .and_then(|e| e.get("outputHash").and_then(|v| v.as_str()))
+        .map(|s| s.to_string());
+
+    let deterministic = match &prev_output_hash {
+        None => true,
+        Some(prev) => prev == &output_hash,
+    };
+
+    let full_execution = json!({
+        "contractId": contract_id,
+        "input": input,
+        "inputHash": input_hash,
+        "output": output,
+        "outputHash": output_hash,
+        "timestamp": timestamp,
+        "duration": duration,
+        "deterministic": deterministic
+    });
+
+    // Record + broadcast a violation when a known input produced a new output.
+    if !deterministic {
+        if let Some(prev) = &prev_output_hash {
+            let violation = json!({
+                "contractId": contract_id,
+                "input": input,
+                "inputHash": input_hash,
+                "expectedOutputHash": prev,
+                "actualOutputHash": output_hash,
+                "timestamp": now_millis()
+            });
+            let mut violations = load_violations(app);
+            violations.push(violation.clone());
+            while violations.len() > 100 {
+                violations.remove(0);
+            }
+            crate::kv_set(app, VIOLATIONS_KEY, Value::Array(violations));
+            // webContents.send('behavior:violation', violation) equivalent.
+            crate::native_ops::emit_event(app, "behavior:violation", &violation);
+        }
+    }
+
+    // history.push(fullExecution); cap at 100 (FIFO).
+    history.push(full_execution.clone());
+    while history.len() > 100 {
+        history.remove(0);
+    }
+    history_map.insert(contract_id, Value::Array(history));
+    crate::kv_set(app, HISTORY_KEY, Value::Object(history_map));
+
+    full_execution
+}
+
+// verifyDeterminism(contractId, input, output): { deterministic, reason }.
+fn verify_determinism(
+    app: &tauri::AppHandle,
+    contract_id: &str,
+    input: &Value,
+    output: &Value,
+) -> Value {
+    let input_hash = hash_value(input);
+    let output_hash = hash_value(output);
+
+    let history_map = load_history_map(app);
+    let history: Vec<Value> = history_map
+        .get(contract_id)
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let previous = history
+        .iter()
+        .find(|e| e.get("inputHash").and_then(|v| v.as_str()) == Some(input_hash.as_str()));
+
+    match previous {
+        None => json!({ "deterministic": true, "reason": "First execution with this input" }),
+        Some(prev) => {
+            let prev_hash = prev
+                .get("outputHash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if prev_hash == output_hash {
+                json!({ "deterministic": true, "reason": "Output matches previous execution" })
+            } else {
+                // `expected ${prev.slice(0,8)}, got ${out.slice(0,8)}`
+                let exp: String = prev_hash.chars().take(8).collect();
+                let got: String = output_hash.chars().take(8).collect();
+                json!({
+                    "deterministic": false,
+                    "reason": format!("Output changed: expected {}, got {}", exp, got)
+                })
+            }
+        }
+    }
+}
+
 // getExecutionHistory(contractId): [...(executionHistory.get(contractId) || [])].
-// executionHistory is only ever populated by behavior:record, which is not ported,
-// so this reads the optional persisted map and otherwise yields []. No synthesis.
+// Reads the native KV-backed history (populated by behavior:record). Falls back
+// to the legacy optional file slot for forward-compatibility, otherwise [].
 fn get_history(app: &tauri::AppHandle, contract_id: &str) -> Value {
+    if let Value::Object(map) = crate::kv_get(app, HISTORY_KEY) {
+        if let Some(arr) = map.get(contract_id).and_then(|v| v.as_array()) {
+            return Value::Array(arr.clone());
+        }
+    }
     let arr = read_file(app, STORE_FILE)
         .get("history")
         .and_then(|h| h.get(contract_id))
@@ -295,10 +522,26 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let contract_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             get_history(app, contract_id)
         }
-        // Heavy channels — NOT ported (need the native sha256 determinism engine).
-        // Honest degrade to null rather than fabricated data.
-        "behavior:record" | "behavior:verify" | "behavior:violations" | "behavior:expected" => {
-            Value::Null
+        // record(execution): hashes input/output, detects + broadcasts determinism
+        // violations, appends to the per-contract history -> full BehaviorExecution.
+        "behavior:record" => {
+            let execution = args.get(0).cloned().unwrap_or(Value::Null);
+            record_execution(app, &execution)
+        }
+        // verify(contractId, input, output): { deterministic, reason }.
+        "behavior:verify" => {
+            let contract_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let input = args.get(1).cloned().unwrap_or(Value::Null);
+            let output = args.get(2).cloned().unwrap_or(Value::Null);
+            verify_determinism(app, contract_id, &input, &output)
+        }
+        // violations(): DeterminismViolation[] (FIFO-capped at 100).
+        "behavior:violations" => Value::Array(load_violations(app)),
+        // expected(contractId, condition): ExpectedOutput | null.
+        "behavior:expected" => {
+            let contract_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let condition = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+            get_expected(contract_id, condition)
         }
         _ => Value::Null,
     }
