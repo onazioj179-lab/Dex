@@ -9,11 +9,14 @@
 //! the renderer with the same event contract.
 //!
 //! IPC surface (routed by the `pty:` prefix in `dex_ipc`):
-//!   pty:spawn  ({ shell?, cwd?, cols?, rows? }) -> { sessionId } | { error }
-//!   pty:write  ({ sessionId, data })            -> { success } | { success:false, error }
-//!   pty:resize ({ sessionId, cols, rows })      -> { success }   (no-op; geometry only)
-//!   pty:kill   ({ sessionId })                  -> { success }
-//!   pty:list   ()                               -> { sessions: [{ id, shell, cwd, alive }] }
+//!   pty:spawn / pty:create ({ shell?, cwd?, cols?, rows? }) -> { sessionId } | { error }
+//!   pty:write     ({ sessionId, data })         -> { success } | { success:false, error }
+//!   pty:read      ({ sessionId })               -> { success, alive, data, code? }  (pull-drain output)
+//!   pty:resize    ({ sessionId, cols, rows })   -> { success }   (no-op; geometry only)
+//!   pty:kill / pty:destroy ({ sessionId })      -> { success }
+//!   pty:getSize   ({ sessionId })               -> { found, cols, rows }
+//!   pty:getStatus ({ sessionId })               -> { alive, exists, code?, shell?, cwd?, cols?, rows? }
+//!   pty:list      ()                            -> { sessions: [{ id, shell, cwd, alive }] }
 //! Events emitted to the renderer (via `native_ops::emit_event`):
 //!   "pty:data" { sessionId, data }
 //!   "pty:exit" { sessionId, code }
@@ -38,13 +41,34 @@ pub struct Session {
     rows: u32,
     child: Child,
     stdin: Option<ChildStdin>,
+    /// Pending output for the pull-based `pty:read` channel. The reader threads
+    /// append decoded chunks here in addition to emitting `pty:data` events, so a
+    /// renderer can either subscribe to events OR poll `pty:read` (or both).
+    /// Capped at `MAX_BUFFER` bytes — oldest data is dropped to bound memory.
+    buffer: String,
+}
+
+/// Exit record retained briefly after a session ends so `pty:getStatus` /
+/// `pty:read` can still report the final code and drain trailing output.
+struct ExitRecord {
+    code: Option<i32>,
+    buffer: String,
 }
 
 #[derive(Default)]
 pub struct Inner {
     sessions: HashMap<String, Session>,
+    /// Recently-exited sessions (bounded), keyed by id. Lets a renderer that
+    /// polls observe the exit + any final output it had not yet read.
+    recent_exits: HashMap<String, ExitRecord>,
     next_id: u32,
 }
+
+/// Hard cap on a session's retained output buffer (bytes). Keeps a long-lived
+/// session from growing unbounded when the renderer never drains via `pty:read`.
+const MAX_BUFFER: usize = 256 * 1024;
+/// Cap on retained exit records so a churny session list cannot leak memory.
+const MAX_RECENT_EXITS: usize = 32;
 
 /// Tauri-managed terminal state (registered in `setup()`).
 pub type TerminalState = Mutex<Inner>;
@@ -142,6 +166,29 @@ fn args_for(shell: &str) -> Vec<String> {
     }
 }
 
+/// Append a chunk to a session's pull buffer (for `pty:read`), capped at
+/// MAX_BUFFER with oldest bytes dropped on a UTF-8 boundary. Kept as a free fn so
+/// the `State` guard is cleanly scoped (avoids an NLL borrow issue in the reader
+/// thread loop).
+fn push_session_buffer(app: &tauri::AppHandle, id: &str, data: &str) {
+    let state = app.state::<TerminalState>();
+    let mut inner = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+    if let Some(s) = inner.sessions.get_mut(id) {
+        s.buffer.push_str(data);
+        if s.buffer.len() > MAX_BUFFER {
+            let overflow = s.buffer.len() - MAX_BUFFER;
+            let mut cut = overflow;
+            while cut < s.buffer.len() && !s.buffer.is_char_boundary(cut) {
+                cut += 1;
+            }
+            s.buffer.drain(..cut);
+        }
+    }
+}
+
 /// Stream a child's stdout/stderr to the renderer as `pty:data` events. The
 /// primary (stdout) reader finalizes the session on EOF — reaps the child for its
 /// exit code and emits `pty:exit`.
@@ -158,6 +205,9 @@ fn spawn_reader<R: Read + Send + 'static>(
                 Ok(0) => break,
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    // Append to the session's pull buffer (for `pty:read`) before
+                    // emitting the push event, so a poller never misses a chunk.
+                    push_session_buffer(&app, &id, &data);
                     crate::native_ops::emit_event(
                         &app,
                         "pty:data",
@@ -184,6 +234,20 @@ fn finalize(app: &tauri::AppHandle, id: &str) {
     };
     if let Some(mut s) = session {
         let code = s.child.wait().ok().and_then(|st| st.code());
+        // Retain the exit code + any undrained output so a polling renderer can
+        // still observe them via `pty:getStatus` / `pty:read` after teardown.
+        if let Ok(mut inner) = state.lock() {
+            if inner.recent_exits.len() >= MAX_RECENT_EXITS {
+                // Evict an arbitrary old record to keep the map bounded.
+                if let Some(k) = inner.recent_exits.keys().next().cloned() {
+                    inner.recent_exits.remove(&k);
+                }
+            }
+            inner.recent_exits.insert(
+                id.to_string(),
+                ExitRecord { code, buffer: std::mem::take(&mut s.buffer) },
+            );
+        }
         crate::native_ops::emit_event(app, "pty:exit", &json!({ "sessionId": id, "code": code }));
     }
 }
@@ -247,7 +311,16 @@ fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let id = format!("pty-{}", inner.next_id);
     inner.sessions.insert(
         id.clone(),
-        Session { id: id.clone(), shell: shell.clone(), cwd, cols, rows, child, stdin },
+        Session {
+            id: id.clone(),
+            shell: shell.clone(),
+            cwd,
+            cols,
+            rows,
+            child,
+            stdin,
+            buffer: String::new(),
+        },
     );
     drop(inner); // release the lock before starting the reader threads
 
@@ -340,13 +413,80 @@ fn list_sessions(app: &tauri::AppHandle) -> Value {
     json!({ "sessions": sessions })
 }
 
+/// Return the recorded geometry for a session. Pipe-based stdio has no real TTY,
+/// so cols/rows are the values last set by `pty:resize`/spawn (what the fit-addon
+/// drives). Reports `found:false` for an unknown/exited session.
+fn get_size(app: &tauri::AppHandle, opts: &Value) -> Value {
+    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
+    let state = app.state::<TerminalState>();
+    let inner = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return json!({ "found": false, "cols": 0, "rows": 0 }),
+    };
+    match inner.sessions.get(sid) {
+        Some(s) => json!({ "found": true, "cols": s.cols, "rows": s.rows }),
+        None => json!({ "found": false, "cols": 0, "rows": 0 }),
+    }
+}
+
+/// Report liveness for a session: `alive:true` while the child runs; once it has
+/// exited (and been finalized) `alive:false` with the retained exit `code`. An id
+/// never seen yields `{ alive:false, exists:false }`.
+fn get_status(app: &tauri::AppHandle, opts: &Value) -> Value {
+    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
+    let state = app.state::<TerminalState>();
+    let inner = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return json!({ "alive": false, "exists": false }),
+    };
+    if let Some(s) = inner.sessions.get(sid) {
+        return json!({
+            "alive": true,
+            "exists": true,
+            "shell": s.shell,
+            "cwd": s.cwd,
+            "cols": s.cols,
+            "rows": s.rows,
+        });
+    }
+    if let Some(rec) = inner.recent_exits.get(sid) {
+        return json!({ "alive": false, "exists": true, "code": rec.code });
+    }
+    json!({ "alive": false, "exists": false })
+}
+
+/// Pull-drain a session's buffered output (alternative to subscribing to the
+/// `pty:data` event stream). Returns the accumulated text and clears it. After a
+/// session exits, its final undrained output is still readable once from the
+/// retained exit record, which is then removed.
+fn read_session(app: &tauri::AppHandle, opts: &Value) -> Value {
+    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
+    let state = app.state::<TerminalState>();
+    let mut inner = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return json!({ "success": false, "error": "terminal state unavailable", "data": "" }),
+    };
+    if let Some(s) = inner.sessions.get_mut(sid) {
+        let data = std::mem::take(&mut s.buffer);
+        return json!({ "success": true, "alive": true, "data": data });
+    }
+    // Session already exited: hand back its trailing output once, then drop it.
+    if let Some(rec) = inner.recent_exits.remove(sid) {
+        return json!({ "success": true, "alive": false, "code": rec.code, "data": rec.buffer });
+    }
+    json!({ "success": false, "error": "Unknown session", "data": "" })
+}
+
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let opts = args.get(0).cloned().unwrap_or(Value::Null);
     match channel {
-        "pty:spawn" => spawn_session(app, &opts),
+        "pty:spawn" | "pty:create" => spawn_session(app, &opts),
         "pty:write" => write_session(app, &opts),
+        "pty:read" => read_session(app, &opts),
         "pty:resize" => resize_session(app, &opts),
-        "pty:kill" => kill_session(app, &opts),
+        "pty:kill" | "pty:destroy" => kill_session(app, &opts),
+        "pty:getSize" => get_size(app, &opts),
+        "pty:getStatus" => get_status(app, &opts),
         "pty:list" => list_sessions(app),
         _ => Value::Null,
     }

@@ -1,61 +1,96 @@
 // =============================================================================
-// DEX Tauri — state-sync subsystem (port attempt of the `state-sync:*` IPC
-// surface).
+// DEX Tauri — state-sync subsystem (port of the `state-sync:*` IPC surface).
 //
-// HONEST-DEGRADE TIER (no data to port). The task named an Electron source
-// `src/main/core/StateSync.ts` and DATA channel `getState`, plus HEAVY channels
-// `sync` / `resolve`. After auditing the entire repo, NONE of these exist:
+// SOURCE OF TRUTH. The task named an Electron source `src/main/core/StateSync.ts`
+// and DATA channels `getState` / `sync` / `resolve`, plus the relay channel
+// `state-sync:update`. After a full-repo audit, ONLY `state-sync:update` exists:
 //
-//   - There is no `src/main/core/StateSync.ts` file.
-//   - The ONLY `state-sync:*` channel anywhere in the Electron main process is
-//     `state-sync:update`, registered in
+//   - There is NO `src/main/core/StateSync.ts` file (verified by file search).
+//   - There is NO `getState`, `sync`, or `resolve` handler anywhere in the
+//     `state-sync:` namespace (verified by full-repo grep). They have no Electron
+//     implementation, no return shape, and no backing store to mirror, so they
+//     are degraded honestly rather than faked (project rule: "fail honestly,
+//     don't fake"). Inventing fields/storage for them would be fabrication.
+//
+//   - The ONE real channel, `state-sync:update`, is registered in
 //     src/main/core/MultiWindowManager.ts (registerIPC) as:
-//         ipcMain.on('state-sync:update', (event, appId, stateKey, stateValue) => { ... })
-//     plus an `ipc-message` forwarder in the same file. It is a FIRE-AND-FORGET
-//     window-to-window relay over `ipcRenderer.send` (NOT `ipcMain.handle`): it
-//     rebroadcasts the (appId, stateKey, stateValue) tuple to the other
-//     detached/main windows and returns NOTHING. There is no request/response,
-//     no return shape, no `electron-store`, no DataStore-KV key, and no
-//     `state-sync.json` file backing it.
-//   - There is no `getState`, `sync`, or `resolve` handler in the `state-sync:`
-//     namespace (verified by full-repo grep). The `state-sync.json` storage
-//     named in the task likewise does not exist.
+//         ipcMain.on('state-sync:update', (event, appId, stateKey, stateValue) => {
+//           for (const [, win] of this.detachedWindows)
+//             if (!win.isDestroyed() && win.webContents !== event.sender)
+//               win.webContents.send('state-sync:update', appId, stateKey, stateValue);
+//           if (mainWindow && mainWindow.webContents !== event.sender)
+//             mainWindow.webContents.send('state-sync:update', appId, stateKey, stateValue);
+//         });
+//     It is FIRE-AND-FORGET (`ipcMain.on`, not `ipcMain.handle`): the caller
+//     never awaits a value, so the value the renderer observes is `void`. The
+//     real work is a SIDE EFFECT — rebroadcast the `(appId, stateKey, stateValue)`
+//     tuple to the other window contexts.
 //
-// `src-tauri/src/multi_window.rs` already documents this exact conclusion in its
-// header: the `state-sync:update` relay "has no DB component — it is
-// intentionally not part of this dispatcher surface."
-//
-// Because porting requires matching EXACT Electron return shapes and never
-// inventing fields/storage, there is nothing to port at a real shape here.
-// Fabricating a `getState` handler with invented fields plus a fabricated
-// `state-sync.json` store would be faking, which the project rules forbid
-// ("fail honestly, don't fake"). So this module degrades honestly: `dispatch`
-// owns the whole `state-sync:` namespace and returns Value::Null for every
-// channel.
-//
-// `state-sync:update` over Tauri: the renderer-side relay is fire-and-forget
-// (Electron used `ipcRenderer.send`, whose caller never awaits a value). The
-// cross-window rebroadcast is a live-window side effect, not data, and lives in
-// the window layer — not this pure-data dispatcher. Returning Null is the
-// correct, lossless result for the value the renderer reads (none).
+// REAL NATIVE PORT of `state-sync:update`. The cross-window rebroadcast IS
+// reproducible natively: Tauri's `app.emit(channel, payload)` (via
+// crate::native_ops::emit_event, the documented analog of
+// `webContents.send`) pushes a `state-sync:update` event that the tauriCompat
+// bridge delivers to `dex.on('state-sync:update', cb)` subscribers — exactly the
+// relay Electron performed. Electron carried three positional args
+// `(appId, stateKey, stateValue)`; Tauri's emit takes ONE payload value, so the
+// tuple is packed into a single object `{ appId, stateKey, stateValue }`, which
+// is how the compat bridge surfaces multi-arg sends. The data RESULT stays
+// `void -> Null`, matching the Electron caller (which observes nothing). This
+// upgrades the prior all-Null degrade: the relay side effect is now actually
+// performed instead of dropped.
 //
 // DIVERGENCES (documented):
-//   - getState / sync / resolve: not implemented and not faked — they have no
-//     Electron implementation, return shape, or storage to mirror (see
-//     channelsSkipped).
-//   - state-sync:update: the data result is identical (void -> Null); the live
-//     window-to-window rebroadcast side effect is intentionally not reproduced
-//     in this pure-data layer (same precedent as multi_window.rs).
+//   - getState / sync / resolve: no Electron implementation/shape/store exists;
+//     returned as honest not-ported errors (see channelsDegraded), never faked.
+//   - state-sync:update: the renderer-observed value is identical (void -> Null).
+//     The one behavioral nuance Electron had — skip the *sender* window — is not
+//     reproducible here: Tauri's emit is a single broadcast with no per-window
+//     sender exclusion in this pure-data dispatcher, so the originating context
+//     may also receive its own update. The compat-bridge relay already keys
+//     updates by (appId, stateKey) so a self-echo is idempotent/no-op for the
+//     sender; correctness is preserved (state values are last-write-wins per
+//     key). This is the only faithful single-emit option without reaching into
+//     the live window layer.
 // =============================================================================
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
-/// Route a `state-sync:*` channel. Args are the positional JSON array the
-/// renderer sent (see tauriCompat.ts). The entire namespace is a fire-and-forget
-/// window relay with no request/response value and no backing store, so every
-/// channel degrades honestly to Value::Null (the same void result the Electron
-/// caller observes). `_args` is unused: no channel here reads a positional arg
-/// for a returned value.
-pub fn dispatch(_app: &tauri::AppHandle, _channel: &str, _args: &Value) -> Value {
-    Value::Null
+/// Standard honest-degrade body for the data channels that have no Electron
+/// implementation, return shape, or backing store to port (`getState`, `sync`,
+/// `resolve`). Returning a structured error (rather than a fabricated payload)
+/// keeps the renderer's failure path honest.
+fn not_ported() -> Value {
+    json!({ "success": false, "error": "not ported (needs native runtime)" })
+}
+
+/// Route a `state-sync:*` channel. `args` is the positional JSON array the
+/// renderer sent (see tauriCompat.ts); positional args are read with
+/// `args.get(0)` etc.
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    match channel {
+        // -- Real native port: cross-window state relay ----------------------
+        // Electron: ipcMain.on('state-sync:update', (e, appId, stateKey, stateValue))
+        // -> rebroadcast the tuple to the other windows; return nothing.
+        // Tauri: pack the three positional args into one payload object and emit
+        // it on the same channel so dex.on('state-sync:update', cb) subscribers
+        // receive it. Fire-and-forget -> Value::Null (the void the caller reads).
+        "state-sync:update" => {
+            let app_id = args.get(0).cloned().unwrap_or(Value::Null);
+            let state_key = args.get(1).cloned().unwrap_or(Value::Null);
+            let state_value = args.get(2).cloned().unwrap_or(Value::Null);
+            let payload = json!({
+                "appId": app_id,
+                "stateKey": state_key,
+                "stateValue": state_value,
+            });
+            crate::native_ops::emit_event(app, "state-sync:update", &payload);
+            Value::Null
+        }
+
+        // -- Honest degrade: no Electron source/shape/store to port ----------
+        "getState" | "sync" | "resolve" => not_ported(),
+
+        // Unknown channel in this namespace: void, like the Electron relay.
+        _ => Value::Null,
+    }
 }

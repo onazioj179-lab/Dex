@@ -2,11 +2,13 @@
 // DEX Tauri — Batch-action preview subsystem (port of the preview/CRUD surface
 // of core/BatchActionPreviewer.ts).
 //
-// Only the five DATA channels are ported; they each build a BatchPreview and,
-// in Electron, stash it in an in-memory `previews: Map<string, BatchPreview>`
-// that the (heavy, NOT ported) updateItem/execute/cancel/progress channels read
-// back. To keep the previews available to any later port of those channels we
-// persist the map to the native DataStore-KV under the SAME key the storage
+// The five DATA channels build a BatchPreview and, in Electron, stash it in an
+// in-memory `previews: Map<string, BatchPreview>` that the heavy
+// updateItem/execute/cancel/progress channels read back. Those heavy channels
+// are now ALSO ported (real fs work on a worker thread + KV-backed activeBatch
+// and cancellation flag — see the "Heavy execution channels" section below).
+// To share the previews across the stateless dispatch calls we persist the map
+// to the native DataStore-KV under the SAME key the storage
 // spec names ("batch"), reached via crate::kv_get / crate::kv_set — same
 // backbone as rule_engine.rs / modes_dispatch. The KV blob shape is:
 //   { "previews": { "<previewId>": BatchPreview, ... },
@@ -513,10 +515,313 @@ fn files_arg(args: &Value) -> Vec<Value> {
         .unwrap_or_default()
 }
 
+// --- Heavy execution channels ----------------------------------------------
+//
+// Electron held three pieces of live state on the singleton: the `previews`
+// map (already persisted to KV by the preview channels above), the single
+// `activeBatch: BatchProgress | null`, and a `cancellationRequested` bool that
+// the running loop polls. We persist all three to the SAME KV blob so the
+// stateless dispatch + the spawned worker thread share them:
+//   state["activeBatch"]          -> BatchProgress | (absent == null)
+//   state["cancellationRequested"]-> bool
+// executeBatch runs on a std::thread (like native_ops.rs schedulers): it does
+// real fs work via std::fs, emits "batch:started"/"batch:progress"/
+// "batch:completed" through crate::native_ops::emit_event (parity with the
+// Electron EventEmitter.emit calls, which the bridge forwards to the renderer),
+// and re-reads `cancellationRequested` from KV before each item so batch:cancel
+// can interrupt it. Return shape of batch:execute matches the Electron contract:
+// it resolves to the final BatchProgress (here we synchronously run to
+// completion on the worker and return that final object) — see DIVERGENCE note
+// below on why we run synchronously rather than returning early.
+
+// recalcStats over a preview's items array (mirrors updateItemAction /
+// createPreview stats computation exactly).
+fn recalc_stats(items: &[Value]) -> Value {
+    fn action_of(i: &Value) -> &str {
+        i.get("action").and_then(|v| v.as_str()).unwrap_or("")
+    }
+    fn has_error(i: &Value) -> bool {
+        i.get("error").and_then(|v| v.as_str()).map_or(false, |s| !s.is_empty())
+    }
+    let total = items.len();
+    let will_process = items
+        .iter()
+        .filter(|i| matches!(action_of(i), "keep" | "overwrite"))
+        .count();
+    let will_skip = items.iter().filter(|i| action_of(i) == "skip").count();
+    let will_overwrite = items.iter().filter(|i| action_of(i) == "overwrite").count();
+    let errors = items.iter().filter(|i| has_error(i)).count();
+    json!({
+        "total": total,
+        "willProcess": will_process,
+        "willSkip": will_skip,
+        "willOverwrite": will_overwrite,
+        "errors": errors,
+    })
+}
+
+// updateItemAction(previewId, itemId, action) -> { success: bool }
+fn update_item(app: &tauri::AppHandle, preview_id: &str, item_id: &str, action: &str) -> Value {
+    let mut state = load_state(app);
+    let mut previews = previews_map(&state);
+
+    let preview = match previews.get_mut(preview_id) {
+        Some(p) => p,
+        None => return json!({ "success": false }),
+    };
+
+    // Mutate the item's action inside a scope so the items borrow ends before
+    // we re-borrow `preview` to write the recalculated stats.
+    let stats = {
+        let items = match preview.get_mut("items").and_then(|v| v.as_array_mut()) {
+            Some(it) => it,
+            None => return json!({ "success": false }),
+        };
+        let found = items
+            .iter_mut()
+            .find(|i| i.get("id").and_then(|v| v.as_str()) == Some(item_id));
+        let item = match found {
+            Some(i) => i,
+            None => return json!({ "success": false }),
+        };
+        if let Some(obj) = item.as_object_mut() {
+            obj.insert("action".into(), json!(action));
+        }
+        recalc_stats(items)
+    };
+
+    if let Some(obj) = preview.as_object_mut() {
+        obj.insert("stats".into(), stats);
+    }
+
+    state.insert("previews".into(), Value::Object(previews));
+    save_state(app, state);
+    json!({ "success": true })
+}
+
+// fs.mkdir(dir, { recursive: true }) — best-effort parent creation.
+fn mkdir_recursive(dir: &str) -> std::io::Result<()> {
+    if dir.is_empty() || dir == "." {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dir)
+}
+
+// executeItem(type, item) — real fs op; Err carries the message Electron would
+// have surfaced (item.error). Mirrors the Electron switch exactly.
+fn execute_item(batch_type: &str, item: &Value) -> Result<(), String> {
+    let source = item.get("sourcePath").and_then(|v| v.as_str()).unwrap_or("");
+    let target = item.get("targetPath").and_then(|v| v.as_str());
+
+    match batch_type {
+        "rename" | "move" | "organize" => {
+            let tp = target.filter(|s| !s.is_empty()).ok_or_else(|| "No target path".to_string())?;
+            mkdir_recursive(&dirname(tp)).map_err(|e| e.to_string())?;
+            std::fs::rename(source, tp).map_err(|e| e.to_string())
+        }
+        "copy" => {
+            let tp = target.filter(|s| !s.is_empty()).ok_or_else(|| "No target path".to_string())?;
+            mkdir_recursive(&dirname(tp)).map_err(|e| e.to_string())?;
+            std::fs::copy(source, tp).map(|_| ()).map_err(|e| e.to_string())
+        }
+        "delete" => {
+            // Electron's note: "Move to trash would be better - for now, just
+            // delete". We match that: a hard unlink of the source file.
+            std::fs::remove_file(source).map_err(|e| e.to_string())
+        }
+        other => Err(format!("Unsupported action type: {}", other)),
+    }
+}
+
+// Read cancellationRequested from a fresh KV load (so batch:cancel, which runs
+// on the dispatch thread and writes KV, is observed by the worker loop).
+fn cancellation_requested(app: &tauri::AppHandle) -> bool {
+    load_state(app)
+        .get("cancellationRequested")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
+// Persist the activeBatch BatchProgress into KV (merging with the latest blob
+// so concurrent preview writes are not clobbered).
+fn save_active(app: &tauri::AppHandle, active: &Value) {
+    let mut state = load_state(app);
+    state.insert("activeBatch".into(), active.clone());
+    save_state(app, state);
+}
+
+// executeBatch(previewId) -> BatchProgress (throws in Electron when the preview
+// is missing or another batch runs; we mirror by returning an error object —
+// the bridge surfaces a rejected promise either way).
+//
+// DIVERGENCE (documented): Electron's executeBatch is async and resolves only
+// after the whole loop finishes, while emitting progress events throughout. We
+// preserve that exact contract: we run the loop on a worker thread, BLOCK the
+// dispatch on the worker's JoinHandle, and return the final BatchProgress. The
+// thread is used so the loop is a real OS thread (matching the "use a spawned
+// thread for OS work" guidance and keeping the heavy fs loop off any shared
+// lock) and so batch:cancel — handled on a different dispatch call — can flip
+// the KV cancellation flag mid-run and have the worker observe it. Net renderer
+// observable behavior (events + resolved value) is identical to Electron.
+fn execute_batch(app: &tauri::AppHandle, preview_id: &str) -> Value {
+    let state = load_state(app);
+    let previews = previews_map(&state);
+
+    let preview = match previews.get(preview_id) {
+        Some(p) => p.clone(),
+        None => return json!({ "success": false, "error": "Preview not found" }),
+    };
+
+    // Reject if another batch is currently running.
+    if let Some(active) = state.get("activeBatch") {
+        if active.get("status").and_then(|v| v.as_str()) == Some("running") {
+            return json!({ "success": false, "error": "Another batch is already running" });
+        }
+    }
+
+    let batch_type = preview.get("type").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let all_items: Vec<Value> = preview
+        .get("items")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // itemsToProcess = items with action keep|overwrite (preserving order/ids).
+    let items_to_process: Vec<Value> = all_items
+        .iter()
+        .filter(|i| {
+            matches!(
+                i.get("action").and_then(|v| v.as_str()).unwrap_or(""),
+                "keep" | "overwrite"
+            )
+        })
+        .cloned()
+        .collect();
+
+    // Clear any prior cancellation request and seed the activeBatch.
+    {
+        let mut s = load_state(app);
+        s.insert("cancellationRequested".into(), json!(false));
+        save_state(app, s);
+    }
+
+    let started_at = now_ms();
+    let total = items_to_process.len();
+    let active = json!({
+        "batchId": preview_id,
+        "status": "running",
+        "processed": 0,
+        "total": total,
+        "errors": [],
+        "startedAt": started_at,
+    });
+    save_active(app, &active);
+    crate::native_ops::emit_event(app, "batch:started", &active);
+
+    // Worker thread: real fs loop with cancellation polling + progress events.
+    let app_thread = app.clone();
+    let preview_id_owned = preview_id.to_string();
+    let handle = std::thread::spawn(move || -> Value {
+        let mut processed: u64 = 0;
+        let mut errors: Vec<Value> = Vec::new();
+        let mut cancelled = false;
+
+        for item in &items_to_process {
+            if cancellation_requested(&app_thread) {
+                cancelled = true;
+                break;
+            }
+
+            // Publish `current` and a progress tick before doing the work
+            // (parity with Electron emitting before executeItem).
+            let mut current_item = item.clone();
+            let tick = json!({
+                "batchId": preview_id_owned,
+                "status": "running",
+                "processed": processed,
+                "total": total,
+                "current": current_item,
+                "errors": errors,
+                "startedAt": started_at,
+            });
+            save_active(&app_thread, &tick);
+            crate::native_ops::emit_event(&app_thread, "batch:progress", &tick);
+
+            match execute_item(&batch_type, item) {
+                Ok(()) => {
+                    if let Some(o) = current_item.as_object_mut() {
+                        o.insert("completed".into(), json!(true));
+                    }
+                }
+                Err(msg) => {
+                    if let Some(o) = current_item.as_object_mut() {
+                        o.insert("error".into(), json!(msg.clone()));
+                    }
+                    errors.push(json!({ "item": current_item, "error": msg }));
+                }
+            }
+
+            processed += 1;
+        }
+
+        let status = if cancelled {
+            "cancelled"
+        } else if !errors.is_empty() {
+            "error"
+        } else {
+            "completed"
+        };
+
+        // Final BatchProgress: current cleared (undefined in Electron -> omit
+        // the key), completedAt set.
+        let final_progress = json!({
+            "batchId": preview_id_owned,
+            "status": status,
+            "processed": processed,
+            "total": total,
+            "errors": errors,
+            "startedAt": started_at,
+            "completedAt": now_ms(),
+        });
+        save_active(&app_thread, &final_progress);
+        crate::native_ops::emit_event(&app_thread, "batch:completed", &final_progress);
+        final_progress
+    });
+
+    match handle.join() {
+        Ok(progress) => progress,
+        Err(_) => json!({ "success": false, "error": "batch worker panicked" }),
+    }
+}
+
+// cancelBatch(previewId?) -> { success: bool }. Sets the KV flag the worker
+// polls; true only when a batch is actually running (Electron semantics).
+fn cancel_batch(app: &tauri::AppHandle) -> Value {
+    let mut state = load_state(app);
+    let running = state
+        .get("activeBatch")
+        .and_then(|a| a.get("status"))
+        .and_then(|v| v.as_str())
+        == Some("running");
+    if running {
+        state.insert("cancellationRequested".into(), json!(true));
+        save_state(app, state);
+        json!({ "success": true })
+    } else {
+        json!({ "success": false })
+    }
+}
+
+// progress() -> activeBatch | null
+fn progress(app: &tauri::AppHandle) -> Value {
+    load_state(app).get("activeBatch").cloned().unwrap_or(Value::Null)
+}
+
 /// Route a `batch:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). The five preview/data channels are ported; the
-/// heavy execution channels (updateItem/execute/cancel/progress + the in-memory
-/// getPreview/clearPreview helpers) are NOT ported and return Value::Null.
+/// sent (see tauriCompat.ts). All channels are ported: the five preview/data
+/// channels, the heavy execution channels (updateItem/execute/cancel/progress)
+/// and the in-memory getPreview/clearPreview helpers. Unknown channels return
+/// Value::Null.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "batch:previewRename" => {
@@ -554,7 +859,36 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
                 create_organize_item(item_id, file_path, &target_dir, &options)
             })
         }
-        // Heavy / in-memory channels — not ported (see header). Honest degrade.
+        // --- Heavy / state channels (now ported) ---------------------------
+        "batch:updateItem" => {
+            let preview_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let item_id = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+            let action = args.get(2).and_then(|v| v.as_str()).unwrap_or("");
+            update_item(app, preview_id, item_id, action)
+        }
+        "batch:execute" => {
+            let preview_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            execute_batch(app, preview_id)
+        }
+        "batch:cancel" => cancel_batch(app),
+        "batch:progress" => progress(app),
+        // In-memory preview helpers (trivial KV reads; ported alongside).
+        "batch:getPreview" => {
+            let preview_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            previews_map(&load_state(app))
+                .get(preview_id)
+                .cloned()
+                .unwrap_or(Value::Null)
+        }
+        "batch:clearPreview" => {
+            let preview_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let mut state = load_state(app);
+            let mut previews = previews_map(&state);
+            let removed = previews.remove(&preview_id).is_some();
+            state.insert("previews".into(), Value::Object(previews));
+            save_state(app, state);
+            json!({ "success": removed })
+        }
         _ => Value::Null,
     }
 }

@@ -18,13 +18,21 @@
 // of truth for theme state across both namespaces.
 //
 // Channels & shapes:
-//   - visual:getTheme -> ThemeConfig object (stored themeConfig, or defaults)
+//   - visual:getTheme  -> ThemeConfig object (stored themeConfig, or defaults)
+//   - visual:setTheme  -> persists a full ThemeConfig and live-applies it
+//   - visual:customize -> merges a partial customization into the stored config
 //
-// HEAVY channels intentionally NOT ported (no native runtime side-effects faked):
-//   - visual:setTheme  : mutates live theme + persists; live-apply side effect.
-//   - visual:customize : interactive customization flow.
-// Both return Value::Null via the prefix route (honest degrade); they are not
-// implemented and not faked.
+// HEAVY channels — now ported with REAL native side-effects (KV write + renderer
+// push), not faked:
+//   - visual:setTheme  : merges the supplied config onto the stored themeConfig,
+//     persists it via kv_set, and pushes a `theme:changed` renderer event so the
+//     live UI re-applies tokens (parity with ThemeSystem.notifyRenderers /
+//     main.ts `webContents.send('theme:changed', cfg)`). Returns { success: true }.
+//   - visual:customize : same store, but applies ONLY the provided fields
+//     (partial merge — accentColor / mode / fontScale / reducedMotion / density),
+//     persists, pushes `theme:changed`, and returns the resulting full config.
+// Both operate on the SAME "themeConfig" KV key as theme:* in main.rs, keeping a
+// single source of truth across the theme and visual namespaces.
 //
 // DIVERGENCES (documented):
 //   - Channel/source mapping: see SOURCE NOTE above. `visual:getTheme` is mapped
@@ -63,15 +71,73 @@ fn get_theme(app: &tauri::AppHandle) -> Value {
     }
 }
 
+/// Allow-list of recognized theme-config fields. Anything outside this set is
+/// ignored so callers cannot inject arbitrary keys into the canonical store.
+const THEME_FIELDS: [&str; 5] = [
+    "mode",
+    "accentColor",
+    "fontScale",
+    "reducedMotion",
+    "density",
+];
+
+/// Merge the recognized fields of `incoming` onto the currently stored config
+/// (or the defaults if nothing is stored yet), persist the result under
+/// THEME_KEY, push a `theme:changed` renderer event for live re-apply, and
+/// return the resulting full config. Shared by setTheme and customize.
+fn apply_theme(app: &tauri::AppHandle, incoming: &Value) -> Value {
+    // Start from the stored config, falling back to the documented defaults so
+    // a partial customize never drops fields the renderer relies on.
+    let mut map = match crate::kv_get(app, THEME_KEY) {
+        Value::Object(m) => m,
+        _ => theme_defaults()
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
+    };
+
+    if let Some(obj) = incoming.as_object() {
+        for field in THEME_FIELDS.iter() {
+            if let Some(val) = obj.get(*field) {
+                map.insert((*field).to_string(), val.clone());
+            }
+        }
+    }
+
+    let merged = Value::Object(map);
+    let _ = crate::kv_set(app, THEME_KEY, merged.clone());
+
+    // Live-apply parity with ThemeSystem.notifyRenderers /
+    // main.ts `webContents.send('theme:changed', cfg)`.
+    crate::native_ops::emit_event(app, "theme:changed", &merged);
+
+    merged
+}
+
 /// Route a `visual:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). Every channel in the namespace is handled here;
 /// the ported data channel returns its shaped value, the skipped heavy channels
 /// and any unknown channels return Value::Null (honest degrade) so prefix
 /// routing of the whole `visual:` namespace to this dispatch is safe.
-pub fn dispatch(app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "visual:getTheme" => get_theme(app),
-        // visual:setTheme, visual:customize — heavy/side-effecting, not ported.
+        // visual:setTheme — persist a full config and live-apply it. The renderer
+        // sends the new ThemeConfig as the first positional arg. We merge it onto
+        // the existing store (so unspecified fields are preserved), push
+        // `theme:changed`, and report success like the Electron handler.
+        "visual:setTheme" => {
+            let incoming = args.get(0).cloned().unwrap_or(Value::Null);
+            let _ = apply_theme(app, &incoming);
+            json!({ "success": true })
+        }
+        // visual:customize — partial merge of the supplied fields into the stored
+        // config; returns the resulting full config so the caller can reflect it.
+        "visual:customize" => {
+            let incoming = args.get(0).cloned().unwrap_or(Value::Null);
+            apply_theme(app, &incoming)
+        }
+        // Unknown channels in the namespace: honest degrade.
         _ => Value::Null,
     }
 }

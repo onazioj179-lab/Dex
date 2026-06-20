@@ -21,14 +21,29 @@
 //   - history:recent (limit = 20)              -> HistoryEvent[]
 //   - history:byType (type: string)           -> HistoryEvent[]
 //
-// Channels SKIPPED (heavy / stateful / not data-CRUD — left in Electron):
-//   - history:record  : mutates the in-memory log + counter + debounced save +
-//                       BrowserWindow broadcast. Not ported.
-//   - history:undo    : emits 'undo:request' to native handlers + re-records.
-//   - history:clear   : mutates + schedules save.
-//   - history:export  : writes an arbitrary fs path.
-//   For each, prefix routing returns Value::Null (renderer treats absent record
-//   id / undefined as a no-op). We do NOT fake them.
+// Channels PORTED (heavy / stateful WRITE surface) — round 3, REAL native impl
+// against the SAME on-disk file (no Electron tracker required):
+//   - history:record (data) -> id (string)
+//       Builds a HistoryEvent with a fresh id + timestamp, unshifts it onto the
+//       persisted array (newest-first), trims to maxEvents (1000), writes the
+//       file synchronously (no 5s debounce — we persist immediately so the
+//       read channels observe it at once), then broadcasts 'history:event' to
+//       the renderer via emit_event (parity with the Electron webContents.send).
+//   - history:undo (id) -> { success, error? }
+//       Looks up the event; if not found / not undoable / no undoData, returns
+//       the same failure shapes. Otherwise emits 'undo:request' with the event
+//       so native/renderer handlers can perform the actual revert, records the
+//       inverse "Undid: …" event, and returns { success: true }.
+//   - history:clear (before?) -> { cleared }
+//       Drops the whole log (or everything strictly older than `before`),
+//       writes the file, returns the count removed.
+//   - history:export (filePath) -> { success, error? }
+//       Serializes the persisted events (pretty, 2-space — Electron used
+//       JSON.stringify(events, null, 2)) and writes them to the caller's path.
+//
+// Persistence divergence vs Electron: the Electron tracker debounced saves by
+// 5s and broadcast from memory; this port writes through on every mutation so a
+// stateless dispatcher stays consistent across calls. Shapes are identical.
 //
 // DIVERGENCES (documented):
 //   - The Electron tracker holds events in MEMORY and only debounce-persists to
@@ -45,10 +60,27 @@
 
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 const HISTORY_FILE: &str = "activity-history.json";
 const DEFAULT_RECENT_LIMIT: usize = 20;
+// DEFAULT_CONFIG.maxEvents in the Electron tracker — the log is trimmed to this.
+const MAX_EVENTS: usize = 1000;
+
+// Process-lifetime monotonic counter mirroring the Electron `++this.eventCounter`
+// that disambiguates ids recorded inside the same millisecond. Starts at 0; the
+// first recorded id therefore uses suffix 1, exactly like Electron.
+static EVENT_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+// Epoch millis — the timestamp + id-time source (Electron used Date.now()).
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 // --- file IO ----------------------------------------------------------------
 
@@ -68,6 +100,19 @@ fn read_events(app: &tauri::AppHandle) -> Vec<Value> {
             .unwrap_or_default(),
         Err(_) => Vec::new(),
     }
+}
+
+// Persist the (newest-first) event array back to the bare-array file. Electron's
+// saveHistory() wrote `JSON.stringify(events.slice(0, maxEvents))` (compact); we
+// match that — compact, trimmed to MAX_EVENTS. Returns Err on IO failure.
+fn write_events(app: &tauri::AppHandle, events: &[Value]) -> std::io::Result<()> {
+    let trimmed: &[Value] = if events.len() > MAX_EVENTS {
+        &events[..MAX_EVENTS]
+    } else {
+        events
+    };
+    let data = serde_json::to_string(&Value::Array(trimmed.to_vec())).unwrap_or_else(|_| "[]".into());
+    std::fs::write(store_path(app, HISTORY_FILE), data)
 }
 
 // --- event field accessors --------------------------------------------------
@@ -195,6 +240,113 @@ fn get_stats(events: &[Value]) -> Value {
     Value::Object(out)
 }
 
+// --- write surface ----------------------------------------------------------
+
+// recordEvent(data) -> id. Mirrors the Electron path: build the full event from
+// the caller's partial (everything except id/timestamp), unshift newest-first,
+// trim, persist, broadcast. `data` is the first positional arg (an object); a
+// non-object is treated as an empty object so we still mint a well-formed event.
+fn record_event(app: &tauri::AppHandle, data: &Value) -> Value {
+    let counter = EVENT_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
+    let ts = now_millis();
+    let id = format!("hist-{}-{}", ts, counter);
+
+    // Start from the caller's fields, then overwrite id/timestamp (Electron spread
+    // `{ ...data, id, timestamp }` — id/timestamp always win).
+    let mut event: Map<String, Value> = data
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    event.insert("id".into(), json!(id));
+    event.insert("timestamp".into(), json!(ts));
+    // `undoable` is required on the type; default false when the caller omits it
+    // (Electron's convenience callers always set it, but raw record may not).
+    event.entry("undoable").or_insert(json!(false));
+    let event = Value::Object(event);
+
+    let mut events = read_events(app);
+    events.insert(0, event.clone());
+    if events.len() > MAX_EVENTS {
+        events.truncate(MAX_EVENTS);
+    }
+    let _ = write_events(app, &events);
+
+    // webContents.send('history:event', event) — one payload, same channel.
+    crate::native_ops::emit_event(app, "history:event", &event);
+
+    json!(id)
+}
+
+// undoEvent(id) -> { success, error? }. Emits 'undo:request' for handlers, then
+// records the inverse event. We do NOT perform the underlying revert here — in
+// Electron the actual undo was done by whatever subscribed to 'undo:request';
+// that contract is preserved by re-emitting the event for the renderer/native
+// handlers to act on.
+fn undo_event(app: &tauri::AppHandle, id: &str) -> Value {
+    let events = read_events(app);
+    let event = match events.iter().find(|e| ev_id(e) == id) {
+        Some(e) => e.clone(),
+        None => return json!({ "success": false, "error": "Event not found" }),
+    };
+
+    let has_undo_data = event.get("undoData").map(|v| !v.is_null()).unwrap_or(false);
+    if !ev_undoable(&event) || !has_undo_data {
+        return json!({ "success": false, "error": "Event cannot be undone" });
+    }
+
+    // Hand the event to whoever performs the actual revert.
+    crate::native_ops::emit_event(app, "undo:request", &event);
+
+    // Record the inverse action (swap old/new value), exactly as Electron did.
+    let inverse = json!({
+        "type": ev_type(&event),
+        "title": format!("Undid: {}", event.get("title").and_then(|v| v.as_str()).unwrap_or("")),
+        "target": event.get("target").cloned().unwrap_or(Value::Null),
+        "oldValue": event.get("newValue").cloned().unwrap_or(Value::Null),
+        "newValue": event.get("oldValue").cloned().unwrap_or(Value::Null),
+        "undoable": false
+    });
+    let _ = record_event(app, &inverse);
+
+    json!({ "success": true })
+}
+
+// clearHistory(before?) -> { cleared }. before truthy -> keep events at/after it;
+// else drop everything. (Electron: `if (before)` — 0 is falsy, so a 0/absent
+// `before` clears all.)
+fn clear_history(app: &tauri::AppHandle, before: &Value) -> Value {
+    let mut events = read_events(app);
+    let initial = events.len();
+
+    let cutoff = before.as_i64().unwrap_or(0);
+    if cutoff != 0 {
+        events.retain(|e| ev_timestamp(e) >= cutoff);
+    } else {
+        events.clear();
+    }
+
+    let cleared = initial - events.len();
+    let _ = write_events(app, &events);
+    json!({ "cleared": cleared })
+}
+
+// exportHistory(filePath) -> { success, error? }. Pretty (2-space) JSON of the
+// full persisted log, written to the caller's path.
+fn export_history(app: &tauri::AppHandle, file_path: &str) -> Value {
+    if file_path.is_empty() {
+        return json!({ "success": false, "error": "No file path provided" });
+    }
+    let events = read_events(app);
+    let data = match serde_json::to_string_pretty(&Value::Array(events)) {
+        Ok(d) => d,
+        Err(e) => return json!({ "success": false, "error": e.to_string() }),
+    };
+    match std::fs::write(file_path, data) {
+        Ok(()) => json!({ "success": true }),
+        Err(e) => json!({ "success": false, "error": e.to_string() }),
+    }
+}
+
 /// Route a `history:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). Every channel in the namespace is handled; the
 /// heavy/stateful channels (record/undo/clear/export) and unknown ones return
@@ -216,7 +368,18 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let kind = a0.as_str().unwrap_or("");
             json!(get_by_type(&read_events(app), kind))
         }
-        // Heavy / stateful — NOT ported (owned by the Electron tracker).
+        // Heavy / stateful WRITE surface — REAL native impl over the same file.
+        "history:record" => record_event(app, &a0),
+        "history:undo" => {
+            let id = a0.as_str().unwrap_or("");
+            undo_event(app, id)
+        }
+        "history:clear" => clear_history(app, &a0),
+        "history:export" => {
+            let file_path = a0.as_str().unwrap_or("");
+            export_history(app, file_path)
+        }
+        // Unknown channels in the namespace — honest degrade.
         _ => Value::Null,
     }
 }

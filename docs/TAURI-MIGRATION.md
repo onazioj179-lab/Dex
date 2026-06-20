@@ -12,8 +12,18 @@
 ## RESUME HERE  ← next session starts here
 
 **Status:** Electron is the shipping build (v5.0.1). Tauri shell boots and serves
-the same renderer; **~210 namespaces are natively backed** after the round-2 sweep;
-the rest degrade to `null`.
+the same renderer; **232 namespaces are natively backed** after rounds 1-3. Round 3
+(2026-06-19) implemented the previously-skipped HEAVY channels across 122 modules —
+real native code: timers via std::thread, process/OS commands via std::process,
+renderer push events via native_ops::emit_event, HTTP via ureq, file I/O via std::fs,
+session state via OnceLock/Mutex or appData JSON. Only genuinely-impossible channels
+still degrade to `null` (LLM provider streaming needing API keys, real IoT hardware,
+creating live OS windows, sandboxed JS execution) — honest gaps, never faked.
+Verified: `cargo check` EXIT 0, `tsc --noEmit` EXIT 0. Round 3 was run as a workflow
+that edited ONLY each module's own file (NO git/main.rs — the round-2 incident below
+is not repeatable); integration was 5 small orchestrator compile-fixes. NEXT: run
+`npm run dev:tauri`, read `__dexDegradeReport()` (auto-saved to dex-kv.json) for the
+final real-usage gap list, then flip the default shell to Tauri and retire Electron.
 
 **!!! INCIDENT + LESSON (2026-06-19) — never repeat:** a porting workflow told its
 agents to add a temp `mod` line, `cargo check`, then `git checkout src-tauri/src/

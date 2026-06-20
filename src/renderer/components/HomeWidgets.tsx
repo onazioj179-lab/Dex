@@ -1202,28 +1202,8 @@ export const HomeWidgets: React.FC = () => {
         />
       ))}
 
-      {/* Empty state: let user add clock/date widget themselves quickly */}
-      {widgets.filter(w => w.visible).length === 0 && (
-        <div style={{ position: 'absolute', top: 88, right: 20, zIndex: 20 }}>
-          <button
-            onClick={() => { addWidget('clock'); }}
-            style={{
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.16)',
-              background: 'rgba(24,24,28,0.58)',
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-            aria-label="Add clock widget"
-            title="Add clock widget"
-          >
-            Add Clock Widget
-          </button>
-        </div>
-      )}
+      {/* No empty-state nudge: the desktop stays clean by default (macOS-style).
+          Widgets are added via right-click the desktop -> Add Widget. */}
 
       {/* No persistent "Add widget" button (Widget Freedom initiative): the
           workspace is the editor. Repositioning/resizing/removing are direct

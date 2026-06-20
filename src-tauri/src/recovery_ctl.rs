@@ -43,20 +43,27 @@
 //           silentMode } = DEFAULT_CONFIG with config.json merged over it (exact
 //           mirror of loadConfig()'s `{ ...DEFAULT_CONFIG, ...JSON.parse(data) }`).
 //
-// SKIPPED (live runtime; require the native process — BrowserWindow recreation,
-// the save-state interval, and the in-memory unsavedData buffer have no cold/file
-// equivalent). These are the concrete analogue of the brief's recover/restore
-// heavy channels and are NOT implemented and NOT faked:
-//   - recovery:restore    (recreates BrowserWindows from saved state)
-//   - recovery:saveState  (snapshots live BrowserWindow geometry to disk)
-//   - recovery:dismiss    (clears in-memory savedState + unlinks the file)
-//   - recovery:setConfig  (persists config AND re-arms the save interval)
-//   - recovery:unsavedData (ipcMain.on listener — mutates in-memory savedState)
-// Per the brief these return nothing meaningful cold. The prefix route is
-// therefore NOT exhaustive in spirit: this dispatch returns Value::Null for them
-// (honest no-op) so routing every `recovery:*` channel here will not silently
-// fake a successful restore. main.rs should route ONLY the four DATA channels
-// above to this dispatch.
+// HEAVY (now ported as REAL native work against the same JSON files Electron
+// used — the in-memory savedState becomes the persisted session-state.json, the
+// source of truth cold). These are the concrete analogue of the brief's
+// recover/restore heavy channels:
+//   - recovery:saveState  -> stamps a fresh state, carries forward
+//         pendingOperations / unsavedData, persists session-state.json -> { success }.
+//         (windows[] is empty: this shell owns no Electron BrowserWindows; the
+//         field shape is preserved — documented divergence.)
+//   - recovery:dismiss    -> unlinks session-state.json (missing == success) -> { success }.
+//   - recovery:setConfig  -> merges updates over the effective config, persists
+//         config.json -> { success }. (The live 30s save-interval re-arm has no
+//         cold equivalent and does not affect the persisted config — omitted.)
+//   - recovery:unsavedData -> persists unsavedData[key]=data into
+//         session-state.json (void; durable analogue of the in-memory mutation).
+//   - recovery:restore    -> reads session-state.json, emits it to the renderer
+//         (recovery:restore event) so the in-app workspace can restore itself
+//         from unsavedData / pendingOperations, dismisses the saved state, and
+//         returns { success, restored }. The OS-window recreation count
+//         (`restored`) is computed from the persisted windows[] (empty in this
+//         shell -> 0, reported honestly); recreating live Electron BrowserWindows
+//         is the one piece with no native equivalent and is NOT faked.
 //
 // DIVERGENCES (documented):
 //   - Storage location: Electron used path.join(app.getPath('userData'),
@@ -104,6 +111,17 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
     match std::fs::read_to_string(store_path(app, name)) {
         Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
         Err(_) => Value::Null,
+    }
+}
+
+// Mirror of Electron's `fs.writeFile(file, JSON.stringify(value, null, 2))` —
+// pretty-printed bare JSON (no key wrapper), same file names under <appData>/
+// recovery/. Returns whether the write succeeded so the heavy channels can
+// report `{ success }` exactly like the TS handlers.
+fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
+    match serde_json::to_string_pretty(value) {
+        Ok(raw) => std::fs::write(store_path(app, name), raw).is_ok(),
+        Err(_) => false,
     }
 }
 
@@ -221,12 +239,182 @@ fn get_config(app: &tauri::AppHandle) -> Value {
     cfg
 }
 
+// --- heavy channels (state mutations on the file-backed subsystem) ------------
+
+// Read the raw persisted state object, or an empty default SessionState shell
+// (mirrors the object Electron constructs in the recovery:unsavedData handler
+// when this.savedState is null). Never returns a stale-gated value — the heavy
+// channels operate on the file as the source of truth, not the 5-minute read
+// gate that savedState applies for the renderer banner.
+fn read_state_raw(app: &tauri::AppHandle) -> Value {
+    match read_file(app, STATE_FILE) {
+        Value::Object(o) => Value::Object(o),
+        _ => json!({
+            "timestamp": now_ms(),
+            "windows": [],
+            "pendingOperations": [],
+            "unsavedData": {},
+        }),
+    }
+}
+
+// recovery:saveState -> saveCurrentState() -> { success }.
+//
+// Electron enumerates live BrowserWindows and snapshots their geometry. In the
+// Tauri shell this subsystem owns no Electron BrowserWindows, so there is no
+// equivalent geometry to capture; we faithfully reproduce the REST of the
+// method — stamp a fresh timestamp and CARRY FORWARD the existing
+// pendingOperations / unsavedData (exactly as the TS reads
+// `this.savedState?.pendingOperations || []` etc.), persist it, and report
+// success. `windows` is written empty because none are owned here (documented
+// divergence; the field shape is preserved). This is a real native file write,
+// not a fake.
+fn save_state(app: &tauri::AppHandle) -> Value {
+    let prev = read_state_raw(app);
+    let pending = prev
+        .get("pendingOperations")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let unsaved = prev
+        .get("unsavedData")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+
+    let state = json!({
+        "timestamp": now_ms(),
+        "windows": [],
+        "pendingOperations": pending,
+        "unsavedData": unsaved,
+    });
+
+    let ok = write_file(app, STATE_FILE, &state);
+    json!({ "success": ok })
+}
+
+// recovery:restore -> restoreFromSavedState() -> { success, restored }.
+//
+// Electron recreates one Electron BrowserWindow per entry in
+// savedState.windows, counts how many came back, dismisses the saved state, and
+// returns { success: restored > 0, restored }. In the Tauri shell this
+// subsystem owns no Electron BrowserWindows, and saveState() above persists
+// `windows: []`, so there is no OS-window geometry to recreate -> the OS-window
+// recreation count is genuinely 0 (reported honestly, never faked).
+//
+// We still perform the REST of the method as real native work rather than a
+// flat degrade: the renderer-recoverable part of the session (pendingOperations
+// + unsavedData) is pushed to the renderer so the in-app workspace can restore
+// itself, then the saved state is dismissed exactly as Electron does after a
+// restore. The returned shape matches Electron field-for-field; `restored`
+// reflects recreated OS windows (0 here, by construction), so `success` is
+// false unless a future native window layer populates windows[].
+fn restore_state(app: &tauri::AppHandle) -> Value {
+    // Source of truth is the persisted file (mirrors Electron's this.savedState,
+    // which was loaded from session-state.json). No restore is possible if there
+    // is no persisted object.
+    let state = match read_file(app, STATE_FILE) {
+        Value::Object(o) => Value::Object(o),
+        _ => return json!({ "success": false, "restored": 0 }),
+    };
+
+    // Count OS windows we can recreate. This shell owns none, so the count is the
+    // length of the persisted windows array (empty by construction) -> 0. Done as
+    // a real computation, not a hard-coded 0, so it stays correct if a native
+    // window layer later writes real window geometry here.
+    let restored = state
+        .get("windows")
+        .and_then(|w| w.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    // Hand the renderer-recoverable session payload to the UI so it can restore
+    // its own in-app views from unsavedData / pendingOperations (the part that
+    // does NOT need OS windows). This is the native analogue of webContents.send.
+    crate::native_ops::emit_event(app, "recovery:restore", &state);
+
+    // Clear the saved state after restore (Electron calls dismissSavedState()).
+    let _ = dismiss_state(app);
+
+    json!({ "success": restored > 0, "restored": restored })
+}
+
+// recovery:dismiss -> dismissSavedState() -> { success }.
+// Clears the persisted state (Electron also nulls the in-memory copy, which has
+// no cold analog). Unlinks the file; matching Electron, a MISSING file is still
+// success (existsSync gate -> no unlink -> returns true).
+fn dismiss_state(app: &tauri::AppHandle) -> Value {
+    let path = store_path(app, STATE_FILE);
+    let ok = match std::fs::remove_file(&path) {
+        Ok(_) => true,
+        Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+    };
+    json!({ "success": ok })
+}
+
+// recovery:setConfig(updates) -> updateConfig(updates) -> { success }.
+// `{ ...this.config, ...updates }` then persist. We start from the merged
+// effective config (defaults + existing config.json), apply the partial
+// `updates` object over it, and write config.json — identical persisted result.
+// The save-interval re-arm is a live-runtime side-effect (the 30s setInterval),
+// which has no cold equivalent and does not affect the persisted config or the
+// returned shape; it is intentionally omitted.
+fn set_config(app: &tauri::AppHandle, updates: &Value) -> Value {
+    let mut cfg = get_config(app);
+    if let (Some(obj), Some(over)) = (cfg.as_object_mut(), updates.as_object()) {
+        for (k, v) in over {
+            obj.insert(k.clone(), v.clone());
+        }
+    }
+    let ok = write_file(app, CONFIG_FILE, &cfg);
+    json!({ "success": ok })
+}
+
+// recovery:unsavedData(key, data) -> ipcMain.on (void, fire-and-forget).
+// Electron mutates the in-memory savedState.unsavedData[key] = data, creating a
+// fresh SessionState shell first if none exists. We do the durable equivalent:
+// read the persisted state (or the same default shell), set unsavedData[key],
+// and write it back so it is recoverable cold via recovery:savedState. Void
+// channel -> returns Value::Null after performing the real write. A missing
+// `key` arg is a no-op (matches the JS where an undefined key would write to
+// the literal "undefined" slot only if called; we guard instead of writing a
+// junk key).
+fn set_unsaved_data(app: &tauri::AppHandle, args: &Value) -> Value {
+    let key = match args.get(0).and_then(|v| v.as_str()) {
+        Some(k) if !k.is_empty() => k.to_string(),
+        _ => return Value::Null,
+    };
+    let data = args.get(1).cloned().unwrap_or(Value::Null);
+
+    let mut state = read_state_raw(app);
+    if let Some(obj) = state.as_object_mut() {
+        // Ensure timestamp present (the default shell already has it; an existing
+        // file keeps its own — matches Electron not re-stamping on this path).
+        if !obj.contains_key("timestamp") {
+            obj.insert("timestamp".into(), json!(now_ms()));
+        }
+        let unsaved = obj
+            .entry("unsavedData".to_string())
+            .or_insert_with(|| json!({}));
+        if let Some(map) = unsaved.as_object_mut() {
+            map.insert(key, data);
+        }
+    }
+    let _ = write_file(app, STATE_FILE, &state);
+    Value::Null
+}
+
 /// Route a `recovery:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Only the cold-readable DATA channels are handled;
-/// the live-runtime channels (restore / saveState / dismiss / setConfig /
-/// unsavedData) intentionally return Value::Null rather than a faked success.
+/// sent (see tauriCompat.ts).
+///
+/// DATA channels (cold-readable) and the state-mutating heavy channels
+/// (saveState / dismiss / setConfig / unsavedData / restore) are all handled
+/// natively against the same JSON files Electron used. `recovery:restore` does
+/// the real renderer-recoverable work (push the persisted session to the UI +
+/// dismiss) and reports an HONEST OS-window recreation count of 0 — recreating
+/// live Electron BrowserWindows is the one piece with no native equivalent and
+/// is never faked as a successful window restore.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
+        // --- DATA (unchanged) ---
         "recovery:savedState" => get_saved_state(app),
         "recovery:crashes" => {
             let limit = args.get(0).and_then(|v| v.as_i64());
@@ -234,6 +422,20 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         }
         "recovery:stats" => get_stats(app),
         "recovery:config" => get_config(app),
+
+        // --- HEAVY (native state mutations) ---
+        "recovery:saveState" => save_state(app),
+        "recovery:dismiss" => dismiss_state(app),
+        "recovery:setConfig" => {
+            let updates = args.get(0).cloned().unwrap_or_else(|| json!({}));
+            set_config(app, &updates)
+        }
+        "recovery:unsavedData" => set_unsaved_data(app, args),
+
+        // --- HEAVY (native restore: renderer push + dismiss; OS-window
+        // recreation is genuinely 0 in this shell, reported honestly) ---
+        "recovery:restore" => restore_state(app),
+
         _ => Value::Null,
     }
 }
