@@ -33,10 +33,18 @@
 //   - LOAD TRIM: Electron slices the loaded array to the last MAX_STORED_CRASHES
 //     (200). We mirror that on read so totals match a freshly-loaded singleton.
 //
-// HEAVY/native channels are NOT ported and NOT faked (see dispatch + the
-// channelsSkipped report): reportRendererError (records a crash via the native
-// crashReporter + process handlers), clear (mutating delete), and upload (no
-// such channel exists; the Electron reporter is local-only, uploadToServer:false).
+// WRITE tier (now ported natively):
+//   - crash-reporter:reportRendererError(data) -> { recorded: true }
+//       records a 'renderer' crash: builds the CrashRecord, appends to the same
+//       flat-array crash-log.json (trimmed to MAX_STORED_CRASHES), and pushes
+//       'crash-reporter:new-crash' to the renderer (Electron webContents.send).
+//   - crash-reporter:clear() -> { success: true }
+//       empties the log (writes []), mirroring this.crashes=[] + saveCrashLog().
+//
+// DEGRADED (cannot be ported, not faked):
+//   - crash-reporter:upload — no Electron handler exists; the native reporter is
+//     local-only (submitURL='', uploadToServer:false). There is no remote target
+//     to upload to, so it returns { success:false, error:"not ported ..." }.
 // =============================================================================
 
 use serde_json::{json, Value};
@@ -83,6 +91,81 @@ fn load_crashes(app: &tauri::AppHandle) -> Vec<Value> {
 
 fn current_version(app: &tauri::AppHandle) -> String {
     app.package_info().version.to_string()
+}
+
+// process.platform values (macos -> "darwin", windows -> "win32").
+fn node_platform() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        "windows" => "win32",
+        other => other,
+    }
+}
+
+// process.arch values (x86_64 -> "x64", aarch64 -> "arm64", x86 -> "ia32").
+fn node_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "x86_64" => "x64",
+        "x86" => "ia32",
+        "aarch64" => "arm64",
+        other => other,
+    }
+}
+
+// Mirror saveCrashLog(): trim to the last MAX_STORED_CRASHES, write pretty JSON.
+fn save_crashes(app: &tauri::AppHandle, crashes: &[Value]) {
+    let start = crashes.len().saturating_sub(MAX_STORED_CRASHES);
+    let trimmed = &crashes[start..];
+    if let Ok(serialized) = serde_json::to_string_pretty(trimmed) {
+        let _ = std::fs::write(store_path(app), serialized);
+    }
+}
+
+// Mirror recordCrash(): build the record, append, persist, push to the renderer.
+// `uptime` in Electron was `(Date.now() - startTime) / 1000` (process uptime in
+// seconds); a stateless dispatch has no session anchor, so we use host uptime
+// (sysinfo::System::uptime, seconds since boot) as the faithful analog.
+fn record_crash(
+    app: &tauri::AppHandle,
+    crash_type: &str,
+    message: &str,
+    stack: Option<&str>,
+) -> Value {
+    // id: Electron used `crash-<ts>-<rand6>`; pseudo_uuid_v4 is the crate-standard
+    // id source and is at least as unique. Keep the `crash-` prefix for parity.
+    let id = format!("crash-{}", crate::util::pseudo_uuid_v4());
+
+    // message truncated to 500 chars, stack to 2000 (char-safe to avoid splitting
+    // a multibyte boundary, unlike JS's UTF-16 .slice).
+    let message_trunc: String = message.chars().take(500).collect();
+    let stack_val = match stack {
+        Some(s) if !s.is_empty() => {
+            let t: String = s.chars().take(2000).collect();
+            Value::String(t)
+        }
+        _ => Value::Null,
+    };
+
+    let record = json!({
+        "id": id,
+        "timestamp": now_ms(),
+        "type": crash_type,
+        "version": current_version(app),
+        "platform": node_platform(),
+        "arch": node_arch(),
+        "uptime": sysinfo::System::uptime() as i64,
+        "message": message_trunc,
+        "stack": stack_val,
+    });
+
+    let mut crashes = load_crashes(app);
+    crashes.push(record.clone());
+    save_crashes(app, &crashes);
+
+    // Electron: win.webContents.send('crash-reporter:new-crash', record).
+    crate::native_ops::emit_event(app, "crash-reporter:new-crash", &record);
+
+    record
 }
 
 fn timestamp(r: &Value) -> i64 {
@@ -155,9 +238,30 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let limit = args.get(0).and_then(|v| v.as_i64());
             get_recent(app, limit)
         }
-        // Heavy/native — intentionally not ported, not faked.
-        //   crash-reporter:reportRendererError, crash-reporter:clear
-        // and any other channel in the namespace -> null.
+        // recordCrash('renderer', data.message, data.stack); -> { recorded: true }.
+        "crash-reporter:reportRendererError" => {
+            let data = args.get(0).cloned().unwrap_or(Value::Null);
+            let message = data
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let stack = data.get("stack").and_then(|v| v.as_str());
+            record_crash(app, "renderer", &message, stack);
+            json!({ "recorded": true })
+        }
+        // this.crashes = []; saveCrashLog(); -> { success: true }.
+        "crash-reporter:clear" => {
+            save_crashes(app, &[]);
+            json!({ "success": true })
+        }
+        // `upload` has no Electron handler: the native crashReporter runs with
+        // submitURL='' and uploadToServer:false (local-only, by design for
+        // privacy). There is nothing to upload to and no remote endpoint exists,
+        // so this is honestly degraded rather than faked.
+        "crash-reporter:upload" | "upload" => {
+            json!({ "success": false, "error": "not ported (needs native runtime)" })
+        }
         _ => Value::Null,
     }
 }

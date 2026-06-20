@@ -66,18 +66,9 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
 
 const STORAGE_KEY = 'dex-home-widgets';
 
-const DEFAULT_WIDGETS: Widget[] = [
-  {
-    id: 'default-clock',
-    type: 'clock',
-    title: 'Clock',
-    x: 32,
-    y: 110,
-    width: 280,
-    height: 150,
-    visible: true,
-  },
-];
+// Empty by default: Home is a clean desktop. Widgets are opt-in (right-click ->
+// Add Widget); the user's choices persist in localStorage.
+const DEFAULT_WIDGETS: Widget[] = [];
 
 function loadWidgets(): Widget[] {
   try {

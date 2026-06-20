@@ -42,14 +42,39 @@
 //   - The thresholds (maxMemoryMB 400, maxCpuPercent 25, errorThreshold 5) are
 //     copied verbatim from the Electron config so the warning text matches.
 //
-// HEAVY channels (NOT ported, NOT faked): watch / unwatch / alert. These are the
-// live-monitoring side: the periodic timer, process error hooks, renderer
-// heartbeat tracking and the `watchdog:healthUpdate` push event. They need the
-// native runtime + a long-lived controller and have no pure-data result, so the
-// dispatcher returns Value::Null for them (honest degrade).
+// LIVE-MONITORING channels (now ported with REAL native code): watch / unwatch /
+// alert. These mirror the live side of WatchdogController (the periodic
+// runHealthCheck timer + the `watchdog:healthUpdate` push event + the
+// uncaughtException/recordError -> renderer notification path):
+//   - watch:   register a monitored target in KV (`watchdog:watches`) and, on the
+//              first active watch, spawn ONE background timer thread that runs a
+//              health check every `checkIntervalMs` and emits `watchdog:healthUpdate`
+//              to the renderer (parity with runHealthCheck()'s webContents.send).
+//   - unwatch: remove a target from the KV registry.
+//   - alert:   record an alert into the KV error buffer (parity with recordError /
+//              recentErrors, capped at 50) and push a `watchdog:alert` renderer
+//              event so the UI is notified live.
+// Background timer precedent: native_ops.rs start_reminder_scheduler
+// (std::thread::spawn + sleep). Renderer push precedent:
+// crate::native_ops::emit_event. State precedent: crate::kv_get / crate::kv_set.
 // =============================================================================
 
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+// KV keys for the native watchdog registry / alert buffer. Same key is used by
+// every dispatch call so reads and writes are consistent across sessions.
+const WATCHES_KEY: &str = "watchdog:watches";
+const ALERTS_KEY: &str = "watchdog:alerts";
+
+// checkIntervalMs from WatchdogController.config (60s), used by the timer thread.
+const CHECK_INTERVAL_MS: u64 = 60_000;
+// recentErrors cap from recordError().
+const MAX_ALERTS: usize = 50;
+
+// Guards against spawning more than one background health-check timer per process
+// (the Electron controller is a single long-lived instance; this is its parity).
+static MONITOR_RUNNING: AtomicBool = AtomicBool::new(false);
 
 // Thresholds copied verbatim from WatchdogController's config so warning text
 // matches the Electron output exactly.
@@ -104,18 +129,173 @@ fn get_status() -> Value {
     })
 }
 
+// Load the watch registry as an array (tolerates missing/garbage state).
+fn load_watches(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, WATCHES_KEY) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
+// Load the alert buffer as an array.
+fn load_alerts(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, ALERTS_KEY) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
+// Spawn the single background health-check timer. Mirrors WatchdogController.start():
+// an initial check then a periodic check every checkIntervalMs, each emitting the
+// `watchdog:healthUpdate` event (parity with runHealthCheck's webContents.send).
+// Idempotent: only one thread runs per process.
+fn ensure_monitor(app: &tauri::AppHandle) {
+    // compare_exchange so exactly one caller wins the spawn race.
+    if MONITOR_RUNNING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        // Initial check (Electron runs runHealthCheck() immediately in start()).
+        crate::native_ops::emit_event(&app, "watchdog:healthUpdate", &get_status());
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(CHECK_INTERVAL_MS));
+            // Stop the timer once there are no active watches (parity with stop()).
+            if load_watches(&app).is_empty() {
+                MONITOR_RUNNING.store(false, Ordering::SeqCst);
+                break;
+            }
+            crate::native_ops::emit_event(&app, "watchdog:healthUpdate", &get_status());
+        }
+    });
+}
+
+// watchdog:watch — register a monitored target and start the live timer.
+// args[0] is an optional target descriptor: { name?, maxMemoryMB?, maxCpuPercent? }
+// (or a bare string name). Returns the stored watch object.
+fn watch(app: &tauri::AppHandle, args: &Value) -> Value {
+    let spec = args.get(0).cloned().unwrap_or(Value::Null);
+    let name = match &spec {
+        Value::String(s) => s.clone(),
+        Value::Object(o) => o
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("process")
+            .to_string(),
+        _ => "process".to_string(),
+    };
+    let max_memory = spec
+        .get("maxMemoryMB")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(MAX_MEMORY_MB);
+    let max_cpu = spec
+        .get("maxCpuPercent")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(MAX_CPU_PERCENT);
+
+    let id = crate::util::pseudo_uuid_v4();
+    let entry = json!({
+        "id": id,
+        "name": name,
+        "maxMemoryMB": max_memory,
+        "maxCpuPercent": max_cpu,
+        "createdAt": now_ms(),
+    });
+
+    let mut watches = load_watches(app);
+    watches.push(entry.clone());
+    crate::kv_set(app, WATCHES_KEY, Value::Array(watches));
+
+    // Start (or keep) the live health-check timer now that a watch is active.
+    ensure_monitor(app);
+
+    entry
+}
+
+// watchdog:unwatch — remove a target by id. args[0] is the watch id string (or an
+// object with an `id`). Returns { success, removed }.
+fn unwatch(app: &tauri::AppHandle, args: &Value) -> Value {
+    let id = match args.get(0) {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Object(o)) => o
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        _ => String::new(),
+    };
+    if id.is_empty() {
+        return json!({ "success": false, "error": "missing watch id" });
+    }
+    let before = load_watches(app);
+    let before_len = before.len();
+    let after: Vec<Value> = before
+        .into_iter()
+        .filter(|w| w.get("id").and_then(|v| v.as_str()) != Some(id.as_str()))
+        .collect();
+    let removed = after.len() != before_len;
+    crate::kv_set(app, WATCHES_KEY, Value::Array(after));
+    json!({ "success": true, "removed": removed })
+}
+
+// watchdog:alert — record an alert (parity with recordError/recentErrors) and push
+// a live `watchdog:alert` renderer event. args[0]: { message, level? } or a bare
+// string message. Returns the stored alert object.
+fn alert(app: &tauri::AppHandle, args: &Value) -> Value {
+    let spec = args.get(0).cloned().unwrap_or(Value::Null);
+    let message = match &spec {
+        Value::String(s) => s.clone(),
+        Value::Object(o) => o
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        _ => String::new(),
+    };
+    let level = spec
+        .get("level")
+        .and_then(|v| v.as_str())
+        .unwrap_or("error")
+        .to_string();
+
+    let record = json!({
+        "id": crate::util::pseudo_uuid_v4(),
+        "message": message,
+        "level": level,
+        "timestamp": now_ms(),
+    });
+
+    // Append to the capped buffer (recentErrors cap = 50; keep the newest).
+    let mut alerts = load_alerts(app);
+    alerts.push(record.clone());
+    if alerts.len() > MAX_ALERTS {
+        let overflow = alerts.len() - MAX_ALERTS;
+        alerts.drain(0..overflow);
+    }
+    crate::kv_set(app, ALERTS_KEY, Value::Array(alerts));
+
+    // Push the alert live to the renderer.
+    crate::native_ops::emit_event(app, "watchdog:alert", &record);
+
+    record
+}
+
 /// Route a `watchdog:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Only the data channel `getStatus` is ported; the
-/// heavy live-monitoring channels (watch/unwatch/alert) return Value::Null.
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// sent (see tauriCompat.ts). The data channel `getStatus`/`health` and the live
+/// channels `watch`/`unwatch`/`alert` are all ported with real native code.
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         // Data surface. `watchdog:health` is the Electron handler name for the
         // same HealthStatus; both are routed here for compatibility.
         "watchdog:getStatus" | "watchdog:health" => get_status(),
 
-        // Heavy channels: live monitoring runtime required. Not ported, not
-        // faked — honest null degrade.
-        "watchdog:watch" | "watchdog:unwatch" | "watchdog:alert" => Value::Null,
+        // Live-monitoring channels: real native registry + timer + push events.
+        "watchdog:watch" => watch(app, args),
+        "watchdog:unwatch" => unwatch(app, args),
+        "watchdog:alert" => alert(app, args),
 
         _ => Value::Null,
     }

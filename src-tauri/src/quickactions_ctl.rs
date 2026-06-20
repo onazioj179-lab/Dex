@@ -22,14 +22,27 @@
 //     extensions?[], minItems?, maxItems?, shortcut?,
 //     isDestructive?, requiresConfirmation? }
 //
-// HEAVY channels SKIPPED (not implemented, not faked):
-//   - quickactions:execute    — notifies the renderer over a live webContents
-//     channel and emits an EventEmitter event; pure side-effect, needs the native
-//     runtime. Omitted (prefix route returns null).
-//   - quickactions:register / quickactions:unregister — the "customize" surface;
-//     mutate the in-memory customActions Map. With no persistence in Electron a
-//     fresh process always starts with zero custom actions, so the list channels
-//     are unaffected. Omitted (prefix route returns null).
+// HEAVY channels — NOW PORTED with real native code:
+//   - quickactions:execute(actionId, context) — resolves the action from the
+//     built-in catalog or the custom store; if missing returns
+//     { success:false, message:'Action not found' }; otherwise pushes the
+//     `quickaction:execute` renderer event with { action, context } (the Tauri
+//     analog of Electron's webContents.send) and returns { success:true }. The
+//     internal EventEmitter 'action:executed' fan-out had no renderer-visible
+//     effect, so it is not emulated (no fake side-effect invented).
+//   - quickactions:register(action) — refuses to override a built-in id
+//     ({ success:false, error:'Cannot override built-in action' }), else stores
+//     the action in the custom catalog and returns { success:true }.
+//   - quickactions:unregister(actionId) — refuses built-in ids ({ success:false }),
+//     else removes from the custom catalog and returns { success: <removed> }.
+//
+// PERSISTENCE divergence (intentional improvement, documented): Electron kept
+// custom actions in an in-memory Map that vanished on restart. Here they are
+// persisted through the shared native KV store (crate::kv_get / crate::kv_set at
+// QUICKACTIONS_KEY -> dex-kv.json) so that register/unregister survive within a
+// process AND across restarts, and so the list channels (all/forContext/
+// byShortcut) now also fold in any registered custom actions — matching the
+// Electron in-process semantics where those lists concatenated the custom Map.
 //
 // DIVERGENCES (documented):
 //   - forContext context-type gate: the Electron filter has a subtle early
@@ -257,26 +270,245 @@ fn relevance(a: &Act, ctx: &Value) -> i64 {
 }
 
 // getActionByShortcut(shortcut, context) -> QuickAction | null
-fn action_by_shortcut(shortcut: &str, ctx: &Value) -> Value {
+fn action_by_shortcut(app: &tauri::AppHandle, shortcut: &str, ctx: &Value) -> Value {
     let normalized = shortcut.to_lowercase();
-    for a in actions_for_context(ctx) {
-        if let Some(s) = a.shortcut {
+    for a in actions_for_context_v(app, ctx) {
+        if let Some(s) = a.get("shortcut").and_then(|v| v.as_str()) {
             if s.to_lowercase() == normalized {
-                return act_to_json(a);
+                return a;
             }
         }
     }
     Value::Null
 }
 
+// ===========================================================================
+// CUSTOM ACTION STORE (persisted)
+//
+// Mirrors the Electron `customActions` Map but backed by the shared native KV
+// store so it survives across restarts. Stored as a JSON array of QuickAction
+// objects (same shape the renderer registers). Built-in ids can never be
+// shadowed (register refuses them), so id uniqueness across the two catalogs is
+// guaranteed by the register guard.
+// ===========================================================================
+
+const QUICKACTIONS_KEY: &str = "quickactions:custom";
+
+fn read_custom(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, QUICKACTIONS_KEY) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
+fn write_custom(app: &tauri::AppHandle, list: &[Value]) {
+    crate::kv_set(app, QUICKACTIONS_KEY, Value::Array(list.to_vec()));
+}
+
+fn is_builtin_id(id: &str) -> bool {
+    DEFAULT_ACTIONS.iter().any(|a| a.id == id)
+}
+
+// ===========================================================================
+// VALUE-BASED ACCESSORS (built-ins + custom, mirroring the Electron
+// `[...this.actions.values(), ...this.customActions.values()]` concatenation)
+//
+// These operate over generic QuickAction Values so registered custom actions
+// participate in the list channels, exactly as in the Electron process.
+// ===========================================================================
+
+// All actions as owned Values, built-ins first then custom (insertion order).
+fn all_actions_v(app: &tauri::AppHandle) -> Vec<Value> {
+    let mut out: Vec<Value> = DEFAULT_ACTIONS.iter().map(act_to_json).collect();
+    out.extend(read_custom(app));
+    out
+}
+
+// Value field accessors mirroring the Act-based helpers above.
+fn v_contexts_includes(a: &Value, t: &str) -> bool {
+    a.get("contexts")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().any(|c| c.as_str() == Some(t)))
+        .unwrap_or(false)
+}
+
+fn v_extensions(a: &Value) -> Vec<String> {
+    a.get("extensions")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn v_min_items(a: &Value) -> Option<i64> {
+    a.get("minItems").and_then(|v| v.as_i64())
+}
+
+fn v_max_items(a: &Value) -> Option<i64> {
+    a.get("maxItems").and_then(|v| v.as_i64())
+}
+
+fn v_category(a: &Value) -> &str {
+    a.get("category").and_then(|v| v.as_str()).unwrap_or("")
+}
+
+fn v_has_shortcut(a: &Value) -> bool {
+    a.get("shortcut").and_then(|v| v.as_str()).is_some()
+}
+
+// getActionRelevance(action, context) over a Value.
+fn relevance_v(a: &Value, ctx: &Value) -> i64 {
+    let mut score = 0i64;
+    let t = ctx_type(ctx);
+    let items = ctx_items(ctx);
+
+    if v_contexts_includes(a, &t) {
+        score += 10;
+    }
+
+    let exts = v_extensions(a);
+    if !exts.is_empty() && !items.is_empty() {
+        if let Some(e) = items[0].get("extension").and_then(|v| v.as_str()) {
+            let ext = e.to_lowercase();
+            if exts.iter().any(|x| *x == ext) {
+                score += 5;
+            }
+        }
+    }
+
+    if v_has_shortcut(a) {
+        score += 3;
+    }
+
+    if v_category(a) == "file" {
+        score += 2;
+    }
+
+    score
+}
+
+// getActionsForContext(context) over the merged built-in + custom catalog.
+fn actions_for_context_v(app: &tauri::AppHandle, ctx: &Value) -> Vec<Value> {
+    let t = ctx_type(ctx);
+    let items = ctx_items(ctx);
+    let item_count = items.len();
+
+    let mut matched: Vec<Value> = all_actions_v(app)
+        .into_iter()
+        .filter(|a| {
+            if !v_contexts_includes(a, &t) {
+                if item_count > 1 && !v_contexts_includes(a, "multiple") {
+                    return false;
+                }
+                if item_count <= 1 {
+                    return false;
+                }
+            }
+
+            if let Some(min) = v_min_items(a) {
+                if (item_count as i64) < min {
+                    return false;
+                }
+            }
+            if let Some(max) = v_max_items(a) {
+                if (item_count as i64) > max {
+                    return false;
+                }
+            }
+
+            let exts = v_extensions(a);
+            if !exts.is_empty() {
+                let has_match = items.iter().any(|it| {
+                    let ext = item_ext(it);
+                    exts.iter().any(|e| *e == ext)
+                });
+                if !has_match {
+                    return false;
+                }
+            }
+
+            true
+        })
+        .collect();
+
+    matched.sort_by(|a, b| relevance_v(b, ctx).cmp(&relevance_v(a, ctx)));
+    matched
+}
+
+// executeAction(actionId, context) -> ActionResult
+fn execute_action(app: &tauri::AppHandle, action_id: &str, ctx: &Value) -> Value {
+    // Resolve from built-ins first, then the custom store (Electron order).
+    let action: Option<Value> = DEFAULT_ACTIONS
+        .iter()
+        .find(|a| a.id == action_id)
+        .map(act_to_json)
+        .or_else(|| {
+            read_custom(app)
+                .into_iter()
+                .find(|a| a.get("id").and_then(|v| v.as_str()) == Some(action_id))
+        });
+
+    let action = match action {
+        Some(a) => a,
+        None => return json!({ "success": false, "message": "Action not found" }),
+    };
+
+    // Notify the renderer to handle the action (Electron webContents.send).
+    crate::native_ops::emit_event(
+        app,
+        "quickaction:execute",
+        &json!({ "action": action, "context": ctx }),
+    );
+
+    json!({ "success": true })
+}
+
+// registerAction(action) -> { success, error? }
+fn register_action(app: &tauri::AppHandle, action: &Value) -> Value {
+    let id = action.get("id").and_then(|v| v.as_str()).unwrap_or("");
+
+    if id.is_empty() {
+        return json!({ "success": false, "error": "Action id is required" });
+    }
+    if is_builtin_id(id) {
+        return json!({ "success": false, "error": "Cannot override built-in action" });
+    }
+
+    let mut list = read_custom(app);
+    // Replace any existing custom action with the same id (Map.set semantics).
+    list.retain(|a| a.get("id").and_then(|v| v.as_str()) != Some(id));
+    list.push(action.clone());
+    write_custom(app, &list);
+
+    json!({ "success": true })
+}
+
+// unregisterAction(actionId) -> { success }
+fn unregister_action(app: &tauri::AppHandle, action_id: &str) -> Value {
+    if is_builtin_id(action_id) {
+        return json!({ "success": false });
+    }
+
+    let mut list = read_custom(app);
+    let before = list.len();
+    list.retain(|a| a.get("id").and_then(|v| v.as_str()) != Some(action_id));
+    let removed = list.len() != before;
+    if removed {
+        write_custom(app, &list);
+    }
+
+    json!({ "success": removed })
+}
+
 /// Route a `quickactions:*` channel. Args are the positional JSON array the
-/// renderer sent (see tauriCompat.ts). Every channel in the namespace is handled;
-/// the heavy/unported ones (execute, register, unregister) and any unknown
-/// channel return Value::Null (honest degrade).
-///
-/// The `_app` handle is unused — these channels read no persisted state — but is
-/// taken to match the house dispatch signature used by analytics/rule_engine.
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+/// renderer sent (see tauriCompat.ts). Every channel in the namespace is handled,
+/// including the heavy ones (execute/register/unregister) which run real native
+/// code (custom-action KV persistence + a `quickaction:execute` renderer event).
+/// Only unknown channels fall through to Value::Null (honest degrade).
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "quickactions:all" => {
             Value::Array(DEFAULT_ACTIONS.iter().map(act_to_json).collect())
@@ -288,10 +520,25 @@ pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "quickactions:byShortcut" => {
             let shortcut = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             let ctx = args.get(1).cloned().unwrap_or(Value::Null);
-            action_by_shortcut(shortcut, &ctx)
+            action_by_shortcut(app, shortcut, &ctx)
         }
-        // Heavy / customize surface — intentionally not ported, not faked.
-        // "quickactions:execute" | "quickactions:register" | "quickactions:unregister"
+        // executeAction(actionId, context) -> ActionResult; pushes the
+        // `quickaction:execute` renderer event (Electron webContents.send analog).
+        "quickactions:execute" => {
+            let action_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let ctx = args.get(1).cloned().unwrap_or(Value::Null);
+            execute_action(app, action_id, &ctx)
+        }
+        // registerAction(action) -> { success, error? } (custom catalog, persisted).
+        "quickactions:register" => {
+            let action = args.get(0).cloned().unwrap_or(Value::Null);
+            register_action(app, &action)
+        }
+        // unregisterAction(actionId) -> { success } (custom catalog, persisted).
+        "quickactions:unregister" => {
+            let action_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            unregister_action(app, action_id)
+        }
         _ => Value::Null,
     }
 }

@@ -1,23 +1,25 @@
 # DEX — Roadmap (single source of truth)
 
-> **CHECKPOINT (2026-06-19) — Tauri migration FIRST HALF done; SECOND HALF is next.**
+> **CHECKPOINT (2026-06-19) — Tauri migration rounds 1-3 DONE (data + heavy channels); final usage gap-check + flip to Tauri next.**
 > This block is the single consolidated current plan (older per-slice goals folded in;
 > full detail in docs/TAURI-MIGRATION.md).
 >
 > **DONE & committed.** Calendar redesigned to the icon-grid (Mon-first pill headers,
 > true-black rounded tiles, per-event DexIcon glyphs + notification dots, bold today).
-> Tauri migration first half complete: **~210 namespaces natively backed** via `dex_ipc`
-> — analytics, power, mode, projects, dev-platform (git/env/ssh/fs/watch), and ~140
-> data/CRUD subsystems (round 1+2), each its own `src-tauri/src/<name>.rs`. main.rs mod
-> count 74 -> 222; `cargo check` 0 errors, `tsc` GREEN.
+> Tauri migration rounds 1-3 complete: **232 namespaces natively backed** via `dex_ipc`
+> — analytics, power, mode, projects, dev-platform (git/env/ssh/fs/watch), ~140 data/CRUD
+> subsystems (round 1+2), and round 3's HEAVY channels (timers/process-exec/Tauri-events/
+> HTTP/file-IO) across 122 modules, each its own `src-tauri/src/<name>.rs`. `cargo check`
+> 0 errors, `tsc` GREEN. Only genuinely-impossible channels (LLM streaming, IoT hardware,
+> live OS windows, sandboxed JS) still degrade — honest gaps, never faked.
 >
-> **NEXT MIGRATION — second half (the path to scrapping Electron): ~630 heavy channels**
-> that need REAL native backends (not shape-ports), by category: live-runtime-state 137,
-> execution 107, network/transport 83, live-window/events 75, timers/scheduler 24,
-> binary/io 18, LLM/agent 6, other ~180. STRATEGY: usage-driven — run `npm run dev:tauri`,
-> exercise DEX, read the auto-saved degrade report (`dex-kv.json` -> `__dex_degrade`, or
-> `__dexDegradeReport()` in the app-window console) and build the channels actually hit,
-> top-down, until empty -> then flip the default shell to Tauri and retire Electron.
+> **NEXT MIGRATION — final gap-check + flip.** Round 3 implemented the buildable heavy
+> channels (timers/exec/events/HTTP/file-IO) across 122 modules. What remains are the
+> genuinely-impossible channels (LLM provider streaming, IoT hardware, live OS windows,
+> sandboxed JS) which degrade honestly. STRATEGY: run `npm run dev:tauri`, exercise DEX,
+> read the auto-saved degrade report (`dex-kv.json` -> `__dex_degrade`, or
+> `__dexDegradeReport()` in the app-window console); the remaining list should be small
+> -> build or accept each, then flip the default shell to Tauri and retire Electron.
 >
 > **Deferred (small, currently degrade to null):** rewind:getDaySummary, auth:setup:*,
 > files:organizeByType. **Parked:** Calendar 15/16 icon-render edge case.

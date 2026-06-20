@@ -30,10 +30,24 @@
 // shape, same corrupt-tolerant parse) so the data layer is honest; only the
 // native validity verdict is reported as unavailable.
 //
-// HEAVY channels (creator:challenge + creator:verify == requestAccess,
-// creator:lock == revokeAccess) are NOT ported — challenge/verify are native
-// HMAC crypto, and lock is a privileged state mutation gated on that flow. They
-// return null (prefix route degrades honestly). See channelsSkipped.
+// HEAVY channels:
+//   - creator:lock (revokeAccess) IS ported natively: it is a pure data
+//     mutation (delete the persisted token file) followed by a renderer push,
+//     with no dependency on the native HMAC verifier. We unlink the same file
+//     Electron unlinked and return its exact { unlocked: false } shape.
+//   - creator:challenge (creatorMakeChallenge) + creator:verify
+//     (creatorVerifySignature) are NOT ported: both are backed by the native
+//     `creator_key` N-API module, whose HMAC secret is regenerated every boot
+//     and never exposed to JS. A challenge issued here could never be verified,
+//     and verification cannot be reproduced without the owner's offline key.
+//     Faking either would fabricate an unlocked/power state, which this
+//     subsystem must NEVER do. They therefore degrade honestly:
+//       - creator:challenge -> Value::Null (the exact `if (!native) return null`
+//         branch Electron itself returns when the module is absent).
+//       - creator:verify    -> { ok: false, reason: "native-unavailable" }
+//         (the exact `if (!native)` branch from registerCreatorAccessIpc).
+//     The renderer already handles both (resolvePlan treats a non-unlocked
+//     state as the 'free' tier, see src/shared/plan.ts).
 // =============================================================================
 
 use serde_json::{json, Value};
@@ -82,6 +96,20 @@ fn get_status(_app: &tauri::AppHandle) -> Value {
     })
 }
 
+// persist(null) — the revoke side of Electron's persist(): delete the token
+// file, ignoring a missing file (mirrors `try { fs.unlinkSync(...) } catch {}`).
+fn clear_persisted(app: &tauri::AppHandle) {
+    let _ = std::fs::remove_file(store_path(app));
+}
+
+// creator:lock (revokeAccess). Pure data mutation — no native verifier needed.
+// Electron's handler is simply `persist(null); return { unlocked: false };`.
+// We delete the same file and return the identical shape.
+fn revoke_access(app: &tauri::AppHandle) -> Value {
+    clear_persisted(app);
+    json!({ "unlocked": false })
+}
+
 // creator:current (getAccess). We faithfully read the persisted token file as
 // Electron did. Electron then asks the native module to validate it; with no
 // native module Electron returns { unlocked: false, reason: 'native-unavailable' }
@@ -97,14 +125,21 @@ fn get_current(app: &tauri::AppHandle) -> Value {
 }
 
 /// Route a `creator:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). The two read channels are ported; the native
-/// HMAC / mutation channels (challenge, verify, lock) return Value::Null so the
-/// prefix route degrades honestly without ever fabricating an unlocked state.
+/// sent (see tauriCompat.ts). The two read channels plus the lock mutation are
+/// ported; the native HMAC channels (challenge, verify) degrade honestly with
+/// their exact Electron `if (!native)` shapes, never fabricating an unlocked
+/// state.
 pub fn dispatch(_app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
     match channel {
         "creator:status" => get_status(_app),
         "creator:current" => get_current(_app),
-        // Heavy / native channels — intentionally not ported (see header).
+        // Pure data mutation — ported natively (delete persisted token).
+        "creator:lock" => revoke_access(_app),
+        // Native HMAC crypto — cannot be reproduced without the per-boot owner
+        // secret. Degrade with the exact Electron module-absent shapes; never
+        // fabricate an unlocked verdict.
+        "creator:challenge" => Value::Null,
+        "creator:verify" => json!({ "ok": false, "reason": "native-unavailable" }),
         _ => Value::Null,
     }
 }

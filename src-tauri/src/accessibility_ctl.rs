@@ -44,12 +44,50 @@
 //   - get-tree receives a bare windowId number at args.get(0) (Electron:
 //     `(_event, windowId: number)`).
 // =============================================================================
+//
+// LIVE-RUNTIME CHANNELS (now ported natively, Feature 61 + the tree populator):
+//   - accessibility:tree-update          (Feature 62 populator)
+//   - accessibility:focus-changed        (Feature 61 event)
+//   - accessibility:keyboard-navigation  (Feature 61 event)
+//   - accessibility:element-announced     (Feature 61 event)
+//   - accessibility:live-region-update    (Feature 61 event)
+//
+// In Electron these were ALL `ipcMain.on` listeners (fire-and-forget / void):
+//   * tree-update -> `updateTree(windowId, tree)`: computes nodeCount +
+//     focusedNodeId and stores a UITreeSnapshot in the in-process Map. We do the
+//     identical computation and persist the snapshot into the SAME cache file the
+//     query handlers (get-tree / find-node / describe-element) already read — so
+//     those queries now serve REAL data instead of always returning null/[].
+//   * the four event channels -> `emit({ type, timestamp, data })`: pushed the
+//     event onto a bounded `recentEvents` ring buffer (max 200, halved on
+//     overflow) and fanned it out to in-process listeners. We replicate that ring
+//     buffer in the SAME cache file under "recentEvents", and re-broadcast each
+//     event to the renderer via `crate::native_ops::emit_event` under the
+//     canonical channel name `accessibility:event` carrying the full
+//     AccessibilityEvent payload (the Tauri analogue of Electron's listener
+//     fan-out / webContents.send). All four are void -> dispatch returns Null,
+//     exactly like Electron's `ipcMain.on` (which returns nothing).
+//
+// The shapes are byte-for-byte the Electron ones:
+//   AccessibilityEvent = { type, timestamp, data }
+//   UITreeSnapshot     = { timestamp, windowId, rootNode, focusedNodeId, nodeCount }
+// =============================================================================
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 const CACHE_FILE: &str = "accessibility-tree-cache.json";
+const MAX_RECENT_EVENTS: usize = 200;
+
+// epoch millis (mirrors Date.now()).
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 // --- file IO ----------------------------------------------------------------
 
@@ -63,6 +101,21 @@ fn read_cache(app: &tauri::AppHandle) -> Value {
     match std::fs::read_to_string(store_path(app)) {
         Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
         Err(_) => Value::Null,
+    }
+}
+
+// Read the whole cache as a JSON object (creating an empty one if absent/invalid)
+// so writers can mutate "snapshots" / "recentEvents" without clobbering the other.
+fn read_cache_object(app: &tauri::AppHandle) -> Map<String, Value> {
+    match read_cache(app) {
+        Value::Object(m) => m,
+        _ => Map::new(),
+    }
+}
+
+fn write_cache(app: &tauri::AppHandle, cache: &Map<String, Value>) {
+    if let Ok(raw) = serde_json::to_string(&Value::Object(cache.clone())) {
+        let _ = std::fs::write(store_path(app), raw);
     }
 }
 
@@ -174,12 +227,107 @@ fn handle_describe_element(app: &tauri::AppHandle, window_id: i64, node_id: &str
     }
 }
 
+// --- Feature 62 populator: tree-update --------------------------------------
+
+// countNodes(node): 1 + sum(children). Mirrors the private recursive counter.
+fn count_nodes(node: &Value) -> i64 {
+    let mut count = 1i64;
+    for child in children_of(node) {
+        count += count_nodes(&child);
+    }
+    count
+}
+
+// findFocusedNode(node): pre-order, first node with state.focused === true.
+fn find_focused_node(node: &Value) -> Value {
+    if node
+        .get("state")
+        .and_then(|s| s.get("focused"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        return node.clone();
+    }
+    for child in children_of(node) {
+        let found = find_focused_node(&child);
+        if !found.is_null() {
+            return found;
+        }
+    }
+    Value::Null
+}
+
+// updateTree(windowId, tree): build the UITreeSnapshot and persist it under
+// snapshots["<windowId>"] in the SAME cache file the query handlers read. Void.
+fn handle_tree_update(app: &tauri::AppHandle, window_id: i64, tree: Value) {
+    if tree.is_null() {
+        return; // nothing to register (Electron would store an undefined tree; we no-op honestly)
+    }
+    let node_count = count_nodes(&tree);
+    let focused = find_focused_node(&tree);
+    let focused_node_id = focused
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(Value::from)
+        .unwrap_or(Value::Null);
+
+    let snapshot = json!({
+        "timestamp": now_ms(),
+        "windowId": window_id,
+        "rootNode": tree,
+        "focusedNodeId": focused_node_id,
+        "nodeCount": node_count,
+    });
+
+    let mut cache = read_cache_object(app);
+    let mut snaps = match cache.get("snapshots") {
+        Some(Value::Object(m)) => m.clone(),
+        _ => Map::new(),
+    };
+    snaps.insert(window_id.to_string(), snapshot);
+    cache.insert("snapshots".to_string(), Value::Object(snaps));
+    write_cache(app, &cache);
+}
+
+// --- Feature 61 events ------------------------------------------------------
+
+// emit(event): push onto the bounded recentEvents ring buffer (max 200, halved
+// to the most-recent 100 on overflow — identical to Electron's slice(-max/2))
+// and re-broadcast to the renderer. `type` + `timestamp` + `data` shape exact.
+fn handle_event(app: &tauri::AppHandle, event_type: &str, data: Value) {
+    let event = json!({
+        "type": event_type,
+        "timestamp": now_ms(),
+        "data": if data.is_null() { json!({}) } else { data },
+    });
+
+    // Persist into the ring buffer in the shared cache file.
+    let mut cache = read_cache_object(app);
+    let mut events = match cache.get("recentEvents") {
+        Some(Value::Array(a)) => a.clone(),
+        _ => Vec::new(),
+    };
+    events.push(event.clone());
+    if events.len() > MAX_RECENT_EVENTS {
+        // keep the most-recent half (Electron: slice(-maxRecentEvents / 2)).
+        let keep = MAX_RECENT_EVENTS / 2;
+        let start = events.len() - keep;
+        events = events.split_off(start);
+    }
+    cache.insert("recentEvents".to_string(), Value::Array(events));
+    write_cache(app, &cache);
+
+    // Fan out to the renderer (Tauri analogue of the in-process listener
+    // dispatch / webContents.send in Electron).
+    crate::native_ops::emit_event(app, "accessibility:event", &event);
+}
+
 /// Route an `accessibility:*` channel. Args are the positional JSON array the
-/// renderer sent (see tauriCompat.ts). Only the three data/query channels are
-/// handled; every heavy live-runtime channel (focus-changed, keyboard-
-/// navigation, element-announced, live-region-update, tree-update) is NOT ported
-/// and falls through to Value::Null (honest degrade — the prefix route is safe
-/// because skipped channels return null rather than fabricated data).
+/// renderer sent (see tauriCompat.ts). The three data/query channels plus the
+/// five live-runtime channels (tree-update populator + the four Feature-61 event
+/// channels) are now handled natively. The event channels and the tree-update
+/// populator are void (Electron `ipcMain.on`) and return Value::Null. Any other
+/// `accessibility:*` channel falls through to Value::Null (honest degrade).
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let a0 = args.get(0).cloned().unwrap_or(Value::Null);
     match channel {
@@ -199,6 +347,33 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let window_id = a0.get("windowId").and_then(|v| v.as_i64()).unwrap_or(0);
             let node_id = a0.get("nodeId").and_then(|v| v.as_str()).unwrap_or("");
             handle_describe_element(app, window_id, node_id)
+        }
+        // updateTree({ windowId, tree }) — single object arg; void.
+        // (Electron: `ipcMain.on('tree-update', (_e, { windowId, tree }) => ...)`.)
+        "accessibility:tree-update" => {
+            let window_id = a0.get("windowId").and_then(|v| v.as_i64()).unwrap_or(0);
+            let tree = a0.get("tree").cloned().unwrap_or(Value::Null);
+            handle_tree_update(app, window_id, tree);
+            Value::Null
+        }
+        // Feature 61 events — `ipcMain.on(channel, (_e, data) => emit(...))`; each
+        // takes a single `data` arg and is void. The event `type` is the channel
+        // suffix, matching AccessibilityEventType exactly.
+        "accessibility:focus-changed" => {
+            handle_event(app, "focus-changed", a0);
+            Value::Null
+        }
+        "accessibility:keyboard-navigation" => {
+            handle_event(app, "keyboard-navigation", a0);
+            Value::Null
+        }
+        "accessibility:element-announced" => {
+            handle_event(app, "element-announced", a0);
+            Value::Null
+        }
+        "accessibility:live-region-update" => {
+            handle_event(app, "live-region-update", a0);
+            Value::Null
         }
         _ => Value::Null,
     }

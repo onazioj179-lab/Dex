@@ -49,6 +49,9 @@ use tauri::Manager;
 
 const PATTERNS_FILE: &str = "xenon-patterns.json";
 const PATTERN_MATURE_DAYS: i64 = 7;
+// Pattern learning rolling window (Xenon.ts PATTERN_ROLLING_DAYS).
+const PATTERN_ROLLING_DAYS: i64 = 30;
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -77,6 +80,27 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
         Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
         Err(_) => Value::Null,
     }
+}
+
+// electron-store writes the whole document as pretty JSON; mirror that so the
+// file stays byte-compatible with what the Electron Xenon engine would read.
+fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) {
+    if let Ok(raw) = serde_json::to_string_pretty(value) {
+        let _ = std::fs::write(store_path(app, name), raw);
+    }
+}
+
+// Persist the `patterns` object back to xenon-patterns.json, preserving any
+// other top-level keys electron-store may have written.
+fn write_patterns(app: &tauri::AppHandle, patterns: Value) {
+    let mut doc = read_file(app, PATTERNS_FILE);
+    if !doc.is_object() {
+        doc = json!({});
+    }
+    if let Some(obj) = doc.as_object_mut() {
+        obj.insert("patterns".to_string(), patterns);
+    }
+    write_file(app, PATTERNS_FILE, &doc);
 }
 
 // --- patterns store ---------------------------------------------------------
@@ -168,13 +192,215 @@ fn get_status(app: &tauri::AppHandle) -> Value {
     })
 }
 
+// getPatterns(): returns the persisted `patterns` object verbatim (same shape
+// XenonEngine.getPatterns() returned from its electron-store). When the file is
+// absent the same constructor defaults are returned.
+fn get_patterns(app: &tauri::AppHandle) -> Value {
+    read_patterns(app)
+}
+
+// reportActiveApp(appId): the persisted half of XenonEngine.reportActiveApp.
+//
+// The LIVE half (in-memory app-state machine, priority re-evaluation, Electron
+// window throttling) only exists while the engine runs in-process and has no
+// data surface here. But recordPatternUsage()/recordCoOccurrence() write to the
+// xenon-patterns store, and that IS real, native, and persistent — so we apply
+// exactly those mutations to xenon-patterns.json:
+//   - bump hourlyUsage[hour], sessionCount, lastUpdated for `appId`
+//   - evict entries older than the 30-day rolling window
+//   - recompute dayCount = floor((now - firstSeen) / DAY_MS)
+//   - record co-occurrence from the previously-reported app (tracked in the
+//     persisted store via a small `lastForeground` marker so the cross-call
+//     edge survives without the in-memory engine).
+//
+// Validation mirrors setupIPC: only strings of length 1..128 are accepted.
+// Void channel -> returns Value::Null regardless.
+fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
+    let app_id = match args.get(0).and_then(|v| v.as_str()) {
+        Some(s) if !s.is_empty() && s.len() < 128 => s.to_string(),
+        _ => return Value::Null,
+    };
+
+    let now = now_ms();
+    let hour = utc_hour(now);
+
+    // Load the full patterns object (with defaults applied).
+    let mut patterns = read_patterns(app);
+    if !patterns.is_object() {
+        patterns = json!({ "entries": {}, "firstSeen": now, "dayCount": 0 });
+    }
+    let obj = match patterns.as_object_mut() {
+        Some(o) => o,
+        None => return Value::Null,
+    };
+
+    // firstSeen default if missing.
+    if !obj.contains_key("firstSeen") {
+        obj.insert("firstSeen".to_string(), json!(now));
+    }
+    let first_seen = obj.get("firstSeen").and_then(|v| v.as_i64()).unwrap_or(now);
+
+    // The previously-reported foreground app, persisted across calls so the
+    // co-occurrence edge (fromApp -> toApp) can be recorded without the live
+    // engine. This is an additive marker; it does not change the entries shape.
+    let prev_foreground = obj
+        .get("lastForeground")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Ensure entries map exists.
+    if !obj.get("entries").map(|v| v.is_object()).unwrap_or(false) {
+        obj.insert("entries".to_string(), json!({}));
+    }
+
+    // --- recordCoOccurrence(prev, appId): bump prev.coOccurrence[appId] ------
+    if let Some(prev) = prev_foreground.as_ref() {
+        if prev != &app_id {
+            if let Some(entries) = obj.get_mut("entries").and_then(|v| v.as_object_mut()) {
+                if let Some(prev_entry) = entries.get_mut(prev).and_then(|v| v.as_object_mut()) {
+                    let co = prev_entry
+                        .entry("coOccurrence")
+                        .or_insert_with(|| json!({}));
+                    if let Some(co_map) = co.as_object_mut() {
+                        let cur = co_map.get(&app_id).and_then(|v| v.as_i64()).unwrap_or(0);
+                        co_map.insert(app_id.clone(), json!(cur + 1));
+                    }
+                }
+            }
+        }
+    }
+
+    // --- recordPatternUsage(appId) ------------------------------------------
+    if let Some(entries) = obj.get_mut("entries").and_then(|v| v.as_object_mut()) {
+        // Create the entry with the same default shape if absent.
+        if !entries.contains_key(&app_id) {
+            entries.insert(
+                app_id.clone(),
+                json!({
+                    "appId": app_id,
+                    "hourlyUsage": vec![0i64; 24],
+                    "avgSessionMs": 0,
+                    "sessionCount": 0,
+                    "coOccurrence": {},
+                    "lastUpdated": now,
+                }),
+            );
+        }
+        if let Some(entry) = entries.get_mut(&app_id).and_then(|v| v.as_object_mut()) {
+            // hourlyUsage[hour] += 1 (24-slot array, repaired if malformed).
+            let needs_fix = entry
+                .get("hourlyUsage")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len() != 24)
+                .unwrap_or(true);
+            if needs_fix {
+                entry.insert("hourlyUsage".to_string(), json!(vec![0i64; 24]));
+            }
+            if let Some(hu) = entry.get_mut("hourlyUsage").and_then(|v| v.as_array_mut()) {
+                let cur = hu.get(hour).and_then(|v| v.as_i64()).unwrap_or(0);
+                hu[hour] = json!(cur + 1);
+            }
+            // sessionCount++ and lastUpdated = now.
+            let sc = entry.get("sessionCount").and_then(|v| v.as_i64()).unwrap_or(0);
+            entry.insert("sessionCount".to_string(), json!(sc + 1));
+            entry.insert("lastUpdated".to_string(), json!(now));
+        }
+
+        // Evict entries older than the rolling window (lastUpdated < cutoff).
+        let cutoff = now - PATTERN_ROLLING_DAYS * DAY_MS;
+        let stale: Vec<String> = entries
+            .iter()
+            .filter(|(_, e)| {
+                e.get("lastUpdated").and_then(|v| v.as_i64()).unwrap_or(now) < cutoff
+            })
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in stale {
+            entries.remove(&k);
+        }
+    }
+
+    // dayCount = floor((now - firstSeen) / DAY_MS).
+    obj.insert(
+        "dayCount".to_string(),
+        json!(((now - first_seen).max(0)) / DAY_MS),
+    );
+
+    // Persist the new foreground marker for the next call's co-occurrence edge.
+    obj.insert("lastForeground".to_string(), json!(app_id));
+
+    write_patterns(app, patterns);
+    Value::Null
+}
+
+// system_sample(): a live one-shot system sample with the EXACT XenonSystemSample
+// shape the engine pushed via `xenon:systemSample`. Xenon's own sampler computed
+// these from the native bridge; here sysinfo provides the same numbers. This is
+// a pure compute-on-read with no engine state, so it is a faithful native port
+// of the sample payload (callers that previously listened for the pushed event
+// can pull an equivalent snapshot). Also emits the same event for any listeners.
+fn system_sample(app: &tauri::AppHandle) -> Value {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_memory();
+    sys.refresh_cpu();
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    sys.refresh_cpu();
+    sys.refresh_memory();
+
+    let total = sys.total_memory().max(1); // bytes
+    let used = sys.used_memory(); // bytes
+    let cpu_percent = sys.global_cpu_info().cpu_usage() as f64; // 0..100
+    let memory_percent = (used as f64 / total as f64) * 100.0;
+    let memory_used_mb = (used as f64 / (1024.0 * 1024.0)).round() as i64;
+    let memory_total_mb = (total as f64 / (1024.0 * 1024.0)).round() as i64;
+
+    let sample = json!({
+        "timestamp": now_ms(),
+        "cpuPercent": cpu_percent,
+        "memoryPercent": memory_percent,
+        "memoryUsedMB": memory_used_mb,
+        "memoryTotalMB": memory_total_mb,
+    });
+
+    // Mirror webContents.send('xenon:systemSample', sample) for live listeners.
+    crate::native_ops::emit_event(app, "xenon:systemSample", &sample);
+    sample
+}
+
 /// Route a `xenon:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Only the data channel `xenon:getStatus` is ported;
-/// every other channel in the namespace (live/native-only) returns Value::Null
-/// (honest degrade), so prefix routing of `xenon:` to this dispatch is safe.
-pub fn dispatch(app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// sent (see tauriCompat.ts).
+///
+/// Ported (real native):
+///   - xenon:getStatus       — status snapshot (sysinfo metrics + persisted-derived)
+///   - xenon:getPatterns     — persisted pattern store verbatim
+///   - xenon:reportActiveApp — persists pattern usage + co-occurrence (void)
+///   - xenon:systemSample    — live one-shot sample (sysinfo) + emits the event
+///
+/// Honest degrade (returned, never faked):
+///   - xenon:execute — no such handler exists in Xenon.ts (no source contract).
+///   - xenon:power / xenon:throttle / xenon:preWarm / xenon:memoryPressure /
+///     xenon:forceGC — these are main->renderer PUSH events (webContents.send),
+///     not invocable handlers; they require the live engine's priority loop /
+///     window-throttling, which has no data surface in the data-only port.
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "xenon:getStatus" => get_status(app),
+        "xenon:getPatterns" => get_patterns(app),
+        "xenon:reportActiveApp" => report_active_app(app, args),
+        "xenon:systemSample" => system_sample(app),
+
+        // Void push-event names — no invoke contract / engine-only side effects.
+        "xenon:power"
+        | "xenon:throttle"
+        | "xenon:preWarm"
+        | "xenon:memoryPressure"
+        | "xenon:forceGC" => Value::Null,
+
+        // execute: not a Xenon handler (no Electron source).
+        "xenon:execute" => {
+            json!({ "success": false, "error": "not ported (needs native runtime)" })
+        }
+
         _ => Value::Null,
     }
 }
