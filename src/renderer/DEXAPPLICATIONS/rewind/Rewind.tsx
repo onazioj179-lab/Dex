@@ -1150,7 +1150,8 @@ const timer = setInterval(check, 15000);
       <style>{`
         /* === REWIND - UI HOVER === */
         .rewind-app button { font-family: inherit; transition: background 0.12s ease, border-color 0.12s ease; }
-        .rewind-app button:hover { background: var(--color-surface-2) !important; }
+        .rewind-app button:not(:disabled):hover { background: var(--color-surface-2) !important; }
+        .rewind-app button:disabled { opacity: 0.4; cursor: default; }
         .rewind-app * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
         .rewind-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .rewind-app ::-webkit-scrollbar-track { background: transparent; }
@@ -1384,7 +1385,7 @@ const timer = setInterval(check, 15000);
         <div style={S.lightboxOverlay} onMouseDown={() => setLightboxUrl(null)}>
           <div style={S.lightboxContent} onMouseDown={e => e.stopPropagation()}>
             <img src={lightboxUrl} alt="Screenshot" style={S.lightboxImg} />
-            <button style={S.lightboxClose} onClick={() => setLightboxUrl(null)} aria-label="Close lightbox">x</button>
+            <button style={S.lightboxClose} onClick={() => setLightboxUrl(null)} aria-label="Close lightbox">&times;</button>
           </div>
         </div>
       )}
@@ -1791,9 +1792,9 @@ const timer = setInterval(check, 15000);
                 <div style={S.entryContent}>{entry.content}</div>
                 <div style={S.entryMeta}>
                   <span style={{ color: TYPE_COLORS[entry.type], fontWeight: 500 }}>{TYPE_LABELS[entry.type]}</span>
-                  <span style={{ opacity: 0.56 }}>-</span>
+                  <span style={{ opacity: 0.3 }}>&#183;</span>
                   <span>{entry.appName}</span>
-                  <span style={{ opacity: 0.56 }}>-</span>
+                  <span style={{ opacity: 0.3 }}>&#183;</span>
                   <span>{formatTime(entry.timestamp)}</span>
                 </div>
               </div>
@@ -1860,9 +1861,9 @@ const timer = setInterval(check, 15000);
                 <div style={S.entryContent}>{entry.content}</div>
                 <div style={S.entryMeta}>
                   <span style={{ color: TYPE_COLORS[entry.type], fontWeight: 500 }}>{TYPE_LABELS[entry.type]}</span>
-                  <span style={{ opacity: 0.56 }}>-</span>
+                  <span style={{ opacity: 0.3 }}>&#183;</span>
                   <span>{entry.appName}</span>
-                  <span style={{ opacity: 0.56 }}>-</span>
+                  <span style={{ opacity: 0.3 }}>&#183;</span>
                   <span>{formatDate(entry.timestamp)} {formatTime(entry.timestamp)}</span>
                 </div>
               </div>
@@ -2371,7 +2372,7 @@ const timer = setInterval(check, 15000);
             {(settings?.excludedApps || []).map(app => (
               <div key={app} style={S.excludeTag}>
                 <span>{app}</span>
-                <button aria-label={`Remove ${app} from exclusion list`} style={S.excludeRemove} onClick={() => removeExclusion(app)}>x</button>
+                <button aria-label={`Remove ${app} from exclusion list`} style={S.excludeRemove} onClick={() => removeExclusion(app)}>&times;</button>
               </div>
             ))}
             {(settings?.excludedApps || []).length === 0 && (
@@ -2916,7 +2917,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     padding: '4px 0',
     zIndex: 'var(--z-max)',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 0.5px 0 rgba(255,255,255,0.06)',
+    boxShadow: 'var(--pg-shadow-panel)',
   },
   dropdownItem: {
     display: 'block',
@@ -3332,7 +3333,7 @@ const S: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     maxWidth: 320,
     cursor: 'default',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0.5px 0 rgba(255,255,255,0.06)',
+    boxShadow: 'var(--pg-shadow-panel)',
   },
 };
 
