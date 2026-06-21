@@ -13,6 +13,7 @@ import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templa
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
 import { findMatchingBracket } from '../../../shared/format/bracketMatcher';
 import { highlightDexScript } from './dexCode/highlight';
+import { extractSymbols, lineStartOffset, SYMBOL_TAG } from './dexCode/symbols';
 import {
   getRecentFiles,
   addRecentFile,
@@ -51,6 +52,10 @@ const DexCode: React.FC = () => {
   const [duration, setDuration] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  // Autosave status for the status bar. 'saving' while the debounce is pending,
+  // 'saved' briefly after the write lands, then idle. Purely a UI affordance --
+  // the autosave timing itself is unchanged.
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   // Collapsible sidebar (DEX 5.6: IDE-like, "nothing locked"). Toggle from the
   // Navigator activity-bar button or Ctrl+B (VS Code convention). Persisted.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -82,6 +87,15 @@ const DexCode: React.FC = () => {
   const [showReplace, setShowReplace] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+  // Outline / precision navigation: the live symbol map of the current file.
+  const [showOutline, setShowOutline] = useState(true);
+  const [outlineFilter, setOutlineFilter] = useState('');
+  // Go to Line (Ctrl+G).
+  const [showGoToLine, setShowGoToLine] = useState(false);
+  const [goToLineInput, setGoToLineInput] = useState('');
+  const goToLineRef = useRef<HTMLInputElement>(null);
+  // Output -> ecosystem (copy / send via DEX Flow).
+  const [outputCopied, setOutputCopied] = useState(false);
   // Track original content for modified detection
   const originalCodeRef = useRef(code);
 
@@ -190,14 +204,24 @@ const DexCode: React.FC = () => {
 
   // Auto-save
   useEffect(() => {
+    setSaveState('saving');
     const timer = window.setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, code);
         localStorage.setItem(FILE_KEY, fileName);
       } catch { /* ignore */ }
+      setSaveState('saved');
     }, 300);
     return () => window.clearTimeout(timer);
   }, [code, fileName]);
+
+  // After "Saved" shows briefly, fade the indicator back to idle. Reset on each
+  // new save so the message stays visible while edits are in flight.
+  useEffect(() => {
+    if (saveState !== 'saved') return;
+    const timer = window.setTimeout(() => setSaveState('idle'), 1500);
+    return () => window.clearTimeout(timer);
+  }, [saveState]);
 
   // Persist the bottom panel height (debounced) so it restores on next mount.
   useEffect(() => {
@@ -330,9 +354,17 @@ const DexCode: React.FC = () => {
         setShowReplace(true);
         requestAnimationFrame(() => findInputRef.current?.focus());
       }
-      if (e.key === 'Escape' && showFind) {
+      // Go to Line (Ctrl/Cmd+G) — precision navigation.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        setShowGoToLine(true);
+        setGoToLineInput('');
+        requestAnimationFrame(() => goToLineRef.current?.focus());
+      }
+      if (e.key === 'Escape' && (showFind || showGoToLine)) {
         setShowFind(false);
         setShowReplace(false);
+        setShowGoToLine(false);
         editorRef.current?.focus();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '=') {
@@ -351,9 +383,40 @@ const DexCode: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar]);
+  }, [code, fileName, runCode, showFind, showGoToLine, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar]);
 
   // Tab key, bracket auto-close, auto-indent
+  // Live symbol map of the current file (functions / classes / top-level vars).
+  const symbols = useMemo(() => extractSymbols(code), [code]);
+  const filteredSymbols = useMemo(() => {
+    const q = outlineFilter.trim().toLowerCase();
+    return q ? symbols.filter(s => s.name.toLowerCase().includes(q)) : symbols;
+  }, [symbols, outlineFilter]);
+
+  // Precision navigation: move the caret to a 1-indexed line, focus, and center
+  // it in the viewport. The textarea's onScroll keeps the highlight overlay in
+  // sync. Used by the Outline so a click jumps straight to a symbol.
+  const jumpToLine = useCallback((line: number) => {
+    const ta = editorRef.current;
+    if (!ta) return;
+    const pos = lineStartOffset(code, line);
+    const totalLines = Math.max(1, code.split('\n').length);
+    requestAnimationFrame(() => {
+      ta.selectionStart = ta.selectionEnd = pos;
+      ta.focus();
+      const lineHeight = ta.scrollHeight / totalLines;
+      ta.scrollTop = Math.max(0, (line - 1) * lineHeight - ta.clientHeight / 2);
+    });
+  }, [code]);
+
+  const handleGoToLine = useCallback(() => {
+    const n = parseInt(goToLineInput.trim(), 10);
+    if (!Number.isFinite(n) || n < 1) return;
+    jumpToLine(n);
+    setShowGoToLine(false);
+    setGoToLineInput('');
+  }, [goToLineInput, jumpToLine]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     const start = ta.selectionStart;
@@ -549,7 +612,7 @@ const DexCode: React.FC = () => {
   }, [code]);
 
   return (
-    <div style={S.container}>
+    <div style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)' }}>
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
         <button
@@ -566,10 +629,11 @@ const DexCode: React.FC = () => {
         <button
           title="Find"
           aria-label="Find in file"
-          style={S.activityBtn}
+          aria-pressed={showFind}
+          style={showFind ? S.activityBtnActive : S.activityBtn}
           onClick={() => setShowFind(s => !s)}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          onMouseEnter={e => { if (!showFind) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { if (!showFind) e.currentTarget.style.background = 'transparent'; }}
         >
           <DexIcon name="search" size={16} />
         </button>
@@ -587,10 +651,11 @@ const DexCode: React.FC = () => {
         <button
           title="Terminal"
           aria-label="Toggle terminal"
-          style={S.activityBtn}
+          aria-pressed={terminalOpen}
+          style={terminalOpen ? S.activityBtnActive : S.activityBtn}
           onClick={() => setTerminalOpen(o => !o)}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          onMouseEnter={e => { if (!terminalOpen) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { if (!terminalOpen) e.currentTarget.style.background = 'transparent'; }}
         >
           <DexIcon name="terminal" size={16} />
         </button>
@@ -608,27 +673,96 @@ const DexCode: React.FC = () => {
         <div style={S.sidebarBlock}>
           <div style={S.sectionHeading}>File</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <button onClick={handleNewFile} style={S.fileActionBtn}>
+            <button
+              onClick={handleNewFile}
+              style={S.fileActionBtn}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
               <DexIcon name="plus" size={12} />
               <span>New File</span>
               <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+N</span>
             </button>
-            <button onClick={handleOpenFile} style={S.fileActionBtn}>
+            <button
+              onClick={handleOpenFile}
+              style={S.fileActionBtn}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
               <DexIcon name="folder-open" size={12} />
               <span>Open File</span>
               <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+O</span>
             </button>
-            <button onClick={handleSaveFile} style={S.fileActionBtn}>
+            <button
+              onClick={handleSaveFile}
+              style={S.fileActionBtn}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
               <DexIcon name="save" size={12} />
               <span>Save{isModified ? ' *' : ''}</span>
               <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+S</span>
             </button>
-            <button onClick={handleSaveAs} style={S.fileActionBtn}>
+            <button
+              onClick={handleSaveAs}
+              style={S.fileActionBtn}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
               <DexIcon name="download" size={12} />
               <span>Save As</span>
               <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+Shift+S</span>
             </button>
           </div>
+        </div>
+
+        {/* Outline — live symbol map (precision navigation, DEX signature) */}
+        <div style={S.sidebarBlock}>
+          <div
+            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={() => setShowOutline(v => !v)}
+          >
+            <DexIcon name={showOutline ? 'chevron-down' : 'chevron-right'} size={10} />
+            Outline
+            <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{symbols.length}</span>
+          </div>
+          {showOutline && (
+            symbols.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No symbols yet</div>
+            ) : (
+              <>
+                {symbols.length > 6 && (
+                  <input
+                    value={outlineFilter}
+                    onChange={e => setOutlineFilter(e.target.value)}
+                    placeholder="Filter symbols…"
+                    aria-label="Filter symbols"
+                    style={{ width: '100%', boxSizing: 'border-box', margin: '2px 0 4px', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none' }}
+                  />
+                )}
+                {filteredSymbols.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No matches</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
+                    {filteredSymbols.map((s, i) => (
+                      <button
+                        key={`${s.name}-${s.line}-${i}`}
+                        onClick={() => jumpToLine(s.line)}
+                        style={{ ...S.recentFileBtn }}
+                        title={`${s.name} — line ${s.line}`}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, width: 22, flexShrink: 0, textTransform: 'uppercase' }}>{SYMBOL_TAG[s.kind]}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                        <span style={{ marginLeft: 'auto', opacity: 0.4, fontSize: 10 }}>{s.line}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )
+          )}
         </div>
 
         {/* Recent Files */}
@@ -644,11 +778,13 @@ const DexCode: React.FC = () => {
             {showRecentFiles && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {recentFiles.map((f, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => handleOpenRecent(f)} 
+                  <button
+                    key={i}
+                    onClick={() => handleOpenRecent(f)}
                     style={{ ...S.recentFileBtn }}
                     title={f}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <DexIcon name="code" size={11} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -805,6 +941,26 @@ const DexCode: React.FC = () => {
                 )}
               </div>
             )}
+            {showGoToLine && (
+              <div style={S.findBar}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                  <DexIcon name="chevron-right" size={12} color="var(--color-text-tertiary)" />
+                  <input
+                    ref={goToLineRef}
+                    type="number"
+                    min={1}
+                    value={goToLineInput}
+                    onChange={e => setGoToLineInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleGoToLine(); } if (e.key === 'Escape') { setShowGoToLine(false); editorRef.current?.focus(); } }}
+                    placeholder={`Go to line… (1–${lineCount})`}
+                    style={S.findInput}
+                    aria-label="Go to line"
+                  />
+                  <button onClick={handleGoToLine} style={S.findNavBtn} title="Go (Enter)">Go</button>
+                  <button onClick={() => { setShowGoToLine(false); editorRef.current?.focus(); }} style={S.findNavBtn} title="Close (Esc)"><DexIcon name="close" size={12} /></button>
+                </div>
+              </div>
+            )}
             <div style={S.editorWrapper}>
               {/* Line numbers */}
               <div style={S.lineNumbers} aria-hidden="true">
@@ -847,11 +1003,25 @@ const DexCode: React.FC = () => {
                   {duration < 1 ? '<1' : Math.round(duration)}ms
                 </span>
               )}
+              {output.length > 0 && (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                  <button
+                    onClick={async () => { try { await navigator.clipboard.writeText(output.join('\n')); setOutputCopied(true); setTimeout(() => setOutputCopied(false), 1200); } catch { /* clipboard unavailable */ } }}
+                    style={S.findNavBtn}
+                    title="Copy output to clipboard"
+                  >{outputCopied ? 'Copied' : 'Copy'}</button>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('dex-flow-open', { detail: { payload: { kind: 'text', content: output.join('\n'), source: 'dexcode', label: 'DexCode output' } } }))}
+                    style={S.findNavBtn}
+                    title="Send output to another app (DEX Flow)"
+                  >Send</button>
+                </div>
+              )}
             </div>
             <div ref={outputRef} style={S.outputContent}>
               {output.length === 0 && !error && (
                 <div style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic', fontSize: 12 }}>
-                  <span style={{opacity:0.5}}>\$ </span>Run your code to see output here
+                  <span style={{opacity:0.5}}>$ </span>Run your code to see output here
                 </div>
               )}
               {output.map((line, i) => (
@@ -896,6 +1066,30 @@ const DexCode: React.FC = () => {
           )}
           <span>{stats.chars} chars</span>
           <span style={{ fontSize: 9 }}>{fontSize}px</span>
+          {/* Autosave indicator -- mirrors the local-storage autosave state */}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              opacity: saveState === 'idle' ? 0.45 : 1,
+              transition: 'opacity 0.2s',
+            }}
+            title="Editor content is autosaved to this device"
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: saveState === 'saving'
+                  ? 'var(--color-text-tertiary)'
+                  : 'var(--color-accent, #4A9EFF)',
+              }}
+            />
+            {saveState === 'saving' ? 'Saving…' : 'Saved'}
+          </span>
           <button
             type="button"
             onClick={() => setTerminalOpen(v => !v)}

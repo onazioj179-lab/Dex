@@ -136,6 +136,8 @@ interface UkiStoreState {
   setIsSearchingMemory: (v: boolean) => void;
   clearMemorySearch: () => void;
   togglePanel: () => void;
+  /** Idempotently reveal the UKI panel. Used by "ask UKI about this" entry points. */
+  openPanel: () => void;
 }
 
 // Hydrate conversation history from localStorage (local-only, no network)
@@ -241,4 +243,5 @@ export const useUkiStore = create<UkiStoreState>((set, get) => ({
   setIsSearchingMemory: (v) => set({ isSearchingMemory: v }),
   clearMemorySearch: () => set({ memorySearchResults: [], memorySearchQuery: '', isSearchingMemory: false }),
   togglePanel: () => set(s => ({ showPanel: !s.showPanel })),
+  openPanel: () => set({ showPanel: true }),
 }));

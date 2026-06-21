@@ -12,6 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
+import { DexSearchInput } from '../styles/components';
 import { premiumGlassPanel, premiumGlassToolbar } from '../styles/glassMenu';
 import type { CatalogEntry, InstalledApp, PlanResult } from '../../shared/store/catalog';
 import type { InstallResult } from '../../shared/store/installer';
@@ -156,16 +157,17 @@ export default function Store(): React.ReactElement {
         </div>
 
         <div style={styles.controls}>
-          <label style={styles.searchWrap}>
-            <span style={styles.searchIcon} aria-hidden><DexIcon name="search" size={14} /></span>
-            <input
+          <div style={styles.searchWrap}>
+            <DexSearchInput
+              fullWidth
               aria-label="Search the DEX Store"
               value={query}
               onChange={e => onSearchChange(e.target.value)}
+              onClear={() => onSearchChange('')}
               placeholder="Search apps"
-              style={inputStyle}
+              style={{ maxWidth: 340 }}
             />
-          </label>
+          </div>
           {!inDetail && (
             <label style={styles.filterPill}>
               <input
@@ -178,10 +180,17 @@ export default function Store(): React.ReactElement {
               <span>Installed</span>
             </label>
           )}
-          <button type="button" style={styles.iconBtn} onClick={refresh} disabled={busy !== null} title="Refresh catalog">
+          <button
+            type="button"
+            style={{ ...styles.iconBtn, opacity: busy !== null ? 0.5 : 1, cursor: busy !== null ? 'not-allowed' : 'pointer' }}
+            onClick={refresh}
+            disabled={busy !== null}
+            title="Refresh catalog"
+            aria-label="Refresh catalog"
+          >
             <DexIcon name="refresh" size={14} />
           </button>
-          <button type="button" style={styles.iconBtn} onClick={() => setDevOpen(true)} title="Developer: install an app from a signed file">
+          <button type="button" style={styles.iconBtn} onClick={() => setDevOpen(true)} title="Developer: install an app from a signed file" aria-label="Developer: install an app from a signed file">
             <DexIcon name="terminal" size={14} />
           </button>
         </div>
@@ -237,20 +246,6 @@ export default function Store(): React.ReactElement {
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 160,
-  maxWidth: 340,
-  padding: 'var(--space-2) 10px var(--space-2) var(--space-8)',
-  background: 'var(--color-bg-surface)',
-  border: '1px solid var(--pg-border-strong)',
-  borderRadius: 6,
-  color: 'var(--color-text-primary)',
-  outline: 'none',
-  fontSize: 13,
-  boxSizing: 'border-box',
-};
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -309,8 +304,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflowY: 'visible',
     scrollbarWidth: 'thin',
   },
-  searchWrap: { position: 'relative', display: 'flex', alignItems: 'center', minWidth: 180, flex: '1 1 240px' },
-  searchIcon: { position: 'absolute', left: 10, display: 'flex', color: 'var(--color-text-tertiary)', pointerEvents: 'none' },
+  searchWrap: { display: 'flex', alignItems: 'center', minWidth: 180, flex: '1 1 240px' },
   filterPill: {
     minHeight: 32,
     display: 'flex',

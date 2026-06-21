@@ -502,6 +502,7 @@ export const Browser: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [urlFocused, setUrlFocused] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [hoveredFavorite, setHoveredFavorite] = useState<string | null>(null);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
 
@@ -1675,6 +1676,14 @@ export const Browser: React.FC = () => {
             {downloads.some(d => d.status === 'downloading') && <span style={styles.activeDot} />}
           </button>
           <button
+            style={{...styles.navBtn, ...(showKeychain ? { color: 'var(--color-accent)' } : {})}}
+            onClick={() => setShowKeychain(p => !p)}
+            title="Keychain"
+            aria-label="Keychain"
+          >
+            {Icon.key}
+          </button>
+          <button
             style={{...styles.navBtn, ...(showSettings ? { color: 'var(--color-accent)' } : {})}}
             onClick={() => setShowSettings(p => !p)}
             title="Settings"
@@ -1727,6 +1736,15 @@ export const Browser: React.FC = () => {
           </div>
         </form>
         <button style={styles.navBtnSmall} onClick={() => addBookmark()} aria-label="Bookmark">{Icon.bookmark}</button>
+        <button
+          style={{...styles.navBtnSmall, ...(currentTab ? {} : { opacity: 0.4, cursor: 'not-allowed' })}}
+          onClick={toggleReadingMode}
+          disabled={!currentTab}
+          aria-disabled={!currentTab}
+          aria-label="Reading mode"
+          title="Reading mode"
+        >{Icon.reader}</button>
+        <button style={styles.navBtnSmall} onClick={() => setShowBookmarks(!showBookmarks)} aria-label="Bookmarks" title="Bookmarks">{Icon.bookmarkList}</button>
         <button style={styles.navBtnSmall} onClick={() => setShowHistory(!showHistory)} aria-label="History" title="History & Tools">{Icon.history}</button>
       </div>
 
@@ -2213,13 +2231,20 @@ export const Browser: React.FC = () => {
             {bookmarks.length > 0 && (
               <div style={styles.favoriteGrid}>
                 {bookmarks.slice(0, 12).map(b => (
-                  <div key={b.id} style={styles.favorite} onClick={() => navigate(b.url)}>
+                  <div
+                    key={b.id}
+                    style={styles.favorite}
+                    onClick={() => navigate(b.url)}
+                    onMouseEnter={() => setHoveredFavorite(b.id)}
+                    onMouseLeave={() => setHoveredFavorite(null)}
+                  >
                     <div style={styles.favIcon}>{Icon.globe}</div>
                     <span style={styles.favLabel}>{b.title.slice(0, 12)}</span>
                     <button
-                      style={styles.favRemove}
+                      style={{ ...styles.favRemove, display: hoveredFavorite === b.id ? 'flex' : 'none' }}
                       onClick={(e) => { e.stopPropagation(); removeBookmark(b.id); }}
                       aria-label="Remove bookmark"
+                      title="Remove bookmark"
                     >
                       {Icon.close}
                     </button>

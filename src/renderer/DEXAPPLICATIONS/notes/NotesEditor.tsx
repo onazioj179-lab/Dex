@@ -1126,6 +1126,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                     aria-label={action.label}
                     style={styles.toolbarBtn}
                     title={action.label + (action.shortcut ? ` (${action.shortcut})` : '')}
+                    onMouseEnter={e => { e.currentTarget.style.background = styles.toolbarBtnActive.background as string; e.currentTarget.style.color = styles.toolbarBtnActive.color as string; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = styles.toolbarBtn.background as string; e.currentTarget.style.color = styles.toolbarBtn.color as string; }}
                     onMouseDown={e => { e.preventDefault(); handleToolbarAction(action); }}
                   >
                     {action.glyph ? <DexIcon name={action.glyph} size={15} /> : action.icon}
@@ -1167,6 +1169,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 title={`uki: ${action.label} (uses your configured AI provider)`}
                 style={{ ...styles.aiBtn, ...(aiBusy ? styles.aiBtnDisabled : {}) }}
                 disabled={aiBusy}
+                onMouseEnter={e => { if (!aiBusy) e.currentTarget.style.background = 'var(--color-accent-soft, rgba(100,210,255,0.12))'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 onMouseDown={e => { e.preventDefault(); void runAiAction(action); }}
               >
                 {action.label}

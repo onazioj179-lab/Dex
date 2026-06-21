@@ -13,6 +13,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { DexLoader } from './LoadingStates';
+import { DexSearchInput } from '../styles/components';
 import {
   useNotificationCenterStore,
   useGlobalSearchStore,
@@ -242,6 +243,7 @@ function NotificationPanel(): React.ReactElement {
               </div>
               {group.items.map((n) => {
                 const dot = NOTIF_ICON_COLORS[n.icon] || 'var(--color-accent)';
+                const restBg = n.read === 0 ? 'color-mix(in srgb, var(--color-accent) 8%, transparent)' : 'transparent';
                 return (
                 <div
                   key={n.id}
@@ -250,11 +252,13 @@ function NotificationPanel(): React.ReactElement {
                     padding: '10px var(--space-4)',
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
-                    background: n.read === 0 ? 'rgba(59,130,246,0.08)' : 'transparent',
+                    background: restBg,
                     display: 'flex',
                     gap: '10px',
                     alignItems: 'flex-start',
                   }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = restBg; }}
                 >
                   <div
                     style={{
@@ -330,6 +334,12 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         setOpen(!isOpen);
+      } else if (e.key === 'Escape' && isOpen) {
+        // Robust Esc-to-close: the inline onKeyDown only fires while focus is
+        // inside the overlay, but clicking a result row or scrolling can move
+        // focus out. A window-level listener (matching the bell/feedback
+        // panels) closes reliably regardless of where focus landed.
+        setOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeydown);
@@ -395,21 +405,13 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
         }}
       >
         <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
-          <input
+          <DexSearchInput
             ref={inputRef}
+            fullWidth
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
+            onClear={() => handleQueryChange('')}
             placeholder="Search"
-            style={{
-              width: '100%',
-              background: 'var(--color-bg-hover)',
-              border: '1px solid var(--color-border, #3a3a3c)',
-              borderRadius: '8px',
-              padding: 'var(--space-3) var(--space-4)',
-              color: 'var(--color-text-primary)',
-              fontSize: '15px',
-              outline: 'none',
-            }}
           />
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -581,7 +583,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); retryTask(task.id); }}
               aria-label={`Retry task ${task.name}`}
-              style={{ background: 'none', border: '1px solid #ef4444', borderRadius: '3px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid var(--color-error)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Retry
             </button>
@@ -642,6 +644,12 @@ export function ScratchpadOverlay(): React.ReactElement | null {
         e.preventDefault();
         if (!isOpen) loadState();
         setOpen(!isOpen);
+      } else if (e.key === 'Escape' && isOpen) {
+        // Robust Esc-to-close: the inline onKeyDown only catches Esc while
+        // focus is inside the textarea, but dragging the title bar or clicking
+        // a footer button moves focus out. Close at the window level instead.
+        setOpen(false);
+        setConfirmClear(false);
       }
     };
     window.addEventListener('keydown', handleKeydown);

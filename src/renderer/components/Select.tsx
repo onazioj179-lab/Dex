@@ -208,11 +208,7 @@ export const Select: React.FC<SelectProps> = ({
       borderRadius: 'var(--radius-lg)',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
-      boxShadow: 'inset 0 0.5px 0 var(--color-bg-hover)',
-      transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-    },
-    controlFocused: {
-      boxShadow: `0 0 0 2px ${error ? 'var(--color-error-muted)' : 'var(--color-accent-muted, var(--color-accent-soft))'}`,
+      transition: 'border-color 150ms cubic-bezier(0.4, 0, 0.2, 1)',
     },
     value: {
       flex: 1,
@@ -250,9 +246,10 @@ export const Select: React.FC<SelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
+      padding: 4,
       background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
+      borderRadius: 10,
       boxShadow: 'var(--pg-shadow-popover)',
       maxHeight: 240,
       overflow: 'auto',
@@ -265,7 +262,8 @@ export const Select: React.FC<SelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px var(--space-3)',
+      padding: '8px var(--space-3)',
+      borderRadius: 6,
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
@@ -275,7 +273,6 @@ export const Select: React.FC<SelectProps> = ({
       background: 'var(--color-bg-hover)',
     },
     optionSelected: {
-      background: 'var(--color-accent-light)',
       color: 'var(--color-accent, #7cb8ff)',
     },
     optionDisabled: {
@@ -322,10 +319,7 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <div ref={containerRef} style={styles.container}>
       <div
-        style={{
-          ...styles.control,
-          ...(isOpen ? styles.controlFocused : {}),
-        }}
+        style={styles.control}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
         tabIndex={disabled ? -1 : 0}
@@ -555,9 +549,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
+      padding: 4,
       background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
+      borderRadius: 10,
       boxShadow: 'var(--pg-shadow-popover)',
       maxHeight: 240,
       overflow: 'auto',
@@ -567,10 +562,18 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px var(--space-3)',
+      padding: '8px var(--space-3)',
+      borderRadius: 6,
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
+      transition: 'background 0.1s',
+    },
+    empty: {
+      padding: 'var(--space-5)',
+      textAlign: 'center',
+      color: 'var(--color-text-muted)',
+      fontSize: 13,
     },
     checkbox: {
       width: 16,
@@ -602,7 +605,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               onClick={(e) => handleRemove(option.value, e)}
               aria-label={`Remove ${option.label}`}
             >
-              ×
+              <DexIcon name="close" size={10} />
             </button>
           </span>
         ))}
@@ -630,7 +633,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
 
       {isOpen && (
         <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
-          {filteredOptions.map(option => {
+          {filteredOptions.length === 0 ? (
+            <div style={styles.empty}>No options found</div>
+          ) : filteredOptions.map(option => {
             const isSelected = currentValues.includes(option.value);
             const isDisabled = option.disabled ||
               (maxSelected && !isSelected && currentValues.length >= maxSelected);
@@ -644,6 +649,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                   cursor: isDisabled ? 'not-allowed' : 'pointer',
                 }}
                 onClick={() => !isDisabled && handleToggle(option)}
+                onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 <div
                   style={{
@@ -651,7 +658,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     ...(isSelected ? styles.checkboxChecked : {}),
                   }}
                 >
-                  {isSelected && 'check'}
+                  {isSelected && <DexIcon name="check" size={10} />}
                 </div>
                 {option.label}
               </div>

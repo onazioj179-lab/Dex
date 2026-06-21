@@ -20,6 +20,7 @@ import {
 } from './VinxTypes';
 import { Z_DROPDOWN_MAX } from '../../../shared/zIndex';
 import { EmptyState } from '../../components/EmptyState';
+import { DexSearchInput } from '../../styles/components';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -45,12 +46,6 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 const searchBarStyle: React.CSSProperties = {
   height: 28, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)',
   borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
-};
-
-const searchInputStyle: React.CSSProperties = {
-  flex: 1, height: 24, background: 'var(--color-bg-inset)', border: '1px solid var(--color-border)',
-  borderRadius: 6, padding: '0 var(--space-2)', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
-  fontFamily: 'inherit', boxSizing: 'border-box',
 };
 
 const listItemStyle = (selected: boolean): React.CSSProperties => ({
@@ -331,12 +326,14 @@ const MediaTab: React.FC = memo(() => {
 
       {/* Search */}
       <div style={searchBarStyle}>
-        <input
-          style={searchInputStyle}
+        <DexSearchInput
+          size="sm"
+          fullWidth
           placeholder="Search media..."
           aria-label="Search media library"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
         />
       </div>
 
@@ -513,7 +510,7 @@ const EffectsTab: React.FC = memo(() => {
   return (
     <div style={panelStyle}>
       <div style={searchBarStyle}>
-        <input style={searchInputStyle} placeholder="Search" aria-label="Search effects" value={search} onChange={e => setSearch(e.target.value)} />
+        <DexSearchInput size="sm" fullWidth placeholder="Search" aria-label="Search effects" value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch('')} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([category, effects]) => (
@@ -575,7 +572,7 @@ const TransitionsTab: React.FC = memo(() => {
   return (
     <div style={panelStyle}>
       <div style={searchBarStyle}>
-        <input style={searchInputStyle} placeholder="Search" aria-label="Search transitions" value={search} onChange={e => setSearch(e.target.value)} />
+        <DexSearchInput size="sm" fullWidth placeholder="Search" aria-label="Search transitions" value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch('')} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([group, transitions]) => (

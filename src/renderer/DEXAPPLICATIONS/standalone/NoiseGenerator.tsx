@@ -237,14 +237,14 @@ const NoiseGenerator: React.FC = () => {
 
       {/* Volume */}
       <div style={st.volumeRow}>
-        <span style={st.volumeIcon}><DexIcon name="volume-2" size={16} /></span>
+        <span style={st.volumeIcon}><DexIcon name="volume-1" size={16} /></span>
         <input
           type="range" min="0" max="1" step="0.01" value={volume}
           onChange={e => setVolume(parseFloat(e.target.value))}
           style={st.slider}
           aria-label="Volume"
         />
-        <span style={st.volumeIcon}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></span>
+        <span style={st.volumeIcon}><DexIcon name="volume-2" size={16} /></span>
       </div>
 
       {/* Timer */}

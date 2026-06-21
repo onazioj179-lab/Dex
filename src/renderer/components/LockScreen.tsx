@@ -499,7 +499,7 @@ export const LockScreen: React.FC = () => {
                 type="submit"
                 style={{
                   ...styles.unlockBtn,
-                  ...(lockoutStatus.isLockedOut || isLoading ? styles.unlockBtnDisabled : {}),
+                  ...(lockoutStatus.isLockedOut || isLoading || !password.trim() ? styles.unlockBtnDisabled : {}),
                 }}
                 className="lock-unlock-btn"
                 disabled={lockoutStatus.isLockedOut || isLoading || !password.trim()}

@@ -338,10 +338,10 @@ const Calendar: React.FC = () => {
         <div style={styles.headerLeft}>
           <button style={styles.todayBtn} onClick={goToToday} aria-label="Go to today">Today</button>
           <div style={styles.navBtns}>
-            <button style={styles.navBtn} onClick={() => navigate(-1)} aria-label="Previous month">
+            <button style={styles.navBtn} onClick={() => navigate(-1)} aria-label={view === 'week' ? 'Previous week' : 'Previous month'} title={view === 'week' ? 'Previous week' : 'Previous month'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <button style={styles.navBtn} onClick={() => navigate(1)} aria-label="Next month">
+            <button style={styles.navBtn} onClick={() => navigate(1)} aria-label={view === 'week' ? 'Next week' : 'Next month'} title={view === 'week' ? 'Next week' : 'Next month'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
             </button>
           </div>
@@ -363,7 +363,7 @@ const Calendar: React.FC = () => {
             <button style={{ ...styles.viewBtn, ...(view === 'month' ? styles.viewBtnActive : {}) }} onClick={() => setView('month')} aria-label="Month view">Month</button>
             <button style={{ ...styles.viewBtn, ...(view === 'week' ? styles.viewBtnActive : {}) }} onClick={() => setView('week')} aria-label="Week view">Week</button>
           </div>
-          <button style={styles.addBtn} onClick={() => setShowEventModal(true)} aria-label="Add event">
+          <button style={styles.addBtn} onClick={() => setShowEventModal(true)} aria-label="Add event" title="Add event">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
           <button style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportICS} aria-label="Export ICS">Export</button>
@@ -443,7 +443,7 @@ const Calendar: React.FC = () => {
         </div>
 
         {/* Toggle Sidebar */}
-        <button style={styles.sidebarToggle} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar">
+        <button style={styles.sidebarToggle} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" title="Toggle sidebar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
           </svg>
@@ -619,10 +619,13 @@ const Calendar: React.FC = () => {
                   <button
                     key={r}
                     style={{
-                      padding: '4px 10px', borderRadius: 4, border: 'none', fontSize: 12,
-                      background: newEvent.recurring === r ? 'var(--accent)' : 'var(--bg-tertiary, #333)',
-                      color: newEvent.recurring === r ? '#fff' : 'var(--text-secondary)',
+                      padding: '4px 10px', borderRadius: 4,
+                      border: '1px solid ' + (newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
+                      fontSize: 12,
+                      background: newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                      color: newEvent.recurring === r ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
                     onClick={() => setNewEvent({ ...newEvent, recurring: r })}
                     aria-label={`Repeat ${r}`}

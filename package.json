@@ -2,7 +2,6 @@
   "name": "dex",
   "version": "6.0.0",
   "description": "DEX - Personal Control Hub for Desktop Automation",
-  "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
   "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://github.com/onazioj179-lab/Dex",
@@ -12,21 +11,18 @@
   },
   "scripts": {
     "clean": "rimraf dist release",
-    "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:main\"",
+    "dev": "tauri dev",
     "dev:renderer": "vite",
-    "dev:main": "tsc -p tsconfig.main.json && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 NODE_ENV=development electron .",
-    "build": "npm run build:renderer && npm run build:main",
+    "build": "npm run build:renderer",
     "build:renderer": "vite build",
-    "build:main": "tsc -p tsconfig.main.json",
     "build:native": "cd native && npm install && npx napi build --platform --release",
     "build:native:debug": "cd native && npm install && npx napi build --platform",
     "build:core": "node scripts/build-dex-core.js",
     "backlog:build": "node scripts/build-master-backlog.js",
     "backlog:sprints": "node scripts/split-sprints.js",
-    "build:all": "npm run build:native && npm run build:core && npm run build",
+    "build:all": "npm run build:native && npm run build:core && npm run build:tauri",
     "dev:tauri": "tauri dev",
     "build:tauri": "tauri build",
-    "start": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -34,21 +30,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:legacy": "node tests/run-tests.js",
-    "package": "npm run build && electron-builder",
-    "package:win": "npm run build && electron-builder --win",
-    "package:mac": "npm run build && electron-builder --mac",
-    "package:mac:x64": "npm run build && electron-builder --mac --x64",
-    "package:mac:arm64": "npm run build && electron-builder --mac --arm64",
-    "package:linux": "npm run build && electron-builder --linux",
-    "package:linux:deb": "npm run build && electron-builder --linux deb",
-    "package:linux:rpm": "npm run build && electron-builder --linux rpm",
-    "package:linux:appimage": "npm run build && electron-builder --linux AppImage",
-    "package:all": "npm run build && electron-builder -mwl",
-    "release:win": "node scripts/release.js --platform win",
-    "release:mac": "node scripts/release.js --platform mac",
-    "release:linux": "node scripts/release.js --platform linux",
-    "release:publish": "node scripts/release.js --publish",
-    "postinstall": "npx electron-builder install-app-deps",
+    "package": "npm run build:tauri",
     "generate-icons": "node scripts/generate-icons.js",
     "watermark": "node scripts/add-watermarks.js",
     "watermark:check": "node scripts/add-watermarks.js --check",
@@ -68,9 +50,6 @@
     "better-sqlite3": "^11.6.0",
     "d3-force": "^3.0.0",
     "dompurify": "^3.3.1",
-    "electron-log": "^5.0.3",
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.7.3",
     "idb-keyval": "^6.2.2",
     "loudness": "^0.4.2",
     "maplibre-gl": "^5.24.0",
@@ -98,8 +77,6 @@
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
     "cross-env": "^10.1.0",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
     "happy-dom": "^20.3.9",
     "jsdom": "^27.4.0",
     "lightningcss": "^1.32.0",
@@ -110,180 +87,5 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.10",
     "vitest": "^4.0.18"
-  },
-  "build": {
-    "appId": "com.onazioj.dex",
-    "productName": "DEX",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-    "copyright": "Copyright © 2026 Onazi Treasure OJ. All Rights Reserved.",
-    "directories": {
-      "output": "release",
-      "buildResources": "assets"
-    },
-    "files": [
-      "dist/**/*",
-      "!dist/**/*.map"
-    ],
-    "extraResources": [
-      {
-        "from": "native",
-        "to": "native",
-        "filter": [
-          "*.node"
-        ]
-      },
-      {
-        "from": "src/python",
-        "to": "python",
-        "filter": [
-          "**/*.py",
-          "requirements.txt"
-        ]
-      },
-      {
-        "from": "assets/config/update-server.json",
-        "to": "config/update-server.json"
-      },
-      {
-        "from": "docs/CHANGELOG.md",
-        "to": "CHANGELOG.md"
-      }
-    ],
-    "asar": true,
-    "compression": "maximum",
-    "removePackageScripts": true,
-    "win": {
-      "icon": "assets/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "publisherName": "Onazi Treasure OJ",
-      "verifyUpdateCodeSignature": false
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": true,
-      "include": "assets/installer/windows-clean-uninstall.nsh",
-      "license": "LICENSE",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "DEX",
-      "menuCategory": "DEX",
-      "runAfterFinish": true,
-      "warningsAsErrors": false,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.png",
-      "category": "public.app-category.utilities",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "assets/entitlements.mac.plist",
-      "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
-      "darkModeSupport": true,
-      "type": "distribution",
-      "minimumSystemVersion": "10.15",
-      "extendInfo": {
-        "NSAppleEventsUsageDescription": "Dex needs permission to control other applications for automation.",
-        "NSSystemAdministrationUsageDescription": "Dex needs elevated privileges for certain system automation tasks.",
-        "NSHighResolutionCapable": true,
-        "NSSupportsAutomaticGraphicsSwitching": true,
-        "CFBundleDocumentTypes": [],
-        "LSApplicationCategoryType": "public.app-category.utilities",
-        "LSMinimumSystemVersion": "10.15"
-      }
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      }
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "rpm",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.png",
-      "category": "Utility",
-      "maintainer": "Onazi Treasure OJ <onazi75@gmail.com>",
-      "vendor": "Onazi Treasure OJ",
-      "synopsis": "Personal Control Hub",
-      "description": "DEX — desktop automation and productivity platform"
-    },
-    "appImage": {
-      "artifactName": "${productName}-${version}.${ext}"
-    },
-    "deb": {
-      "depends": [
-        "libnotify4",
-        "libxtst6",
-        "libnss3"
-      ],
-      "afterInstall": "assets/linux/after-install.sh",
-      "afterRemove": "assets/linux/after-remove.sh"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "onazioj179-lab",
-      "repo": "dex-updates",
-      "releaseType": "release"
-    }
   }
 }

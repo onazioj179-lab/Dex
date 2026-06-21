@@ -25,6 +25,7 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 import { buildDexCommands, matchTerminalCommand, resolveShortcut, suggestDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { describeCapabilities, type CapabilityStatus } from '../uki/permissions';
+import { parseAnsi, type Span } from '../../shared/term/ansiParser';
 
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
@@ -40,45 +41,6 @@ const bridge = (): ElectronBridge | null => {
   const w = window as unknown as { electron?: ElectronBridge };
   return w.electron && typeof w.electron.invoke === 'function' ? w.electron : null;
 };
-
-// ---------------------------------------------------------------------------
-// Lightweight ANSI parser -- handles SGR (color) codes, strips others.
-// ---------------------------------------------------------------------------
-const ANSI_REGEX = /\x1b\[([\d;?]*)([A-Za-z])/g;
-const ANSI_COLORS_FG: Record<number, string> = {
-  30: '#1e1e1e', 31: '#ff5f5f', 32: '#3da66a', 33: '#ffb020',
-  34: '#4a9eff', 35: '#c678dd', 36: '#56b6c2', 37: '#d0d0d0',
-  90: '#666666', 91: '#ff8080', 92: '#5dd685', 93: '#ffd166',
-  94: '#7ab8ff', 95: '#dd9cff', 96: '#7fdfee', 97: '#ffffff',
-};
-
-interface Span { text: string; color?: string; bold?: boolean; }
-
-function parseAnsi(input: string, prevColor?: string, prevBold?: boolean): { spans: Span[]; color?: string; bold?: boolean } {
-  const spans: Span[] = [];
-  let cursor = 0;
-  let color = prevColor;
-  let bold = prevBold;
-  let m: RegExpExecArray | null;
-  ANSI_REGEX.lastIndex = 0;
-  while ((m = ANSI_REGEX.exec(input)) !== null) {
-    if (m.index > cursor) spans.push({ text: input.slice(cursor, m.index), color, bold });
-    if (m[2] === 'm') {
-      const codes = m[1].split(';').filter(Boolean).map(Number);
-      if (codes.length === 0) { color = undefined; bold = false; }
-      for (const c of codes) {
-        if (c === 0) { color = undefined; bold = false; }
-        else if (c === 1) { bold = true; }
-        else if (c === 22) { bold = false; }
-        else if (c === 39) { color = undefined; }
-        else if (ANSI_COLORS_FG[c]) { color = ANSI_COLORS_FG[c]; }
-      }
-    }
-    cursor = m.index + m[0].length;
-  }
-  if (cursor < input.length) spans.push({ text: input.slice(cursor), color, bold });
-  return { spans, color, bold };
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -470,8 +432,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     }
 
     // --- `dex <cmd>` suggestion dropdown intercepts navigation/commit/dismiss.
-    // It only fires while the dropdown is visible; Tab is intentionally left to
-    // the existing completion below, so muscle memory is preserved.
+    // It only fires while the dropdown is visible. Tab now COMPLETES the line with
+    // the highlighted suggestion (fills it, does not run) -- previously Tab had no
+    // handler and fell through to the input default, blurring the terminal (the
+    // "Tab does nothing" bug). Enter still accepts + runs.
     if (showSuggest) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -481,6 +445,12 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSuggestIdx((i) => (i - 1 + dexSuggestions.length) % dexSuggestions.length);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const pick = dexSuggestions[Math.min(suggestIdx, dexSuggestions.length - 1)];
+        if (pick) { setInput(`dex ${pick.command.terminal}`); setSuggestIdx(0); }
         return;
       }
       if (e.key === 'Enter') {
@@ -540,7 +510,12 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       e.preventDefault();
       setLines([]);
     } else if (e.ctrlKey && e.key.toLowerCase() === 'c') {
-      // Send SIGINT via control-char
+      // If the user has selected output text, Ctrl+C means "copy" — let the
+      // browser handle it natively and do NOT also send SIGINT / clear the line.
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
+      // Otherwise: send SIGINT via control-char and discard the pending line.
+      e.preventDefault();
       const b = bridge();
       if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
       setInput('');
@@ -615,7 +590,38 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           whiteSpace: 'pre-wrap', wordBreak: 'break-all',
         }}
       >
-        {error && <div style={{ color: 'var(--color-error, #ff5f5f)' }}>{error}</div>}
+        {(unavailable || (!sessionId && error)) && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+              margin: '4px 0 10px',
+              padding: '10px 12px',
+              background: 'rgba(255,95,95,0.08)',
+              border: '1px solid rgba(255,95,95,0.32)',
+              borderRadius: 4,
+              color: '#ffb3b3',
+            }}
+          >
+            <span style={{ color: 'var(--color-error, #ff5f5f)', fontWeight: 600 }}>
+              Terminal unavailable — the shell couldn’t start.
+            </span>
+            {error && <span style={{ color: '#cc8a8a', fontSize: 11 }}>{error}</span>}
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                background: 'transparent', color: 'var(--color-accent, #4a9eff)',
+                border: '1px solid var(--color-accent, #4a9eff)', borderRadius: 4,
+                fontSize: 11, cursor: 'pointer', padding: '3px 12px', fontWeight: 600,
+                fontFamily: 'inherit',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {error && sessionId && <div style={{ color: 'var(--color-error, #ff5f5f)' }}>{error}</div>}
         {lines.map(l => (
           <div key={l.id}>
             {l.spans.map((sp, i) => (

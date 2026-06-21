@@ -39,6 +39,11 @@ const inputStyle: React.CSSProperties = {
 };
 const blank = { name: '', host: '', user: '', port: '22', keyPath: '' };
 
+// glassButton carries no :disabled CSS; give disabled controls the standalone-app
+// visual so they don't stay fully lit with a pointer cursor.
+const disabledVisual = (off: boolean): React.CSSProperties =>
+  off ? { opacity: 0.5, cursor: 'not-allowed' } : {};
+
 export default function SshClient(): React.ReactElement {
   const bridge = useMemo(getBridge, []);
   const [tools, setTools] = useState<{ ssh: boolean; keygen: boolean } | null>(null);
@@ -159,7 +164,7 @@ export default function SshClient(): React.ReactElement {
                 </div>
                 <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12, borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }} onClick={() => connect(p.id)}>Connect</button>
                 <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11 }} onClick={() => edit(p)}>Edit</button>
-                <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11, color: 'var(--color-error)', borderColor: 'var(--color-error)' }} disabled={busy} onClick={() => del(p.id)}>Delete</button>
+                <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11, color: 'var(--color-error)', borderColor: 'var(--color-error)', ...disabledVisual(busy) }} disabled={busy} onClick={() => del(p.id)}>Delete</button>
               </li>
             ))}
           </ul>
@@ -173,7 +178,7 @@ export default function SshClient(): React.ReactElement {
           <input aria-label="Host" value={form.host} onChange={(e) => setForm(f => ({ ...f, host: e.target.value }))} placeholder="host (example.com)" style={inputStyle} />
           <input aria-label="Port" value={form.port} onChange={(e) => setForm(f => ({ ...f, port: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="22" style={{ ...inputStyle, width: 100 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ ...glassButton, padding: '6px 16px' }} disabled={busy || !form.host.trim() || !form.user.trim()} onClick={saveProfile}>{editingId ? 'Update' : 'Add profile'}</button>
+            <button style={{ ...glassButton, padding: '6px 16px', ...disabledVisual(busy || !form.host.trim() || !form.user.trim()) }} disabled={busy || !form.host.trim() || !form.user.trim()} onClick={saveProfile}>{editingId ? 'Update' : 'Add profile'}</button>
             {editingId && <button style={glassButton} onClick={() => { setForm({ ...blank }); setEditingId(null); }}>Cancel</button>}
           </div>
         </div>
@@ -202,7 +207,7 @@ export default function SshClient(): React.ReactElement {
             <option value="rsa">rsa (4096)</option>
           </select>
           <input aria-label="Key name" value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="key name" style={{ ...inputStyle, width: 200, fontFamily: 'var(--font-mono)' }} />
-          <button style={glassButton} disabled={busy || !keyName.trim() || !(tools?.keygen)} onClick={genKey}>Generate key</button>
+          <button style={{ ...glassButton, ...disabledVisual(busy || !keyName.trim() || !(tools?.keygen)) }} disabled={busy || !keyName.trim() || !(tools?.keygen)} onClick={genKey}>Generate key</button>
         </div>
       </section>
     </div>

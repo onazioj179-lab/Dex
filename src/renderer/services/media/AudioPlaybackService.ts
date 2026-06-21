@@ -77,8 +77,12 @@ export class AudioPlaybackService {
     return this.buffer.duration;
   }
 
-  /** Start (or restart) playback, optionally from a given second. */
-  play(fromSec?: number): void {
+  /**
+   * Start (or restart) playback, optionally from a given second. When
+   * `fadeInSec` is given the master gain ramps up from silence so the onset
+   * isn't abrupt — mirrors the fade-out crossfade callers apply on the way out.
+   */
+  play(fromSec?: number, fadeInSec = 0): void {
     const ctx = this.ensureContext();
     if (!this.buffer || !this.gain) return;
     if (this.status === 'playing') this.stopSource();
@@ -99,7 +103,22 @@ export class AudioPlaybackService {
     this.source = source;
     this.startedAt = ctx.currentTime;
     if (ctx.state === 'suspended') void ctx.resume();
+    if (fadeInSec > 0) this.fadeInGain(fadeInSec);
     this.setStatus('playing');
+  }
+
+  /**
+   * Ramp the master gain from near-silence up to the current volume over
+   * `seconds`. Exponential ramps can't target or start from 0, so we seed an
+   * epsilon and finish with the real target gain.
+   */
+  private fadeInGain(seconds: number): void {
+    if (!this.gain || !this.ctx) return;
+    const target = Math.max(0.0001, dbToGain(this.volumeDb));
+    const now = this.ctx.currentTime;
+    this.gain.gain.cancelScheduledValues(now);
+    this.gain.gain.setValueAtTime(0.0001, now);
+    this.gain.gain.exponentialRampToValueAtTime(target, now + seconds);
   }
 
   pause(): void {

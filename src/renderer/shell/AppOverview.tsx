@@ -182,48 +182,61 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
         cursor: 'default',
       }}
     >
-      {/* Search bar */}
-      {search.length > 0 && (
+      {/* Search bar — single input that owns the ref. While empty it stays
+          off-screen (so first keystroke focuses it); it reveals as a flat pill
+          once the user starts filtering. */}
+      <div style={{
+        position: 'absolute',
+        top: 40,
+        width: 320,
+        padding: 'var(--space-2) var(--space-4)',
+        background: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        opacity: search.length > 0 ? 1 : 0,
+        pointerEvents: search.length > 0 ? 'auto' : 'none',
+        transition: isReduceMotion() ? 'none' : 'opacity 0.15s ease',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          ref={searchRef}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Filter apps"
+          placeholder="Filter apps..."
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: 'var(--color-text-primary)',
+            fontSize: 14,
+            fontFamily: 'var(--font-family)',
+          }}
+        />
+      </div>
+
+      {/* Empty state when the filter (or an empty desktop) yields nothing */}
+      {filtered.length === 0 && (
         <div style={{
-          position: 'absolute',
-          top: 40,
-          width: 320,
-          padding: 'var(--space-2) var(--space-4)',
-          background: 'var(--color-border-subtle)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 8,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           gap: 'var(--space-2)',
+          color: 'var(--color-text-muted)',
+          fontSize: 14,
+          fontFamily: 'var(--font-family)',
         }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            autoFocus
-            placeholder="Filter apps..."
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: 'var(--color-text-primary)',
-              fontSize: 14,
-              fontFamily: 'var(--font-family)',
-            }}
-          />
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>{search ? `No apps match "${search}"` : 'No open apps'}</span>
         </div>
       )}
-      <input
-        ref={searchRef}
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
-        tabIndex={-1}
-      />
 
       {/* Card grid */}
+      {filtered.length > 0 && (
       <div style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${Math.min(maxPerRow, filtered.length)}, ${cardWidth}px)`,
@@ -255,12 +268,12 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 width: '100%',
                 height: cardHeight,
                 borderRadius: 10,
-                background: app.id === activeAppId
-                  ? 'var(--color-accent-light, rgba(74,158,255,0.12))'
-                  : 'var(--color-border-subtle)',
-                border: app.id === activeAppId
-                  ? '2px solid var(--color-accent)'
-                  : '1px solid var(--color-border-subtle)',
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--color-border-subtle)',
+                // Active app: calm accent ring (outline keeps the layout stable
+                // and reads clearly without a loud fill or thick border).
+                outline: app.id === activeAppId ? '2px solid var(--color-accent)' : 'none',
+                outlineOffset: app.id === activeAppId ? 2 : 0,
                 overflow: 'hidden',
                 position: 'relative',
                 boxShadow: 'var(--pg-shadow-card)',
@@ -290,6 +303,8 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 {isHovered && app.id !== 'home' && (
                   <button
                     onClick={(e) => handleCardClose(e, app.id)}
+                    title={`Close ${app.name}`}
+                    aria-label={`Close ${app.name}`}
                     style={{
                       position: 'absolute',
                       top: 6, right: 6,
@@ -325,6 +340,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
           );
         })}
       </div>
+      )}
     </div>
   );
 };

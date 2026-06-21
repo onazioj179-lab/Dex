@@ -23,6 +23,8 @@ import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../../uki/answerEngine';
+import { classifyOperatorIntent, diagnose } from '../../uki/operator';
+import { APP_DEFINITIONS } from '../../store/runningApps';
 import type { ChatMessage } from '../../uki/providers/types';
 
 interface Conversation {
@@ -103,6 +105,150 @@ async function dexInvoke<T = unknown>(channel: string, ...args: unknown[]): Prom
 
 const newId = () =>
   `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** Launch a DEX app by id or name via the same `dex-open-app` event AppManager
+ *  listens for. Returns the resolved app name, or null when nothing matches. */
+function launchAppByName(name: string): string | null {
+  const norm = name.toLowerCase().trim();
+  if (!norm) return null;
+  const entries = Object.entries(APP_DEFINITIONS);
+  let hit = entries.find(([id]) => id === norm);
+  if (!hit) hit = entries.find(([, d]) => d.name.toLowerCase() === norm);
+  if (!hit) hit = entries.find(([, d]) => d.name.toLowerCase().startsWith(norm));
+  if (!hit) return null;
+  const [id, def] = hit;
+  try {
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: id, appName: def.name } }));
+  } catch {
+    return null;
+  }
+  return def.name;
+}
+
+/** Result of a slash command: either a reply to show, or null when the input
+ *  is not a (recognized) slash command and should fall through to normal chat. */
+interface SlashOutcome { reply: string; role: 'copilot' | 'system'; }
+
+/**
+ * Self-contained slash commands wired to real DEX mechanisms (no new backend
+ * channels). Anything not handled here returns null and falls through to the
+ * action planner / LLM. `/summarize` is deliberately NOT handled so it routes
+ * through the existing `uki.summarize` planner action.
+ */
+async function runSlashCommand(text: string): Promise<SlashOutcome | null> {
+  if (!text.startsWith('/')) return null;
+  const space = text.indexOf(' ');
+  const cmd = (space === -1 ? text.slice(1) : text.slice(1, space)).toLowerCase();
+  const arg = (space === -1 ? '' : text.slice(space + 1)).trim();
+  switch (cmd) {
+    case 'help':
+    case '?':
+      return {
+        role: 'system',
+        reply:
+          'Slash commands: /open <app>, /note <text>, /task <text>, /find <query>, /run <workflow>, ' +
+          '/summarize <text>, /timer [minutes], /clipboard, /focus, /mute, /notify <text>, /help.',
+      };
+    case 'open': {
+      if (!arg) return { role: 'system', reply: 'Usage: /open <app name>. Try /open notes or /open files.' };
+      const name = launchAppByName(arg);
+      return { role: 'system', reply: name ? `Opening ${name}…` : `No app matches "${arg}". Try /help.` };
+    }
+    case 'note': {
+      launchAppByName('notes');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:create-note', { detail: { text: arg } })); } catch { /* best effort */ }
+      }
+      return { role: 'system', reply: arg ? `Note drafted: "${arg.slice(0, 80)}"` : 'Notes opened.' };
+    }
+    case 'task': {
+      launchAppByName('tasks');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:create-task', { detail: { text: arg } })); } catch { /* best effort */ }
+      }
+      return { role: 'system', reply: arg ? `Task added: "${arg.slice(0, 80)}"` : 'Tasks opened.' };
+    }
+    case 'find': {
+      launchAppByName('files');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:files-search', { detail: { query: arg } })); } catch { /* best effort */ }
+      }
+      return { role: 'system', reply: arg ? `Searching files for "${arg}"…` : 'Files opened. Type a query.' };
+    }
+    case 'run': {
+      launchAppByName('workflows');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:workflow-run', { detail: { name: arg } })); } catch { /* best effort */ }
+      }
+      return { role: 'system', reply: arg ? `Running workflow "${arg}"…` : 'Workflows opened.' };
+    }
+    case 'timer': {
+      // The Timer app keeps its own state with no event-driven start API, so the
+      // safe, real action is to open it; we echo the requested minutes to enter.
+      const mins = arg ? Math.max(1, Math.min(1440, Math.round(parseFloat(arg)))) : NaN;
+      const name = launchAppByName('timer');
+      if (!name) return { role: 'system', reply: 'Timer app is unavailable.' };
+      if (Number.isFinite(mins)) {
+        return { role: 'system', reply: `Timer opened — enter ${mins} minute${mins === 1 ? '' : 's'} and press start.` };
+      }
+      return { role: 'system', reply: 'Timer opened. Tip: /timer 10 to suggest 10 minutes.' };
+    }
+    case 'clipboard': {
+      try {
+        const clip = await navigator.clipboard?.readText?.();
+        if (clip == null || clip === '') return { role: 'system', reply: 'Clipboard is empty.' };
+        return { role: 'copilot', reply: `Clipboard:\n\n${clip.slice(0, 4000)}` };
+      } catch {
+        return { role: 'system', reply: 'Could not read the clipboard (permission denied).' };
+      }
+    }
+    case 'focus': {
+      // Toggle the distraction-free focus-mode class (the same mechanism the UKI
+      // overlay's accessibility action uses); persisted so it survives reloads.
+      const on = !document.documentElement.classList.contains('focus-mode');
+      document.documentElement.classList.toggle('focus-mode', on);
+      try {
+        if (on) localStorage.setItem('dex:a11y:focusMode', 'true');
+        else localStorage.removeItem('dex:a11y:focusMode');
+      } catch { /* localStorage unavailable */ }
+      return { role: 'system', reply: on ? 'Focus mode on. Non-essential UI hidden — /focus again to exit.' : 'Focus mode off.' };
+    }
+    case 'mute': {
+      // Mute by setting system volume to 0: persist + broadcast the same
+      // `dex-system-volume` event AppManager fires, and zero live media elements.
+      try {
+        localStorage.setItem('dex-system-volume', '0');
+        document.querySelectorAll<HTMLMediaElement>('audio, video').forEach((el) => { el.volume = 0; });
+        window.dispatchEvent(new CustomEvent('dex-system-volume', { detail: 0 }));
+      } catch { /* best effort */ }
+      return { role: 'system', reply: 'System muted. Adjust volume from the top bar to restore.' };
+    }
+    case 'notify': {
+      if (!arg) return { role: 'system', reply: 'Usage: /notify <text>.' };
+      try {
+        window.dispatchEvent(new CustomEvent('dex-notification', {
+          detail: { title: 'uki', body: arg, type: 'info', source: 'uki' },
+        }));
+      } catch { /* best effort */ }
+      return { role: 'system', reply: `Notification sent: "${arg.slice(0, 80)}"` };
+    }
+    default:
+      // Unknown slash word — let it fall through to the normal chat path.
+      return null;
+  }
+}
+
+/** When the user clearly describes a problem and on-device troubleshooting
+ *  knowledge has a confident hit, answer locally (no LLM round-trip). Returns
+ *  null otherwise so normal chat / LLM fallback proceeds unchanged. */
+function tryOperatorLocalAnswer(text: string): string | null {
+  if (classifyOperatorIntent(text) !== 'diagnose') return null;
+  const hits = diagnose(text, 1);
+  const top = hits[0];
+  if (!top) return null;
+  const steps = top.fix.map((s, i) => `${i + 1}. ${s}`).join('\n');
+  return `${top.symptom}\n\nLikely cause: ${top.cause}\n\nTry this:\n${steps}`;
+}
 
 export default function Uki(): React.ReactElement {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -280,6 +426,19 @@ export default function Uki(): React.ReactElement {
     autosize(inputRef.current);
     if (cid) void dexInvoke('uki-chat:appendMessage', cid, userMsg);
 
+    // Slash commands run first against real DEX mechanisms (open/note/task/find/
+    // run/timer/clipboard/focus/mute/notify). `/summarize` is intentionally left
+    // to the planner below (uki.summarize). Unknown slashes fall through.
+    if (text.startsWith('/') && !/^\/summari[sz]e\b/i.test(text)) {
+      const outcome = await runSlashCommand(text);
+      if (outcome) {
+        const reply: Message = { id: newId(), role: outcome.role, content: outcome.reply, timestamp: Date.now() };
+        setMessages((m) => [...m, reply]);
+        if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+        return;
+      }
+    }
+
     // Imperative action? Decompose into a plan, then either hold for explicit
     // approval (mutating, e.g. opening an app) or run read-only LLM transforms.
     const command = buildChatCommand(text);
@@ -328,6 +487,17 @@ export default function Uki(): React.ReactElement {
         }
         grounding = groundingLine(knowledge);
       }
+    }
+
+    // Operator (light touch): if the message clearly describes a problem and the
+    // on-device troubleshooting knowledge has a confident hit, answer locally
+    // instead of falling back to the raw LLM. Guarded so normal chat is untouched.
+    const localAnswer = tryOperatorLocalAnswer(text);
+    if (localAnswer) {
+      const reply: Message = { id: newId(), role: 'copilot', content: localAnswer, timestamp: Date.now() };
+      setMessages((m) => [...m, reply]);
+      if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+      return;
     }
 
     // Re-check live (the once-on-mount value can be stale if a key was just added).
@@ -600,7 +770,7 @@ const S: Record<string, React.CSSProperties> = {
   bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 3 },
   bubbleSystem: { background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', fontSize: 13, fontStyle: 'italic' },
   caret: { opacity: 0.6, marginLeft: 1 },
-  actionCard: { alignSelf: 'flex-start', maxWidth: '80%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)', borderRadius: 10, padding: 'var(--space-3)' },
+  actionCard: { alignSelf: 'flex-start', maxWidth: '80%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 'var(--space-3)', boxShadow: 'var(--pg-shadow-panel)' },
   actionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', marginBottom: 6 },
   actionSummary: { margin: 0, fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', color: 'var(--color-text-secondary)', lineHeight: 1.5 },
   actionRow: { display: 'flex', gap: 'var(--space-2)', marginTop: 10 },

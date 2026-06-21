@@ -165,8 +165,9 @@ html[data-perf-tier="low"] * {
   -webkit-backdrop-filter: none !important;
   animation: none !important;
   transition: none !important;
-  box-shadow: none !important;
-  filter: none !important;
+  /* box-shadow kept: a static box-shadow is cheap (no GPU backdrop blur), and
+     stripping it made every window/card/panel dead-flat on low-end hardware.
+     Depth stays on every tier. */
   text-shadow: none !important;
 }
 html[data-perf-tier="low"] [data-tip]::after { display: none !important; }

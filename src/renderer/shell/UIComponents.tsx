@@ -487,13 +487,13 @@ export const DexListItem: React.FC<{
         display: 'flex',
         alignItems: 'center',
         padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 4,
+        borderRadius: 6,
         cursor: 'pointer',
         position: 'relative',
         background: selected
-          ? 'rgba(74,158,255,0.08)'
+          ? 'var(--color-accent-light)'
           : hovered
-            ? 'var(--color-border-subtle)'
+            ? 'var(--color-bg-hover)'
             : 'transparent',
         transition: isReduceMotion() ? 'none' : `background ${hovered ? '0.06s' : '0.08s'} ease`,
         ...customStyle,
@@ -739,7 +739,7 @@ export const SelectionToolbar: React.FC<{
     fontSize: 12,
     fontWeight: 500,
     cursor: 'pointer',
-    borderRadius: 3,
+    borderRadius: 6,
     transition: 'background 0.1s ease',
   };
 
@@ -763,7 +763,7 @@ export const SelectionToolbar: React.FC<{
         <button
           onClick={onCut}
           style={btnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border-subtle)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >Cut</button>
       )}
@@ -771,7 +771,7 @@ export const SelectionToolbar: React.FC<{
         <button
           onClick={onCopy}
           style={btnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border-subtle)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >Copy</button>
       )}
@@ -779,7 +779,7 @@ export const SelectionToolbar: React.FC<{
         <button
           onClick={onPaste}
           style={btnStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border-subtle)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
         >Paste</button>
       )}

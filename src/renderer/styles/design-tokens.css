@@ -15,8 +15,8 @@
 
 :root {
   /* ---- Type: native system stack for chrome (never a web font) ---------- */
-  /* macOS → SF Pro, Windows → Segoe UI Variable, Linux → Inter/system.       */
-  --dex-font-ui: -apple-system, "Segoe UI Variable", "Segoe UI", system-ui, Inter, sans-serif;
+  /* macOS → SF Pro Display/Text, Windows → Segoe UI Variable, Linux → system.  */
+  --dex-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --dex-font-mono: "SF Mono", "Cascadia Code", "Berkeley Mono", ui-monospace, "Roboto Mono", monospace;
   /* Tabular numerals for any numeric / data display. */
   --dex-numeric: "tnum" 1, "lnum" 1;

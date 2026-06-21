@@ -32,6 +32,7 @@ const CATEGORY_LABELS: Record<SpotlightCategory, string> = {
   projects: 'Projects',
   workflows: 'Workflows',
   commands: 'Commands',
+  clipboard: 'Clipboard',
   screenshots: 'Screenshots',
   conversations: 'Conversations',
   actions: 'Actions',
@@ -42,7 +43,7 @@ const CATEGORY_LABELS: Record<SpotlightCategory, string> = {
 const CATEGORY_ORDER: SpotlightCategory[] = [
   'top', 'calculator', 'apps', 'settings', 'recent',
   'notes', 'tasks', 'files', 'projects', 'workflows',
-  'commands', 'screenshots', 'conversations', 'actions', 'web',
+  'commands', 'clipboard', 'screenshots', 'conversations', 'actions', 'web',
 ];
 
 const CategoryIcon: React.FC<{ category: SpotlightCategory }> = memo(({ category }) => {
@@ -70,6 +71,8 @@ const CategoryIcon: React.FC<{ category: SpotlightCategory }> = memo(({ category
       return <svg {...props}><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6a3 3 0 0 1 3 3v6"/></svg>;
     case 'commands':
       return <svg {...props}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>;
+    case 'clipboard':
+      return <svg {...props}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>;
     case 'screenshots':
       return <svg {...props}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
     case 'conversations':
@@ -347,6 +350,12 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   const resultsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scaleSpring = useRef<SpringAnimator | null>(null);
+  // Mirror the live query so the engine's async refresh callback (registered
+  // once on mount) always reads the CURRENT query, not the empty string it
+  // closed over at mount. Without this, async deep-search results (files, host,
+  // screenshots, conversations) are indexed but never rendered until the next
+  // keystroke re-runs search().
+  const queryRef = useRef('');
 
   // Flatten results for keyboard nav
   const flatResults = useMemo(() => {
@@ -363,8 +372,9 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // Initialize engine on mount
   useEffect(() => {
     spotlightEngine.start(() => {
-      if (query.trim()) {
-        setResults(spotlightEngine.search(query));
+      const q = queryRef.current;
+      if (q.trim()) {
+        setResults(spotlightEngine.search(q));
       }
     });
     return () => spotlightEngine.destroy();
@@ -434,6 +444,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
 
   const handleSearch = useCallback((value: string) => {
     setQuery(value);
+    queryRef.current = value;
     setSelectedIndex(0);
 
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -472,6 +483,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
     }
 
     setQuery('');
+    queryRef.current = '';
     setResults([]);
     setShowResults(false);
   }, [query, variant, onClose, onNavigate]);
@@ -515,6 +527,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         e.preventDefault();
         if (query) {
           setQuery('');
+          queryRef.current = '';
           setResults(spotlightEngine.search(''));
           setShowResults(false);
         } else if (variant === 'overlay') {
@@ -560,22 +573,18 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   if (variant === 'home') {
     return (
       <div data-dex-spotlight style={{ width: '100%', maxWidth: 560, position: 'relative' }}>
-        {/* Search Bar — macOS Tahoe glass pill, soft focus, embedded mic */}
+        {/* Search Bar — canonical search pill (calm, no highlight); hero height retained */}
         <div className="dex-home-search-pill" style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-          height: 50, padding: '0 var(--space-5)',
-          // DEX Sharp 2.0: a dark, fully-opaque pill (no blur in full-flat mode, so
-          // translucency would just muddy the wallpaper). Crisp, not bleachy.
-          background: 'var(--color-bg-surface-solid, #141416)',
-          border: '1px solid var(--color-border)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          height: 50, padding: '0 14px', boxSizing: 'border-box',
+          background: 'var(--color-bg-inset)',
+          border: `1px solid ${showResults ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
           borderRadius: 9999,
-          transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
-          boxShadow: showResults
-            ? '0 16px 40px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.10)'
-            : '0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)',
+          transition: 'border-color 0.18s ease',
         }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(235,235,245,0.6)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} aria-hidden="true">
+            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <input
             ref={inputRef}
@@ -598,14 +607,14 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             aria-activedescendant={showResults && flatResults.length > 0 ? `spotlight-result-home-${selectedIndex}` : undefined}
             autoComplete="off"
             spellCheck={false}
+            className="dex-search-field"
             style={{
               flex: 1, height: '100%',
               background: 'transparent', border: 'none', outline: 'none',
-              color: 'rgba(255,255,255,0.96)',
+              color: 'var(--color-text-primary)',
               fontSize: 16, fontWeight: 400,
               fontFamily: 'var(--font-family)',
               letterSpacing: '-0.01em',
-              caretColor: 'var(--color-accent)',
             }}
           />
           {query && (

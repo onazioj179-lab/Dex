@@ -93,7 +93,7 @@ const AiProviderSettings: React.FC = () => {
         packaged app uses the OS keychain). Ollama runs locally and needs no key.
       </p>
 
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-var(--space-2) 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-6px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)', flexShrink: 0 }} />
         Running on {shellLabel()}
       </div>

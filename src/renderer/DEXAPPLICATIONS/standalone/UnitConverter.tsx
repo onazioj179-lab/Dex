@@ -104,6 +104,15 @@ const UnitConverter: React.FC = () => {
     setToIdx(fromIdx);
   }, [fromIdx, toIdx]);
 
+  // Copy the converted value to the clipboard. Guarded — clipboard access can be
+  // blocked (insecure context / permissions) and must not throw into the UI.
+  const copyResult = useCallback(() => {
+    if (!result) return;
+    try {
+      void navigator.clipboard?.writeText(result).catch(() => { /* clipboard blocked */ });
+    } catch { /* clipboard unavailable */ }
+  }, [result]);
+
   const handleCategoryChange = useCallback((cat: Category) => {
     setCategory(cat);
     setFromIdx(0);
@@ -182,8 +191,21 @@ const UnitConverter: React.FC = () => {
           >
             {units.map((u, i) => <option key={i} value={i}>{u.label} ({u.symbol})</option>)}
           </select>
-          <div style={s.resultDisplay}>
-            {result || '—'}
+          <div style={s.resultRow}>
+            <div style={s.resultDisplay}>
+              {result || '—'}
+            </div>
+            <button
+              onClick={copyResult}
+              style={{ ...s.copyBtn, ...(!result ? s.copyBtnDisabled : {}) }}
+              title="Copy result"
+              aria-label="Copy result"
+              disabled={!result}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -267,13 +289,26 @@ const s: Record<string, React.CSSProperties> = {
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
+  resultRow: {
+    width: '100%', display: 'flex', alignItems: 'stretch', gap: 'var(--space-2)',
+  },
   resultDisplay: {
-    width: '100%', padding: '14px var(--space-4)', borderRadius: 10,
+    flex: 1, padding: '14px var(--space-4)', borderRadius: 10,
     background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
     boxSizing: 'border-box',
+  },
+  copyBtn: {
+    width: 44, borderRadius: 10, flexShrink: 0,
+    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    color: 'var(--color-text-secondary)', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.15s ease',
+  },
+  copyBtnDisabled: {
+    opacity: 0.4, cursor: 'not-allowed',
   },
   swapBtn: {
     width: 40, height: 40, borderRadius: '50%',

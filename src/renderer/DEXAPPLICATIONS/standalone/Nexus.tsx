@@ -54,12 +54,17 @@ interface Palette {
   textDim: string;
   bg: string;
   accentRGB: RGB;
+  /** Resolved UI font family — canvas ctx.font cannot read var(--dex-font-ui). */
+  fontUI: string;
 }
+
+const FALLBACK_FONT_UI = 'system-ui';
 
 const FALLBACK: Palette = {
   accent: '#4A9EFF', info: '#64D2FF', success: '#34C759', warning: '#FF9F0A',
   error: '#FF453A', text: '#FFFFFF', textDim: '#A0A0A5', bg: '#0C0C0E',
   accentRGB: { r: 74, g: 158, b: 255 },
+  fontUI: FALLBACK_FONT_UI,
 };
 
 function readPalette(): Palette {
@@ -77,6 +82,7 @@ function readPalette(): Palette {
     textDim: g('--color-text-muted', FALLBACK.textDim),
     bg: g('--color-bg-base', FALLBACK.bg),
     accentRGB: parseAccentColor(accent) || FALLBACK.accentRGB,
+    fontUI: g('--dex-font-ui', FALLBACK_FONT_UI),
   };
 }
 
@@ -610,7 +616,7 @@ const Nexus: React.FC = () => {
       ctx.fill();
       ctx.globalAlpha = 0.85;
       ctx.fillStyle = stateColor;
-      ctx.font = '700 8px var(--dex-font-ui, system-ui)';
+      ctx.font = `700 8px ${pal.fontUI || FALLBACK_FONT_UI}`;
       ctx.fillText(sm.label, ccx, ccy + coreR + 14);
       ctx.globalAlpha = 1;
 
@@ -643,7 +649,18 @@ const Nexus: React.FC = () => {
     const q = (askInputRef.current?.value || '').trim();
     if (!q) return;
     window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query: q } }));
+    // Open UKI so the user actually SEES the answer (was fire-and-forget before).
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { id: 'uki' } }));
     if (askInputRef.current) askInputRef.current.value = '';
+  }, []);
+
+  // Marker selection used to be a dead end (highlight only). Inspecting a node now
+  // routes it to UKI and opens the assistant, so the HUD becomes a real query
+  // surface over the knowledge graph.
+  const inspectMarker = useCallback((m: Marker | null) => {
+    if (!m) return;
+    window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query: `Tell me about "${m.label}" (${m.tag})` } }));
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { id: 'uki' } }));
   }, []);
 
   const toggleMic = useCallback(() => {
@@ -727,9 +744,17 @@ const Nexus: React.FC = () => {
 
       {/* Selected read-out */}
       {selected && (
-        <div style={{
+        <div
+          role="button"
+          tabIndex={0}
+          title="Ask UKI about this node"
+          onClick={() => inspectMarker(selected)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inspectMarker(selected); } }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-elevated)')}
+          style={{
           position: 'absolute', top: 'calc(50% + 12px)', left: '50%', transform: 'translate(-50%, 0)',
-          marginTop: 90, zIndex: 14, pointerEvents: 'none',
+          marginTop: 90, zIndex: 14, pointerEvents: 'auto', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '6px 12px', borderRadius: 8,
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
@@ -738,6 +763,7 @@ const Nexus: React.FC = () => {
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.label}</span>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: markerColor(selected, paletteRef.current) }}>{selected.tag}</span>
           <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{ago(selected.ts)}</span>
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.5, color: 'var(--color-accent)', marginLeft: 2 }}>ASK ↵</span>
         </div>
       )}
 
@@ -770,10 +796,25 @@ const Nexus: React.FC = () => {
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); askUki(); } }}
           style={{ width: 'min(34vw, 240px)', minWidth: 120, background: 'none', border: 'none', outline: 'none', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--dex-font-ui)' }}
         />
-        <button onClick={askUki} aria-label="Send to UKI" style={cradleBtn(false)}>
+        <button
+          onClick={askUki}
+          aria-label="Send to UKI"
+          title="Send to UKI"
+          style={cradleBtn(false)}
+          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.25)')}
+          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
         </button>
-        <button onClick={toggleMic} aria-label={micArmed ? 'Stop listening' : 'Start listening'} aria-pressed={micArmed} style={cradleBtn(micArmed)}>
+        <button
+          onClick={toggleMic}
+          aria-label={micArmed ? 'Stop listening' : 'Start listening'}
+          title={micArmed ? 'Stop listening' : 'Start listening'}
+          aria-pressed={micArmed}
+          style={cradleBtn(micArmed)}
+          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.25)')}
+          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /></svg>
         </button>
       </div>

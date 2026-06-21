@@ -15,6 +15,7 @@ import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
 import { getDiskInfo } from '../../utils/nativeBridge';
 import { planExport } from '../../../shared/video/pipeline';
+import DexIcon from '../../components/DexIcon';
 
 // Track active export intervals for cleanup
 interface ActiveExport {
@@ -345,10 +346,10 @@ export const ExportDialog: React.FC = memo(() => {
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Export</span>
           <button
             aria-label="Close Export dialog"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontSize: 16, padding: 4 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4, display: 'flex', alignItems: 'center' }}
             onClick={() => setShowExportDialog(false)}
           >
-            X
+            <DexIcon name="close" size={14} />
           </button>
         </div>
 
@@ -509,10 +510,10 @@ export const ExportDialog: React.FC = memo(() => {
                   )}
                   <button
                     aria-label={`Remove export job ${job.outputPath}`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontSize: 10, padding: 4 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4, display: 'flex', alignItems: 'center' }}
                     onClick={() => removeExportJob(job.id)}
                   >
-                    X
+                    <DexIcon name="close" size={12} />
                   </button>
                 </div>
               ))}

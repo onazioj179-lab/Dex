@@ -1220,9 +1220,9 @@ const VinxEditor: React.FC = () => {
               <button
                 aria-label="Close multicam panel"
                 onClick={() => setShowMulticamPanel(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 0, width: 20, height: 20 }}
+                style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }}
               >
-                X
+                <DexIcon name="close" size={14} />
               </button>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
