@@ -811,8 +811,8 @@ const Transfers: React.FC = () => {
                             style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', background: 'none', border: 'none', padding: 0, outline: 'none', width: '140px' }}
                             title="Click to edit nickname"
                           />
-                          <button onClick={() => toggleTrusted(device.deviceId)} title={trustedDevices.has(device.deviceId) ? 'Trusted device' : 'Mark as trusted'} style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                          <button onClick={() => toggleTrusted(device.deviceId)} title={trustedDevices.has(device.deviceId) ? 'Trusted device' : 'Mark as trusted'} aria-label={trustedDevices.has(device.deviceId) ? 'Trusted device' : 'Mark as trusted'} aria-pressed={trustedDevices.has(device.deviceId)} style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex',
                             color: trustedDevices.has(device.deviceId) ? 'var(--color-success)' : 'var(--color-text-muted)', opacity: trustedDevices.has(device.deviceId) ? 1 : 0.4,
                           }}>{Icons.shield}</button>
                         </div>
@@ -830,7 +830,7 @@ const Transfers: React.FC = () => {
                     <button onClick={() => sendToDevice(device)} disabled={sending} style={{
                       padding: 'var(--space-2) 18px', borderRadius: 6, border: 'none',
                       background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontSize: 12, fontWeight: 600, cursor: sending ? 'default' : 'pointer',
                       display: 'flex', alignItems: 'center', gap: 6, opacity: sending ? 0.5 : 1,
                     }}>{Icons.send} Send Files</button>
                   </div>
@@ -879,7 +879,7 @@ const Transfers: React.FC = () => {
             {activeTransfers.length === 0 && pendingDevices.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px var(--space-5)', color: 'var(--color-text-muted)', fontSize: 14 }}>
                 <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-3)' }}>
-                  <span style={{ fontSize: 24, color: 'var(--color-success, #32D54B)' }}>{Icons.send}</span>
+                  <span style={{ color: 'var(--color-success, #32D54B)', display: 'flex' }}>{Icons.send}</span>
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Select a device above to start sharing files</div>
@@ -904,7 +904,7 @@ const Transfers: React.FC = () => {
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {t.status === 'bandwidth-test' ? 'Measuring bandwidth...' : t.status === 'verifying' ? 'Verifying...' : `Sending ${formatSize(t.totalBytes)}`}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                           {formatSpeed(t.speed)} {t.streamCount > 0 && `| ${t.streamCount} streams`} | ETA: {formatTime(t.timeRemainingMs)}
                         </div>
                       </div>
@@ -931,11 +931,11 @@ const Transfers: React.FC = () => {
                       )}
                     </div>
                     <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-                      <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 2, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
+                      <div style={{ width: `${Math.min(100, Math.max(0, t.progress))}%`, height: '100%', borderRadius: 3, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)' }}>{t.progress}%</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(t.progress)}%</span>
                     </div>
                   </div>
                 ))}
@@ -1002,13 +1002,13 @@ const Transfers: React.FC = () => {
                 <button onClick={httpShareFiles} disabled={busy} style={{
                   padding: '7px var(--space-4)', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
-                  fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, fontWeight: 500, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6,
                 }}>{Icons.file} Add Files</button>
                 <button onClick={httpServerRunning ? stopHttpServer : startHttpServer} disabled={busy} style={{
-                  padding: '7px var(--space-4)', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  padding: '7px var(--space-4)', borderRadius: 8, border: 'none', cursor: busy ? 'default' : 'pointer',
                   background: httpServerRunning ? 'rgba(255,69,58,0.15)' : 'rgba(48,209,88,0.15)',
                   color: httpServerRunning ? 'var(--color-error)' : 'var(--color-success)',
-                  fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, fontWeight: 600, opacity: busy ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6,
                 }}>{httpServerRunning ? 'Stop Server' : 'Start Server'}</button>
               </div>
             </div>
@@ -1059,8 +1059,8 @@ const Transfers: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{f.downloadCount} dl{f.downloadCount !== 1 ? 's' : ''}</span>
-                          <button onClick={() => httpRemoveFile(f.id)} title="Remove file" style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                          <button onClick={() => httpRemoveFile(f.id)} title="Remove file" aria-label="Remove file" style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex',
                             color: 'var(--color-text-muted)', opacity: 0.6,
                           }}>{Icons.close}</button>
                         </div>
@@ -1120,7 +1120,7 @@ const Transfers: React.FC = () => {
         }}>
           <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Transfer Settings</span>
-            <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>{Icons.close}</button>
+            <button onClick={() => setShowSettings(false)} title="Close settings" aria-label="Close settings" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex' }}>{Icons.close}</button>
           </div>
           <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Auto-accept */}
@@ -1223,8 +1223,8 @@ const Transfers: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Sound on complete</span>
               <div style={{ flex: 1 }} />
-              <div onClick={() => setSoundEnabled(p => !p)} style={{ width: 32, height: 18, borderRadius: 8, background: soundEnabled ? 'rgba(48,209,88,0.3)' : 'var(--color-text-tertiary)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
-                <div style={{ width: 14, height: 14, borderRadius: 6, background: soundEnabled ? 'var(--color-success)' : 'var(--color-text-muted)', position: 'absolute', top: 2, transition: 'all 0.2s', ...(soundEnabled ? { right: 2 } : { left: 2 }) }} />
+              <div onClick={() => setSoundEnabled(p => !p)} role="switch" aria-checked={soundEnabled} aria-label="Sound on complete" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSoundEnabled(p => !p); } }} style={{ width: 32, height: 18, borderRadius: 9, background: soundEnabled ? 'rgba(48,209,88,0.3)' : 'var(--color-text-tertiary)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: soundEnabled ? 'var(--color-success)' : 'var(--color-text-muted)', position: 'absolute', top: 2, transition: 'all 0.2s', ...(soundEnabled ? { right: 2 } : { left: 2 }) }} />
               </div>
             </div>
           </div>
