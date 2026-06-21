@@ -162,7 +162,7 @@ const PropertiesPanel: React.FC = () => {
                 <div style={{ width: 14, height: 14, borderRadius: 2, background: mat.color, border: '1px solid var(--color-border)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500 }}>{mat.name}</div>
-                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{mat.density} kg/m\u00B3 | {mat.tensileStrength} MPa</div>
+                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{mat.density} kg/m&sup3; | {mat.tensileStrength} MPa</div>
                 </div>
               </button>
             ))}

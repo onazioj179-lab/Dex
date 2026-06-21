@@ -352,6 +352,10 @@ export const Files: React.FC = () => {
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [quickLookFile, setQuickLookFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
+  // Column view (Miller columns): per-path entry cache + in-flight set so each
+  // pushed column loads its own directory listing via the same files:list API.
+  const [columnData, setColumnData] = useState<Record<string, FileItem[]>>({});
+  const [columnLoading, setColumnLoading] = useState<Set<string>>(new Set());
 
   // Inline rename state (v2): when set, the matching row renders an <input>
   // instead of the static filename span. Replaces the legacy window.prompt UX.
@@ -534,6 +538,13 @@ export const Files: React.FC = () => {
   const loadFiles = useCallback(async (location: string) => {
     setLoading(true);
     setLoadError(null);
+    // Invalidate the per-column listing cache so deeper Miller columns re-fetch
+    // after a refresh or any filesystem mutation (all mutation handlers funnel
+    // through loadFiles on success). Column 0 renders from the live
+    // filteredFiles list and is unaffected; the column load effect re-fetches
+    // any currently-visible column paths once the cache is cleared.
+    setColumnData({});
+    setColumnLoading(new Set());
     try {
       if (window.electron?.invoke) {
         const result = await window.electron.invoke('files:list', location);
@@ -575,6 +586,44 @@ export const Files: React.FC = () => {
     }
     setLoading(false);
   }, [getFileCategory]);
+
+  // Load a single column's directory listing (column view). Reuses the same
+  // files:list bridge as the main view, caching results per path so each pushed
+  // Miller column populates instead of rendering blank.
+  const loadColumn = useCallback(async (location: string) => {
+    if (!window.electron?.invoke) return;
+    setColumnLoading(prev => { const next = new Set(prev); next.add(location); return next; });
+    try {
+      const result = await window.electron.invoke('files:list', location);
+      if (result?.success) {
+        const filesWithCategory: FileItem[] = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
+          ...f,
+          modified: new Date(f.modified),
+          category: getFileCategory(f.extension || '', f.name),
+        }));
+        setColumnData(prev => ({ ...prev, [location]: filesWithCategory }));
+      } else {
+        setColumnData(prev => ({ ...prev, [location]: [] }));
+      }
+    } catch (error) {
+      console.error('Failed to load column:', error);
+      setColumnData(prev => ({ ...prev, [location]: [] }));
+    } finally {
+      setColumnLoading(prev => { const next = new Set(prev); next.delete(location); return next; });
+    }
+  }, [getFileCategory]);
+
+  // Fetch listings for any non-root column path not yet cached or in flight.
+  // Column 0 (the root '') always renders from the live filteredFiles list.
+  useEffect(() => {
+    if (viewMode !== 'column') return;
+    columnPath.forEach((path, idx) => {
+      if (idx === 0 || !path) return;
+      if (columnData[path] === undefined && !columnLoading.has(path)) {
+        loadColumn(path);
+      }
+    });
+  }, [viewMode, columnPath, columnData, columnLoading, loadColumn]);
 
   const handleDrop = useCallback(async (e: React.DragEvent, targetDir: FileItem) => {
     e.preventDefault();
@@ -1008,7 +1057,7 @@ export const Files: React.FC = () => {
       observer.observe(loadMoreRef.current);
     }
     return () => observer.disconnect();
-  }, [hasMoreFiles]);
+  }, [hasMoreFiles, viewMode]);
 
   const handleSelectAll = useCallback(() => {
     setSelectedFiles(new Set(filteredFiles.map(f => f.path)));
@@ -1594,17 +1643,39 @@ export const Files: React.FC = () => {
                   <span style={{...styles.fileMeta, width: 80, textAlign: 'right'}}>{file.isDirectory ? '--' : formatSize(file.size)}</span>
                 </div>
               ))}
+              {/* Load more trigger for infinite scroll (matches grid view) */}
+              {filteredFiles.length > 0 && hasMoreFiles && (
+                <div
+                  ref={loadMoreRef}
+                  style={{
+                    padding: 'var(--space-4)',
+                    textAlign: 'center',
+                    color: 'var(--color-text-muted)',
+                    fontSize: 12,
+                  }}
+                >
+                  Loading more ({filteredFiles.length - visibleCount} remaining)...
+                </div>
+              )}
             </div>
           ) : viewMode === 'column' ? (
             <div style={{ display: 'flex', height: '100%', overflow: 'auto' }}>
               {columnPath.map((colPath, colIdx) => {
-                const colFiles = colIdx === 0 ? filteredFiles : files.filter(() => true);
+                // Column 0 mirrors the live (filtered) main list; deeper columns
+                // render the cached listing for their own path.
+                const colEntries = colIdx === 0 ? filteredFiles : (columnData[colPath] ?? []);
+                const isColLoading = colIdx !== 0 && columnData[colPath] === undefined && columnLoading.has(colPath);
+                const isColEmpty = colIdx !== 0 && !isColLoading && columnData[colPath] !== undefined && colEntries.length === 0;
                 return (
                   <div key={colIdx} style={{
                     minWidth: 200, maxWidth: 260, borderRight: '1px solid var(--color-border, var(--color-border-subtle))',
                     flexShrink: 0, overflow: 'auto', background: colIdx % 2 === 0 ? 'var(--color-bg-surface-solid)' : 'var(--color-bg-secondary)',
                   }}>
-                    {(colIdx === 0 ? filteredFiles : []).map(file => (
+                    {isColLoading ? (
+                      <div style={{ padding: '12px 10px', fontSize: 12, color: 'var(--color-text-secondary)' }}>Loading...</div>
+                    ) : isColEmpty ? (
+                      <div style={{ padding: '12px 10px', fontSize: 12, color: 'var(--color-text-secondary)' }}>Empty folder</div>
+                    ) : colEntries.map(file => (
                       <div
                         key={file.path}
                         style={{
@@ -1612,9 +1683,15 @@ export const Files: React.FC = () => {
                           background: selectedFile === file.path ? 'var(--color-bg-active)' : 'transparent',
                         }}
                         onClick={() => {
-                          handleItemClick(file);
                           if (file.isDirectory) {
+                            // Push (or replace) the next column for this folder.
+                            // Avoid navigateTo here so existing columns stay visible.
+                            setSelectedFile(file.path);
                             setColumnPath(prev => [...prev.slice(0, colIdx + 1), file.path]);
+                          } else {
+                            handleItemClick(file);
+                            // Trim any deeper columns when selecting a leaf file.
+                            setColumnPath(prev => prev.slice(0, colIdx + 1));
                           }
                         }}
                         onDoubleClick={() => handleItemDoubleClick(file)}

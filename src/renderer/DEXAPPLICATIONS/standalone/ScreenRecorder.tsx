@@ -174,7 +174,7 @@ const ScreenRecorder: React.FC = () => {
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
-      fontFamily: 'var(--font-system)',
+      fontFamily: 'var(--font-family)',
     }}>
       {/* Header / toolbar */}
       <div style={{ ...premiumGlassToolbar, padding: '10px var(--space-4)', justifyContent: 'space-between' }}>
@@ -190,6 +190,7 @@ const ScreenRecorder: React.FC = () => {
           <select
             value={selectedId}
             disabled={sourceDisabled}
+            aria-label="Capture source"
             onChange={e => setSelectedId(e.target.value)}
             style={{
               padding: '6px 10px', borderRadius: 6, fontSize: 12,

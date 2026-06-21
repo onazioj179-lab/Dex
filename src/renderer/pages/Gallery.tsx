@@ -1096,9 +1096,9 @@ export const Gallery: React.FC = () => {
               {selectionMode && selectedItems.size > 0 && (
                 <>
                   <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600 }}>{selectedItems.size} selected</span>
-                  <button onClick={selectAll} aria-label="Select all" style={{ ...styles.viewBtn, fontSize: 10, color: 'var(--color-accent)' }}>All</button>
-                  <button onClick={batchExport} aria-label="Export selected" style={{ ...styles.viewBtn, color: 'var(--color-success)' }}>Export</button>
-                  <button onClick={batchDelete} aria-label="Delete selected" style={{ ...styles.viewBtn, color: 'var(--color-error)' }}>Delete</button>
+                  <button onClick={selectAll} aria-label="Select all" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-accent)' }}>All</button>
+                  <button onClick={batchExport} aria-label="Export selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-success)' }}>Export</button>
+                  <button onClick={batchDelete} aria-label="Delete selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Delete</button>
                 </>
               )}
               <button style={{...styles.viewBtn, background: viewMode === 'grid' ? 'var(--color-border)' : 'transparent'}} aria-label="Grid view" aria-pressed={viewMode === 'grid'} onClick={() => setViewMode('grid')}>{Icons.grid}</button>
@@ -1121,8 +1121,19 @@ export const Gallery: React.FC = () => {
             </div>
           ) : sortedMedia.length === 0 ? (
             <div style={styles.emptyState}>
-              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-5)' }}>
-                <span style={{ fontSize: 36, color: 'var(--color-accent)' }}>{selectedAlbum === 'videos' ? Icons.video : Icons.photo}</span>
+              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-5)', color: 'var(--color-accent)' }}>
+                {selectedAlbum === 'videos' ? (
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="M10 9l5 3-5 3V9z"/>
+                  </svg>
+                ) : (
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 21"/>
+                  </svg>
+                )}
               </div>
               <div style={styles.emptyTitle}>
                 {selectedAlbum === 'favorites' ? 'No favorites yet'
@@ -1235,7 +1246,7 @@ export const Gallery: React.FC = () => {
                       {item.duration != null && ` ${formatDuration(item.duration)}`}
                     </span>
                   </div>
-                  <button style={styles.listFavBtn} aria-label={favorites.includes(item.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id); }}>
+                  <button style={{ ...styles.listFavBtn, color: favorites.includes(item.id) ? 'var(--color-error)' : 'var(--color-text-muted)' }} aria-label={favorites.includes(item.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id); }}>
                     {favorites.includes(item.id) ? Icons.heart : Icons.heartOutline}
                   </button>
                 </div>
@@ -1659,7 +1670,9 @@ export const Gallery: React.FC = () => {
           </div>
 
           <div style={styles.lightboxContent}>
-            <button style={styles.navBtn} aria-label="Previous media" onClick={() => navigateMedia('prev')}>{Icons.chevronLeft}</button>
+            {(() => { const atStart = sortedMedia[0]?.id === selectedMedia.id; return (
+            <button style={{ ...styles.navBtn, opacity: atStart ? 0.35 : 1, cursor: atStart ? 'default' : 'pointer' }} aria-label="Previous media" disabled={atStart} onClick={() => navigateMedia('prev')}>{Icons.chevronLeft}</button>
+            ); })()}
             <div style={{...styles.lightboxImage, background: getPlaceholderColor(selectedMedia.id), overflow: 'hidden', position: 'relative'}}>
               {selectedMedia.type === 'video' ? (
                 selectedMedia.src ? (
@@ -1865,7 +1878,9 @@ export const Gallery: React.FC = () => {
                 )
               )}
             </div>
-            <button style={styles.navBtn} aria-label="Next media" onClick={() => navigateMedia('next')}>{Icons.chevronRight}</button>
+            {(() => { const atEnd = sortedMedia[sortedMedia.length - 1]?.id === selectedMedia.id; return (
+            <button style={{ ...styles.navBtn, opacity: atEnd ? 0.35 : 1, cursor: atEnd ? 'default' : 'pointer' }} aria-label="Next media" disabled={atEnd} onClick={() => navigateMedia('next')}>{Icons.chevronRight}</button>
+            ); })()}
           </div>
 
           <div style={styles.lightboxFooter}>

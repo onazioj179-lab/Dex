@@ -876,8 +876,21 @@ const AXL: React.FC = () => {
 
     // GD&T annotations overlay
     project.annotations.forEach(a => {
-      const px = w / 2 + a.position.x;
-      const py = h / 2 - a.position.y;
+      // Smart Annotation: project the callout's model-space position through the
+      // SAME camera transform parts use, so it tracks its feature as you orbit /
+      // zoom / explode (previously it sat at a raw screen offset and detached).
+      // The frame/text below stays in screen pixels -> readable at any zoom.
+      const ax0 = a.position.x, ay0 = a.position.y, az0 = a.position.z || 0;
+      let aIsoX = ax0 * Math.cos(effAz) - az0 * Math.sin(effAz);
+      let aIsoY = -ay0 * Math.cos(effEl) + (ax0 * Math.sin(effAz) + az0 * Math.cos(effAz)) * Math.sin(effEl);
+      if (project.assembly.exploded) {
+        const dist = project.assembly.explodeDistance || 50;
+        const mag = Math.sqrt(ax0 * ax0 + ay0 * ay0 + az0 * az0) || 1;
+        aIsoX += (ax0 / mag) * dist * Math.cos(effAz);
+        aIsoY -= (ay0 / mag) * dist * Math.cos(effEl);
+      }
+      const px = w / 2 + aIsoX * camScale;
+      const py = h / 2 + aIsoY * camScale;
       const frameText = `${a.symbol} ${a.tolerance} | ${a.datum}`;
       ctx.font = '10px monospace';
       const tw = ctx.measureText(frameText).width + 12;
@@ -1441,7 +1454,7 @@ const AXL: React.FC = () => {
                 <div>
                   <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Safety Factor</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: simResults.safetyFactor > 2 ? 'var(--color-success)' : simResults.safetyFactor > 1 ? 'var(--color-warning)' : 'var(--color-error)' }}>
-                    {simResults.safetyFactor.toFixed(2)}\u00d7
+                    {simResults.safetyFactor.toFixed(2)}&times;
                   </div>
                 </div>
               </div>
@@ -1671,7 +1684,7 @@ const AXL: React.FC = () => {
               )}
               {featureType === 'revolve' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
-                  Angle (\u00b0):
+                  Angle (&deg;):
                   <input type="number" value={featureParams.angle} onChange={e => setFeatureParams(p => ({ ...p, angle: Number(e.target.value) }))}
                     style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
                 </label>

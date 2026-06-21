@@ -28,7 +28,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
 
   return (
     <div
-      role="dialog"
+      role="listbox"
       aria-label="App Switcher"
       style={{
         position: 'fixed',
@@ -57,6 +57,9 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
         return (
           <div
             key={app.id}
+            role="option"
+            aria-selected={isSelected}
+            aria-label={name}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -64,8 +67,9 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
               gap: 4,
               padding: 'var(--space-2) 10px',
               borderRadius: 10,
-              background: isSelected ? 'var(--color-border)' : 'transparent',
-              border: isSelected ? '1.5px solid var(--color-text-tertiary)' : '1.5px solid transparent',
+              // Calm, clear selection: subtle fill + accent ring (not a colored glow).
+              background: isSelected ? 'var(--color-bg-hover)' : 'transparent',
+              border: isSelected ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
               transition: 'background 0.1s, border-color 0.1s',
               minWidth: 56,
             }}
@@ -74,8 +78,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
               width: 40, height: 40, borderRadius: 8,
               background: color,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isSelected ? `0 2px 10px ${color}66` : `0 1px 4px ${color}33`,
-              transition: 'box-shadow 0.15s',
+              boxShadow: 'var(--pg-shadow-card)',
             }}>
               <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>
                 {name.charAt(0).toUpperCase()}

@@ -296,7 +296,7 @@ const PresentationBuilder: React.FC = () => {
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
-      fontFamily: 'var(--font-system)',
+      fontFamily: 'var(--font-family)',
     }}>
       <style>{`
         @media print {

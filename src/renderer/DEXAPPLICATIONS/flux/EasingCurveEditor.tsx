@@ -90,7 +90,8 @@ const EasingCurveEditor: React.FC<EasingCurveEditorProps> = ({ value, onChange, 
     ctx.setLineDash([]);
 
     // Bezier curve
-    ctx.strokeStyle = 'var(--color-accent, #4a9eff)';
+    // Canvas 2D context cannot resolve CSS variables; use a literal accent color.
+    ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(p0.cx, p0.cy);

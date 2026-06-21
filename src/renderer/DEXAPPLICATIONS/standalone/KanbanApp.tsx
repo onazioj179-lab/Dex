@@ -160,7 +160,7 @@ const CardDetail: React.FC<{
       <div style={modalStyles.modal} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Edit card">
         <div style={modalStyles.header}>
           <h3 style={modalStyles.headerTitle}>Edit Card</h3>
-          <button style={modalStyles.closeBtn} onClick={onClose} aria-label="Close">{Icons.x}</button>
+          <button className="kanban-icon-btn" style={modalStyles.closeBtn} onClick={onClose} aria-label="Close">{Icons.x}</button>
         </div>
 
         <div style={modalStyles.body}>
@@ -201,7 +201,7 @@ const CardDetail: React.FC<{
                 <button key={c} onClick={() => setLabelColor(c)} aria-label={`Select label color ${c}`} style={{ width: 20, height: 20, borderRadius: 3, border: labelColor === c ? '2px solid #fff' : '1px solid transparent', background: c, cursor: 'pointer' }} />
               ))}
             </div>
-            <button style={modalStyles.addBtn} onClick={addLabel} aria-label="Add label">Add</button>
+            <button className="kanban-btn" style={modalStyles.addBtn} onClick={addLabel} aria-label="Add label">Add</button>
           </div>
 
           <label style={modalStyles.label}>Checklist</label>
@@ -214,15 +214,15 @@ const CardDetail: React.FC<{
           ))}
           <div style={{ display: 'flex', gap: 6 }}>
             <input style={{ ...modalStyles.input, flex: 1 }} value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)} placeholder="New checklist item" onKeyDown={e => e.key === 'Enter' && addCheckItem()} />
-            <button style={modalStyles.addBtn} onClick={addCheckItem} aria-label="Add checklist item">Add</button>
+            <button className="kanban-btn" style={modalStyles.addBtn} onClick={addCheckItem} aria-label="Add checklist item">Add</button>
           </div>
         </div>
 
         <div style={modalStyles.footer}>
-          <button style={modalStyles.deleteBtn} onClick={onDelete} aria-label="Delete card">Delete Card</button>
+          <button className="kanban-btn" style={modalStyles.deleteBtn} onClick={onDelete} aria-label="Delete card">Delete Card</button>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <button style={modalStyles.cancelBtn} onClick={onClose} aria-label="Cancel">Cancel</button>
-            <button style={modalStyles.saveBtn} onClick={handleSave} aria-label="Save card">Save</button>
+            <button className="kanban-btn" style={modalStyles.cancelBtn} onClick={onClose} aria-label="Cancel">Cancel</button>
+            <button className="kanban-btn" style={modalStyles.saveBtn} onClick={handleSave} aria-label="Save card">Save</button>
           </div>
         </div>
       </div>
@@ -434,7 +434,7 @@ const KanbanApp: React.FC = () => {
                 {b.name}
               </button>
             ))}
-            <button style={styles.boardTabAdd} onClick={addBoard} aria-label="Add board">{Icons.plus}</button>
+            <button className="kanban-icon-btn" style={styles.boardTabAdd} onClick={addBoard} aria-label="Add board">{Icons.plus}</button>
           </div>
 
         </div>
@@ -541,8 +541,8 @@ const KanbanApp: React.FC = () => {
               }}
             />
             <div style={{ display: 'flex', gap: 6, marginTop: 'var(--space-2)' }}>
-              <button style={styles.addCardSubmit} onClick={addColumn} aria-label="Add column">Add Column</button>
-              <button style={styles.addCardCancel} onClick={() => setShowNewCol(false)} aria-label="Cancel adding column">Cancel</button>
+              <button className="kanban-btn" style={styles.addCardSubmit} onClick={addColumn} aria-label="Add column">Add Column</button>
+              <button className="kanban-btn" style={styles.addCardCancel} onClick={() => setShowNewCol(false)} aria-label="Cancel adding column">Cancel</button>
             </div>
           </div>
         ) : (
@@ -572,13 +572,13 @@ const styles: Record<string, React.CSSProperties> = {
   topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, background: 'var(--color-bg-surface-solid, #1C1C1E)' },
   topLeft: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' },
   topRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
-  boardIcon: { width: 36, height: 36, borderRadius: 8, background: 'rgba(99,102,241,0.12)', color: '#5e5ce6', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  boardIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--color-accent-soft, rgba(99,102,241,0.12))', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   boardTitle: { fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.3px' },
   boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
   progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
   boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 },
   boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease' },
-  boardTabActive: { background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #fafafa)' },
+  boardTabActive: { background: 'var(--color-bg-elevated, #2c2c2e)', color: 'var(--color-text-primary, #fafafa)', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' },
   boardTabAdd: { width: 28, height: 28, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
   column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 10, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },

@@ -204,6 +204,12 @@ const WorldClock: React.FC = () => {
       )}
 
       {/* Clock Grid */}
+      {activeZones.length === 0 ? (
+        <div style={s.emptyState}>
+          <div style={s.emptyTitle}>No timezones added</div>
+          <div style={s.emptyHint}>Use the + button to add a city.</div>
+        </div>
+      ) : (
       <div style={s.clockGrid}>
         {activeZones.map(zone => {
           const zoneTime = getTimeInZone(zone);
@@ -227,6 +233,7 @@ const WorldClock: React.FC = () => {
           );
         })}
       </div>
+      )}
     </div>
   );
 };
@@ -290,6 +297,13 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.01em', marginTop: 4,
   },
   clockDate: { fontSize: 11, color: 'var(--color-text-secondary)' },
+  emptyState: {
+    flex: 1, display: 'flex', flexDirection: 'column' as const,
+    alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+    padding: 'var(--space-5)', textAlign: 'center' as const,
+  },
+  emptyTitle: { fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' },
+  emptyHint: { fontSize: 12, color: 'var(--color-text-tertiary)' },
 };
 
 export default memo(WorldClock);

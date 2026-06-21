@@ -10,6 +10,13 @@
 // Items 226-250 of the 1000-item improvement plan
 // =============================================================================
 
+import { applySpectrumBands, type SpectrumSculpt, type SpectrumSculptBand } from '../../../shared/creative/spectrumSculpt';
+export { applySpectrumBands };
+export type { SpectrumSculpt, SpectrumSculptBand };
+import { toneMapValue, type ToneMapSettings } from '../../../shared/creative/toneMap';
+export { toneMapValue };
+export type { ToneMapSettings };
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -89,6 +96,8 @@ export interface ColorGrade {
   curves: ColorCurves;
   qualifier?: HSLQualifier;
   window?: PowerWindow;
+  spectrumSculpt?: SpectrumSculpt;
+  toneMap?: ToneMapSettings;
   nodes: GradeNode[];
 }
 
@@ -108,6 +117,8 @@ export interface NodeCorrection {
   curves?: Partial<ColorCurves>;
   qualifier?: HSLQualifier;
   window?: PowerWindow;
+  spectrumSculpt?: SpectrumSculpt;
+  toneMap?: ToneMapSettings;
   blendMode: BlendMode;
   opacity: number;
 }
@@ -781,9 +792,45 @@ export class ColorGradingEngine {
     return result;
   }
   
+  /** Per-pixel Spectrum Sculpt: warp hue bands (uses the pure applySpectrumBands). */
+  applySpectrumSculpt(frame: ImageData, sculpt: SpectrumSculpt): ImageData {
+    if (!sculpt.enabled || !sculpt.bands.length) return frame;
+    const result = new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
+    const { data } = result;
+    for (let i = 0; i < data.length; i += 4) {
+      const r0 = this.srgbToLinear(data[i] / 255);
+      const g0 = this.srgbToLinear(data[i + 1] / 255);
+      const b0 = this.srgbToLinear(data[i + 2] / 255);
+      const [h, s, l] = this.rgbToHsl(r0, g0, b0);
+      const [nh, ns, nl] = applySpectrumBands(h, s, l, sculpt.bands);
+      const [r, g, b] = this.hslToRgb(nh, ns, nl);
+      data[i] = Math.round(this.linearToSrgb(Math.max(0, Math.min(1, r))) * 255);
+      data[i + 1] = Math.round(this.linearToSrgb(Math.max(0, Math.min(1, g))) * 255);
+      data[i + 2] = Math.round(this.linearToSrgb(Math.max(0, Math.min(1, b))) * 255);
+    }
+    return result;
+  }
+
+  /** Per-pixel HDR tone mapping (Dynamic Range Studio) — uses the pure toneMapValue. */
+  applyToneMap(frame: ImageData, settings: ToneMapSettings): ImageData {
+    if (!settings.enabled || settings.operator === 'none') return frame;
+    const result = new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
+    const { data } = result;
+    const gain = Math.pow(2, settings.exposure);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = this.srgbToLinear(data[i] / 255) * gain;
+      const g = this.srgbToLinear(data[i + 1] / 255) * gain;
+      const b = this.srgbToLinear(data[i + 2] / 255) * gain;
+      data[i] = Math.round(this.linearToSrgb(toneMapValue(r, settings.operator)) * 255);
+      data[i + 1] = Math.round(this.linearToSrgb(toneMapValue(g, settings.operator)) * 255);
+      data[i + 2] = Math.round(this.linearToSrgb(toneMapValue(b, settings.operator)) * 255);
+    }
+    return result;
+  }
+
   private applyNode(frame: ImageData, node: GradeNode, grade: ColorGrade): ImageData {
     let result = frame;
-    
+
     // Apply node corrections
     if (node.correction.primary) {
       const primary = { ...grade.primary, ...node.correction.primary };
@@ -807,7 +854,15 @@ export class ColorGradingEngine {
     if (node.correction.window) {
       result = this.applyPowerWindow(result, node.correction.window);
     }
-    
+
+    if (node.correction.spectrumSculpt) {
+      result = this.applySpectrumSculpt(result, node.correction.spectrumSculpt);
+    }
+
+    if (node.correction.toneMap) {
+      result = this.applyToneMap(result, node.correction.toneMap);
+    }
+
     return result;
   }
   

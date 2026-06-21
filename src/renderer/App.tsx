@@ -42,6 +42,14 @@ import {
   initAppSubsystemIPC 
 } from './store/appSubsystem';
 import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
+import { startClipboardMonitor } from './services/ClipboardMonitor';
+import FlowSendMenu from './components/FlowSendMenu';
+import { wireFlowIntakes } from './services/flowIntakes';
+import ContextNowPanel from './components/ContextNowPanel';
+import { startContextEngine } from './services/contextEngineWiring';
+import LearnOverlay from './components/LearnOverlay';
+import { registerBuiltinLearn } from './services/learnRegistry';
+import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
@@ -70,6 +78,8 @@ import {
   useSystemEvents,
 } from './services';
 import { initXenonListener } from './store/xenonStore';
+import { onIdleSweep } from './utils/cacheExpiry';
+import { startLeakDetector } from './services/leakDetector';
 import { sharedTick } from './services/SharedTick';
 
 // Motion system -- spring physics, reduce-motion, scrollbar styles
@@ -228,6 +238,11 @@ export const App: React.FC = () => {
     window.addEventListener('dex-open-clipboard', onOpenClipboard);
     return () => window.removeEventListener('dex-open-clipboard', onOpenClipboard);
   }, [clipboardOpen]);
+  // Omni Clipboard: start continuous background capture so the history already
+  // holds what you copied while working (not just whatever is on the clipboard
+  // the moment the panel opens). Idempotent; runs once for the app's lifetime.
+  // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
+  useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); registerBuiltinLearn(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();
@@ -417,7 +432,23 @@ export const App: React.FC = () => {
     // sees the translucent native menu on right-click. Custom React menus
     // (which call e.preventDefault() in their own handlers and open via
     // onContextMenu before this listener fires) still work normally.
-    const suppressNativeContext = (e: MouseEvent) => { e.preventDefault(); };
+    // Additionally: on plain non-editable content with a text selection, and
+    // only when no component already claimed the right-click, offer the
+    // universal "Ask UKI about this" affordance via a dispatched event that
+    // AskUkiContextMenu renders. This is the "right-click anything and ask UKI"
+    // path -- one more route to the assistant, with native suppression intact.
+    const suppressNativeContext = (e: MouseEvent) => {
+      const claimedByComponent = e.defaultPrevented; // its onContextMenu ran first
+      e.preventDefault();
+      if (claimedByComponent) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, [contenteditable=""], [contenteditable="true"]')) return;
+      const text = (window.getSelection?.()?.toString() ?? '').trim();
+      if (!text) return;
+      try {
+        window.dispatchEvent(new CustomEvent('dex:ask-uki-selection', { detail: { text, x: e.clientX, y: e.clientY } }));
+      } catch { /* event constructor unavailable -- non-fatal */ }
+    };
     document.addEventListener('contextmenu', suppressNativeContext);
 
     // === CRITICAL PATH (must run immediately) ===
@@ -435,7 +466,11 @@ export const App: React.FC = () => {
 
     // Initialize Xenon push-model listener (replaces renderer polling for system metrics)
     const cleanupXenon = initXenonListener();
-    
+    // Long-session stability: sweep registered TTL caches when the shell goes deep-idle.
+    const cleanupIdleSweep = onIdleSweep();
+    // Long-session reliability: quietly watch for sustained heap growth (leak detection).
+    const stopLeakDetector = startLeakDetector();
+
     // Start user session
     useSessionService.getState().startSession();
 
@@ -498,6 +533,8 @@ export const App: React.FC = () => {
       window.removeEventListener('beforeunload', onBeforeUnload);
       try { flushWindowManifest(); } catch { /* non-fatal */ }
       cleanupXenon();
+      cleanupIdleSweep();
+      stopLeakDetector();
       usePerformanceMonitor.getState().stopMonitoring();
       useIntegrityMonitor.getState().stopMonitoring();
       useSessionService.getState().endSession();
@@ -593,6 +630,26 @@ export const App: React.FC = () => {
       </Suspense>
       </AppErrorBoundary>
 
+      {/* DEX Flow - universal "Send to..." picker (opened via dex-flow-open) */}
+      <AppErrorBoundary instanceId="flow" appId="flow" appName="DEX Flow" appColor="#5e5ce6">
+        <FlowSendMenu />
+      </AppErrorBoundary>
+
+      {/* DEX Now - current-context panel (opened via dex-open-context) */}
+      <AppErrorBoundary instanceId="context" appId="context" appName="DEX Now" appColor="#30d158">
+        <ContextNowPanel />
+      </AppErrorBoundary>
+
+      {/* DEX Learn - per-app self-teaching overlay (opened via dex-open-learn) */}
+      <AppErrorBoundary instanceId="learn" appId="learn" appName="DEX Learn" appColor="#5e5ce6">
+        <LearnOverlay />
+      </AppErrorBoundary>
+
+      {/* DEX Quick Actions - context action menu (opened via dex-open-quick-actions) */}
+      <AppErrorBoundary instanceId="quickactions" appId="quickactions" appName="Quick Actions" appColor="#ff9f0a">
+        <QuickActionsMenu />
+      </AppErrorBoundary>
+
       {/* Picture-in-Picture Video Player */}
       {pipState && (
         <AppErrorBoundary instanceId="pip" appId="pip" appName="Picture in Picture" appColor="#0a84ff">
@@ -662,10 +719,11 @@ export const App: React.FC = () => {
         }} />
       )}
 
-      {/* Solid base behind all apps: an open app is NEVER see-through to the
-          wallpaper. The wallpaper shows only on the Home desktop, which paints its
-          own wallpaper layer on top of this base. */}
-      <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'var(--color-bg-base)' }}>
+      {/* No separate backdrop layer: the Home desktop (always mounted at z0 inside,
+          painting its own wallpaper) IS the surface that houses everything. Apps
+          float on Home; minimizing reveals Home, never a black "screen". Apps don't
+          bleed because every non-home app surface is opaque. */}
+      <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'transparent' }}>
         <AppErrorBoundary instanceId="appmanager" appId="appmanager" appName="App Shell" appColor="var(--color-accent, #0a84ff)">
         <Suspense fallback={(
           <div style={{

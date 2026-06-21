@@ -685,8 +685,8 @@ const UpdateManagerSection: React.FC = () => {
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 26, borderRadius: 13, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
-    background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
+    width: 44, height: 24, borderRadius: 12, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
+    background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
   const btnBase: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
@@ -694,7 +694,7 @@ const UpdateManagerSection: React.FC = () => {
   const Toggle: React.FC<{ on: boolean; onToggle: () => void; ariaLabel: string }> = ({ on, onToggle, ariaLabel }) => (
     <button style={pill(on)} onClick={onToggle} aria-checked={on} role="switch" aria-label={ariaLabel}>
       <span style={{
-        position: 'absolute', top: 3, left: on ? 21 : 3,
+        position: 'absolute', top: 2, left: on ? 22 : 2,
         width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
         boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
       }} />
@@ -1607,7 +1607,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
           step={step}
           value={Number(settings[key] ?? 1)}
           onChange={e => setSettings((prev: any) => ({ ...prev, [key]: Number(e.target.value) }))}
-          style={{ width: 140, accentColor: 'var(--color-accent, #0a84ff)' }}
+          style={{ width: 120, accentColor: 'var(--color-accent, #0a84ff)' }}
           aria-label={label}
         />
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>
@@ -3278,7 +3278,7 @@ export const Settings: React.FC = () => {
                   />
                   <span style={{
                     position: 'absolute', inset: 0, borderRadius: 10,
-                    background: entry.enabled ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
+                    background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
                     <span style={{
@@ -3441,7 +3441,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3764,7 +3764,7 @@ export const Settings: React.FC = () => {
                 />
                 <span style={{
                   position: 'absolute', inset: 0, borderRadius: 10,
-                  background: autoOpt ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
+                  background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
                   <span style={{

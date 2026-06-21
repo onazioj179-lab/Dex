@@ -11,11 +11,10 @@
 // =============================================================================
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { 
-  useCollaborationStore, 
+import {
+  useCollaborationStore,
   SharedProject,
   Checkpoint,
-  hasPermission,
 } from '../../services/CollaborationSystem';
 import ShareDialog from '../../components/ShareDialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -244,30 +243,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
-  emptyState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 60,
-    textAlign: 'center',
-  },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-    background: 'linear-gradient(135deg, rgba(94,92,230,0.15), rgba(191,90,242,0.1))',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 'var(--space-5)',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    color: 'var(--color-text-primary, #fff)',
-    marginBottom: 'var(--space-2)',
-  },
   checkpointList: {
     display: 'flex',
     flexDirection: 'column',
@@ -364,6 +339,35 @@ const APP_THEMES: Record<string, { bg: string; color: string; icon: string }> = 
   axl: { bg: 'linear-gradient(135deg, #339af0, #228be6)', color: '#339af0', icon: 'A' },
 };
 
+// Activity feed icons (rendered white on a colored gradient circle)
+const ACTIVITY_ICONS = {
+  pending: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  ),
+  approved: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  denied: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  checkpoint: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+    </svg>
+  ),
+  user: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
+};
+
 // ---------------------------------------------------------------------------
 // COMPONENT
 // ---------------------------------------------------------------------------
@@ -385,7 +389,6 @@ const CollabHub: React.FC = () => {
     setCurrentUser,
     createProject,
     setActiveProject,
-    toggleChatPanel,
     handleAccessRequest,
   } = useCollaborationStore();
 
@@ -453,7 +456,7 @@ const CollabHub: React.FC = () => {
     timestamp: number;
     title: string;
     description: string;
-    icon: string;
+    icon: React.ReactNode;
     iconBg: string;
     actionable?: boolean;
     requestId?: string;
@@ -478,7 +481,7 @@ const CollabHub: React.FC = () => {
             ? `${req.requesterName} was granted access`
             : `${req.requesterName}'s request was denied`,
           description: req.message || `Requested ${req.requestedRole} access to ${p.name}`,
-          icon: req.status === 'pending' ? '!' : req.status === 'approved' ? 'OK' : 'NO',
+          icon: req.status === 'pending' ? ACTIVITY_ICONS.pending : req.status === 'approved' ? ACTIVITY_ICONS.approved : ACTIVITY_ICONS.denied,
           iconBg: req.status === 'pending' 
             ? 'linear-gradient(135deg, #ff9f0a, #ff6b00)'
             : req.status === 'approved'
@@ -500,7 +503,7 @@ const CollabHub: React.FC = () => {
           timestamp: cp.timestamp,
           title: cp.autoSave ? 'Auto-saved checkpoint' : `Checkpoint: ${cp.name}`,
           description: `${cp.creatorName} saved a checkpoint on ${p.name}`,
-          icon: 'SAVE',
+          icon: ACTIVITY_ICONS.checkpoint,
           iconBg: 'linear-gradient(135deg, #30d158, #34c759)',
         });
       });
@@ -518,7 +521,7 @@ const CollabHub: React.FC = () => {
           timestamp: c.joinedAt,
           title: `${c.name} joined`,
           description: `Joined ${p.name} as ${c.role}${c.isVisitor ? ' (visitor)' : ''}`,
-          icon: 'USER',
+          icon: ACTIVITY_ICONS.user,
           iconBg: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
         });
       });
@@ -633,10 +636,46 @@ const CollabHub: React.FC = () => {
       {/* Tabs */}
       <div style={styles.tabs}>
         {([
-          { id: 'projects' as const, label: 'My Projects', icon: 'PRJ', badge: 0 },
-          { id: 'shared' as const, label: 'Shared with Me', icon: 'TEAM', badge: 0 },
-          { id: 'checkpoints' as const, label: 'Checkpoints', icon: 'SAVE', badge: 0 },
-          { id: 'activity' as const, label: 'Activity', icon: 'LOG', badge: pendingRequests },
+          {
+            id: 'projects' as const,
+            label: 'My Projects',
+            badge: 0,
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            ),
+          },
+          {
+            id: 'shared' as const,
+            label: 'Shared with Me',
+            badge: 0,
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            ),
+          },
+          {
+            id: 'checkpoints' as const,
+            label: 'Checkpoints',
+            badge: 0,
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+            ),
+          },
+          {
+            id: 'activity' as const,
+            label: 'Activity',
+            badge: pendingRequests,
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            ),
+          },
         ]).map(tab => (
           <button
             key={tab.id}
@@ -645,8 +684,9 @@ const CollabHub: React.FC = () => {
               ...(activeTab === tab.id ? styles.tabActive : {}),
             }}
             onClick={() => setActiveTab(tab.id)}
+            aria-pressed={activeTab === tab.id}
           >
-            <span>{tab.icon}</span>
+            <span style={{ display: 'flex', alignItems: 'center' }} aria-hidden="true">{tab.icon}</span>
             {tab.label}
             {tab.badge > 0 && (
               <span style={styles.tabBadge}>{tab.badge}</span>
@@ -664,11 +704,13 @@ const CollabHub: React.FC = () => {
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <span style={{ flex: 1 }}>{error}</span>
-            <button 
+            <button
               onClick={() => setError(null)}
-              style={{ 
-                background: 'transparent', 
-                border: 'none', 
+              title="Dismiss"
+              aria-label="Dismiss error"
+              style={{
+                background: 'transparent',
+                border: 'none',
                 color: 'var(--color-error, #ff453a)',
                 cursor: 'pointer',
                 padding: 4,
@@ -758,6 +800,8 @@ const CollabHub: React.FC = () => {
                         data-menu-btn
                         style={styles.cardMenu}
                         onClick={e => { e.stopPropagation(); setShowShare(project.id); }}
+                        title="Project options"
+                        aria-label="Project options"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                           <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
@@ -833,15 +877,16 @@ const CollabHub: React.FC = () => {
         {/* Checkpoints */}
         {activeTab === 'checkpoints' && (
           allCheckpoints.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="1.5">
+            <EmptyState
+              title="No checkpoints yet"
+              description="Saved versions of your projects will appear here so you can review or restore them."
+              icon={(
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                   <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
                 </svg>
-              </div>
-              <div style={styles.emptyTitle}>No checkpoints yet</div>
-            </div>
+              )}
+            />
           ) : (
             <div style={styles.checkpointList}>
               {allCheckpoints.map(cp => (
@@ -884,14 +929,15 @@ const CollabHub: React.FC = () => {
         {/* Activity */}
         {activeTab === 'activity' && (
           activityFeed.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff9f0a" strokeWidth="1.5">
+            <EmptyState
+              title="No activity yet"
+              description="Access requests, checkpoints, and new collaborators will show up here as your projects evolve."
+              icon={(
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
-              </div>
-              <div style={styles.emptyTitle}>No activity yet</div>
-            </div>
+              )}
+            />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {activityFeed.map(item => (

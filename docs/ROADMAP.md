@@ -1587,6 +1587,511 @@ REMAINING (lower leverage / deferred):
     multi-session tabs (above). The big-app tool work (DAW razor/slice, video blade,
     etc.) is real per-app feature work, not a single sweep.
 
+## Signature Feature Extraction (owner brief, 2026-06-20)
+
+> Convert industry-defining capabilities into DEX-native, DEX-named signature
+> features (never copies). The brief lists OS-level systems first (Workspace
+> Continuity, Universal Workspace, Smart Clipboard, Session Restore, Intelligence
+> Layer) plus per-suite features. Strategy: wire the existing backbone into real,
+> opt-in UI rather than orphaning new modules.
+>
+> **CONSTRAINT discovered (do not violate):** the auto "Restore your workspace?"
+> prompt was removed by owner directive — `AppManager` silently clears the
+> last-session journal on boot ("DEX never nags to reopen apps"). All
+> continuity/resume features must therefore be USER-INVOKED, never a boot nag.
+>
+> **DONE — Omni Clipboard (Smart Clipboard System, the "Universal Clipboard"
+> signature).** Turned the old clipboard panel (which only captured while it was
+> *open*, so history was almost always empty, and was text-only) into a real
+> cross-app clipboard memory:
+> - `store/clipboardStore.ts` — single source of truth (Zustand, persisted via
+>   debouncedJsonStorage, key `dex-clipboard-omni`, cap 100, pinned never evicted),
+>   with conservative `detectClipKind` typing: text / code (+language: ts/js/py/
+>   rust/html/css/sh/json) / link / color / email / path / number. One-time
+>   migration of the legacy `dex-clipboard-history` format.
+> - `services/ClipboardMonitor.ts` — continuous background capture (copy/cut DOM
+>   events + focus-gated SharedTick poll) that attributes each clip to the
+>   foreground DEX app. Started once in `App.tsx`.
+> - `components/ClipboardHistory.tsx` — rewritten to read the store: typed icons,
+>   code in monospace + language tag, live color swatches, source-app + time meta,
+>   type-filter chips (All/Pinned/Text/Code/Links/Colors), search over content/
+>   source/language, pin-to-top, copy-without-closing, clear-unpinned. Still
+>   opt-in (Ctrl+Shift+V).
+> - Ecosystem wiring: `system.clipboard` command in the canonical catalog
+>   (`dexCommands.ts`) → `clipboard` action in AppManager's command bus →
+>   `dex-open-clipboard`; and a new `clipboard` Spotlight category (engine index
+>   block + label/order/icon in SpotlightSearch) so clips are globally searchable
+>   and copy on select.
+> - IMAGE support DONE: the monitor captures copied images (copy-event file items)
+>   as data URLs (kind `image`), the panel renders thumbnails, and copy/select
+>   writes a real image blob back to the clipboard. Images are SESSION-ONLY
+>   (partialize drops them) so base64 never blows the localStorage quota. Verified
+>   in preview (thumbnail renders; persisted store excludes images).
+> - Verified: `tsc --noEmit` 0 errors, watermark check 2110/2110, and in the live
+>   preview — typing classified correctly (incl. single-line JSON→json,
+>   interface→ts, arrow-fn→js), source attribution, pin-to-top, and the type
+>   filter all confirmed via accessibility snapshots; no console errors.
+>
+> **DONE — DEX Flow (Universal Send-to / Handoff, the "Handoff → Flow Transfer"
+> signature).** Generalized the creative-only `continuity:handoff` into an
+> OS-wide "send anything to any app":
+> - `services/FlowTransfer.ts` — `sendFlow(appId, payload)` with two tiers: a
+>   RICH built-in Browser route (links open, text searches) + a `registerFlowIntake`
+>   registry for apps to add their own, and a UNIVERSAL fallback (copy → open app →
+>   "paste to drop it in") that works for every app today with zero per-app wiring.
+>   `getFlowTargets(payload)` suggests kind-appropriate destinations (excludes the
+>   origin app). Every send is announced on ContextBus `continuity:handoff`.
+> - `components/FlowSendMenu.tsx` — a global opt-in "Send to…" picker opened via
+>   `dex-flow-open` (with an explicit payload, or it resolves the current text
+>   selection → latest clip). Mounted in App.tsx.
+> - Entry points: a "Send to app" action on every Omni Clipboard clip, and a
+>   `system.sendTo` command (`Ctrl+Shift+O`) → `sendto` action in AppManager's bus.
+> - Verified: tsc 0; live preview — link→Browser routed the URL via
+>   `dex-spotlight-navigate`, target suggestions correctly excluded the origin app,
+>   the universal fallback opened the target + toasted, and the no-payload command
+>   resolved the latest clip. Shell stays mounted (no error-boundary fallback).
+> - Rich Notes intake DONE (`services/flowIntakes.ts`, registered at startup):
+>   Send-to-Notes creates a REAL note (title = first line, body = TipTap doc) via
+>   the Notes app's own store — verified in the preview (note created, success
+>   toast, no error). Tasks intake intentionally SKIPPED: the Tasks app persists
+>   via its own path, not `nl-task:create`, so a rich intake would write to the
+>   wrong store — the universal fallback is correct for Tasks.
+>
+> **DONE — DEX Now / Context Engine (the "Intelligence/Memory" signature).**
+> `shared/uki/contextEngine.ts` was a pure accumulator fed by nothing (orphaned).
+> Now wired + surfaced:
+> - `services/contextEngineWiring.ts` (`startContextEngine`, in App.tsx) feeds the
+>   engine from ContextBus: project (`continuity:project`), workspace
+>   (`continuity:stage`), file (`file:opened/saved`), notes/tasks activity, and a
+>   recent-activity stream. Open-apps is driven by a DIRECT `useRunningApps`
+>   subscription, NOT ContextBus — the bus throttles one event/channel/~frame, so
+>   two rapid app opens dropped the second and left the set stale (caught + fixed
+>   in preview). Exposes `window.__dexContextEngine`.
+> - `components/ContextNowPanel.tsx` — a user-invoked "Now" panel (active project/
+>   workspace/file + open-app chips + recent-activity timeline; live-refreshes
+>   while open). Opened via `dex-open-context`; `system.context` command
+>   ("now" / "what am I working on") → `context` action in AppManager's bus.
+> - Verified: tsc 0; live preview — launched 3 apps via the store, all appeared in
+>   open-apps; project/file/activity rendered; the throttle bug was found and fixed.
+>
+> **DONE (next batch):** (1) UKI loop closed — `uki/operator.formatOperatorBriefing`
+> now appends a `recent:` line from the Context Engine's activity stream (the one
+> thing the briefing lacked), so UKI sees what the user just *did*, not only what's
+> open. (2) Creative Flow intakes (`services/flowIntakes.ts`) — sending an IMAGE to
+> Prism/Flux/Forge/AXL routes through each app's existing CreativeSuiteBridge inbox
+> (verified in preview: "Sent to PRISM" success + app open), so it lands as a real
+> import; the Notes intake skips images (they fall through to paste). tsc 0.
+>
+> **DONE — DEX Learn (Education layer, "every app can teach itself").**
+> `services/learnRegistry.ts` (per-app guides: overview + bullet sections;
+> `registerBuiltinLearn` ships guides for Notes/DexCode/Prism/Files) +
+> `components/LearnOverlay.tsx` (reads the CURRENT app's guide, or a generic one
+> built from APP_DEFINITIONS + the DEX-wide shortcut tips, so EVERY app is
+> teachable with zero per-app work). `system.learn` command ("learn"/"help") →
+> `learn` action → `dex-open-learn`. Guides cross-reference the new Clipboard/
+> Flow/Now superpowers. Verified: tsc 0, build green, preview (custom Notes guide
+> + generic Calculator fallback both render).
+>
+> **DONE — DexCode Outline (first deep per-app feature; "precision navigation").**
+> `DEXAPPLICATIONS/standalone/dexCode/symbols.ts` — a pure, tested-by-preview
+> single-pass parser: DexScript `fn` functions, `class`, and TOP-LEVEL (column-0)
+> `let`/`const`/`var` (top-level only, so function-body locals are excluded);
+> JS `function`/`class` recognised too. Plus `lineStartOffset`. Surfaced as an
+> always-on collapsible **Outline** section in the DexCode sidebar (tag + name +
+> line); clicking a symbol moves the caret to that line, focuses, and centers it
+> (`jumpToLine`, reusing the textarea + onScroll highlight sync). No shortcut
+> conflict (Ctrl+Shift+O is now the global DEX Flow). Verified in preview: parsed
+> `fn add`/`fn factorial`/`let total` from real code (locals excluded), click →
+> caret jumped exactly to `fn factorial` + editor focused. tsc 0, build green.
+>
+> **DONE — DexCode Go to Line + Outline filter (more precision nav).** Ctrl/Cmd+G
+> opens an inline go-to-line bar that reuses `jumpToLine` (verified: "5" → caret on
+> `fn factorial`); the Outline gains a filter input (shown when >6 symbols) backed
+> by a `filteredSymbols` memo (verified: 7 symbols → "alph" narrows to 1). tsc 0,
+> build green, clean reload.
+>
+> **DONE — DexCode output → ecosystem (the DexCode "stronger together" signature).**
+> When a run produces output, the Output pane shows Copy + Send buttons: Copy puts
+> the output on the clipboard (so it lands in the Omni Clipboard), Send opens the
+> DEX Flow picker pre-loaded with the output (route to Notes/Browser/Tasks/Files;
+> DexCode excluded as origin). Verified in preview: Run → output → Send → Flow
+> picker shows the output text + correct targets. tsc 0, build green.
+>
+> **DONE — DEX color ecosystem (cross-app, "stronger together").** Two flagship
+> color apps now feed the Omni Clipboard so picked/copied colors are reusable +
+> sendable across DEX (typed automatically as `color` clips, attributed to source):
+> PRISM's eyedropper (`prism/Prism.tsx`, on pick → store.add + OS clipboard + toast)
+> and the Color Picker's copy helper (`standalone/ColorPicker.tsx`). Verified in
+> preview: Color Picker "Copy HEX" → `{kind:color, #3399ff, src:Colors}` in the
+> store; PRISM uses the identical store.add path. tsc 0, build green.
+> NOTE: **Notes app assessed as already mature** (live word/char/reading-time, TOC
+> outline w/ jump, backlinks, tags, find, SendToMenu all exist) — deliberately NOT
+> churned a low-value feature into it.
+>
+> **DONE — Calculator → ecosystem (upgrade).** Copy result now also lands in the
+> Omni Clipboard (typed `number`, attributed); the old Notes-only "Send" was
+> GENERALIZED to the universal DEX Flow picker (send a result to any app). Verified
+> in preview: Copy → `{number, src:Calculator}` clip; Send → Flow picker opens.
+> tsc 0, build green. (Pattern now applied across DexCode output, Prism, Color
+> Picker, Calculator — value-producing apps feed Clipboard/Flow.)
+>
+> **NEXT candidates:** DEX Audio Pattern Engine (deep, audio hard to verify
+> headlessly); surface IntelligenceLayer predictions (IPC → full-app verify); Omni
+> Clipboard external-image capture; DexCode multi-cursor (heavier).
+>
+> **DONE — window-system interaction polish (v6 shell track).** Three fixes in
+> `shell/FloatingWindow.tsx`, the chrome every detached app window shares.
+> (1) DRAG "GHOST"/WOBBLE root-caused + fixed: the live drag position is written to
+> the DOM imperatively each frame, but render still bound `left/top` from the stale
+> committed `pos`, so the throttled snap-zone preview's `setPreviewZone` re-render
+> snapped the window back to its drag-start position for a frame (visible wobble,
+> worst near screen edges). Render now reads the live position from a ref while
+> dragging, so an incidental mid-drag re-render can't clobber the imperative
+> position (React 18 createRoot batches the pointer handlers, so release is jump-free
+> too). (2) Title-bar controls (close/min/max) no longer initiate a drag — a plain
+> press used to flip the window into its heavy "dragging" shadow and flash the snap
+> preview; a target-is-`button` guard in the pointerdown handler suppresses it while
+> the window-root onPointerDown still focuses the window. (3) Removed dead
+> `GPU_HINTS` const (defined, referenced nowhere). Verified tsc 0.
+> AUDIT (verify-first, like the P3 sweep — mostly FALSE POSITIVES, NOT churned): no
+> dead/no-op buttons in the renderer; global scroll containment already correct
+> (`* { overscroll-behavior: contain }` — the "40+ chaining containers" finding was
+> bogus, the universal rule already covers them); `.dex-btn` per-variant state matrix
+> + global `:focus-visible` ring already complete; `WindowDepthManager` z-order/
+> stacking already correct. Universal `scroll-behavior: smooth` is an intentional
+> premium-feel choice (team opts out per-context, e.g. timeline scrub) — left as-is.
+>
+> **DONE — DEX-wide refinement sweep (v6, 6 surfaces in parallel + Imosion).**
+> Verify-first fixers over DISJOINT files (no shared-file edits, no git); central
+> `tsc` 0 after all edits. GENUINE FIXES: (a) Spotlight search — async deep-search
+> results (host files / universal search / file-intelligence / screenshots /
+> conversations) were indexed but NEVER rendered: the engine refresh callback read
+> `query` from a mount-time `[]`-deps closure (always ''), so its repaint guard was
+> permanently false; fixed with a live `queryRef` (`shell/SpotlightSearch.tsx`).
+> (b) Terminal — Ctrl+C with an active text selection sent SIGINT instead of
+> copying; now copies when output text is selected (`components/Terminal.tsx`).
+> (c) UKI — auto-scroll didn't follow token streaming (added streamingResponse/
+> isThinking/thoughtSteps deps), no Esc-to-close (added), auto-grown textarea didn't
+> collapse after send (`components/UkiOverlay.tsx`). (d) Task Manager — process rows
+> rendered 6 grid children into a 5-column template, so End/Tree buttons fell out
+> from under the Action header; wrapped them in one Action cell + widened the column
+> (`pages/TaskManager.tsx`). (e) Clipboard — the forward-Delete key in the search
+> box deleted a clip instead of editing text; now only removes a clip when forward-
+> delete is a no-op on the query (`components/ClipboardHistory.tsx`). (f) Command
+> Palette — selection drift: arrows/Enter/aria indexed fuzzy-score order but the
+> list renders grouped-by-category, so the highlighted row and the command Enter ran
+> could differ; added an `orderedCommands` flatten matching render order + id-based
+> scroll-into-view (`components/CommandPalette.tsx`). (g) Notifications — a swipe-to-
+> dismiss also fired the banner's click/deep-link; suppressed click after a drag
+> (`shell/NotificationBanners.tsx`). (h) Imosion CRASH-LOOP root-caused + fixed:
+> `navigator.mediaDevices.addEventListener('devicechange')` ran OUTSIDE the device-
+> enum try/catch, so when `mediaDevices` is undefined (insecure/headless ctx, or mic
+> denied) it threw synchronously on mount -> bounded error-boundary retry loop. Now
+> every media access is feature-detected and degrades (input disabled, app still
+> renders) (`DEXAPPLICATIONS/imosion/Imosion.tsx`). VERIFIED LIVE: launched Imosion
+> in the headless preview (no mediaDevices) -> mounts + renders, no crash card.
+> FALSE POSITIVES (verified solid, NOT churned): QuickControls; Calculator (l-to-r
+> precedence is intentional) / Timer; Terminal split-panes/tabs (genuinely absent,
+> needs multi-session PTY — reported, not faked); no standalone Dock/Screenshot/
+> Reminder component files exist (dock lives in AppManager). tsc 0 across 8 files.
+>
+> **DONE — Multi-Mind / "many paths" initiative: verified ~already built, shipped
+> the one genuine gap.** AUDIT FIRST (the initiative is mostly philosophy and the
+> platform already satisfies it, so almost nothing to churn): search surfaces
+> ACTIONS / settings / commands, not just files (`SpotlightEngine` result types +
+> alias system); inline calc AND unit conversion already work in both Spotlight
+> (`SpotlightEngine.ts:404`) and the Command Palette; UKI already answers calc,
+> unit conversion, time/date, system, running-apps, and knowledge (weather/define/
+> currency) queries LOCALLY before any LLM via `trySystemTool` (`UkiOverlay.tsx:973`
+> -> tryMathCalculation / tryUnitConversion) plus 14 slash commands
+> (`UkiSlashCommands`). So "invisible apps" + "search finds actions" are already
+> DONE -- not churned. THE GENUINE GAP -- "right-click anything and ask UKI" --
+> built end-to-end: the global context-menu handler (`App.tsx`, the single
+> right-click authority that suppresses the native menu) now, when no component
+> claimed the click and there is a text selection on non-editable content,
+> dispatches `dex:ask-uki-selection`; a new self-contained
+> `components/AskUkiContextMenu.tsx` renders a DEX menu there ("Ask UKI about
+> '<sel>'" + Copy); choosing it dispatches a new reusable `uki:ask` event that
+> `UkiOverlay` listens for (new `openPanel()` on `ukiStore`), opening UKI seeded
+> with the selection and focused. `uki:ask` is a reusable inbound bridge that
+> drag-drop / commands can adopt with one dispatch. VERIFIED LIVE end-to-end in the
+> preview: selection -> right-click -> menu -> click -> UKI opens with the text
+> seeded; tsc 0. NOTE: the first attempt (a window-level contextmenu listener) was
+> DEAD because App's document-level suppressor preventDefaults every right-click
+> before the window bubble phase -- caught by live testing, then re-routed through
+> the global handler. Files: App.tsx, components/AskUkiContextMenu.tsx (new),
+> components/UkiOverlay.tsx, store/ukiStore.ts, components/AppManager.tsx.
+>
+> **DONE — DEX-wide stability + consistency pass (onboarding -> apps).** STABILITY:
+> two sweeps. (1) EMPIRICAL -- launched ~40 apps via the running-apps store in the
+> live preview and checked each for an AppErrorBoundary crash card: ZERO crashes
+> (every creative/media/system/utility app mounts clean; Imosion, the one prior
+> crasher, confirmed fixed). (2) CODE-LEVEL -- swept all of DEXAPPLICATIONS for the
+> Imosion bug class (env-dependent browser APIs -- mediaDevices/getUserMedia/
+> AudioContext/geolocation/MIDI/WebGL/clipboard/Notification accessed unguarded at
+> mount): found NONE outside the already-fixed Imosion site -- every other site is
+> already behind try/catch, feature-detection, or a user-triggered handler. So the
+> apps are genuinely stable; not churned. CONSISTENCY/SHARPNESS: Settings toggle
+> ON-state color had drifted -- several hand-rolled toggles rendered BLUE
+> (`--color-accent`) while the canonical `renderToggle` (~80% of rows) is GREEN
+> (`--color-success`), and the drifted ones even had a green fallback literal under
+> the blue var (proof of the drift). Unified 3 toggles to green + aligned one
+> off-scale toggle geometry (44x26/r13 -> 44x24/r12, knob recentred) + one slider
+> width (140 -> 120) to the shared scale (`pages/Settings.tsx`). LockScreen Unlock
+> button rendered at full accent opacity while functionally disabled on an empty
+> password -- its disabled visual now matches its `disabled` condition
+> (`components/LockScreen.tsx`). Onboarding + the rest of LockScreen audited and
+> confirmed solid (flow/gating/keyboard/focus/aria all correct) -- not churned.
+> Verified: tsc 0; ~40-app live crash sweep green.
+>
+> **DONE — flagship creative-app internal-UI sharpness pass (parallel, 1 app per
+> agent, disjoint dirs).** Each found GENUINE chrome inconsistencies (not churn):
+> PRISM -- DEAD HOVER STATES: hover CSS for `.prism-tool-btn` / `.prism-icon-btn`
+> / `.prism-tab` / `.prism-layer-item` existed but the class names were never
+> applied to any element, so the tool palette / layers / tabs had NO hover
+> feedback; wired them (guarded vs active) + added missing color-swatch aria-labels
+> (`prism/Prism.tsx`). FLUX -- tool-flyout selected state rendered RED (#ff375f)
+> while the app accent is PURPLE (#bf5af2); bezier curve drew a CSS var on a 2D
+> canvas (silently failed) -> literal #4a9eff; blank Inspector with no layer ->
+> added empty state; Morph confirm button had no disabled visual (`flux/Flux.tsx`,
+> `flux/EasingCurveEditor.tsx`). AXL -- literal `×` / `°` / `³`
+> escape sequences sat in RAW JSX text (JS escapes don't apply there) so users saw
+> "×" instead of x / deg / cubed; -> HTML entities, matching the file's
+> existing `&sup3;` convention (`axl/Axl.tsx`, `axl/PropertiesPanel.tsx`). FORGE --
+> literal "arrow-right" text shown instead of an arrow glyph; default tab was
+> 'queue' (no such panel) -> blank sidebar on first load, fixed to 'presets' +
+> guarded the persisted-restore; segment-label casing (`forge/Forge.tsx`). VINX --
+> 4 bare literal `X` close buttons -> the `DexIcon name="close"` used by the other
+> ~20 (`vinx/Vinx.tsx`, `vinx/Inspector.tsx`, `vinx/ExportDialog.tsx`). Each agent
+> also confirmed the bulk of its app's chrome already consistent (toolbars/panels/
+> states/aria) -- not churned. FLAGGED (not faked, out of chrome scope): Forge
+> subtitle Position/Style selects are dead (uncontrolled, not consumed by encode);
+> VINX timeline ruler canvas uses CSS vars in ctx fill (won't resolve). Verified:
+> tsc 0; all 5 edited apps re-launched in the live preview -> mount clean, no
+> regressions.
+>
+> **DONE — productivity/utility app internal-UI sharpness pass (parallel, 1 app per
+> agent, disjoint files).** ~26 genuine fixes across 8 apps; recurring theme was
+> DEAD HOVER/ACTIVE STATES (CSS/transitions declared but never wired) plus a few
+> real defects. NOTES -- duplicate color swatches (Orange+Yellow both mapped to
+> `--color-warning`; Yellow -> #FFD60A), dead hover on New-Note/format-toolbar/AI
+> buttons wired (the format toolbar's `toolbarBtnActive` style was defined but
+> unused) (`notes/NotesComponents.tsx`, `notes/NotesEditor.tsx`). KANBAN -- active
+> board tab was INVISIBLE (same bg token as its track) -> elevated pill; hardcoded
+> #5e5ce6 accent -> `--color-accent`; dead hover on add-column/modal/add-board
+> buttons wired (`standalone/KanbanApp.tsx`). DEXCODE -- literal `\$` rendered as
+> text in the output empty-state -> `$`; collapsed-sidebar left a dead 220px grid
+> column (workspace squashed) -> conditional grid template; Find/Terminal toggles
+> had no active state; dead hover on sidebar buttons (`standalone/DexCode.tsx`).
+> NEXUS -- dead hover on cradle buttons + selected chip, missing title tooltips
+> (`standalone/Nexus.tsx`). MAPS -- missing no-results empty state; basemap toggle
+> missing hover (`standalone/Maps.tsx`). GALLERY -- empty-state icon rendered 18px
+> in an 80px circle (fontSize on a fixed-size SVG is inert) -> 40px SVG; list
+> favorited heart was gray not red; selection-mode Export/Delete text clipped in a
+> 28px icon-width box; lightbox prev/next had no disabled state at first/last
+> (`pages/Gallery.tsx`). FILES -- DEAD PAGINATION: the load-more sentinel existed
+> only in grid view but list is the DEFAULT, so folders >100 items silently capped;
+> added the list sentinel + re-bind observer on view switch; removed dead code
+> (`pages/Files.tsx`). BROWSER -- the bookmark-remove X was permanently invisible
+> (`display:none` never overridden) -> reveal-on-hover like the tab close button
+> (`pages/Browser.tsx`). FLAGGED (not faked, out of chrome scope): Browser
+> Keychain/Bookmarks/Reading-Mode/tab-context-menu panels are built but have no
+> trigger to OPEN them; Files column-view trailing panels need async per-column
+> loads; Nexus `ctx.font` uses a CSS var (won't resolve). Verified: tsc 0; all 8
+> edited apps re-launched live -> mount clean, no regressions.
+>
+> **DONE — small-utility + media + system app internal-UI sharpness pass (parallel,
+> ~18 apps, disjoint files).** ~24 fixes. Two real defects stood out: GAMES --
+> undefined utility classes (`sm:*`, `space-y-2`, `opacity-70/80`, `break-words`)
+> SILENTLY NO-OP in this project's hand-authored utility layer, so game rows were
+> permanently stacked (Plan/Launch fell below the title at ALL widths), had no gaps,
+> dim text wasn't dim, and buttons had no padding/disabled feedback -> rewrote to
+> real inline styles/tokens (`pages/Games.tsx`) [confirms the known
+> utility-css-not-tailwind trap]. POWER -- sorting by Disk/Status/Threads silently
+> sorted by PID (comparator missing those branches); active sort header + memory
+> trend rendered EMPTY-STRING indicators (invisible); missing `°C`; 4 panels
+> (startup items / scheduled tasks / app-memory / thermal) rendered BLANK with no
+> empty state (`pages/Power.tsx`). Plus: NoiseGenerator both slider ends drew the
+> SAME volume icon -> volume-1/volume-2; Weather bare `+`/`×` glyph buttons ->
+> DexIcon (+ dead fontSize, redundant var fallback); PixelArt bare `x` delete ->
+> DexIcon; Canvas + UnitConverter `disabled` controls had no disabled visual ->
+> added; QRCode/ScreenRecorder/PDFViewer icon controls missing aria-label/title (+
+> PDFViewer hyphen `-` -> proper minus); WorldClock missing empty state; LearnOverlay
+> section bullets used the generic accent instead of the per-app accent; Store/
+> StoreHome Install/Refresh disabled buttons had no feedback. Also fixed an undefined
+> `--font-system` token (silently fell back to the browser default font) in 3 apps
+> -> `--font-family`, matching the rest of DEX (`ScreenRecorder.tsx`, `PixelArt.tsx`,
+> `PDFViewer.tsx`). Stopwatch/Pomodoro/ColorPicker/PasswordGenerator/Achievements/
+> RecycleBin/Learn/LiveActivityBrowser audited + confirmed solid -- not churned.
+> FLAGGED (real bug, out of UI scope): Workflows execution engine switches on
+> kebab-case action ids but nodes carry catalog ids (a1..a60), so every step falls
+> through to default and never runs -- needs a dedicated action-id-contract fix.
+> Verified: tsc 0; all 14 edited apps re-launched live -> mount clean, no regressions.
+>
+> **DONE — remaining apps sharpness pass (Music/Calendar/Tasks/Git/SSH/Env/Collab);
+> completes the app-by-app internal-UI sweep.** ~17 fixes, genuine again. CALENDAR --
+> recurring-frequency buttons had an INVISIBLE active state: active bg `var(--accent)`
+> resolves to white in the true-black theme -> white-on-white selection; inactive bg
+> used undefined `--bg-tertiary` (fell back to off-palette #333); rewired to
+> `--color-accent`/`--color-text-inverse` like the rest of the app; also nav arrows
+> said "month" while stepping by WEEK -> view-aware labels (`standalone/Calendar.tsx`).
+> COLLABHUB -- tab icons were LITERAL placeholder strings ('PRJ'/'TEAM'/'SAVE'/'LOG')
+> and activity-feed icons ('!'/'OK'/'NO'/'SAVE'/'USER') rendered as clipped text in a
+> 40px circle -> real inline SVGs; bespoke empty states -> shared EmptyState; removed
+> dead imports (`standalone/CollabHub.tsx`). DEV TOOLS (Git/SSH/Env) -- the shared
+> `glassButton` base has no `:disabled` CSS, so EVERY disabled button stayed fully
+> lit with a pointer cursor; added a `disabledVisual` helper across ~15 controls in
+> all 3 files. MUSIC -- error token `--color-danger` -> `--color-error`; tabular-nums
+> on transport + track-list time readouts (`pages/Audio.tsx`). TASKS -- decorative
+> add-row checkbox had a misleading pointer cursor (-> default + aria-hidden); dead
+> `fontSize` on 2 DexIcon buttons + icon centering (`pages/Tasks.tsx`). Verified:
+> tsc 0; all 7 re-launched live -> mount clean, no regressions.
+>
+> **UI/UX SHARPNESS SWEEP -- COVERAGE COMPLETE.** Across this program: the shell
+> (window drag/controls), onboarding + lock screen, settings, search/command-palette/
+> notifications/clipboard/task-manager, and the INTERNAL UI of ~43 apps (every entry
+> in APP_DEFINITIONS that has a UI) have been audited + sharpened, each verified with
+> `tsc` 0 and a live mount check; a ~40-app empirical crash sweep is green. Recurring
+> defect classes found + fixed app-wide: dead hover/active CSS never wired; INVISIBLE
+> active states (same-bg or white-on-white in true-black); LITERAL escape/placeholder
+> text in JSX; undefined utility classNames + CSS var tokens silently no-op; disabled
+> controls with no visual; missing empty states; icon-only controls missing aria.
+> REMAINING (genuine behavior/wiring bugs, deliberately flagged not faked, each needs
+> a focused task): Workflows execution action-id mismatch (steps never run); Browser
+> Keychain/Bookmarks/Reading-Mode panels have no open trigger; Forge subtitle
+> Position/Style selects uncontrolled + not consumed by the encoder; Files column-view
+> needs async per-column loads; a few canvas `ctx.font/fillStyle` CSS-var deep-render
+> spots (Nexus/VINX ruler).
+>
+> **DONE — behavior/wiring batch (the flagged real bugs, not cosmetics).**
+> WORKFLOWS EXECUTION FIXED -- `executeWorkflow` switched on kebab action ids but
+> nodes carry catalog ids `a1`..`a60` AND used wrong config keys (folder/destination/
+> duration/script vs path/dest/seconds/code), so every step hit `default` and never
+> ran. Rewrote the switch to the catalog ids + correct keys, executing client-side
+> actions (a1/a2/a3 files list/copy/move, a11 delete, a12 rename, a6 wait, a7 run-
+> script, a8 open-app, a9 condition w/ all operators, a10 loop, a35/a36 open url/file)
+> through the SAME IPC channels Files.tsx already uses; server-side action types still
+> route to `dex.workflows.execute`. Correctly determined the chatActions/dexCommand
+> runner uses a DIFFERENT catalog (app-launch/window/nav) and would not run these
+> (`pages/Workflows.tsx`). BROWSER -- Keychain / Bookmarks / Reading-Mode panels were
+> built but had no open trigger; wired 3 triggers in the existing toolbar/address-bar
+> pattern (Reading Mode gated on an active tab), each traced to its panel's visibility
+> state; VERIFIED LIVE: clicking Keychain opens the panel (DOM grows, password content
+> renders) (`pages/Browser.tsx`). FORGE -- subtitle Position/Style selects were
+> uncontrolled + dropped; added state, controlled them, and threaded both into the
+> same `subtitleBurnIn` settings object that carries font/size. Honest finding: burn-in
+> is SIMULATED in this build (the canvas/MediaRecorder encode path reads neither
+> subtitleBurnIn nor cues -- 0 drawtext/subtitles refs), so values are genuinely wired
+> to where font/size go, not faked into a non-existent encoder (`forge/Forge.tsx`).
+> FILES -- column (Miller) view rendered blank trailing panels because only column 0
+> had data; added per-column async loading via the existing `files:list` bridge with
+> per-column loading/empty states, and fixed folder clicks to push columns without
+> collapsing via navigateTo (`pages/Files.tsx`). Verified: tsc 0; all 4 apps
+> re-launched clean; Browser keychain trigger verified live. REMAINING (minor,
+> flagged): Workflows backend-only action types need dedicated renderer IPC; Forge
+> burn-in has no encode consumer yet; Files column cache isn't invalidated after
+> create/delete/move/rename; canvas `ctx.font/fillStyle` CSS-var spots (Nexus/VINX).
+>
+> **DONE — final cleanup batch (cleared the remaining flagged items).** WORKFLOWS --
+> wired 18 MORE action types to run CLIENT-SIDE by reusing existing renderer modules
+> (no new IPC): Notes a4/a20/a21/a22 (useNotesStore create/append/search/export),
+> a5/a25 notification+dialog (toast helper), a24 clipboard (useClipboardStore +
+> navigator.clipboard), a26 play-sound (Web Audio), a28 stop (now actually halts via
+> context.stopped), a29 set-var, a31 eval (charset-guarded), a32 regex, a33/a34 JSON,
+> a54-a57 text transforms, a58-a60 list sort/filter/count. Native/OS (file-write/
+> media/system), email, and CORS-blocked web actions stay on the backend
+> `dex.workflows.execute` path -- reported, not faked (`pages/Workflows.tsx`). FORGE --
+> implemented REAL subtitle burn-in in the canvas/MediaRecorder composite loop: active
+> cue picked by `video.currentTime`, position (top/center/bottom), style (outline=
+> stroke+fill / shadow / box), multi-line; fully gated so the no-subtitle path is
+> byte-identical (`forge/Forge.tsx`). FILES -- column cache (`columnData`/
+> `columnLoading`) now cleared at the top of `loadFiles`, the single funnel every
+> mutation (create/delete/move/rename/paste/organize) already calls; no reload loop
+> (load effect only fetches undefined+not-loading paths), column 0 (live) unaffected
+> (`pages/Files.tsx`). CANVAS CSS-VARS -- Nexus `ctx.font` now resolves `--dex-font-ui`
+> via the existing palette resolver (once/frame); VINX Timeline ruler resolves its
+> bg/tick/label tokens via one `getComputedStyle` per draw -- both render the intended
+> font/colors instead of the invalid-value fallback, unchanged when tokens are defined
+> (`standalone/Nexus.tsx`, `vinx/Timeline.tsx`). Verified: tsc 0; all 5 affected apps
+> re-launched clean. **ALL PREVIOUSLY-FLAGGED BEHAVIOR/WIRING/RENDER ITEMS NOW
+> RESOLVED.** Only genuinely native/OS/CORS-bound workflow steps + a real ffmpeg
+> subtitle encoder remain backend-dependent (honest platform limits, not defects).
+
+> **DONE — window-drag smoothness (root cause) + search-field pill/no-highlight.**
+> DRAG: app windows dragged badly on this machine because it runs perf-tier=LOW,
+> and `html[data-perf-tier="low"] * { will-change: auto !important; contain: layout
+> style !important }` (globals.css) OVERRODE the drag handlers' imperative
+> `el.style.willChange='transform'` -- so the dragged window never got its own
+> compositor layer and the live transform repainted the whole heavy window every
+> frame. Both window systems (FloatingWindow + AppManager) already tag the in-flight
+> window with `data-dragging`/`data-resizing`; added a tier-scoped override
+> (`html[data-perf-tier="low"] [data-dragging="true"]`, etc. -- higher specificity
+> than the low-tier `*` rule so it actually wins) that re-grants
+> `will-change: transform` + `contain: layout style paint` ONLY during the gesture,
+> released on pointer-up. "Spend GPU for the active drag, keep low-tier savings
+> everywhere else." VERIFIED LIVE: tier=low, a data-dragging element now computes
+> will-change:transform (was forced to auto). SEARCH FIELD: the canonical
+> `DexSearchInput` (styles/components.tsx) had a heavy focus look -- white border +
+> 3px white glow stacking with the inner input's global :focus-visible blue outline
+> (three rings, two colors). Per owner: make every search bar a FULL PILL with NO
+> highlight. Now `borderRadius: 9999`, `boxShadow: none` (no glow ever), focus only
+> nudges the hairline to `--color-border-strong` (neutral, no accent), and the inner
+> input's global outline is suppressed via a scoped `.dex-search-field:focus-visible
+> { outline:none }` (globals.css). VERIFIED LIVE: focused field = 9999px radius,
+> boxShadow none, input outline none. Propagates to all ~18 DexSearchInput call
+> sites. tsc 0.
+>
+> **DONE — dropdowns / menus / bars / overlays: calm-consistent "pro" pass + bugs
+> (parallel, 8 shared components, disjoint).** Carried the pill-search restraint
+> (no glow, calm) across the shared overlay layer; ~25 fixes. SELECT/UNIFIEDDROPDOWN
+> -- removed the accent GLOW RING on the Select trigger; panel radius 6->10 + item
+> radius unified; loud selected-fill -> calm accent text + check; FIXED a literal
+> `'check'` string rendered instead of an icon + a literal `×` -> DexIcon; added
+> missing option hover + "No options" empty states; UnifiedDropdown swapped an
+> invented heavy double-shadow for `--pg-shadow-popover`, removed a DEAD `itemHover`
+> style, and stripped a stacked (bg + 2px outline) focus highlight to one subtle bg
+> (`components/Select.tsx`, `components/UnifiedDropdown.tsx`). UICOMPONENTS --
+> DexListItem selected/hover used hardcoded rgba + border-color-as-fill (invisible
+> in light/HC themes) -> `--color-accent-light`/`--color-bg-hover`; radius aligned;
+> same hover-token fix on SelectionToolbar (`shell/UIComponents.tsx`). QUICKCONTROLS
+> -- removed warning-dot glow, popover radius 8->10, added the missing disabled
+> visual on the permission toggle (`shell/QuickControls.tsx`). APPOVERVIEW -- FIXED
+> a real focus bug: two `<input>`s shared one `searchRef`, so typing focused the
+> hidden input and the visible filter never received keystrokes; merged to one
+> input, calm accent-outline selection, added empty state + close aria
+> (`shell/AppOverview.tsx`). APPSWITCHER -- selection was nearly INVISIBLE (muted
+> tertiary border) -> clear 1.5px accent ring + uniform `--pg-shadow-card`; added
+> role=listbox/option + aria-selected (`shell/AppSwitcher.tsx`). MINISHELL -- token
+> shadow + removed status-dot glow (`shell/MiniShell.tsx`). UNIFIEDSYSTEMS --
+> hardcoded accent/error rgba -> tokens (theme-correct), added notification-row
+> hover, and made Esc-to-close robust for Global Search + Scratchpad (it broke once
+> focus left the backdrop) (`components/UnifiedSystems.tsx`). ModalHost/Toast are
+> pure shims (no visual surface) -- correctly unchanged. Verified: tsc 0; shell
+> boots clean; Settings/Files/Tasks/Calendar (heavy Select/overlay users) mount
+> clean. FLAGGED: DexSlider lacks ARIA slider semantics (a11y, separate task).
+
+> **DONE — search consolidation + FloatingLauncher wiring/polish + UKI tune.**
+> SEARCH: every DEX search bar is now the one canonical pill (DexSearchInput --
+> full pill, muted placeholder, NO focus glow/outline). Swapped/restyled the
+> custom holdouts (FloatingLauncher dock, SpotlightSearch hero, MediaBrowser x3,
+> Home, SystemFeatures, Maps, EnvManager, Store, CommandPalette, UnifiedSystems;
+> many others were already canonical). DOCK DOUBLE-SEARCH: removed the large
+> "Search apps" inline field from the app-launcher panel (owner pick) -- the
+> launcher is now a clean app grid and the dock pill (+ overlay) is the single
+> search; bumped the dock pill sm->md (32px) to match the 32px bar buttons and the
+> canonical size, so the dock row aligns inline. FLOATINGLAUNCHER WIRING: the
+> Recent-apps buttons were DEAD -- `openRecent` dispatched `dex-open-app` with
+> `{ id }` but every handler keys off `{ appId }`; rewired to call `openApp(id)`
+> directly (same path as the music/calendar buttons). Made the dock search a clean
+> readOnly trigger (focus/click -> universal overlay) + aria-label. Verified live:
+> launcher/search/UKI-toggle/expand/now-playing/calendar/recents all functional;
+> dock UKI button opens the UKI panel. UKI POLISH: send button now shows a disabled
+> visual; error state given a visible accent bar + role=alert (was invisible muted-
+> on-muted, off-scale radius); added calm hover to speak/collapse/close/show-
+> thinking/slash-suggestion controls. Auto-scroll/Enter/Shift+Enter/Esc/uki:ask/TTS
+> confirmed intact. Verified: tsc 0; shell + dock + UKI mount clean; 2-search gone
+> (launcher grid shows, only the dock pill remains).
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.

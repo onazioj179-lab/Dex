@@ -131,7 +131,6 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
           position: 'absolute', top: 2, right: 2,
           width: 5, height: 5, borderRadius: '50%',
           background: 'var(--color-warning, #ffb020)',
-          boxShadow: '0 0 4px color-mix(in srgb, var(--color-warning, #ffb020) 60%, transparent)',
         }} />
       )}
     </button>
@@ -189,7 +188,7 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
         zIndex: 'var(--z-popover, 9000)' as React.CSSProperties['zIndex'],
         background: 'var(--color-bg-elevated, #111111)',
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 8,
+        borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 10,
         animation: 'qcPop 0.12s ease-out',
@@ -333,7 +332,8 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
           borderRadius: 4, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
           marginBottom: 'var(--space-2)',
-          transition: 'background 0.12s, border-color 0.12s',
+          opacity: busy ? 0.6 : 1,
+          transition: 'background 0.12s, border-color 0.12s, opacity 0.12s',
         }}
       >
         <span style={{ fontSize: 12, fontWeight: 600 }}>

@@ -353,6 +353,7 @@ const Canvas: React.FC = () => {
               style={{ ...s.toolBtn, ...(tool === t ? s.toolBtnActive : {}) }}
               onClick={() => setTool(t)}
               title={t.charAt(0).toUpperCase() + t.slice(1)}
+              aria-label={t}
             >
               <DexIcon name={t === 'pen' ? 'edit' : t === 'eraser' ? 'delete' : 'marker'} size={16} />
             </button>
@@ -421,16 +422,16 @@ const Canvas: React.FC = () => {
 
         {/* Actions */}
         <div style={s.actionGroup}>
-          <button style={s.actionBtn} onClick={() => undo()} disabled={!canUndo} title="Undo (Ctrl+Z)">
+          <button style={{ ...s.actionBtn, ...(canUndo ? {} : s.actionBtnDisabled) }} onClick={() => undo()} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
             <DexIcon name="undo" size={16} />
           </button>
-          <button style={s.actionBtn} onClick={() => redo()} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+          <button style={{ ...s.actionBtn, ...(canRedo ? {} : s.actionBtnDisabled) }} onClick={() => redo()} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
             <DexIcon name="redo" size={16} />
           </button>
-          <button style={s.actionBtn} onClick={clear} title="Clear">
+          <button style={s.actionBtn} onClick={clear} title="Clear" aria-label="Clear">
             <DexIcon name="trash" size={16} />
           </button>
-          <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={saveImage} title="Save">
+          <button style={{ ...s.actionBtn, ...s.saveBtn }} onClick={saveImage} title="Save" aria-label="Save">
             <DexIcon name="download" size={16} />
           </button>
         </div>
@@ -546,6 +547,10 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
+  },
+  actionBtnDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
   },
   saveBtn: {
     background: 'var(--color-accent)',

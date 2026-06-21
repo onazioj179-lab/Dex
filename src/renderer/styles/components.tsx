@@ -1622,10 +1622,14 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
     height: heights[size],
     padding: `0 ${space[3]}px`,
     background: 'var(--color-bg-inset)',
-    border: `1px solid ${focused ? 'var(--dex-focus-color, #fff)' : 'var(--color-border)'}`,
-    borderRadius: radius.md,
-    boxShadow: focused ? '0 0 0 3px var(--dex-focus-glow, rgba(255,255,255,0.22))' : 'none',
-    transition: `border-color ${transition.fast}, box-shadow ${transition.fast}`,
+    // Full pill, NO focus highlight/glow. Focus only nudges the hairline a shade
+    // brighter (neutral, not accent) -- no ring, no halo. The inner input's global
+    // :focus-visible outline is suppressed via .dex-search-field, so the field
+    // never shows a highlight box. One calm, consistent search field everywhere.
+    border: `1px solid ${focused ? 'var(--color-border-strong, var(--color-border))' : 'var(--color-border)'}`,
+    borderRadius: 9999,
+    boxShadow: 'none',
+    transition: `border-color ${transition.fast}`,
     width: fullWidth ? '100%' : 'auto',
     // No hard 200px floor -- it broke compact toolbars (e.g. Vinx side panels).
     // Callers size via fullWidth or an explicit width in style.
@@ -1676,6 +1680,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
       <input
         ref={ref}
         type="text"
+        className="dex-search-field"
         value={value}
         onChange={onChange}
         placeholder={placeholder}

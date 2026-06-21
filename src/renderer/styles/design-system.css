@@ -15,16 +15,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Font Subsetting (item 154) — load Latin only, CJK on demand
    ═══════════════════════════════════════════════════════════════════════════ */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: local('Inter');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC,
-    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
+/* Inter @font-face removed -- the UI now uses the native Apple/Segoe pro sans
+   stack (see --font-family / --font-sans). Berkeley Mono stays for code surfaces. */
 @font-face {
   font-family: 'Berkeley Mono';
   font-style: normal;
@@ -163,10 +155,13 @@
   --color-surface: #111111;   /* cards, panels, elevated areas */
   --color-overlay: #1a1a1a;   /* modals, dropdowns, popovers */
   --color-raised:  #222222;   /* hover / selected rows */
-  /* Glass -- floating UI only (dock, top bar, orbs, overlays, modals) */
-  --glass-bg:     rgba(12, 12, 12, 0.85);
+  /* Floating chrome (dock, top bar, orbs, spotlight, control center). DEX Sharp
+     full-flat: SOLID and OPAQUE -- never see-through to wallpaper/windows behind.
+     One token, so every `var(--glass-bg)` consumer goes solid in one place. Blur
+     is also off (it's globally killed); kept as `none` for honesty. */
+  --glass-bg:     #141416;
   --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-blur:   blur(20px);
+  --glass-blur:   none;
   --glass-tint:   rgba(80, 80, 120, 0.04);
   /* Border tiers (spec aliases) */
   --border-subtle:  rgba(255, 255, 255, 0.06);
@@ -319,8 +314,11 @@
      The CHROME default is --dex-font-ui (design-tokens.css, the authoritative
      layer, applied to html/body) — a native OS sans stack. Do not add new
      stacks; these three plus --dex-font-ui are the complete set. */
-  --font-family: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
-  --font-sans: 'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  /* UI text -- Apple SF Pro first (Display + Text), native Segoe UI Variable on
+     Windows. No monospace, no Inter web font: chrome reads as a clean pro Apple
+     sans everywhere. Genuine code/CLI surfaces use --font-mono explicitly. */
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
 
   /* Font Sizes — THE text scale (one scale; tokens.ts and tailwind mirror it).
@@ -836,7 +834,10 @@
   background: var(--color-bg-surface-solid);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
-  box-shadow: var(--pg-shadow-card);
+  /* Append a hairline top highlight (inset) onto the existing card depth so the
+     opaque solid surface catches a touch of light at its top edge — Apple-style,
+     additive only, does not replace the --pg-shadow-card drop shadow. */
+  box-shadow: var(--pg-shadow-card), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
 }
 .dex-surface-soft {
   background: var(--surface-matte);
@@ -2764,9 +2765,9 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 
 /* Liquid glass dock */
 .liquid-glass-dock {
-  background: rgba(18, 18, 20, 0.75);
-  backdrop-filter: var(--blur-lg) saturate(200%);
-  -webkit-backdrop-filter: var(--blur-lg) saturate(200%);
+  /* Solid, opaque dock -- no translucency, no backdrop blur (owner direction:
+     remove all transparency). Was rgba(18,18,20,0.75) + backdrop-filter. */
+  background: var(--color-bg-elevated, #1A1A1E);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
@@ -2925,8 +2926,9 @@ body,
 html[data-perf-tier="low"] * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-  filter: none !important;
+  /* box-shadow NOT stripped: a static box-shadow is cheap (no GPU backdrop blur),
+     and nuking it left windows/cards/panels dead-flat on low-end hardware. Depth
+     stays on every tier. */
   text-shadow: none !important;
 }
 html[data-perf-tier="low"] *,
@@ -2950,12 +2952,8 @@ html[data-perf-tier="low"] *::after {
   transition-duration: 50ms !important;
 }
 
-/* Low-end: remove box-shadows on non-modal elements */
-html[data-perf-tier="low"] .card,
-html[data-perf-tier="low"] .list-item,
-html[data-perf-tier="low"] .btn {
-  box-shadow: none !important;
-}
+/* Low-end: cards/list-items/buttons keep their depth too (cheap static shadows).
+   The old rule stripped them, which read as flat/cheap on low-end hardware. */
 
 /* GPU acceleration for scrollable containers */
 .gpu-accelerated {
@@ -6042,6 +6040,27 @@ html, body {
 }
 .press-effect:active {
   transform: scale(0.97);
+}
+
+/* Pressable — opt-in tactile feedback for buttons / interactive controls that
+   want a fuller Apple-style response (subtle hover lift + crisp press-down)
+   than the global button:active rule. Add class="dex-pressable" to any control
+   that owns its layout but reads flat. Intentionally OPT-IN rather than a new
+   global button rule: a global button:active { transform } already exists, and
+   re-declaring transform globally would fight controls that set their own. The
+   :where() base keeps specificity at zero so a component's own transform still
+   wins; the :hover/:active states use translate (not scale) so they compose
+   cleanly without clobbering an element's existing scale. */
+:where(.dex-pressable) {
+  transition: transform 120ms var(--ease-out, ease-out),
+              box-shadow 120ms var(--ease-out, ease-out);
+}
+.dex-pressable:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(-0.5px);
+}
+.dex-pressable:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(0.5px) scale(0.985);
+  transition-duration: 40ms;
 }
 
 /* Glow on hover */

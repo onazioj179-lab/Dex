@@ -192,11 +192,11 @@ const Weather: React.FC = () => {
               <option key={loc} value={loc}>{loc}</option>
             ))}
           </select>
-          <button style={s.iconBtn} onClick={() => setAddingLocation(!addingLocation)} aria-label="Add location" title="Add location">+</button>
+          <button style={s.iconBtn} onClick={() => setAddingLocation(!addingLocation)} aria-label="Add location" title="Add location"><DexIcon name="plus" size={16} /></button>
           {locations.length > 1 && (
-            <button style={{ ...s.iconBtn, color: 'var(--color-error)' }} onClick={() => removeLocation(location)} aria-label="Remove location" title="Remove location">×</button>
+            <button style={{ ...s.iconBtn, color: 'var(--color-error)' }} onClick={() => removeLocation(location)} aria-label="Remove location" title="Remove location"><DexIcon name="close" size={16} /></button>
           )}
-          <button style={{ ...s.unitBtn, fontWeight: unit === 'C' ? 700 : 400 }} onClick={() => setUnit(unit === 'C' ? 'F' : 'C')} aria-label="Toggle temperature unit">
+          <button style={{ ...s.unitBtn, fontWeight: unit === 'C' ? 700 : 400 }} onClick={() => setUnit(unit === 'C' ? 'F' : 'C')} aria-label="Toggle temperature unit" title={`Switch to ${unit === 'C' ? 'Fahrenheit' : 'Celsius'}`}>
             °{unit}
           </button>
         </div>
@@ -340,14 +340,14 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
   },
   locationSelect: {
-    flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
+    flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
     borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'var(--color-text-primary)',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-family)', outline: 'none', cursor: 'pointer',
   },
   iconBtn: {
     width: 32, height: 32, borderRadius: 6, border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
-    fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   unitBtn: {
     padding: '6px 10px', borderRadius: 6, border: 'none',
@@ -358,7 +358,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)',
   },
   addInput: {
-    flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
+    flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
     borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'var(--color-text-primary)',
     fontSize: 13, outline: 'none', fontFamily: 'var(--font-family)',
   },

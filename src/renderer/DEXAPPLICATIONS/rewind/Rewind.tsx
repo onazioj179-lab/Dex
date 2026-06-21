@@ -137,17 +137,17 @@ const THEME_PRESETS: Record<Exclude<RewindThemeName, 'custom'>, {
 }> = {
   dark: {
     background: '#0D0D0D',
-    surface: '#161616',
+    surface: '#18181B',
     accent: 'var(--color-accent)',
-    text: '#EBEBEB',
-    muted: '#555555',
+    text: '#F4F4F6',
+    muted: '#9A9AA1',
   },
   darker: {
     background: 'var(--color-bg-base)',
-    surface: '#111111',
+    surface: '#151517',
     accent: 'var(--color-accent)',
-    text: '#EBEBEB',
-    muted: '#444444',
+    text: '#F4F4F6',
+    muted: '#92929A',
   },
   light: {
     background: '#f5f5f5',
@@ -158,10 +158,10 @@ const THEME_PRESETS: Record<Exclude<RewindThemeName, 'custom'>, {
   },
   'high-contrast': {
     background: '#000000',
-    surface: '#111111',
+    surface: '#141414',
     accent: 'var(--color-text-primary)',
     text: 'var(--color-text-primary)',
-    muted: '#aaaaaa',
+    muted: '#D4D4D8',
   },
 };
 
@@ -353,8 +353,8 @@ const Rewind: React.FC = () => {
     background: 'var(--color-bg-elevated)',
     surface: '#2d2d2d',
     accent: 'var(--color-accent)',
-    text: '#cccccc',
-    muted: '#666666',
+    text: '#F4F4F6',
+    muted: '#9A9AA1',
   });
   const [backgroundErrorBanner, setBackgroundErrorBanner] = useState<{ message: string; timestamp: number } | null>(null);
   const [todayLogs, setTodayLogs] = useState('');
@@ -1341,7 +1341,7 @@ const timer = setInterval(check, 15000);
                     }}
                   >
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{cmd.title}</span>
-                    <span style={{ fontSize: 11, opacity: 0.6 }}>{cmd.description}</span>
+                    <span style={{ fontSize: 11, opacity: 0.72 }}>{cmd.description}</span>
                   </button>
                 ))
               ) : commandSearchResults.length > 0 ? (
@@ -1366,11 +1366,11 @@ const timer = setInterval(check, 15000);
                     }}
                   >
                     <div style={{ fontSize: 12, fontWeight: 600 }}>{entry.content}</div>
-                    <div style={{ fontSize: 11, opacity: 0.6 }}>{entry.appName} {formatTime(entry.timestamp)}</div>
+                    <div style={{ fontSize: 11, opacity: 0.72 }}>{entry.appName} {formatTime(entry.timestamp)}</div>
                   </button>
                 ))
               ) : (
-                <div style={{ fontSize: 12, opacity: 0.6, padding: 'var(--space-3)' }}>No matching commands or activity results.</div>
+                <div style={{ fontSize: 12, opacity: 0.72, padding: 'var(--space-3)' }}>No matching commands or activity results.</div>
               )}
             </div>
           </div>
@@ -1394,7 +1394,7 @@ const timer = setInterval(check, 15000);
         <div style={S.lightboxOverlay} onMouseDown={() => setAboutModal(false)}>
           <div style={S.aboutCard} onMouseDown={e => e.stopPropagation()}>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 'var(--space-2)' }}>DEX Rewind</div>
-            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Version {appVersion}</div>
+            <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 'var(--space-3)' }}>Version {appVersion}</div>
             <div style={{ fontSize: 12, lineHeight: 1.5, opacity: 0.8 }}>
               Activity logger and search for your desktop -- all data stays local.
             </div>
@@ -1519,7 +1519,7 @@ const timer = setInterval(check, 15000);
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Nothing recorded yet</div>
-                  <div style={{ fontSize: 12, opacity: 0.45, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, opacity: 0.64, lineHeight: 1.5 }}>
                     {isRecording
                       ? 'Events will appear as you use your computer. Check back after a few minutes.'
                       : 'Recording is paused. Click "Live" in the header to resume.'}
@@ -1553,17 +1553,17 @@ const timer = setInterval(check, 15000);
               {!loading && !searchQuery && (
                 <div style={S.emptyState}>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Search your history</div>
-                  <div style={{ fontSize: 12, opacity: 0.45 }}>Find apps opened, text copied, files changed, sites visited</div>
+                  <div style={{ fontSize: 12, opacity: 0.64 }}>Find apps opened, text copied, files changed, sites visited</div>
                 </div>
               )}
               {!loading && searchQuery && searchResults.length === 0 && (
                 <div style={S.emptyState}>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No results</div>
-                  <div style={{ fontSize: 12, opacity: 0.45 }}>Try different keywords or a shorter phrase</div>
+                  <div style={{ fontSize: 12, opacity: 0.64 }}>Try different keywords or a shorter phrase</div>
                 </div>
               )}
               {!loading && searchResults.length > 0 && (
-                <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 4 }}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
+                <div style={{ fontSize: 11, opacity: 0.56, marginBottom: 4 }}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
               )}
               {!loading && searchResults.map(entry => (
                 <div key={entry.id} style={S.entryCard}>
@@ -1613,7 +1613,7 @@ const timer = setInterval(check, 15000);
                       minWidth: 80,
                     }}>
                       <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))' }}>{stat.value}</div>
-                      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{stat.label}</div>
+                      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{stat.label}</div>
                     </div>
                   ))}
                   {summary?.topApps?.slice(0, 4).map(app => (
@@ -1626,7 +1626,7 @@ const timer = setInterval(check, 15000);
                       minWidth: 80,
                     }}>
                       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary, #fafafa)' }}>{app.count}</div>
-                      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{app.name}</div>
+                      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{app.name}</div>
                     </div>
                   ))}
                 </div>
@@ -1753,9 +1753,9 @@ const timer = setInterval(check, 15000);
                         </span>
                       )}
                       <span style={{ fontWeight: 600 }}>{sess.primaryAppId}</span>
-                      <span style={{ opacity: 0.5 }}>{formatDuration(sessionDuration(sess))}</span>
-                      <span style={{ opacity: 0.4 }}>·</span>
-                      <span style={{ opacity: 0.6 }}>{sess.eventCount} event{sess.eventCount === 1 ? '' : 's'}</span>
+                      <span style={{ opacity: 0.7 }}>{formatDuration(sessionDuration(sess))}</span>
+                      <span style={{ opacity: 0.56 }}>·</span>
+                      <span style={{ opacity: 0.72 }}>{sess.eventCount} event{sess.eventCount === 1 ? '' : 's'}</span>
                     </div>
                     );
                   })}
@@ -1777,7 +1777,7 @@ const timer = setInterval(check, 15000);
           {!loading && timeline.length === 0 && (
             <div style={S.emptyState}>
               <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>No activity recorded</div>
-              <div style={{ fontSize: 11, opacity: 0.5 }}>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>
                 {isRecording ? 'Events will appear as you use your computer' : 'Recording is paused'}
               </div>
             </div>
@@ -1791,9 +1791,9 @@ const timer = setInterval(check, 15000);
                 <div style={S.entryContent}>{entry.content}</div>
                 <div style={S.entryMeta}>
                   <span style={{ color: TYPE_COLORS[entry.type], fontWeight: 500 }}>{TYPE_LABELS[entry.type]}</span>
-                  <span style={{ opacity: 0.4 }}>-</span>
+                  <span style={{ opacity: 0.56 }}>-</span>
                   <span>{entry.appName}</span>
-                  <span style={{ opacity: 0.4 }}>-</span>
+                  <span style={{ opacity: 0.56 }}>-</span>
                   <span>{formatTime(entry.timestamp)}</span>
                 </div>
               </div>
@@ -1835,19 +1835,19 @@ const timer = setInterval(check, 15000);
           {!loading && searchResults.length === 0 && searchQuery && (
             <div style={S.emptyState}>
               <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>No results found</div>
-              <div style={{ fontSize: 11, opacity: 0.5 }}>Try different keywords or a broader query</div>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>Try different keywords or a broader query</div>
             </div>
           )}
           {!loading && searchResults.length === 0 && !searchQuery && (
             <div style={S.emptyState}>
               <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>Search your activity</div>
-              <div style={{ fontSize: 11, opacity: 0.5 }}>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>
                 Find anything you did -- apps opened, text copied, files changed, websites visited
               </div>
             </div>
           )}
           {!loading && searchResults.length > 0 && (
-            <div style={{ fontSize: 11, opacity: 0.5, padding: '0 4px', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, opacity: 0.7, padding: '0 4px', marginBottom: 4 }}>
               {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
             </div>
           )}
@@ -1860,9 +1860,9 @@ const timer = setInterval(check, 15000);
                 <div style={S.entryContent}>{entry.content}</div>
                 <div style={S.entryMeta}>
                   <span style={{ color: TYPE_COLORS[entry.type], fontWeight: 500 }}>{TYPE_LABELS[entry.type]}</span>
-                  <span style={{ opacity: 0.4 }}>-</span>
+                  <span style={{ opacity: 0.56 }}>-</span>
                   <span>{entry.appName}</span>
-                  <span style={{ opacity: 0.4 }}>-</span>
+                  <span style={{ opacity: 0.56 }}>-</span>
                   <span>{formatDate(entry.timestamp)} {formatTime(entry.timestamp)}</span>
                 </div>
               </div>
@@ -2133,11 +2133,11 @@ const timer = setInterval(check, 15000);
         {/* Empty state */}
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: 'var(--space-10) 0', color: 'var(--text-muted, #71717a)' }}>
-            <div style={{ marginBottom: 'var(--space-2)', opacity: 0.4 }}><DexIcon name="pencil" size={32} /></div>
+            <div style={{ marginBottom: 'var(--space-2)', opacity: 0.56 }}><DexIcon name="pencil" size={32} /></div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>
               {journalFilter === 'pinned' ? 'No pinned entries' : 'No journal entries yet'}
             </div>
-            <div style={{ fontSize: 12, marginTop: 4, opacity: 0.6 }}>
+            <div style={{ fontSize: 12, marginTop: 4, opacity: 0.72 }}>
               {journalFilter === 'pinned' ? 'Pin entries to see them here' : 'Start writing about your day above'}
             </div>
           </div>
@@ -2281,7 +2281,7 @@ const timer = setInterval(check, 15000);
                 <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: 12 }}>{item.label}</div>
-                    <div style={{ fontSize: 10, opacity: 0.4 }}>{item.desc}</div>
+                    <div style={{ fontSize: 10, opacity: 0.56 }}>{item.desc}</div>
                   </div>
                   <button
                     aria-label={`${settings[item.key] ? 'Disable' : 'Enable'} ${item.label} tracking`}
@@ -2309,7 +2309,7 @@ const timer = setInterval(check, 15000);
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 12 }}>Periodic Screenshots</div>
-                <div style={{ fontSize: 10, opacity: 0.4 }}>Capture screen at regular intervals</div>
+                <div style={{ fontSize: 10, opacity: 0.56 }}>Capture screen at regular intervals</div>
               </div>
               <button
                 aria-label={settings?.screenshotsEnabled ? 'Disable periodic screenshots' : 'Enable periodic screenshots'}
@@ -2343,7 +2343,7 @@ const timer = setInterval(check, 15000);
               </div>
             )}
             {screenshotStorage && (
-              <div style={{ fontSize: 10, opacity: 0.4 }}>
+              <div style={{ fontSize: 10, opacity: 0.56 }}>
                 {screenshotStorage.totalCount} screenshots, {formatBytes(screenshotStorage.totalSizeBytes)}
               </div>
             )}
@@ -2354,7 +2354,7 @@ const timer = setInterval(check, 15000);
         {/* Excluded apps */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Excluded Apps</div>
-          <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: 10, opacity: 0.56, marginBottom: 'var(--space-2)' }}>
             Activity from these apps will not be recorded (process name, case-insensitive)
           </div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
@@ -2375,7 +2375,7 @@ const timer = setInterval(check, 15000);
               </div>
             ))}
             {(settings?.excludedApps || []).length === 0 && (
-              <div style={{ fontSize: 11, opacity: 0.4 }}>No excluded apps</div>
+              <div style={{ fontSize: 11, opacity: 0.56 }}>No excluded apps</div>
             )}
           </div>
         </div>
@@ -2402,7 +2402,7 @@ const timer = setInterval(check, 15000);
         {/* Appearance */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Appearance</div>
-          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 'var(--space-2)' }}>
             Default: dark. Theme applies immediately and saves automatically.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-2)' }}>
@@ -2475,7 +2475,7 @@ const timer = setInterval(check, 15000);
         {/* Notifications */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Notifications</div>
-          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 'var(--space-2)' }}>
             Default: normal. Controls Rewind notification verbosity for status and plugin messages.
           </div>
           <select
@@ -2540,11 +2540,11 @@ const timer = setInterval(check, 15000);
             <button aria-label="Backup now" style={S.headerBtn} onClick={runBackupNow}>Backup Now</button>
             <button aria-label="Restore from backup" style={S.headerBtn} onClick={restoreFromBackup}>Restore from Backup</button>
           </div>
-          <div style={{ marginTop: 'var(--space-2)', fontSize: 11, opacity: 0.55 }}>
+          <div style={{ marginTop: 'var(--space-2)', fontSize: 11, opacity: 0.75 }}>
             Last backup: {backupSettings?.lastBackupAt ? new Date(backupSettings.lastBackupAt).toLocaleString() : 'Never'}
             {backupSettings?.lastBackupSizeBytes ? ` (${formatBytes(backupSettings.lastBackupSizeBytes)})` : ''}
           </div>
-          <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
+          <div style={{ marginTop: 4, fontSize: 11, opacity: 0.64 }}>
             Folder: {backupSettings?.folder || 'Default app data folder'}
           </div>
         </div>
@@ -2552,7 +2552,7 @@ const timer = setInterval(check, 15000);
         {/* Phase 5: Workspace profiles */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Workspace Profiles</div>
-          <div style={{ marginBottom: 'var(--space-2)', fontSize: 11, opacity: 0.55 }}>
+          <div style={{ marginBottom: 'var(--space-2)', fontSize: 11, opacity: 0.75 }}>
             Active profile: {activeWorkspaceProfile?.name || 'Work'}
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
@@ -2584,7 +2584,7 @@ const timer = setInterval(check, 15000);
               }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{profile.name}</div>
-                  <div style={{ fontSize: 10, opacity: 0.5 }}>
+                  <div style={{ fontSize: 10, opacity: 0.7 }}>
                     Apps: {(profile.definingApps || []).join(', ') || 'None'}
                   </div>
                 </div>
@@ -2625,7 +2625,7 @@ const timer = setInterval(check, 15000);
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {plugins.length === 0 && (
-              <div style={{ fontSize: 11, opacity: 0.45 }}>No plugins found. Add .js files to the plugins folder and reload.</div>
+              <div style={{ fontSize: 11, opacity: 0.64 }}>No plugins found. Add .js files to the plugins folder and reload.</div>
             )}
             {plugins.map(plugin => (
               <div key={plugin.id} style={{
@@ -2641,8 +2641,8 @@ const timer = setInterval(check, 15000);
                   <div style={{ fontSize: 12, fontWeight: 600 }}>
                     {plugin.name} v{plugin.version}
                   </div>
-                  <div style={{ fontSize: 10, opacity: 0.55 }}>By {plugin.author}</div>
-                  <div style={{ fontSize: 10, opacity: 0.65 }}>{plugin.description}</div>
+                  <div style={{ fontSize: 10, opacity: 0.75 }}>By {plugin.author}</div>
+                  <div style={{ fontSize: 10, opacity: 0.725 }}>{plugin.description}</div>
                   {plugin.loadError && (
                     <div style={{ fontSize: 10, color: 'var(--color-warning)' }}>Load error: {plugin.loadError}</div>
                   )}
@@ -2696,7 +2696,7 @@ const timer = setInterval(check, 15000);
               {showAuditLog ? 'Hide Audit Log' : 'View Audit Log'}
             </button>
           </div>
-          <div style={{ fontSize: 11, opacity: 0.4 }}>
+          <div style={{ fontSize: 11, opacity: 0.56 }}>
             Integrity check verifies data files have not been tampered with externally.
             Audit log records all security-relevant actions and cannot be cleared from the UI.
           </div>
@@ -2737,7 +2737,7 @@ const timer = setInterval(check, 15000);
         {/* Danger zone */}
         <div style={{ ...S.insightCard, borderColor: 'rgba(255,59,48,0.2)' }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-error)' }}>Danger Zone</div>
-          <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 'var(--space-2)' }}>
+          <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 'var(--space-2)' }}>
             This permanently deletes all Rewind data including screenshots. This cannot be undone.
           </div>
           <button aria-label="Delete all Rewind data" style={S.dangerBtn} onClick={deleteAllData}>
@@ -2777,7 +2777,7 @@ const statusRow: React.CSSProperties = {
 };
 const statusMeta: React.CSSProperties = {
   fontSize: 11,
-  opacity: 0.5,
+  opacity: 0.7,
 };
 const statusDot = (color: string): React.CSSProperties => ({
   width: 7,
@@ -2898,7 +2898,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   profileName: {
     fontSize: 11,
-    opacity: 0.6,
+    opacity: 0.72,
     marginTop: 6,
     textAlign: 'center' as const,
     overflow: 'hidden',
@@ -2944,7 +2944,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 4,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.70)',
     cursor: 'pointer',
     padding: 'var(--space-2) var(--space-3)',
     fontSize: 12,
@@ -3084,7 +3084,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 'var(--space-2)',
     fontSize: 11,
-    opacity: 0.55,
+    opacity: 0.75,
     marginTop: 4,
   },
 
@@ -3096,7 +3096,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     height: '100%',
     fontSize: 13,
-    opacity: 0.5,
+    opacity: 0.7,
     textAlign: 'center' as const,
     padding: 'var(--space-5)',
   },
@@ -3163,7 +3163,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   statLabel: {
     fontSize: 10,
-    opacity: 0.5,
+    opacity: 0.7,
   },
 
   // Toggle
