@@ -32,7 +32,9 @@ import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
 import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
+import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
+import AskUkiContextMenu from './AskUkiContextMenu';
 // Deep import (not the '../uki' barrel): AppManager only needs these two static
 // data constants, but the barrel re-exports the entire assistant (answerEngine,
 // memory, freeApis, …). Importing from the barrel here drags all of it onto the
@@ -86,12 +88,18 @@ function _persistWsStore(): void {
   try { localStorage.setItem('dex-workspace-snapshots', _wsStore.serialize()); } catch { /* ignore */ }
 }
 
+// A lazy component that can also be pre-warmed (chunk fetched ahead of mount) so
+// the predicted next app paints instantly. `preload()` just fires importFn and
+// swallows errors -- the real lazy() retry logic still runs on actual mount.
+type PreloadableLazy<T extends React.ComponentType<any>> =
+  React.LazyExoticComponent<T> & { preload: () => Promise<unknown> };
+
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
   importFn: () => Promise<{ default: T }>,
   maxRetries = 3,
-): React.LazyExoticComponent<T> {
-  return lazy(async () => {
+): PreloadableLazy<T> {
+  const Comp = lazy(async () => {
     const retryKey = `dex-chunk-retry-${Date.now()}`;
     let lastError: Error | null = null;
 
@@ -132,7 +140,12 @@ function lazyRetry<T extends React.ComponentType<any>>(
     // Already reloaded once and still failing — surface the error
     sessionStorage.removeItem('dex-chunk-reload');
     throw lastError || new Error('Failed to load module after multiple retries');
-  });
+  }) as PreloadableLazy<T>;
+  // Pre-warm hook: fetch the chunk ahead of mount (idempotent at the bundler
+  // level; the browser dedupes the dynamic import). Errors are ignored here --
+  // a real mount still runs the full retry path above.
+  Comp.preload = () => importFn().catch(() => undefined);
+  return Comp;
 }
 
 // -- Lazy-load all 22 apps -------------------------------------------------
@@ -309,15 +322,6 @@ const CREATIVE_APPS: ReadonlySet<string> = new Set(['videoeditor', 'imosion', 'p
 
 // Platform detection for title bar overlay handling
 const IS_WINDOWS = navigator.platform.includes('Win');
-
-// Heavy creative apps render their own canvas / GPU surfaces and should
-// never pay the backdrop-filter cost of the global glass system. Their
-// floating windows stay opaque so timelines, viewports, and editors render
-// at full performance.
-const HEAVY_APP_IDS: ReadonlySet<AppId> = new Set<AppId>([
-  'videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl', 'nexus', 'dexcode',
-  'canvas', 'pixelart', 'screenrecorder', 'maps',
-]);
 
 // Map AppId to lazy component
 const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
@@ -554,7 +558,9 @@ const loadingContainer: React.CSSProperties = {
   gap: '18px',
   position: 'relative',
   overflow: 'hidden',
-  background: 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,22,0.98) 100%)',
+  // Solid surface (not a near-black fill) so launching an app reads as a brief
+  // loading frame instead of a black screen. Opaque -- no transparency.
+  background: 'var(--color-bg-surface, #161618)',
 };
 const loadingToolbar: React.CSSProperties = {
   display: 'flex',
@@ -627,25 +633,16 @@ const Loading: React.FC<{ appId?: string }> = ({ appId }) => {
       aria-label={`Loading ${appDef?.name || 'application'}`}
       data-app-loading={appId || 'true'}
     >
-      <div style={loadingToolbar} aria-hidden="true">
-        <div style={loadingSkel(80)} />
-        <div style={loadingSkel(60, '0.1s')} />
-        <div style={loadingSkel(50, '0.2s')} />
-        <div style={{ flex: 1 }} />
-        <div style={loadingSkel(28, '0.3s')} />
-      </div>
-      <div style={loadingContentRow}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'center' }}>
-          <div style={{ ...loadingContentSkel(180, '0.1s'), height: 10 }} aria-hidden="true" />
-          <div style={{ ...loadingContentSkel(120, '0.2s'), height: 10 }} aria-hidden="true" />
-          <div 
-            style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 6 }}
-            aria-live="polite"
-          >
-            {milestones[step] || milestones[milestones.length - 1]}
-          </div>
-        </div>
-      </div>
+      {/* Polished, consistent open state: the DEX reticle loader on a solid
+          surface, labelled with the app name + a stepped milestone. Replaces the
+          old grey skeleton, which read as empty/unfinished. */}
+      <DexLoader
+        variant="panel"
+        label={appDef?.name ? `Opening ${appDef.name}` : 'Opening…'}
+        sublabel={milestones[step] || milestones[milestones.length - 1]}
+        accent={appDef?.color}
+        style={{ flex: 1 }}
+      />
     </div>
   );
 };
@@ -863,66 +860,16 @@ export const AppManager: React.FC = () => {
     return () => window.removeEventListener('dex-notification', onNotify as EventListener);
   }, [notifyPush]);
 
-  // Recovery Level 3: if the previous session ended uncleanly with apps open,
-  // offer a one-click workspace restore (last-session journal in runningApps).
+  // Session restore prompt removed (owner directive: the "Restore your workspace?"
+  // notification was unwanted). We still silently clear the stale last-session
+  // journal on boot so it can't resurface or accumulate -- but DEX never nags to
+  // reopen apps. Apps stay alive while running; a restart simply starts clean.
   const restoreOfferShownRef = useRef(false);
   useEffect(() => {
     if (restoreOfferShownRef.current) return;
     restoreOfferShownRef.current = true;
-    try {
-      const last = readLastSession();
-      if (!last || last.apps.length === 0) return;
-      if (Date.now() - last.timestamp > 24 * 60 * 60 * 1000) { clearLastSession(); return; }
-      const apps = last.apps;
-      const appsLabel = apps.length === 1 ? apps[0].name : `${apps.length} apps`;
-      notifyPush({
-        // Offer session restore on BOTH a clean restart (owner brief P2: "reopen
-        // workspace, everything returns") and an unclean exit (crash recovery).
-        // One-click + dismissible -- a clean restart never force-reopens apps on
-        // its own, so there are still no surprise "ghost apps".
-        title: last.clean ? 'Restore your last workspace?' : 'Restore your workspace?',
-        body: last.clean
-          ? `Pick up where you left off — ${appsLabel} were open.`
-          : `Your last session ended unexpectedly with ${appsLabel} open.`,
-        icon: last.clean ? 'info' : 'warning',
-        priority: last.clean ? 'normal' : 'high',
-        duration: 15000,
-        source: 'recovery',
-        actions: [{
-          label: 'Restore',
-          onClick: () => {
-            const launch = useRunningApps.getState().launchApp;
-            for (const a of apps) launch(a);
-            // Also restore each window's last geometry/z/minimized from the
-            // manifest (crash-recovery ONLY -- a clean restart still starts fresh,
-            // by design). Bounds are clamped to the CURRENT work area in case the
-            // viewport changed since the crash.
-            try {
-              const manifest = loadWindowManifest();
-              if (manifest && manifest.windows.length) {
-                const ws = getShellWorkspace(0);
-                const mins: string[] = [];
-                requestAnimationFrame(() => {
-                  setDetachedApps(prev => {
-                    const next = new Map(prev);
-                    for (const w of manifest.windows) {
-                      if (!apps.some(a => a.id === w.appId)) continue;
-                      const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
-                      next.set(w.appId, { ...c, z: w.z });
-                      if (w.minimized) mins.push(w.appId);
-                    }
-                    return next;
-                  });
-                  if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
-                });
-              }
-            } catch { /* restore is best-effort; the apps still launched */ }
-          },
-        }],
-      });
-      clearLastSession();
-    } catch { /* never block boot */ }
-  }, [notifyPush]);
+    try { clearLastSession(); } catch { /* never block boot */ }
+  }, []);
 
   // -- Split-screen tiling ------------------------------------------------
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
@@ -952,7 +899,6 @@ export const AppManager: React.FC = () => {
 
   // -- Minimized floating windows (hidden but still running) ---------------
   const [minimizedApps, setMinimizedApps] = useState<Set<string>>(new Set());
-  const [showMinimizedList, setShowMinimizedList] = useState(false);
   const minimizeFloatingApp = useCallback((appId: string) => {
     setMinimizedApps(prev => { const next = new Set(prev); next.add(appId); return next; });
   }, []);
@@ -968,56 +914,28 @@ export const AppManager: React.FC = () => {
     });
   }, []);
 
-  // Close minimized-list popover on outside click and Escape
-  const minimizedListRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!showMinimizedList) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!minimizedListRef.current) return;
-      if (minimizedListRef.current.contains(e.target as Node)) return;
-      setShowMinimizedList(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowMinimizedList(false);
-        e.stopPropagation();
-      }
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    document.addEventListener('keydown', onKey);
-    // Focus the first menu item once the popover renders
-    queueMicrotask(() => {
-      const first = minimizedListRef.current?.querySelector<HTMLButtonElement>('button[role="menuitem"]');
-      first?.focus();
-    });
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [showMinimizedList]);
-
   // -- Snap layout picker state for floating window maximize hover ----------
-  const [snapLayoutApp, setSnapLayoutApp] = useState<string | null>(null);
-  const snapLayoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -- Snap preview zone (shown during window drag) -------------------------
-  type SnapPreviewZone = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'maximize' | null;
+  type SnapPreviewZone = 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'maximize' | null;
   const [snapPreviewZone, setSnapPreviewZone] = useState<SnapPreviewZone>(null);
   const snapPreviewRef = useRef<SnapPreviewZone>(null);
 
   const detectDragSnapZone = useCallback((cx: number, cy: number): SnapPreviewZone => {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const EDGE = 16;
-    const CORNER = 48;
-    // Top edge → maximize (wider threshold for HiDPI)
-    if (cy <= 8) return 'maximize';
-    // Corners
+    const EDGE = 18;
+    const CORNER = 64;
+    // Corners first -> quadrants (drag into a corner to quarter-tile).
     if (cx <= CORNER && cy <= CORNER) return 'top-left';
     if (cx >= W - CORNER && cy <= CORNER) return 'top-right';
     if (cx <= CORNER && cy >= H - CORNER) return 'bottom-left';
     if (cx >= W - CORNER && cy >= H - CORNER) return 'bottom-right';
-    // Sides
+    // Edges -> halves. Left/right = side-by-side; top/bottom = up/down split.
+    // (Maximize stays on the title-bar double-click + the maximize button, so the
+    // top edge is free to mean "top half" -- that's the up/down layout the OS lacked.)
+    if (cy <= EDGE) return 'top';
+    if (cy >= H - EDGE) return 'bottom';
     if (cx <= EDGE) return 'left';
     if (cx >= W - EDGE) return 'right';
     return null;
@@ -1481,12 +1399,12 @@ export const AppManager: React.FC = () => {
         topN: 2,
         minProbability: 0.25,
         importer: (appId: string) => {
-          // Best-effort: ensure the app's chunk is fetched before user opens it.
-          const def = APP_DEFINITIONS[appId as AppId];
-          if (!def) return Promise.resolve();
-          // Component lazy-loaders self-cache after first fetch; touching the
-          // launchApp store entry is enough to trigger React.lazy import.
-          try { return Promise.resolve(); } catch { return Promise.resolve(); }
+          // Actually fetch the predicted app's lazy chunk now (idle), so its
+          // first paint is warm when the user opens it. lazyRetry attaches a
+          // .preload() that fires the dynamic import; the browser dedupes it
+          // with the real mount-time import.
+          const Comp = APP_COMPONENTS[appId as AppId] as PreloadableLazy<any> | undefined;
+          return Comp?.preload?.() ?? Promise.resolve();
         },
       });
     }
@@ -2389,8 +2307,12 @@ export const AppManager: React.FC = () => {
       }
       // Maximize on Win/Meta + Up (separate check since Ctrl+Up is Mission Control)
       if (focusedApp && e.metaKey && e.key === 'ArrowUp' && !e.ctrlKey) { e.preventDefault(); tileWindow(focusedApp as AppId, 'maximize'); return; }
-      // Alt+Arrow quadrant snapping
+      // Alt+Shift+Arrow: Up = top half, Down = bottom half (the up/down split),
+      // Left/Right = top quadrants. Pairs with Meta+Left/Right (side-by-side halves)
+      // and drag-to-edge snapping for a full keyboard + pointer tiling set.
       if (focusedApp && e.altKey && e.shiftKey) {
+        if (e.key === 'ArrowUp') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top'); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); tileWindow(focusedApp as AppId, 'bottom'); return; }
         if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-left'); return; }
         if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-right'); return; }
       }
@@ -2480,6 +2402,11 @@ export const AppManager: React.FC = () => {
         case 'splitScreen': if (splitMode !== 'off') { exitSplit(); } else { setShowAppMenu(true); } break;
         case 'arrangeWindows': window.dispatchEvent(new CustomEvent('dex-arrange-windows')); break;
         case 'overview': setShowOverview(p => !p); break;
+        case 'clipboard': window.dispatchEvent(new CustomEvent('dex-open-clipboard')); break;
+        case 'sendto': window.dispatchEvent(new CustomEvent('dex-flow-open')); break;
+        case 'context': window.dispatchEvent(new CustomEvent('dex-open-context')); break;
+        case 'learn': window.dispatchEvent(new CustomEvent('dex-open-learn')); break;
+        case 'quickActions': window.dispatchEvent(new CustomEvent('dex-open-quick-actions')); break;
         case 'navBack': goBack(); break;
         case 'navForward': goForward(); break;
         default: break; // spotlight / commandPalette / compact / lock have their own triggers
@@ -2846,12 +2773,13 @@ export const AppManager: React.FC = () => {
         const visibleBounds = isMaximized
           ? maximizedBounds
           : getUsableFloatingBounds(appId, detBounds, workspaceBounds);
-        // Heavy creative apps keep an opaque rendering surface (their canvas /
-        // GPU compositors should not pay the backdrop-filter cost). Shell-class
-        // apps use the unified glass token so the desktop and Home wallpaper
-        // remain visible underneath, restoring desktop continuity.
-        const isHeavyApp = HEAVY_APP_IDS.has(appId);
-        const useGlass = !isMaximized && !isHeavyApp;
+        // DEX windows are fully opaque -- no glass, no translucency, no backdrop-
+        // filter (owner direction: remove all transparency from apps). Every window
+        // is a solid placed surface; heavy creative apps were always opaque, so now
+        // every window simply matches them. This also removes the GPU backdrop cost
+        // and the see-through title bar.
+        const useGlass = false;
+        const isFocused = focusedFloatingAppId === appId;
         return (
           <div
             key={appId}
@@ -2873,8 +2801,13 @@ export const AppManager: React.FC = () => {
                 : 'var(--color-bg-base, #0C0C0E)',
               backdropFilter: useGlass ? 'var(--blur-xl) saturate(160%)' : undefined,
               WebkitBackdropFilter: useGlass ? 'var(--blur-xl) saturate(160%)' : undefined,
-              border: isMaximized ? 'none' : '1px solid rgba(255,255,255,0.10)',
-              ...adaptiveShadow(isMaximized ? 'none' : '0 20px 60px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)'),
+              // Focus hierarchy (Apple-style depth): the active window LIFTS with a
+              // deeper shadow + a faint accent edge; inactive windows recede with a
+              // softer, lower shadow. Animates via the box-shadow transition below.
+              border: isMaximized ? 'none' : `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+              ...adaptiveShadow(isMaximized ? 'none' : isFocused
+                ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(74,158,255,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)'
+                : '0 10px 28px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.05)'),
               contain: 'layout style paint',
               willChange: 'auto',
               transition: 'box-shadow 0.2s ease',
@@ -2892,8 +2825,11 @@ export const AppManager: React.FC = () => {
               style={{
                 height: 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
-                background: useGlass ? 'rgba(28,28,32,0.55)' : 'var(--color-bg-elevated, #1C1C20)',
+                // Subtle top-lit gradient + hairline highlight gives the title bar real
+                // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
+                background: 'linear-gradient(180deg, #26262B 0%, #1C1C20 100%)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
+                boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
                 justifyContent: 'center',
                 touchAction: 'none',
                 WebkitAppRegion: 'drag',
@@ -2953,26 +2889,46 @@ export const AppManager: React.FC = () => {
                   el.style.willChange = 'transform';
                   el.setAttribute('data-dragging', 'true');
                 }
+                // Sharp drag, same trick as the DEX dock: NEVER cancel the in-flight
+                // RAF. A 120Hz pointer stream cancelling a 60Hz frame is exactly what
+                // made app windows feel laggy. Each move just records the latest
+                // pointer (a cheap ref-like write) and schedules ONE frame; that frame
+                // reads the newest position and paints via a GPU transform. The result
+                // tracks the cursor 1:1 at the display's refresh cadence.
+                let rafScheduled = false;
+                let lastSnapCheck = 0;
+                let pendingPX = startX;
+                let pendingPY = startY;
                 const onMove = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
+                  pendingPX = ev.clientX;
+                  pendingPY = ev.clientY;
+                  if (rafScheduled) return;
+                  rafScheduled = true;
                   rafId = requestAnimationFrame(() => {
+                    rafScheduled = false;
                     const workspace = getShellWorkspace(0);
                     // Free-drag: allow movement past edges, only keep part of title bar reachable
                     const loose = clampWindowForDrag(
-                      { x: origX + ev.clientX - startX, y: origY + ev.clientY - startY, w: dragBounds.w, h: dragBounds.h },
+                      { x: origX + pendingPX - startX, y: origY + pendingPY - startY, w: dragBounds.w, h: dragBounds.h },
                       workspace,
                     );
                     currentX = loose.x;
                     currentY = loose.y;
                     if (el) {
-                      // Use transform during drag for GPU acceleration
+                      // GPU-accelerated transform (no layout/reflow during drag)
                       el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
                     }
-                    // Live snap zone preview
-                    const zone = detectDragSnapZone(ev.clientX, ev.clientY);
-                    if (zone !== snapPreviewRef.current) {
-                      snapPreviewRef.current = zone;
-                      setSnapPreviewZone(zone);
+                    // Live snap-zone preview -- throttled to ~64ms. It's a hit-test
+                    // plus a setState, too costly to run every frame and unnecessary
+                    // at frame cadence.
+                    const now = performance.now();
+                    if (now - lastSnapCheck >= 64) {
+                      lastSnapCheck = now;
+                      const zone = detectDragSnapZone(pendingPX, pendingPY);
+                      if (zone !== snapPreviewRef.current) {
+                        snapPreviewRef.current = zone;
+                        setSnapPreviewZone(zone);
+                      }
                     }
                   });
                 };
@@ -2985,7 +2941,6 @@ export const AppManager: React.FC = () => {
                   titleBar.removeEventListener('lostpointercapture', onUp);
                   if (el) {
                     el.removeAttribute('data-dragging');
-                    el.style.transform = '';
                     el.style.willChange = 'auto';
                     el.style.transition = '';
                   }
@@ -3003,15 +2958,23 @@ export const AppManager: React.FC = () => {
                   // Commit snap or final position
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
-                    if (el) el.style.transition = 'left 0.25s cubic-bezier(0.2,0.9,0.3,1), top 0.25s cubic-bezier(0.2,0.9,0.3,1), width 0.25s cubic-bezier(0.2,0.9,0.3,1), height 0.25s cubic-bezier(0.2,0.9,0.3,1)';
+                    if (el) { el.style.transform = ''; el.style.transition = 'left 0.25s cubic-bezier(0.2,0.9,0.3,1), top 0.25s cubic-bezier(0.2,0.9,0.3,1), width 0.25s cubic-bezier(0.2,0.9,0.3,1), height 0.25s cubic-bezier(0.2,0.9,0.3,1)'; }
                     tileWindow(appId, zone);
                   } else {
+                    // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
+                    const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
+                    if (el) {
+                      // Commit the final left/top in the SAME frame the transform is
+                      // dropped, so the window never flashes back to its pre-drag spot
+                      // for a frame (the old order cleared transform first -> a jump).
+                      el.style.left = clamped.x + 'px';
+                      el.style.top = clamped.y + 'px';
+                      el.style.transform = '';
+                    }
                     setDetachedApps(prev => {
                       const b = prev.get(appId);
                       if (!b) return prev;
                       const next = new Map(prev);
-                      // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
-                      const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
                       next.set(appId, { ...b, ...clamped });
                       return next;
                     });
@@ -3098,49 +3061,9 @@ export const AppManager: React.FC = () => {
                         </svg>
                       )}
                     </button>
-                    {/* Snap layout grid popup */}
-                    {snapLayoutApp === appId && (
-                      <div style={{
-                        position: 'absolute', top: 28, right: -16, zIndex: 'var(--z-overlay)' as unknown as number,
-                        background: 'var(--color-bg-elevated)',
-                        border: '1px solid var(--color-border)', borderRadius: 10,
-                        padding: '10px 10px var(--space-2)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
-                        boxShadow: 'var(--pg-shadow-context), inset 0 0.5px 0 var(--color-border-subtle)',
-                        width: 'min(240px, calc(100vw - 48px))',
-                        animation: 'fadeIn 0.18s ease',
-                      } as React.CSSProperties}>
-                        <div style={{ gridColumn: '1 / -1', fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2, paddingLeft: 2 }}>Snap Layout</div>
-                        {([
-                          { pos: 'maximize' as const, label: 'Full', svg: <rect x="2" y="2" width="20" height="20" rx="2" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/> },
-                          { pos: 'center' as const, label: 'Center', svg: <rect x="5" y="4" width="14" height="16" rx="2" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/> },
-                          { pos: 'left' as const, label: 'Left', svg: <><rect x="2" y="2" width="10" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="13" y="2" width="9" height="20" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'right' as const, label: 'Right', svg: <><rect x="12" y="2" width="10" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="9" height="20" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'top-left' as const, label: 'Top L', svg: <><rect x="2" y="2" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="13" y="2" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="2" y="13" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="13" y="13" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'top-right' as const, label: 'Top R', svg: <><rect x="12" y="2" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="2" y="13" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="12" y="13" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'bottom-left' as const, label: 'Bot L', svg: <><rect x="2" y="12" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="13" y="2" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="13" y="12" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'bottom-right' as const, label: 'Bot R', svg: <><rect x="12" y="12" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="12" y="2" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="2" y="12" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'left-third' as const, label: '1/3 L', svg: <><rect x="2" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="16" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'center-third' as const, label: '1/3 C', svg: <><rect x="9" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="16" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                          { pos: 'right-third' as const, label: '1/3 R', svg: <><rect x="16" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="9" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
-                        ] as const).map(({ pos, label, svg }) => (
-                          <button key={pos} onClick={() => { tileWindow(appId, pos); setSnapLayoutApp(null); }}
-                            title={label}
-                            aria-label={`Snap window ${label}`}
-                            style={{
-                              width: 50, height: 38, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                              background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4,
-                              color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0,
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(74,158,255,0.12)'; e.currentTarget.style.color = 'var(--color-accent)'; e.currentTarget.style.borderColor = 'rgba(74,158,255,0.3)'; e.currentTarget.style.transform = 'scale(1.02)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-border-subtle)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.borderColor = 'var(--color-bg-hover)'; e.currentTarget.style.transform = 'scale(1)'; }}
-                          >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">{svg}</svg>
-                            <span style={{ fontSize: 7, fontWeight: 600, lineHeight: 1, opacity: 0.6 }}>{label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Snap-layout popup retired (intrusive); maximize/restore is a
+                        direct click and edge-snap still works by dragging to a screen
+                        edge. The state that drove this was removed. */}
                   </div>
                   {/* Close button */}
                   <button
@@ -3650,6 +3573,10 @@ export const AppManager: React.FC = () => {
             pointerEvents: showInline ? 'auto' : 'none',
             zIndex: appId === 'home' ? 0 : 1,
             flexDirection: 'column',
+            // Home is the desktop layer (its own wallpaper) -- stays transparent so
+            // the wallpaper shows. Every OTHER app is an opaque surface so it never
+            // reveals the shell backdrop or lets the wallpaper bleed into it.
+            background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -3693,7 +3620,6 @@ export const AppManager: React.FC = () => {
   // out of the row. Placement math lives in shared/shell/tabReorder (tested).
   const [tabOrder, setTabOrder] = useState<string[]>([]);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const draggingTabRef = useRef<string | null>(null);
@@ -3749,7 +3675,6 @@ export const AppManager: React.FC = () => {
     try { target.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
     draggingTabRef.current = appId;
     setDraggingTab(appId);
-    setGhostPos({ x: e.clientX, y: e.clientY });
   }, []);
 
   const handleTabDragMove = useCallback((e: React.PointerEvent) => {
@@ -3757,8 +3682,7 @@ export const AppManager: React.FC = () => {
     const dragging = draggingTabRef.current;
     const pointerX = e.clientX;
     const pointerY = e.clientY;
-    // The ghost follows the cursor immediately for a fluid feel.
-    setGhostPos({ x: pointerX, y: pointerY });
+    // No floating ghost: the dragged tab itself reorders live into its drop slot.
     // Recompute the drop slot off the real, measured tab centres (variable tab
     // widths), throttled to one calc per frame.
     cancelAnimationFrame(dragRafRef.current);
@@ -3783,7 +3707,6 @@ export const AppManager: React.FC = () => {
     try { target.releasePointerCapture(e.pointerId); } catch { /* release is best-effort */ }
     draggingTabRef.current = null;
     setDraggingTab(null);
-    setGhostPos(null);
     cancelAnimationFrame(dragRafRef.current);
     // Persist tab order (best-effort).
     setTabOrder(cur => { try { localStorage.setItem('dex-tab-order', JSON.stringify(cur)); } catch { /* best-effort */ } return cur; });
@@ -3810,8 +3733,6 @@ export const AppManager: React.FC = () => {
       return aIdx - bIdx;
     });
 
-    const ghostDef = draggingTab ? APP_DEFINITIONS[draggingTab as AppId] : null;
-
     return (
       <>
       <div
@@ -3823,10 +3744,12 @@ export const AppManager: React.FC = () => {
           // so the two read as one continuous two-tier bar divided by a single
           // hairline, not two unrelated strips. (No blur in full-flat mode.)
           background: '#0E0E11',
-          backdropFilter: 'var(--blur-xl) saturate(180%)',
-          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.04)',
+          // Hairline top highlight + a soft shadow that lifts the chrome off the
+          // content below -- depth, not a dead-flat strip. No backdrop-filter
+          // (blur is off platform-wide; the property was dead GPU cost).
+          boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.05), 0 3px 8px rgba(0,0,0,0.30)',
+          position: 'relative', zIndex: 2,
           flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
           scrollbarWidth: 'none',
         }}
@@ -3860,18 +3783,19 @@ export const AppManager: React.FC = () => {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 12px', height: 26, borderRadius: 13, /* pill-shaped tabs (owner request) */
-                background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
-                border: isDragging ? '1px dashed var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
+                background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'var(--color-bg-elevated, #1C1C20)' : 'transparent',
+                border: isDragging ? '1px solid var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
-                transform: 'none',
+                // The dragged tab itself lifts (scale + shadow) and reorders live into
+                // its drop slot -- no floating ghost copy. Stays fully opaque.
+                transform: isDragging ? 'scale(1.05)' : 'none',
                 transition: isDragging ? 'none' : 'transform 0.18s cubic-bezier(0.4,0,0.2,1), background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease',
-                zIndex: 1,
-                boxShadow: 'none',
-                // The dragged tab becomes a dimmed drop-slot; the floating ghost carries the lift.
-                opacity: isDragging ? 0.38 : 1,
+                zIndex: isDragging ? 5 : 1,
+                boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,0.40)' : 'none',
+                opacity: 1,
                 touchAction: 'none',
                 userSelect: 'none',
-                willChange: isDragging ? 'opacity' : 'auto',
+                willChange: isDragging ? 'transform' : 'auto',
               }}
               onMouseEnter={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -3912,33 +3836,6 @@ export const AppManager: React.FC = () => {
         })}
       </div>
 
-      {/* Floating ghost: a lifted copy of the dragged tab that tracks the cursor. */}
-      {draggingTab && ghostPos && (
-        <div
-          aria-hidden
-          style={{
-            position: 'fixed', left: ghostPos.x, top: ghostPos.y,
-            transform: 'translate(10px, -50%) scale(1.06)',
-            pointerEvents: 'none', zIndex: 9999,
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '0 10px 0 var(--space-2)', height: 26, borderRadius: 4,
-            background: 'var(--color-bg-glass-strong, rgba(20,20,22,0.92))',
-            backdropFilter: 'var(--blur-lg) saturate(180%)', WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
-            border: '1px solid var(--color-border-subtle)',
-            boxShadow: '0 12px 28px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.06) inset',
-            opacity: 0.97,
-          }}
-        >
-          <span style={{ display: 'flex', color: ghostDef?.color || 'var(--color-text-tertiary)', alignItems: 'center', flexShrink: 0 }}>
-            {AppIconPngs[draggingTab as AppId]
-              ? <AppIconImg appId={draggingTab as AppId} size={14} />
-              : (Icons[draggingTab as AppId] || <DexIcon name={ghostDef?.icon || draggingTab} size={14} color={ghostDef?.color || 'var(--color-text-tertiary)'} />)}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-            {ghostDef?.name || draggingTab}
-          </span>
-        </div>
-      )}
       </>
     );
   };
@@ -3950,12 +3847,12 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      // Master overhaul: glass top bar -- frosted, wallpaper shows through (Part 2.2).
-      background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-      backdropFilter: 'var(--glass-blur, blur(20px))',
-      WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
+      // Top chrome bar -- solid (opaque --glass-bg), lifted off the content with a
+      // soft shadow + hairline top highlight. No backdrop-filter (blur is off
+      // platform-wide; the property was dead GPU cost).
+      background: 'var(--glass-bg, #141416)',
       borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-      boxShadow: '0 1px 8px rgba(0,0,0,0.28)',
+      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.05), 0 3px 8px rgba(0,0,0,0.30)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -4009,8 +3906,11 @@ export const AppManager: React.FC = () => {
         {/* Live Activities Strip -- shows running app status */}
         {(() => {
           const activeCreative = runningApps.filter(a => CREATIVE_APPS.has(a.id));
-          const hasMinimized = minimizedApps.size > 0;
-          if (activeCreative.length === 0 && !hasMinimized) {
+          // Center shows the current app's name (or creative-app status dots).
+          // Minimized windows are NOT shown here -- they live in the app tab bar
+          // like every other open app (click the tab to restore), so the top bar
+          // center stays clean.
+          if (activeCreative.length === 0) {
             return <span style={{ pointerEvents: 'none' }}>{getLabel(currentApp)}</span>;
           }
           return (
@@ -4023,7 +3923,7 @@ export const AppManager: React.FC = () => {
               borderRadius: 14, padding: '2px 10px 2px 6px',
               height: 24, overflow: 'hidden',
             }}>
-              {activeCreative.length > 0 ? activeCreative.slice(0, 3).map(a => {
+              {activeCreative.slice(0, 3).map(a => {
                 const def = APP_DEFINITIONS[a.id];
                 const col = def?.color || 'var(--color-text-tertiary)';
                 return (
@@ -4035,87 +3935,7 @@ export const AppManager: React.FC = () => {
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def?.name || a.id}</span>
                   </button>
                 );
-              }) : null}
-              {hasMinimized && (
-                <div style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => setShowMinimizedList(v => !v)}
-                    aria-label={`${minimizedApps.size} minimized window${minimizedApps.size > 1 ? 's' : ''} — click to restore`}
-                    title="Click to see minimized windows"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 3,
-                      background: showMinimizedList ? 'rgba(255,255,255,0.12)' : 'none',
-                      border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 6,
-                      fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 2,
-                      transition: 'background 0.12s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
-                    onMouseLeave={e => { if (!showMinimizedList) (e.currentTarget as HTMLElement).style.background = 'none'; }}
-                  >
-                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                      <rect x="1" y="4" width="10" height="7" rx="1.5" />
-                      <path d="M4 4V2.5A1.5 1.5 0 0 1 5.5 1h1A1.5 1.5 0 0 1 8 2.5V4" />
-                    </svg>
-                    {minimizedApps.size} minimized
-                  </button>
-                  {showMinimizedList && (
-                    <div
-                      ref={minimizedListRef}
-                      role="menu"
-                      aria-label="Minimized windows"
-                      onKeyDown={e => {
-                        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-                        e.preventDefault();
-                        const items = Array.from(minimizedListRef.current?.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]') || []);
-                        if (items.length === 0) return;
-                        const active = document.activeElement as HTMLButtonElement | null;
-                        const idx = active ? items.indexOf(active) : -1;
-                        const next = e.key === 'ArrowDown'
-                          ? items[(idx + 1) % items.length]
-                          : items[(idx - 1 + items.length) % items.length];
-                        next?.focus();
-                      }}
-                      style={{
-                        position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                        background: 'var(--pg-toolbar, rgba(28,28,32,0.92))',
-                        border: '1px solid var(--pg-border, rgba(255,255,255,0.10))',
-                        borderRadius: 8, padding: '4px 0',
-                        boxShadow: 'var(--pg-shadow-overlay, 0 12px 32px rgba(0,0,0,0.45))',
-                        backdropFilter: 'var(--blur-lg) saturate(180%)',
-                        WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
-                        minWidth: 160, zIndex: Z_DROPDOWN_BASE + 500,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {Array.from(minimizedApps).map(id => {
-                        const def = APP_DEFINITIONS[id];
-                        const col = def?.color || 'var(--color-text-tertiary)';
-                        return (
-                          <button
-                            key={id}
-                            role="menuitem"
-                            onClick={() => { restoreFloatingApp(id); setCurrentApp(id as AppId); setShowMinimizedList(false); }}
-                            title={`Restore ${def?.name || id}`}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                              width: '100%', padding: '6px var(--space-3)',
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              fontSize: 12, color: 'var(--color-text-primary, #f5f5f7)',
-                              textAlign: 'left', transition: 'background 0.1s',
-                            }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
-                          >
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0, boxShadow: `0 0 4px ${col}60` }} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{def?.name || id}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-              {activeCreative.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{getLabel(currentApp)}</span>}
+              })}
             </div>
           );
         })()}
@@ -4391,9 +4211,11 @@ export const AppManager: React.FC = () => {
       {splitMode === 'off' ? (
         <div ref={contentRef} role="main" aria-label="App content" style={{
           flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
-          // SOLID per owner request -- was 'transparent', which let the desktop
-          // wallpaper bleed through every opened app (Browser, etc.).
-          background: 'var(--color-bg-base)',
+          // Transparent so the Home desktop (the wallpaper layer, always mounted at
+          // z0 inside here) is what shows behind floating app windows -- minimizing
+          // a window reveals the desktop, never a flat black void. Apps don't bleed
+          // because every non-home app surface is opaque (see the app container bg).
+          background: 'transparent',
           borderRadius: 0,
           contain: 'layout style',
         }}>
@@ -4484,6 +4306,8 @@ export const AppManager: React.FC = () => {
           'top-right':  { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
           'bottom-left':  { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
           'bottom-right': { x: LEFT + PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+          top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
+          bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
           maximize:     { x: LEFT, y: TOP, w: W, h: H },
         };
         const z = zones[snapPreviewZone];
@@ -4510,6 +4334,10 @@ export const AppManager: React.FC = () => {
 
       {/* UKI Voice Assistant Transcript Overlay */}
       <UkiOverlay />
+
+      {/* Global "right-click selected text -> Ask UKI" affordance (one more
+          path to the assistant). Self-contained; defers to any existing menu. */}
+      <AskUkiContextMenu />
 
       {/* Floating Dock -- position fixed so it floats freely, no black bar */}
       {/* Dock hover preview -- simple name tooltip */}
@@ -4586,36 +4414,9 @@ export const AppManager: React.FC = () => {
             <style>{`
               @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
-            {/* Inline search -- the App Menu searches its OWN apps (type to filter),
-                no longer bouncing to a separate surface. Auto-focused on open.
-                Uses the canonical DexSearchInput (built-in icon + clear button) so
-                the field matches every other search surface pixel-for-pixel. */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <DexSearchInput
-                ref={appMenuSearchRef}
-                size="md"
-                fullWidth
-                autoFocus
-                value={appMenuSearch}
-                onChange={(e) => setAppMenuSearch(e.target.value)}
-                onClear={() => { setAppMenuSearch(''); appMenuSearchRef.current?.focus(); }}
-                placeholder="Search apps"
-                aria-label="Search apps"
-                onKeyDown={(e) => {
-                  const panel = e.currentTarget.closest('[data-dex-app-menu-panel]');
-                  if (e.key === 'Escape') {
-                    e.stopPropagation();
-                    if (appMenuSearch) setAppMenuSearch(''); else { setShowAppMenu(false); }
-                  } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus();
-                  } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.click();
-                  }
-                }}
-              />
-            </div>
+            {/* App search consolidated to the single dock search pill (+ the
+                universal overlay it opens) -- this panel is now a clean app grid
+                with no duplicate inline search bar. */}
             {(() => {
               const all = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
               const byId = new Map(all.map(app => [app.id, app]));

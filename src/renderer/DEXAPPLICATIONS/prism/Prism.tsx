@@ -84,6 +84,7 @@ import {
   type AdjustmentKind,
 } from './PrismEngine';
 import { getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
+import { buildBandMask } from '../../../shared/creative/luminanceMask';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 import { AdjustmentControls } from './AdjustmentControls';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
@@ -1275,6 +1276,15 @@ const Prism: React.FC = () => {
       const pixel = ctx.getImageData(Math.round(pt.x), Math.round(pt.y), 1, 1).data;
       const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(c => c.toString(16).padStart(2, '0')).join('');
       setForegroundColor(hex);
+      // DEX color ecosystem (signature tie): a picked color flows into the Omni
+      // Clipboard as a typed color clip attributed to PRISM, plus the OS clipboard
+      // — so it's instantly reusable across DEX (paste anywhere, send via Flow),
+      // not trapped in the foreground swatch.
+      try {
+        (window as any).__dexClipboardStore?.getState?.().add(hex, { sourceAppId: 'prism', sourceAppName: 'PRISM', kind: 'color' });
+        void navigator.clipboard?.writeText?.(hex);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Color ${hex.toUpperCase()} copied` } }));
+      } catch { /* color ecosystem optional */ }
       return;
     }
 
@@ -2860,6 +2870,7 @@ const Prism: React.FC = () => {
             return (
               <div key={group.id} style={{ position: 'relative' }}>
                 <button
+                  className={isGroupActive ? undefined : 'prism-tool-btn'}
                   style={{
                     ...styles.toolBtn,
                     ...(isGroupActive ? styles.toolBtnActive : {}),
@@ -2972,12 +2983,16 @@ const Prism: React.FC = () => {
                 type="color"
                 value={foregroundColor}
                 onChange={(e) => setForegroundColor(e.target.value)}
+                title="Foreground color"
+                aria-label="Foreground color"
                 style={{ position: 'absolute', top: 0, left: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
               <input
                 type="color"
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
+                title="Background color"
+                aria-label="Background color"
                 style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
             </div>
@@ -3178,10 +3193,10 @@ const Prism: React.FC = () => {
         <div data-testid="prism-layers" style={styles.sidebar}>
           {/* Tabs */}
           <div style={styles.tabs}>
-            <button style={{ ...styles.tab, ...(activePanel === 'adjustments' ? styles.tabActive : {}) }} onClick={() => setActivePanel('adjustments')} aria-label="Adjustments tab">
+            <button className={activePanel === 'adjustments' ? undefined : 'prism-tab'} style={{ ...styles.tab, ...(activePanel === 'adjustments' ? styles.tabActive : {}) }} onClick={() => setActivePanel('adjustments')} aria-label="Adjustments tab">
               {Icons.sliders} Adjust
             </button>
-            <button style={{ ...styles.tab, ...(activePanel === 'presets' ? styles.tabActive : {}) }} onClick={() => setActivePanel('presets')} aria-label="Presets tab">
+            <button className={activePanel === 'presets' ? undefined : 'prism-tab'} style={{ ...styles.tab, ...(activePanel === 'presets' ? styles.tabActive : {}) }} onClick={() => setActivePanel('presets')} aria-label="Presets tab">
               {Icons.filter} Presets
             </button>
           </div>
@@ -3373,11 +3388,12 @@ const Prism: React.FC = () => {
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Layers</span>
               <div style={{ display: 'flex', gap: '4px' }}>
-                <button style={styles.iconBtn} onClick={() => addLayer('image')} title="Add Layer" aria-label="Add layer">{Icons.plus}</button>
-                <button style={styles.iconBtn} onClick={() => addLayer('text')} title="Add Text" aria-label="Add text layer">{Icons.text}</button>
-                <button style={styles.iconBtn} onClick={() => addLayer('shape')} title="Add Shape" aria-label="Add shape layer">{Icons.shape}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('image')} title="Add Layer" aria-label="Add layer">{Icons.plus}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('text')} title="Add Text" aria-label="Add text layer">{Icons.text}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('shape')} title="Add Shape" aria-label="Add shape layer">{Icons.shape}</button>
                 <div style={{ position: 'relative' }}>
                   <button
+                    className="prism-icon-btn"
                     style={styles.iconBtn}
                     onClick={(e) => { e.stopPropagation(); setShowAddAdjustmentMenu(v => !v); }}
                     title="Add Adjustment Layer"
@@ -3411,6 +3427,7 @@ const Prism: React.FC = () => {
               {layers.map(layer => (
                 <div
                   key={layer.id}
+                  className={selectedLayerId === layer.id ? undefined : 'prism-layer-item'}
                   style={{ ...styles.layerItem, ...(selectedLayerId === layer.id ? styles.layerItemSelected : {}) }}
                   onClick={() => setSelectedLayerId(layer.id)}
                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layer.id); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top, layerId: layer.id }); }}
@@ -3423,10 +3440,10 @@ const Prism: React.FC = () => {
                     <div style={styles.layerType}>{layer.type}</div>
                   </div>
                   <div style={styles.layerActions}>
-                    <button style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }} aria-label={`Toggle ${layer.name} visibility`}>
+                    <button className="prism-icon-btn" style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }} aria-label={`Toggle ${layer.name} visibility`}>
                       {layer.visible ? Icons.eye : Icons.eyeOff}
                     </button>
-                    <button style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id); }} aria-label={`Toggle ${layer.name} lock`}>
+                    <button className="prism-icon-btn" style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id); }} aria-label={`Toggle ${layer.name} lock`}>
                       {layer.locked ? Icons.lock : Icons.unlock}
                     </button>
                   </div>
@@ -3800,6 +3817,23 @@ const Prism: React.FC = () => {
               setSelection(prev => ({ ...prev, mask }));
               setShowColorRange(false);
             }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Select Range</button>
+
+            {/* Smart Mask — luminosity masking (shadows / midtones / highlights) */}
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-bg-hover)' }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Luminosity Mask</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {(['shadows', 'midtones', 'highlights'] as const).map(band => (
+                  <button key={band} aria-label={`Select ${band}`} title={`Smart Mask: select ${band}`} onClick={() => {
+                    const canvas = canvasRef.current; if (!canvas) return;
+                    const ctx = canvas.getContext('2d'); if (!ctx) return;
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const mask = buildBandMask(imgData.data, canvas.width * canvas.height, band);
+                    setSelection(prev => ({ ...prev, mask }));
+                    setShowColorRange(false);
+                  }} style={{ flex: 1, padding: '6px 4px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{band}</button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

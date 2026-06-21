@@ -351,7 +351,10 @@ const Forge: React.FC = () => {
   const [notifyOnComplete, setNotifyOnComplete] = useState(true);
   
   // Active panel
-  const [activeTab, setActiveTab] = useState<'queue' | 'presets' | 'watch' | 'settings'>('queue');
+  // Default to 'presets': the sidebar only renders presets/watch/settings panels,
+  // so a 'queue' default left no tab highlighted and the sidebar body empty on
+  // first load (the queue lives in the main area, not a sidebar tab).
+  const [activeTab, setActiveTab] = useState<'presets' | 'watch' | 'settings'>('presets');
   const [presetCategory, setPresetCategory] = useState<string>('all');
   const [newPresetName, setNewPresetName] = useState('');
   const [showPresetInput, setShowPresetInput] = useState(false);
@@ -376,6 +379,8 @@ const Forge: React.FC = () => {
   const [showSubBurnIn, setShowSubBurnIn] = useState(false);
   const [subBurnFont, setSubBurnFont] = useState('Arial');
   const [subBurnSize, setSubBurnSize] = useState(24);
+  const [subBurnPosition, setSubBurnPosition] = useState<'Bottom' | 'Top' | 'Center'>('Bottom');
+  const [subBurnStyle, setSubBurnStyle] = useState<'Outline' | 'Shadow' | 'Box'>('Outline');
   const [showConditionalRules, setShowConditionalRules] = useState(false);
   const [conditionalRules, setConditionalRules] = useState<Array<{ condition: string; action: string; enabled: boolean }>>([
     { condition: 'Resolution > 1080p', action: 'Downscale to 1080p', enabled: true },
@@ -508,7 +513,7 @@ const Forge: React.FC = () => {
         if (data.useHardwareAccel !== undefined) setUseHardwareAccel(data.useHardwareAccel);
         if (data.shutdownAfter !== undefined) setShutdownAfter(data.shutdownAfter);
         if (data.notifyOnComplete !== undefined) setNotifyOnComplete(data.notifyOnComplete);
-        if (data.activeTab) setActiveTab(data.activeTab);
+        if (data.activeTab && ['presets', 'watch', 'settings'].includes(data.activeTab)) setActiveTab(data.activeTab);
         if (data.presetCategory) setPresetCategory(data.presetCategory);
         if (data.watchFolders) setWatchFolders(data.watchFolders);
       } catch (e) { console.warn('[Forge] Failed to restore workspace from localStorage:', e); }
@@ -563,6 +568,8 @@ const Forge: React.FC = () => {
       const trimIn = jobData?.trimIn ?? 0; // 0-1 fraction
       const trimOut = jobData?.trimOut ?? 1;
       const watermark = jobData?.watermark as { type: string; text: string; opacity: number; position: string } | undefined;
+      const subtitleCues = jobData?.subtitleCues as Array<{ start: number; end: number; text: string }> | undefined;
+      const subtitleBurnIn = jobData?.subtitleBurnIn as { font: string; size: number; position: string; style: string } | undefined;
 
       const onMetadataReady = async () => {
         const canvas = document.createElement('canvas');
@@ -660,6 +667,80 @@ const Forge: React.FC = () => {
             ctx.strokeText(watermark.text, wx, wy);
             ctx.fillText(watermark.text, wx, wy);
             ctx.restore();
+          }
+
+          // Composite subtitle burn-in: draw the cue whose range contains the current time
+          if (subtitleBurnIn && subtitleCues && subtitleCues.length > 0) {
+            const t = video.currentTime;
+            const active = subtitleCues.find(c => t >= c.start && t <= c.end);
+            if (active && active.text) {
+              const fontSize = Math.max(8, subtitleBurnIn.size || 24);
+              const fontFamily = subtitleBurnIn.font || 'Arial';
+              const lines = active.text.split('\n');
+              const lineHeight = fontSize * 1.25;
+              const margin = Math.round(targetH * 0.06);
+              const cx = targetW / 2;
+
+              ctx.save();
+              ctx.font = `${fontSize}px ${fontFamily}`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'alphabetic';
+
+              // Vertical anchor (baseline of the first line) by position
+              const blockHeight = lines.length * lineHeight;
+              let firstBaseline: number;
+              if (subtitleBurnIn.position === 'Top') {
+                firstBaseline = margin + fontSize;
+              } else if (subtitleBurnIn.position === 'Center') {
+                firstBaseline = (targetH - blockHeight) / 2 + fontSize;
+              } else { // Bottom (default)
+                firstBaseline = targetH - margin - blockHeight + fontSize;
+              }
+
+              // Box style: filled rounded rect behind the whole text block
+              if (subtitleBurnIn.style === 'Box') {
+                let maxWidth = 0;
+                for (const line of lines) { maxWidth = Math.max(maxWidth, ctx.measureText(line).width); }
+                const boxPad = Math.round(fontSize * 0.35);
+                const boxX = cx - maxWidth / 2 - boxPad;
+                const boxY = firstBaseline - fontSize - boxPad;
+                const boxW = maxWidth + boxPad * 2;
+                const boxH = blockHeight + boxPad * 2;
+                const r = Math.min(boxPad, boxW / 2, boxH / 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.beginPath();
+                ctx.moveTo(boxX + r, boxY);
+                ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + boxH, r);
+                ctx.arcTo(boxX + boxW, boxY + boxH, boxX, boxY + boxH, r);
+                ctx.arcTo(boxX, boxY + boxH, boxX, boxY, r);
+                ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
+                ctx.closePath();
+                ctx.fill();
+              }
+
+              lines.forEach((line, i) => {
+                const baseline = firstBaseline + i * lineHeight;
+                if (subtitleBurnIn.style === 'Outline') {
+                  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+                  ctx.lineWidth = Math.max(2, fontSize / 10);
+                  ctx.lineJoin = 'round';
+                  ctx.strokeText(line, cx, baseline);
+                } else if (subtitleBurnIn.style === 'Shadow') {
+                  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+                  ctx.shadowBlur = Math.max(2, fontSize / 6);
+                  ctx.shadowOffsetX = Math.max(1, fontSize / 16);
+                  ctx.shadowOffsetY = Math.max(1, fontSize / 16);
+                }
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText(line, cx, baseline);
+                // Reset shadow so it does not bleed onto subsequent draws
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+              });
+              ctx.restore();
+            }
           }
 
           const effectiveStart = startTime;
@@ -1542,7 +1623,7 @@ const Forge: React.FC = () => {
                       <span style={{ color: wf.active ? 'var(--color-success)' : '#6b7280' }}>{Icons.folderWatch}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '11px', fontWeight: 600 }}>{wf.path}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{wf.preset} arrow-right {wf.destination}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{wf.preset} → {wf.destination}</div>
                       </div>
                       <button className="forge-icon-btn" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' }}
                         onClick={() => setWatchFolders(prev => prev.filter(f => f.id !== wf.id))} aria-label={`Remove watch folder ${wf.path}`}>{Icons.trash}</button>
@@ -1987,7 +2068,7 @@ const Forge: React.FC = () => {
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            <SegmentedControl options={(['text', 'image'] as const)} value={watermarkType} onChange={setWatermarkType} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 10, width: '100%' }} />
+            <SegmentedControl options={(['text', 'image'] as const).map(t => ({ value: t, label: t === 'text' ? 'Text' : 'Image' }))} value={watermarkType} onChange={setWatermarkType} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 10, width: '100%' }} />
             {watermarkType === 'text' && (
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 'var(--space-2)' }} />
             )}
@@ -2116,7 +2197,7 @@ const Forge: React.FC = () => {
                       cues.push({ start, end, text: lines.slice(2).join('\n').replace(/<[^>]+>/g, '') });
                     }
                     if (selectedJob) {
-                      setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleCues: cues, subtitleBurnIn: { font: subBurnFont, size: subBurnSize } } as any : j));
+                      setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleCues: cues, subtitleBurnIn: { font: subBurnFont, size: subBurnSize, position: subBurnPosition, style: subBurnStyle } } as any : j));
                       toast.success(`Loaded ${cues.length} subtitle cues from ${file.name}`);
                     }
                   };
@@ -2131,12 +2212,12 @@ const Forge: React.FC = () => {
             </select>
             <CreativeSlider label="Font Size" min={12} max={64} step={1} value={subBurnSize} onChange={setSubBurnSize} unit="px" accentColor="var(--color-accent)" layout="stacked" style={{ marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
+              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select value={subBurnPosition} onChange={e => setSubBurnPosition(e.target.value as typeof subBurnPosition)} style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
+              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select value={subBurnStyle} onChange={e => setSubBurnStyle(e.target.value as typeof subBurnStyle)} style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
             </div>
             <button aria-label="Apply subtitle burn-in" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
-              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleBurnIn: { font: subBurnFont, size: subBurnSize } } as any : j));
+              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleBurnIn: { font: subBurnFont, size: subBurnSize, position: subBurnPosition, style: subBurnStyle } } as any : j));
               toast.success('Subtitle burn-in configured'); setShowSubBurnIn(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
           </div>

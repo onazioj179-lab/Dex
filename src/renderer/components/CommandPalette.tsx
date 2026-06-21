@@ -24,6 +24,7 @@ import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces
 import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBoundary';
 import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
+import { DexSearchInput } from '../styles/components';
 
 // Catalog ACTION commands the palette does NOT already cover (split / arrange /
 // lock / fullscreen exist above). Adding only the gaps keeps the catalog the one
@@ -56,7 +57,6 @@ interface CommandPaletteProps {
 // ==================== ICONS ====================
 
 const Icons = {
-  search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
   files: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   notes: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
   tasks: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
@@ -349,6 +349,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     return [...inlineResults, ...scored.map(x => x.cmd)];
   }, [commands, query, recentIds]);
 
+  // Flatten into the SAME order the list renders (grouped by category). The list
+  // is rendered grouped, so the visual top-to-bottom order differs from the
+  // score-sorted `filteredCommands`; keyboard nav, scroll-into-view, the active-
+  // descendant aria, and Enter must all index against THIS order or the
+  // highlighted row and the executed command drift apart.
+  const orderedCommands = useMemo(() => {
+    const groups = new Map<string, Command[]>();
+    for (const cmd of filteredCommands) {
+      const list = groups.get(cmd.category);
+      if (list) list.push(cmd);
+      else groups.set(cmd.category, [cmd]);
+    }
+    return Array.from(groups.values()).flat();
+  }, [filteredCommands]);
+
   // Reset state when opened
   useEffect(() => {
     if (isOpen) {
@@ -372,7 +387,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+        setSelectedIndex(i => Math.min(i + 1, orderedCommands.length - 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -380,8 +395,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         break;
       case 'Enter':
         e.preventDefault();
-        if (filteredCommands[selectedIndex]) {
-          runCommand(filteredCommands[selectedIndex]);
+        if (orderedCommands[selectedIndex]) {
+          runCommand(orderedCommands[selectedIndex]);
         }
         break;
       case 'Escape':
@@ -389,15 +404,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         onClose();
         break;
     }
-  }, [filteredCommands, selectedIndex, onClose, runCommand]);
+  }, [orderedCommands, selectedIndex, onClose, runCommand]);
 
-  // Scroll selected item into view
+  // Scroll selected item into view. Items are nested inside per-category group
+  // wrappers, so listRef.children is NOT the flat item list -- look the row up by
+  // its stable id (cmd-<id>) instead of by child index.
   useEffect(() => {
-    if (listRef.current) {
-      const selected = listRef.current.children[selectedIndex] as HTMLElement;
-      selected?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [selectedIndex]);
+    const cmd = orderedCommands[selectedIndex];
+    if (!cmd || !listRef.current) return;
+    const selected = listRef.current.querySelector<HTMLElement>(
+      `#cmd-${CSS.escape(cmd.id)}`
+    );
+    selected?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, orderedCommands]);
 
   if (!isOpen) return null;
 
@@ -427,19 +446,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       gap: 'var(--space-3)',
       padding: 'var(--space-4)',
       borderBottom: '1px solid var(--color-border)',
-    },
-    searchIcon: {
-      color: 'var(--color-text-muted)',
-      flexShrink: 0,
-    },
-    input: {
-      flex: 1,
-      background: 'transparent',
-      border: 'none',
-      outline: 'none',
-      fontSize: '16px',
-      color: 'var(--color-text-primary)',
-      fontFamily: 'inherit',
     },
     shortcut: {
       padding: '4px var(--space-2)',
@@ -528,19 +534,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     <div style={styles.overlay} onMouseDown={onClose} role="presentation">
       <div ref={trapRef} style={styles.container} onMouseDown={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Command palette">
         <div style={styles.inputWrapper}>
-          <span style={styles.searchIcon}>{Icons.search}</span>
-          <input
+          <DexSearchInput
             ref={inputRef}
-            type="text"
+            fullWidth
             placeholder="Search"
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onClear={() => { setQuery(''); setSelectedIndex(0); inputRef.current?.focus(); }}
             onKeyDown={handleKeyDown}
-            style={styles.input}
             role="combobox"
             aria-expanded="true"
             aria-controls="cmd-palette-list"
-            aria-activedescendant={filteredCommands[selectedIndex] ? `cmd-${filteredCommands[selectedIndex].id}` : undefined}
+            aria-activedescendant={orderedCommands[selectedIndex] ? `cmd-${orderedCommands[selectedIndex].id}` : undefined}
             aria-autocomplete="list"
           />
           <span style={styles.shortcut}>ESC</span>

@@ -79,22 +79,10 @@ export const useRunningApps = create<RunningAppsState>()(
           }));
           if (currentAppId !== app.id) ContextBus.emit('app:focused', { appId: app.id, ts: Date.now() });
         } else {
-          // Check max concurrent app limit based on device tier
-          const tier = getStoredTier() || 'mid';
-          const maxApps = getMaxConcurrentApps(tier);
-          if (runningApps.length >= maxApps) {
-            // At limit — dispatch notification instead of launching
-            window.dispatchEvent(new CustomEvent('dex-notification', {
-              detail: {
-                title: 'App Limit Reached',
-                body: `Close an app first. Your device supports ${maxApps} apps at once.`,
-                type: 'warning',
-              },
-            }));
-            // Still focus home so user can manage apps
-            set({ currentAppId: 'home' });
-            return;
-          }
+          // No hard app limit -- DEX scales to as many apps as the user opens.
+          // Background apps stay alive (see shouldKeepAlive); the mounted
+          // keep-alive set only trims NON-running apps, so running apps are never
+          // evicted no matter how many are open. Add apps freely.
           // Launch new app
           const newApp: RunningApp = {
             ...app,

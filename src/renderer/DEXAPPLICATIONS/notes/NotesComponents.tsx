@@ -348,7 +348,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
     if (onDuplicate) items.push({ id: 'dup', label: 'Duplicate', onClick: () => onDuplicate(note.id) });
     if (onSetColor) {
       items.push({ id: 'div-color', label: '', divider: true });
-      const noteColors = ['var(--color-error)','var(--color-warning)','var(--color-warning)','var(--color-success)','#64d2ff','#bf5af2','#ff375f'];
+      const noteColors = ['var(--color-error)','var(--color-warning)','#FFD60A','var(--color-success)','#64d2ff','#bf5af2','#ff375f'];
       noteColors.forEach(c => items.push({
         id: `color-${c}`, label: c === note.color_label ? `● ${c}` : `○ ${c}`,
         onClick: () => onSetColor(note.id, c === note.color_label ? null : c),
@@ -597,6 +597,8 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           <button
             aria-label="Create new note"
             onClick={() => { setShowTemplateMenu(false); onCreate(); }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.32)')}
+            onMouseLeave={e => (e.currentTarget.style.background = colors.accentDim)}
             style={{
               flex: 1,
               padding: 'var(--space-2) 0',
@@ -617,6 +619,8 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
               aria-label="New note from template"
               title="New from template"
               onClick={() => setShowTemplateMenu(v => !v)}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.32)')}
+              onMouseLeave={e => (e.currentTarget.style.background = colors.accentDim)}
               style={{
                 width: 30,
                 display: 'flex',
@@ -721,7 +725,7 @@ const COLOR_LABELS = [
   { value: null, label: 'None', hex: 'transparent' },
   { value: 'red', label: 'Red', hex: 'var(--color-error)' },
   { value: 'orange', label: 'Orange', hex: 'var(--color-warning)' },
-  { value: 'yellow', label: 'Yellow', hex: 'var(--color-warning)' },
+  { value: 'yellow', label: 'Yellow', hex: '#FFD60A' },
   { value: 'green', label: 'Green', hex: 'var(--color-success)' },
   { value: 'blue', label: 'Blue', hex: 'var(--color-accent)' },
   { value: 'purple', label: 'Purple', hex: '#BF5AF2' },

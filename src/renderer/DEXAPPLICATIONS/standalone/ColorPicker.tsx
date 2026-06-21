@@ -38,11 +38,14 @@ const hexToHsl = (hex: string): HSL => {
 import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
 const hexToRgb = (hex: string) => sharedHexToRgb(hex) ?? { r: 0, g: 0, b: 0 };
 
+// Real hex values so clicking a swatch can be parsed by hexToHsl. The brand
+// colors are resolved from the base design-system tokens (error/warning/success/
+// accent/text-tertiary) rather than `var(--...)` strings, which hexToHsl can't read.
 const PRESETS = [
-  'var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-success)',
+  '#FF453A', '#FF9F0A', '#FFD60A', '#34C759', '#30D158',
   '#64D2FF', '#5E5CE6', '#BF5AF2', '#FF375F', '#AC8E68',
-  'var(--color-text-tertiary)', 'var(--color-text-tertiary)', '#48484A', '#F5F5F7', '#1C1C1E',
-  'var(--color-accent)', 'var(--color-accent)', '#007AFF', '#5856D6', '#AF52DE',
+  '#8E8E93', '#AEAEB2', '#48484A', '#F5F5F7', '#1C1C1E',
+  '#4A9EFF', '#0A84FF', '#007AFF', '#5856D6', '#AF52DE',
 ];
 
 const STORAGE_KEY = 'dex-colorpicker-history';
@@ -104,6 +107,9 @@ const ColorPicker: React.FC = () => {
 
   const copy = useCallback((text: string) => {
     navigator.clipboard.writeText(text).catch(() => { /* clipboard blocked */ });
+    // DEX color ecosystem: copied colors also flow into the Omni Clipboard (typed
+    // automatically as a color clip), so they're reusable + sendable across DEX.
+    try { (window as any).__dexClipboardStore?.getState?.().add(text, { sourceAppId: 'colorpicker', sourceAppName: 'Colors' }); } catch { /* optional */ }
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setCopied(false), 1500);
@@ -185,8 +191,8 @@ const ColorPicker: React.FC = () => {
       <div style={s.section}>
         <div className="dex-label-caps" style={s.sectionLabel}>Presets</div>
         <div style={s.palette}>
-          {PRESETS.map(c => (
-            <button key={c} onClick={() => setHsl(hexToHsl(c))}
+          {PRESETS.map((c, i) => (
+            <button key={`${c}-${i}`} onClick={() => setHsl(hexToHsl(c))}
               style={{ ...s.swatch, background: c, boxShadow: c === hex ? '0 0 0 2px var(--color-accent)' : 'none' }}
               title={c} />
           ))}

@@ -23,6 +23,7 @@ import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
+import { DexSearchInput } from '../styles/components';
 import DexIcon from './DexIcon';
 
 const MOVE_THRESHOLD = 6; // px before a press becomes a drag
@@ -107,6 +108,31 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const openApp = useCallback((id: string) => {
     try { const def = APP_DEFINITIONS[id]; if (def) launchApp({ id, name: def.name, icon: def.icon, color: def.color }); } catch { /* not registered */ }
   }, [launchApp]);
+
+  // Recent apps (Phase I — quiet learning surface). Last ~5 DISTINCT recently
+  // used apps, most-recent first, excluding `home` and the current app. Reads
+  // the same sessionHistory the store maintains; degrades to empty silently.
+  const sessionHistory = useRunningApps(s => s.sessionHistory);
+  const currentAppId = useRunningApps(s => s.currentAppId);
+  const recentApps = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string; icon: string; color: string }> = [];
+    for (const id of sessionHistory) {
+      if (id === 'home' || id === currentAppId || seen.has(id)) continue;
+      const def = APP_DEFINITIONS[id];
+      if (!def) continue; // unregistered / stale id — skip quietly
+      seen.add(id);
+      out.push({ id, name: def.name, icon: def.icon, color: def.color });
+      if (out.length >= 5) break;
+    }
+    return out;
+  }, [sessionHistory, currentAppId]);
+  const openRecent = useCallback((id: string) => {
+    // Launch directly via the same reliable path the music/calendar buttons use.
+    // The old code dispatched dex-open-app with { id }, but every handler keys
+    // off { appId } -- so the recent buttons silently did nothing. openApp works.
+    openApp(id);
+  }, [openApp]);
 
   const [today, setToday] = useState<CalEvent[]>([]);
   const week = useMemo(currentWeek, []);
@@ -265,17 +291,32 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           </svg>
         </div>
 
-        <button type="button" aria-label="Open launcher" onPointerDown={e => e.stopPropagation()} onClick={onOpen} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+        <button type="button" className="dex-pressable" aria-label="Open launcher" onPointerDown={e => e.stopPropagation()} onClick={onOpen} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
             {[[1, 1], [10, 1], [1, 10], [10, 10]].map(([rx, ry]) => <rect key={`${rx}-${ry}`} x={rx} y={ry} width="7" height="7" rx="2" fill="currentColor" />)}
           </svg>
         </button>
         {onSearch && (
-          <button type="button" aria-label="Search" onPointerDown={e => e.stopPropagation()} onClick={onSearch} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-          </button>
+          // Canonical DEX search pill (shared DexSearchInput) -- identical
+          // magnifier, size, muted placeholder and hairline everywhere. The dock
+          // routes any interaction to the universal Search overlay rather than
+          // filtering inline, so the pill always looks the same and behaves like
+          // every other search field. stopPropagation keeps a click from dragging.
+          <div onPointerDown={e => e.stopPropagation()} style={{ width: 168, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <DexSearchInput
+              size="md"
+              fullWidth
+              readOnly
+              placeholder="Search"
+              aria-label="Open search"
+              value=""
+              onChange={onSearch}
+              onFocus={onSearch}
+              onClear={onSearch}
+            />
+          </div>
         )}
-        <button type="button" aria-label="Open UKI assistant" onPointerDown={e => e.stopPropagation()} onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+        <button type="button" className="dex-pressable" aria-label="Open UKI assistant" onPointerDown={e => e.stopPropagation()} onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10v1a7 7 0 0 0 14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />
           </svg>
@@ -303,6 +344,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
 
       {/* Widget drawer -- OPT-IN. Only present once the user expands. */}
       {expanded && (
+        <>
         <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
           {/* Now Playing */}
           <div style={{ width: 178, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -386,6 +428,43 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
             </div>
           </div>
         </div>
+
+        {/* Recent apps -- quiet quick-launch. Renders nothing without history. */}
+        {recentApps.length > 0 && (
+          <div
+            role="group"
+            aria-label="Recent apps"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 10px',
+              borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
+            }}
+          >
+            {recentApps.map(app => (
+              <button
+                key={app.id}
+                type="button"
+                title={app.name}
+                aria-label={`Open ${app.name}`}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={() => openRecent(app.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 32, height: 32, flexShrink: 0, borderRadius: 8, padding: 0,
+                  border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
+                  background: 'var(--color-bg-inset, #101012)', cursor: 'pointer',
+                  color: app.color && app.color.startsWith('var(') ? app.color : (app.color || 'var(--color-text-secondary)'),
+                  transition: 'background 0.12s ease, border-color 0.12s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-inset, #101012)'; }}
+              >
+                <DexIcon name={app.icon} size={17} color="currentColor" />
+              </button>
+            ))}
+          </div>
+        )}
+        </>
       )}
     </div>
   );

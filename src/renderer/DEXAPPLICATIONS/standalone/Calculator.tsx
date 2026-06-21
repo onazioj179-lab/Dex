@@ -178,6 +178,28 @@ const Calculator: React.FC = () => {
     return result;
   };
 
+  // Copy the current display value to the clipboard. Guarded — clipboard may be
+  // blocked (insecure context / permissions) and must never throw into the UI.
+  const copyResult = useCallback(() => {
+    try {
+      void navigator.clipboard?.writeText(display).catch(() => { /* clipboard blocked */ });
+      // DEX ecosystem: the result also lands in the Omni Clipboard (typed as a
+      // number), so it's reusable + sendable across DEX.
+      (window as any).__dexClipboardStore?.getState?.().add(display, { sourceAppId: 'calculator', sourceAppName: 'Calculator' });
+    } catch { /* clipboard unavailable */ }
+  }, [display]);
+
+  // Send the latest result anywhere via DEX Flow (universal handoff) — Notes,
+  // DexCode, the Browser, etc. — instead of being hard-wired to Notes only.
+  const sendResult = useCallback(() => {
+    const text = expression ? `${expression} ${display}` : display;
+    try {
+      window.dispatchEvent(new CustomEvent('dex-flow-open', { detail: { payload: { kind: 'text', content: text, source: 'calculator', label: 'Calculator result' } } }));
+    } catch {
+      try { void navigator.clipboard?.writeText(text).catch(() => { /* clipboard blocked */ }); } catch { /* clipboard unavailable */ }
+    }
+  }, [display, expression]);
+
   // Keyboard support -- use ref to always capture latest closures without re-registering
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>();
   keyHandlerRef.current = (e: KeyboardEvent) => {
@@ -260,7 +282,17 @@ const Calculator: React.FC = () => {
           >Scientific</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button style={styles.historyBtn} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history">
+          <button style={styles.historyBtn} onClick={copyResult} aria-label="Copy result" title="Copy result">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button style={styles.historyBtn} onClick={sendResult} aria-label="Send result to app" title="Send to app (Flow)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
+            </svg>
+          </button>
+          <button style={styles.historyBtn} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" title="History">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>

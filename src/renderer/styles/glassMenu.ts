@@ -42,8 +42,11 @@ export const adaptiveBlur = (_highBlur: number, _highSaturate = 200): { backdrop
 /** Returns a scaled box-shadow value based on device capability */
 export const adaptiveShadow = (highValue: string, midValue?: string): { boxShadow: string } => {
   const tier = _tier();
-  if (tier === 'low') return { boxShadow: 'none' };
-  if (tier === 'mid') return { boxShadow: midValue || '0 2px 8px rgba(0,0,0,0.18)' };
+  // Depth on EVERY tier. A static box-shadow is cheap (unlike a GPU backdrop blur),
+  // so the old "low tier = no shadow" left windows and panels dead-flat for no real
+  // perf win. Low/mid use a caller-supplied lighter shadow when one is given,
+  // otherwise they keep the full layered shadow so the UI always has hierarchy.
+  if (tier === 'low' || tier === 'mid') return { boxShadow: midValue ?? highValue };
   return { boxShadow: highValue };
 };
 

@@ -21,12 +21,6 @@ import { platform } from '../utils';
 // Throttle interval for snap zone detection (ms) - increased for better perf under memory pressure
 const SNAP_DETECT_THROTTLE_MS = 64;
 
-// GPU compositing hints - minimal for memory efficiency
-const GPU_HINTS = {
-  willChange: 'auto',
-  backfaceVisibility: 'hidden' as const,
-} as const;
-
 // ---------------------------------------------------------------------------
 // TYPES
 // ---------------------------------------------------------------------------
@@ -258,6 +252,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   // State before snap/maximize for restoration
   const preSnapRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+  // Live drag position. Written every animation frame during a title-bar drag
+  // and read back during render so an incidental mid-drag re-render (e.g. a
+  // snap-zone preview update) never repaints the window at the stale committed
+  // `pos` for a frame. That one-frame snap-back was the old "ghost" / wobble.
+  const livePosRef = useRef({ x: pos.x, y: pos.y });
   const dragRafRef = useRef<number>(0);
   const resizeDirRef = useRef<string>('');
   const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0, px: 0, py: 0 });
@@ -335,6 +334,13 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   // -----------------------------------------------------------------------
 
   const handleTitlePointerDown = useCallback((e: React.PointerEvent) => {
+    // A press on a title-bar control (close / minimize / maximize, and any
+    // future toolbar button) must not begin a window drag. Without this guard
+    // the pointerdown bubbles up and flips the window into its "dragging"
+    // shadow -- and can nudge it / flash the snap preview -- on a plain click.
+    // We deliberately do NOT stopPropagation: the window root's onPointerDown
+    // (handleFocus) still runs, so clicking a control still focuses the window.
+    if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     handleFocus();
     setDragging(true);
@@ -351,32 +357,32 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       const newX = e.clientX - restored.width / 2;
       const newY = e.clientY - 18;
       setPos({ x: newX, y: newY });
+      livePosRef.current = { x: newX, y: newY };
       dragOffsetRef.current = { x: restored.width / 2, y: 18 };
       preSnapRef.current = null;
     } else {
+      livePosRef.current = { x: posRef.current.x, y: posRef.current.y };
       dragOffsetRef.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y };
     }
 
-    // Smooth drag - RAF reads latest position without cancellation
-    // This prevents 120Hz pointermove from cancelling 60Hz RAF frames
-    const latestPos = { x: posRef.current.x, y: posRef.current.y };
+    // Smooth drag - RAF reads the latest position without cancellation so a
+    // 120Hz pointer stream never cancels an in-flight 60Hz frame.
     let rafScheduled = false;
 
     const onMove = (ev: PointerEvent) => {
       const unclampedX = ev.clientX - dragOffsetRef.current.x;
       const unclampedY = ev.clientY - dragOffsetRef.current.y;
       const clamped = clampWindowPosition(unclampedX, unclampedY, sizeRef.current.width, sizeRef.current.height);
-      latestPos.x = clamped.x;
-      latestPos.y = clamped.y;
-      
-      // Schedule RAF only once - it will read latest position when it fires
+      livePosRef.current = { x: clamped.x, y: clamped.y };
+
+      // Schedule RAF only once - it will read the latest position when it fires
       if (!rafScheduled) {
         rafScheduled = true;
         dragRafRef.current = requestAnimationFrame(() => {
           rafScheduled = false;
           if (windowEl) {
-            windowEl.style.left = `${latestPos.x}px`;
-            windowEl.style.top = `${latestPos.y}px`;
+            windowEl.style.left = `${livePosRef.current.x}px`;
+            windowEl.style.top = `${livePosRef.current.y}px`;
           }
         });
       }
@@ -458,7 +464,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       el.removeEventListener('pointercancel', onUp);
       el.removeEventListener('lostpointercapture', onLostCapture);
       setDragging(false);
-      const clamped = clampWindowPosition(latestPos.x, latestPos.y, sizeRef.current.width, sizeRef.current.height);
+      const clamped = clampWindowPosition(livePosRef.current.x, livePosRef.current.y, sizeRef.current.width, sizeRef.current.height);
       setPos(clamped);
       previewZoneRef.current = null;
       setPreviewZone(null);
@@ -577,8 +583,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     : '0 4px 16px rgba(0,0,0,0.35), 0 0 0 0.5px var(--color-bg-hover)';
 
   const maxBounds = maximized ? getMaximizedBounds() : null;
-  const actualX = maxBounds ? maxBounds.x : pos.x;
-  const actualY = maxBounds ? maxBounds.y : pos.y;
+  // While dragging, the true position lives in livePosRef (written to the DOM
+  // imperatively each frame). Read it here so a mid-drag re-render paints the
+  // live position instead of snapping back to the stale committed `pos`.
+  const actualX = maxBounds ? maxBounds.x : (dragging ? livePosRef.current.x : pos.x);
+  const actualY = maxBounds ? maxBounds.y : (dragging ? livePosRef.current.y : pos.y);
   const actualW = maxBounds ? maxBounds.width : size.width;
   const actualH = maxBounds ? maxBounds.height : size.height;
 

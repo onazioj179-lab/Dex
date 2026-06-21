@@ -266,6 +266,9 @@ export const Power: React.FC = () => {
       if (sortBy === 'cpu') cmp = a.cpu - b.cpu;
       else if (sortBy === 'memory') cmp = a.memory - b.memory;
       else if (sortBy === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortBy === 'disk') cmp = a.disk - b.disk;
+      else if (sortBy === 'status') cmp = a.status.localeCompare(b.status);
+      else if (sortBy === 'threads') cmp = a.threads - b.threads;
       else cmp = a.pid - b.pid;
       return sortAsc ? cmp : -cmp;
     });
@@ -463,7 +466,7 @@ export const Power: React.FC = () => {
                     onClick={() => { if (sortBy === col.key) setSortAsc(!sortAsc); else { setSortBy(col.key as typeof sortBy); setSortAsc(false); } }}
                     style={{ background: 'none', border: 'none', color: sortBy === col.key ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer', textAlign: 'left' as const, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', padding: 0 }}
                   >
-                    {col.label} {sortBy === col.key ? (sortAsc ? '' : '') : ''}
+                    {col.label}{sortBy === col.key ? (sortAsc ? ' ↑' : ' ↓') : ''}
                   </button>
                 ))}
               </div>
@@ -534,7 +537,7 @@ export const Power: React.FC = () => {
               {[
                 { label: 'Health', value: `${battery.health}%`, color: battery.health > 80 ? 'var(--color-success)' : 'var(--color-warning)' },
                 { label: 'Cycle Count', value: `${battery.cycleCount}`, color: '#64d2ff' },
-                { label: 'Temperature', value: `${battery.temperature}C`, color: battery.temperature > 40 ? 'var(--color-error)' : 'var(--color-accent)' },
+                { label: 'Temperature', value: `${battery.temperature}°C`, color: battery.temperature > 40 ? 'var(--color-error)' : 'var(--color-accent)' },
                 { label: 'Voltage', value: `${battery.voltage}V`, color: '#bf5af2' },
               ].map(s => (
                 <div key={s.label} style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
@@ -651,11 +654,14 @@ export const Power: React.FC = () => {
             {/* Per-app memory */}
             <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>App Memory Usage</div>
+              {memInfo.appMemory.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No per-app memory data</div>
+              )}
               {memInfo.appMemory.map(app => (
                 <div key={app.name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text-primary)' }}>{app.name}</span>
-                  <span style={{ fontSize: 11, color: app.trend === 'up' ? 'var(--color-error)' : app.trend === 'down' ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>
-                    {app.trend === 'up' ? '' : app.trend === 'down' ? '' : ''}
+                  <span aria-hidden style={{ fontSize: 11, color: app.trend === 'up' ? 'var(--color-error)' : app.trend === 'down' ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>
+                    {app.trend === 'up' ? '↑' : app.trend === 'down' ? '↓' : '–'}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', width: 60, textAlign: 'right' as const }}>{app.memory} MB</span>
                 </div>
@@ -682,6 +688,9 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Startup Items</h3>
 
             <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+              {startupItems.length === 0 && (
+                <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No startup items</div>
+              )}
               {startupItems.map((item, i) => (
                 <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', borderBottom: i < startupItems.length - 1 ? '1px solid var(--color-border-subtle)' : 'none' }}>
                   <span style={{ fontSize: 14, display: 'flex' }}>{item.type === 'app' ? <PackageIcon size={14} /> : item.type === 'service' ? <SettingsIcon size={14} /> : <FileTextIcon size={14} />}</span>
@@ -689,7 +698,7 @@ export const Power: React.FC = () => {
                     <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{item.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
                       Impact: <span style={{ color: item.impact === 'high' ? 'var(--color-error)' : item.impact === 'medium' ? 'var(--color-warning)' : 'var(--color-success)' }}>{item.impact}</span>
-                      {item.delay > 0 && ` Delay: ${item.delay}s`}
+                      {item.delay > 0 && ` · Delay: ${item.delay}s`}
                     </div>
                   </div>
                   <ToggleSwitch checked={item.enabled} onChange={() => toggleStartup(item.id)} label={`Toggle ${item.name}`} />
@@ -699,11 +708,14 @@ export const Power: React.FC = () => {
 
             <h3 style={{ margin: 'var(--space-2) 0 0', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>Scheduled Tasks</h3>
             <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+              {scheduledTasks.length === 0 && (
+                <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No scheduled tasks</div>
+              )}
               {scheduledTasks.map((task, i) => (
                 <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', borderBottom: i < scheduledTasks.length - 1 ? '1px solid var(--color-border-subtle)' : 'none' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{task.name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{task.schedule} Last: {task.lastRun}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{task.schedule} · Last: {task.lastRun}</div>
                   </div>
                   <ToggleSwitch checked={task.enabled} onChange={() => toggleScheduled(task.id)} label={`Toggle ${task.name}`} />
                 </div>
@@ -717,6 +729,9 @@ export const Power: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 600 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Thermal Monitoring</h3>
 
+            {thermals.length === 0 && (
+              <div style={{ ...glassPanel, padding: 'var(--space-8)', borderRadius: 10, textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No thermal sensor data available</div>
+            )}
             {thermals.map(zone => {
               const pct = (zone.temp / zone.maxTemp) * 100;
               const color = pct > 80 ? 'var(--color-error)' : pct > 60 ? 'var(--color-warning)' : 'var(--color-success)';
@@ -724,13 +739,13 @@ export const Power: React.FC = () => {
                 <div key={zone.name} style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>{zone.name}</span>
-                    <span style={{ fontSize: 20, fontWeight: 500, color }}>{zone.temp.toFixed(0)}C</span>
+                    <span style={{ fontSize: 20, fontWeight: 500, color }}>{zone.temp.toFixed(0)}°C</span>
                   </div>
                   <div style={{ height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden', marginBottom: 'var(--space-2)' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-                    <span>Max: {zone.maxTemp}C</span>
+                    <span>Max: {zone.maxTemp}°C</span>
                     {zone.fanSpeed > 0 && <span>Fan: {zone.fanSpeed} RPM / {zone.maxFanSpeed} RPM</span>}
                   </div>
                 </div>

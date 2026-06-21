@@ -17,6 +17,7 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 import { useLiveActivity, type LiveActivity, type ActivityType } from '../utils/liveActivity';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
 import { glassPanel, glassOverlay } from '../styles/glassMenu';
+import { DexSearchInput } from '../styles/components';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { HomeWidgets, HomeDashboard } from '../components/HomeWidgets';
@@ -311,18 +312,14 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
         <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)' }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: '#fff' }}>Pin App to Home</h2>
           <p style={{ margin: '3px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose an app to drop on your desktop. Drag to move, right-click to unpin.</p>
-          <input
+          <DexSearchInput
             autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
+            onClear={() => setQuery('')}
             placeholder="Search apps"
             aria-label="Filter apps"
-            style={{
-              width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 8,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid var(--color-border-subtle)',
-              color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
-            }}
+            fullWidth
           />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)' }}>

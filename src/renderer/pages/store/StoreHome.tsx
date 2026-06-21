@@ -207,7 +207,12 @@ function FeaturedHero({
                 <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{rating.toFixed(1)}</span>
               </span>
             )}
-            <button type="button" style={storeButton('accent')} disabled={busy !== null} onClick={() => onOpen(m.packageId)}>
+            <button
+              type="button"
+              style={{ ...storeButton('accent'), opacity: busy !== null ? 0.5 : 1, cursor: busy !== null ? 'not-allowed' : 'pointer' }}
+              disabled={busy !== null}
+              onClick={() => onOpen(m.packageId)}
+            >
               <DexIcon name="arrow-right" size={14} /> View
             </button>
           </div>

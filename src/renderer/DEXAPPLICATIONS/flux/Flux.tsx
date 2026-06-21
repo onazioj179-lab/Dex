@@ -2506,10 +2506,10 @@ const Flux: React.FC = () => {
                             alignItems: 'center',
                             gap: 'var(--space-2)',
                             padding: '6px var(--space-2)',
-                            background: activeTool === toolId ? 'rgba(255,55,95,0.15)' : 'transparent',
+                            background: activeTool === toolId ? 'rgba(191,90,242,0.15)' : 'transparent',
                             border: 'none',
                             borderRadius: 4,
-                            color: activeTool === toolId ? '#ff375f' : 'var(--color-text-primary)',
+                            color: activeTool === toolId ? '#bf5af2' : 'var(--color-text-primary)',
                             cursor: 'pointer',
                             fontSize: 11,
                             textAlign: 'left',
@@ -2947,6 +2947,13 @@ const Flux: React.FC = () => {
                         ))}
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* Inspector Panel - empty state */}
+                {activeTab === 'inspector' && !selectedLayer && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-5) 0' }}>
+                    Select a layer to inspect.
                   </div>
                 )}
 
@@ -4581,7 +4588,7 @@ const Flux: React.FC = () => {
               >Cancel</button>
               <button
                 type="button"
-                style={{ ...styles.btn, ...styles.btnPrimary, padding: '6px var(--space-3)' }}
+                style={{ ...styles.btn, ...styles.btnPrimary, padding: '6px var(--space-3)', opacity: morphPathInput.trim().length === 0 ? 0.5 : 1, cursor: morphPathInput.trim().length === 0 ? 'not-allowed' : 'pointer' }}
                 disabled={morphPathInput.trim().length === 0}
                 onClick={() => {
                   const trimmed = morphPathInput.trim();

@@ -318,7 +318,7 @@ const PixelArt: React.FC = () => {
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
-      fontFamily: 'var(--font-system)',
+      fontFamily: 'var(--font-family)',
     }}>
       <div style={{ ...premiumGlassToolbar, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -422,10 +422,11 @@ const PixelArt: React.FC = () => {
                 style={{
                   position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%',
                   background: 'var(--color-error)', color: '#fff', border: 'none', cursor: 'pointer',
-                  fontSize: 10, lineHeight: '14px', padding: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                 }}
-                title="Delete frame"
-              >x</button>
+                title={`Delete frame ${i + 1}`}
+                aria-label={`Delete frame ${i + 1}`}
+              ><DexIcon name="close" size={10} color="#fff" /></button>
             </div>
           );
         })}

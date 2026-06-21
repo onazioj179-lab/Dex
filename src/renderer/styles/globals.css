@@ -73,10 +73,10 @@ button,
   contain: layout style paint;
 }
 
-/* Low-tier: keep glass style, but use a lighter blur for stability */
-html[data-perf-tier="low"] * {
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-}
+/* Low-tier: previously flattened EVERY element's shadow to a single weak layer
+   (box-shadow !important on *), which killed all depth on low-end hardware and
+   made windows/cards/panels read dead-flat. Static box-shadows are cheap (no GPU
+   blur), so depth now stays on every tier -- the universal override is removed. */
 html[data-perf-tier="low"] [style*="backdrop-filter"],
 html[data-perf-tier="low"] [style*="backdropFilter"] {
   backdrop-filter: var(--blur-md) saturate(140%) !important;
@@ -186,6 +186,13 @@ html[data-thermal-state="critical"] [data-decorative="true"] { display: none !im
   border-radius: var(--radius-sm);
 }
 :focus:not(:focus-visible) {
+  outline: none !important;
+}
+/* DexSearchInput renders its OWN focus ring on the wrapper (accent hairline +
+   soft halo). The inner <input> therefore suppresses the global outline so the
+   field shows one clean ring instead of a doubled wrapper-border + inner-outline.
+   Component-scoped (class + :focus-visible) so it beats the bare rule above. */
+.dex-search-field:focus-visible {
   outline: none !important;
 }
 
@@ -491,10 +498,9 @@ html[data-perf-tier="low"] [style*="blur"] {
   /* Budget/low-tier hardware: drop the GPU-expensive backdrop blur entirely
      (this matches the TierManager low preset `enableBackdropFilter:false` —
      the old rule forced a 10px blur on EVERY glass panel and was a major
-     compositor load on the exact machines that overload). Use a near-solid
-     surface so panels stay readable instead of letting the wallpaper/widgets
-     bleed through. */
-  background: rgba(20,20,22,0.95) !important;
+     compositor load on the exact machines that overload). Fully OPAQUE surface
+     (owner: remove all transparency) so nothing bleeds through behind chrome. */
+  background: #141416 !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -514,6 +520,27 @@ html[data-perf-tier="low"] { -webkit-font-smoothing: antialiased !important; -mo
 /* Low: flat borders instead of shadows */
 html[data-perf-tier="low"] .card, html[data-perf-tier="low"] .panel {
   border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* ── Active drag/resize: always GPU-accelerate the window IN FLIGHT ───────────
+   The one case where every tier (incl. low) must spend GPU. A window being
+   dragged needs its OWN compositor layer (will-change: transform) + full paint
+   containment, or the live transform repaints the whole heavy window every frame
+   and the drag stutters. The low-tier `* { will-change:auto !important }` rule
+   above otherwise defeats the drag handlers' imperative layer promotion -- and
+   it out-specifies a bare [data-dragging], so the low-tier-scoped selectors here
+   are required to win. Scoped to the element actually in flight (FloatingWindow +
+   AppManager both set data-dragging / data-resizing only during the gesture), so
+   the savings hold everywhere else and the layer is released on pointer-up. */
+html[data-perf-tier="low"] [data-dragging="true"],
+html[data-perf-tier="low"] [data-resizing="true"],
+html[data-perf-tier="mid"] [data-dragging="true"],
+html[data-perf-tier="mid"] [data-resizing="true"],
+[data-dragging="true"],
+[data-resizing="true"] {
+  will-change: transform !important;
+  contain: layout style paint !important;
+  backface-visibility: hidden !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

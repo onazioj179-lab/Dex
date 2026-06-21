@@ -10,6 +10,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { glassPanel, glassButton } from '../../styles/glassMenu';
+import { DexSearchInput } from '../../styles/components';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
@@ -31,6 +32,11 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', outline: 'none',
   fontFamily: 'var(--font-mono)', fontSize: 12, minWidth: 0,
 };
+
+// glassButton has no :disabled CSS; give disabled controls the standalone-app
+// visual so they don't stay fully lit with a pointer cursor.
+const disabledVisual = (off: boolean): React.CSSProperties =>
+  off ? { opacity: 0.5, cursor: 'not-allowed' } : {};
 
 export default function EnvManager(): React.ReactElement {
   const bridge = useMemo(getBridge, []);
@@ -132,7 +138,7 @@ export default function EnvManager(): React.ReactElement {
               {appScopes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </optgroup>
           </select>
-          <input aria-label="Search variables" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" style={{ ...inputStyle, minWidth: 160 }} />
+          <DexSearchInput aria-label="Search variables" size="sm" value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search" style={{ minWidth: 160 }} />
         </div>
       </header>
 
@@ -143,7 +149,7 @@ export default function EnvManager(): React.ReactElement {
           <input aria-label="New variable name" value={newName} onChange={(e) => setNewName(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === 'Enter') addVar(); }} placeholder="NAME" style={{ ...inputStyle, width: 200 }} />
           <span style={{ opacity: 0.5 }}>=</span>
           <input aria-label="New variable value" value={newValue} onChange={(e) => setNewValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addVar(); }} placeholder="value" style={{ ...inputStyle, flex: 1 }} />
-          <button style={glassButton} disabled={busy || !newName.trim()} onClick={addVar}>Add</button>
+          <button style={{ ...glassButton, ...disabledVisual(busy || !newName.trim()) }} disabled={busy || !newName.trim()} onClick={addVar}>Add</button>
         </div>
       )}
 
@@ -175,7 +181,7 @@ export default function EnvManager(): React.ReactElement {
                 aria-label={`Copy value of ${row.name}`}
               >Copy</button>
               {!isSystem && (
-                <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11, color: 'var(--color-error)', borderColor: 'var(--color-error)' }} disabled={busy} onClick={() => remove(row.name)} aria-label={`Delete ${row.name}`}>Delete</button>
+                <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11, color: 'var(--color-error)', borderColor: 'var(--color-error)', ...disabledVisual(busy) }} disabled={busy} onClick={() => remove(row.name)} aria-label={`Delete ${row.name}`}>Delete</button>
               )}
             </li>
           ))}

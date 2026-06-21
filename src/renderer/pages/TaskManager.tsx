@@ -441,10 +441,24 @@ const TaskManager: React.FC = () => {
       elevated = true;
     }
     const level: 'healthy' | 'elevated' | 'critical' = critical ? 'critical' : elevated ? 'elevated' : 'healthy';
-    return { level, issues };
+    // Name the dominant resource for the pill: pick whichever of CPU/Mem is the
+    // bigger offender (highest % over its own elevated threshold), derived from
+    // the same status values that set the level above.
+    let bottleneck: string | null = null;
+    if (level !== 'healthy') {
+      const cpuOver = cpuUsage > 70 ? cpuUsage - 70 : -1;
+      const memOver = memoryPercent > 80 ? memoryPercent - 80 : -1;
+      if (cpuOver >= 0 || memOver >= 0) {
+        bottleneck = cpuOver >= memOver ? `CPU ${cpuUsage}%` : `Mem ${memoryPercent}%`;
+      } else if (frozenCount > 0) {
+        bottleneck = `${frozenCount} frozen`;
+      }
+    }
+    return { level, issues, bottleneck };
   }, [cpuUsage, memoryPercent, frozenCount, topProcess]);
   const healthTone = health.level === 'critical' ? '#FF453A' : health.level === 'elevated' ? '#FF9F0A' : '#30D158';
   const healthLabel = health.level === 'critical' ? 'Critical' : health.level === 'elevated' ? 'Elevated' : 'Healthy';
+  const healthPillText = health.bottleneck ? `${healthLabel} · ${health.bottleneck}` : healthLabel;
 
   const handleManualRefresh = () => {
     refreshStatus();
@@ -519,7 +533,7 @@ const TaskManager: React.FC = () => {
             style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '14' }}
           >
             <span style={{ width: 7, height: 7, borderRadius: 999, background: healthTone, display: 'inline-block' }} />
-            {healthLabel}
+            {healthPillText}
           </span>
         </div>
         <div style={styles.headerControls}>
@@ -801,24 +815,26 @@ const TaskManager: React.FC = () => {
                       <span style={styles.processPid}>{process.pid}</span>
                       <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
                       <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
-                      <button
-                        style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
-                        onClick={() => handleEndProcess(process.pid, process.name)}
-                        disabled={isKilling}
-                        aria-label={`End process ${process.name}`}
-                        title={`End ${process.name}`}
-                      >
-                        {isKilling ? '...' : 'End'}
-                      </button>
-                      <button
-                        style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, marginLeft: 4, opacity: isKilling ? 0.5 : 1 }}
-                        onClick={() => handleEndTree(process.pid, process.name)}
-                        disabled={isKilling}
-                        aria-label={`End process tree ${process.name}`}
-                        title={`End ${process.name} and all child processes`}
-                      >
-                        Tree
-                      </button>
+                      <div style={styles.processActions}>
+                        <button
+                          style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
+                          onClick={() => handleEndProcess(process.pid, process.name)}
+                          disabled={isKilling}
+                          aria-label={`End process ${process.name}`}
+                          title={`End ${process.name}`}
+                        >
+                          {isKilling ? '...' : 'End'}
+                        </button>
+                        <button
+                          style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
+                          onClick={() => handleEndTree(process.pid, process.name)}
+                          disabled={isKilling}
+                          aria-label={`End process tree ${process.name}`}
+                          title={`End ${process.name} and all child processes`}
+                        >
+                          Tree
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -870,10 +886,11 @@ const styles: Record<string, React.CSSProperties> = {
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   ghostButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
   endButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
-  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   sortHeader: { display: 'flex', alignItems: 'center', height: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', textTransform: 'inherit', letterSpacing: 'inherit', cursor: 'pointer' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
-  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },
+  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },
+  processActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   processRowHover: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' },
   processName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   processPid: { color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },

@@ -18,6 +18,7 @@
  */
 
 import ContextBus from '../services/ContextBus';
+import { contextEngine } from '../../shared/uki/contextEngine';
 import { liveContext, type LiveContext } from './context';
 import { findTroubleshooting, type DexTroubleshooting } from './knowledge';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../services/workflowTemplates';
@@ -174,6 +175,15 @@ export function formatOperatorBriefing(b: OperatorBriefing = buildOperatorBriefi
   if (b.openAppIds.length) lines.push(`open: ${b.openAppIds.join(', ')}`);
   if (b.activeProjectId) lines.push(`project: ${b.activeProjectId}`);
   if (b.relevantWorkflows.length) lines.push(`workflows: ${b.relevantWorkflows.map((w) => w.id).join(', ')}`);
+  // Recent activity from the Context Engine — the one thing the briefing above
+  // does not already carry, so UKI knows what the user just did, not only what
+  // is open. Targets are clipped so the block stays token-bounded.
+  try {
+    const recent = contextEngine.getContext().recentActivity
+      .slice(0, 4)
+      .map((a) => `${a.kind}:${a.target.length > 24 ? a.target.slice(0, 24) + '…' : a.target}`);
+    if (recent.length) lines.push(`recent: ${recent.join(', ')}`);
+  } catch { /* context engine optional */ }
   lines.push(`load: ${b.systemPolicy}`);
   const out = lines.join('\n');
   return out.length > maxChars ? out.slice(0, maxChars - 1) + '…' : out;

@@ -207,9 +207,13 @@ export function isHeavyApp(appId: string): boolean {
   return HEAVY_APP_IDS.includes(appId);
 }
 
-export function shouldKeepAlive(appId: string, tier: DeviceTier): boolean {
-  if (!TIER_PRESETS[tier].deferHeavyApps) return true;
-  return !isHeavyApp(appId);
+export function shouldKeepAlive(_appId: string, _tier: DeviceTier): boolean {
+  // Owner directive: apps NEVER close, blank, or unmount on their own -- not on
+  // idle, not when backgrounded, not under memory pressure, on any tier. Every
+  // launched app stays fully mounted and alive so switching back is instant and
+  // never shows a blank/reloading surface. Resource pressure is handled by Xenon
+  // throttling CPU/GPU/FPS (prioritization), which keeps the component mounted.
+  return true;
 }
 
 export function getMaxConcurrentApps(tier: DeviceTier): number {
