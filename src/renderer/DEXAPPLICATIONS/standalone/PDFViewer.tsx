@@ -163,7 +163,7 @@ const PDFViewer: React.FC = () => {
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
-      fontFamily: 'var(--font-system)',
+      fontFamily: 'var(--font-family)',
     }}>
       <div style={{ ...premiumGlassToolbar, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -174,13 +174,13 @@ const PDFViewer: React.FC = () => {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={!filePath} style={btn}>Prev</button>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={!filePath} style={btn} title="Previous page" aria-label="Previous page">Prev</button>
           <span style={{ fontSize: 12, minWidth: 36, textAlign: 'center' }}>{page}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={!filePath} style={btn}>Next</button>
+          <button onClick={() => setPage(p => p + 1)} disabled={!filePath} style={btn} title="Next page" aria-label="Next page">Next</button>
           <span style={{ width: 8 }} />
-          <button onClick={() => setZoom(z => Math.max(25, z - 10))} disabled={!filePath} style={btn}>-</button>
+          <button onClick={() => setZoom(z => Math.max(25, z - 10))} disabled={!filePath} style={btn} title="Zoom out" aria-label="Zoom out">&#8722;</button>
           <span style={{ fontSize: 12, minWidth: 44, textAlign: 'center' }}>{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(400, z + 10))} disabled={!filePath} style={btn}>+</button>
+          <button onClick={() => setZoom(z => Math.min(400, z + 10))} disabled={!filePath} style={btn} title="Zoom in" aria-label="Zoom in">+</button>
           <span style={{ width: 8 }} />
           <button
             onClick={() => setAnnotateMode(m => !m)}

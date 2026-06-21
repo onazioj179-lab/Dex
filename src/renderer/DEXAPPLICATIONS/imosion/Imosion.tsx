@@ -56,6 +56,9 @@ import {
   drawAutomationLane,
 } from './ImosionEngine';
 import { computeSignalLevels } from '../../../shared/audio/dsp';
+import { generateDrumPattern, DRUM_GENRES, type DrumGenre } from '../../../shared/audio/drumPattern';
+import { generateRiff, RIFF_SCALES, type RiffScale } from '../../../shared/audio/riffMachine';
+import { varyPattern } from '../../../shared/audio/patternVariant';
 import { DexSearchInput } from '../../styles/components';
 
 // ==================== APP IDENTITY ====================
@@ -340,6 +343,7 @@ interface MidiNote {
   duration: number; // beats
   velocity: number; // 0-127
   selected?: boolean;
+  slide?: boolean; // Glide Notes: portamento — glide pitch from the previous note
 }
 
 interface MidiClip {
@@ -2258,12 +2262,22 @@ const Imosion: React.FC = () => {
     return () => { input.onmidimessage = null; };
   }, [midiAccess, activeMidiInput, midiCCMap]);
 
-  // Enumerate audio devices on mount
+  // Enumerate audio devices on mount.
+  // Degrade safely when the media stack is unavailable (insecure context, headless
+  // preview, or a build without navigator.mediaDevices): the app stays usable with
+  // recording controls disabled rather than crashing on mount.
   useEffect(() => {
+    const md = navigator.mediaDevices;
+    if (!md) {
+      console.warn('[Imosion] Media devices unavailable in this environment; recording/input disabled.');
+      return;
+    }
     const getDevices = async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (typeof md.getUserMedia === 'function') {
+          await md.getUserMedia({ audio: true });
+        }
+        const devices = typeof md.enumerateDevices === 'function' ? await md.enumerateDevices() : [];
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
         setAudioDevices([...audioInputs, ...audioOutputs]);
@@ -2274,8 +2288,9 @@ const Imosion: React.FC = () => {
       }
     };
     getDevices();
-    navigator.mediaDevices.addEventListener('devicechange', getDevices);
-    return () => navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+    if (typeof md.addEventListener !== 'function') return;
+    md.addEventListener('devicechange', getDevices);
+    return () => md.removeEventListener('devicechange', getDevices);
   }, []);
 
   // Master settings with full mastering chain
@@ -2499,6 +2514,7 @@ const Imosion: React.FC = () => {
   const [pianoRollScroll, setPianoRollScroll] = useState({ x: 0, y: 60 * 6 }); // scroll to middle C area
   const [pianoRollTool, setPianoRollTool] = useState<'select' | 'draw' | 'erase'>('draw');
   const [pianoRollSnap, setPianoRollSnap] = useState<number>(0.25); // 1/4 = quarter note, 0.25 = 16th
+  const [riffScale, setRiffScale] = useState<RiffScale>('minor'); // Idea Forge (Riff Machine)
   const [pianoRollSelectedNotes, setPianoRollSelectedNotes] = useState<Set<string>>(new Set());
   const [pianoRollDrag, setPianoRollDrag] = useState<{ type: 'none' | 'move' | 'resize' | 'marquee'; noteId?: string; startX: number; startY: number; startPitch?: number; startTime?: number } | null>(null);
   const [showVelocityLane, setShowVelocityLane] = useState(true);
@@ -2553,6 +2569,7 @@ const Imosion: React.FC = () => {
   ];
   const [beatKit, setBeatKit] = useState(BEAT_KITS[0]);
   const [beatSteps, setBeatSteps] = useState(16);
+  const [drumGenre, setDrumGenre] = useState<DrumGenre>('house');
   const [beatGrid, setBeatGrid] = useState<boolean[][]>(() => Array.from({ length: 16 }, () => Array(16).fill(false)));
   const [beatVelocities, setBeatVelocities] = useState<number[][]>(() => Array.from({ length: 16 }, () => Array(16).fill(0.8)));
   const [beatSwing, setBeatSwing] = useState(0);
@@ -2578,12 +2595,38 @@ const Imosion: React.FC = () => {
     };
   }, []);
 
-  const toggleBeatCell = useCallback((row: number, col: number) => {
+  // Pattern Brush: drag across the step grid to PAINT cells on/off instead of
+  // clicking one at a time. mousedown seeds the paint value from the first cell
+  // (toggle), then entering more cells while the mouse is held applies that same
+  // value -- so a single drag lays down or clears a whole run of steps.
+  // Right-click still cycles velocity (unchanged).
+  const beatPaintValue = useRef<boolean | null>(null);
+  const setBeatCellValue = useCallback((row: number, col: number, value: boolean) => {
     setBeatGrid(g => {
+      if ((g[row]?.[col] ?? false) === value) return g;
       const ng = g.map(r => [...r]);
-      ng[row][col] = !ng[row][col];
+      ng[row][col] = value;
       return ng;
     });
+  }, []);
+  const beatCellDown = useCallback((row: number, col: number) => {
+    setBeatGrid(g => {
+      const target = !(g[row]?.[col] ?? false);
+      beatPaintValue.current = target;
+      const ng = g.map(r => [...r]);
+      ng[row][col] = target;
+      return ng;
+    });
+  }, []);
+  const beatCellEnter = useCallback((row: number, col: number) => {
+    if (beatPaintValue.current === null) return;
+    setBeatCellValue(row, col, beatPaintValue.current);
+  }, [setBeatCellValue]);
+  // End a paint stroke anywhere the mouse is released.
+  useEffect(() => {
+    const end = () => { beatPaintValue.current = null; };
+    window.addEventListener('mouseup', end);
+    return () => window.removeEventListener('mouseup', end);
   }, []);
 
   const startBeatSequencer = useCallback(() => {
@@ -2636,6 +2679,24 @@ const Imosion: React.FC = () => {
       return Math.random() < 0.12;
     })));
   }, []);
+
+  // Session Performer: generate a musically-structured pattern from genre rules
+  // (rule-based, not ML). A fresh seed each press gives a new take of the genre.
+  const performBeat = useCallback(() => {
+    const pattern = generateDrumPattern({ genre: drumGenre, rows: 16, steps: beatSteps, seed: Math.floor(Math.random() * 1e9) });
+    setBeatGrid(pattern);
+    setBeatVelocities(Array.from({ length: 16 }, () => Array(beatSteps).fill(0.8)));
+  }, [drumGenre, beatSteps]);
+
+  // Idea Forge: generate an in-scale melodic riff into the piano roll (rule-based,
+  // not ML). Root = C4; a fresh seed each press gives a new idea in the scale.
+  const forgeRiff = useCallback(() => {
+    const riff = generateRiff({ root: 60, scale: riffScale, bars: 2, stepsPerBar: 8, density: 0.65, seed: Math.floor(Math.random() * 1e9) });
+    setPianoRollNotes(riff.map((n, i) => ({
+      id: `riff-${Date.now()}-${i}`,
+      pitch: n.pitch, startTime: n.startTime, duration: n.duration, velocity: n.velocity, selected: false,
+    })));
+  }, [riffScale]);
 
   // ===== NEW PRO FEATURES =====
   // Built-in effects visual UI
@@ -4120,6 +4181,16 @@ const Imosion: React.FC = () => {
             osc.type = 'sawtooth';
             osc.frequency.value = midiToFreq(note.pitch);
             gain.gain.value = (note.velocity / 127) * 0.15;
+            // Glide Notes: a slide note glides in pitch from the previous note.
+            let slidePrevPitch: number | null = null;
+            if (note.slide) {
+              let bestEnd = -Infinity;
+              for (const n of pianoRollNotes) {
+                if (n.id === note.id) continue;
+                const end = n.startTime + n.duration;
+                if (end <= note.startTime + 0.001 && end > bestEnd) { bestEnd = end; slidePrevPitch = n.pitch; }
+              }
+            }
 
             // ADSR envelope
             const attackTime = 0.01;
@@ -4137,6 +4208,11 @@ const Imosion: React.FC = () => {
               osc.stop(playStartTime + remaining);
             } else {
               const when = playStartTime + (noteStartSec - cursorTime);
+              if (slidePrevPitch != null) {
+                const glideT = Math.min(0.12, noteDurSec * 0.25);
+                osc.frequency.setValueAtTime(midiToFreq(slidePrevPitch), when);
+                osc.frequency.exponentialRampToValueAtTime(midiToFreq(note.pitch), when + glideT);
+              }
               gain.gain.setValueAtTime(0, when);
               gain.gain.linearRampToValueAtTime((note.velocity / 127) * 0.15, when + attackTime);
               gain.gain.setTargetAtTime(0, when + noteDurSec - releaseTime, 0.02);
@@ -5913,6 +5989,11 @@ const Imosion: React.FC = () => {
                   <input type="range" min="0" max="100" value={beatSwing} onChange={e => setBeatSwing(Number(e.target.value))} style={{ width: 60 }} />
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', width: 24, textAlign: 'right' }}>{beatSwing}%</span>
                 </div>
+                <select aria-label="Drum genre" value={drumGenre} onChange={e => setDrumGenre(e.target.value as DrumGenre)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '9px', padding: '3px var(--space-2)', cursor: 'pointer' }}>
+                  {DRUM_GENRES.map(gn => <option key={gn} value={gn}>{gn.charAt(0).toUpperCase() + gn.slice(1)}</option>)}
+                </select>
+                <button aria-label="Session Performer — generate a drum pattern" title="Session Performer: generate a pattern in this genre" onClick={performBeat} style={{ padding: '3px var(--space-2)', background: 'rgba(48,209,88,0.12)', border: '1px solid rgba(48,209,88,0.25)', borderRadius: '3px', color: 'var(--color-success)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Perform</button>
+                <button aria-label="Vary — make a variation of the current pattern" title="Variant System: create a variation of the current pattern" onClick={() => setBeatGrid(g => varyPattern(g, 0.5, Math.floor(Math.random() * 1e9)))} style={{ padding: '3px var(--space-2)', background: 'rgba(94,92,230,0.12)', border: '1px solid rgba(94,92,230,0.25)', borderRadius: '3px', color: '#9b99ff', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Vary</button>
                 <button aria-label="Randomize" onClick={randomizeBeatPattern} style={{ padding: '3px var(--space-2)', background: 'rgba(255,159,10,0.1)', border: '1px solid rgba(255,159,10,0.2)', borderRadius: '3px', color: 'var(--color-warning)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Random</button>
                 <button aria-label="Clear" onClick={clearBeatPattern} style={{ padding: '3px var(--space-2)', background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Clear</button>
                 <button aria-label={beatPlaying ? 'Stop' : 'Play'} onClick={beatPlaying ? stopBeatSequencer : startBeatSequencer} style={{ padding: '3px 10px', background: beatPlaying ? 'rgba(255,69,58,0.2)' : 'rgba(48,209,88,0.15)', border: `1px solid ${beatPlaying ? 'rgba(255,69,58,0.3)' : 'rgba(48,209,88,0.3)'}`, borderRadius: '3px', color: beatPlaying ? 'var(--color-error)' : 'var(--color-success)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>{beatPlaying ? 'Stop' : 'Play'}</button>
@@ -5955,10 +6036,11 @@ const Imosion: React.FC = () => {
                       return (
                         <div
                           key={ci}
-                          onClick={() => toggleBeatCell(ri, ci)}
+                          onMouseDown={() => beatCellDown(ri, ci)}
+                          onMouseEnter={() => beatCellEnter(ri, ci)}
                           onContextMenu={e => { e.preventDefault(); if (active) setBeatVelocities(v => { const nv = v.map(r => [...r]); nv[ri][ci] = nv[ri][ci] > 0.5 ? 0.3 : nv[ri][ci] > 0.2 ? 1 : 0.8; return nv; }); }}
                           style={{
-                            width: 28, minWidth: 28, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                            width: 28, minWidth: 28, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none',
                             background: isPlayhead ? 'rgba(48,209,88,0.06)' : isBeat ? 'rgba(255,255,255,0.015)' : 'transparent',
                             borderRight: ci % 4 === 3 ? '1px solid var(--color-bg-hover)' : '1px solid var(--color-border-subtle)',
                           }}
@@ -6095,6 +6177,10 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <button aria-label="Select All" onClick={() => setPianoRollSelectedNotes(new Set(pianoRollNotes.map(n => n.id)))} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Select All</button>
+                <select aria-label="Riff scale" value={riffScale} onChange={e => setRiffScale(e.target.value as RiffScale)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', padding: '4px var(--space-2)', cursor: 'pointer' }}>
+                  {RIFF_SCALES.map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                </select>
+                <button aria-label="Idea Forge — generate a riff" title="Idea Forge: generate a melodic riff in this scale" onClick={forgeRiff} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(48,209,88,0.25)', background: 'rgba(48,209,88,0.12)', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Idea Forge</button>
                 <button aria-label="Delete Selected" onClick={() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>Delete</button>
                 <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.1)', color: '#bf5af2', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
                 <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(100,210,255,0.3)', background: showChordTrigger ? 'rgba(100,210,255,0.2)' : 'transparent', color: showChordTrigger ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
@@ -6175,8 +6261,8 @@ const Imosion: React.FC = () => {
                     const isSelected = pianoRollSelectedNotes.has(note.id);
                     const velocityAlpha = 0.4 + (note.velocity / 127) * 0.6;
                     return (
-                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: isSelected ? 'rgba(255,149,0,0.85)' : `rgba(191,90,242,${velocityAlpha})`, borderRadius: '2px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: isSelected ? '1px solid #ff9f0a' : '1px solid var(--color-border)', boxShadow: isSelected ? '0 0 6px rgba(255,149,0,0.3)' : 'none', transition: 'box-shadow 0.1s' }}
-                        onClick={e => { e.stopPropagation(); if (pianoRollTool === 'select') { const newSel = new Set(e.shiftKey ? pianoRollSelectedNotes : []); if (newSel.has(note.id)) newSel.delete(note.id); else newSel.add(note.id); setPianoRollSelectedNotes(newSel); } else if (pianoRollTool === 'erase') { setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); } }}
+                      <div key={note.id} title={note.slide ? 'Glide note (Alt+click to toggle)' : 'Alt+click to make a glide note'} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: isSelected ? 'rgba(255,149,0,0.85)' : note.slide ? `rgba(100,210,255,${velocityAlpha})` : `rgba(191,90,242,${velocityAlpha})`, borderRadius: '2px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: isSelected ? '1px solid #ff9f0a' : note.slide ? '1px solid #64d2ff' : '1px solid var(--color-border)', boxShadow: note.slide ? '0 0 6px rgba(100,210,255,0.4)' : isSelected ? '0 0 6px rgba(255,149,0,0.3)' : 'none', transition: 'box-shadow 0.1s' }}
+                        onClick={e => { e.stopPropagation(); if (e.altKey) { setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, slide: !n.slide } : n)); return; } if (pianoRollTool === 'select') { const newSel = new Set(e.shiftKey ? pianoRollSelectedNotes : []); if (newSel.has(note.id)) newSel.delete(note.id); else newSel.add(note.id); setPianoRollSelectedNotes(newSel); } else if (pianoRollTool === 'erase') { setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); } }}
                       >
                         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '4px', cursor: 'ew-resize', borderRadius: '0 2px 2px 0' }} onMouseDown={e => { e.stopPropagation(); setPianoRollDrag({ type: 'resize', noteId: note.id, startX: e.clientX, startY: e.clientY, startTime: note.startTime }); }} />
                         <span style={{ fontSize: '6px', color: 'var(--color-text-secondary)', padding: '0 2px', lineHeight: `${noteHeight - 1}px`, overflow: 'hidden', whiteSpace: 'nowrap', userSelect: 'none' }}>{midiNoteName(note.pitch)}</span>

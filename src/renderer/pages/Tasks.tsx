@@ -824,7 +824,7 @@ export const Tasks: React.FC = () => {
 
         {/* Add Task */}
         <div style={styles.addTask}>
-          <div style={styles.checkbox} />
+          <div style={{ ...styles.checkbox, cursor: 'default' }} aria-hidden="true" />
           <input
             type="text"
             placeholder="Add a task"
@@ -1075,7 +1075,7 @@ export const Tasks: React.FC = () => {
                           {sub.completed && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
                         </button>
                         <span style={{ flex: 1, fontSize: 12, color: 'var(--color-text-primary)', textDecoration: sub.completed ? 'line-through' : 'none', opacity: sub.completed ? 0.5 : 1 }}>{sub.title}</span>
-                        <button onClick={() => deleteSubtask(task.id, sub.id)} aria-label={`Delete subtask ${sub.title}`} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 14, cursor: 'pointer' }}><DexIcon name="close" size={14} /></button>
+                        <button onClick={() => deleteSubtask(task.id, sub.id)} aria-label={`Delete subtask ${sub.title}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}><DexIcon name="close" size={14} /></button>
                       </div>
                     ))}
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -1328,7 +1328,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-muted)',
-    fontSize: '18px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },

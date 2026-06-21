@@ -1422,19 +1422,29 @@ fn notifications_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -
 /// one subsystem at a time; anything not yet ported returns `null`, so the UI
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
-fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+    // Run OFF the UI thread. A synchronous `#[tauri::command]` executes on the main
+    // thread, so the renderer's boot-time flood of IPC calls — SQLite, filesystem,
+    // sysinfo, all blocking — froze the webview ("DEX not responding"). Hopping onto
+    // the blocking thread pool keeps the event loop free; calls still serialize on
+    // the shared DB mutex, but never on the UI thread.
+    //
     // Panic guard: a single ported module that panics must NOT crash the app — it
     // degrades to null (same as an unported channel). Recovered panics are logged.
     let ch_for_log = channel.clone();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        dex_ipc_impl(app, window, channel, args)
-    })) {
-        Ok(v) => v,
-        Err(_) => {
-            eprintln!("[dex_ipc] recovered from panic in channel: {ch_for_log}");
-            Value::Null
+    tauri::async_runtime::spawn_blocking(move || {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            dex_ipc_impl(app, window, channel, args)
+        })) {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("[dex_ipc] recovered from panic in channel: {ch_for_log}");
+                Value::Null
+            }
         }
-    }
+    })
+    .await
+    .unwrap_or(Value::Null)
 }
 
 fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {

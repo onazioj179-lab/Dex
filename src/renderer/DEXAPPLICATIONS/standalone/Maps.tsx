@@ -20,6 +20,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DexIcon from '../../components/DexIcon';
+import { DexSearchInput } from '../../styles/components';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 
@@ -176,23 +177,15 @@ const DexMaps: React.FC = () => {
 
       {/* Search */}
       <div style={{ position: 'absolute', top: 12, left: 12, width: 'min(320px, calc(100% - 24px))', zIndex: 5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38, padding: '0 12px',
-          background: 'var(--color-bg-glass-strong, rgba(26,26,30,0.9))', backdropFilter: 'var(--blur-lg)', WebkitBackdropFilter: 'var(--blur-lg)',
-          border: '1px solid var(--color-border)', borderRadius: 10 }}>
-          <DexIcon name="search" size={15} color="var(--color-text-tertiary)" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search places"
-            aria-label="Search places"
-            style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--color-text-primary)', fontSize: 13 }}
-          />
-          {searching && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" aria-hidden style={{ animation: 'spin 0.8s linear infinite' }}>
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-          )}
-        </div>
+        <DexSearchInput
+          fullWidth
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onClear={() => { setQuery(''); setResults([]); }}
+          loading={searching}
+          placeholder="Search places"
+          aria-label="Search places"
+        />
         {results.length > 0 && (
           <div role="listbox" aria-label="Search results" style={{ marginTop: 6, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
             {results.map((r, i) => (
@@ -203,6 +196,11 @@ const DexMaps: React.FC = () => {
                 {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{r.detail}</span>}
               </button>
             ))}
+          </div>
+        )}
+        {query.trim() && !searching && results.length === 0 && (
+          <div role="status" style={{ marginTop: 6, padding: '10px 12px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: 'var(--shadow-lg)', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+            No places found
           </div>
         )}
       </div>
@@ -225,10 +223,12 @@ const DexMaps: React.FC = () => {
 
       {/* Basemap style toggle */}
       <button aria-label={`Switch to ${MAP_STYLES[styleKey === 'liberty' ? 'positron' : 'liberty'].label} basemap`}
+        title={`Switch to ${MAP_STYLES[styleKey === 'liberty' ? 'positron' : 'liberty'].label} basemap`}
         onClick={() => setStyleKey(k => (k === 'liberty' ? 'positron' : 'liberty'))}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}
         style={{ position: 'absolute', left: 12, bottom: 28, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6,
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10,
-          color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', zIndex: 5 }}>
+          color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'background 0.12s ease', zIndex: 5 }}>
         <DexIcon name="layers" size={14} />
         {MAP_STYLES[styleKey].label}
       </button>

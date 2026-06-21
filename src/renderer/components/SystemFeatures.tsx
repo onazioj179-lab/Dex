@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useCallback, useState, memo } from 'react';
+import { DexSearchInput } from '../styles/components';
 import { useAppSubsystem } from '../store/appSubsystem';
 import { initializeTheme, toggleTheme, getCurrentTheme } from './ThemeManager';
 import { notify } from '../services/notify';
@@ -257,13 +258,6 @@ const launcherStyles: Record<string, React.CSSProperties> = {
     boxShadow: 'var(--pg-shadow-modal), 0 0 0 0.5px var(--color-bg-hover)',
     overflow: 'hidden',
   },
-  input: {
-    width: '100%', padding: '14px 18px',
-    background: 'transparent', border: 'none', outline: 'none',
-    fontSize: 17, fontWeight: 300, letterSpacing: '-0.01em',
-    color: 'var(--color-text-primary, #fff)',
-    borderBottom: '1px solid var(--color-border-subtle, var(--color-border-subtle))',
-  },
   results: {
     maxHeight: 340, overflowY: 'auto' as const, padding: '4px 0',
   },
@@ -330,14 +324,17 @@ const GlobalSearchOverlay: React.FC<GlobalSearchOverlayProps> = memo(({ onClose,
   return (
     <div style={launcherStyles.overlay} onMouseDown={onClose}>
       <div style={launcherStyles.container} onMouseDown={e => e.stopPropagation()}>
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search"
-          autoFocus
-          style={launcherStyles.input}
-        />
+        <div style={{ padding: '12px 12px', borderBottom: '1px solid var(--color-border-subtle, var(--color-border-subtle))' }}>
+          <DexSearchInput
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onClear={() => setQuery('')}
+            placeholder="Search"
+            aria-label="Global search"
+            autoFocus
+            fullWidth
+          />
+        </div>
         <div style={launcherStyles.results}>
           {results.map(item => (
             <button

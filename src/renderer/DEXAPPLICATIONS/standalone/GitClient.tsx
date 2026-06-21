@@ -73,6 +73,11 @@ const rowStyle: React.CSSProperties = {
   background: 'var(--color-bg-surface)',
 };
 
+// glassButton has no :disabled CSS, so a disabled button otherwise stays fully
+// lit with a pointer cursor. Match the standalone-app convention for the visual.
+const disabledVisual = (off: boolean): React.CSSProperties =>
+  off ? { opacity: 0.5, cursor: 'not-allowed' } : {};
+
 export default function GitClient(): React.ReactElement {
   const bridge = useMemo(getBridge, []);
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -178,7 +183,7 @@ export default function GitClient(): React.ReactElement {
         <span title={m.title} style={{ width: 18, textAlign: 'center', fontWeight: 700, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.ch}</span>
         <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{f.path}</span>
         <button
-          style={{ ...glassButton, padding: '2px 10px', fontSize: 12 }}
+          style={{ ...glassButton, padding: '2px 10px', fontSize: 12, ...disabledVisual(busy) }}
           disabled={busy}
           onClick={() => toggleStage(f)}
           aria-label={f.staged ? `Unstage ${f.path}` : `Stage ${f.path}`}
@@ -214,14 +219,14 @@ export default function GitClient(): React.ReactElement {
               value={branches.current ?? ''}
               disabled={busy}
               onChange={(e) => { const b = e.target.value; if (b && b !== branches.current) void run(() => bridge!.checkout(repoPath, b), `Switched to ${b}`); }}
-              style={{ ...glassButton, padding: '4px 8px', fontSize: 12 }}
+              style={{ ...glassButton, padding: '4px 8px', fontSize: 12, ...disabledVisual(busy) }}
             >
               {branches.branches.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           )}
-          {status?.isRepo && <button style={glassButton} disabled={busy} onClick={() => run(() => bridge!.pull(repoPath), 'Pulled')}>Pull</button>}
-          {status?.isRepo && <button style={glassButton} disabled={busy} onClick={() => run(() => bridge!.push(repoPath), 'Pushed')}>Push</button>}
-          <button style={glassButton} disabled={busy || !repoPath} onClick={() => refresh()}>Refresh</button>
+          {status?.isRepo && <button style={{ ...glassButton, ...disabledVisual(busy) }} disabled={busy} onClick={() => run(() => bridge!.pull(repoPath), 'Pulled')}>Pull</button>}
+          {status?.isRepo && <button style={{ ...glassButton, ...disabledVisual(busy) }} disabled={busy} onClick={() => run(() => bridge!.push(repoPath), 'Pushed')}>Push</button>}
+          <button style={{ ...glassButton, ...disabledVisual(busy || !repoPath) }} disabled={busy || !repoPath} onClick={() => refresh()}>Refresh</button>
         </div>
       </header>
 
@@ -239,7 +244,7 @@ export default function GitClient(): React.ReactElement {
             color: 'var(--color-text-primary)', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12,
           }}
         />
-        <button style={glassButton} disabled={busy || !pending.trim()} onClick={openRepo}>Open</button>
+        <button style={{ ...glassButton, ...disabledVisual(busy || !pending.trim()) }} disabled={busy || !pending.trim()} onClick={openRepo}>Open</button>
       </div>
 
       {note && <div role="status" aria-live="polite" className="text-sm break-words" style={{ color: 'var(--color-text-secondary)' }}>{note}</div>}
@@ -266,9 +271,9 @@ export default function GitClient(): React.ReactElement {
                 Changes {status ? `(${status.files.length})` : ''}
               </h2>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12 }} disabled={busy || unstaged.length === 0}
+                <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12, ...disabledVisual(busy || unstaged.length === 0) }} disabled={busy || unstaged.length === 0}
                   onClick={() => run(() => bridge!.stage(repoPath, unstaged.map(f => f.path)), 'Staged all')}>Stage all</button>
-                <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12 }} disabled={busy || staged.length === 0}
+                <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12, ...disabledVisual(busy || staged.length === 0) }} disabled={busy || staged.length === 0}
                   onClick={() => run(() => bridge!.unstage(repoPath, staged.map(f => f.path)), 'Unstaged all')}>Unstage all</button>
               </div>
             </div>
@@ -308,7 +313,7 @@ export default function GitClient(): React.ReactElement {
               }}
             />
             <button
-              style={{ ...glassButton, alignSelf: 'flex-start', padding: '6px 16px', borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}
+              style={{ ...glassButton, alignSelf: 'flex-start', padding: '6px 16px', borderColor: 'var(--color-accent)', color: 'var(--color-accent)', ...disabledVisual(busy || staged.length === 0 || !message.trim()) }}
               disabled={busy || staged.length === 0 || !message.trim()}
               onClick={commit}
             >

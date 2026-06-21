@@ -193,11 +193,11 @@ const QRCodeGenerator: React.FC = () => {
         <div style={s.colorRow}>
           <label style={s.colorLabel}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>FG</span>
-            <input type="color" value={fgColor} onChange={e => setFgColor(e.target.value)} style={s.colorInput} />
+            <input type="color" value={fgColor} onChange={e => setFgColor(e.target.value)} style={s.colorInput} title="Foreground color" aria-label="Foreground color" />
           </label>
           <label style={s.colorLabel}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>BG</span>
-            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={s.colorInput} />
+            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={s.colorInput} title="Background color" aria-label="Background color" />
           </label>
         </div>
       </div>

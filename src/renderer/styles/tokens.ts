@@ -159,9 +159,9 @@ export const transition = {
 // Native chrome tokens (mirror design-tokens.css — keep in sync)
 // ---------------------------------------------------------------------------
 
-/** System font stack for app chrome — never a web font. SF Pro / Segoe UI / Inter. */
+/** System font stack for app chrome — never a web font. SF Pro / Segoe UI Variable. */
 export const fontStack = {
-  ui: '-apple-system, "Segoe UI Variable", "Segoe UI", system-ui, Inter, sans-serif',
+  ui: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
   mono: '"SF Mono", "Cascadia Code", "Berkeley Mono", ui-monospace, "Roboto Mono", monospace',
 } as const;
 

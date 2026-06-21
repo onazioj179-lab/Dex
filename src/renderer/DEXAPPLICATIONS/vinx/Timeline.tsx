@@ -110,8 +110,17 @@ const TimelineRuler: React.FC<{
     canvas.height = RULER_HEIGHT * dpr;
     ctx.scale(dpr, dpr);
 
+    // Canvas 2D context cannot resolve var(--token) strings, so read the design
+    // tokens to literals once per draw and reuse them for every fill/stroke below.
+    const cs = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
+      ? getComputedStyle(document.documentElement) : null;
+    const token = (name: string, fb: string) => (cs?.getPropertyValue(name).trim() || fb);
+    const bgBase = token('--color-bg-base', '#0C0C0E');
+    const textTertiary = token('--color-text-tertiary', '#8A8A8E');
+    const bgHover = token('--color-bg-hover', 'rgba(255,255,255,0.08)');
+
     ctx.clearRect(0, 0, width, RULER_HEIGHT);
-    ctx.fillStyle = 'var(--color-bg-base)';
+    ctx.fillStyle = bgBase;
     ctx.fillRect(0, 0, width, RULER_HEIGHT);
 
     const ppf = PIXELS_PER_FRAME_BASE * zoom;
@@ -133,12 +142,12 @@ const TimelineRuler: React.FC<{
       ctx.beginPath();
       ctx.moveTo(x, RULER_HEIGHT);
       ctx.lineTo(x, isMajor ? 4 : RULER_HEIGHT - 6);
-      ctx.strokeStyle = isMajor ? 'var(--color-text-tertiary)' : 'var(--color-bg-hover)';
+      ctx.strokeStyle = isMajor ? textTertiary : bgHover;
       ctx.lineWidth = 1;
       ctx.stroke();
 
       if (isMajor) {
-        ctx.fillStyle = 'var(--color-text-tertiary)';
+        ctx.fillStyle = textTertiary;
         ctx.font = '9px "SF Mono", "Cascadia Code", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(formatTimecode(f, frameRate), x, 12);
@@ -161,7 +170,7 @@ const TimelineRuler: React.FC<{
     ctx.beginPath();
     ctx.moveTo(0, RULER_HEIGHT - 0.5);
     ctx.lineTo(width, RULER_HEIGHT - 0.5);
-    ctx.strokeStyle = 'var(--color-bg-hover)';
+    ctx.strokeStyle = bgHover;
     ctx.lineWidth = 1;
     ctx.stroke();
   }, [zoom, scrollX, width, frameRate, currentFrame, duration]);

@@ -18,6 +18,8 @@ import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/Cont
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { validateWorkflow } from '../../shared/workflow/validate';
+import { useNotesStore } from '../store/notesStore';
+import { useClipboardStore } from '../store/clipboardStore';
 
 // ===========================================================================
 // TYPES
@@ -728,39 +730,42 @@ export const Workflows: React.FC = () => {
       const node = nodes.find(n => n.id === nodeId);
       if (node) {
         try {
+          // Nodes carry ACTION_BLOCKS catalog ids (a1..a60) -- NOT kebab-case
+          // ids. Switch on those ids, reading each node's real config keys, so
+          // the per-action logic actually runs instead of falling through.
           switch (node.actionId) {
-            case 'get-files': {
-              const folder = node.config.folder || 'documents';
+            case 'a1': { // Get Files (config: path, filter)
+              const folder = node.config.path || 'documents';
               if (window.electron?.invoke) {
                 const res = await window.electron.invoke('files:list', folder);
                 context.files = res?.files || [];
               }
               break;
             }
-            case 'copy-file': {
+            case 'a2': { // Copy File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
-              const dest = node.config.destination || '';
+              const dest = node.config.dest || '';
               if (src && dest && window.electron?.invoke) {
                 await window.electron.invoke('files:copy', src, dest);
               }
               break;
             }
-            case 'move-file': {
+            case 'a3': { // Move File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
-              const dest = node.config.destination || '';
+              const dest = node.config.dest || '';
               if (src && dest && window.electron?.invoke) {
                 await window.electron.invoke('files:move', src, dest);
               }
               break;
             }
-            case 'delete-file': {
+            case 'a11': { // Delete File (config: path)
               const path = node.config.path || context.files?.[0]?.path;
               if (path && window.electron?.invoke) {
                 await window.electron.invoke('files:delete', path);
               }
               break;
             }
-            case 'rename-file': {
+            case 'a12': { // Rename File (config: path, newName)
               const path = node.config.path || '';
               const newName = node.config.newName || '';
               if (path && newName && window.electron?.invoke) {
@@ -768,8 +773,22 @@ export const Workflows: React.FC = () => {
               }
               break;
             }
-            case 'run-script': {
-              const script = node.config.script || '';
+            case 'a36': { // Open File with default app (config: path)
+              const path = node.config.path || context.files?.[0]?.path;
+              if (path && window.electron?.invoke) {
+                await window.electron.invoke('shell:openPath', path);
+              }
+              break;
+            }
+            case 'a35': { // Open URL (config: url)
+              const url = node.config.url || '';
+              if (url && window.electron?.invoke) {
+                await window.electron.invoke('shell:openPath', url);
+              }
+              break;
+            }
+            case 'a7': { // Run Script (config: language, code)
+              const script = node.config.code || '';
               if (script && window.electron?.invoke) {
                 const res = await window.electron.invoke('workflow:runScript', script);
                 context.output = res?.output || '';
@@ -777,36 +796,272 @@ export const Workflows: React.FC = () => {
               }
               break;
             }
-            case 'open-app': {
+            case 'a8': { // Open App (config: appName)
               const app = node.config.appName || '';
               if (app && window.electron?.invoke) {
                 await window.electron.invoke('shell:openPath', app);
               }
               break;
             }
-            case 'wait': {
-              const ms = Math.min(parseInt(node.config.duration || '1000', 10), 30000);
+            case 'a6': { // Wait (config: seconds)
+              const seconds = parseFloat(node.config.seconds || '1');
+              const ms = Math.min(Math.max(seconds, 0) * 1000, 30000);
               await new Promise(resolve => setTimeout(resolve, ms));
               break;
             }
-            case 'condition': {
+            case 'a9': { // Condition (config: variable, operator, value)
               const condVal = node.config.variable ? context[node.config.variable] : context.result;
               const condOp = node.config.operator || 'exists';
               const condMet = condOp === 'exists' ? !!condVal :
                               condOp === 'empty' ? !condVal :
-                              condOp === 'equals' ? String(condVal) === node.config.value : true;
+                              condOp === 'equals' ? String(condVal) === node.config.value :
+                              condOp === 'not equals' ? String(condVal) !== node.config.value :
+                              condOp === 'contains' ? String(condVal ?? '').includes(node.config.value || '') :
+                              condOp === 'greater than' ? Number(condVal) > Number(node.config.value) :
+                              condOp === 'less than' ? Number(condVal) < Number(node.config.value) : true;
               context.conditionResult = condMet;
               break;
             }
-            case 'loop': {
-              // Loop sets iteration count in context
+            case 'a10': { // Loop (config: count)
               context.loopCount = Math.min(parseInt(node.config.count || '1', 10), 100);
               break;
             }
-            case 'create-note':
-            case 'send-message':
+
+            // ---- Notes (run in the renderer via the Notes store) ----
+            case 'a4': { // Create Note (config: title, content)
+              const title = (node.config.title || 'Untitled').trim();
+              const body = node.config.content || '';
+              const store = useNotesStore.getState();
+              const id = await store.createNote();
+              if (id) {
+                const doc = JSON.stringify({
+                  type: 'doc',
+                  content: body.split('\n').map((line) => ({
+                    type: 'paragraph',
+                    content: line ? [{ type: 'text', text: line }] : [],
+                  })),
+                });
+                await store.updateNote(id, { title, plain_text: body, content: doc });
+                context.result = id;
+                context.output = body;
+              }
+              break;
+            }
+            case 'a20': { // Append to Note (config: title, content)
+              const title = (node.config.title || '').trim().toLowerCase();
+              const addition = node.config.content || '';
+              const store = useNotesStore.getState();
+              const match = store.notes.find(n => (n.title || '').trim().toLowerCase() === title);
+              if (match && addition) {
+                await store.loadNote(match.id);
+                const existing = store.activeNote?.id === match.id
+                  ? (store.activeNote.plain_text || '')
+                  : (match.plain_text || '');
+                const merged = existing ? `${existing}\n${addition}` : addition;
+                const doc = JSON.stringify({
+                  type: 'doc',
+                  content: merged.split('\n').map((line) => ({
+                    type: 'paragraph',
+                    content: line ? [{ type: 'text', text: line }] : [],
+                  })),
+                });
+                await store.updateNote(match.id, { plain_text: merged, content: doc });
+                context.result = match.id;
+                context.output = merged;
+              }
+              break;
+            }
+            case 'a21': { // Search Notes (config: query)
+              const query = node.config.query || '';
+              if (query) {
+                const store = useNotesStore.getState();
+                await store.search(query);
+                context.list = store.searchResults;
+                context.result = store.searchResults.length;
+              }
+              break;
+            }
+            case 'a22': { // Export Note (config: title, dest) -> Markdown content
+              const title = (node.config.title || '').trim().toLowerCase();
+              const store = useNotesStore.getState();
+              const match = store.notes.find(n => (n.title || '').trim().toLowerCase() === title);
+              if (match) {
+                const exported = await store.exportNote(match.id, 'markdown');
+                context.output = exported || '';
+                context.result = exported;
+              }
+              break;
+            }
+
+            // ---- Communication / feedback (renderer-capable) ----
+            case 'a5': { // Send Notification (config: title, body)
+              toast.info(node.config.title || 'Notification', node.config.body || '');
+              break;
+            }
+            case 'a25': { // Show Dialog (config: title, message, type)
+              const type = node.config.type || 'info';
+              const t = node.config.title || 'Dialog';
+              const m = node.config.message || '';
+              if (type === 'error') toast.error(t, m);
+              else if (type === 'warning') toast.warning(t, m);
+              else toast.info(t, m);
+              break;
+            }
+            case 'a24': { // Clipboard Copy (config: text)
+              const text = node.config.text || context.output || '';
+              if (text) {
+                try { await navigator.clipboard?.writeText(text); } catch { /* clipboard blocked */ }
+                useClipboardStore.getState().add(text, { sourceAppId: 'workflows', sourceAppName: 'Workflows' });
+                context.output = text;
+              }
+              break;
+            }
+            case 'a26': { // Play Sound (config: sound) -- short Web Audio tone
+              try {
+                const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+                if (Ctx) {
+                  const ac = new Ctx();
+                  const osc = ac.createOscillator();
+                  const gain = ac.createGain();
+                  const freq = node.config.sound === 'ping' ? 880
+                    : node.config.sound === 'pop' ? 440
+                    : node.config.sound === 'hero' ? 660
+                    : node.config.sound === 'glass' ? 1046 : 587;
+                  osc.frequency.value = freq;
+                  gain.gain.value = 0.08;
+                  osc.connect(gain); gain.connect(ac.destination);
+                  osc.start();
+                  setTimeout(() => { osc.stop(); ac.close().catch(() => {}); }, 160);
+                }
+              } catch { /* audio unavailable */ }
+              break;
+            }
+
+            // ---- Control / data plumbing (pure, renderer) ----
+            case 'a28': { // Stop Workflow
+              context.stopped = true;
+              break;
+            }
+            case 'a29': { // Set Variable (config: name, value)
+              if (node.config.name) context[node.config.name] = node.config.value ?? '';
+              break;
+            }
+
+            // ---- Scripting helpers that are pure (no OS / no eval of arbitrary code) ----
+            case 'a31': { // Evaluate Expression (config: expression) -- arithmetic only
+              const expr = (node.config.expression || '').trim();
+              if (expr && /^[\d\s+\-*/().%]+$/.test(expr)) {
+                try {
+                  // Restricted to a numeric/operator charset above, so this only
+                  // ever evaluates arithmetic -- no identifiers, calls, or access.
+                  // eslint-disable-next-line no-new-func
+                  const val = Function(`"use strict";return (${expr});`)();
+                  context.result = val;
+                  context.output = String(val);
+                } catch { /* invalid expression */ }
+              }
+              break;
+            }
+            case 'a32': { // Regular Expression (config: input, pattern, replace)
+              const input = node.config.input || context.output || '';
+              const pattern = node.config.pattern || '';
+              if (pattern) {
+                try {
+                  const re = new RegExp(pattern, 'g');
+                  if (node.config.replace !== undefined && node.config.replace !== '') {
+                    context.output = input.replace(re, node.config.replace);
+                  } else {
+                    const m = input.match(re);
+                    context.list = m || [];
+                    context.result = m;
+                  }
+                } catch { /* invalid pattern */ }
+              }
+              break;
+            }
+            case 'a33': { // JSON Parse (config: input)
+              const input = node.config.input || context.output || '';
+              if (input) {
+                try { context.result = JSON.parse(input); } catch { /* invalid JSON */ }
+              }
+              break;
+            }
+            case 'a34': { // JSON Stringify (config: variable)
+              const src = node.config.variable ? context[node.config.variable] : context.result;
+              try { context.output = JSON.stringify(src ?? null); } catch { /* circular */ }
+              break;
+            }
+
+            // ---- Text transforms (pure, renderer) ----
+            case 'a54': { // Find & Replace (config: find, replace)
+              const find = node.config.find || '';
+              if (find) {
+                context.output = String(context.output || '').split(find).join(node.config.replace || '');
+              }
+              break;
+            }
+            case 'a55': { // Split Text (config: delimiter)
+              const delim = node.config.delimiter ?? '';
+              context.list = String(context.output || '').split(delim === '' ? /\s+/ : delim);
+              context.result = context.list.length;
+              break;
+            }
+            case 'a56': { // Join Text (config: separator)
+              const sep = node.config.separator ?? '';
+              if (Array.isArray(context.list)) {
+                context.output = context.list.map((x: any) => String(x)).join(sep);
+              }
+              break;
+            }
+            case 'a57': { // Format Date (config: format) -- current date/time
+              const now = new Date();
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const Y = now.getFullYear(), M = pad(now.getMonth() + 1), D = pad(now.getDate());
+              const fmt = node.config.format || 'YYYY-MM-DD';
+              context.output =
+                fmt === 'MM/DD/YYYY' ? `${M}/${D}/${Y}` :
+                fmt === 'DD.MM.YYYY' ? `${D}.${M}.${Y}` :
+                fmt === 'ISO 8601' ? now.toISOString() :
+                `${Y}-${M}-${D}`;
+              break;
+            }
+
+            // ---- Data (pure list ops, renderer) ----
+            case 'a58': { // Sort List (config: order)
+              if (Array.isArray(context.list)) {
+                const sorted = [...context.list].sort((a: any, b: any) =>
+                  String(a).localeCompare(String(b)));
+                context.list = node.config.order === 'descending' ? sorted.reverse() : sorted;
+              }
+              break;
+            }
+            case 'a59': { // Filter List (config: operator, value)
+              if (Array.isArray(context.list)) {
+                const v = node.config.value || '';
+                const op = node.config.operator || 'contains';
+                context.list = context.list.filter((item: any) => {
+                  const s = String(item);
+                  if (op === 'starts with') return s.startsWith(v);
+                  if (op === 'ends with') return s.endsWith(v);
+                  if (op === 'matches regex') { try { return new RegExp(v).test(s); } catch { return false; } }
+                  return s.includes(v);
+                });
+                context.result = context.list.length;
+              }
+              break;
+            }
+            case 'a60': { // Count Items
+              const arr = Array.isArray(context.list) ? context.list
+                : Array.isArray(context.files) ? context.files : [];
+              context.result = arr.length;
+              context.output = String(arr.length);
+              break;
+            }
+
             default:
-              // Mark as handled -- these actions run server-side via IPC
+              // Remaining catalog actions (notes, communication, media, system,
+              // web, text, data, ...) run server-side via the workflow IPC
+              // executor invoked once after this loop. Mark as dispatched.
               context[`${node.actionId}_dispatched`] = true;
               break;
           }
@@ -819,6 +1074,9 @@ export const Workflows: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 300));
       setExecutingNodes(new Set());
       setExecutedNodes(prev => new Set([...prev, nodeId]));
+
+      // Stop Workflow (a28) halts the remaining steps.
+      if (context.stopped) break;
     }
 
     // Also run via IPC if available
@@ -827,7 +1085,7 @@ export const Workflows: React.FC = () => {
     }
 
     setIsRunning(false);
-  }, [nodes, connections, selectedWorkflow, runWorkflow]);
+  }, [nodes, connections, selectedWorkflow, runWorkflow, toast]);
 
   const formatLastRun = (date: Date | null): string => {
     if (!date) return 'Never run';
@@ -949,7 +1207,7 @@ export const Workflows: React.FC = () => {
                     <h3 style={styles.cardTitle}>{workflow.name}</h3>
                     <p style={styles.cardDescription}>{workflow.description || 'No description'}</p>
                     <div style={styles.cardFooter}>
-                      <span style={styles.cardMeta}>{workflow.nodes?.length || workflow.steps || 0} steps {formatLastRun(workflow.lastRun)}</span>
+                      <span style={styles.cardMeta}>{workflow.nodes?.length || workflow.steps || 0} steps · {formatLastRun(workflow.lastRun)}</span>
                       <button style={{ ...styles.runBtn, background: `${workflow.color}22`, border: `1px solid ${workflow.color}40`, color: workflow.color }} aria-label="Run workflow" onClick={() => runWorkflow(workflow.id)}>
                         {Icons.play}
                       </button>
@@ -995,13 +1253,13 @@ export const Workflows: React.FC = () => {
                   );
                 })()}
                 <button
-                  style={{ ...styles.backBtn, color: 'var(--color-text-muted)' }}
-                  onClick={() => setShowTemplates(!showTemplates)} aria-label="Templates"
+                  style={{ ...styles.backBtn, color: showTemplates ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+                  onClick={() => setShowTemplates(!showTemplates)} aria-label="Templates" aria-expanded={showTemplates}
                 >
                   {Icons.template} Templates
                 </button>
                 <button
-                  style={{ ...styles.runEditorBtn, opacity: isRunning || nodes.length === 0 ? 0.5 : 1 }}
+                  style={{ ...styles.runEditorBtn, opacity: isRunning || nodes.length === 0 ? 0.5 : 1, cursor: isRunning || nodes.length === 0 ? 'default' : 'pointer' }}
                   onClick={executeWorkflow}
                   disabled={isRunning || nodes.length === 0}
                   aria-label="Run workflow"

@@ -1248,6 +1248,46 @@ const UkiOverlay: React.FC = () => {
   const isActive = state === 'listening' || state === 'processing' || state === 'thinking' || state === 'speaking';
   const isVisible = isActive || showPanel || (showTranscript && (transcript || response));
 
+  // Esc closes the overlay. The textarea swallows Escape (blur only) so a key
+  // pressed inside the input never reaches here; this captures Escape from
+  // anywhere else while the overlay is visible and dismisses it cleanly.
+  useEffect(() => {
+    if (!isVisible) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const active = document.activeElement as HTMLElement | null;
+      // If focus is in the input, let its own handler blur first; a second
+      // Escape (input no longer focused) closes the panel.
+      if (active === inputRef.current) return;
+      e.preventDefault();
+      useUkiStore.getState().reset();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isVisible]);
+
+  // "Ask UKI about this" inbound bridge. Any surface (the global selection
+  // context menu, drag-drop, a command) can hand UKI text to act on by
+  // dispatching `window.dispatchEvent(new CustomEvent('uki:ask', { detail: { text } }))`.
+  // This mirrors the existing OUTBOUND uki:* event convention. We open the
+  // panel and SEED the input (not auto-send) so the user can frame the question
+  // around the supplied context, then focus the box. Attached once for the life
+  // of the always-mounted overlay.
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const text = ((e as CustomEvent).detail?.text ?? '').toString().trim();
+      useUkiStore.getState().openPanel();
+      if (text) setInputText(text);
+      // The input only exists once the panel renders; focus on the next frame.
+      window.setTimeout(() => {
+        const el = inputRef.current;
+        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      }, 60);
+    };
+    window.addEventListener('uki:ask', onAsk as EventListener);
+    return () => window.removeEventListener('uki:ask', onAsk as EventListener);
+  }, []);
+
   // Animate waveform bars via RAF when listening
   useEffect(() => {
     if (state !== 'listening') {
@@ -1444,7 +1484,12 @@ const UkiOverlay: React.FC = () => {
     // query instead of the bound input box.
     const text = (typeof override === 'string' ? override : inputText).trim();
     if (!text) return;
-    if (typeof override !== 'string') setInputText('');
+    if (typeof override !== 'string') {
+      setInputText('');
+      // Collapse the auto-grown textarea back to a single row; height is set
+      // imperatively in onChange, which won't fire on a programmatic clear.
+      if (inputRef.current) inputRef.current.style.height = 'auto';
+    }
     useUkiStore.getState().setError(null);
     // Reset thought trace and start a new reasoning chain.
     thoughtStepsRef.current = [];
@@ -1685,12 +1730,15 @@ const UkiOverlay: React.FC = () => {
     return () => window.removeEventListener('dex-uki-ask', onAsk as EventListener);
   }, [handleSendText]);
 
-  // Auto-scroll to bottom when content changes
+  // Auto-scroll to bottom when content changes. `streamingResponse`,
+  // `isThinking`, and `thoughtSteps` are included so the view follows live
+  // LLM token streaming and the thinking trace as they grow -- without them
+  // the response could overflow below the fold while the container stays put.
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [transcript, partialTranscript, response, conversationHistory]);
+  }, [transcript, partialTranscript, response, conversationHistory, streamingResponse, isThinking, thoughtSteps]);
 
   // Auto-hide after response shown for 8s (pauses on hover)
   useEffect(() => {
@@ -1804,7 +1852,10 @@ const UkiOverlay: React.FC = () => {
               background: speakResponses ? 'var(--color-accent-light)' : 'transparent',
               border: 'none', color: speakResponses ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
               cursor: 'pointer', flexShrink: 0,
+              transition: 'background 0.15s ease, color 0.15s ease',
             }}
+            onMouseEnter={e => { if (!speakResponses) { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; } }}
+            onMouseLeave={e => { if (!speakResponses) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; } }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -1822,7 +1873,10 @@ const UkiOverlay: React.FC = () => {
               width: 24, height: 22, borderRadius: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
+              transition: 'background 0.15s ease, color 0.15s ease',
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>
               <polyline points="6 9 12 15 18 9" />
@@ -1839,8 +1893,9 @@ const UkiOverlay: React.FC = () => {
               background: 'transparent', border: 'none',
               color: 'var(--color-text-tertiary)', cursor: 'pointer',
               fontSize: 14, lineHeight: 1,
+              transition: 'background 0.15s ease, color 0.15s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-border-subtle)'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
             onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
             aria-label="Dismiss UKI overlay"
           >
@@ -1898,7 +1953,10 @@ const UkiOverlay: React.FC = () => {
                       background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
                       fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4,
                       display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'inherit',
+                      transition: 'color 0.15s ease',
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
                   >
                     <span style={{ display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }}>{'\u25B8'}</span>
                     <span>{isOpen ? 'Hide thinking' : 'Show thinking'}</span>
@@ -2004,10 +2062,10 @@ const UkiOverlay: React.FC = () => {
 
           {/* Error message */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
-              padding: '6px var(--space-2)', background: 'var(--color-error-muted, rgba(255,69,58,0.08))',
-              borderRadius: 6, border: '1px solid var(--color-error-muted, rgba(255,69,58,0.15))',
+              padding: '6px var(--space-2)', background: 'var(--color-error-muted)',
+              borderRadius: 3, borderLeft: '2px solid var(--color-error)',
             }}>
               {error}
             </div>
@@ -2118,9 +2176,12 @@ const UkiOverlay: React.FC = () => {
                     role="option"
                     aria-selected={false}
                     onMouseDown={(e) => { e.preventDefault(); setInputText(m.cmd + ' '); inputRef.current?.focus(); }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     style={{
                       display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)',
                       padding: '4px var(--space-2)', borderRadius: 4, cursor: 'pointer',
+                      transition: 'background 0.12s ease',
                     }}
                   >
                     <span style={{ fontFamily: 'monospace', color: 'var(--color-accent)', fontWeight: 600 }}>{m.cmd}</span>
@@ -2182,7 +2243,8 @@ const UkiOverlay: React.FC = () => {
               background: (inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent',
               border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent'),
               cursor: (inputText.trim() && !isThinking) ? 'pointer' : 'default',
-              transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
+              opacity: (isThinking || state === 'processing' || state === 'thinking') ? 0.5 : 1,
+              transition: 'background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
               flexShrink: 0,
             }}
             aria-label={isThinking ? 'UKI is thinking' : 'Send to UKI'}

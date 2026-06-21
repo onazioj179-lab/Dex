@@ -21,6 +21,7 @@ import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { getAudioPlaybackService } from '../services/media/AudioPlaybackService';
 import { useNowPlaying } from '../services/nowPlaying';
+import { useAsyncResource } from '../utils/useAsyncResource';
 
 // ===========================================================================
 // TYPES
@@ -163,6 +164,38 @@ const saveFavorites = async (favs: string[]) => {
   } catch { /* backend save failed silently */ }
 };
 
+// Persisted user edits to track metadata, keyed by track id.
+// Same storage path as favorites: backend capability:storage with a localStorage fallback.
+type MetadataOverride = Partial<Pick<Track, 'title' | 'artist' | 'album' | 'genre' | 'year' | 'composer'>>;
+
+const loadMetadataOverrides = async (): Promise<Record<string, MetadataOverride>> => {
+  try {
+    if (window.dex?.invoke) {
+      const result = await window.dex?.invoke('capability:storage:get', 'dex-audio-metadata-overrides');
+      if (result) return JSON.parse(result);
+    }
+  } catch { /* storage unavailable */ }
+  // Fallback to localStorage
+  try {
+    const saved = localStorage.getItem('dex-audio-metadata-overrides');
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+};
+
+const saveMetadataOverrides = async (overrides: Record<string, MetadataOverride>) => {
+  const data = JSON.stringify(overrides);
+  localStorage.setItem('dex-audio-metadata-overrides', data);
+  try {
+    await window.dex?.invoke?.('capability:storage:set', 'dex-audio-metadata-overrides', data);
+  } catch { /* backend save failed silently */ }
+};
+
+// Merge persisted overrides onto a freshly-loaded track so user edits survive reload.
+const applyOverride = (track: Track, overrides: Record<string, MetadataOverride>): Track => {
+  const ov = overrides[track.id];
+  return ov ? { ...track, ...ov } : track;
+};
+
 // ===============================================================================
 // COMPONENT
 // ===============================================================================
@@ -190,7 +223,12 @@ export const Audio: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // `isLoading` (the library scan) is now provided by useAsyncResource below.
+  // Playback readiness, distinct from `isLoading` (which is the library scan).
+  // `isBuffering` shows a brief loading state while a track URL loads/buffers;
+  // `loadError` surfaces a 404 / decode failure instead of a silent "playing".
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -234,6 +272,8 @@ export const Audio: React.FC = () => {
   // Metadata editor state
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const [editMeta, setEditMeta] = useState({ title: '', artist: '', album: '', genre: '', year: '', composer: '' });
+  // Persisted user metadata edits, keyed by track id (loaded on mount, merged on load).
+  const metadataOverridesRef = useRef<Record<string, MetadataOverride>>({});
 
   const openMetadataEditor = useCallback((track: Track) => {
     setEditingTrack(track);
@@ -242,13 +282,21 @@ export const Audio: React.FC = () => {
 
   const saveMetadata = useCallback(() => {
     if (!editingTrack) return;
-    setTracks(prev => prev.map(t => t.id === editingTrack.id
-      ? { ...t, title: editMeta.title || t.title, artist: editMeta.artist || t.artist, album: editMeta.album || t.album, genre: editMeta.genre || t.genre, year: editMeta.year || t.year, composer: editMeta.composer || t.composer }
-      : t
-    ));
+    const patch: MetadataOverride = {
+      title: editMeta.title || editingTrack.title,
+      artist: editMeta.artist || editingTrack.artist,
+      album: editMeta.album || editingTrack.album,
+      genre: editMeta.genre || undefined,
+      year: editMeta.year || undefined,
+      composer: editMeta.composer || undefined,
+    };
+    setTracks(prev => prev.map(t => t.id === editingTrack.id ? { ...t, ...patch } : t));
     if (currentTrack?.id === editingTrack.id) {
-      setCurrentTrack(prev => prev ? { ...prev, title: editMeta.title || prev.title, artist: editMeta.artist || prev.artist, album: editMeta.album || prev.album, genre: editMeta.genre || undefined, year: editMeta.year || undefined, composer: editMeta.composer || undefined } : prev);
+      setCurrentTrack(prev => prev ? { ...prev, ...patch } : prev);
     }
+    // Persist the override keyed by track id so the edit survives reload.
+    metadataOverridesRef.current = { ...metadataOverridesRef.current, [editingTrack.id]: patch };
+    saveMetadataOverrides(metadataOverridesRef.current);
     setEditingTrack(null);
   }, [editingTrack, editMeta, currentTrack]);
 
@@ -335,18 +383,31 @@ export const Audio: React.FC = () => {
     const onError = () => {
       console.warn('[Audio] Playback error');
       setIsPlaying(false);
+      setIsBuffering(false);
+      // A failed src (404 / decode error) must not leave the UI showing "playing".
+      setLoadError(audio.error?.message || 'Could not play this track');
     };
+    // Buffering / readiness feedback so a slow load shows a loading state
+    // and a ready stream clears it (rather than a silent stall).
+    const onWaiting = () => setIsBuffering(true);
+    const onReady = () => { setIsBuffering(false); setLoadError(null); };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('canplay', onReady);
+    audio.addEventListener('playing', onReady);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('canplay', onReady);
+      audio.removeEventListener('playing', onReady);
       audio.pause();
       audio.src = '';
     };
@@ -394,10 +455,21 @@ export const Audio: React.FC = () => {
         console.warn('[Audio] Failed to initialize WebAudio:', err);
       }
     };
-    // AudioContext must be created after user gesture
-    const handler = () => { initWebAudio(); window.removeEventListener('click', handler); };
-    window.addEventListener('click', handler);
-    return () => { window.removeEventListener('click', handler); audioCtxRef.current?.close().catch((e: unknown) => { console.warn('[DEX]', e); }); };
+    // AudioContext must be created after a user gesture, but we don't need to
+    // wait for a real "play" — pre-build the node chain on the FIRST ambient
+    // gesture (pointer/key/click) so first playback has no setup latency.
+    // initWebAudio is idempotent (guards on audioCtxRef), so this runs once.
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'click'];
+    const handler = () => {
+      initWebAudio();
+      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+      events.forEach(ev => window.removeEventListener(ev, handler));
+    };
+    events.forEach(ev => window.addEventListener(ev, handler, { once: false }));
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, handler));
+      audioCtxRef.current?.close().catch((e: unknown) => { console.warn('[DEX]', e); });
+    };
   }, []);
 
   // Sync EQ band values to BiquadFilterNodes
@@ -548,50 +620,80 @@ export const Audio: React.FC = () => {
     return () => audio.removeEventListener('ended', handleEnded);
   }, [repeat, shuffle, currentTrack, filteredTracks]);
 
-  // Load tracks and favorites on mount - fast with timeout
+  // Load favorites on mount (independent of the track scan).
   React.useEffect(() => {
     let mounted = true;
-    const loadData = async () => {
-      // Quick load - don't block UI
+    (async () => {
       try {
         const loadedFavs = await loadFavorites();
         if (mounted) setFavorites(loadedFavs);
       } catch { if (mounted) toast.error('Failed to load favorites'); }
-      
-      // Load tracks in background with timeout
-      if (mounted) setIsLoading(true);
-      try {
-        const { tracks: loadedTracks, pendingEnrich } = await loadTracks();
-        if (mounted) {
-          setTracks(loadedTracks);
-          if (loadedTracks.length > 0) setCurrentTrack(loadedTracks[0]);
-          // Enrich remaining tracks in background and update state
-          if (pendingEnrich.length > 0) {
-            const enrichTrack = async (track: Track): Promise<Track> => {
-              try {
-                const meta = await loadAudioMetadata(track.id);
-                if (meta) {
-                  return { ...track, title: meta.title || track.title, artist: meta.artist || track.artist, album: meta.album || track.album, artwork: meta.artwork || track.artwork, genre: meta.genre, year: meta.year, composer: meta.composer, trackNumber: meta.trackNumber };
-                }
-              } catch { /* metadata parse failed */ }
-              return track;
-            };
-            Promise.all(pendingEnrich.map(enrichTrack)).then(enriched => {
-              if (mounted) {
-                setTracks(prev => {
-                  const enrichedMap = new Map(enriched.map(t => [t.id, t]));
-                  return prev.map(t => enrichedMap.get(t.id) || t);
-                });
-              }
-            }).catch(err => console.warn('[Audio] Background enrichment failed:', err));
-          }
-        }
-      } catch { if (mounted) toast.error('Failed to load audio library'); }
-      if (mounted) setIsLoading(false);
-    };
-    loadData();
+    })();
     return () => { mounted = false; };
   }, []);
+
+  // Initial track-list scan via the shared useAsyncResource hook (timeout +
+  // loading + error + reload). The loader resolves the override-merged base
+  // tracks plus the still-unenriched remainder; background ID3 enrichment is
+  // kicked off separately from the resolved data (see the effect below) so this
+  // hook stays the "primary load" only, exactly as documented.
+  // Timeout is set above loadTracks' own 3000ms internal soft-timeout (which
+  // resolves to an empty library rather than rejecting), so it only fires as a
+  // hard safety net for a genuinely hung IPC call.
+  // `reload` is intentionally not destructured: the Audio UI has no
+  // refresh/retry control to wire it to (the empty state is a drop/browse
+  // zone), and loadTracks already degrades to an empty library rather than
+  // surfacing a retryable error. Add `reload` here if such a control lands.
+  const {
+    data: trackLoad,
+    loading: isLoading,
+  } = useAsyncResource<{ tracks: Track[]; pendingEnrich: Track[] }>(
+    async (signal) => {
+      // Load persisted metadata edits first so they can be merged onto tracks
+      // as they load (and re-applied after background enrichment).
+      try {
+        metadataOverridesRef.current = await loadMetadataOverrides();
+      } catch { /* no overrides */ }
+      if (signal.aborted) return { tracks: [], pendingEnrich: [] };
+      const { tracks: loadedTracks, pendingEnrich } = await loadTracks();
+      const overrides = metadataOverridesRef.current;
+      return { tracks: loadedTracks.map(t => applyOverride(t, overrides)), pendingEnrich };
+    },
+    { timeoutMs: 8000 },
+  );
+
+  // Apply a completed track load: seed the list + current track, then enrich
+  // the remainder in the background (unchanged pipeline).
+  React.useEffect(() => {
+    if (!trackLoad) return;
+    let mounted = true;
+    const { tracks: mergedTracks, pendingEnrich } = trackLoad;
+    setTracks(mergedTracks);
+    if (mergedTracks.length > 0) setCurrentTrack(prev => prev ?? mergedTracks[0]);
+    // Enrich remaining tracks in background and update state
+    if (pendingEnrich.length > 0) {
+      const enrichTrack = async (track: Track): Promise<Track> => {
+        try {
+          const meta = await loadAudioMetadata(track.id);
+          if (meta) {
+            return { ...track, title: meta.title || track.title, artist: meta.artist || track.artist, album: meta.album || track.album, artwork: meta.artwork || track.artwork, genre: meta.genre, year: meta.year, composer: meta.composer, trackNumber: meta.trackNumber };
+          }
+        } catch { /* metadata parse failed */ }
+        return track;
+      };
+      Promise.all(pendingEnrich.map(enrichTrack)).then(enriched => {
+        if (mounted) {
+          const overrides = metadataOverridesRef.current;
+          setTracks(prev => {
+            // Re-apply persisted overrides so background enrichment never clobbers user edits.
+            const enrichedMap = new Map(enriched.map(t => [t.id, applyOverride(t, overrides)]));
+            return prev.map(t => enrichedMap.get(t.id) || t);
+          });
+        }
+      }).catch(err => console.warn('[Audio] Background enrichment failed:', err));
+    }
+    return () => { mounted = false; };
+  }, [trackLoad]);
 
   // Save favorites
   React.useEffect(() => {
@@ -612,26 +714,50 @@ export const Audio: React.FC = () => {
     setCurrentTrack(track);
     setProgress(0);
     setCurrentTime(0);
+    setLoadError(null);
+    setIsBuffering(true);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'audioTracksPlayed', amount: 1 } }));
     if (audioRef.current && (track.url || track.id)) {
       let src = track.url || track.id;
       if (!src.startsWith('http') && !src.startsWith('file://') && !src.startsWith('blob:') && !src.startsWith('data:')) {
         src = `file://${src.replace(/\\/g, '/')}`;
       }
+      // Crossfade fades the master gain out to 0 near a track's end. Ramp it
+      // back up so the incoming track fades IN rather than starting silent.
+      const mainGain = mainGainRef.current;
+      if (mainGain && audioCtxRef.current) {
+        const now = audioCtxRef.current.currentTime;
+        const fade = crossfadeDuration > 0 ? Math.min(crossfadeDuration, 1.5) : 0;
+        // Climb back to the current master level (system volume), not a hardcoded 1,
+        // so a fade-in never overrides a lowered system volume.
+        const target = Math.max(0.0001, mainGain.gain.value > 0.0001 ? mainGain.gain.value : 1);
+        mainGain.gain.cancelScheduledValues(now);
+        if (fade > 0) {
+          // Exponential ramps can't target/scale 0 — seed an epsilon then climb to the target.
+          mainGain.gain.setValueAtTime(0.0001, now);
+          mainGain.gain.exponentialRampToValueAtTime(target, now + fade);
+        } else {
+          mainGain.gain.setValueAtTime(target, now);
+        }
+      }
       audioRef.current.src = src;
       audioRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch(() => {
         setIsPlaying(false);
+        setIsBuffering(false);
+        setLoadError('Could not play this track');
       });
     } else {
+      setIsBuffering(false);
       setIsPlaying(true);
     }
-  }, []);
+  }, [crossfadeDuration]);
 
   const buildTrackCtxItems = useCallback((track: Track): ContextMenuItem[] => [
     { id: 'play', label: 'Play', onClick: () => playTrack(track) },
     { id: 'fav', label: favorites.includes(track.id) ? 'Remove from Favorites' : 'Add to Favorites', onClick: () => toggleFavorite(track.id) },
+    { id: 'queue', label: 'Add to Queue', onClick: () => { setQueue(prev => [...prev, track]); setShowQueue(true); } },
     { id: 'meta', label: 'Edit Metadata', onClick: () => openMetadataEditor(track) },
     { id: 'div1', label: '', divider: true },
     { id: 'imosion', label: 'Open in Imosion', onClick: () => {
@@ -657,7 +783,14 @@ export const Audio: React.FC = () => {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch((e: unknown) => { console.warn('[DEX]', e); });
+      setLoadError(null);
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch((e: unknown) => {
+          console.warn('[DEX]', e);
+          setIsPlaying(false);
+          setLoadError('Could not play this track');
+        });
     }
   }, [isPlaying, currentTrack]);
 
@@ -954,7 +1087,7 @@ export const Audio: React.FC = () => {
                 const groupKey = libraryView === 'artists' ? 'artist' : libraryView === 'albums' ? 'album' : 'artist';
                 const groups: Record<string, Track[]> = {};
                 tracks.forEach(t => {
-                  const key = libraryView === 'genres' ? (t.album?.charAt(0)?.toUpperCase() || '#') : (t[groupKey] || 'Unknown');
+                  const key = libraryView === 'genres' ? (t.genre || 'Unknown') : (t[groupKey] || 'Unknown');
                   if (!groups[key]) groups[key] = [];
                   groups[key].push(t);
                 });
@@ -1303,7 +1436,13 @@ export const Audio: React.FC = () => {
             </div>
             <div style={styles.nowPlayingInfo}>
               <span style={styles.nowPlayingTitle}>{currentTrack.title}</span>
-              <span style={styles.nowPlayingArtist}>{currentTrack.artist}</span>
+              {loadError ? (
+                <span style={{ ...styles.nowPlayingArtist, color: 'var(--color-error)' }}>{loadError}</span>
+              ) : isBuffering ? (
+                <span style={styles.nowPlayingArtist}>Loading…</span>
+              ) : (
+                <span style={styles.nowPlayingArtist}>{currentTrack.artist}</span>
+              )}
             </div>
             <button
               style={{...styles.controlBtn, color: favorites.includes(currentTrack.id) ? 'var(--color-error)' : 'var(--color-text-secondary)'}}
@@ -1327,9 +1466,17 @@ export const Audio: React.FC = () => {
               <button
                 style={styles.playBtn}
                 onClick={togglePlayPause}
-                aria-label={isPlaying ? 'Pause' : 'Play'}
+                aria-label={isBuffering ? 'Loading' : isPlaying ? 'Pause' : 'Play'}
+                aria-busy={isBuffering}
               >
-                {isPlaying ? Icons.pause : Icons.play}
+                {isBuffering && !loadError ? (
+                  <span style={{ display: 'flex', width: 20, height: 20 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'dex-audio-spin 0.8s linear infinite' }}>
+                      <path d="M12 3a9 9 0 1 0 9 9" />
+                    </svg>
+                    <style>{`@keyframes dex-audio-spin { to { transform: rotate(360deg); } }`}</style>
+                  </span>
+                ) : isPlaying ? Icons.pause : Icons.play}
               </button>
               <button style={styles.controlBtn} onClick={skipToNext} aria-label="Next track">{Icons.skipForward}</button>
               <button
@@ -1653,6 +1800,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     color: 'var(--color-text-muted)',
     textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums',
   },
   
   // Now Playing - Tahoe Glass Bar
@@ -1740,6 +1888,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     color: 'var(--color-text-muted)',
     width: '40px',
+    fontVariantNumeric: 'tabular-nums',
   },
   progressBar: {
     flex: 1,

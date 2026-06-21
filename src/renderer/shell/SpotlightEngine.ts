@@ -16,6 +16,7 @@
 import { sharedTick } from '../services/SharedTick';
 import { useXenonStore } from '../store/xenonStore';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useClipboardStore } from '../store/clipboardStore';
 import { useStageStore, STAGE_KIND_META, type StageKind } from '../store/stageStore';
 import { buildDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
@@ -32,6 +33,7 @@ export type SpotlightCategory =
   | 'projects'
   | 'workflows'
   | 'commands'
+  | 'clipboard'
   | 'screenshots'
   | 'conversations'
   | 'actions'
@@ -1013,6 +1015,34 @@ export class SpotlightEngine {
         }
       }
     } catch { /* ignore */ }
+
+    // Omni Clipboard -- recent clips are searchable; selecting copies the clip
+    // back onto the OS clipboard. Source/language flow into the search text so
+    // "copied from Notes" or "json" finds the right clip.
+    try {
+      const clips = useClipboardStore.getState().entries;
+      for (const clip of clips.slice(0, 30)) {
+        if (clip.kind === 'image') continue; // base64 data URLs aren't text-searchable
+        const kindLabel = clip.kind === 'code'
+          ? (clip.language?.toUpperCase() || 'Code')
+          : clip.kind.charAt(0).toUpperCase() + clip.kind.slice(1);
+        items.push({
+          id: `clip-${clip.id}`,
+          category: 'clipboard',
+          title: clip.preview || clip.content.slice(0, 80),
+          subtitle: clip.sourceAppName ? `${kindLabel} · ${clip.sourceAppName}` : kindLabel,
+          searchText: `${clip.content.slice(0, 200)} ${clip.sourceAppName || ''} ${clip.language || ''}`.toLowerCase(),
+          icon: 'clipboard',
+          color: 'var(--color-accent)',
+          action: () => {
+            try { void navigator.clipboard.writeText(clip.content); } catch { /* clipboard unavailable */ }
+            window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Copied to clipboard' } }));
+          },
+          frequency: this._usageFrequency.get(`clip-${clip.id}`) || 0,
+          lastUsed: clip.timestamp,
+        });
+      }
+    } catch { /* clipboard store unavailable */ }
 
     // Register built-in actions from apps
     for (const [, action] of this._actions) {

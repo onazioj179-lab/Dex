@@ -187,14 +187,19 @@ const Banner: React.FC<{
 
   // Swipe to dismiss
   const swipeStartRef = useRef<number | null>(null);
+  // Set once a gesture moves past a small threshold, so the synthetic click that
+  // follows pointerup doesn't fire the banner's onClick (deep-link) after a swipe.
+  const draggedRef = useRef(false);
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     swipeStartRef.current = e.clientX;
+    draggedRef.current = false;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (swipeStartRef.current === null) return;
     const dx = e.clientX - swipeStartRef.current;
+    if (dx > 4) draggedRef.current = true;
     if (dx > 0) setSwipeX(dx); // Only swipe right to dismiss
   }, []);
 
@@ -206,6 +211,12 @@ const Banner: React.FC<{
     }
     swipeStartRef.current = null;
   }, [swipeX, notification.id, onDismiss]);
+
+  const handleClick = useCallback(() => {
+    // Suppress the click that trails a swipe gesture; reset for the next one.
+    if (draggedRef.current) { draggedRef.current = false; return; }
+    onClick?.(notification);
+  }, [onClick, notification]);
 
   const iconColor = (() => {
     switch (notification.icon) {
@@ -240,7 +251,7 @@ const Banner: React.FC<{
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onClick={() => onClick?.(notification)}
+      onClick={handleClick}
       style={{
         width: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
         minHeight: 64,

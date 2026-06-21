@@ -161,6 +161,17 @@ class IdleContinuityService {
     window.dispatchEvent(new CustomEvent('dex-idle-continuity-change', {
       detail: { previous, current: next, snapshot: this.getSnapshot() },
     }));
+    // Best-effort: on deep idle, signal caches/apps to reclaim memory. Additive
+    // and non-breaking — any listener failure must not affect state handling.
+    if (next === 'extended-idle') {
+      try {
+        window.dispatchEvent(new CustomEvent('dex-reclaim-idle', {
+          detail: { snapshot: this.getSnapshot() },
+        }));
+      } catch {
+        // ignore: reclaim is opportunistic
+      }
+    }
   }
 
   private applyRootState(): void {

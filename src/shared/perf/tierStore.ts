@@ -10,7 +10,7 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { type PerfTier, getPerfTier } from '../../main/compute/PerfTier';
+import { type PerfTier, getPerfTier } from './PerfTier';
 
 export type FeatureToggle = 'auto' | 'cpu' | 'gpu' | 'npu' | 'off';
 

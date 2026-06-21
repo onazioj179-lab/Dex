@@ -10,7 +10,7 @@
  * the per-tier ceiling automatically.
  */
 
-import { getPerfTier, presetFor, type PerfTier } from '../../main/compute/PerfTier';
+import { getPerfTier, presetFor, type PerfTier } from './PerfTier';
 
 export interface OpCost {
   /** Estimated CPU thread count consumed (0..N). */

@@ -23,6 +23,15 @@ const rowStyle: React.CSSProperties = {
   borderRadius: 6,
 };
 
+/** glassButton lacks padding/disabled feedback on its own; apply the local convention. */
+const actionButton = (disabled: boolean): React.CSSProperties => ({
+  ...glassButton,
+  padding: '6px 14px',
+  fontSize: 12,
+  opacity: disabled ? 0.5 : 1,
+  cursor: disabled ? 'not-allowed' : 'pointer',
+});
+
 const ipc = (): IpcBridge => {
   const w = window as any;
   const bridge = w.dexAPI ?? w.electronAPI ?? w.electron;
@@ -111,7 +120,7 @@ export default function Games(): React.ReactElement {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
         <div>
           <h1 className="text-2xl font-semibold">Games</h1>
-          <div className="text-xs opacity-70">{games.length} discovered</div>
+          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{games.length} discovered</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <DexSearchInput
@@ -123,14 +132,14 @@ export default function Games(): React.ReactElement {
             size="md"
             style={{ minWidth: 220 }}
           />
-          <button style={glassButton} onClick={refresh} disabled={scanning || busy !== null}>Refresh</button>
-          <button style={glassButton} onClick={onScan} disabled={scanning}>
+          <button style={actionButton(scanning || busy !== null)} onClick={refresh} disabled={scanning || busy !== null}>Refresh</button>
+          <button style={actionButton(scanning)} onClick={onScan} disabled={scanning}>
             {scanning ? 'Scanning...' : 'Scan'}
           </button>
         </div>
       </header>
 
-      {last && <div className="mb-3 text-sm opacity-80 break-words" role="status" aria-live="polite">{last}</div>}
+      {last && <div className="text-sm" role="status" aria-live="polite" style={{ marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>{last}</div>}
 
       {games.length === 0 ? (
         <EmptyState
@@ -147,22 +156,22 @@ export default function Games(): React.ReactElement {
           actions={[{ label: 'Clear search', onClick: () => setQuery(''), variant: 'secondary' }]}
         />
       ) : (
-        <ul className="space-y-2">
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', margin: 0, padding: 0 }}>
           {visibleGames.map(g => {
             const pt = playtime[g.id];
             return (
-              <li key={g.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3" style={rowStyle}>
-                <div className="min-w-0">
+              <li key={g.id} className="flex gap-3 p-3" style={{ ...rowStyle, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div className="min-w-0" style={{ flex: '1 1 220px' }}>
                   <div className="font-medium truncate">{g.title}</div>
-                  <div className="text-xs opacity-70 truncate">
+                  <div className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                     {g.source} - {g.id}
                     {pt ? ` - ${Math.round(pt.totalSec / 60)} min` : ''}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
-                  <button style={glassButton} disabled={busy !== null || scanning} onClick={() => onPlan(g.id)}>Plan</button>
+                <div className="flex gap-2" style={{ flexShrink: 0 }}>
+                  <button style={actionButton(busy !== null || scanning)} disabled={busy !== null || scanning} onClick={() => onPlan(g.id)}>Plan</button>
                   <button
-                    style={glassButton}
+                    style={actionButton(busy !== null || scanning)}
                     disabled={busy !== null || scanning}
                     onClick={() => onLaunch(g.id)}
                   >
@@ -176,9 +185,9 @@ export default function Games(): React.ReactElement {
       )}
 
       {errors.length > 0 && (
-        <details className="mt-4 text-sm opacity-80">
-          <summary>{errors.length} scan error{errors.length === 1 ? '' : 's'}</summary>
-          <ul className="mt-2 space-y-1">
+        <details className="mt-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          <summary style={{ cursor: 'pointer' }}>{errors.length} scan error{errors.length === 1 ? '' : 's'}</summary>
+          <ul className="mt-2" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', listStyle: 'none', margin: 0, padding: 0 }}>
             {errors.map((er, i) => (
               <li key={i}>{er.source}: {er.path} - {er.reason}</li>
             ))}

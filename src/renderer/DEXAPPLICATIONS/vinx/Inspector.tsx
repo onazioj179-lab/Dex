@@ -16,6 +16,7 @@ import type { Clip, ClipEffect, ClipTransform, ColorGradeSettings, ScopeType, Ef
 import { EFFECT_DEFINITIONS, AUDIO_EFFECTS, DEFAULT_COLOR_GRADE, DEFAULT_CLIP_COLOR_GRADING, formatTimecode } from './VinxTypes';
 import { ColorWheel as PrimaryColorWheel, type ColorWheelValue } from './ColorWheel';
 import { ScopesPanel, type ScopeMode } from './ScopesPanel';
+import DexIcon from '../../components/DexIcon';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -335,10 +336,10 @@ const EffectSection: React.FC<{
         <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effect.name}</span>
         <button
           aria-label={`Remove ${effect.name} effect`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--color-text-tertiary)', padding: '0 4px' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: '0 4px', display: 'flex', alignItems: 'center' }}
           onClick={onRemove}
         >
-          X
+          <DexIcon name="close" size={12} />
         </button>
       </div>
       {def && 'parameters' in def && (def as EffectDefinition).parameters.map((param: EffectParameterDef) => {
