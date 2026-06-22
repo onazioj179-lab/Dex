@@ -53,6 +53,8 @@ import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import AppSwitcher from '../shell/AppSwitcher';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
+import { rewardUnlocks as rewardUnlocksEngine, recordChallengeAction, recordChallengeForStat } from '../services/achievementEngine';
+import { installSendToBridge } from '../services/sendTo';
 import { notify } from '../services/notify';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
@@ -202,6 +204,9 @@ const DexMaps = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Maps'));
 const GitClient = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/GitClient'));
 const EnvManager = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/EnvManager'));
 const SshClient = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SshClient'));
+const WorkspaceSpaces = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/WorkspaceSpaces'));
+const SmartInbox = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SmartInbox'));
+const ProjectDashboard = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ProjectDashboard'));
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
@@ -210,7 +215,8 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
-  | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity';
+  | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
+  | 'spaces' | 'inbox' | 'projectdash';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -344,6 +350,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   git: GitClient,
   env: EnvManager,
   ssh: SshClient,
+  spaces: WorkspaceSpaces, inbox: SmartInbox, projectdash: ProjectDashboard,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -434,6 +441,9 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'settings', label: 'Settings' },
   { id: 'taskmanager', label: 'Task Manager' },
   { id: 'liveactivity', label: 'Live Activity' },
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'spaces', label: 'Spaces' },
+  { id: 'projectdash', label: 'Project' },
   { id: 'power', label: 'Power' },
   { id: 'recyclebin', label: 'Trash' },
   // Productivity
@@ -1034,11 +1044,12 @@ export const AppManager: React.FC = () => {
   // reward -- and the reward moment is the entire point. Newly satisfied
   // achievements now always surface on the unified notification path (banner +
   // Notification Center), with a one-tap "View" into the Trophies app.
-  const rewardUnlocks = useCallback((_unlocked: Achievement[]) => {
-    // Achievement-unlock BANNERS suppressed at the owner's request -- they popped
-    // up repeatedly while opening lots of apps. The achievements are still RECORDED
-    // (saveEngagement in applyEngagement) and remain visible in the Trophies app;
-    // only the intrusive top banner is gone. Restore by re-adding the notify() call.
+  // Unlocks now flow through the achievement engine, which COALESCES a burst of
+  // unlocks into a single notification (the owner's original complaint was the
+  // storm of banners when many apps opened at once, not the reward itself). It
+  // also emits dex-achievement-unlocked so an open Trophies grid live-updates.
+  const rewardUnlocks = useCallback((unlocked: Achievement[]) => {
+    rewardUnlocksEngine(unlocked);
   }, []);
 
   const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
@@ -1052,7 +1063,11 @@ export const AppManager: React.FC = () => {
   // Global stat-bump bus -- sourced from every app's real user actions.
   useEffect(() => {
     const handler = (e: CustomEvent<{ key: string; amount?: number }>) => {
-      applyEngagement(s => incrementStat(s, e.detail.key as Parameters<typeof incrementStat>[1], e.detail.amount ?? 1));
+      const key = e.detail.key as Parameters<typeof incrementStat>[1];
+      const amount = e.detail.amount ?? 1;
+      applyEngagement(s => incrementStat(s, key, amount));
+      // Advance any daily challenge tied to this real user action.
+      recordChallengeForStat(key, amount);
     };
     window.addEventListener('dex-stat-bump', handler as EventListener);
     return () => window.removeEventListener('dex-stat-bump', handler as EventListener);
@@ -1061,6 +1076,10 @@ export const AppManager: React.FC = () => {
   // Session start: record ONCE per renderer session. recordSessionStart had no
   // caller, so streaks, session counts and time-of-day stats never advanced and
   // that whole achievement category was unreachable. This revives it.
+  // Global "Send to Notes" bridge: any app can dispatch dex-send-to-notes /
+  // uki:create-note ({ text, title }) and a real note is created.
+  useEffect(() => { installSendToBridge(); }, []);
+
   const sessionRecordedRef = useRef(false);
   useEffect(() => {
     if (sessionRecordedRef.current) return;
@@ -1077,6 +1096,9 @@ export const AppManager: React.FC = () => {
     if (!currentAppId || currentAppId === 'home') return;
     if (['videoeditor', 'prism', 'flux', 'axl'].includes(currentAppId)) return;
     applyEngagement(s => recordAppUsage(s, currentAppId));
+    // Advance app-usage + app-launch daily challenges for the focused app.
+    recordChallengeAction('app_usage', currentAppId);
+    recordChallengeAction('action_count', 'app:launch');
   }, [currentAppId, applyEngagement]);
 
   // -- App Switcher HUD (Ctrl+Tab visual overlay) --------------------------
@@ -4345,15 +4367,9 @@ export const AppManager: React.FC = () => {
       {/* Old bottom hover-trigger / auto-hide reveal strip removed: the dock is
           now always visible and freely draggable, so there is nothing to reveal. */}
 
-      {/* Shared Spotlight search overlay -- opened by the dock Search button.
-          One search surface used everywhere (real results, categories, keyboard
-          nav). Replaces the app menu's old built-in search. */}
-      <SpotlightSearch
-        variant="overlay"
-        isOpen={showSpotlight}
-        onClose={() => setShowSpotlight(false)}
-        onNavigate={(appId) => { setShowSpotlight(false); setCurrentApp(appId as AppId); }}
-      />
+      {/* The full-screen Spotlight overlay is retired: search now lives in the
+          FloatingLauncher dock itself (real field + dropdown that drops from it),
+          so there is no separate centered modal. */}
 
       {/* App Menu Overlay -- the launcher's own panel (no dock inheritance) */}
       {showAppMenu && (
@@ -4612,7 +4628,7 @@ export const AppManager: React.FC = () => {
       {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
-      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} onSearch={() => { setShowSpotlight(true); }} />
+      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
 
       {/* App Switcher HUD -- Ctrl+Tab visual overlay */}
       <AppSwitcher visible={switcherVisible} apps={runningApps} selectedIndex={switcherIndex} />

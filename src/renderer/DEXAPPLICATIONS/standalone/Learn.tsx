@@ -16,6 +16,7 @@ import DexIcon from '../../components/DexIcon';
 import { useLearningStore } from '../../store/learningStore';
 import { platform } from '../../utils';
 import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
+import { sendToNotes } from '../../services/sendTo';
 
 // -- Helpers ---------------------------------------------------------------
 const fmtMs = (ms: number): string => {
@@ -35,7 +36,7 @@ interface Suggestion {
 }
 interface FrequentItem { id: string; count: number }
 
-type Tab = 'overview' | 'shortcuts' | 'apps' | 'insights' | 'power';
+type Tab = 'overview' | 'courses' | 'shortcuts' | 'apps' | 'insights' | 'power';
 
 // -- Power mode definitions -------------------------------------------------
 interface PowerProfile {
@@ -113,6 +114,189 @@ const APP_TIPS_DATA = [
   { app: 'Files', color: '#339AF0', tips: ['Use breadcrumbs to navigate directories', 'Preview images and documents inline', 'Right-click for copy, move, and rename', 'Use the search bar to find files quickly'] },
 ];
 
+// -- Courses: lesson / module model ----------------------------------------
+// A self-contained learning curriculum for DEX. Each module groups lessons;
+// each lesson carries an estimated time and readable body content. All progress
+// is tracked renderer-side and persisted to localStorage (no native bridge).
+interface Lesson {
+  id: string;
+  title: string;
+  minutes: number;       // estimated time
+  summary: string;       // one-line description (also searched)
+  content: string;       // lesson body (searched, sendable to Notes)
+}
+interface CourseModule {
+  id: string;
+  title: string;
+  color: string;
+  description: string;
+  lessons: Lesson[];
+}
+
+const COURSE_MODULES: CourseModule[] = [
+  {
+    id: 'getting-started',
+    title: 'Getting Started',
+    color: '#5e5ce6',
+    description: 'Find your way around the DEX desktop and core workflows.',
+    lessons: [
+      {
+        id: 'gs-tour', title: 'The DEX Desktop Tour', minutes: 4,
+        summary: 'Dock, top bar, Spotlight, and the window area at a glance.',
+        content: 'DEX is built around four areas: the dock for launching apps, the top bar for system status and quick controls, Spotlight (Ctrl/Cmd+K) for search and commands, and the window area where your apps live. Apps open as managed windows you can snap, maximize, and stack. Everything you do is local-first.',
+      },
+      {
+        id: 'gs-launch', title: 'Launching & Switching Apps', minutes: 3,
+        summary: 'Open apps from the dock, Spotlight, or keyboard.',
+        content: 'Click a dock icon or press Ctrl/Cmd plus a number 1 through 9 to jump straight to a dock app. Ctrl/Cmd+Tab cycles through running apps, and F3 opens the app overview. Close the current app with Ctrl/Cmd+W. The fastest path is usually Spotlight: hit Ctrl/Cmd+K and start typing.',
+      },
+      {
+        id: 'gs-windows', title: 'Window Management', minutes: 5,
+        summary: 'Snap, maximize, and arrange windows like a pro.',
+        content: 'Drag a window to a screen edge to snap it to a half or quarter. Double-click a titlebar to maximize or restore. Hover the maximize button to reveal the snap-layout grid and pick an arrangement. Combine snapping with Ctrl/Cmd+Tab to build a multi-app workspace in seconds.',
+      },
+      {
+        id: 'gs-spotlight', title: 'Spotlight & Commands', minutes: 4,
+        summary: 'Search apps, files, and run commands from one field.',
+        content: 'Spotlight is the command center of DEX. Open it with Ctrl/Cmd+K, then search apps, files, and settings, or type a slash command to act instantly. Results are ranked by your recent activity, so the things you use most rise to the top.',
+      },
+    ],
+  },
+  {
+    id: 'creative-suite',
+    title: 'Creative Suite',
+    color: '#BF5AF2',
+    description: 'Produce video, audio, motion, and design work in DEX.',
+    lessons: [
+      {
+        id: 'cs-vinx', title: 'Editing Video in VINX', minutes: 8,
+        summary: 'Timeline basics, shuttle playback, and exporting.',
+        content: 'VINX is the DEX video editor. Drag media from Files onto the timeline, then use J, K, and L for shuttle playback. Right-click clips to split, trim, and add effects. When you are done, export subtitles as SRT from the subtitle panel and render your final cut.',
+      },
+      {
+        id: 'cs-imosion', title: 'Making Music in Imosion', minutes: 7,
+        summary: 'Record, mix, and export stems.',
+        content: 'Imosion is the DEX music studio. Record directly with the built-in mic input, then use the mixer to route and pan channels. Apply per-track effects like reverb, EQ, and compression. Export stems individually when collaborating with others.',
+      },
+      {
+        id: 'cs-flux', title: 'Motion Graphics with FLUX', minutes: 9,
+        summary: 'Keyframes, easing, and 3D depth.',
+        content: 'FLUX builds motion graphics. Add shape or text layers from the toolbar and keyframe their properties for smooth animation. Refine timing in the graph editor using easing curves, and switch on 3D mode for depth and camera control.',
+      },
+      {
+        id: 'cs-prism', title: 'Photo Editing in PRISM', minutes: 6,
+        summary: 'Non-destructive layers and color grading.',
+        content: 'PRISM is the DEX photo editor. Work non-destructively with the layers panel and hold Shift for proportional transforms. Use adjustment layers for global color grading, then export at any resolution from the export dialog.',
+      },
+    ],
+  },
+  {
+    id: 'productivity',
+    title: 'Productivity',
+    color: '#30D158',
+    description: 'Notes, files, and the everyday apps that keep you moving.',
+    lessons: [
+      {
+        id: 'pr-notes', title: 'Notes Like a Power User', minutes: 5,
+        summary: 'Folders, Markdown, pinning, and autocomplete.',
+        content: 'Notes keeps your thinking organized. Use folders in the sidebar to group notes, write with Markdown for rich formatting, and pin important notes to the top. Autocomplete suggests words as you type so capturing ideas stays fast.',
+      },
+      {
+        id: 'pr-files', title: 'Navigating Files', minutes: 4,
+        summary: 'Breadcrumbs, inline preview, and quick search.',
+        content: 'The Files app gives you fast navigation with breadcrumbs and inline preview for images and documents. Right-click for copy, move, and rename, and use the search bar to find anything quickly without leaving the window.',
+      },
+      {
+        id: 'pr-search', title: 'Search Everywhere', minutes: 3,
+        summary: 'One search field, ranked by your habits.',
+        content: 'DEX search is unified. The same field searches apps, files, and settings, and ranks results by what you actually use. The more you work, the smarter ordering becomes, surfacing your frequent destinations first.',
+      },
+    ],
+  },
+];
+
+const ALL_LESSONS: Lesson[] = COURSE_MODULES.flatMap(m => m.lessons);
+const LESSON_MODULE: Record<string, CourseModule> = Object.fromEntries(
+  COURSE_MODULES.flatMap(m => m.lessons.map(l => [l.id, m] as const)),
+);
+const TOTAL_LESSON_COUNT = ALL_LESSONS.length;
+
+// -- Persistence -----------------------------------------------------------
+const PROGRESS_KEY = 'dex.learn.courses.progress.v1';
+const BOOKMARKS_KEY = 'dex.learn.courses.bookmarks.v1';
+const STREAK_KEY = 'dex.learn.courses.streak.v1';
+const RESUME_KEY = 'dex.learn.courses.resume.v1';
+
+type LessonStatus = 'started' | 'completed';
+type ProgressMap = Record<string, LessonStatus>;
+
+interface StreakState {
+  current: number;        // consecutive-day streak count
+  lastDay: string | null; // YYYY-MM-DD of last completion
+  todayCount: number;     // lessons completed today
+  todayKey: string | null;// YYYY-MM-DD that todayCount belongs to
+}
+const DAILY_GOAL = 3;
+
+const dayKey = (d = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const daysBetween = (a: string, b: string): number => {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  const ta = Date.UTC(ay, am - 1, ad);
+  const tb = Date.UTC(by, bm - 1, bd);
+  return Math.round((tb - ta) / 86_400_000);
+};
+
+const loadProgress = (): ProgressMap => {
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    return raw ? (JSON.parse(raw) as ProgressMap) : {};
+  } catch { return {}; }
+};
+const saveProgress = (p: ProgressMap): void => {
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch { /* noop */ }
+};
+const loadBookmarks = (): string[] => {
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    const arr = raw ? (JSON.parse(raw) as string[]) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+};
+const saveBookmarks = (b: string[]): void => {
+  try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(b)); } catch { /* noop */ }
+};
+const loadResume = (): string | null => {
+  try { return localStorage.getItem(RESUME_KEY); } catch { return null; }
+};
+const saveResume = (id: string): void => {
+  try { localStorage.setItem(RESUME_KEY, id); } catch { /* noop */ }
+};
+const loadStreak = (): StreakState => {
+  try {
+    const raw = localStorage.getItem(STREAK_KEY);
+    if (raw) {
+      const s = JSON.parse(raw) as StreakState;
+      return {
+        current: s.current ?? 0,
+        lastDay: s.lastDay ?? null,
+        todayCount: s.todayCount ?? 0,
+        todayKey: s.todayKey ?? null,
+      };
+    }
+  } catch { /* noop */ }
+  return { current: 0, lastDay: null, todayCount: 0, todayKey: null };
+};
+const saveStreak = (s: StreakState): void => {
+  try { localStorage.setItem(STREAK_KEY, JSON.stringify(s)); } catch { /* noop */ }
+};
+
+const learnToast = (type: 'success' | 'error' | 'info', message: string): void => {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+};
+
 // -- Styles (module-level, never re-created) --------------------------------
 const ROOT: React.CSSProperties = {
   width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
@@ -171,7 +355,149 @@ const Learn: React.FC = () => {
   const [dayPatterns, setDayPatterns] = useState<Record<string, { app: string; count: number }[]>>({});
   const [hourlyPatterns, setHourlyPatterns] = useState<Record<string, { app: string; count: number }[]>>({});
   const [sessionStats, setSessionStats] = useState<{ average: number; total: number; count: number } | null>(null);
-  
+
+  // -- Courses state (renderer-only, persisted to localStorage) ------------
+  const [progress, setProgress] = useState<ProgressMap>(() => loadProgress());
+  const [bookmarks, setBookmarks] = useState<string[]>(() => loadBookmarks());
+  const [streak, setStreak] = useState<StreakState>(() => loadStreak());
+  const [activeLesson, setActiveLesson] = useState<string | null>(null);
+  const [courseQuery, setCourseQuery] = useState('');
+  const [noteDraft, setNoteDraft] = useState('');
+
+  // On first courses-view, normalise the streak for the current day:
+  // a missed day resets the streak; the per-day counter rolls over.
+  useEffect(() => {
+    const today = dayKey();
+    setStreak(prev => {
+      let next = prev;
+      if (prev.lastDay && daysBetween(prev.lastDay, today) > 1) {
+        next = { ...next, current: 0 };
+      }
+      if (prev.todayKey !== today) {
+        next = { ...next, todayCount: 0, todayKey: today };
+      }
+      if (next !== prev) saveStreak(next);
+      return next;
+    });
+  }, []);
+
+  // Mark a lesson started (idempotent: never downgrade a completed lesson) and
+  // record it as the resume point.
+  const startLesson = useCallback((id: string) => {
+    setActiveLesson(id);
+    setNoteDraft('');
+    saveResume(id);
+    setProgress(prev => {
+      if (prev[id]) return prev;            // already started or completed
+      const next = { ...prev, [id]: 'started' as LessonStatus };
+      saveProgress(next);
+      return next;
+    });
+  }, []);
+
+  // Mark complete -> update progress + streak (daily count + consecutive days).
+  const completeLesson = useCallback((id: string) => {
+    setProgress(prev => {
+      if (prev[id] === 'completed') return prev;
+      const next = { ...prev, [id]: 'completed' as LessonStatus };
+      saveProgress(next);
+      return next;
+    });
+    setStreak(prev => {
+      if (progress[id] === 'completed') return prev; // no double-count
+      const today = dayKey();
+      let current = prev.current;
+      if (prev.lastDay !== today) {
+        // First completion of a new day: extend the streak if yesterday counted,
+        // otherwise (gap or first ever) the streak restarts at 1.
+        current = prev.lastDay && daysBetween(prev.lastDay, today) === 1
+          ? prev.current + 1
+          : 1;
+      }
+      const todayCount = (prev.todayKey === today ? prev.todayCount : 0) + 1;
+      const next: StreakState = { current, lastDay: today, todayCount, todayKey: today };
+      saveStreak(next);
+      return next;
+    });
+    learnToast('success', 'Lesson completed');
+  }, [progress]);
+
+  const toggleBookmark = useCallback((id: string) => {
+    setBookmarks(prev => {
+      const has = prev.includes(id);
+      const next = has ? prev.filter(b => b !== id) : [...prev, id];
+      saveBookmarks(next);
+      learnToast('info', has ? 'Bookmark removed' : 'Lesson bookmarked');
+      return next;
+    });
+  }, []);
+
+  // Save the user's note (plus lesson title/summary) to the Notes app.
+  const saveNotesFor = useCallback((lesson: Lesson) => {
+    const note = noteDraft.trim();
+    const body = [
+      `# ${lesson.title}`,
+      lesson.summary,
+      '',
+      note ? note : lesson.content,
+    ].join('\n');
+    void sendToNotes(body, `Learn: ${lesson.title}`);
+  }, [noteDraft]);
+
+  // -- Courses derived data ------------------------------------------------
+  const moduleProgress = useMemo(() => {
+    const out: Record<string, { done: number; total: number; pct: number }> = {};
+    for (const m of COURSE_MODULES) {
+      const total = m.lessons.length;
+      const done = m.lessons.filter(l => progress[l.id] === 'completed').length;
+      out[m.id] = { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+    }
+    return out;
+  }, [progress]);
+
+  const completedCount = useMemo(
+    () => ALL_LESSONS.filter(l => progress[l.id] === 'completed').length,
+    [progress],
+  );
+
+  const resumeLesson = useMemo(() => {
+    const id = loadResume();
+    if (id && LESSON_MODULE[id] && progress[id] !== 'completed') {
+      return ALL_LESSONS.find(l => l.id === id) || null;
+    }
+    return null;
+  }, [progress]);
+
+  // Recommend the next incomplete lesson, preferring the module of the last
+  // touched lesson, then the first module with unfinished work.
+  const recommendedLesson = useMemo(() => {
+    const fromId = loadResume();
+    const preferredModule = fromId ? LESSON_MODULE[fromId] : undefined;
+    const search = preferredModule
+      ? [preferredModule, ...COURSE_MODULES.filter(m => m.id !== preferredModule.id)]
+      : COURSE_MODULES;
+    for (const m of search) {
+      const lesson = m.lessons.find(l => progress[l.id] !== 'completed');
+      if (lesson) return lesson;
+    }
+    return null;
+  }, [progress]);
+
+  const courseResults = useMemo(() => {
+    const q = courseQuery.trim().toLowerCase();
+    if (!q) return null;
+    return ALL_LESSONS.filter(l =>
+      l.title.toLowerCase().includes(q) ||
+      l.summary.toLowerCase().includes(q) ||
+      l.content.toLowerCase().includes(q),
+    );
+  }, [courseQuery]);
+
+  const bookmarkedLessons = useMemo(
+    () => bookmarks.map(id => ALL_LESSONS.find(l => l.id === id)).filter((l): l is Lesson => !!l),
+    [bookmarks],
+  );
+
   // Power management state
   const [powerProfile, setPowerProfile] = useState<string>('balanced');
   const [batteryLevel, setBatteryLevel] = useState<number>(100);
@@ -294,6 +620,102 @@ const Learn: React.FC = () => {
     ipc?.invoke?.('patterns:cleanup').catch((e: unknown) => console.warn('[Learn] cleanup:', e));
   }, [reset]);
 
+  // Render one lesson row (status dot, title, time, bookmark, expandable body).
+  const renderLesson = useCallback((lesson: Lesson, accent: string) => {
+    const status = progress[lesson.id];
+    const done = status === 'completed';
+    const isOpen = activeLesson === lesson.id;
+    const bookmarked = bookmarks.includes(lesson.id);
+    return (
+      <div
+        key={lesson.id}
+        style={{
+          borderRadius: 8,
+          border: `1px solid ${isOpen ? accent + '66' : 'var(--color-border-subtle, rgba(255,255,255,.06))'}`,
+          background: isOpen ? accent + '0d' : 'var(--color-bg-hover, rgba(255,255,255,.02))',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          onClick={() => (isOpen ? setActiveLesson(null) : startLesson(lesson.id))}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer' }}
+        >
+          <DexIcon
+            name={done ? 'check-circle' : status === 'started' ? 'play' : 'circle'}
+            size={16}
+            color={done ? 'var(--color-success)' : status === 'started' ? accent : 'currentColor'}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, opacity: done ? 0.55 : 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {lesson.title}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.45, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {lesson.summary}
+            </div>
+          </div>
+          {done && (
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-success)', background: 'rgba(48,209,88,.14)', padding: '2px 6px', borderRadius: 4 }}>
+              Done
+            </span>
+          )}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, opacity: 0.4, flexShrink: 0 }}>
+            <DexIcon name="clock" size={11} />{lesson.minutes}m
+          </span>
+          <button
+            onClick={e => { e.stopPropagation(); toggleBookmark(lesson.id); }}
+            title={bookmarked ? 'Remove bookmark' : 'Bookmark lesson'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: bookmarked ? accent : 'var(--color-text-tertiary, rgba(255,255,255,.4))' }}
+          >
+            <DexIcon name="bookmark" size={15} color={bookmarked ? accent : 'currentColor'} />
+          </button>
+        </div>
+
+        {isOpen && (
+          <div style={{ padding: '0 12px 12px', borderTop: ROW_DIVIDER }}>
+            <p style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.78, margin: '12px 0' }}>{lesson.content}</p>
+            <textarea
+              value={noteDraft}
+              onChange={e => setNoteDraft(e.target.value)}
+              placeholder="Jot a note for this lesson..."
+              style={{
+                width: '100%', minHeight: 56, resize: 'vertical', boxSizing: 'border-box',
+                background: 'var(--color-bg-inset, rgba(0,0,0,.25))', color: 'inherit',
+                border: '1px solid var(--color-border-subtle, rgba(255,255,255,.08))',
+                borderRadius: 6, padding: '8px 10px', fontSize: 12, fontFamily: 'inherit',
+                outline: 'none', marginBottom: 10,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => completeLesson(lesson.id)}
+                disabled={done}
+                style={{
+                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none',
+                  cursor: done ? 'default' : 'pointer',
+                  background: done ? 'var(--color-bg-hover, rgba(255,255,255,.06))' : 'rgba(48,209,88,.16)',
+                  color: done ? 'var(--color-text-tertiary, rgba(255,255,255,.4))' : 'var(--color-success)',
+                }}
+              >
+                {done ? 'Completed' : 'Mark Complete'}
+              </button>
+              <button
+                onClick={() => saveNotesFor(lesson)}
+                style={{
+                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+                  border: '1px solid var(--color-border-subtle, rgba(255,255,255,.1))',
+                  background: 'var(--color-bg-hover, rgba(255,255,255,.04))', color: 'inherit', cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <DexIcon name="file-text" size={13} />Save to Notes
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }, [progress, activeLesson, bookmarks, noteDraft, startLesson, toggleBookmark, completeLesson, saveNotesFor]);
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div style={ROOT}>
@@ -330,7 +752,7 @@ const Learn: React.FC = () => {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
-          {(['overview', 'shortcuts', 'apps', 'insights', 'power'] as Tab[]).map(t => (
+          {(['overview', 'courses', 'shortcuts', 'apps', 'insights', 'power'] as Tab[]).map(t => (
             <button key={t} style={TAB_STYLE(tab === t)} onClick={() => setTab(t)}>
               {t === 'power' ? 'Power' : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -439,6 +861,146 @@ const Learn: React.FC = () => {
                   Open apps, browse files, and create projects. Your activity data will appear here as you use DEX.
                 </div>
               </div>
+            )}
+          </>
+        )}
+
+        {/* ── COURSES TAB ────────────────────────────────────────────── */}
+        {tab === 'courses' && (
+          <>
+            {/* Streak / daily goal + overall progress */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#FF9500', opacity: 0.7 }} />
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <DexIcon name="flame" size={20} color="#FF9500" />{streak.current}
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Day Streak</div>
+              </div>
+              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#30D158', opacity: 0.7 }} />
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>
+                  {streak.todayCount}<span style={{ fontSize: 14, opacity: 0.4 }}>/{DAILY_GOAL}</span>
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Today's Goal</div>
+              </div>
+              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#5e5ce6', opacity: 0.7 }} />
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{completedCount}<span style={{ fontSize: 14, opacity: 0.4 }}>/{TOTAL_LESSON_COUNT}</span></div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Lessons Done</div>
+              </div>
+            </div>
+
+            {/* Search across lessons */}
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', opacity: 0.4, pointerEvents: 'none' }}>
+                <DexIcon name="search" size={14} />
+              </span>
+              <input
+                value={courseQuery}
+                onChange={e => setCourseQuery(e.target.value)}
+                placeholder="Search lessons..."
+                aria-label="Search lessons"
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '9px 12px 9px 34px',
+                  background: 'var(--color-bg-elevated, rgba(255,255,255,.04))', color: 'inherit',
+                  border: '1px solid var(--color-border-subtle, rgba(255,255,255,.08))',
+                  borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            {/* Search results (replaces module list while a query is active) */}
+            {courseResults ? (
+              <div style={CARD}>
+                <div style={CARD_TITLE}>{courseResults.length} Result{courseResults.length === 1 ? '' : 's'}</div>
+                {courseResults.length === 0 ? (
+                  <div style={{ fontSize: 12, opacity: 0.45, padding: '8px 0' }}>No lessons match "{courseQuery}".</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {courseResults.map(l => renderLesson(l, LESSON_MODULE[l.id].color))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Continue where you left off */}
+                {(resumeLesson || recommendedLesson) && (
+                  <div style={CARD}>
+                    <div style={CARD_TITLE}>{resumeLesson ? 'Continue Learning' : 'Recommended Next'}</div>
+                    {(() => {
+                      const next = resumeLesson || recommendedLesson!;
+                      const mod = LESSON_MODULE[next.id];
+                      return (
+                        <button
+                          onClick={() => { setCourseQuery(''); startLesson(next.id); }}
+                          style={{
+                            width: '100%', textAlign: 'left' as const, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                            borderRadius: 8, border: `1px solid ${mod.color}55`, background: `${mod.color}12`, color: 'inherit',
+                          }}
+                        >
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: `${mod.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <DexIcon name="play" size={16} color={mod.color} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{next.title}</div>
+                            <div style={{ fontSize: 11, opacity: 0.5 }}>{mod.title} · {next.minutes} min</div>
+                          </div>
+                          <DexIcon name="chevron-right" size={16} color="currentColor" />
+                        </button>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Bookmarks */}
+                {bookmarkedLessons.length > 0 && (
+                  <div style={CARD}>
+                    <div style={{ ...CARD_TITLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <DexIcon name="bookmark" size={11} />Bookmarks
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {bookmarkedLessons.map(l => renderLesson(l, LESSON_MODULE[l.id].color))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modules with per-module progress bars + lesson lists */}
+                {COURSE_MODULES.map(mod => {
+                  const mp = moduleProgress[mod.id];
+                  return (
+                    <div key={mod.id} style={CARD}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-3)' }}>
+                        <div style={{ width: 26, height: 26, borderRadius: 6, background: `${mod.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <DexIcon name="book" size={14} color={mod.color} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: mod.color }}>{mod.title}</div>
+                          <div style={{ fontSize: 11, opacity: 0.5 }}>{mod.description}</div>
+                        </div>
+                        {mp.pct === 100 && (
+                          <span title="Module complete" style={{ display: 'inline-flex' }}>
+                            <DexIcon name="award" size={18} color={mod.color} />
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Overall progress bar for the module */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-3)' }}>
+                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden' }}>
+                          <div style={{ width: `${mp.pct}%`, height: '100%', borderRadius: 3, background: mod.color, transition: 'width .25s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 11, opacity: 0.5, minWidth: 64, textAlign: 'right' as const }}>{mp.done}/{mp.total} · {mp.pct}%</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {mod.lessons.map(l => renderLesson(l, mod.color))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </>
         )}

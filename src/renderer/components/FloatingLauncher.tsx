@@ -23,7 +23,7 @@ import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
-import { DexSearchInput } from '../styles/components';
+import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
 
 const MOVE_THRESHOLD = 6; // px before a press becomes a drag
@@ -31,6 +31,8 @@ const BAR_H = 44;         // collapsed capsule height
 const PILL_R = BAR_H / 2; // full-capsule radius when collapsed
 const PANEL_R = 16;       // rounded-rect radius when the widget drawer is open
 const EXPAND_KEY = 'dex-nook-expanded';
+const SEARCH_W_KEY = 'dex-nook-search-w';
+const SEARCH_W_DEFAULT = 240;
 
 // --- calendar (reads the same store the Calendar app + Home widget write) ----
 interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string }
@@ -95,6 +97,29 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
       try { localStorage.setItem(EXPAND_KEY, next ? '1' : '0'); } catch { /* quota */ }
       return next;
     });
+  }, []);
+
+  // Search field width -- user-resizable with the mouse (drag the grip), persisted,
+  // defaults to a compact size. The dock search IS the search now (no separate
+  // overlay); it stretches to whatever width the user drags.
+  const [searchWidth, setSearchWidth] = useState<number>(() => {
+    try { const v = parseInt(localStorage.getItem(SEARCH_W_KEY) || '', 10); return Number.isFinite(v) && v >= 160 && v <= 520 ? v : SEARCH_W_DEFAULT; } catch { return SEARCH_W_DEFAULT; }
+  });
+  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const beginResize = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation(); e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startW: searchWidth };
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+  }, [searchWidth]);
+  const onResizeMove = useCallback((e: React.PointerEvent) => {
+    const r = resizeRef.current; if (!r) return;
+    setSearchWidth(Math.max(160, Math.min(520, r.startW + (e.clientX - r.startX))));
+  }, []);
+  const onResizeUp = useCallback((e: React.PointerEvent) => {
+    if (!resizeRef.current) return;
+    resizeRef.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* released */ }
+    setSearchWidth(w => { try { localStorage.setItem(SEARCH_W_KEY, String(w)); } catch { /* quota */ } return w; });
   }, []);
 
   // Now-playing (real audio engine bridge).
@@ -261,7 +286,10 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
         border: '1px solid var(--glass-border, rgba(255,255,255,0.10))',
         borderRadius: expanded ? PANEL_R : PILL_R,
-        overflow: 'hidden',
+        // visible (not hidden) so the search results dropdown can escape the bar.
+        // The glass bg + border still clip to border-radius (background respects
+        // the radius regardless of overflow); only overflowing children show.
+        overflow: 'visible',
         boxShadow: dragging
           ? '0 16px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.5)'
           : '0 8px 28px rgba(0,0,0,0.42), 0 0 0 0.5px rgba(0,0,0,0.45)',
@@ -296,26 +324,37 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
             {[[1, 1], [10, 1], [1, 10], [10, 10]].map(([rx, ry]) => <rect key={`${rx}-${ry}`} x={rx} y={ry} width="7" height="7" rx="2" fill="currentColor" />)}
           </svg>
         </button>
-        {onSearch && (
-          // Canonical DEX search pill (shared DexSearchInput) -- identical
-          // magnifier, size, muted placeholder and hairline everywhere. The dock
-          // routes any interaction to the universal Search overlay rather than
-          // filtering inline, so the pill always looks the same and behaves like
-          // every other search field. stopPropagation keeps a click from dragging.
-          <div onPointerDown={e => e.stopPropagation()} style={{ width: 168, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-            <DexSearchInput
-              size="md"
-              fullWidth
-              readOnly
-              placeholder="Search"
-              aria-label="Open search"
-              value=""
-              onChange={onSearch}
-              onFocus={onSearch}
-              onClear={onSearch}
-            />
-          </div>
-        )}
+        {/* The dock search IS the search now: a real field whose results dropdown
+            drops straight from it (UP, since the dock sits near the bottom). The
+            old full-screen Spotlight overlay is gone. stopPropagation keeps typing/
+            clicking from dragging the bar; the grip beside it resizes the field. */}
+        <div
+          onPointerDown={e => e.stopPropagation()}
+          style={{ width: searchWidth, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center' }}
+        >
+          <SpotlightSearch
+            variant="home"
+            pillHeight={32}
+            dropUp={pos.y > (typeof window !== 'undefined' ? window.innerHeight : 800) / 2}
+            placeholder="Search"
+            hideVoice
+            onNavigate={(appId) => openApp(appId)}
+          />
+        </div>
+        {/* Resize grip -- drag to widen / narrow the search; size persists. */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize search"
+          title="Drag to resize search"
+          onPointerDown={beginResize}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
+          onPointerCancel={onResizeUp}
+          style={{ width: 8, alignSelf: 'stretch', flexShrink: 0, cursor: 'ew-resize', touchAction: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div style={{ width: 2, height: 16, borderRadius: 1, background: 'var(--color-border, rgba(255,255,255,0.16))' }} />
+        </div>
         <button type="button" className="dex-pressable" aria-label="Open UKI assistant" onPointerDown={e => e.stopPropagation()} onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10v1a7 7 0 0 0 14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />

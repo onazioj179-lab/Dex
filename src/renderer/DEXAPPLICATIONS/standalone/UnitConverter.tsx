@@ -3,8 +3,10 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * Professional unit converter — length, weight, temperature, volume, speed, data
  */
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { resolveUnitQuery } from '../../../shared/format/unitSearch';
+
+interface RecentConversion { cat: Category; from: number; to: number; }
 
 type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy';
 
@@ -77,8 +79,23 @@ const UnitConverter: React.FC = () => {
   const [toIdx, setToIdx] = useState(1);
   const [inputValue, setInputValue] = useState('1');
   const [unitQuery, setUnitQuery] = useState('');
+  const [recents, setRecents] = useState<RecentConversion[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dex-unit-recents') || '[]'); } catch { return []; }
+  });
 
   const units = UNITS[category];
+
+  // Track recent distinct conversions for one-tap reuse.
+  useEffect(() => {
+    if (fromIdx === toIdx) return;
+    setRecents(prev => {
+      const entry: RecentConversion = { cat: category, from: fromIdx, to: toIdx };
+      const k = (e: RecentConversion) => `${e.cat}:${e.from}:${e.to}`;
+      const next = [entry, ...prev.filter(e => k(e) !== k(entry))].slice(0, 6);
+      try { localStorage.setItem('dex-unit-recents', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, [category, fromIdx, toIdx]);
 
   // Jump to a unit typed into the search box (e.g. "km", "pounds", "MB").
   const runUnitSearch = useCallback(() => {
@@ -94,8 +111,10 @@ const UnitConverter: React.FC = () => {
   const result = useMemo(() => {
     const val = parseFloat(inputValue);
     if (isNaN(val)) return '';
-    const base = units[fromIdx].toBase(val);
-    const out = units[toIdx].fromBase(base);
+    const fromUnit = units[fromIdx], toUnit = units[toIdx];
+    if (!fromUnit || !toUnit) return '';
+    const base = fromUnit.toBase(val);
+    const out = toUnit.fromBase(base);
     return out.toLocaleString('en-US', { maximumFractionDigits: 8 });
   }, [inputValue, fromIdx, toIdx, units]);
 
@@ -162,6 +181,7 @@ const UnitConverter: React.FC = () => {
             value={fromIdx}
             onChange={e => setFromIdx(Number(e.target.value))}
             style={s.select}
+            aria-label="Convert from unit"
           >
             {units.map((u, i) => <option key={i} value={i}>{u.label} ({u.symbol})</option>)}
           </select>
@@ -172,6 +192,7 @@ const UnitConverter: React.FC = () => {
             onChange={e => setInputValue(e.target.value)}
             style={s.input}
             placeholder="0"
+            aria-label="Value to convert"
           />
         </div>
 
@@ -188,6 +209,7 @@ const UnitConverter: React.FC = () => {
             value={toIdx}
             onChange={e => setToIdx(Number(e.target.value))}
             style={s.select}
+            aria-label="Convert to unit"
           >
             {units.map((u, i) => <option key={i} value={i}>{u.label} ({u.symbol})</option>)}
           </select>
@@ -211,9 +233,29 @@ const UnitConverter: React.FC = () => {
       </div>
 
       {/* Formula */}
-      {inputValue && result && (
+      {inputValue && result && units[fromIdx] && units[toIdx] && (
         <div style={s.formula}>
           {inputValue} {units[fromIdx].symbol} = {result} {units[toIdx].symbol}
+        </div>
+      )}
+
+      {/* Recent conversions — one-tap reuse */}
+      {recents.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 var(--space-5) var(--space-3)' }}>
+          {recents.map((r, i) => {
+            const fu = UNITS[r.cat]?.[r.from], tu = UNITS[r.cat]?.[r.to];
+            if (!fu || !tu) return null;
+            return (
+              <button
+                key={i}
+                onClick={() => { setCategory(r.cat); setFromIdx(r.from); setToIdx(r.to); }}
+                title={`${fu.label} → ${tu.label}`}
+                style={{ padding: '4px 10px', borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {fu.symbol} → {tu.symbol}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -222,13 +264,15 @@ const UnitConverter: React.FC = () => {
         <div className="dex-label-caps" style={s.refHeader}>Quick Reference</div>
         <div style={s.refTable}>
           {[1, 10, 100, 1000].map(val => {
-            const base = units[fromIdx].toBase(val);
-            const converted = units[toIdx].fromBase(base);
+            const fu = units[fromIdx], tu = units[toIdx];
+            if (!fu || !tu) return null;
+            const base = fu.toBase(val);
+            const converted = tu.fromBase(base);
             return (
               <div key={val} style={s.refRow}>
-                <span style={s.refFrom}>{val.toLocaleString()} {units[fromIdx].symbol}</span>
+                <span style={s.refFrom}>{val.toLocaleString()} {fu.symbol}</span>
                 <span style={s.refArrow}>→</span>
-                <span style={s.refTo}>{converted.toLocaleString('en-US', { maximumFractionDigits: 4 })} {units[toIdx].symbol}</span>
+                <span style={s.refTo}>{converted.toLocaleString('en-US', { maximumFractionDigits: 4 })} {tu.symbol}</span>
               </div>
             );
           })}
@@ -298,7 +342,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-    boxSizing: 'border-box',
+    boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   copyBtn: {
     width: 44, borderRadius: 10, flexShrink: 0,
@@ -333,9 +377,9 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
     padding: '6px 0', fontSize: 14, fontVariantNumeric: 'tabular-nums',
   },
-  refFrom: { flex: 1, color: 'var(--color-text-secondary)' },
-  refArrow: { color: 'var(--color-text-muted)', fontSize: 12 },
-  refTo: { flex: 1, textAlign: 'right', color: 'var(--color-text-primary)', fontWeight: 500 },
+  refFrom: { flex: 1, minWidth: 0, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  refArrow: { color: 'var(--color-text-muted)', fontSize: 12, flexShrink: 0 },
+  refTo: { flex: 1, minWidth: 0, textAlign: 'right', color: 'var(--color-text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 };
 
 UnitConverter.displayName = 'UnitConverter';

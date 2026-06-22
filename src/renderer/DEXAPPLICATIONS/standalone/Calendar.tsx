@@ -20,7 +20,28 @@ interface CalendarEvent {
   description: string;
   recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   icon?: string;
+  /** Category id (see CATEGORIES). Older stored events have none -> treated as 'general'. */
+  category?: string;
+  /** Recurrence end: stop repeating after this date (inclusive, YYYY-MM-DD). Empty = forever. */
+  recurUntil?: string;
 }
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// Built-in colour-coded categories. The colour drives the calendar accents when an
+// event has no explicit colour override (legacy events keep their stored colour).
+const CATEGORIES: Category[] = [
+  { id: 'general', name: 'General', color: 'var(--color-accent)' },
+  { id: 'work', name: 'Work', color: '#bf5af2' },
+  { id: 'personal', name: 'Personal', color: 'var(--color-success)' },
+  { id: 'health', name: 'Health', color: '#ff2d55' },
+  { id: 'social', name: 'Social', color: '#64d2ff' },
+  { id: 'travel', name: 'Travel', color: 'var(--color-warning)' },
+];
 
 const Calendar: React.FC = () => {
   // ===== PATTERN LEARNING =====
@@ -30,8 +51,25 @@ const Calendar: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [view, setView] = useState<'month' | 'week'>('month');
+  const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>('month');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Id of the event currently being edited (inline editor reuses the modal). null = new.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // Live search query matched against event titles.
+  const [search, setSearch] = useState('');
+  // Set of category ids that are hidden from rendering (toggle visibility).
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
+  // How many days the agenda view looks ahead.
+  const AGENDA_DAYS = 14;
+  // Working-hours overlay: shade hours outside [start, end) and dim weekends on
+  // the time-grid (week/day) views. Toggleable; bounds persisted in localStorage.
+  const WORK_START = 9;
+  const WORK_END = 18;
+  const [showWorkingHours, setShowWorkingHours] = useState(true);
+  // Is this hour outside configured working hours? (used for shading)
+  const isOffHour = (hour: number) => hour < WORK_START || hour >= WORK_END;
+  // Sat (6) / Sun (0) -> weekend, dimmed in the grid.
+  const isWeekend = (date: Date) => { const d = date.getDay(); return d === 0 || d === 6; };
   const [newEvent, setNewEvent] = useState({
     title: '',
     time: '09:00',
@@ -40,6 +78,8 @@ const Calendar: React.FC = () => {
     description: '',
     recurring: 'none' as CalendarEvent['recurring'],
     icon: '',
+    category: 'general',
+    recurUntil: '',
   });
 
   const colors = ['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff2d55', '#64d2ff'];
@@ -65,7 +105,16 @@ const Calendar: React.FC = () => {
         console.warn('[Calendar] Failed to load events:', e);
       }
     })();
+    // Restore the working-hours overlay preference.
+    try {
+      const pref = localStorage.getItem('dex-calendar-working-hours');
+      if (pref !== null) setShowWorkingHours(pref === '1');
+    } catch (e) { console.warn('[DEX]', e); }
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('dex-calendar-working-hours', showWorkingHours ? '1' : '0'); } catch (e) { console.warn('[DEX]', e); }
+  }, [showWorkingHours]);
 
   useEffect(() => {
     try {
@@ -108,20 +157,32 @@ const Calendar: React.FC = () => {
     return `${y}-${m}-${d}`;
   };
   
-  const getEventsForDate = (date: Date) => {
+  // Category of an event, defaulting legacy/undefined to 'general'.
+  const eventCategory = (e: CalendarEvent): string => e.category || 'general';
+  const isCategoryVisible = (e: CalendarEvent) => !hiddenCategories.has(eventCategory(e));
+  const matchesSearch = (e: CalendarEvent) =>
+    !search.trim() || e.title.toLowerCase().includes(search.trim().toLowerCase());
+
+  // Does an event occur on `date`? Handles one-off dates and recurrence with an
+  // optional end boundary (recurUntil). Local-day comparisons throughout.
+  const eventOccursOn = (e: CalendarEvent, date: Date): boolean => {
     const dateStr = formatDate(date);
-    return events.filter(e => {
-      if (e.date === dateStr) return true;
-      if (!e.recurring || e.recurring === 'none') return false;
-      const eventDate = new Date(e.date);
-      if (eventDate > date) return false;
-      if (e.recurring === 'daily') return true;
-      if (e.recurring === 'weekly') return eventDate.getDay() === date.getDay();
-      if (e.recurring === 'monthly') return eventDate.getDate() === date.getDate();
-      if (e.recurring === 'yearly') return eventDate.getMonth() === date.getMonth() && eventDate.getDate() === date.getDate();
-      return false;
-    });
+    if (e.date === dateStr) return true;
+    if (!e.recurring || e.recurring === 'none') return false;
+    const eventDate = new Date(e.date + 'T00:00:00');
+    if (eventDate > date) return false;
+    if (e.recurUntil && dateStr > e.recurUntil) return false;
+    if (e.recurring === 'daily') return true;
+    if (e.recurring === 'weekly') return eventDate.getDay() === date.getDay();
+    if (e.recurring === 'monthly') return eventDate.getDate() === date.getDate();
+    if (e.recurring === 'yearly') return eventDate.getMonth() === date.getMonth() && eventDate.getDate() === date.getDate();
+    return false;
   };
+
+  const getEventsForDate = (date: Date) =>
+    events
+      .filter(e => isCategoryVisible(e) && matchesSearch(e) && eventOccursOn(e, date))
+      .sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
 
   const isToday = (date: Date) => formatDate(date) === formatDate(new Date());
   const isSelected = (date: Date) => selectedDate && formatDate(date) === formatDate(selectedDate);
@@ -154,7 +215,8 @@ const Calendar: React.FC = () => {
 
   const getEventsForDateAndHour = (date: Date, hour: number): CalendarEvent[] => {
     return events.filter(e => {
-      if (e.date !== formatDate(date)) return false;
+      if (!isCategoryVisible(e) || !matchesSearch(e)) return false;
+      if (!eventOccursOn(e, date)) return false;
       const eventHour = parseInt(e.time.split(':')[0], 10);
       return eventHour === hour;
     });
@@ -177,12 +239,54 @@ const Calendar: React.FC = () => {
     [events],
   );
 
+  const resetNewEvent = () => setNewEvent({
+    title: '', time: '09:00', endTime: '10:00', color: 'var(--color-accent)',
+    description: '', recurring: 'none', icon: '', category: 'general', recurUntil: '',
+  });
+
+  // Open the inline editor pre-filled for a brand new event on `date`.
+  const openNewEvent = (date: Date, time?: string, endTime?: string) => {
+    setEditingId(null);
+    setSelectedDate(date);
+    setNewEvent(prev => ({
+      ...prev,
+      title: '', description: '', icon: '',
+      time: time ?? '09:00',
+      endTime: endTime ?? '10:00',
+    }));
+    setShowEventModal(true);
+  };
+
+  // Open the inline editor pre-filled with an existing event for editing.
+  const openEditEvent = (e: CalendarEvent) => {
+    setEditingId(e.id);
+    setSelectedDate(new Date(e.date + 'T00:00:00'));
+    setNewEvent({
+      title: e.title,
+      time: e.time,
+      endTime: e.endTime,
+      color: e.color,
+      description: e.description || '',
+      recurring: e.recurring || 'none',
+      icon: e.icon || '',
+      category: e.category || 'general',
+      recurUntil: e.recurUntil || '',
+    });
+    setShowEventModal(true);
+  };
+
   const handleSaveEvent = () => {
-    if (!newEvent.title || !selectedDate) return;
-    
-    const event: CalendarEvent = {
-      id: Date.now().toString(),
-      title: newEvent.title,
+    if (!newEvent.title.trim() || !selectedDate) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Event needs a title' } }));
+      return;
+    }
+    if (toMinutes(newEvent.endTime) <= toMinutes(newEvent.time)) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'End time must be after start time' } }));
+      return;
+    }
+
+    const base = {
+      title: newEvent.title.trim(),
       date: formatDate(selectedDate),
       time: newEvent.time,
       endTime: newEvent.endTime,
@@ -190,17 +294,57 @@ const Calendar: React.FC = () => {
       description: newEvent.description,
       recurring: newEvent.recurring,
       icon: newEvent.icon || undefined,
+      category: newEvent.category,
+      recurUntil: newEvent.recurring && newEvent.recurring !== 'none' ? (newEvent.recurUntil || undefined) : undefined,
     };
 
-    setEvents(prev => [...prev, event]);
-    window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'calendarEventsCreated', amount: 1 } }));
-    setNewEvent({ title: '', time: '09:00', endTime: '10:00', color: 'var(--color-accent)', description: '', recurring: 'none', icon: '' });
+    if (editingId) {
+      setEvents(prev => prev.map(e => (e.id === editingId ? { ...e, ...base } : e)));
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event updated' } }));
+    } else {
+      const event: CalendarEvent = { id: Date.now().toString(), ...base };
+      setEvents(prev => [...prev, event]);
+      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'calendarEventsCreated', amount: 1 } }));
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event created' } }));
+    }
+
+    resetNewEvent();
+    setEditingId(null);
     setShowEventModal(false);
+  };
+
+  const closeModal = () => {
+    setShowEventModal(false);
+    setEditingId(null);
+    resetNewEvent();
   };
 
   const deleteEvent = (id: string) => {
     setEvents(prev => prev.filter(e => e.id !== id));
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event deleted' } }));
   };
+
+  const toggleCategory = (id: string) => {
+    setHiddenCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Flatten the next AGENDA_DAYS days of (visible, search-matched) events for the agenda view.
+  const agendaItems = useMemo(() => {
+    const out: { date: Date; event: CalendarEvent }[] = [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    for (let i = 0; i < AGENDA_DAYS; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      getEventsForDate(d).forEach(event => out.push({ date: d, event }));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, hiddenCategories, search]);
 
   // Drag-to-create state (week view)
   const [dragStart, setDragStart] = useState<{ date: Date; hour: number } | null>(null);
@@ -229,13 +373,11 @@ const Calendar: React.FC = () => {
     }
     const startHour = Math.min(dragStart.hour, dragEnd.hour);
     const endHour = Math.max(dragStart.hour, dragEnd.hour) + 1;
-    setSelectedDate(dragStart.date);
-    setNewEvent(prev => ({
-      ...prev,
-      time: startHour.toString().padStart(2, '0') + ':00',
-      endTime: Math.min(endHour, 23).toString().padStart(2, '0') + ':00',
-    }));
-    setShowEventModal(true);
+    openNewEvent(
+      dragStart.date,
+      startHour.toString().padStart(2, '0') + ':00',
+      Math.min(endHour, 23).toString().padStart(2, '0') + ':00',
+    );
     setIsDragging(false);
     setDragStart(null);
     setDragEnd(null);
@@ -253,6 +395,9 @@ const Calendar: React.FC = () => {
     const newDate = new Date(currentDate);
     if (view === 'week') {
       newDate.setDate(newDate.getDate() + dir * 7);
+    } else if (view === 'day') {
+      newDate.setDate(newDate.getDate() + dir);
+      setSelectedDate(new Date(newDate));
     } else {
       newDate.setMonth(newDate.getMonth() + dir);
     }
@@ -264,33 +409,178 @@ const Calendar: React.FC = () => {
     setSelectedDate(new Date());
   };
 
-  // ICS export
-  const exportICS = () => {
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DEX//Calendar//EN'];
-    events.forEach(e => {
-      const dateClean = e.date.replace(/-/g, '');
-      const timeClean = e.time.replace(':', '') + '00';
-      const endClean = e.endTime.replace(':', '') + '00';
-      lines.push('BEGIN:VEVENT');
-      lines.push(`UID:${e.id}@dex`);
-      lines.push(`DTSTART:${dateClean}T${timeClean}`);
-      lines.push(`DTEND:${dateClean}T${endClean}`);
-      lines.push(`SUMMARY:${e.title}`);
-      if (e.description) lines.push(`DESCRIPTION:${e.description}`);
-      if (e.recurring && e.recurring !== 'none') {
-        const freq = e.recurring.toUpperCase();
-        lines.push(`RRULE:FREQ=${freq}`);
+  // Jump to a specific date from the date picker. Aligns selection + visible range.
+  const jumpToDate = (value: string) => {
+    if (!value) return;
+    const d = new Date(value + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    setCurrentDate(d);
+    setSelectedDate(d);
+  };
+
+  // Keyboard navigation: arrow keys page the view, "t" jumps to today. Ignored
+  // while typing in an input/textarea or when the editor modal is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (showEventModal) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); navigate(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); navigate(1); }
+      else if (e.key === 't' || e.key === 'T') { goToToday(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, currentDate, showEventModal]);
+
+  // ICS export ------------------------------------------------------------
+  // Escape per RFC 5545: backslash, comma, semicolon, and newlines must be
+  // escaped inside SUMMARY/DESCRIPTION text values.
+  const icsEscape = (s: string): string =>
+    (s || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\r?\n/g, '\\n');
+
+  // UTC timestamp stamp (DTSTAMP) in basic ICS form, e.g. 20260101T120000Z.
+  const icsStamp = (): string => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+  };
+
+  // Build the VEVENT block lines for one event (local floating times, no Z).
+  const buildVEvent = (e: CalendarEvent): string[] => {
+    const dateClean = e.date.replace(/-/g, '');
+    const timeClean = e.time.replace(':', '') + '00';
+    const endClean = e.endTime.replace(':', '') + '00';
+    const out = [
+      'BEGIN:VEVENT',
+      `UID:${e.id}@dex`,
+      `DTSTAMP:${icsStamp()}`,
+      `DTSTART:${dateClean}T${timeClean}`,
+      `DTEND:${dateClean}T${endClean}`,
+      `SUMMARY:${icsEscape(e.title)}`,
+    ];
+    if (e.description) out.push(`DESCRIPTION:${icsEscape(e.description)}`);
+    if (e.category) out.push(`CATEGORIES:${icsEscape(eventCategory(e))}`);
+    if (e.recurring && e.recurring !== 'none') {
+      let rule = `RRULE:FREQ=${e.recurring.toUpperCase()}`;
+      if (e.recurUntil) rule += `;UNTIL=${e.recurUntil.replace(/-/g, '')}T235959`;
+      out.push(rule);
+    }
+    out.push('END:VEVENT');
+    return out;
+  };
+
+  // Wrap VEVENT blocks in a VCALENDAR envelope and trigger a Blob download.
+  const downloadICS = (vevents: CalendarEvent[], filename: string) => {
+    try {
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DEX//Calendar//EN', 'CALSCALE:GREGORIAN'];
+      vevents.forEach(e => lines.push(...buildVEvent(e)));
+      lines.push('END:VCALENDAR');
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Exported ${vevents.length} event${vevents.length === 1 ? '' : 's'}` } }));
+    } catch (err) {
+      console.warn('[Calendar] ICS export failed:', err);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Export failed' } }));
+    }
+  };
+
+  // Export every stored event.
+  const exportICS = () => downloadICS(events, 'dex-calendar.ics');
+
+  // Export a single event (used from the editor footer + day list).
+  const exportEventICS = (e: CalendarEvent) => {
+    const safe = (e.title || 'event').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'event';
+    downloadICS([e], `dex-${safe}.ics`);
+  };
+
+  // Export only the events occurring within the currently visible range
+  // (month / week / day). Recurring instances are materialised per-day so the
+  // exported file reflects what the user actually sees.
+  const exportVisibleRange = () => {
+    try {
+      let rangeStart: Date;
+      let rangeEnd: Date;
+      if (view === 'week') {
+        const wd = getWeekDates(currentDate);
+        rangeStart = wd[0]; rangeEnd = wd[6];
+      } else if (view === 'day') {
+        rangeStart = new Date(currentDate); rangeEnd = new Date(currentDate);
+      } else if (view === 'agenda') {
+        rangeStart = new Date(); rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeStart.getDate() + AGENDA_DAYS - 1);
+      } else {
+        rangeStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        rangeEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
       }
-      lines.push('END:VEVENT');
-    });
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dex-calendar.ics';
-    a.click();
-    URL.revokeObjectURL(url);
+      // Walk each day in the range, emit one concrete VEVENT per occurrence.
+      const out: CalendarEvent[] = [];
+      const seen = new Set<string>();
+      const cursor = new Date(rangeStart);
+      cursor.setHours(0, 0, 0, 0);
+      while (cursor <= rangeEnd) {
+        getEventsForDate(cursor).forEach(e => {
+          const occDate = formatDate(cursor);
+          const key = e.id + occDate;
+          if (seen.has(key)) return;
+          seen.add(key);
+          // Pin recurring occurrences to their concrete day; one-offs unchanged.
+          out.push({ ...e, date: occDate, recurring: 'none', recurUntil: undefined, id: `${e.id}-${occDate}` });
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      if (out.length === 0) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'No events in the visible range' } }));
+        return;
+      }
+      downloadICS(out, `dex-calendar-${formatDate(rangeStart)}.ics`);
+    } catch (err) {
+      console.warn('[Calendar] Range export failed:', err);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Export failed' } }));
+    }
+  };
+
+  // Duplicate an event (one-click copy). The copy lands on the same day with a
+  // "(copy)" suffix and a fresh id, then is selected for quick editing.
+  const duplicateEvent = (e: CalendarEvent) => {
+    try {
+      const copy: CalendarEvent = {
+        ...e,
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        title: `${e.title} (copy)`,
+      };
+      setEvents(prev => [...prev, copy]);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event duplicated' } }));
+    } catch (err) {
+      console.warn('[Calendar] Duplicate failed:', err);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not duplicate' } }));
+    }
+  };
+
+  // Quick reschedule: shift an event's date forward by `days` (e.g. +1 / +7).
+  const rescheduleEvent = (e: CalendarEvent, days: number) => {
+    try {
+      const d = new Date(e.date + 'T00:00:00');
+      if (isNaN(d.getTime())) return;
+      d.setDate(d.getDate() + days);
+      const newDate = formatDate(d);
+      setEvents(prev => prev.map(ev => (ev.id === e.id ? { ...ev, date: newDate } : ev)));
+      const label = days === 1 ? 'tomorrow' : days === 7 ? 'next week' : `+${days}d`;
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Moved to ${label}` } }));
+    } catch (err) {
+      console.warn('[Calendar] Reschedule failed:', err);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not reschedule' } }));
+    }
   };
 
   // ICS import
@@ -299,6 +589,7 @@ const Calendar: React.FC = () => {
     input.type = 'file';
     input.accept = '.ics';
     input.onchange = async () => {
+      try {
       const file = input.files?.[0];
       if (!file) return;
       const text = await file.text();
@@ -315,8 +606,13 @@ const Calendar: React.FC = () => {
         const summary = get('SUMMARY');
         const desc = get('DESCRIPTION');
         const rrule = get('RRULE');
+        const catRaw = get('CATEGORIES').toLowerCase();
+        const category = CATEGORIES.some(c => c.id === catRaw) ? catRaw : 'general';
         if (!summary || !dtstart) continue;
         const date = dtstart.length >= 8 ? `${dtstart.slice(0,4)}-${dtstart.slice(4,6)}-${dtstart.slice(6,8)}` : '';
+        // Skip entries that didn't yield a usable calendar day; importing an
+        // event with an empty date would make it un-renderable and unmatchable.
+        if (!date) continue;
         const time = dtstart.length >= 13 ? `${dtstart.slice(9,11)}:${dtstart.slice(11,13)}` : '09:00';
         const endTime = dtend.length >= 13 ? `${dtend.slice(9,11)}:${dtend.slice(11,13)}` : '10:00';
         let recurring: CalendarEvent['recurring'] = 'none';
@@ -324,9 +620,19 @@ const Calendar: React.FC = () => {
         else if (rrule.includes('WEEKLY')) recurring = 'weekly';
         else if (rrule.includes('MONTHLY')) recurring = 'monthly';
         else if (rrule.includes('YEARLY')) recurring = 'yearly';
-        imported.push({ id: Date.now().toString() + i, title: summary, date, time, endTime, color: 'var(--color-accent)', description: desc, recurring });
+        const catColor = CATEGORIES.find(c => c.id === category)?.color || 'var(--color-accent)';
+        imported.push({ id: Date.now().toString() + i, title: summary, date, time, endTime, color: catColor, description: desc, recurring, category });
       }
-      if (imported.length > 0) setEvents(prev => [...prev, ...imported]);
+      if (imported.length > 0) {
+        setEvents(prev => [...prev, ...imported]);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Imported ${imported.length} event${imported.length === 1 ? '' : 's'}` } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'No events found in file' } }));
+      }
+      } catch (err) {
+        console.warn('[Calendar] ICS import failed:', err);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Import failed' } }));
+      }
     };
     input.click();
   };
@@ -354,19 +660,59 @@ const Calendar: React.FC = () => {
                     ? `${months[s.getMonth()]} ${s.getDate()} \u2013 ${e.getDate()}, ${s.getFullYear()}`
                     : `${months[s.getMonth()].slice(0,3)} ${s.getDate()} \u2013 ${months[e.getMonth()].slice(0,3)} ${e.getDate()}, ${e.getFullYear()}`;
                 })()
+              : view === 'day'
+              ? currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+              : view === 'agenda'
+              ? `Next ${AGENDA_DAYS} Days`
               : `${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`
             }
           </h1>
+          <input
+            style={styles.jumpDate}
+            type="date"
+            value={formatDate(currentDate)}
+            onChange={e => jumpToDate(e.target.value)}
+            aria-label="Jump to date"
+            title="Jump to date"
+          />
         </div>
         <div style={styles.headerRight}>
+          <div style={styles.searchWrap}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              style={styles.searchInput}
+              type="text"
+              placeholder="Search events"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              aria-label="Search events"
+            />
+            {search && (
+              <button style={styles.searchClear} onClick={() => setSearch('')} aria-label="Clear search"><DexIcon name="close" size={11} /></button>
+            )}
+          </div>
           <div style={styles.viewToggle}>
             <button style={{ ...styles.viewBtn, ...(view === 'month' ? styles.viewBtnActive : {}) }} onClick={() => setView('month')} aria-label="Month view">Month</button>
             <button style={{ ...styles.viewBtn, ...(view === 'week' ? styles.viewBtnActive : {}) }} onClick={() => setView('week')} aria-label="Week view">Week</button>
+            <button style={{ ...styles.viewBtn, ...(view === 'day' ? styles.viewBtnActive : {}) }} onClick={() => setView('day')} aria-label="Day view">Day</button>
+            <button style={{ ...styles.viewBtn, ...(view === 'agenda' ? styles.viewBtnActive : {}) }} onClick={() => setView('agenda')} aria-label="Agenda view">Agenda</button>
           </div>
-          <button style={styles.addBtn} onClick={() => setShowEventModal(true)} aria-label="Add event" title="Add event">
+          <button style={styles.addBtn} onClick={() => openNewEvent(selectedDate || new Date())} aria-label="Add event" title="Add event">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
-          <button style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportICS} aria-label="Export ICS">Export</button>
+          {(view === 'week' || view === 'day') && (
+            <button
+              style={{ ...styles.todayBtn, marginLeft: 4, ...(showWorkingHours ? styles.viewBtnActive : {}) }}
+              onClick={() => setShowWorkingHours(v => !v)}
+              aria-pressed={showWorkingHours}
+              aria-label="Toggle working hours overlay"
+              title={`${showWorkingHours ? 'Hide' : 'Show'} working-hours overlay (${formatHour(WORK_START)}–${formatHour(WORK_END)})`}
+            >
+              Hours
+            </button>
+          )}
+          <button style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportVisibleRange} aria-label="Export visible range to ICS" title="Export the events you're currently viewing">Export</button>
+          <button style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={exportICS} aria-label="Export all events to ICS" title="Export every event">Export All</button>
           <button style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={importICS} aria-label="Import ICS">Import</button>
 
         </div>
@@ -402,6 +748,32 @@ const Calendar: React.FC = () => {
                 </div>
               </div>
 
+              {/* Categories (colour-coded, toggle visibility) */}
+              <div style={styles.catSection}>
+                <div style={styles.dayEventsHeader}>
+                  <span style={styles.dayEventsTitle}>Categories</span>
+                </div>
+                <div style={styles.catList}>
+                  {CATEGORIES.map(cat => {
+                    const hidden = hiddenCategories.has(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        style={{ ...styles.catRow, opacity: hidden ? 0.4 : 1 }}
+                        onClick={() => toggleCategory(cat.id)}
+                        aria-pressed={!hidden}
+                        aria-label={`${hidden ? 'Show' : 'Hide'} ${cat.name}`}
+                        title={`${hidden ? 'Show' : 'Hide'} ${cat.name}`}
+                      >
+                        <span style={{ ...styles.catSwatch, background: cat.color, ...(hidden ? { background: 'transparent', border: `2px solid ${cat.color}` } : {}) }} />
+                        <span style={styles.catName}>{cat.name}</span>
+                        <DexIcon name={hidden ? 'eye-off' : 'eye'} size={12} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Selected Day Events */}
               {selectedDate && (
                 <div style={styles.dayEvents}>
@@ -421,7 +793,12 @@ const Calendar: React.FC = () => {
                       </div>
                     ) : (
                       getEventsForDate(selectedDate).map(event => (
-                        <div key={event.id} style={{ ...styles.eventItem, borderLeftColor: event.color }}>
+                        <div
+                          key={event.id}
+                          style={{ ...styles.eventItem, borderLeftColor: event.color, cursor: 'pointer' }}
+                          onClick={() => openEditEvent(event)}
+                          title="Click to edit"
+                        >
                           <div style={styles.eventTime}>
                             {event.time} - {event.endTime}
                             {conflictIds.has(event.id) && (
@@ -431,7 +808,13 @@ const Calendar: React.FC = () => {
                             )}
                           </div>
                           <div style={styles.eventTitle}>{event.title}</div>
-                          <button style={styles.deleteEventBtn} onClick={() => deleteEvent(event.id)} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
+                          <div style={styles.eventActions} onClick={e => e.stopPropagation()}>
+                            <button style={styles.eventActionBtn} onClick={() => duplicateEvent(event)} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={11} /></button>
+                            <button style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 1)} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day">+1d</button>
+                            <button style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 7)} aria-label={`Move ${event.title} to next week`} title="Reschedule +1 week">+1w</button>
+                            <button style={styles.eventActionBtn} onClick={() => exportEventICS(event)} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={11} /></button>
+                          </div>
+                          <button style={styles.deleteEventBtn} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
                         </div>
                       ))
                     )}
@@ -502,6 +885,120 @@ const Calendar: React.FC = () => {
                 })}
               </div>
             </>
+          ) : view === 'agenda' ? (
+            /* Agenda / List View */
+            <div style={styles.agendaContainer}>
+              {agendaItems.length === 0 ? (
+                <div style={styles.noEvents}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.35, marginBottom: 'var(--space-2)' }}>
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                  <div>No upcoming events{search ? ' match your search' : ''}</div>
+                </div>
+              ) : (
+                (() => {
+                  // Group agenda items by day for headers.
+                  const groups: { key: string; date: Date; items: typeof agendaItems }[] = [];
+                  agendaItems.forEach(item => {
+                    const key = formatDate(item.date);
+                    let g = groups.find(x => x.key === key);
+                    if (!g) { g = { key, date: item.date, items: [] }; groups.push(g); }
+                    g.items.push(item);
+                  });
+                  return groups.map(group => (
+                    <div key={group.key} style={styles.agendaGroup}>
+                      <div style={{ ...styles.agendaDayLabel, ...(isToday(group.date) ? styles.agendaDayLabelToday : {}) }}>
+                        {isToday(group.date) ? 'Today · ' : ''}
+                        {group.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </div>
+                      {group.items.map(({ event }) => (
+                        <div
+                          key={event.id + group.key}
+                          style={{ ...styles.agendaItem, borderLeftColor: event.color }}
+                          onClick={() => openEditEvent(event)}
+                          title="Click to edit"
+                        >
+                          <span style={styles.agendaTime}>{event.time}</span>
+                          {event.icon && (
+                            <span style={{ color: event.color, display: 'inline-flex' }}>
+                              <DexIcon name={event.icon} size={14} color="currentColor" />
+                            </span>
+                          )}
+                          <span style={styles.agendaTitle}>{event.title}</span>
+                          {conflictIds.has(event.id) && (
+                            <span style={styles.conflictTag} title="Overlaps another event">
+                              <DexIcon name="alert-triangle" size={10} /> Conflict
+                            </span>
+                          )}
+                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); duplicateEvent(event); }} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={12} /></button>
+                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); rescheduleEvent(event, 1); }} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day"><DexIcon name="chevron-right" size={12} /></button>
+                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); exportEventICS(event); }} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={12} /></button>
+                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()
+              )}
+            </div>
+          ) : view === 'day' ? (
+            /* Day View - single-column hour grid */
+            <div style={styles.weekViewContainer}>
+              <div style={styles.dayViewHeader}>
+                <div style={styles.weekViewTimeGutter} />
+                <div style={{ ...styles.weekViewDayHeader, ...(isToday(currentDate) ? styles.weekViewDayHeaderToday : {}) }}>
+                  <span style={styles.weekViewDayName}>{currentDate.toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                  <span style={{ ...styles.weekViewDayNum, ...(isToday(currentDate) ? styles.weekViewDayNumToday : {}) }}>
+                    {currentDate.getDate()}
+                  </span>
+                </div>
+              </div>
+              <div style={styles.weekViewBody}>
+                {Array.from({ length: 24 }, (_, hour) => {
+                  const slotEvents = getEventsForDateAndHour(currentDate, hour);
+                  return (
+                    <div key={hour} style={styles.dayViewRow}>
+                      <div style={styles.weekViewTimeLabel}>
+                        <span style={styles.weekViewTimeLabelText}>{formatHour(hour)}</span>
+                      </div>
+                      <div
+                        style={{
+                          ...styles.weekViewCell,
+                          ...(showWorkingHours && isWeekend(currentDate) ? styles.weekViewCellWeekend : {}),
+                          ...(showWorkingHours && isOffHour(hour) ? styles.weekViewCellOffHour : {}),
+                          ...(isToday(currentDate) ? styles.weekViewCellToday : {}),
+                          ...(isInDragRange(currentDate, hour) ? { background: 'var(--color-accent-light, rgba(74,158,255,0.15))' } : {}),
+                        }}
+                        onMouseDown={e => { e.preventDefault(); handleDragStart(currentDate, hour); }}
+                        onMouseEnter={() => handleDragMove(currentDate, hour)}
+                        onMouseUp={() => handleDragEnd()}
+                        onClick={() => {
+                          if (isDragging) return;
+                          const endHour = Math.min(hour + 1, 23);
+                          openNewEvent(currentDate, hour.toString().padStart(2, '0') + ':00', endHour.toString().padStart(2, '0') + ':00');
+                        }}
+                      >
+                        {slotEvents.map(event => (
+                          <div
+                            key={event.id}
+                            style={{
+                              ...styles.dayViewEvent,
+                              background: event.color,
+                              ...(conflictIds.has(event.id) ? styles.weekViewEventConflict : {}),
+                            }}
+                            onClick={e => { e.stopPropagation(); openEditEvent(event); }}
+                            title="Click to edit"
+                          >
+                            <span style={styles.weekViewEventTitle}>{event.title}</span>
+                            <span style={styles.weekViewEventTime}>{event.time} - {event.endTime}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             /* Week View */
             <div style={styles.weekViewContainer}>
@@ -540,6 +1037,8 @@ const Calendar: React.FC = () => {
                           key={dayIdx}
                           style={{
                             ...styles.weekViewCell,
+                            ...(showWorkingHours && isWeekend(date) ? styles.weekViewCellWeekend : {}),
+                            ...(showWorkingHours && isOffHour(hour) ? styles.weekViewCellOffHour : {}),
                             ...(isToday(date) ? styles.weekViewCellToday : {}),
                             ...(isInDragRange(date, hour) ? { background: 'var(--color-accent-light, rgba(74,158,255,0.15))' } : {}),
                           }}
@@ -548,12 +1047,8 @@ const Calendar: React.FC = () => {
                           onMouseUp={() => handleDragEnd()}
                           onClick={() => {
                             if (isDragging) return;
-                            setSelectedDate(date);
-                            const timeStr = hour.toString().padStart(2, '0') + ':00';
                             const endHour = Math.min(hour + 1, 23);
-                            const endTimeStr = endHour.toString().padStart(2, '0') + ':00';
-                            setNewEvent(prev => ({ ...prev, time: timeStr, endTime: endTimeStr }));
-                            setShowEventModal(true);
+                            openNewEvent(date, hour.toString().padStart(2, '0') + ':00', endHour.toString().padStart(2, '0') + ':00');
                           }}
                         >
                           {slotEvents.map(event => (
@@ -564,8 +1059,8 @@ const Calendar: React.FC = () => {
                                 background: event.color,
                                 ...(conflictIds.has(event.id) ? styles.weekViewEventConflict : {}),
                               }}
-                              onClick={e => e.stopPropagation()}
-                              title={conflictIds.has(event.id) ? 'Overlaps another event' : undefined}
+                              onClick={e => { e.stopPropagation(); openEditEvent(event); }}
+                              title={conflictIds.has(event.id) ? 'Overlaps another event' : 'Click to edit'}
                             >
                               <span style={styles.weekViewEventTitle}>{event.title}</span>
                               <span style={styles.weekViewEventTime}>{event.time}</span>
@@ -584,11 +1079,11 @@ const Calendar: React.FC = () => {
 
       {/* Event Modal */}
       {showEventModal && (
-        <div style={styles.modalOverlay} onMouseDown={() => setShowEventModal(false)}>
-          <div style={styles.modal} role="dialog" aria-label="New Event" aria-modal="true" onMouseDown={e => e.stopPropagation()}>
+        <div style={styles.modalOverlay} onMouseDown={closeModal}>
+          <div style={styles.modal} role="dialog" aria-label={editingId ? 'Edit Event' : 'New Event'} aria-modal="true" onMouseDown={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>New Event</h2>
-              <button style={styles.modalClose} onClick={() => setShowEventModal(false)} aria-label="Close modal"><DexIcon name="close" size={14} /></button>
+              <h2 style={styles.modalTitle}>{editingId ? 'Edit Event' : 'New Event'}</h2>
+              <button style={styles.modalClose} onClick={closeModal} aria-label="Close modal"><DexIcon name="close" size={14} /></button>
             </div>
             <div style={styles.modalBody}>
               <input
@@ -598,6 +1093,13 @@ const Calendar: React.FC = () => {
                 value={newEvent.title}
                 onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
                 autoFocus
+              />
+              <input
+                style={styles.timeInput}
+                type="date"
+                value={selectedDate ? formatDate(selectedDate) : formatDate(new Date())}
+                onChange={e => { if (e.target.value) setSelectedDate(new Date(e.target.value + 'T00:00:00')); }}
+                aria-label="Event date"
               />
               <div style={styles.timeRow}>
                 <input
@@ -613,6 +1115,29 @@ const Calendar: React.FC = () => {
                   value={newEvent.endTime}
                   onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })}
                 />
+              </div>
+              {/* Category picker */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+                      border: '1px solid ' + (newEvent.category === cat.id ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
+                      background: newEvent.category === cat.id ? 'var(--color-bg-hover)' : 'transparent',
+                      color: 'var(--color-text-secondary)',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onClick={() => setNewEvent({ ...newEvent, category: cat.id, color: cat.color })}
+                    aria-label={`Category ${cat.name}`}
+                    aria-pressed={newEvent.category === cat.id}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: cat.color }} />
+                    {cat.name}
+                  </button>
+                ))}
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                 {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map(r => (
@@ -634,6 +1159,23 @@ const Calendar: React.FC = () => {
                   </button>
                 ))}
               </div>
+              {newEvent.recurring && newEvent.recurring !== 'none' && (
+                <div style={styles.timeRow}>
+                  <span style={styles.timeSep}>Until</span>
+                  <input
+                    style={styles.timeInput}
+                    type="date"
+                    value={newEvent.recurUntil}
+                    min={selectedDate ? formatDate(selectedDate) : undefined}
+                    onChange={e => setNewEvent({ ...newEvent, recurUntil: e.target.value })}
+                    aria-label="Repeat until date"
+                    title="Leave empty to repeat forever"
+                  />
+                  {newEvent.recurUntil && (
+                    <button style={styles.modalClose} onClick={() => setNewEvent({ ...newEvent, recurUntil: '' })} aria-label="Clear end date"><DexIcon name="close" size={12} /></button>
+                  )}
+                </div>
+              )}
               <div style={styles.iconPicker}>
                 <button
                   type="button"
@@ -677,8 +1219,30 @@ const Calendar: React.FC = () => {
               />
             </div>
             <div style={styles.modalFooter}>
-              <button style={styles.cancelBtn} onClick={() => setShowEventModal(false)} aria-label="Cancel">Cancel</button>
-              <button style={styles.saveBtn} onClick={handleSaveEvent} aria-label="Save event">Save Event</button>
+              {editingId && (() => {
+                const current = events.find(ev => ev.id === editingId);
+                return (
+                  <div style={{ display: 'flex', gap: '6px', marginRight: 'auto', flexWrap: 'wrap' }}>
+                    <button
+                      style={{ ...styles.cancelBtn, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                      onClick={() => { deleteEvent(editingId); closeModal(); }}
+                      aria-label="Delete event"
+                    >
+                      Delete
+                    </button>
+                    {current && (
+                      <>
+                        <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event" title="Duplicate">Duplicate</button>
+                        <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 1); closeModal(); }} aria-label="Move to tomorrow" title="Reschedule +1 day">+1 Day</button>
+                        <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 7); closeModal(); }} aria-label="Move to next week" title="Reschedule +1 week">+1 Week</button>
+                        <button style={styles.cancelBtn} onClick={() => exportEventICS(current)} aria-label="Export this event" title="Export this event (.ics)">Export</button>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+              <button style={styles.cancelBtn} onClick={closeModal} aria-label="Cancel">Cancel</button>
+              <button style={styles.saveBtn} onClick={handleSaveEvent} aria-label="Save event">{editingId ? 'Save Changes' : 'Save Event'}</button>
             </div>
           </div>
         </div>
@@ -749,6 +1313,48 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     margin: 0,
     letterSpacing: '-0.3px',
+  },
+  jumpDate: {
+    background: 'var(--color-bg-hover)',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '4px',
+    padding: '5px 8px',
+    color: 'var(--color-text-secondary)',
+    fontSize: '11px',
+    fontWeight: 600,
+    fontFamily: 'var(--dex-font-ui)',
+    outline: 'none',
+    colorScheme: 'dark',
+  },
+  searchWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: 'var(--color-bg-hover)',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '4px',
+    padding: '0 8px',
+    height: '28px',
+    color: 'var(--color-text-tertiary)',
+  },
+  searchInput: {
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    color: 'var(--color-text-primary)',
+    fontSize: '12px',
+    fontWeight: 500,
+    fontFamily: 'var(--dex-font-ui)',
+    width: '120px',
+  },
+  searchClear: {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--color-text-muted)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    padding: 0,
   },
   viewToggle: {
     display: 'flex',
@@ -867,6 +1473,40 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
     border: '1px solid var(--dex-focus-color, #fff)',
   },
+  catSection: {
+    marginBottom: 'var(--space-4)',
+  },
+  catList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  },
+  catRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '5px 6px',
+    cursor: 'pointer',
+    color: 'var(--color-text-secondary)',
+    fontSize: '12px',
+    transition: 'all 0.15s ease',
+  },
+  catSwatch: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '3px',
+    flexShrink: 0,
+    boxSizing: 'border-box',
+  },
+  catName: {
+    flex: 1,
+    textAlign: 'left',
+    fontWeight: 500,
+  },
   dayEvents: {
     marginTop: 'var(--space-3)',
   },
@@ -916,6 +1556,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 600,
     color: 'var(--color-text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    paddingRight: '22px',
   },
   conflictTag: {
     display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -923,6 +1567,27 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-warning)',
     background: 'var(--color-warning-muted, rgba(255,159,10,0.15))',
     fontWeight: 600, letterSpacing: 0,
+  },
+  eventActions: {
+    display: 'flex',
+    gap: '4px',
+    marginTop: '8px',
+    flexWrap: 'wrap',
+  },
+  eventActionBtn: {
+    background: 'var(--color-bg-hover)',
+    border: '1px solid var(--color-border-subtle)',
+    color: 'var(--color-text-tertiary)',
+    fontSize: '10px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    padding: '3px 6px',
+    borderRadius: '3px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '3px',
+    transition: 'all 0.15s ease',
+    fontFamily: 'var(--dex-font-ui)',
   },
   deleteEventBtn: {
     position: 'absolute',
@@ -1116,6 +1781,15 @@ const styles: Record<string, React.CSSProperties> = {
   weekViewCellToday: {
     background: 'var(--color-accent-soft, rgba(74,158,255,0.04))',
   },
+  // Non-working-hour shading (overlaid below other backgrounds via spread order).
+  weekViewCellOffHour: {
+    background: 'var(--color-bg-base)',
+    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 6px, color-mix(in srgb, var(--color-text-muted) 6%, transparent) 6px, color-mix(in srgb, var(--color-text-muted) 6%, transparent) 7px)',
+  },
+  // Weekend column dimming.
+  weekViewCellWeekend: {
+    background: 'color-mix(in srgb, var(--color-text-muted) 4%, transparent)',
+  },
   weekViewEvent: {
     borderRadius: '3px',
     padding: '2px 6px',
@@ -1141,6 +1815,95 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: 'var(--color-text-primary)',
     display: 'block',
+  },
+  // -- Day View ----------------------------------------------
+  dayViewHeader: {
+    display: 'grid',
+    gridTemplateColumns: '56px 1fr',
+    borderBottom: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-surface)',
+  },
+  dayViewRow: {
+    display: 'grid',
+    gridTemplateColumns: '56px 1fr',
+    minHeight: '48px',
+    borderBottom: '1px solid var(--color-border-subtle)',
+  },
+  dayViewEvent: {
+    borderRadius: '4px',
+    padding: '4px 8px',
+    marginBottom: '2px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    boxShadow: 'var(--shadow-sm)',
+  },
+  // -- Agenda / List View ------------------------------------
+  agendaContainer: {
+    flex: 1,
+    overflowY: 'auto' as const,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-3)',
+    paddingRight: '4px',
+  },
+  agendaGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  agendaDayLabel: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'var(--color-text-tertiary)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.4px',
+    padding: '4px 2px',
+    position: 'sticky' as const,
+    top: 0,
+    background: 'var(--color-bg-base)',
+    zIndex: 1,
+  },
+  agendaDayLabelToday: {
+    color: 'var(--color-accent)',
+  },
+  agendaItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    background: 'var(--color-bg-surface)',
+    border: '1px solid var(--color-border-subtle)',
+    borderLeft: '3px solid',
+    borderRadius: '6px',
+    padding: '10px var(--space-3)',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  agendaTime: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'var(--color-text-muted)',
+    minWidth: '44px',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  agendaTitle: {
+    flex: 1,
+    fontSize: '13px',
+    fontWeight: 600,
+    color: 'var(--color-text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  agendaDelete: {
+    background: 'var(--color-bg-hover)',
+    border: 'none',
+    color: 'var(--color-text-muted)',
+    cursor: 'pointer',
+    padding: '4px 6px',
+    borderRadius: '3px',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.15s ease',
   },
   modalOverlay: {
     position: 'fixed',

@@ -4,6 +4,7 @@
  * Professional color picker with HSL/RGB/HEX, palette, and history
  */
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { sendToNotes } from '../../services/sendTo';
 
 interface HSL { h: number; s: number; l: number }
 
@@ -139,6 +140,7 @@ const ColorPicker: React.FC = () => {
           <span style={s.sliderLabel}>H</span>
           <input type="range" min={0} max={360} value={hsl.h}
             onChange={e => setHsl(p => ({ ...p, h: +e.target.value }))}
+            aria-label="Hue" aria-valuetext={`${hsl.h} degrees`}
             style={{ ...s.slider, background: `linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)` }} />
           <span style={s.sliderVal}>{hsl.h}°</span>
         </div>
@@ -146,6 +148,7 @@ const ColorPicker: React.FC = () => {
           <span style={s.sliderLabel}>S</span>
           <input type="range" min={0} max={100} value={hsl.s}
             onChange={e => setHsl(p => ({ ...p, s: +e.target.value }))}
+            aria-label="Saturation" aria-valuetext={`${hsl.s} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, ${hslToHex(hsl.h, 0, hsl.l)}, ${hslToHex(hsl.h, 100, hsl.l)})` }} />
           <span style={s.sliderVal}>{hsl.s}%</span>
         </div>
@@ -153,6 +156,7 @@ const ColorPicker: React.FC = () => {
           <span style={s.sliderLabel}>L</span>
           <input type="range" min={0} max={100} value={hsl.l}
             onChange={e => setHsl(p => ({ ...p, l: +e.target.value }))}
+            aria-label="Lightness" aria-valuetext={`${hsl.l} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, #000, ${hslToHex(hsl.h, hsl.s, 50)}, #fff)` }} />
           <span style={s.sliderVal}>{hsl.l}%</span>
         </div>
@@ -172,6 +176,17 @@ const ColorPicker: React.FC = () => {
           <span style={s.valueLabel}>HSL</span>
           <span style={s.valueText}>{hsl.h}, {hsl.s}%, {hsl.l}%</span>
         </button>
+        <button
+          onClick={() => sendToNotes(
+            `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
+            `Color ${hex.toUpperCase()}`,
+          )}
+          style={s.valueChip}
+          title="Send swatch to Notes"
+        >
+          <span style={s.valueLabel}>SEND</span>
+          <span style={s.valueText}>Notes</span>
+        </button>
       </div>
 
       {copied && <div style={s.copiedToast}>Copied!</div>}
@@ -184,6 +199,7 @@ const ColorPicker: React.FC = () => {
           style={s.hexInput}
           placeholder="#000000"
           maxLength={7}
+          aria-label="Hex color value"
         />
       </div>
 
@@ -194,7 +210,7 @@ const ColorPicker: React.FC = () => {
           {PRESETS.map((c, i) => (
             <button key={`${c}-${i}`} onClick={() => setHsl(hexToHsl(c))}
               style={{ ...s.swatch, background: c, boxShadow: c === hex ? '0 0 0 2px var(--color-accent)' : 'none' }}
-              title={c} />
+              title={c} aria-label={`Use preset color ${c}`} />
           ))}
         </div>
       </div>
@@ -223,7 +239,7 @@ const ColorPicker: React.FC = () => {
                 copy(c);
               }}
                 style={{ ...s.swatch, background: c }}
-                title={c} />
+                title={c} aria-label={`Reuse recent color ${c}`} />
             ))}
           </div>
         </div>

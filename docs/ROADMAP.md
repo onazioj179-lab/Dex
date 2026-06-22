@@ -2092,6 +2092,259 @@ REMAINING (lower leverage / deferred):
 > confirmed intact. Verified: tsc 0; shell + dock + UKI mount clean; 2-search gone
 > (launcher grid shows, only the dock pill remains).
 
+> **DONE — v6.0.4 Per-App Completion, Batch 1 (productivity apps).** Honest
+> finding first: these apps were already large/functional, so this closed the REAL
+> gaps and wired the REAL missing pieces rather than rebuilding finished work
+> (Notes TOC-nav/split-view/font-picker and the Games launcher were already done).
+> SHARED FOUNDATIONS: `shared/time/dateHelpers.ts` (one definition of overdue/due-
+> soon + token colours + recurrence advance) and `shared/collections/sortFilter.ts`
+> (multi-term AND search, priority rank, comparator) -- reused across Kanban/Notes/
+> DexCode for identical semantics. ACHIEVEMENTS (highest-value, cross-cutting): new
+> `services/achievementEngine.ts` un-mutes the unlock reward the owner had disabled
+> for spamming -- it now COALESCES a burst into ONE notification (verified live: a
+> 2000-note stat bump unlocked 36 at once and produced a single "36 achievements
+> unlocked +1415 points" banner, not 36). Added `unlockedAt` timestamps to
+> EngagementState; fixed the silent-unlock leak where Prism/Flux/Vinx/Axl discarded
+> `newUnlocks` (now routed through the coalescing engine); wired the built-but-dead
+> daily-challenge system into a Trophies section (Lv/XP/streak + 3 live cards) with
+> stat->challenge progress + completion toasts; live grid refresh on unlock; a
+> "Recently unlocked" sort; and a local "Share progress" (clipboard). Multiplayer
+> leaderboard left as local-first (no backend exists -- not faked). KANBAN: controls
+> strip (canonical DexSearchInput + sort by due/priority/created/title + dir toggle
+> + priority filter, display-only), within-column drag-reorder with a drop indicator
+> and the same-column off-by-one fix, overdue/due-soon colouring + relative labels,
+> and REAL recurring tasks (a recurring card reaching Done respawns in origin with
+> the due date advanced + checklist reset). NEXUS: fixed the close glitch -- added a
+> close button (verified: closes the app via dex-close-app) + minimal-mode toggle +
+> auto-collapse under 520px; second-Esc closes; tiered marker cap by perf tier with
+> a shown/total overflow read-out; low-tier drops the sweep/framing passes. NOTES:
+> indent/outdent + alignment toolbar group (native execCommand, persists like Bold);
+> a per-editor word-count goal pill with session delta; and REAL cross-folder search
+> -- the store's `dexnotes:search` fallback returned [] (found nothing); now a real
+> title+body scan, merged into the folder-scoped list so search spans the vault.
+> DEXCODE: new `dexCode/project.ts` (open a folder via the proven Forge dialog/
+> readdir bridge, browse top-level source files, open on click, grep across files to
+> file:line hits that open + jump). Verified: tsc 0, watermark lint 0; live runtime
+> checks of Achievements engine/UI, Kanban controls, and Nexus close all pass; no
+> console errors. NOTE: DexCode project-open uses the native directory dialog (absent
+> in the web preview) -- verify in the packaged app. Deferred (honest): Notes folder
+> breadcrumb (avoided render surgery near two TitleInput sites); DexCode goto-def
+> across files. NEXT BATCH: Creative suite completion (Imosion/Vinx/Prism/Flux/Forge/
+> Axl) under the same no-skip mandate (real engines via WebCodecs/WASM/WebGL/Web
+> Audio, native paths flagged honestly).
+
+> **DONE — Nexus de-chat + UKI popup drag polish (owner follow-up).** The inline
+> "command cradle" in Nexus (Filter-nodes input + Ask-UKI chat field + send + mic)
+> was glitchy on contact and unwanted -- removed it entirely along with its dead
+> code (askUki/toggleMic/micArmed/query state + filter, the click-core-to-mic
+> gesture, the "/" focus keybind, and the now-unused cradleBtn helper). Nexus is now
+> a pure visualisation HUD: hovering/clicking a marker still routes it to the UKI
+> assistant (the draggable popup) via dex-uki-ask -- no chat surface lives in Nexus.
+> Then made the floating UKI popup (UkiOverlay) drag *better*: the drag handle is
+> now just the header (clicking the response/content area no longer starts a drag),
+> dragging uses pointer events (survives fast moves / leaving the window) with a
+> body grabbing-cursor + selection lock, the on-screen clamp uses the panel's
+> MEASURED size (the old hard-coded 380x320 mis-clamped a taller panel), the
+> position persists to localStorage and re-clamps on window resize. Verified live:
+> Nexus shows no ask/filter/mic/send controls and the close button still closes it;
+> the UKI popup drags from its header and the live position matches the persisted
+> `dex-uki-panel-pos`. tsc 0, watermark lint 0, no console errors.
+
+> **DONE — UKI agentic upgrade (web search + control + multi-step).** The audit
+> found UKI's LLM was wired (streamConfiguredLLM/askConfiguredLLM across 5
+> providers) but the loop was missing: it was text-in/text-out, "web search" only
+> opened a browser tab, and it could not chain actions -- plus a rich orphaned
+> backbone (shared/uki/toolCall, webCache ToolBudget, freeApis). Added a provider-
+> agnostic ReAct agent: new `src/renderer/uki/agentRunner.ts` gives the model a tool
+> catalog + a one-line text protocol (`TOOL <name> {json}`), runs the tool, feeds
+> the RESULT back, and loops -- bounded by a per-tool budget (webCache) and a step
+> cap. Works across OpenAI/Anthropic/Google/Ollama/OpenRouter with NO per-provider
+> tool-format wiring. REAL tools: web_search (live keyless DuckDuckGo + Wikipedia
+> via freeApis), open_app/close_app (drive the shell via dex-open-app/dex-close-app),
+> notify, get_context (formatUkiContexts), list_apps. Wired into UkiOverlay's
+> configured-provider branch (replaces the single-shot stream); each tool call
+> surfaces in the "show thinking" trace; degrades to the existing local/HF fallback
+> if the provider fails. ALSO made web search keyless-real: UKI's "search for X"
+> intent now returns inline DuckDuckGo+Wikipedia results instead of just bouncing to
+> the browser, and fixed the query-extraction bug ("search for X" leaked "for X").
+> Verified live (no provider key in the preview): web endpoints reachable (Wikipedia
+> REST returned real JWST text); "search for Eiffel Tower" answered inline from
+> Wikipedia; UKI pipeline intact, no console errors. NOTE: the full agentic
+> tool-loop (control + multi-step) activates once a provider key is set in Settings
+> -> AI Providers -- agentic reasoning inherently needs an LLM; the keyless path
+> still does real web search + the existing system tools. tsc 0, watermark lint 0.
+
+> **DONE — Batch 1 deferred items closed (no-skip pass).** Finished every item the
+> earlier batches had deferred or left partial. NOTES: a folder breadcrumb above the
+> title (walks selectedFolderId -> parents via parent_id, each segment jumps via
+> store.selectFolder; shows only inside a folder); a "Two Columns" toolbar inserter
+> -- implemented as a 1-row 2-cell table so it ROUND-TRIPS through the document model
+> (a raw flex div would be dropped on save), using the exact insertHTML path as the
+> working table inserter. ACHIEVEMENTS: the local self-history "leaderboard" is now a
+> 14-day daily-XP sparkline + best-day in the DailyChallengesBar, sourced from the
+> maintained challenge history (hidden until history accrues). DEXCODE: cross-file
+> go-to-definition + find-references -- new `buildSymbolIndex(project)` in project.ts
+> indexes every file's symbols by name; F12 / Ctrl+Click on the caret's identifier
+> jumps to the defining file+line (cross-file, falling back to the current file's
+> symbols), Shift+F12 greps the project and lists references in the Project panel.
+> DEXCODE async-startup (a planned item) was intentionally NOT changed: the editor
+> already uses lazy useState initializers (one sub-ms localStorage read, non-blocking)
+> -- converting them to a useEffect hydrate would flash default content then swap to
+> the real file, a regression, so the fast path stays. Verified: tsc 0, watermark lint
+> 0 (2138 files); Notes toolbar shows Two Columns + indent + align; the Columns
+> inserter uses the same (working) mechanism as Table (programmatic execCommand can't
+> be driven from the harness, so verified by parity); DexCode shows the go-to-def
+> hint; no NEW console errors across Notes/DexCode/Achievements/Kanban. Native-gated
+> checks (DexCode project/goto-def need the OS folder dialog; breadcrumb needs a
+> created folder; sparkline needs accrued history) verify in the packaged app.
+
+> **DONE — Backlog sweep: real features across the whole app roster + Creative suite.**
+> Pulled from docs/DEX-BACKLOG-smallapps.md (the ~522-item per-app catalog) and the
+> v6.0.4 Creative initiative, building REAL working features (no stubs, no fakes) app
+> by app. Small/utility/system/media/dev apps: Calculator (copy/send-to-Notes, unit-
+> aware input), Unit Converter (swap + recents), Color Picker (multi-format copy +
+> send swatch), QR (paste/encode-URL, PNG+SVG download, copy-image, EC level + size,
+> history, Wi-Fi/vCard/geo payloads — plus a real scannable-matrix fix), World Clock
+> (add-city search, reorder, 12/24h, home offset, day/night, working-hours), Weather
+> (multi-location, hourly + 7-day, unit toggles, sunrise/sunset, auto-refresh+cache),
+> Maps (geocode search/recents, saved places, haversine distance, drop-pin/copy-
+> coords, tile styles, send-to-Notes), Noise Generator (9 real Web-Audio layers,
+> mixer, presets, sleep-fade, shuffle), Pixel Art (frames+onion-skin, mirror, fill/
+> replace, line/rect, PNG@scale + spritesheet), Markdown Editor (synced split, toolbar,
+> outline, find/replace+regex, GFM task toggles, export/Send-to-Notes), Calendar
+> (day/week/agenda, drag-create, recurrence, categories, search), Canvas (layers,
+> brush/eraser, shapes, undo/redo, text, pan/zoom, export), Gallery (lightbox keys,
+> slideshow, batch, sort, favorites, rename, breadcrumb), Timer/Stopwatch/Pomodoro
+> (NEW shared store/timerStore.ts — wall-clock state survives switch+reload; multi-
+> timers, laps export, pomodoro config+log), Tasks (NL due dates, !/#/@ tokens,
+> recurrence, subtask rollup, smart lists, bulk), Env Manager (profiles, mask/reveal,
+> import/export, diff, validation, .env.example), Presentation (rail reorder, themes/
+> layouts, speaker notes, present mode, image/PDF export, outline import), Learn
+> (progress/resume, badges, search, bookmarks→Notes, streak), Audio (queue reorder,
+> loop/shuffle/speed, A-B repeat, sleep-fade, media keys), SSH (profiles, groups,
+> recents, copy-cmd, ssh-config import), Recycle Bin (restore, empty-older-than,
+> search, reclaimable size, bulk, sort), Task Manager (search/sort, group-by-app,
+> sparklines, pin, detail, snapshot→Notes), Store (search/filter, detail, featured/
+> recent, favorites+ratings), Git (history+details, ahead/behind badges, commit
+> templates — skipped amend/branch-create/diff/stash where no IPC channel exists),
+> Files (breadcrumb, recents, batch copy/cut/paste, view+sort, open-with, pins,
+> properties), Workflows (drag steps, triggers, run history, templates, enable/
+> disable, dry-run, retry/continue-on-error), Collab Hub (local presence/rooms/chat —
+> honestly local-only), Live Activity (filter/range, group, pause, search, export),
+> Screen Recorder (getDisplayMedia capture, mic, countdown, pause/resume, formats,
+> downloads, still-shot), Settings (per-section reset; search was already present),
+> Terminal (persisted history+Ctrl-R, named tabs restore, snippets, scrollback search,
+> output→Notes, exit-code badges), PDF Viewer (zoom/rotate/jump, send-selection→Notes;
+> thumbnails+text-search honestly flagged as pdf.js-only), Browser (bookmarks search,
+> URL→Notes, per-site zoom memory, reader→Notes), Transfers (pause/resume/cancel,
+> speed/ETA, retry, throughput, reorder), Power (battery+wake-lock keep-awake, power
+> mode, wake log, per-app energy).
+> CREATIVE SUITE (real engines, native-blocked paths flagged honestly): VINX real
+> WebM export via canvas.captureStream + MediaRecorder of actual playback (ProRes/
+> H.265/etc. flagged native-only, no fake completion); FLUX real sandboxed expression
+> evaluator (time/value/index + wiggle/seeded-random, per-frame, degrades to static
+> on error) + 12 real templates; FORGE real image transcode (PNG/JPEG/WebP via canvas)
+> + real WAV PCM encoder (lossy audio + all video honestly flagged native; removed
+> ~290 lines of fake simulated encode); AXL real direct-stiffness 2D truss FEA
+> (engine/fea.ts — assemble K, Gaussian solve K·u=F, axial stress, von Mises, safety
+> factor; hand-verified physics) replacing the stubbed ratio-coloring; PRISM real
+> canvas-boolean layer ops + real merge/flatten + real diffusion inpainting (content-
+> aware fill); IMOSION real built-in Web-Audio subtractive synth (synth.ts — polyphony,
+> ADSR, resonant filter) routed through the existing mixer so MIDI/piano-roll makes
+> sound without external plugins (VST/AU hosting flagged native). New shared sink:
+> services/sendTo.ts (sendToNotes) wired app-wide, and AppManager routes uki:create-
+> note / dex-send-to-notes to it. Verified: tsc 0, watermark lint 0 (2146 files) after
+> every wave. Honestly native/dependency-blocked and NOT faked: true video transcode
+> (ffmpeg), lossy audio encode, pdf.js thumbnails/text-search, a WebGL/Three 3D CAD
+> viewport, VST/AU plugin hosting, and any feature whose IPC channel doesn't exist
+> (skipped + noted per app, never invented).
+
+> **DONE — Shared-platform primitives (ADR-0003 track) + an a11y pass.** From
+> docs/DEX-BACKLOG-shared.md "First Wins". Built the genuinely-missing shared
+> primitives (the existing ones — useAsyncResource, DexLoader, leakDetector — were
+> NOT re-chased): `utils/useReducedMotion.ts` (prefersReducedMotion/Transparency +
+> reactive hooks + motionDuration), `utils/usePersistentState.ts` (useState that
+> persists+restores via safe localStorage, plus useAppUIState namespacing and
+> imperative read/write/clear), `utils/useManagedTimers.ts` (leak-safe useInterval/
+> useTimeout/useAnimationFrame/useEventListener — callback kept in a ref, always
+> cleared on unmount, null delay pauses), and `services/toastResult.ts` (one
+> standard success/error path over the dex-toast contract: reportOk/Error, toastResult,
+> copyWithToast, withToast). Then an additive, behavior-preserving accessibility pass
+> across ten standalone apps: aria-labels on icon-only buttons, aria-label+aria-valuetext
+> on sliders, role/tabIndex/keydown on custom button-divs (ColorPicker, PixelArt, Canvas,
+> QRCode, NoiseGenerator most-affected; Weather/Maps/SSH/EnvManager were already labeled),
+> and a reduced-motion gate on WorldClock's analog-hand sweep via the new util. Honest
+> note: agents did NOT bolt the reduced-motion util onto apps with no decorative loop
+> (an unused import would not compile) — adoption of these primitives across the rest of
+> the roster is the remaining (large) shared-backlog work. tsc 0, watermark lint 0 (2150).
+
+> **DONE — Stability/Performance primitive gaps (shared backlog).** Honest finding:
+> MOST of this track already exists in-codebase and was NOT re-chased — error boundaries
+> (`services/ErrorBoundary.tsx`, `AppWrapper`, `RewindViewErrorBoundary`), Zustand
+> debounced/quota-pruning persistence (`utils/debouncedStorage.ts` = Perf #25), plus
+> leakDetector, cacheExpiry, useAsyncResource, TierManager, debounce/throttle, useVirtualList.
+> The genuine gaps were the general-purpose (non-Zustand) helpers apps hand-roll everywhere,
+> now built: `utils/safeJson.ts` (safeJsonParse with optional shape validator + safeJsonStringify),
+> `utils/safeStorage.ts` (canonical safe get/set/getJSON/setJSON with quota-prune-and-retry +
+> per-app `namespaced()` prefixing), and `utils/migrateState.ts` (versioned `__v` step-migration
+> of persisted blobs + `loadMigrated` that rewrites the upgraded form). tsc 0, watermark lint 0
+> (2153). Remaining shared-backlog work is now overwhelmingly ADOPTION of existing+new primitives
+> across the roster, plus the Design/Accessibility/Platform/Future categories and the separate
+> 200-patch initiative.
+
+> **DONE — 200-patch initiative: roster-wide leak-safety + a11y + robustness pass.** Three
+> verified waves of parallel per-file agents (disjoint sets, `npm run lint` green after each)
+> across ~40 app/page/component files. REAL bugs fixed (not just polish): Imosion (collab
+> BroadcastChannel + sounding MIDI voices leaked on unmount), Prism (canvas-drag rAF never
+> cancelled), Forge (AudioContext leaked on decode error), Browser (webview listeners never
+> detached), Weather (a fresh AbortController per 15-min tick, never aborted), Maps (stale
+> one-shot styledata listener), SSH/EnvManager/Settings/Rewind (flash/scroll setTimeouts firing
+> after unmount), Power (memory-cleanup double-fire), DexNotes (resizer rAF + drag listeners
+> leaked mid-drag). Plus, app-wide: aria-labels on icon-only buttons, labels on inputs/sliders
+> (aria-valuetext), role/tabIndex/Enter-Space on custom button-divs, overflow clamping
+> (ellipsis + minWidth:0) on titles/rows that could blow out layout, async-button disable-while-
+> in-flight to stop double-fire, and null-guards on handlers that could throw. Many files were
+> already clean and honestly left untouched. tsc 0, watermark lint 0 (2153) after every wave.
+
+> **DONE — Per-app feature DEEPENING (more catalog items).** Three more verified waves
+> pulling deeper from DEX-BACKLOG-smallapps.md. Tasks: blocked-by dependencies + warning
+> badge, snooze (tomorrow/next-week/date), estimate-vs-actual time tally, j/k/x/e keyboard
+> triage, quick filter chips. Files: disk-usage breakdown, duplicate finder, copy-path/relative,
+> show-hidden, properties. Clipboard: snippet library, transform actions (upper/trim/slugify),
+> merge clips, source labels, send-to. Calculator: scientific panel, programmer mode (hex/bin/oct),
+> date math, constants, angle mode. Calendar: ICS export (event + range), agenda view, working-
+> hours overlay + weekend dim, duplicate + quick-reschedule, category visibility round-tripped
+> through ICS. Gallery, Browser, Weather: deeper media/browse/forecast features. PixelArt:
+> tile-preview seamlessness, palette lock with nearest-color snap, image import + downscale.
+> DexCode, MarkdownEditor, Maps: more dev/editor/map depth. Design/A11y focus rings confirmed
+> ALREADY global in globals.css (not re-chased). tsc 0, watermark lint 0 (2153) after each wave.
+> Honest remainder: the "Future" backlog (marketplace, cross-device sync, real-time multiplayer,
+> offline-first conflict resolution) is roadmap-scale architecture, not single-pass — flagged, not
+> faked.
+
+> **DONE — Deepening wave 4.** Notes: inline #tag filter chips, per-note color labels (list dot +
+> border), New-from-template (Meeting/Standup/Retro/Blank). Terminal: deeper session/snippet/
+> broadcast features. Store: detail/changelog/update-all depth. Settings: export/import profile +
+> per-section reset depth. tsc 0, watermark lint 0 (2153). The achievable per-app catalog is now
+> deeply covered roster-wide; the genuinely-remaining work is the roadmap-scale "Future" track.
+
+> **DONE — Future track, the tractable (local-first) items.** Three NEW real apps, built
+> self-contained then registered through the proven 5-touchpoint path (lazy import + AppId union
+> + APP_COMPONENTS map + LAUNCHPAD_APPS + APP_DEFINITIONS in runningApps.ts): **Spaces**
+> (`WorkspaceSpaces.tsx`, Future #2/#27 — snapshot the running apps + active Project Stage into a
+> named space, restore by re-opening them; rename/delete; persisted), **Inbox** (`SmartInbox.tsx`,
+> Future #32 — aggregates the notification hub `notification-center:getAll` + live `dex-notification`
+> events + ContextBus activity, grouped, click-through via dex-open-app, degrades to live-only when
+> the native hub is absent), and **Project** (`ProjectDashboard.tsx`, Future #8 — active Stage
+> header, task/notes/activity stat cards read from existing persistence, ContextBus recent-activity
+> feed, quick links). tsc 0, watermark lint 0 (2156). HONESTLY NOT BUILT (would require a backend /
+> are multi-week, so flagged not faked): app marketplace w/ third-party review (#1), cross-device
+> sync (#3) + handoff (#26), real-time multiplayer / live co-editing (#6/#17), offline-first +
+> E2E-encrypted sync (#9/#10), pluggable cloud storage backends (#33), bundled local offline-AI
+> model (#34). These need a server/CRDT-transport/native-model that doesn't exist in a renderer-only
+> build; their local-first foundations (crdt.ts, dataExport, keystore, projectSpaces) are present to
+> build on when that backend lands.
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.

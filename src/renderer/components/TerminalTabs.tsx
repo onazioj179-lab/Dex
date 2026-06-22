@@ -9,10 +9,20 @@
  * Terminal instances. Each tab is a real <Terminal> with its own PTY (autoSpawn),
  * kept mounted while hidden so switching tabs never loses a session or its
  * scrollback. Closing the last tab closes the whole panel (onClose). The base
- * Terminal component is untouched — this only composes it.
+ * Terminal component is composed, not modified.
+ *
+ * Persistence: the open tab list + their names is saved to localStorage and
+ * restored on the next mount. Sessions are recreated through the SAME path as a
+ * fresh tab (each Terminal autoSpawns its own PTY on mount), so a relaunched
+ * panel comes back with the same tabs and names (scrollback is not persisted —
+ * the OS shell has no replay channel for that).
+ *
+ * Auto-title: each Terminal reports the command it is currently running via
+ * `onRunningCommand`; if the user hasn't manually renamed the tab, its label
+ * tracks that command (truncated to the first word/argv0).
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Terminal } from './Terminal';
 
 interface TerminalTabsProps {
@@ -23,12 +33,65 @@ interface TerminalTabsProps {
 
 interface Tab {
   id: string;
+  /** User-set name; when present it overrides the auto-title. */
+  name?: string;
+}
+
+const TABS_KEY = 'dex.terminal.tabs.v1';
+
+interface PersistedState { tabs: Tab[]; activeId: string; nextNum: number; }
+
+function loadState(): PersistedState | null {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(TABS_KEY) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    if (!parsed || !Array.isArray(parsed.tabs)) return null;
+    const tabs = parsed.tabs
+      .filter((t): t is Tab => !!t && typeof (t as Tab).id === 'string')
+      .map((t) => ({ id: t.id, name: typeof t.name === 'string' ? t.name : undefined }));
+    if (tabs.length === 0) return null;
+    const activeId = typeof parsed.activeId === 'string' && tabs.some((t) => t.id === parsed.activeId)
+      ? parsed.activeId
+      : tabs[tabs.length - 1].id;
+    const nextNum = typeof parsed.nextNum === 'number' && parsed.nextNum > 0 ? parsed.nextNum : tabs.length + 1;
+    return { tabs, activeId, nextNum };
+  } catch {
+    return null;
+  }
+}
+
+function saveState(state: PersistedState): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(TABS_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable — tabs simply won't restore next time */
+  }
+}
+
+/** Derive a short tab label from a running command (argv0, capped). */
+function titleFromCommand(cmd: string): string {
+  const first = cmd.trim().split(/\s+/)[0] || cmd.trim();
+  // Strip a path prefix (e.g. /usr/bin/node -> node, C:\x\git.exe -> git.exe).
+  const base = first.split(/[\\/]/).pop() || first;
+  return base.length > 16 ? `${base.slice(0, 15)}…` : base;
 }
 
 export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height }) => {
-  const [tabs, setTabs] = useState<Tab[]>([{ id: 't1' }]);
-  const [activeId, setActiveId] = useState('t1');
-  const nextNum = useRef(2);
+  const restored = useMemo(() => loadState(), []);
+  const [tabs, setTabs] = useState<Tab[]>(() => restored?.tabs ?? [{ id: 't1' }]);
+  const [activeId, setActiveId] = useState(() => restored?.activeId ?? 't1');
+  const nextNum = useRef(restored?.nextNum ?? 2);
+  // Live running-command per tab id (for auto-title); not persisted.
+  const [running, setRunning] = useState<Record<string, string | null>>({});
+  // Inline rename editor state.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+
+  // Persist the tab list + names + active tab whenever they change.
+  useEffect(() => {
+    saveState({ tabs, activeId, nextNum: nextNum.current });
+  }, [tabs, activeId]);
 
   const addTab = useCallback(() => {
     const id = `t${nextNum.current++}`;
@@ -37,6 +100,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
   }, []);
 
   const closeTab = useCallback((id: string) => {
+    setRunning(prev => { const next = { ...prev }; delete next[id]; return next; });
     setTabs(prev => {
       const next = prev.filter(t => t.id !== id);
       if (next.length === 0) {
@@ -48,6 +112,28 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
       return next;
     });
   }, [activeId, onClose]);
+
+  const commitRename = useCallback(() => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== editingId) return t;
+      const name = editName.trim();
+      return { ...t, name: name || undefined };
+    }));
+    setEditingId(null);
+    setEditName('');
+  }, [editingId, editName]);
+
+  const startRename = useCallback((tab: Tab, fallback: string) => {
+    setEditingId(tab.id);
+    setEditName(tab.name ?? fallback);
+  }, []);
+
+  const labelFor = useCallback((tab: Tab, index: number): string => {
+    if (tab.name) return tab.name;
+    const cmd = running[tab.id];
+    if (cmd) return titleFromCommand(cmd);
+    return `Terminal ${index + 1}`;
+  }, [running]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0 }}>
@@ -65,6 +151,8 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
       >
         {tabs.map((t, i) => {
           const active = t.id === activeId;
+          const label = labelFor(t, i);
+          const editing = editingId === t.id;
           return (
             <div
               key={t.id}
@@ -72,7 +160,12 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               aria-selected={active}
               tabIndex={0}
               onClick={() => setActiveId(t.id)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(t.id); } }}
+              onDoubleClick={() => startRename(t, label)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(t.id); }
+                else if (e.key === 'F2') { e.preventDefault(); startRename(t, label); }
+              }}
+              title="Double-click to rename"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '3px 8px', borderRadius: 5, cursor: 'pointer',
@@ -84,15 +177,36 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <span>{`Terminal ${i + 1}`}</span>
+              {editing ? (
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); setEditingId(null); setEditName(''); }
+                  }}
+                  aria-label={`Rename ${label}`}
+                  style={{
+                    width: 96, background: '#141414', color: '#e0e0e0',
+                    border: '1px solid rgba(255,255,255,0.18)', borderRadius: 3, outline: 'none',
+                    fontFamily: 'inherit', fontSize: 11, fontWeight: 600, padding: '0 4px',
+                  }}
+                />
+              ) : (
+                <span style={{ maxWidth: 140, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              )}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
-                aria-label={`Close terminal ${i + 1}`}
+                aria-label={`Close ${label}`}
                 title="Close tab"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 14, height: 14, padding: 0, borderRadius: 3,
+                  width: 14, height: 14, flexShrink: 0, padding: 0, borderRadius: 3,
                   background: 'transparent', border: 'none', cursor: 'pointer',
                   color: 'inherit', opacity: 0.7, lineHeight: 1,
                 }}
@@ -127,14 +241,19 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
       </div>
 
       {/* Sessions: every tab stays mounted (its PTY + scrollback persist); only the
-          active one is shown. */}
+          active one is shown. Each Terminal autoSpawns, so a restored tab list
+          recreates its sessions through the same path as a fresh tab. */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {tabs.map(t => (
           <div
             key={t.id}
             style={{ position: 'absolute', inset: 0, display: t.id === activeId ? 'block' : 'none' }}
           >
-            <Terminal cwd={cwd} onClose={() => closeTab(t.id)} />
+            <Terminal
+              cwd={cwd}
+              onClose={() => closeTab(t.id)}
+              onRunningCommand={(cmd) => setRunning(prev => (prev[t.id] === cmd ? prev : { ...prev, [t.id]: cmd }))}
+            />
           </div>
         ))}
       </div>

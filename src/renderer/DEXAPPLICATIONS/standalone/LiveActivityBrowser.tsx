@@ -17,6 +17,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DexSearchInput } from '../../styles/components';
 import { APP_DEFINITIONS, useRunningApps } from '../../store/runningApps';
+import { sendToNotes } from '../../services/sendTo';
 
 // --- bridge ---------------------------------------------------------------
 // Same invoke seam the feature stores use; degrades to empty under web/no-bridge.
@@ -49,6 +50,33 @@ interface FeedStats {
 
 const REFRESH_MS = 4000;
 const FEED_LIMIT = 200;
+
+// Time-range filter. `ms` of 0 means "all time" (no lower bound).
+type RangeKey = '5m' | '1h' | '24h' | 'all';
+const TIME_RANGES: { key: RangeKey; label: string; ms: number }[] = [
+  { key: '5m', label: '5m', ms: 5 * 60 * 1000 },
+  { key: '1h', label: '1h', ms: 60 * 60 * 1000 },
+  { key: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+  { key: 'all', label: 'All', ms: 0 },
+];
+
+type GroupMode = 'none' | 'app' | 'time';
+
+// Fire a standard DEX toast (same channel the rest of the platform uses).
+function toast(type: 'success' | 'error' | 'info', message: string): void {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+}
+
+// Coarse time buckets for the "group by time" mode.
+function timeBucket(ts: number): string {
+  if (!ts) return 'Earlier';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 5) return 'Last 5 minutes';
+  if (m < 60) return 'Last hour';
+  if (m < 60 * 24) return 'Last 24 hours';
+  return 'Earlier';
+}
+const TIME_BUCKET_ORDER = ['Last 5 minutes', 'Last hour', 'Last 24 hours', 'Earlier'];
 
 // SQLite stores created_at as UTC 'YYYY-MM-DD HH:MM:SS' (no zone) -- normalise to
 // a real UTC instant so relative time is correct regardless of the user's locale.
@@ -93,21 +121,61 @@ const LiveActivityBrowser: React.FC = () => {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [stats, setStats] = useState<FeedStats | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [appFilter, setAppFilter] = useState<string>('all');
+  const [range, setRange] = useState<RangeKey>('all');
+  const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [query, setQuery] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [paused, setPaused] = useState(false);
+  // Guards the async toolbar actions (export / clear) so a double-click can't
+  // fire overlapping invokes.
+  const [busy, setBusy] = useState(false);
+  // While paused we keep showing `entries`, but accumulate fresh fetches here so
+  // resuming reveals everything that arrived without losing any events.
+  const [bufferCount, setBufferCount] = useState(0);
+  const pausedRef = useRef(false);
+  const bufferRef = useRef<ActivityEntry[]>([]);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const launchApp = useRunningApps(s => s.launchApp);
   const bringToFront = useRunningApps(s => s.bringToFront);
 
   const load = useCallback(async () => {
-    const [feed, st] = await Promise.all([
-      invoke<ActivityEntry[]>('activity-feed:get', { limit: FEED_LIMIT }),
-      invoke<FeedStats>('activity-feed:stats'),
-    ]);
-    if (Array.isArray(feed)) setEntries(feed);
-    if (st && typeof st === 'object') setStats(st);
-    setLoaded(true);
+    try {
+      const [feed, st] = await Promise.all([
+        invoke<ActivityEntry[]>('activity-feed:get', { limit: FEED_LIMIT }),
+        invoke<FeedStats>('activity-feed:stats'),
+      ]);
+      if (st && typeof st === 'object') setStats(st);
+      if (Array.isArray(feed)) {
+        if (pausedRef.current) {
+          // Freeze the visible list; stash the latest snapshot and surface a count
+          // of how many new entries are waiting so the user can resume to see them.
+          bufferRef.current = feed;
+          setBufferCount(Math.max(0, feed.length - entries.length));
+        } else {
+          setEntries(feed);
+        }
+      }
+      setLoaded(true);
+    } catch (err) {
+      console.warn('[LiveActivity] load failed', err);
+      setLoaded(true);
+    }
+  }, [entries.length]);
+
+  // Pause/resume the live feed. On resume we flush whatever was buffered.
+  const togglePause = useCallback(() => {
+    setPaused(prev => {
+      const next = !prev;
+      pausedRef.current = next;
+      if (!next) {
+        if (bufferRef.current.length) setEntries(bufferRef.current);
+        bufferRef.current = [];
+        setBufferCount(0);
+      }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -123,18 +191,61 @@ const LiveActivityBrowser: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const rangeMs = TIME_RANGES.find(r => r.key === range)?.ms ?? 0;
+    const floor = rangeMs ? Date.now() - rangeMs : 0;
     return entries.filter(e =>
       (typeFilter === 'all' || e.event_type === typeFilter) &&
-      (!q || e.title.toLowerCase().includes(q) || e.app.toLowerCase().includes(q) || e.source.toLowerCase().includes(q))
+      (appFilter === 'all' || e.app === appFilter) &&
+      (!floor || parseTs(e.created_at) >= floor) &&
+      (!q ||
+        e.title.toLowerCase().includes(q) ||
+        e.app.toLowerCase().includes(q) ||
+        e.source.toLowerCase().includes(q) ||
+        (e.details || '').toLowerCase().includes(q))
     );
-  }, [entries, typeFilter, query]);
+  }, [entries, typeFilter, appFilter, range, query]);
 
   const typeChips = useMemo(() => {
     const types = Object.keys(stats?.byType ?? {}).sort((a, b) => (stats!.byType[b] - stats!.byType[a]));
     return ['all', ...types];
   }, [stats]);
 
+  // Distinct apps present in the current feed, busiest first. Derived from the
+  // activity data itself so it always reflects what's actually in the log.
+  const appChips = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of entries) {
+      if (!e.app) continue;
+      counts.set(e.app, (counts.get(e.app) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([app]) => app);
+  }, [entries]);
+
+  // Group the filtered rows for rendering when a group mode is active.
+  const groups = useMemo(() => {
+    if (groupMode === 'none') return null;
+    const map = new Map<string, ActivityEntry[]>();
+    for (const e of filtered) {
+      const key = groupMode === 'app'
+        ? ((APP_DEFINITIONS as Record<string, { name: string }>)[e.app]?.name || e.app || 'System')
+        : timeBucket(parseTs(e.created_at));
+      const bucket = map.get(key);
+      if (bucket) bucket.push(e); else map.set(key, [e]);
+    }
+    const keys = [...map.keys()];
+    if (groupMode === 'time') {
+      keys.sort((a, b) => TIME_BUCKET_ORDER.indexOf(a) - TIME_BUCKET_ORDER.indexOf(b));
+    } else {
+      keys.sort((a, b) => (map.get(b)!.length - map.get(a)!.length));
+    }
+    return keys.map(k => ({ key: k, rows: map.get(k)! }));
+  }, [filtered, groupMode]);
+
+  // Click-through: open the originating app. Dispatch the platform open-app event
+  // (the contract this surface advertises) and drive the running-apps store too.
   const openApp = useCallback((appId: string) => {
+    if (!appId) return;
+    try { window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId } })); } catch { /* noop */ }
     const def = (APP_DEFINITIONS as Record<string, { name: string; icon: string; color: string }>)[appId];
     if (!def) return;
     try {
@@ -143,11 +254,96 @@ const LiveActivityBrowser: React.FC = () => {
     } catch { /* navigation best-effort */ }
   }, [launchApp, bringToFront]);
 
+  // Export the currently filtered slice as a plain-text log into Notes.
+  const exportToNotes = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (!filtered.length) { toast('info', 'Nothing to export'); return; }
+      const parts: string[] = [];
+      if (typeFilter !== 'all') parts.push(`type=${typeFilter}`);
+      if (appFilter !== 'all') parts.push(`app=${appFilter}`);
+      if (range !== 'all') parts.push(`range=${range}`);
+      if (query.trim()) parts.push(`search="${query.trim()}"`);
+      const header = `DEX Activity Log (${filtered.length} item${filtered.length === 1 ? '' : 's'})` +
+        (parts.length ? ` — ${parts.join(', ')}` : '');
+      const lines = filtered.map(e => {
+        const when = relTime(parseTs(e.created_at));
+        const appName = (APP_DEFINITIONS as Record<string, { name: string }>)[e.app]?.name || e.app || 'System';
+        const extra = e.details ? ` — ${e.details}` : '';
+        return `[${when}] ${appName} · ${e.event_type}: ${e.title}${extra}`;
+      });
+      await sendToNotes([header, '', ...lines].join('\n'), header);
+    } catch (err) {
+      console.warn('[LiveActivity] export failed', err);
+      toast('error', 'Could not export activity');
+    } finally {
+      setBusy(false);
+    }
+  }, [filtered, typeFilter, appFilter, range, query, busy]);
+
+  // Friendly label for an app id, derived from the shared definitions.
+  const appLabel = useCallback((appId: string): string =>
+    (APP_DEFINITIONS as Record<string, { name: string }>)[appId]?.name || appId || 'System', []);
+
   const clearAll = useCallback(async () => {
-    await invoke('activity-feed:clear');
-    setEntries([]);
-    void load();
-  }, [load]);
+    if (busy) return;
+    setBusy(true);
+    try {
+      await invoke('activity-feed:clear');
+      setEntries([]);
+      bufferRef.current = [];
+      setBufferCount(0);
+      void load();
+    } catch (err) {
+      console.warn('[LiveActivity] clear failed', err);
+      toast('error', 'Could not clear activity');
+    } finally {
+      setBusy(false);
+    }
+  }, [load, busy]);
+
+  // One feed row. Shared by the flat and grouped render paths.
+  const renderRow = useCallback((e: ActivityEntry) => {
+    const def = (APP_DEFINITIONS as Record<string, { name: string; color: string }>)[e.app];
+    const clickable = !!def;
+    return (
+      <div
+        key={e.id}
+        role={clickable ? 'button' : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        onClick={clickable ? () => openApp(e.app) : undefined}
+        onKeyDown={clickable ? (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openApp(e.app); } } : undefined}
+        className={clickable ? 'dex-hover-bg' : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          height: 44, padding: '0 var(--space-4)',
+          borderBottom: '1px solid var(--color-border-subtle)',
+          cursor: clickable ? 'pointer' : 'default',
+        }}
+      >
+        <span style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+          background: 'var(--color-bg-inset)',
+          color: def?.color || 'var(--color-text-tertiary)',
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {TYPE_ICON[e.event_type] ?? fallbackIcon}
+          </svg>
+        </span>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {def?.name || e.app || 'System'}{e.source ? ` · ${e.source}` : ''}
+          </span>
+        </span>
+        <span className="dex-tnum" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', flexShrink: 0 }}>
+          {relTime(parseTs(e.created_at))}
+        </span>
+      </div>
+    );
+  }, [openApp]);
 
   return (
     <div style={PAGE}>
@@ -165,16 +361,50 @@ const LiveActivityBrowser: React.FC = () => {
         )}
         <div style={{ flex: 1 }} />
         <div style={{ width: 220 }}>
-          <DexSearchInput value={query} onChange={e => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Filter activity" size="sm" fullWidth />
+          <DexSearchInput value={query} onChange={e => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search activity" size="sm" fullWidth />
         </div>
         <button
           type="button"
-          onClick={() => { void clearAll(); }}
-          aria-label="Clear activity log"
+          onClick={togglePause}
+          aria-pressed={paused}
+          aria-label={paused ? 'Resume live feed' : 'Pause live feed'}
+          title={paused ? 'Resume live feed' : 'Pause live feed'}
           style={{
             height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: paused ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+            border: `1px solid ${paused ? 'var(--dex-focus-color, #fff)' : 'var(--color-border)'}`,
+            color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            {paused ? <polygon points="6 4 20 12 6 20 6 4" /> : <><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>}
+          </svg>
+          {paused ? (bufferCount ? `Resume (${bufferCount})` : 'Resume') : 'Pause'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { void exportToNotes(); }}
+          disabled={busy}
+          aria-label="Send filtered activity to Notes"
+          title="Send the current view to Notes"
+          style={{
+            height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
             background: 'transparent', border: '1px solid var(--color-border)',
             color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
+            opacity: busy ? 0.5 : 1,
+          }}
+        >Send to Notes</button>
+        <button
+          type="button"
+          onClick={() => { void clearAll(); }}
+          disabled={busy}
+          aria-label="Clear activity log"
+          style={{
+            height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
+            background: 'transparent', border: '1px solid var(--color-border)',
+            color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
+            opacity: busy ? 0.5 : 1,
           }}
         >Clear</button>
       </div>
@@ -204,6 +434,84 @@ const LiveActivityBrowser: React.FC = () => {
         </div>
       )}
 
+      {/* Controls: time range, group mode, app filter */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap',
+        padding: 'var(--space-2) var(--space-4)', flexShrink: 0,
+        borderBottom: '1px solid var(--color-border-subtle)',
+      }}>
+        {/* Time range segmented control */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Range</span>
+          {TIME_RANGES.map(r => {
+            const active = range === r.key;
+            return (
+              <button
+                key={r.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setRange(r.key)}
+                style={{
+                  height: 22, padding: '0 9px', borderRadius: 5, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600,
+                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                }}
+              >{r.label}</button>
+            );
+          })}
+        </div>
+
+        {/* Group-by segmented control */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Group</span>
+          {([['none', 'None'], ['app', 'App'], ['time', 'Time']] as [GroupMode, string][]).map(([mode, label]) => {
+            const active = groupMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setGroupMode(mode)}
+                style={{
+                  height: 22, padding: '0 9px', borderRadius: 5, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600,
+                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* App filter chips (derived from the activity in the feed) */}
+      {appChips.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 'var(--space-2) var(--space-4)', flexShrink: 0, borderBottom: '1px solid var(--color-border-subtle)' }}>
+          {['all', ...appChips].map(a => {
+            const active = appFilter === a;
+            const label = a === 'all' ? 'All apps' : appLabel(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setAppFilter(a)}
+                style={{
+                  height: 24, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600,
+                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                }}
+              >{label}</button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Feed */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {filtered.length === 0 ? (
@@ -213,47 +521,24 @@ const LiveActivityBrowser: React.FC = () => {
             </svg>
             <span style={{ fontSize: 13 }}>{loaded ? 'No activity yet' : 'Loading activity...'}</span>
           </div>
-        ) : (
-          filtered.map(e => {
-            const def = (APP_DEFINITIONS as Record<string, { name: string; color: string }>)[e.app];
-            const clickable = !!def;
-            return (
-              <div
-                key={e.id}
-                role={clickable ? 'button' : undefined}
-                tabIndex={clickable ? 0 : undefined}
-                onClick={clickable ? () => openApp(e.app) : undefined}
-                onKeyDown={clickable ? (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openApp(e.app); } } : undefined}
-                className={clickable ? 'dex-hover-bg' : undefined}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-                  height: 44, padding: '0 var(--space-4)',
-                  borderBottom: '1px solid var(--color-border-subtle)',
-                  cursor: clickable ? 'pointer' : 'default',
-                }}
-              >
-                <span style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                  background: 'var(--color-bg-inset)',
-                  color: def?.color || 'var(--color-text-tertiary)',
-                }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {TYPE_ICON[e.event_type] ?? fallbackIcon}
-                  </svg>
-                </span>
-                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</span>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {def?.name || e.app || 'System'}{e.source ? ` · ${e.source}` : ''}
-                  </span>
-                </span>
-                <span className="dex-tnum" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', flexShrink: 0 }}>
-                  {relTime(parseTs(e.created_at))}
-                </span>
+        ) : groups ? (
+          groups.map(g => (
+            <div key={g.key}>
+              <div style={{
+                position: 'sticky', top: 0, zIndex: 1,
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '0 var(--space-4)', height: 26,
+                background: 'var(--color-bg-surface)',
+                borderBottom: '1px solid var(--color-border-subtle)',
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>{g.key}</span>
+                <span className="dex-tnum" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)' }}>{g.rows.length}</span>
               </div>
-            );
-          })
+              {g.rows.map(renderRow)}
+            </div>
+          ))
+        ) : (
+          filtered.map(renderRow)
         )}
       </div>
     </div>

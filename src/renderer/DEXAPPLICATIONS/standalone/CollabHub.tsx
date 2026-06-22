@@ -180,6 +180,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-primary, #fff)',
     marginBottom: 4,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: 0,
   },
   cardMeta: {
     fontSize: 12,
@@ -270,12 +274,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   checkpointInfo: {
     flex: 1,
+    minWidth: 0,
   },
   checkpointName: {
     fontSize: 14,
     fontWeight: 500,
     color: 'var(--color-text-primary, #fff)',
     marginBottom: 2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   checkpointMeta: {
     fontSize: 12,
@@ -369,10 +377,127 @@ const ACTIVITY_ICONS = {
 };
 
 // ---------------------------------------------------------------------------
+// LOCAL ROOMS MODEL
+// ---------------------------------------------------------------------------
+// These features run entirely on local/in-memory state persisted to
+// localStorage. There is no real-time backend wired into the renderer, so
+// presence is "local session" presence (the current user plus any seeded /
+// invited members) and chat is local-only. Labels in the UI say so honestly.
+
+const ROOMS_STORAGE_KEY = 'dex-collab-rooms-v1';
+const ROOM_MEMBERSHIP_KEY = 'dex-collab-room-membership-v1';
+
+type MemberStatus = 'online' | 'away' | 'offline';
+
+interface RoomMember {
+  id: string;
+  name: string;
+  email?: string;
+  status: MemberStatus;
+  lastActiveAt: number;
+  isCurrentUser?: boolean;
+}
+
+interface RoomMessage {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  timestamp: number;
+  system?: boolean;
+}
+
+type RoomActivityType =
+  | 'created'
+  | 'joined'
+  | 'left'
+  | 'message'
+  | 'status'
+  | 'linkout';
+
+interface RoomActivity {
+  id: string;
+  type: RoomActivityType;
+  actorId: string;
+  actorName: string;
+  detail: string;
+  timestamp: number;
+}
+
+interface CollabRoom {
+  id: string;
+  name: string;
+  topic: string;
+  appId: string; // linked DEX app for shared note/board link-out
+  createdAt: number;
+  members: RoomMember[];
+  messages: RoomMessage[];
+  activity: RoomActivity[];
+}
+
+const genId = (prefix: string): string =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+// Deterministic avatar color from a string id/name
+const avatarColor = (seed: string): string => {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) & 0xffffff;
+  const hue = h % 360;
+  return `hsl(${hue}, 60%, 55%)`;
+};
+
+const STATUS_COLORS: Record<MemberStatus, string> = {
+  online: '#30d158',
+  away: '#ff9f0a',
+  offline: '#636366',
+};
+
+function loadRooms(): CollabRoom[] {
+  try {
+    const raw = localStorage.getItem(ROOMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as CollabRoom[];
+  } catch (err) {
+    console.error('[CollabHub] failed to load rooms:', err);
+    return [];
+  }
+}
+
+function persistRooms(rooms: CollabRoom[]): void {
+  try {
+    localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(rooms));
+  } catch (err) {
+    console.error('[CollabHub] failed to persist rooms:', err);
+  }
+}
+
+function loadMembership(): string[] {
+  try {
+    const raw = localStorage.getItem(ROOM_MEMBERSHIP_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch (err) {
+    console.error('[CollabHub] failed to load room membership:', err);
+    return [];
+  }
+}
+
+function persistMembership(ids: string[]): void {
+  try {
+    localStorage.setItem(ROOM_MEMBERSHIP_KEY, JSON.stringify(ids));
+  } catch (err) {
+    console.error('[CollabHub] failed to persist room membership:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // COMPONENT
 // ---------------------------------------------------------------------------
 
-type TabId = 'projects' | 'shared' | 'checkpoints' | 'activity';
+type TabId = 'projects' | 'shared' | 'checkpoints' | 'activity' | 'rooms';
 
 const CollabHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
@@ -402,6 +527,294 @@ const CollabHub: React.FC = () => {
       });
     }
   }, [currentUser, setCurrentUser]);
+
+  // -------------------------------------------------------------------------
+  // ROOMS (local session) state
+  // -------------------------------------------------------------------------
+  const [rooms, setRooms] = useState<CollabRoom[]>(() => loadRooms());
+  const [joinedRoomIds, setJoinedRoomIds] = useState<string[]>(() => loadMembership());
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [roomSearch, setRoomSearch] = useState('');
+  const [draftMessage, setDraftMessage] = useState('');
+  const chatScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const me = useMemo(() => ({
+    id: currentUser?.id || 'user-1',
+    name: currentUser?.name || 'DEX User',
+    email: currentUser?.email,
+  }), [currentUser]);
+
+  // Persist rooms / membership whenever they change
+  useEffect(() => { persistRooms(rooms); }, [rooms]);
+  useEffect(() => { persistMembership(joinedRoomIds); }, [joinedRoomIds]);
+
+  // Keep a valid active room selection
+  useEffect(() => {
+    if (activeRoomId && !rooms.some(r => r.id === activeRoomId)) {
+      setActiveRoomId(null);
+    } else if (!activeRoomId && rooms.length > 0) {
+      setActiveRoomId(rooms[0].id);
+    }
+  }, [rooms, activeRoomId]);
+
+  // Mark the current user "online" in joined rooms on mount / membership change
+  useEffect(() => {
+    setRooms(prev => prev.map(room => {
+      if (!joinedRoomIds.includes(room.id)) return room;
+      const hasMe = room.members.some(m => m.id === me.id);
+      if (!hasMe) return room;
+      return {
+        ...room,
+        members: room.members.map(m =>
+          m.id === me.id
+            ? { ...m, status: 'online' as MemberStatus, lastActiveAt: Date.now() }
+            : m
+        ),
+      };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinedRoomIds, me.id]);
+
+  const activeRoom = useMemo(
+    () => rooms.find(r => r.id === activeRoomId) || null,
+    [rooms, activeRoomId]
+  );
+
+  const isJoined = useCallback(
+    (roomId: string) => joinedRoomIds.includes(roomId),
+    [joinedRoomIds]
+  );
+
+  // Auto-scroll chat to bottom when active room messages change
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [activeRoom?.messages.length, activeRoomId]);
+
+  const toast = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+  }, []);
+
+  const appendActivity = (room: CollabRoom, activity: Omit<RoomActivity, 'id' | 'timestamp'>): CollabRoom => ({
+    ...room,
+    activity: [
+      ...room.activity,
+      { ...activity, id: genId('act'), timestamp: Date.now() },
+    ].slice(-200),
+  });
+
+  const handleCreateRoom = useCallback(() => {
+    const name = prompt('Room name:');
+    if (!name || !name.trim()) return;
+    const topic = prompt('Topic (optional):') || '';
+    const appId = (prompt('Linked app (vinx, imosion, prism, flux, forge, axl):') || 'prism')
+      .trim()
+      .toLowerCase();
+
+    const now = Date.now();
+    const ownerMember: RoomMember = {
+      id: me.id,
+      name: me.name,
+      email: me.email,
+      status: 'online',
+      lastActiveAt: now,
+      isCurrentUser: true,
+    };
+    const room: CollabRoom = {
+      id: genId('room'),
+      name: name.trim(),
+      topic: topic.trim(),
+      appId: APP_THEMES[appId] ? appId : 'prism',
+      createdAt: now,
+      members: [ownerMember],
+      messages: [{
+        id: genId('msg'),
+        authorId: 'system',
+        authorName: 'System',
+        content: `${me.name} created this room (local session).`,
+        timestamp: now,
+        system: true,
+      }],
+      activity: [{
+        id: genId('act'),
+        type: 'created',
+        actorId: me.id,
+        actorName: me.name,
+        detail: `created room "${name.trim()}"`,
+        timestamp: now,
+      }],
+    };
+
+    setRooms(prev => [room, ...prev]);
+    setJoinedRoomIds(prev => prev.includes(room.id) ? prev : [...prev, room.id]);
+    setActiveRoomId(room.id);
+    toast('success', `Room "${room.name}" created`);
+  }, [me, toast]);
+
+  const handleJoinRoom = useCallback((roomId: string) => {
+    setRooms(prev => prev.map(room => {
+      if (room.id !== roomId) return room;
+      const exists = room.members.some(m => m.id === me.id);
+      const members = exists
+        ? room.members.map(m => m.id === me.id
+            ? { ...m, status: 'online' as MemberStatus, lastActiveAt: Date.now() }
+            : m)
+        : [...room.members, {
+            id: me.id,
+            name: me.name,
+            email: me.email,
+            status: 'online' as MemberStatus,
+            lastActiveAt: Date.now(),
+            isCurrentUser: true,
+          }];
+      let next: CollabRoom = { ...room, members };
+      if (!exists) {
+        next = appendActivity(next, {
+          type: 'joined',
+          actorId: me.id,
+          actorName: me.name,
+          detail: `joined the room`,
+        });
+        next = {
+          ...next,
+          messages: [...next.messages, {
+            id: genId('msg'),
+            authorId: 'system',
+            authorName: 'System',
+            content: `${me.name} joined the room.`,
+            timestamp: Date.now(),
+            system: true,
+          }],
+        };
+      }
+      return next;
+    }));
+    setJoinedRoomIds(prev => prev.includes(roomId) ? prev : [...prev, roomId]);
+    setActiveRoomId(roomId);
+    toast('success', 'Joined room');
+  }, [me, toast]);
+
+  const handleLeaveRoom = useCallback((roomId: string) => {
+    setRooms(prev => prev.map(room => {
+      if (room.id !== roomId) return room;
+      let next = appendActivity(room, {
+        type: 'left',
+        actorId: me.id,
+        actorName: me.name,
+        detail: `left the room`,
+      });
+      next = {
+        ...next,
+        members: next.members.map(m =>
+          m.id === me.id ? { ...m, status: 'offline' as MemberStatus, lastActiveAt: Date.now() } : m
+        ),
+        messages: [...next.messages, {
+          id: genId('msg'),
+          authorId: 'system',
+          authorName: 'System',
+          content: `${me.name} left the room.`,
+          timestamp: Date.now(),
+          system: true,
+        }],
+      };
+      return next;
+    }));
+    setJoinedRoomIds(prev => prev.filter(id => id !== roomId));
+    toast('info', 'Left room');
+  }, [me, toast]);
+
+  const handleSendMessage = useCallback((roomId: string) => {
+    const content = draftMessage.trim();
+    if (!content) return;
+    if (!isJoined(roomId)) {
+      toast('error', 'Join the room to send messages');
+      return;
+    }
+    setRooms(prev => prev.map(room => {
+      if (room.id !== roomId) return room;
+      const msg: RoomMessage = {
+        id: genId('msg'),
+        authorId: me.id,
+        authorName: me.name,
+        content,
+        timestamp: Date.now(),
+      };
+      let next: CollabRoom = {
+        ...room,
+        messages: [...room.messages, msg],
+        members: room.members.map(m =>
+          m.id === me.id ? { ...m, status: 'online' as MemberStatus, lastActiveAt: Date.now() } : m
+        ),
+      };
+      next = appendActivity(next, {
+        type: 'message',
+        actorId: me.id,
+        actorName: me.name,
+        detail: content.length > 60 ? `${content.slice(0, 60)}…` : content,
+      });
+      return next;
+    }));
+    setDraftMessage('');
+  }, [draftMessage, isJoined, me, toast]);
+
+  // Cycle the current user's presence status in a room: online -> away -> online
+  const handleToggleMyStatus = useCallback((roomId: string) => {
+    setRooms(prev => prev.map(room => {
+      if (room.id !== roomId) return room;
+      const mine = room.members.find(m => m.id === me.id);
+      if (!mine) return room;
+      const nextStatus: MemberStatus = mine.status === 'online' ? 'away' : 'online';
+      let next: CollabRoom = {
+        ...room,
+        members: room.members.map(m =>
+          m.id === me.id ? { ...m, status: nextStatus, lastActiveAt: Date.now() } : m
+        ),
+      };
+      next = appendActivity(next, {
+        type: 'status',
+        actorId: me.id,
+        actorName: me.name,
+        detail: `set status to ${nextStatus}`,
+      });
+      return next;
+    }));
+  }, [me]);
+
+  // Shared note/board link-out -> opens the linked app
+  const handleRoomLinkOut = useCallback((room: CollabRoom) => {
+    window.dispatchEvent(new CustomEvent('dex-open-app', {
+      detail: { appId: room.appId },
+    }));
+    setRooms(prev => prev.map(r => {
+      if (r.id !== room.id) return r;
+      return appendActivity(r, {
+        type: 'linkout',
+        actorId: me.id,
+        actorName: me.name,
+        detail: `opened ${room.appId}`,
+      });
+    }));
+    toast('info', `Opening ${room.appId}…`);
+  }, [me, toast]);
+
+  // Search across rooms + members
+  const filteredRooms = useMemo(() => {
+    const q = roomSearch.trim().toLowerCase();
+    const sorted = [...rooms].sort((a, b) => b.createdAt - a.createdAt);
+    if (!q) return sorted;
+    return sorted.filter(room =>
+      room.name.toLowerCase().includes(q) ||
+      room.topic.toLowerCase().includes(q) ||
+      room.appId.toLowerCase().includes(q) ||
+      room.members.some(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q)
+      )
+    );
+  }, [rooms, roomSearch]);
+
+  const presenceCount = useCallback((room: CollabRoom) =>
+    room.members.filter(m => m.status === 'online').length, []);
 
   const projectList = useMemo(() => {
     const list = Array.from(projects.values());
@@ -676,6 +1089,16 @@ const CollabHub: React.FC = () => {
               </svg>
             ),
           },
+          {
+            id: 'rooms' as const,
+            label: 'Rooms',
+            badge: joinedRoomIds.length,
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+              </svg>
+            ),
+          },
         ]).map(tab => (
           <button
             key={tab.id}
@@ -724,7 +1147,7 @@ const CollabHub: React.FC = () => {
         )}
 
         {/* Search */}
-        {activeTab !== 'checkpoints' && activeTab !== 'activity' && (
+        {activeTab !== 'checkpoints' && activeTab !== 'activity' && activeTab !== 'rooms' && (
           <>
             <DexSearchInput
               fullWidth
@@ -827,7 +1250,7 @@ const CollabHub: React.FC = () => {
                           }}
                           title={c.name}
                         >
-                          {c.name[0].toUpperCase()}
+                          {c.name?.[0]?.toUpperCase() || '?'}
                         </div>
                       ))}
                       {moreCount > 0 && (
@@ -1070,6 +1493,377 @@ const CollabHub: React.FC = () => {
               ))}
             </div>
           )
+        )}
+
+        {/* Rooms (local session) */}
+        {activeTab === 'rooms' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {/* Local-session honesty banner + create */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+              borderRadius: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: STATUS_COLORS.online, flexShrink: 0,
+                  boxShadow: `0 0 8px ${STATUS_COLORS.online}`,
+                }} />
+                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                  Local session · presence and chat are stored on this device only
+                </span>
+              </div>
+              <button
+                style={{ ...styles.actionBtn, ...styles.actionBtnPrimary, flexShrink: 0 }}
+                onClick={handleCreateRoom}
+                onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.filter = 'brightness(1)'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                New Room
+              </button>
+            </div>
+
+            <DexSearchInput
+              fullWidth
+              placeholder="Search rooms and members"
+              value={roomSearch}
+              onChange={e => setRoomSearch(e.target.value)}
+              onClear={() => setRoomSearch('')}
+            />
+
+            {rooms.length === 0 ? (
+              <EmptyState
+                title="No rooms yet"
+                description="Create a local room to organize presence, an activity timeline, and a chat for a shared note or board."
+                icon={(
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                  </svg>
+                )}
+                actions={[{ label: 'Create room', onClick: handleCreateRoom }]}
+              />
+            ) : filteredRooms.length === 0 ? (
+              <EmptyState
+                title="No matches"
+                description="No rooms or members match your search."
+                icon={(
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                )}
+              />
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 'var(--space-4)', alignItems: 'start' }}>
+                {/* Room list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {filteredRooms.map(room => {
+                    const theme = APP_THEMES[room.appId] || APP_THEMES.prism;
+                    const selected = room.id === activeRoomId;
+                    const joined = isJoined(room.id);
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => setActiveRoomId(room.id)}
+                        style={{
+                          textAlign: 'left',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          padding: 'var(--space-3) var(--space-4)',
+                          background: selected
+                            ? 'var(--color-bg-active, rgba(255,255,255,0.1))'
+                            : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+                          border: selected
+                            ? '1px solid var(--dex-focus-color, rgba(255,255,255,0.25))'
+                            : '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          color: 'var(--color-text-primary, #fff)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ ...styles.cardAvatar, marginLeft: 0, background: theme.bg, width: 28, height: 28, fontSize: 12 }}>
+                            {theme.icon}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {room.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary, #8e8e93)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {room.topic || room.appId}
+                            </div>
+                          </div>
+                          {joined && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, padding: '2px 6px',
+                              borderRadius: 4, background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
+                              color: 'var(--color-success, #30d158)', flexShrink: 0,
+                            }}>
+                              JOINED
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS.online }} />
+                            {presenceCount(room)} online
+                          </span>
+                          <span>{room.members.length} member{room.members.length === 1 ? '' : 's'}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active room detail */}
+                {activeRoom ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0 }}>
+                    {/* Header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                      gap: 'var(--space-3)', padding: 'var(--space-4)',
+                      background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+                      border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+                      borderRadius: 10,
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
+                          {activeRoom.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary, #8e8e93)', marginTop: 2 }}>
+                          {activeRoom.topic ? `${activeRoom.topic} · ` : ''}linked to {activeRoom.appId}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button
+                          style={styles.actionBtn}
+                          onClick={() => handleRoomLinkOut(activeRoom)}
+                          title={`Open ${activeRoom.appId}`}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.12))'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.08))'; }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                          Open board
+                        </button>
+                        {isJoined(activeRoom.id) ? (
+                          <>
+                            <button
+                              style={styles.actionBtn}
+                              onClick={() => handleToggleMyStatus(activeRoom.id)}
+                              title="Toggle your presence"
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.12))'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.08))'; }}
+                            >
+                              {activeRoom.members.find(m => m.id === me.id)?.status === 'away' ? 'Set online' : 'Set away'}
+                            </button>
+                            <button
+                              style={{ ...styles.actionBtn, color: 'var(--color-error, #ff453a)' }}
+                              onClick={() => handleLeaveRoom(activeRoom.id)}
+                              title="Leave room"
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.1)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.08))'; }}
+                            >
+                              Leave
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            style={{ ...styles.actionBtn, ...styles.actionBtnPrimary }}
+                            onClick={() => handleJoinRoom(activeRoom.id)}
+                            title="Join room"
+                            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.filter = 'brightness(1)'; }}
+                          >
+                            Join
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 'var(--space-4)', alignItems: 'start' }}>
+                      {/* Chat */}
+                      <div style={{
+                        display: 'flex', flexDirection: 'column',
+                        border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+                        borderRadius: 10, overflow: 'hidden',
+                        background: 'var(--color-bg-hover, rgba(255,255,255,0.02))',
+                      }}>
+                        <div
+                          ref={chatScrollRef}
+                          style={{
+                            display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+                            padding: 'var(--space-4)', height: 320, overflowY: 'auto',
+                          }}
+                        >
+                          {activeRoom.messages.map(msg => {
+                            if (msg.system) {
+                              return (
+                                <div key={msg.id} style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-text-muted, #636366)' }}>
+                                  {msg.content}
+                                </div>
+                              );
+                            }
+                            const mine = msg.authorId === me.id;
+                            return (
+                              <div key={msg.id} style={{ display: 'flex', gap: 10, flexDirection: mine ? 'row-reverse' : 'row' }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 600, color: '#fff',
+                                  background: avatarColor(msg.authorId),
+                                }}>
+                                  {msg.authorName[0]?.toUpperCase() || '?'}
+                                </div>
+                                <div style={{ maxWidth: '75%' }}>
+                                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary, #8e8e93)', marginBottom: 3, textAlign: mine ? 'right' : 'left' }}>
+                                    {mine ? 'You' : msg.authorName} · {formatTime(msg.timestamp)}
+                                  </div>
+                                  <div style={{
+                                    fontSize: 13, lineHeight: 1.4, padding: '8px 12px', borderRadius: 10,
+                                    color: 'var(--color-text-primary, #fff)',
+                                    background: mine
+                                      ? 'linear-gradient(135deg, #0a84ff, #5e5ce6)'
+                                      : 'var(--color-bg-active, rgba(255,255,255,0.08))',
+                                    wordBreak: 'break-word',
+                                  }}>
+                                    {msg.content}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{
+                          display: 'flex', gap: 'var(--space-2)', padding: 'var(--space-3)',
+                          borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+                        }}>
+                          <input
+                            value={draftMessage}
+                            onChange={e => setDraftMessage(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(activeRoom.id); } }}
+                            placeholder={isJoined(activeRoom.id) ? 'Message (local-only)…' : 'Join to chat'}
+                            disabled={!isJoined(activeRoom.id)}
+                            style={{
+                              flex: 1, padding: '8px 12px', fontSize: 13,
+                              background: 'var(--color-bg-base, rgba(0,0,0,0.2))',
+                              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
+                              borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                              outline: 'none', opacity: isJoined(activeRoom.id) ? 1 : 0.5,
+                            }}
+                          />
+                          <button
+                            style={{ ...styles.actionBtn, ...styles.actionBtnPrimary, opacity: (isJoined(activeRoom.id) && draftMessage.trim()) ? 1 : 0.5 }}
+                            onClick={() => handleSendMessage(activeRoom.id)}
+                            disabled={!isJoined(activeRoom.id) || !draftMessage.trim()}
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Presence list */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                          Members · {activeRoom.members.length}
+                        </div>
+                        {[...activeRoom.members]
+                          .sort((a, b) => {
+                            const order: Record<MemberStatus, number> = { online: 0, away: 1, offline: 2 };
+                            return order[a.status] - order[b.status];
+                          })
+                          .map(m => (
+                            <div key={m.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '8px 10px', borderRadius: 8,
+                              background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+                              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+                            }}>
+                              <div style={{ position: 'relative', flexShrink: 0 }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 600, color: '#fff',
+                                  background: avatarColor(m.id),
+                                }}>
+                                  {m.name[0]?.toUpperCase() || '?'}
+                                </div>
+                                <span style={{
+                                  position: 'absolute', right: -1, bottom: -1,
+                                  width: 9, height: 9, borderRadius: '50%',
+                                  background: STATUS_COLORS[m.status],
+                                  border: '2px solid var(--color-bg-elevated, #1a1a1c)',
+                                }} title={m.status} />
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {m.name}{m.isCurrentUser ? ' (you)' : ''}
+                                </div>
+                                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                                  {m.status === 'online' ? 'Online' : m.status === 'away' ? 'Away' : `Last seen ${formatTime(m.lastActiveAt)}`}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Activity timeline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                        Activity timeline
+                      </div>
+                      {[...activeRoom.activity].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30).map(a => (
+                        <div key={a.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 12px', borderRadius: 8,
+                          background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
+                          border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.05))',
+                        }}>
+                          <div style={{
+                            width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 10, fontWeight: 600, color: '#fff',
+                            background: avatarColor(a.actorId),
+                          }}>
+                            {a.actorName[0]?.toUpperCase() || '?'}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--color-text-secondary, #c7c7cc)' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>{a.actorName}</span>{' '}
+                            <span style={{ color: 'var(--color-text-tertiary, #8e8e93)' }}>{a.detail}</span>
+                          </div>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-muted, #636366)', flexShrink: 0 }}>
+                            {formatTime(a.timestamp)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="Select a room"
+                    description="Pick a room on the left to see presence, chat, and its activity timeline."
+                    icon={(
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    )}
+                  />
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

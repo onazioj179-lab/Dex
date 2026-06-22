@@ -684,9 +684,9 @@ const timer = setInterval(check, 15000);
   }, [settings]);
 
   useEffect(() => {
-    if (commandPaletteOpen) {
-      setTimeout(() => commandInputRef.current?.focus(), 0);
-    }
+    if (!commandPaletteOpen) return;
+    const focusTimer = setTimeout(() => commandInputRef.current?.focus(), 0);
+    return () => clearTimeout(focusTimer);
   }, [commandPaletteOpen]);
 
   useEffect(() => {
@@ -2331,6 +2331,7 @@ const timer = setInterval(check, 15000);
                 <span style={{ fontSize: 12 }}>Capture every</span>
                 <select
                   style={S.select}
+                  aria-label="Screenshot capture interval"
                   value={settings?.screenshotIntervalMin || 5}
                   onChange={e => updateSetting('screenshotIntervalMin', parseInt(e.target.value))}
                 >
@@ -2388,6 +2389,7 @@ const timer = setInterval(check, 15000);
             <span style={{ fontSize: 12 }}>Keep data for</span>
             <select
               style={S.select}
+              aria-label="Data retention period"
               value={settings?.retentionDays || 30}
               onChange={e => updateSetting('retentionDays', parseInt(e.target.value))}
             >
@@ -2481,6 +2483,7 @@ const timer = setInterval(check, 15000);
           </div>
           <select
             style={S.select}
+            aria-label="Notification mode"
             value={(settings as any)?.notificationMode || 'normal'}
             onChange={e => updateSetting('notificationMode', e.target.value)}
           >
@@ -2526,6 +2529,7 @@ const timer = setInterval(check, 15000);
             <span style={{ fontSize: 12 }}>Schedule:</span>
             <select
               style={S.select}
+              aria-label="Backup schedule"
               value={backupSettings?.schedule || 'daily'}
               onChange={async e => {
                 if (!dex?.rewind?.setBackupSchedule) return;

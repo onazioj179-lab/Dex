@@ -4,6 +4,9 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  */
 import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
+import { DexSearchInput } from '../../styles/components';
+import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../../shared/time/dateHelpers';
+import { textIncludesAll, priorityRank, byField } from '../../../shared/collections/sortFilter';
 
 // -- Types --------------------------------------------------------------
 
@@ -16,7 +19,10 @@ interface KanbanCard {
   createdAt: number;
   dueDate?: string;
   checklist: { text: string; done: boolean }[];
+  recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
 }
+
+type SortField = 'none' | 'dueDate' | 'priority' | 'createdAt' | 'title';
 
 interface KanbanColumn {
   id: string;
@@ -95,6 +101,7 @@ const Icons = {
   edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   board: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   flag: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>,
+  repeat: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
 };
 
 // -- Priority colors ----------------------------------------------------
@@ -120,6 +127,7 @@ const CardDetail: React.FC<{
   const [description, setDescription] = useState(card.description);
   const [priority, setPriority] = useState(card.priority);
   const [dueDate, setDueDate] = useState(card.dueDate || '');
+  const [recurrence, setRecurrence] = useState<NonNullable<KanbanCard['recurrence']>>(card.recurrence || 'none');
   const [labels, setLabels] = useState(card.labels);
   const [checklist, setChecklist] = useState(card.checklist);
   const [newLabel, setNewLabel] = useState('');
@@ -134,7 +142,7 @@ const CardDetail: React.FC<{
   }, [onClose]);
 
   const handleSave = () => {
-    onSave({ ...card, title: title.trim() || 'Untitled', description, priority, dueDate: dueDate || undefined, labels, checklist });
+    onSave({ ...card, title: title.trim() || 'Untitled', description, priority, dueDate: dueDate || undefined, recurrence, labels, checklist });
   };
 
   const addLabel = () => {
@@ -182,6 +190,15 @@ const CardDetail: React.FC<{
             <div style={{ flex: 1 }}>
               <label style={modalStyles.label}>Due Date</label>
               <input style={modalStyles.input} type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={modalStyles.label}>Repeat</label>
+              <select style={modalStyles.select} value={recurrence} onChange={e => setRecurrence(e.target.value as NonNullable<KanbanCard['recurrence']>)}>
+                <option value="none">None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
             </div>
           </div>
 
@@ -258,10 +275,41 @@ const KanbanApp: React.FC = () => {
   const [newColTitle, setNewColTitle] = useState('');
   const [showNewCol, setShowNewCol] = useState(false);
   const [dragCard, setDragCard] = useState<{ colId: string; cardIdx: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ colId: string; idx: number } | null>(null);
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<SortField>('none');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [filterPriority, setFilterPriority] = useState<'all' | KanbanCard['priority']>('all');
   const newCardRef = useRef<HTMLInputElement>(null);
   const newColRef = useRef<HTMLInputElement>(null);
 
   const board = boards[activeBoardIdx] || boards[0];
+
+  // A sort/search/filter changes the displayed order, so precise drag-reorder by
+  // index becomes ambiguous -- dragging is disabled while any view transform is
+  // active (the user clears it to reorganize). Cross-column moves resume then too.
+  const viewActive = sortField !== 'none' || search.trim() !== '' || filterPriority !== 'all';
+
+  const sortKey = useCallback((c: KanbanCard): number | string => {
+    switch (sortField) {
+      case 'dueDate': return c.dueDate ? new Date(c.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      case 'priority': return priorityRank(c.priority);
+      case 'createdAt': return c.createdAt;
+      case 'title': return c.title.toLowerCase();
+      default: return 0;
+    }
+  }, [sortField]);
+
+  // Cards to render for a column, carrying each card's REAL index so edit + drag
+  // operate on stored positions regardless of the active view transform.
+  const getDisplayCards = useCallback((col: KanbanColumn): { card: KanbanCard; realIdx: number }[] => {
+    let list = col.cards.map((card, realIdx) => ({ card, realIdx }));
+    const q = search.trim();
+    if (q) list = list.filter(x => textIncludesAll(`${x.card.title} ${x.card.description}`, q));
+    if (filterPriority !== 'all') list = list.filter(x => x.card.priority === filterPriority);
+    if (sortField !== 'none') list = [...list].sort(byField(x => sortKey(x.card), sortDir));
+    return list;
+  }, [search, filterPriority, sortField, sortDir, sortKey]);
 
   // Load from backend on mount (async, overrides localStorage if available)
   useEffect(() => {
@@ -366,18 +414,36 @@ const KanbanApp: React.FC = () => {
   }, []);
 
   const handleDrop = useCallback((targetColId: string, targetIdx: number) => {
-    if (!dragCard) return;
+    const src = dragCard;
+    if (!src) return;
     updateBoard(b => {
       const cols = b.columns.map(c => ({ ...c, cards: [...c.cards] }));
-      const srcCol = cols.find(c => c.id === dragCard.colId);
+      const srcCol = cols.find(c => c.id === src.colId);
       const dstCol = cols.find(c => c.id === targetColId);
       if (!srcCol || !dstCol) return b;
-      const [card] = srcCol.cards.splice(dragCard.cardIdx, 1);
+      const [card] = srcCol.cards.splice(src.cardIdx, 1);
       if (!card) return b;
-      dstCol.cards.splice(targetIdx, 0, card);
+      // Same-column reorder: removing the source first shifts later indices, so a
+      // target past the source must drop by one to land where the gap was shown.
+      let idx = targetIdx;
+      if (src.colId === targetColId && targetIdx > src.cardIdx) idx--;
+      dstCol.cards.splice(idx, 0, card);
+      // Recurring card reaching a "done" column spawns its next occurrence back in
+      // the origin column with the due date advanced and the checklist reset.
+      if (/done|complete/i.test(dstCol.title) && card.recurrence && card.recurrence !== 'none') {
+        const originCol = cols.find(c => c.id === src.colId) || srcCol;
+        originCol.cards.push({
+          ...card,
+          id: generateId(),
+          createdAt: Date.now(),
+          dueDate: card.dueDate ? advanceDate(card.dueDate, card.recurrence) : undefined,
+          checklist: card.checklist.map(ci => ({ ...ci, done: false })),
+        });
+      }
       return { ...b, columns: cols };
     });
     setDragCard(null);
+    setDropTarget(null);
   }, [dragCard, updateBoard]);
 
   // Board management
@@ -440,6 +506,33 @@ const KanbanApp: React.FC = () => {
         </div>
       </div>
 
+      {/* Controls: search / filter / sort */}
+      <div style={styles.controls}>
+        <div style={{ width: 220 }}>
+          <DexSearchInput size="sm" fullWidth value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch('')} placeholder="Search cards..." />
+        </div>
+        <select style={styles.controlSelect} value={filterPriority} onChange={e => setFilterPriority(e.target.value as 'all' | KanbanCard['priority'])} aria-label="Filter by priority">
+          <option value="all">All priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <select style={styles.controlSelect} value={sortField} onChange={e => setSortField(e.target.value as SortField)} aria-label="Sort by">
+          <option value="none">No sort</option>
+          <option value="dueDate">Due date</option>
+          <option value="priority">Priority</option>
+          <option value="createdAt">Created</option>
+          <option value="title">Title</option>
+        </select>
+        {sortField !== 'none' && (
+          <button className="kanban-btn" style={styles.controlBtn} onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} title="Toggle sort direction">
+            {sortDir === 'asc' ? 'Asc' : 'Desc'}
+          </button>
+        )}
+        {viewActive && <span style={styles.controlHint}>Drag disabled while filtered/sorted</span>}
+      </div>
+
       {/* Board */}
       <div style={styles.board}>
         {board.columns.map(col => (
@@ -463,41 +556,67 @@ const KanbanApp: React.FC = () => {
                   No cards yet
                 </div>
               )}
-              {col.cards.map((card, ci) => (
-                <div
-                  key={card.id}
-                  className="kanban-card"
-                  style={styles.card}
-                  draggable
-                  onDragStart={() => handleDragStart(col.id, ci)}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => { e.stopPropagation(); handleDrop(col.id, ci); }}
-                  onClick={() => setEditingCard({ colId: col.id, cardIdx: ci })}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Card: ${card.title}`}
-                  onKeyDown={e => e.key === 'Enter' && setEditingCard({ colId: col.id, cardIdx: ci })}
-                >
-                  {card.labels.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-                      {card.labels.map((l, li) => (
-                        <span key={li} style={{ padding: '1px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, background: `${l.color}20`, color: l.color }}>{l.text}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div style={styles.cardTitle}>{card.title}</div>
-                  {card.description && <div style={styles.cardDesc}>{card.description.slice(0, 80)}{card.description.length > 80 ? '...' : ''}</div>}
-                  <div style={styles.cardFooter}>
-                    <span style={{ ...styles.priorityBadge, color: PRIORITY_CONFIG[card.priority].color }}>
-                      {Icons.flag} {PRIORITY_CONFIG[card.priority].label}
-                    </span>
-                    {card.checklist.length > 0 && (
-                      <span style={styles.checkCount}>{Icons.check} {card.checklist.filter(c => c.done).length}/{card.checklist.length}</span>
+              {getDisplayCards(col).map(({ card, realIdx: ci }) => (
+                <React.Fragment key={card.id}>
+                  {dropTarget && dropTarget.colId === col.id && dropTarget.idx === ci && <div style={styles.dropLine} />}
+                  <div
+                    className="kanban-card"
+                    style={{
+                      ...styles.card,
+                      ...(dueStatus(card.dueDate) === 'overdue' ? { borderLeft: '3px solid var(--color-error)' } : null),
+                      ...(dragCard && dragCard.colId === col.id && dragCard.cardIdx === ci ? { opacity: 0.4 } : null),
+                    }}
+                    draggable={!viewActive}
+                    onDragStart={() => handleDragStart(col.id, ci)}
+                    onDragEnd={() => setDropTarget(null)}
+                    onDragOver={e => {
+                      e.preventDefault();
+                      if (viewActive || !dragCard) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const after = e.clientY > rect.top + rect.height / 2;
+                      setDropTarget({ colId: col.id, idx: after ? ci + 1 : ci });
+                    }}
+                    onDrop={e => {
+                      e.stopPropagation();
+                      if (viewActive) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const after = e.clientY > rect.top + rect.height / 2;
+                      handleDrop(col.id, after ? ci + 1 : ci);
+                    }}
+                    onClick={() => setEditingCard({ colId: col.id, cardIdx: ci })}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Card: ${card.title}`}
+                    onKeyDown={e => e.key === 'Enter' && setEditingCard({ colId: col.id, cardIdx: ci })}
+                  >
+                    {card.labels.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                        {card.labels.map((l, li) => (
+                          <span key={li} style={{ padding: '1px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, background: `${l.color}20`, color: l.color }}>{l.text}</span>
+                        ))}
+                      </div>
                     )}
-                    {card.dueDate && <span style={styles.dueBadge}>{card.dueDate}</span>}
+                    <div style={styles.cardTitle}>{card.title}</div>
+                    {card.description && <div style={styles.cardDesc}>{card.description.slice(0, 80)}{card.description.length > 80 ? '...' : ''}</div>}
+                    <div style={styles.cardFooter}>
+                      <span style={{ ...styles.priorityBadge, color: (PRIORITY_CONFIG[card.priority] || PRIORITY_CONFIG.medium).color }}>
+                        {Icons.flag} {(PRIORITY_CONFIG[card.priority] || PRIORITY_CONFIG.medium).label}
+                      </span>
+                      {card.recurrence && card.recurrence !== 'none' && (
+                        <span style={styles.checkCount} title={`Repeats ${card.recurrence}`}>{Icons.repeat} {card.recurrence}</span>
+                      )}
+                      {card.checklist.length > 0 && (
+                        <span style={styles.checkCount}>{Icons.check} {card.checklist.filter(c => c.done).length}/{card.checklist.length}</span>
+                      )}
+                      {card.dueDate && (() => {
+                        const dc = dueStatusColor(dueStatus(card.dueDate));
+                        return <span style={{ ...styles.dueBadge, ...(dc ? { color: dc, fontWeight: 700 } : null) }}>{relativeDueLabel(card.dueDate)}</span>;
+                      })()}
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               ))}
+              {dropTarget && dropTarget.colId === col.id && dropTarget.idx >= col.cards.length && <div style={styles.dropLine} />}
 
               {addingToCol === col.id ? (
                 <div style={styles.addCardForm}>
@@ -577,9 +696,14 @@ const styles: Record<string, React.CSSProperties> = {
   boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
   progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
   boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 },
-  boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease' },
+  boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   boardTabActive: { background: 'var(--color-bg-elevated, #2c2c2e)', color: 'var(--color-text-primary, #fafafa)', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' },
   boardTabAdd: { width: 28, height: 28, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  controls: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, background: 'var(--color-bg-surface, rgba(255,255,255,.01))', flexWrap: 'wrap' },
+  controlSelect: { padding: '5px var(--space-2)', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', outline: 'none', cursor: 'pointer' },
+  controlBtn: { padding: '5px 12px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' },
+  controlHint: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', opacity: 0.7, marginLeft: 'auto' },
+  dropLine: { height: 2, borderRadius: 2, margin: '1px 4px', background: 'var(--color-accent)', boxShadow: '0 0 6px var(--color-accent)' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
   column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 10, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
   colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', borderRadius: '10px 10px 0 0' },
@@ -589,7 +713,7 @@ const styles: Record<string, React.CSSProperties> = {
   colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, opacity: 0.4 },
   cardList: { flex: 1, padding: 'var(--space-2) var(--space-2)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 },
   card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
-  cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4 },
+  cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4, overflowWrap: 'anywhere', minWidth: 0 },
   cardDesc: { fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, lineHeight: 1.4 },
   cardFooter: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' },
   priorityBadge: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 600 },

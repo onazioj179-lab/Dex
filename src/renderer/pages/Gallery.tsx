@@ -426,10 +426,66 @@ export const Gallery: React.FC = () => {
   const [slideshowRunning, setSlideshowRunning] = useState(false);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
 
+  // Search + sort (operate on the current album's media)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<'date' | 'name' | 'size'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Custom (renamed) names, keyed by media id, persisted to localStorage.
+  const [renameMap, setRenameMap] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('dex-gallery-renames') || '{}') || {}; } catch { return {}; }
+  });
+  // Inline rename: which item id is being edited, plus its draft text.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
   // Batch selection
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Resolve an item's effective display name (custom rename wins over the raw name).
+  const displayName = useCallback((item: MediaItem) => renameMap[item.id] ?? item.name, [renameMap]);
+
+  // Persist renames whenever they change.
+  useEffect(() => {
+    try { localStorage.setItem('dex-gallery-renames', JSON.stringify(renameMap)); } catch { /* */ }
+  }, [renameMap]);
+
+  // Derive a folder breadcrumb from the media path (id/src are absolute file paths).
+  const folderCrumbs = useCallback((item: MediaItem | null): string[] => {
+    if (!item) return [];
+    try {
+      const raw = (item.id || item.src || '').replace(/^file:\/\//, '');
+      const parts = raw.replace(/\\/g, '/').split('/').filter(Boolean);
+      parts.pop(); // drop the filename
+      return parts.slice(-3); // keep the last few folders so it stays compact
+    } catch { return []; }
+  }, []);
+
+  const commitRename = useCallback((item: MediaItem) => {
+    try {
+      const next = renameDraft.trim();
+      setRenameMap(prev => {
+        const copy = { ...prev };
+        if (!next || next === item.name) delete copy[item.id];
+        else copy[item.id] = next;
+        return copy;
+      });
+      if (next && next !== displayName(item)) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Renamed' } }));
+      }
+    } catch {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Rename failed' } }));
+    } finally {
+      setRenamingId(null);
+      setRenameDraft('');
+    }
+  }, [renameDraft, displayName]);
+
+  const startRename = useCallback((item: MediaItem) => {
+    setRenamingId(item.id);
+    setRenameDraft(displayName(item));
+  }, [displayName]);
   // Anchor index (within sortedMedia) for shift-click range selection.
   const lastSelectedIndexRef = useRef<number | null>(null);
 
@@ -445,22 +501,40 @@ export const Gallery: React.FC = () => {
   const filteredMedia = useMemo(() => {
     const now = Date.now();
     const sevenDays = 7 * 24 * 3600 * 1000;
+    const q = searchQuery.trim().toLowerCase();
     return media.filter(item => {
-      switch (selectedAlbum) {
-        case 'photos': return item.type === 'image';
-        case 'videos': return item.type === 'video';
-        case 'favorites': return favorites.includes(item.id);
-        case 'recent': return (now - item.date.getTime()) < sevenDays;
-        case 'screenshots': return item.name?.toLowerCase().includes('screenshot');
-        default: return true;
+      const albumMatch = (() => {
+        switch (selectedAlbum) {
+          case 'photos': return item.type === 'image';
+          case 'videos': return item.type === 'video';
+          case 'favorites': return favorites.includes(item.id);
+          case 'recent': return (now - item.date.getTime()) < sevenDays;
+          case 'screenshots': return item.name?.toLowerCase().includes('screenshot');
+          default: return true;
+        }
+      })();
+      if (!albumMatch) return false;
+      if (q) {
+        const name = (renameMap[item.id] ?? item.name ?? '').toLowerCase();
+        if (!name.includes(q)) return false;
       }
+      return true;
     });
-  }, [media, favorites, selectedAlbum]);
+  }, [media, favorites, selectedAlbum, searchQuery, renameMap]);
 
-  // Sort: newest first
-  const sortedMedia = useMemo(() =>
-    [...filteredMedia].sort((a, b) => b.date.getTime() - a.date.getTime()),
-  [filteredMedia]);
+  // Sort by the active key/direction. Name uses the effective (renamed) name.
+  const sortedMedia = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...filteredMedia].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'name': cmp = (renameMap[a.id] ?? a.name ?? '').localeCompare(renameMap[b.id] ?? b.name ?? '', undefined, { numeric: true, sensitivity: 'base' }); break;
+        case 'size': cmp = (a.size || 0) - (b.size || 0); break;
+        case 'date': default: cmp = a.date.getTime() - b.date.getTime(); break;
+      }
+      return cmp * dir;
+    });
+  }, [filteredMedia, sortKey, sortDir, renameMap]);
 
   // -- uki context: let the assistant see the active album, view, and selection.
   // Registered once; a latest-value ref keeps the resolver reading live state.
@@ -526,6 +600,29 @@ export const Gallery: React.FC = () => {
     setMedia(prev => prev.filter(m => !selectedItems.has(m.id)));
     clearSelection();
   }, [selectedItems, clearSelection]);
+
+  // Batch favorite: if any selected item is not yet a favorite, favorite them
+  // all; otherwise (all already favorited) toggle them all off.
+  const batchFavorite = useCallback(() => {
+    if (selectedItems.size === 0) return;
+    try {
+      setFavorites(prev => {
+        const ids = [...selectedItems];
+        const allFav = ids.every(id => prev.includes(id));
+        if (allFav) {
+          const next = prev.filter(id => !selectedItems.has(id));
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Removed ${ids.length} from favorites` } }));
+          return next;
+        }
+        const set = new Set(prev);
+        ids.forEach(id => set.add(id));
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Favorited ${ids.length} item${ids.length !== 1 ? 's' : ''}` } }));
+        return [...set];
+      });
+    } catch {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Batch favorite failed' } }));
+    }
+  }, [selectedItems]);
 
   const batchExport = useCallback(() => {
     if (selectedItems.size === 0) return;
@@ -855,8 +952,8 @@ export const Gallery: React.FC = () => {
   // avoid the virtualizer's measure pass causing a one-frame layout shift.
   const GRID_VIRTUALIZE_THRESHOLD = 30;
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  // Reset visible count when album/filter changes
-  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [selectedAlbum]);
+  // Reset visible count when album/search/sort changes
+  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [selectedAlbum, searchQuery, sortKey, sortDir]);
   const visibleMedia = useMemo(() => sortedMedia.slice(0, visibleCount), [sortedMedia, visibleCount]);
   const hasMoreItems = visibleCount < sortedMedia.length;
 
@@ -915,14 +1012,17 @@ export const Gallery: React.FC = () => {
     // Right-clicking inside a multi-selection acts on the whole selection.
     if (selectedItems.has(item.id) && selectedItems.size > 1) {
       const count = selectedItems.size;
+      const allFav = [...selectedItems].every(id => favorites.includes(id));
       return [
-        { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport },
+        { id: 'fav-sel', label: allFav ? `Unfavorite ${count} items` : `Favorite ${count} items`, icon: Icons.heart, onSelect: batchFavorite },
+        { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport, dividerAfter: true },
         { id: 'deselect', label: 'Clear selection', icon: Icons.close, onSelect: clearSelection, dividerAfter: true },
         { id: 'delete-sel', label: `Delete ${count} items`, icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: batchDelete },
       ];
     }
     return [
       { id: 'open', label: 'Open', icon: Icons.grid, onSelect: () => setSelectedMedia(item) },
+      { id: 'rename', label: 'Rename', icon: Icons.edit, shortcut: 'F2', onSelect: () => startRename(item) },
       { id: 'select', label: selectedItems.has(item.id) ? 'Deselect' : 'Select', icon: Icons.grid, onSelect: () => { setSelectionMode(true); toggleItemSelection(item.id); lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); }, dividerAfter: true },
       { id: 'fav', label: isFav ? 'Unfavorite' : 'Favorite', icon: Icons.heart, onSelect: () => toggleFavorite(item.id), dividerAfter: true },
       { id: 'copy', label: 'Copy to Clipboard', shortcut: 'Ctrl+C', icon: Icons.copy, onSelect: () => { setSelectedMedia(item); setTimeout(() => copyImageToClipboard(), 50); } },
@@ -936,19 +1036,24 @@ export const Gallery: React.FC = () => {
       { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).electron?.invoke) (window as any).electron.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
       { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
-  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, clearSelection]);
+  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
 
-  // Lightbox keyboard nav
+  // Lightbox keyboard nav + zoom. '+'/'=' zoom in, '-' zoom out, '0' fits.
   useEffect(() => {
     if (!selectedMedia) return;
     const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.key === 'Escape') setSelectedMedia(null);
       else if (e.key === 'ArrowLeft') navigateMedia('prev');
       else if (e.key === 'ArrowRight') navigateMedia('next');
+      else if (selectedMedia.type === 'image' && (e.key === '+' || e.key === '=')) { e.preventDefault(); zoomIn(); }
+      else if (selectedMedia.type === 'image' && (e.key === '-' || e.key === '_')) { e.preventDefault(); zoomOut(); }
+      else if (selectedMedia.type === 'image' && e.key === '0') { e.preventDefault(); zoomReset(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedMedia, navigateMedia]);
+  }, [selectedMedia, navigateMedia, zoomIn, zoomOut, zoomReset]);
 
   // Grid-level selection shortcuts: Ctrl/Cmd+A select all, Delete/Backspace remove
   // the selection, Escape clears it. Suppressed while the lightbox or a text field
@@ -960,11 +1065,12 @@ export const Gallery: React.FC = () => {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); setSelectionMode(true); selectAll(); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedItems.size > 0) { e.preventDefault(); batchDelete(); } return; }
-      if (e.key === 'Escape') { if (selectionMode || selectedItems.size > 0) { e.preventDefault(); clearSelection(); } return; }
+      if (e.key === 'F2') { if (selectedItems.size === 1) { const id = [...selectedItems][0]; const m = sortedMedia.find(x => x.id === id); if (m) { e.preventDefault(); startRename(m); } } return; }
+      if (e.key === 'Escape') { if (renamingId) { setRenamingId(null); setRenameDraft(''); return; } if (selectionMode || selectedItems.size > 0) { e.preventDefault(); clearSelection(); } return; }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedMedia, selectionMode, selectedItems, selectAll, batchDelete, clearSelection]);
+  }, [selectedMedia, selectionMode, selectedItems, selectAll, batchDelete, clearSelection, sortedMedia, startRename, renamingId]);
 
   const albumIcon = (id: string) => {
     switch (id) {
@@ -1081,6 +1187,45 @@ export const Gallery: React.FC = () => {
         <div style={styles.toolbar}>
           <h2 style={styles.title}>{ALBUMS.find(a => a.id === selectedAlbum)?.name ?? 'All Media'}</h2>
           <div style={styles.toolbarRight}>
+            {/* Search within the current album */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: 8, display: 'flex', color: 'var(--color-text-muted)', pointerEvents: 'none' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              </span>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search"
+                aria-label="Search media by name"
+                style={{ width: 150, height: 28, padding: '0 24px 0 26px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none' }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 2 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              )}
+            </div>
+            {/* Sort key + direction */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <select
+                value={sortKey}
+                onChange={e => setSortKey(e.target.value as 'date' | 'name' | 'size')}
+                aria-label="Sort by"
+                style={{ height: 28, padding: '0 var(--space-2)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="date">Date</option>
+                <option value="name">Name</option>
+                <option value="size">Size</option>
+              </select>
+              <button
+                onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+                aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+                title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                style={{ ...styles.viewBtn, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: sortDir === 'asc' ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+              </button>
+            </div>
             <span style={styles.itemCount}>
               {sortedMedia.length} item{sortedMedia.length !== 1 ? 's' : ''}
               {sortedMedia.filter(m => m.type === 'video').length > 0 && (
@@ -1097,6 +1242,7 @@ export const Gallery: React.FC = () => {
                 <>
                   <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600 }}>{selectedItems.size} selected</span>
                   <button onClick={selectAll} aria-label="Select all" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-accent)' }}>All</button>
+                  <button onClick={batchFavorite} aria-label="Favorite selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Favorite</button>
                   <button onClick={batchExport} aria-label="Export selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-success)' }}>Export</button>
                   <button onClick={batchDelete} aria-label="Delete selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Delete</button>
                 </>
@@ -1201,7 +1347,20 @@ export const Gallery: React.FC = () => {
                       {getMediaFormat(item)}
                     </span>
                   </div>
-                  <span style={styles.itemName}>{item.name}</span>
+                  {renamingId === item.id ? (
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => setRenameDraft(e.target.value)}
+                      onBlur={() => commitRename(item)}
+                      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commitRename(item); else if (e.key === 'Escape') { setRenamingId(null); setRenameDraft(''); } }}
+                      aria-label="Rename media"
+                      style={{ ...styles.itemName, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', outline: 'none', textAlign: 'center' }}
+                    />
+                  ) : (
+                    <span style={styles.itemName} title={displayName(item)} onDoubleClick={e => { e.stopPropagation(); startRename(item); }}>{displayName(item)}</span>
+                  )}
                 </div>
               );
               // Avoid layout shift on tiny libraries
@@ -1240,7 +1399,20 @@ export const Gallery: React.FC = () => {
                     {item.type === 'video' && <span style={{...styles.playBadge, width: 20, height: 20, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)'}}>{Icons.play}</span>}
                   </div>
                   <div style={styles.listInfo}>
-                    <span style={styles.listName}>{item.name}</span>
+                    {renamingId === item.id ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => setRenameDraft(e.target.value)}
+                        onBlur={() => commitRename(item)}
+                        onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commitRename(item); else if (e.key === 'Escape') { setRenamingId(null); setRenameDraft(''); } }}
+                        aria-label="Rename media"
+                        style={{ ...styles.listName, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', outline: 'none' }}
+                      />
+                    ) : (
+                      <span style={styles.listName} onDoubleClick={e => { e.stopPropagation(); startRename(item); }}>{displayName(item)}</span>
+                    )}
                     <span style={styles.listMeta}>
                       {getMediaFormat(item)} -- {item.type === 'video' ? 'Video' : 'Photo'} {formatDate(item.date)} {formatSize(item.size)}
                       {item.duration != null && ` ${formatDuration(item.duration)}`}
@@ -1438,7 +1610,7 @@ export const Gallery: React.FC = () => {
             {[{ label: 'Exposure', value: adjustExposure, set: setAdjustExposure, min: -100, max: 100, color: 'var(--color-warning)' }, { label: 'Contrast', value: adjustContrast, set: setAdjustContrast, min: -100, max: 100, color: 'var(--color-accent)' }, { label: 'Saturation', value: adjustSaturation, set: setAdjustSaturation, min: -100, max: 100, color: 'var(--color-success)' }, { label: 'Temperature', value: adjustTemp, set: setAdjustTemp, min: -100, max: 100, color: 'var(--color-warning)' }].map(s => (
               <div key={s.label} style={{ marginBottom: 'var(--space-2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value > 0 ? '+' : ''}{s.value}</span></div>
-                <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: s.color }} />
+                <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} aria-label={s.label} style={{ width: '100%', accentColor: s.color }} />
               </div>
             ))}
             <button aria-label="Reset all adjustments" onClick={() => { setAdjustExposure(0); setAdjustContrast(0); setAdjustSaturation(0); setAdjustTemp(0); }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 4 }}>Reset All</button>
@@ -1487,7 +1659,7 @@ export const Gallery: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Straighten</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{straightenAngle}°</span></div>
-            <input type="range" min="-45" max="45" value={straightenAngle} onChange={e => setStraightenAngle(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
+            <input type="range" min="-45" max="45" value={straightenAngle} onChange={e => setStraightenAngle(Number(e.target.value))} aria-label="Straighten angle in degrees" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'flex', gap: 4 }}>
               <button aria-label="Rotate clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 90) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-cw" size={10} /> 90</button>
               <button aria-label="Rotate counter-clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 270) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-ccw" size={10} /> 90</button>
@@ -1588,7 +1760,7 @@ export const Gallery: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Interval</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{slideshowInterval}s</span></div>
-            <input type="range" min="1" max="15" value={slideshowInterval} onChange={e => setSlideshowInterval(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
+            <input type="range" min="1" max="15" value={slideshowInterval} onChange={e => setSlideshowInterval(Number(e.target.value))} aria-label="Slideshow interval in seconds" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Photos Included</div>
             <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{media.filter(m => m.type === 'image').length} photos from {selectedAlbum === 'all' ? 'All Photos' : selectedAlbum}</span>
@@ -1637,7 +1809,19 @@ export const Gallery: React.FC = () => {
           <div style={styles.lightboxHeader}>
             <button style={styles.lightboxClose} aria-label="Close lightbox" onClick={() => setSelectedMedia(null)}>{Icons.close}</button>
             <span style={styles.lightboxTitle}>
-              {selectedMedia.name}
+              {/* Folder breadcrumb derived from the media path */}
+              {folderCrumbs(selectedMedia).length > 0 && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 'var(--space-2)', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 400 }}>
+                  {folderCrumbs(selectedMedia).map((crumb, i, arr) => (
+                    <React.Fragment key={i}>
+                      <span>{crumb}</span>
+                      {i < arr.length - 1 && <span style={{ opacity: 0.5 }}>/</span>}
+                    </React.Fragment>
+                  ))}
+                  <span style={{ opacity: 0.5 }}>/</span>
+                </span>
+              )}
+              {displayName(selectedMedia)}
               {selectedMedia.type === 'video' && <span style={{ marginLeft: 'var(--space-2)', padding: '2px var(--space-2)', borderRadius: 3, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
             </span>
             <div style={styles.lightboxActions}>

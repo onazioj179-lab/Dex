@@ -236,7 +236,8 @@ export const DexSlider: React.FC<{
   step?: number;
   onChange: (value: number) => void;
   disabled?: boolean;
-}> = ({ value, min = 0, max = 100, step = 1, onChange, disabled = false }) => {
+  label?: string;
+}> = ({ value, min = 0, max = 100, step = 1, onChange, disabled = false, label }) => {
   const [dragging, setDragging] = useState(false);
   const [hovered, setHovered] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -267,9 +268,50 @@ export const DexSlider: React.FC<{
     onChange(Math.max(min, Math.min(max, stepped)));
   };
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (disabled) return;
+    const pageStep = Math.max(step, (max - min) / 10);
+    let next: number | null = null;
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        next = value - step;
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        next = value + step;
+        break;
+      case 'PageDown':
+        next = value - pageStep;
+        break;
+      case 'PageUp':
+        next = value + pageStep;
+        break;
+      case 'Home':
+        next = min;
+        break;
+      case 'End':
+        next = max;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    onChange(Math.max(min, Math.min(max, next)));
+  }, [disabled, value, min, max, step, onChange]);
+
   return (
     <div
       ref={trackRef}
+      role="slider"
+      tabIndex={disabled ? -1 : 0}
+      aria-valuenow={value}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-orientation="horizontal"
+      aria-label={label ?? 'Slider'}
+      aria-disabled={disabled || undefined}
+      onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

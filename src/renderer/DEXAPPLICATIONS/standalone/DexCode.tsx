@@ -23,6 +23,11 @@ import {
   saveFile,
 } from './dexCode/fileIO';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import {
+  pickProjectFolder, loadProject, getStoredProjectRoot, clearStoredProject,
+  readProjectFile, searchProject, projectName, buildSymbolIndex,
+  type DexProject, type WorkspaceHit, type ProjectSymbol,
+} from './dexCode/project';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -417,10 +422,116 @@ const DexCode: React.FC = () => {
     setGoToLineInput('');
   }, [goToLineInput, jumpToLine]);
 
+  // --- Project awareness: open a folder, browse + search its source files ---
+  const [project, setProject] = useState<DexProject | null>(null);
+  const [showProject, setShowProject] = useState(true);
+  const [workspaceQuery, setWorkspaceQuery] = useState('');
+  const [workspaceHits, setWorkspaceHits] = useState<WorkspaceHit[]>([]);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+
+  // Restore the last-opened project folder on mount.
+  useEffect(() => {
+    const root = getStoredProjectRoot();
+    if (root) loadProject(root).then(p => { if (p) setProject(p); });
+  }, []);
+
+  // Load a project file into the editor (mirrors handleOpenRecent), optionally
+  // jumping to a line once the new content has rendered.
+  const loadEditorFromPath = useCallback(async (filePath: string, line?: number) => {
+    const content = await readProjectFile(filePath);
+    if (content == null) return;
+    setCode(content);
+    setCurrentFilePath(filePath);
+    setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');
+    originalCodeRef.current = content;
+    setIsModified(false);
+    addRecentFile(filePath);
+    setRecentFiles(getRecentFiles());
+    if (line && line > 0) setTimeout(() => jumpToLine(line), 60);
+  }, [jumpToLine]);
+
+  const openFolder = useCallback(async () => {
+    const proj = await pickProjectFolder();
+    if (proj) { setProject(proj); setWorkspaceHits([]); setWorkspaceQuery(''); }
+  }, []);
+
+  const closeProject = useCallback(() => {
+    clearStoredProject();
+    setProject(null);
+    setWorkspaceHits([]);
+    setWorkspaceQuery('');
+  }, []);
+
+  const runWorkspaceSearch = useCallback(async () => {
+    if (!project) return;
+    const q = workspaceQuery.trim();
+    if (!q) { setWorkspaceHits([]); return; }
+    setWorkspaceBusy(true);
+    try { setWorkspaceHits(await searchProject(project, q)); }
+    finally { setWorkspaceBusy(false); }
+  }, [project, workspaceQuery]);
+
+  // Cross-file symbol index for go-to-definition; rebuilt when the project changes.
+  const [symbolIndex, setSymbolIndex] = useState<Map<string, ProjectSymbol[]>>(new Map());
+  useEffect(() => {
+    if (!project) { setSymbolIndex(new Map()); return; }
+    let cancelled = false;
+    buildSymbolIndex(project).then(idx => { if (!cancelled) setSymbolIndex(idx); });
+    return () => { cancelled = true; };
+  }, [project]);
+
+  // The identifier under the editor caret (for go-to-definition / find-references).
+  const identifierAt = useCallback((): string => {
+    const ta = editorRef.current;
+    if (!ta) return '';
+    const pos = ta.selectionStart;
+    const isWord = (c: string) => /[A-Za-z0-9_$]/.test(c || '');
+    let s = pos, e = pos;
+    while (s > 0 && isWord(code[s - 1])) s--;
+    while (e < code.length && isWord(code[e])) e++;
+    return code.slice(s, e);
+  }, [code]);
+
+  // Go to a symbol's definition: prefer a cross-file project hit, else the current
+  // file's own symbols. Opens the defining file and jumps to the line.
+  const gotoDefinition = useCallback((word: string) => {
+    const w = word.trim();
+    if (!w) return;
+    const hits = symbolIndex.get(w);
+    if (hits && hits.length) {
+      const hit = hits[0];
+      if (currentFilePath && hit.file.path === currentFilePath) jumpToLine(hit.line);
+      else loadEditorFromPath(hit.file.path, hit.line);
+      return;
+    }
+    const local = symbols.find(sym => sym.name === w);
+    if (local) { jumpToLine(local.line); return; }
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `No definition found for "${w}"` } }));
+  }, [symbolIndex, symbols, currentFilePath, jumpToLine, loadEditorFromPath]);
+
+  // Find references: grep the project for the identifier, surfaced in the Project panel.
+  const findReferences = useCallback((word: string) => {
+    const w = word.trim();
+    if (!w || !project) return;
+    setWorkspaceQuery(w);
+    setShowProject(true);
+    setWorkspaceBusy(true);
+    searchProject(project, w).then(hits => { setWorkspaceHits(hits); setWorkspaceBusy(false); });
+  }, [project]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
+
+    // F12: go to definition of the identifier at the caret. Shift+F12: find
+    // references across the open project.
+    if (e.key === 'F12') {
+      e.preventDefault();
+      const word = identifierAt();
+      if (e.shiftKey) findReferences(word); else gotoDefinition(word);
+      return;
+    }
 
     // Jump to matching bracket (Ctrl/Cmd+M): partner of the bracket at, or just
     // before, the caret.
@@ -516,7 +627,7 @@ const DexCode: React.FC = () => {
         return;
       }
     }
-  }, [code]);
+  }, [code, identifierAt, gotoDefinition, findReferences]);
 
   const highlighted = useMemo(() => highlightDexScript(code), [code]);
 
@@ -716,11 +827,100 @@ const DexCode: React.FC = () => {
           </div>
         </div>
 
+        {/* Project — open a folder, browse + search its source files */}
+        <div style={S.sidebarBlock}>
+          <div
+            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={() => setShowProject(v => !v)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showProject}
+            aria-label="Toggle Project section"
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowProject(v => !v); } }}
+          >
+            <DexIcon name={showProject ? 'chevron-down' : 'chevron-right'} size={10} />
+            Project
+            {project && <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{project.files.length}</span>}
+          </div>
+          {showProject && (
+            !project ? (
+              <button
+                onClick={openFolder}
+                style={S.fileActionBtn}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <DexIcon name="folder-open" size={12} />
+                <span>Open Folder…</span>
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 var(--space-2)' }}>
+                  <DexIcon name="folder-open" size={11} />
+                  <span style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={project.root}>{projectName(project.root)}</span>
+                  <button onClick={openFolder} title="Open a different folder" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="folder-open" size={11} /></button>
+                  <button onClick={closeProject} title="Close project" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="x" size={11} /></button>
+                </div>
+                <input
+                  value={workspaceQuery}
+                  onChange={e => setWorkspaceQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') runWorkspaceSearch(); }}
+                  placeholder="Search in project…"
+                  aria-label="Search in project"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none' }}
+                />
+                {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>Searching…</div>}
+                {workspaceHits.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
+                    <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
+                    {workspaceHits.map((h, i) => (
+                      <button
+                        key={`${h.path}-${h.line}-${i}`}
+                        onClick={() => loadEditorFromPath(h.path, h.line)}
+                        style={{ ...S.recentFileBtn, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}
+                        title={`${h.name}:${h.line}`}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span style={{ fontSize: 10, opacity: 0.7 }}>{h.name}:{h.line}</span>
+                        <span style={{ fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{h.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
+                    {project.files.length === 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No source files</div>
+                    ) : project.files.map((f, i) => (
+                      <button
+                        key={`${f.path}-${i}`}
+                        onClick={() => loadEditorFromPath(f.path)}
+                        style={{ ...S.recentFileBtn, ...(currentFilePath === f.path ? { background: 'var(--color-bg-hover)' } : null) }}
+                        title={f.path}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = currentFilePath === f.path ? 'var(--color-bg-hover)' : 'transparent')}
+                      >
+                        <DexIcon name="code" size={11} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+
         {/* Outline — live symbol map (precision navigation, DEX signature) */}
         <div style={S.sidebarBlock}>
           <div
             style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
             onClick={() => setShowOutline(v => !v)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showOutline}
+            aria-label="Toggle Outline section"
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowOutline(v => !v); } }}
           >
             <DexIcon name={showOutline ? 'chevron-down' : 'chevron-right'} size={10} />
             Outline
@@ -768,9 +968,14 @@ const DexCode: React.FC = () => {
         {/* Recent Files */}
         {recentFiles.length > 0 && (
           <div style={S.sidebarBlock}>
-            <div 
+            <div
               style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
               onClick={() => setShowRecentFiles(!showRecentFiles)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={showRecentFiles}
+              aria-label="Toggle Recent Files section"
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowRecentFiles(!showRecentFiles); } }}
             >
               <DexIcon name={showRecentFiles ? 'chevron-down' : 'chevron-right'} size={10} />
               Recent Files
@@ -983,8 +1188,9 @@ const DexCode: React.FC = () => {
                 onScroll={handleScroll}
                 onKeyDown={handleKeyDown}
                 onKeyUp={updateCursorPos}
-                onClick={updateCursorPos}
+                onClick={e => { updateCursorPos(); if (e.ctrlKey || e.metaKey) gotoDefinition(identifierAt()); }}
                 onSelect={updateCursorPos}
+                title="Ctrl/Cmd+Click or F12: Go to Definition · Shift+F12: Find References"
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"

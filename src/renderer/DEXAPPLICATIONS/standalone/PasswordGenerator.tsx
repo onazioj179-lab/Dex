@@ -50,6 +50,7 @@ const PasswordGenerator: React.FC = () => {
   });
   const [history, setHistory] = useState<PasswordEntry[]>([]);
   const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const clipboardTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -115,8 +116,22 @@ const PasswordGenerator: React.FC = () => {
   };
 
   const copy = async () => {
-    await navigator.clipboard.writeText(password);
+    if (copying || !password) return;
+    if (!navigator.clipboard?.writeText) {
+      toast.error('Clipboard unavailable');
+      return;
+    }
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(password);
+    } catch (e: unknown) {
+      console.warn('[PasswordGenerator] copy failed:', e);
+      toast.error('Could not copy to clipboard');
+      setCopying(false);
+      return;
+    }
     setCopied(true);
+    setCopying(false);
     toast.success('Copied to clipboard', 'Password will be cleared from clipboard in 30s');
     // Clear copied indicator
     if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
@@ -124,7 +139,7 @@ const PasswordGenerator: React.FC = () => {
     // Auto-clear clipboard after 30 seconds for security
     if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
     clipboardTimerRef.current = setTimeout(() => {
-      navigator.clipboard.writeText('').catch((e: unknown) => { console.warn('[DEX]', e); });
+      navigator.clipboard?.writeText('').catch((e: unknown) => { console.warn('[DEX]', e); });
     }, 30000);
   };
 
@@ -199,7 +214,7 @@ const PasswordGenerator: React.FC = () => {
 
           {/* Action Buttons */}
           <div style={styles.actions}>
-            <button className="pwgen-btn" style={{ ...styles.actionBtn, ...(copied ? styles.copiedBtn : {}) }} onClick={copy} aria-label={copied ? 'Copied to clipboard' : 'Copy password'}>
+            <button className="pwgen-btn" style={{ ...styles.actionBtn, ...(copied ? styles.copiedBtn : {}), ...(copying ? { opacity: 0.6, cursor: 'wait' } : {}) }} onClick={copy} disabled={copying} aria-label={copied ? 'Copied to clipboard' : 'Copy password'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {copied ? <polyline points="20 6 9 17 4 12"/> : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>}
               </svg>
@@ -233,6 +248,7 @@ const PasswordGenerator: React.FC = () => {
               max="48"
               value={length}
               onChange={e => setLength(Number(e.target.value))}
+              aria-label="Password length"
               style={styles.slider}
             />
             <div style={styles.sliderLabels}>
@@ -272,7 +288,7 @@ const PasswordGenerator: React.FC = () => {
                     <div style={styles.historyMeta}>
                       <span>{entry.strength && <span style={{ marginRight: 6, opacity: 0.7 }}>{entry.strength}</span>}{new Date(entry.date).toLocaleDateString()}</span>
                       <div style={styles.historyActions}>
-                        <button className="pwgen-action" style={{ ...styles.historyActionBtn, color: 'var(--color-accent, #0a84ff)' }} onClick={() => { if (entry.password) { navigator.clipboard.writeText(entry.password).then(() => toast.success('Copied to clipboard')).catch(() => {}); } }} aria-label="Copy password">Copy</button>
+                        <button className="pwgen-action" style={{ ...styles.historyActionBtn, color: 'var(--color-accent, #0a84ff)' }} onClick={() => { if (entry.password) { navigator.clipboard?.writeText(entry.password).then(() => toast.success('Copied to clipboard')).catch(() => {}); } }} aria-label="Copy password">Copy</button>
                         <button className="pwgen-action" style={{ ...styles.historyActionBtn, color: 'var(--color-error)' }} onClick={() => deleteEntry(entry.id)} aria-label="Delete password">Delete</button>
                       </div>
                     </div>
