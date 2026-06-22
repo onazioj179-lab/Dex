@@ -112,7 +112,26 @@ const DEFAULT_MEMORY: MemoryInfo = {
 const STORAGE_KEYS = {
   startupItems: 'dex-power-startup-items',
   scheduledTasks: 'dex-power-scheduled-tasks',
+  powerMode: 'dex-power-mode',
+  keepAwake: 'dex-power-keep-awake',
+  powerLog: 'dex-power-event-log',
 };
+
+// Simplified, user-facing power mode independent of the richer PerformanceProfile.
+type PowerMode = 'balanced' | 'saver' | 'performance';
+
+const POWER_MODE_TO_PROFILE: Record<PowerMode, PerformanceProfile> = {
+  balanced: 'balanced',
+  saver: 'powerSaver',
+  performance: 'highPerformance',
+};
+
+interface PowerLogEntry {
+  id: string;
+  type: 'wake' | 'sleep' | 'charge' | 'discharge' | 'online' | 'offline';
+  label: string;
+  at: number;
+}
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -151,6 +170,18 @@ export const Power: React.FC = () => {
   // Battery
   const [battery, setBattery] = useState<BatteryInfo>(DEFAULT_BATTERY);
 
+  // Simplified power mode (balanced/saver/performance), persisted to localStorage.
+  const [powerMode, setPowerMode] = useState<PowerMode>(() => loadFromStorage<PowerMode>(STORAGE_KEYS.powerMode, 'balanced'));
+
+  // Keep awake for N minutes (uses the Screen Wake Lock API — no IPC channel exists).
+  const [keepAwakeMinutes, setKeepAwakeMinutes] = useState<number>(() => loadFromStorage<number>(STORAGE_KEYS.keepAwake, 0));
+  const [keepAwakeUntil, setKeepAwakeUntil] = useState<number>(0);
+  const wakeLockRef = useRef<any>(null);
+  const keepAwakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Wake/sleep + power-source event log, persisted (most recent 50 kept).
+  const [powerLog, setPowerLog] = useState<PowerLogEntry[]>(() => loadFromStorage<PowerLogEntry[]>(STORAGE_KEYS.powerLog, []));
+
   // Performance
   const [profile, setProfile] = useState<PerformanceProfile>('balanced');
   const [cpuLimit, setCpuLimit] = useState(100);
@@ -176,6 +207,8 @@ export const Power: React.FC = () => {
 
   // Live CPU history for chart
   const [cpuHistory, setCpuHistory] = useState<number[]>(Array(60).fill(0));
+  // In-flight guard so the memory-cleanup button can't be double-fired.
+  const [cleaningMemory, setCleaningMemory] = useState(false);
   const toast = useToastHelpers();
   const pollFailCountRef = useRef(0);
 
@@ -248,6 +281,162 @@ export const Power: React.FC = () => {
     );
   }, [profile]);
 
+  // Append a power-event log entry (de-duped against the immediately-previous
+  // entry of the same type within 2s) and keep only the most recent 50.
+  const pushLog = useCallback((type: PowerLogEntry['type'], label: string) => {
+    setPowerLog(prev => {
+      const now = Date.now();
+      if (prev[0] && prev[0].type === type && now - prev[0].at < 2000) return prev;
+      const entry: PowerLogEntry = { id: `${now}-${Math.random().toString(36).slice(2, 8)}`, type, label, at: now };
+      const next = [entry, ...prev].slice(0, 50);
+      return next;
+    });
+  }, []);
+
+  // Persist the power log.
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.powerLog, JSON.stringify(powerLog)); } catch (e) { console.warn('[DEX]', e); }
+  }, [powerLog]);
+
+  // Persist + apply simplified power mode. Maps onto the richer performance
+  // profile (real IPC) and mirrors into the profile selector so both stay in sync.
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.powerMode, JSON.stringify(powerMode)); } catch (e) { console.warn('[DEX]', e); }
+    const mapped = POWER_MODE_TO_PROFILE[powerMode];
+    setProfile(prev => (prev === mapped ? prev : mapped));
+  }, [powerMode]);
+
+  // Live battery via the Web Battery API (navigator.getBattery) — no IPC needed.
+  // Fills in level / charging / time-remaining and logs charge/discharge events.
+  useEffect(() => {
+    let bat: any = null;
+    let cancelled = false;
+    const fmtRemaining = (seconds: number): string => {
+      if (!isFinite(seconds) || seconds <= 0) return 'N/A';
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+    const apply = () => {
+      if (!bat || cancelled) return;
+      const remaining = bat.charging ? bat.chargingTime : bat.dischargingTime;
+      setBattery(prev => ({
+        ...prev,
+        level: Math.round(bat.level * 100),
+        charging: bat.charging,
+        timeRemaining: fmtRemaining(remaining),
+      }));
+    };
+    const onCharging = () => { apply(); pushLog(bat.charging ? 'charge' : 'discharge', bat.charging ? 'Power adapter connected' : 'Running on battery'); };
+    const onLevel = () => apply();
+    const onTime = () => apply();
+    try {
+      const getBattery = (navigator as any).getBattery;
+      if (typeof getBattery === 'function') {
+        getBattery.call(navigator).then((b: any) => {
+          if (cancelled) return;
+          bat = b;
+          apply();
+          b.addEventListener('chargingchange', onCharging);
+          b.addEventListener('levelchange', onLevel);
+          b.addEventListener('chargingtimechange', onTime);
+          b.addEventListener('dischargingtimechange', onTime);
+        }).catch(() => { /* battery API unavailable */ });
+      }
+    } catch (e) { console.warn('[Power] Battery API error:', e); }
+    return () => {
+      cancelled = true;
+      if (bat) {
+        try {
+          bat.removeEventListener('chargingchange', onCharging);
+          bat.removeEventListener('levelchange', onLevel);
+          bat.removeEventListener('chargingtimechange', onTime);
+          bat.removeEventListener('dischargingtimechange', onTime);
+        } catch { /* ignore */ }
+      }
+    };
+  }, [pushLog]);
+
+  // Wake/sleep timeline — record visibility (sleep/wake) and connectivity events.
+  useEffect(() => {
+    const onVis = () => pushLog(document.hidden ? 'sleep' : 'wake', document.hidden ? 'System idle / display off' : 'System resumed');
+    const onOnline = () => pushLog('online', 'Network connected');
+    const onOffline = () => pushLog('offline', 'Network disconnected');
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [pushLog]);
+
+  // --- Keep awake (Screen Wake Lock API) ---
+  const releaseWakeLock = useCallback(async () => {
+    try { if (wakeLockRef.current) { await wakeLockRef.current.release(); wakeLockRef.current = null; } }
+    catch (e) { console.warn('[Power] Wake lock release error:', e); }
+  }, []);
+
+  const acquireWakeLock = useCallback(async () => {
+    try {
+      const wl = (navigator as any).wakeLock;
+      if (wl && typeof wl.request === 'function' && !document.hidden) {
+        wakeLockRef.current = await wl.request('screen');
+        wakeLockRef.current?.addEventListener?.('release', () => { wakeLockRef.current = null; });
+      }
+    } catch (e) { console.warn('[Power] Wake lock request error:', e); }
+  }, []);
+
+  const stopKeepAwake = useCallback(() => {
+    setKeepAwakeUntil(0);
+    if (keepAwakeTimerRef.current) { clearTimeout(keepAwakeTimerRef.current); keepAwakeTimerRef.current = null; }
+    releaseWakeLock();
+    try { localStorage.setItem(STORAGE_KEYS.keepAwake, JSON.stringify(0)); } catch { /* ignore */ }
+    setKeepAwakeMinutes(0);
+  }, [releaseWakeLock]);
+
+  const startKeepAwake = useCallback((minutes: number) => {
+    try {
+      setKeepAwakeMinutes(minutes);
+      try { localStorage.setItem(STORAGE_KEYS.keepAwake, JSON.stringify(minutes)); } catch { /* ignore */ }
+      if (keepAwakeTimerRef.current) { clearTimeout(keepAwakeTimerRef.current); keepAwakeTimerRef.current = null; }
+      if (minutes <= 0) { stopKeepAwake(); return; }
+      const until = Date.now() + minutes * 60 * 1000;
+      setKeepAwakeUntil(until);
+      acquireWakeLock();
+      keepAwakeTimerRef.current = setTimeout(() => {
+        stopKeepAwake();
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Keep awake ended' } }));
+      }, minutes * 60 * 1000);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Keeping awake for ${minutes} min` } }));
+    } catch (e) { console.warn('[Power] Keep awake error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to enable keep awake' } })); }
+  }, [acquireWakeLock, stopKeepAwake]);
+
+  // Re-acquire the wake lock when the tab becomes visible again (the OS releases
+  // wake locks on hide) while a keep-awake window is still active.
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden && keepAwakeUntil > Date.now() && !wakeLockRef.current) acquireWakeLock(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { document.removeEventListener('visibilitychange', onVis); releaseWakeLock(); };
+  }, [keepAwakeUntil, acquireWakeLock, releaseWakeLock]);
+
+  // Per-app energy impact derived from live process data (CPU + disk + network).
+  // Weighted so CPU dominates, matching typical OS energy-impact heuristics.
+  const energyImpact = useMemo(() => {
+    return processes
+      .map(p => ({
+        name: p.name,
+        pid: p.pid,
+        score: (p.cpu || 0) * 1.0 + (p.disk || 0) * 0.05 + (p.network || 0) * 0.05,
+        cpu: p.cpu || 0,
+      }))
+      .filter(e => e.score > 0.1)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+  }, [processes]);
+  const maxImpact = useMemo(() => energyImpact.reduce((m, e) => Math.max(m, e.score), 0) || 1, [energyImpact]);
+
   // Persist startup items to localStorage
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEYS.startupItems, JSON.stringify(startupItems)); } catch (e) { console.warn('[DEX]', e); }
@@ -260,12 +449,12 @@ export const Power: React.FC = () => {
 
   // Sort & filter processes
   const sortedProcesses = useMemo(() => {
-    let filtered = processes.filter(p => p.name.toLowerCase().includes(searchFilter.toLowerCase()));
+    let filtered = processes.filter(p => (p.name || '').toLowerCase().includes(searchFilter.toLowerCase()));
     filtered.sort((a, b) => {
       let cmp = 0;
       if (sortBy === 'cpu') cmp = a.cpu - b.cpu;
       else if (sortBy === 'memory') cmp = a.memory - b.memory;
-      else if (sortBy === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortBy === 'name') cmp = (a.name || '').localeCompare(b.name || '');
       else if (sortBy === 'disk') cmp = a.disk - b.disk;
       else if (sortBy === 'status') cmp = a.status.localeCompare(b.status);
       else if (sortBy === 'threads') cmp = a.threads - b.threads;
@@ -302,6 +491,8 @@ export const Power: React.FC = () => {
   }, []);
 
   const handleMemoryCleanup = useCallback(async () => {
+    if (cleaningMemory) return;
+    setCleaningMemory(true);
     try {
       await window.dex?.power?.freeMemory?.();
       const stats = await window.dex?.power?.getStats?.();
@@ -309,17 +500,26 @@ export const Power: React.FC = () => {
         setMemInfo(prev => ({ ...prev, ...stats.memory }));
         return;
       }
+      // Fallback: locally estimate cleanup if IPC returns no memory stats
+      setMemInfo(prev => ({
+        ...prev,
+        used: Math.max(4000, prev.used - 2000),
+        available: Math.min(prev.total, prev.available + 2000),
+        cached: Math.max(500, prev.cached - 1000),
+      }));
     } catch (e) {
       console.warn('[Power] Memory cleanup error:', e);
+      // Fallback: locally estimate cleanup if IPC fails
+      setMemInfo(prev => ({
+        ...prev,
+        used: Math.max(4000, prev.used - 2000),
+        available: Math.min(prev.total, prev.available + 2000),
+        cached: Math.max(500, prev.cached - 1000),
+      }));
+    } finally {
+      setCleaningMemory(false);
     }
-    // Fallback: locally estimate cleanup if IPC fails
-    setMemInfo(prev => ({
-      ...prev,
-      used: Math.max(4000, prev.used - 2000),
-      available: Math.min(prev.total, prev.available + 2000),
-      cached: Math.max(500, prev.cached - 1000),
-    }));
-  }, []);
+  }, [cleaningMemory]);
 
   const toggleStartup = useCallback((id: string) => {
     setStartupItems(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
@@ -565,8 +765,106 @@ export const Power: React.FC = () => {
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Low Power Mode</div>
                   <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Reduce energy usage to extend battery life</div>
                 </div>
-                <ToggleSwitch checked={profile === 'powerSaver'} onChange={() => setProfile(profile === 'powerSaver' ? 'balanced' : 'powerSaver')} label="Toggle low power mode" />
+                <ToggleSwitch checked={profile === 'powerSaver'} onChange={() => setPowerMode(powerMode === 'saver' ? 'balanced' : 'saver')} label="Toggle low power mode" />
               </div>
+            </div>
+
+            {/* Power mode (balanced / saver / performance) — persisted */}
+            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+              <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500, marginBottom: 'var(--space-3)' }}>Power Mode</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([
+                  { key: 'saver', label: 'Saver', color: 'var(--color-success)' },
+                  { key: 'balanced', label: 'Balanced', color: 'var(--color-accent)' },
+                  { key: 'performance', label: 'Performance', color: 'var(--color-warning)' },
+                ] as { key: PowerMode; label: string; color: string }[]).map(m => (
+                  <button key={m.key} onClick={() => setPowerMode(m.key)} aria-pressed={powerMode === m.key} style={{
+                    flex: 1, padding: '8px var(--space-3)', borderRadius: 8, cursor: 'pointer',
+                    border: powerMode === m.key ? `1px solid ${m.color}` : '1px solid var(--color-border-subtle)',
+                    background: powerMode === m.key ? `${m.color}1f` : 'var(--color-bg-elevated)',
+                    color: powerMode === m.key ? m.color : 'var(--color-text-secondary)',
+                    fontSize: 12, fontWeight: 600,
+                  }}>{m.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Keep awake for N minutes (Screen Wake Lock) */}
+            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                <div>
+                  <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Keep Awake</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                    {keepAwakeUntil > Date.now()
+                      ? `Active — ${Math.max(0, Math.ceil((keepAwakeUntil - Date.now()) / 60000))} min remaining`
+                      : 'Prevent the display from sleeping'}
+                  </div>
+                </div>
+                {keepAwakeUntil > Date.now() && (
+                  <button onClick={stopKeepAwake} style={{ ...glassButton, padding: '6px 14px', fontSize: 12, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', border: '1px solid rgba(255,69,58,0.25)' }}>Stop</button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[15, 30, 60, 120].map(min => {
+                  const active = keepAwakeUntil > Date.now() && keepAwakeMinutes === min;
+                  return (
+                    <button key={min} onClick={() => startKeepAwake(min)} aria-pressed={active} style={{
+                      flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                      border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
+                      background: active ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'var(--color-bg-elevated)',
+                      color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      fontSize: 12, fontWeight: 600,
+                    }}>{min < 60 ? `${min}m` : `${min / 60}h`}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Per-app energy impact (derived from live process data) */}
+            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+              <div className="dex-label-caps" style={{ marginBottom: 'var(--space-3)' }}>Energy Impact</div>
+              {energyImpact.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No active energy consumers</div>
+              ) : energyImpact.map(e => {
+                const pct = (e.score / maxImpact) * 100;
+                const color = e.score > maxImpact * 0.66 ? 'var(--color-error)' : e.score > maxImpact * 0.33 ? 'var(--color-warning)' : 'var(--color-success)';
+                return (
+                  <div key={e.pid} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
+                    <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{e.name}</span>
+                    <div style={{ width: 90, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', width: 44, textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' }}>{e.cpu.toFixed(1)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Wake / sleep / power-source timeline */}
+            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                <span className="dex-label-caps">Activity Log</span>
+                {powerLog.length > 0 && (
+                  <button onClick={() => setPowerLog([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Clear</button>
+                )}
+              </div>
+              {powerLog.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No recorded events yet</div>
+              ) : (
+                <div style={{ maxHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {powerLog.map(ev => {
+                    const dot = ev.type === 'wake' || ev.type === 'online' || ev.type === 'charge' ? 'var(--color-success)'
+                      : ev.type === 'sleep' || ev.type === 'offline' ? 'var(--color-warning)' : 'var(--color-accent)';
+                    return (
+                      <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary)' }}>{ev.label}</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{new Date(ev.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -628,8 +926,8 @@ export const Power: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 600 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Memory</h3>
-              <button onClick={handleMemoryCleanup} style={{ ...glassButton, padding: '6px 14px', fontSize: 12, background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)', border: '1px solid rgba(48,209,88,0.25)' }}>
-                <CleanupIcon size={14} /> Clean Up Memory
+              <button onClick={handleMemoryCleanup} disabled={cleaningMemory} aria-label="Clean up memory" style={{ ...glassButton, padding: '6px 14px', fontSize: 12, background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)', border: '1px solid rgba(48,209,88,0.25)', opacity: cleaningMemory ? 0.5 : 1, cursor: cleaningMemory ? 'default' : 'pointer' }}>
+                <CleanupIcon size={14} /> {cleaningMemory ? 'Cleaning…' : 'Clean Up Memory'}
               </button>
             </div>
 

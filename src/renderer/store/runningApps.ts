@@ -327,6 +327,9 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: `${_M}+2`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
   taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: `${_M}+Shift+Esc`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
   liveactivity: { name: 'Live Activity', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'A live, browsable feed of everything happening across DEX' },
+  inbox: { name: 'Inbox', color: '#64d2ff', icon: 'bell', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Unified feed of notifications and cross-app activity' },
+  spaces: { name: 'Spaces', color: '#bf5af2', icon: 'layers', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Snapshot and restore your open apps and project as named workspaces' },
+  projectdash: { name: 'Project', color: 'var(--color-accent)', icon: 'dashboard', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Per-project overview: tasks, notes, and recent activity' },
 
   // Productivity Apps
   notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: `${_M}+4`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },

@@ -26,6 +26,7 @@ import { buildDexCommands, matchTerminalCommand, resolveShortcut, suggestDexComm
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { describeCapabilities, type CapabilityStatus } from '../uki/permissions';
 import { parseAnsi, type Span } from '../../shared/term/ansiParser';
+import { sendToNotes } from '../services/sendTo';
 
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
@@ -56,9 +57,62 @@ export interface TerminalProps {
   onClose?: () => void;
   /** Visible height in px. Defaults to flex-fill. */
   height?: number | string;
+  /**
+   * Reports the command currently running in this session (or null when idle)
+   * so the host (TerminalTabs) can auto-title the tab. Best-effort.
+   */
+  onRunningCommand?: (cmd: string | null) => void;
 }
 
 interface Line { id: number; spans: Span[]; }
+
+// ---------------------------------------------------------------------------
+// Persistence (localStorage) — command history + saved snippets/aliases.
+// All access is guarded; a corrupt or unavailable store degrades to in-memory.
+// ---------------------------------------------------------------------------
+const HISTORY_KEY = 'dex.terminal.history.v1';
+const SNIPPETS_KEY = 'dex.terminal.snippets.v1';
+const MAX_PERSISTED_HISTORY = 500;
+
+interface Snippet { id: string; name: string; command: string; }
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage full / unavailable — keep working in-memory */
+  }
+}
+
+function loadHistory(): string[] {
+  const v = readJson<unknown>(HISTORY_KEY, []);
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
+function loadSnippets(): Snippet[] {
+  const v = readJson<unknown>(SNIPPETS_KEY, []);
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is Snippet =>
+    !!x && typeof x === 'object'
+    && typeof (x as Snippet).id === 'string'
+    && typeof (x as Snippet).name === 'string'
+    && typeof (x as Snippet).command === 'string');
+}
+
+function toast(type: 'success' | 'error' | 'info', message: string): void {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+}
 
 // A shell that dies almost immediately is a failed start (e.g. missing binary),
 // not a normal exit — those get a bounded, backed-off retry. A clean exit after
@@ -77,12 +131,25 @@ function longestCommonPrefix(items: readonly string[]): string {
   return prefix;
 }
 
-export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height }) => {
+export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
+  // History is shared across sessions and persisted to localStorage. We seed
+  // from storage on first mount so prior commands are immediately available to
+  // ArrowUp / Ctrl+R reverse-search.
+  const [history, setHistory] = useState<string[]>(() => loadHistory());
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
+  // Saved snippets / aliases palette (persisted). Toggled with Ctrl+S.
+  const [snippets, setSnippets] = useState<Snippet[]>(() => loadSnippets());
+  const [showSnippets, setShowSnippets] = useState(false);
+  const [snippetName, setSnippetName] = useState('');
+  const [snippetCmd, setSnippetCmd] = useState('');
+  // Scrollback search (Ctrl+F): query + which match is focused. null = off.
+  const [scrollSearch, setScrollSearch] = useState<{ q: string; idx: number } | null>(null);
+  // Per-command exit-code badges, keyed by the line id that introduced the
+  // command echo. Populated when the session reports an exit code.
+  const [exitBadges, setExitBadges] = useState<Record<number, number>>({});
   // Reverse history search (Ctrl+R): `q` is the query, `idx` selects among
   // matches (newest first); null means search mode is off.
   const [revSearch, setRevSearch] = useState<{ q: string; idx: number } | null>(null);
@@ -101,7 +168,14 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const colorStateRef = useRef<{ color?: string; bold?: boolean }>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const shouldFollowOutputRef = useRef(true);
+  // Tracks the most recent shell command sent (for tab auto-title) and the line
+  // id of its echo (so an exit-code badge can be attached to the right line).
+  const runningCmdRef = useRef<string | null>(null);
+  const lastCmdLineIdRef = useRef<number | null>(null);
+  const onRunningCommandRef = useRef(onRunningCommand);
+  onRunningCommandRef.current = onRunningCommand;
 
   const flushTailBuffer = useCallback(() => {
     const tail = bufferRef.current;
@@ -205,6 +279,13 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       appendOutput(`\r\n[session exited code=${code}]\r\n`);
       activeId = null;
       if (!mounted) return;
+      // Attach an exit-code badge to the most recent command line, if any.
+      const badgeLine = lastCmdLineIdRef.current;
+      if (badgeLine !== null) {
+        setExitBadges(prev => ({ ...prev, [badgeLine]: code }));
+      }
+      runningCmdRef.current = null;
+      try { onRunningCommandRef.current?.(null); } catch { /* host detached */ }
       setSessionId(null);
       // -1 is our "shell unavailable" sentinel; a non-zero fast exit is also a
       // failed start. Either way retry (bounded). A clean/long-lived exit does
@@ -249,6 +330,29 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   }, []);
 
   // -------------------------------------------------------------------------
+  // Persist history + snippets to localStorage (capped, guarded).
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const capped = history.length > MAX_PERSISTED_HISTORY ? history.slice(history.length - MAX_PERSISTED_HISTORY) : history;
+    writeJson(HISTORY_KEY, capped);
+  }, [history]);
+
+  useEffect(() => { writeJson(SNIPPETS_KEY, snippets); }, [snippets]);
+
+  // Keep history in sync across mounted sessions/tabs that share this storage.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      try {
+        if (e.key === HISTORY_KEY) setHistory(loadHistory());
+        else if (e.key === SNIPPETS_KEY) setSnippets(loadSnippets());
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Auto-scroll on new output
   // -------------------------------------------------------------------------
   useEffect(() => {
@@ -275,6 +379,14 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const send = useCallback((text: string) => {
     const b = bridge();
     if (!b || !sessionId) return;
+    // The echo of `${text}\r\n` becomes exactly one committed line; its id is the
+    // next value lineIdRef will yield. Capture it so an exit-code badge can be
+    // attached to this command later.
+    if (text.trim()) {
+      lastCmdLineIdRef.current = lineIdRef.current + 1;
+      runningCmdRef.current = text.trim();
+      try { onRunningCommandRef.current?.(text.trim()); } catch { /* host detached */ }
+    }
     // Echo locally so the line appears immediately
     appendOutput(`${text}\r\n`);
     const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.platform);
@@ -413,7 +525,85 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     send(value);
   }, [handleDexInput, send]);
 
+  // -------------------------------------------------------------------------
+  // Scrollback search (Ctrl+F): find query in the current buffer, with match
+  // line-ids for highlighting and a focused match to scroll into view.
+  // -------------------------------------------------------------------------
+  const lineText = useCallback((l: Line) => l.spans.map((s) => s.text).join(''), []);
+  const scrollMatchIds = useMemo(() => {
+    if (!scrollSearch || !scrollSearch.q) return [] as number[];
+    const q = scrollSearch.q.toLowerCase();
+    return lines.filter((l) => lineText(l).toLowerCase().includes(q)).map((l) => l.id);
+  }, [scrollSearch, lines, lineText]);
+  const focusedMatchId = scrollMatchIds.length
+    ? scrollMatchIds[Math.min(scrollSearch?.idx ?? 0, scrollMatchIds.length - 1)]
+    : null;
+
+  // Scroll the focused match into view (and pause output-follow while searching).
+  useEffect(() => {
+    if (focusedMatchId === null) return;
+    shouldFollowOutputRef.current = false;
+    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-line-id="${focusedMatchId}"]`);
+    el?.scrollIntoView({ block: 'center' });
+  }, [focusedMatchId]);
+
+  // -------------------------------------------------------------------------
+  // Snippets / aliases + Send to Notes.
+  // -------------------------------------------------------------------------
+  const insertSnippet = useCallback((cmd: string) => {
+    setInput(cmd);
+    setShowSnippets(false);
+    setHistoryIdx(null);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, []);
+
+  const saveSnippet = useCallback(() => {
+    const name = snippetName.trim();
+    const command = snippetCmd.trim();
+    if (!command) { toast('error', 'Snippet needs a command'); return; }
+    const snip: Snippet = {
+      id: `s${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+      name: name || command,
+      command,
+    };
+    setSnippets((prev) => [...prev, snip]);
+    setSnippetName('');
+    setSnippetCmd('');
+    toast('success', 'Snippet saved');
+  }, [snippetName, snippetCmd]);
+
+  const deleteSnippet = useCallback((id: string) => {
+    setSnippets((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const sendBufferToNotes = useCallback(() => {
+    try {
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      const selected = sel && !sel.isCollapsed ? sel.toString() : '';
+      const text = selected || lines.map(lineText).join('\n');
+      if (!text.trim()) { toast('info', 'Nothing to send'); return; }
+      void sendToNotes(text, selected ? 'Terminal selection' : 'Terminal output');
+    } catch {
+      toast('error', 'Could not send to Notes');
+    }
+  }, [lines, lineText]);
+
   const onKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // --- Scrollback search mode intercepts navigation/commit keys. Typing and
+    // Backspace edit the query via the search field's own onChange.
+    if (scrollSearch) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        setScrollSearch((p) => (p && scrollMatchIds.length ? { ...p, idx: (p.idx + 1) % scrollMatchIds.length } : p));
+        return;
+      }
+      if (e.key === 'Escape' || (e.ctrlKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        setScrollSearch(null);
+        shouldFollowOutputRef.current = true;
+        return;
+      }
+    }
     // --- Reverse history search mode intercepts navigation/commit keys. Typing
     // and Backspace fall through to the input's onChange, which edits the query.
     if (revSearch) {
@@ -494,6 +684,17 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     } else if (e.ctrlKey && e.key.toLowerCase() === 'r') {
       e.preventDefault();
       setRevSearch({ q: '', idx: 0 });
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      setScrollSearch({ q: '', idx: 0 });
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      // Toggle the snippets / aliases palette; prefill the command with the
+      // current line so "save this command" is one keystroke away.
+      e.preventDefault();
+      setShowSnippets((open) => {
+        if (!open && input.trim()) setSnippetCmd(input.trim());
+        return !open;
+      });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (history.length === 0) return;
@@ -520,7 +721,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
       setInput('');
     }
-  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput, showSuggest, dexSuggestions, suggestIdx, dexSuggestQuery, acceptSuggestion]);
+  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput, showSuggest, dexSuggestions, suggestIdx, dexSuggestQuery, acceptSuggestion, scrollSearch, scrollMatchIds]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -570,7 +771,43 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           )}
           <button
             type="button"
-            onClick={() => setLines([])}
+            onClick={() => { setScrollSearch((p) => (p ? null : { q: '', idx: 0 })); setTimeout(() => searchInputRef.current?.focus(), 0); }}
+            title="Search scrollback (Ctrl+F)"
+            aria-label="Search scrollback"
+            style={{
+              background: 'transparent', color: scrollSearch ? 'var(--color-accent, #4a9eff)' : '#999', border: 'none',
+              fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
+            }}
+          >
+            Find
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSnippets((o) => !o)}
+            title="Saved snippets (Ctrl+S)"
+            aria-label="Saved snippets"
+            style={{
+              background: 'transparent', color: showSnippets ? 'var(--color-accent, #4a9eff)' : '#999', border: 'none',
+              fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
+            }}
+          >
+            Snippets
+          </button>
+          <button
+            type="button"
+            onClick={sendBufferToNotes}
+            title="Send output (or selection) to Notes"
+            aria-label="Send to Notes"
+            style={{
+              background: 'transparent', color: '#999', border: 'none',
+              fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
+            }}
+          >
+            To Notes
+          </button>
+          <button
+            type="button"
+            onClick={() => { setLines([]); setExitBadges({}); }}
             title="Clear (Ctrl+L)"
             aria-label="Clear terminal"
             style={{
@@ -622,14 +859,195 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           </div>
         )}
         {error && sessionId && <div style={{ color: 'var(--color-error, #ff5f5f)' }}>{error}</div>}
-        {lines.map(l => (
-          <div key={l.id}>
-            {l.spans.map((sp, i) => (
-              <span key={i} style={{ color: sp.color, fontWeight: sp.bold ? 600 : 400 }}>{sp.text}</span>
-            ))}
-          </div>
-        ))}
+        {lines.map(l => {
+          const isMatch = scrollMatchIds.includes(l.id);
+          const isFocused = l.id === focusedMatchId;
+          const badge = exitBadges[l.id];
+          return (
+            <div
+              key={l.id}
+              data-line-id={l.id}
+              style={{
+                background: isFocused ? 'rgba(255,214,10,0.22)' : isMatch ? 'rgba(255,214,10,0.10)' : undefined,
+                display: badge !== undefined ? 'flex' : undefined,
+                alignItems: badge !== undefined ? 'center' : undefined,
+                gap: badge !== undefined ? 8 : undefined,
+              }}
+            >
+              <span style={{ flex: badge !== undefined ? 1 : undefined, minWidth: 0 }}>
+                {l.spans.map((sp, i) => (
+                  <span key={i} style={{ color: sp.color, fontWeight: sp.bold ? 600 : 400 }}>{sp.text}</span>
+                ))}
+              </span>
+              {badge !== undefined && (
+                <span
+                  title={`Exit code ${badge}`}
+                  style={{
+                    flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '0 6px', borderRadius: 8,
+                    background: badge === 0 ? 'rgba(61,166,106,0.18)' : 'rgba(255,95,95,0.18)',
+                    color: badge === 0 ? '#5fd38a' : '#ff8a8a',
+                    border: `1px solid ${badge === 0 ? 'rgba(61,166,106,0.4)' : 'rgba(255,95,95,0.4)'}`,
+                  }}
+                >
+                  {`exit ${badge}`}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
+      {scrollSearch && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '4px 10px',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: '#0a0a0a',
+            color: '#999', fontSize: 11,
+          }}
+        >
+          <span style={{ color: '#c9a227', fontWeight: 600 }}>Find</span>
+          <input
+            ref={searchInputRef}
+            value={scrollSearch.q}
+            onChange={(e) => setScrollSearch({ q: e.target.value, idx: 0 })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setScrollSearch((p) => (p && scrollMatchIds.length ? { ...p, idx: (p.idx + (e.shiftKey ? -1 + scrollMatchIds.length : 1)) % scrollMatchIds.length } : p));
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setScrollSearch(null);
+                shouldFollowOutputRef.current = true;
+                inputRef.current?.focus();
+              }
+            }}
+            placeholder="Search scrollback…"
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="Search scrollback"
+            style={{
+              flex: 1, background: 'transparent', color: '#e0e0e0', border: 'none', outline: 'none',
+              fontFamily: 'inherit', fontSize: 'inherit',
+            }}
+          />
+          <span style={{ color: '#666', flexShrink: 0 }}>
+            {scrollSearch.q
+              ? scrollMatchIds.length
+                ? `${Math.min(scrollSearch.idx, scrollMatchIds.length - 1) + 1}/${scrollMatchIds.length}`
+                : 'no matches'
+              : ''}
+          </span>
+          <button
+            type="button"
+            onClick={() => setScrollSearch((p) => (p && scrollMatchIds.length ? { ...p, idx: (p.idx + 1) % scrollMatchIds.length } : p))}
+            title="Next match (Enter)"
+            aria-label="Next match"
+            style={{ background: 'transparent', color: '#999', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '0 4px' }}
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            onClick={() => { setScrollSearch(null); shouldFollowOutputRef.current = true; inputRef.current?.focus(); }}
+            title="Close search (Esc)"
+            aria-label="Close search"
+            style={{ background: 'transparent', color: '#999', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '0 4px' }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+      {showSnippets && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Saved command snippets"
+          style={{
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: '#0a0a0a',
+            fontSize: 11,
+            maxHeight: 200,
+            overflowY: 'auto',
+            padding: '6px 10px',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <input
+              value={snippetName}
+              onChange={(e) => setSnippetName(e.target.value)}
+              placeholder="Name (optional)"
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="Snippet name"
+              style={{
+                width: 120, background: '#141414', color: '#e0e0e0',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, outline: 'none',
+                fontFamily: 'inherit', fontSize: 'inherit', padding: '3px 6px',
+              }}
+            />
+            <input
+              value={snippetCmd}
+              onChange={(e) => setSnippetCmd(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveSnippet(); } }}
+              placeholder="Command to save…"
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="Snippet command"
+              style={{
+                flex: 1, background: '#141414', color: '#e0e0e0',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, outline: 'none',
+                fontFamily: 'inherit', fontSize: 'inherit', padding: '3px 6px',
+              }}
+            />
+            <button
+              type="button"
+              onClick={saveSnippet}
+              title="Save snippet"
+              style={{
+                background: 'transparent', color: 'var(--color-accent, #4a9eff)',
+                border: '1px solid var(--color-accent, #4a9eff)', borderRadius: 4,
+                fontSize: 11, cursor: 'pointer', padding: '2px 10px', fontWeight: 600, fontFamily: 'inherit',
+              }}
+            >
+              Save
+            </button>
+          </div>
+          {snippets.length === 0 ? (
+            <div style={{ color: '#666', padding: '4px 2px' }}>No saved snippets. Type a command above and Save, or open this with a command on the prompt (Ctrl+S).</div>
+          ) : (
+            snippets.map((s) => (
+              <div
+                key={s.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '3px 2px' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => insertSnippet(s.command)}
+                  title="Insert into prompt"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
+                    background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+                    color: '#b8b8b8', fontFamily: 'inherit', fontSize: 'inherit', padding: 0,
+                  }}
+                >
+                  <span style={{ color: '#e0e0e0', fontWeight: 600, flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  <span style={{ color: '#3da66a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.command}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteSnippet(s.id)}
+                  aria-label={`Delete snippet ${s.name}`}
+                  title="Delete snippet"
+                  style={{ background: 'transparent', color: '#999', border: 'none', cursor: 'pointer', fontSize: 11, flexShrink: 0, padding: '0 4px' }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
       {revSearch && (
         <div
           style={{

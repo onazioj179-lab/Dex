@@ -58,12 +58,43 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function humanSize(json: string): string {
-  const bytes = new Blob([json]).size;
+function itemBytes(json: string): number {
+  try {
+    return new Blob([json || '']).size;
+  } catch {
+    return (json || '').length;
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1_048_576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  if (bytes < 1_073_741_824) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
 }
+
+function humanSize(json: string): string {
+  return formatBytes(itemBytes(json));
+}
+
+// Derive a folder-ish key from an original location for sort/grouping.
+function originalFolder(loc: string): string {
+  if (!loc) return '';
+  const norm = loc.replace(/\\/g, '/');
+  const cut = norm.lastIndexOf('/');
+  return cut > 0 ? norm.slice(0, cut) : norm;
+}
+
+function toast(type: 'success' | 'error' | 'info', message: string): void {
+  try {
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+  } catch {
+    /* non-fatal */
+  }
+}
+
+type SortKey = 'date' | 'size' | 'folder';
 
 // ── Styles ─────────────────────────────────────────────────────
 const rootStyle: React.CSSProperties = {
@@ -104,9 +135,10 @@ const emptyState: React.CSSProperties = {
 };
 
 // ── Row component ──────────────────────────────────────────────
-const ItemRow = memo(({ item, selected, onToggleSelect, onRestore, onDelete }: {
+const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelete }: {
   item: RecycleBinItem;
   selected: boolean;
+  busy: boolean;
   onToggleSelect: (id: number) => void;
   onRestore: (id: number) => void;
   onDelete: (id: number) => void;
@@ -146,20 +178,35 @@ const ItemRow = memo(({ item, selected, onToggleSelect, onRestore, onDelete }: {
           {item.item_name || 'Untitled'}
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
-          {item.item_type} &middot; {formatDate(item.deleted_at)} &middot; {humanSize(item.item_data)}
+          {item.item_type} &middot; Deleted {formatDate(item.deleted_at)} &middot; {humanSize(item.item_data)}
         </div>
+        {item.original_location && (
+          <div
+            title={item.original_location}
+            style={{
+              fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1, opacity: 0.8,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}
+          >
+            <span style={{ opacity: 0.7 }}>From </span>{item.original_location}
+          </div>
+        )}
       </div>
 
       {/* Actions (visible on hover) */}
       {hover && (
         <>
           <button
-            style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)' }}
+            disabled={busy}
+            style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
             onClick={() => onRestore(item.id)}
+            aria-label={`Restore ${item.item_name || 'item'}`}
           >Restore</button>
           <button
-            style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)' }}
+            disabled={busy}
+            style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
             onClick={() => onDelete(item.id)}
+            aria-label={`Permanently delete ${item.item_name || 'item'}`}
           >Delete</button>
         </>
       )}
@@ -176,17 +223,25 @@ const RecycleBin: React.FC = () => {
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [appFilter, setAppFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [olderDays, setOlderDays] = useState(7);
+  const [busy, setBusy] = useState(false);
 
   // Load items
   const reload = useCallback(async () => {
     setLoading(true);
-    const [grouped, count] = await Promise.all([
-      ipc('recycle-bin:getGrouped') as Promise<GroupedItems[] | null>,
-      ipc('recycle-bin:getCount') as Promise<number | null>,
-    ]);
-    setGroups(grouped || []);
-    setTotalCount(count || 0);
-    setLoading(false);
+    try {
+      const [grouped, count] = await Promise.all([
+        ipc('recycle-bin:getGrouped') as Promise<GroupedItems[] | null>,
+        ipc('recycle-bin:getCount') as Promise<number | null>,
+      ]);
+      setGroups(Array.isArray(grouped) ? grouped : []);
+      setTotalCount(typeof count === 'number' ? count : 0);
+    } catch (err) {
+      console.warn('[RecycleBin] reload failed:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
@@ -199,42 +254,145 @@ const RecycleBin: React.FC = () => {
     return () => { if (api?.off) api.off('recycle-bin:count', handler); };
   }, [reload]);
 
+  // Find an item by id across all loaded groups (for nicer toast text).
+  const findItem = useCallback((id: number): RecycleBinItem | undefined => {
+    for (const g of groups) {
+      const hit = g.items.find(i => i.id === id);
+      if (hit) return hit;
+    }
+    return undefined;
+  }, [groups]);
+
   // Actions
   const handleRestore = useCallback(async (id: number) => {
-    await ipc('recycle-bin:restore', id);
-    reload();
-  }, [reload]);
+    setBusy(true);
+    try {
+      const it = findItem(id);
+      await ipc('recycle-bin:restore', id);
+      toast('success', it?.original_location
+        ? `Restored "${it.item_name || 'item'}" to ${it.original_location}`
+        : 'Item restored');
+    } catch (err) {
+      console.warn('[RecycleBin] restore failed:', err);
+      toast('error', 'Could not restore item');
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  }, [reload, findItem]);
 
   const handleDelete = useCallback(async (id: number) => {
-    await ipc('recycle-bin:permanentlyDelete', id);
-    reload();
-  }, [reload]);
+    setBusy(true);
+    try {
+      const it = findItem(id);
+      await ipc('recycle-bin:permanentlyDelete', id);
+      toast('success', `Permanently deleted "${it?.item_name || 'item'}"`);
+    } catch (err) {
+      console.warn('[RecycleBin] delete failed:', err);
+      toast('error', 'Could not delete item');
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  }, [reload, findItem]);
 
   const handleEmptyAll = useCallback(async () => {
-    await ipc('recycle-bin:emptyAll');
-    setConfirmEmpty(false);
-    reload();
+    setBusy(true);
+    try {
+      await ipc('recycle-bin:emptyAll');
+      toast('success', 'Trash emptied');
+    } catch (err) {
+      console.warn('[RecycleBin] emptyAll failed:', err);
+      toast('error', 'Could not empty trash');
+    } finally {
+      setConfirmEmpty(false);
+      setBusy(false);
+      reload();
+    }
   }, [reload]);
 
-  // Filtered + searched
+  // Empty everything older than N days — built from per-item permanent delete
+  // since there is no dedicated channel for it.
+  const handleEmptyOlderThan = useCallback(async () => {
+    const cutoff = Date.now() - olderDays * 86_400_000;
+    const stale = groups.flatMap(g => g.items).filter(i => i.deleted_at <= cutoff);
+    if (stale.length === 0) {
+      toast('info', `No items older than ${olderDays} day${olderDays === 1 ? '' : 's'}`);
+      return;
+    }
+    setBusy(true);
+    let ok = 0;
+    try {
+      for (const it of stale) {
+        try {
+          await ipc('recycle-bin:permanentlyDelete', it.id);
+          ok++;
+        } catch (err) {
+          console.warn('[RecycleBin] delete (older-than) failed for', it.id, err);
+        }
+      }
+      toast(ok > 0 ? 'success' : 'error',
+        ok > 0
+          ? `Deleted ${ok} item${ok === 1 ? '' : 's'} older than ${olderDays} day${olderDays === 1 ? '' : 's'}`
+          : 'Could not delete older items');
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  }, [groups, olderDays, reload]);
+
+  // Sort comparator for the chosen key.
+  const sortItems = useCallback((items: RecycleBinItem[]): RecycleBinItem[] => {
+    const arr = [...items];
+    switch (sortKey) {
+      case 'size':
+        arr.sort((a, b) => itemBytes(b.item_data) - itemBytes(a.item_data));
+        break;
+      case 'folder':
+        arr.sort((a, b) =>
+          originalFolder(a.original_location).localeCompare(originalFolder(b.original_location)) ||
+          b.deleted_at - a.deleted_at);
+        break;
+      case 'date':
+      default:
+        arr.sort((a, b) => b.deleted_at - a.deleted_at); // most recently deleted first
+        break;
+    }
+    return arr;
+  }, [sortKey]);
+
+  // Filtered + searched + sorted. Search matches name, type, source-app label,
+  // and original location/folder.
   const visibleGroups = useMemo(() => {
     let g = groups;
     if (appFilter) g = g.filter(gr => gr.app === appFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
-      g = g.map(gr => ({
-        ...gr,
-        items: gr.items.filter(i =>
-          i.item_name.toLowerCase().includes(q) ||
-          i.item_type.toLowerCase().includes(q)
-        ),
-        count: 0, // recalculated below
-      })).filter(gr => gr.items.length > 0).map(gr => ({ ...gr, count: gr.items.length }));
+      g = g.map(gr => {
+        const appHit = gr.app.toLowerCase().includes(q) || appLabel(gr.app).toLowerCase().includes(q);
+        const items = gr.items.filter(i =>
+          appHit ||
+          (i.item_name || '').toLowerCase().includes(q) ||
+          (i.item_type || '').toLowerCase().includes(q) ||
+          (i.original_location || '').toLowerCase().includes(q)
+        );
+        return { ...gr, items, count: items.length };
+      }).filter(gr => gr.items.length > 0);
     }
-    return g;
-  }, [groups, appFilter, search]);
+    return g.map(gr => ({ ...gr, items: sortItems(gr.items) }));
+  }, [groups, appFilter, search, sortItems]);
 
   const totalVisible = visibleGroups.reduce((s, g) => s + g.items.length, 0);
+
+  // Size reclaimable: whole bin and currently-visible subset.
+  const totalReclaimable = useMemo(
+    () => groups.reduce((s, g) => s + g.items.reduce((t, i) => t + itemBytes(i.item_data), 0), 0),
+    [groups],
+  );
+  const visibleReclaimable = useMemo(
+    () => visibleGroups.reduce((s, g) => s + g.items.reduce((t, i) => t + itemBytes(i.item_data), 0), 0),
+    [visibleGroups],
+  );
 
   // ── Multi-select ───────────────────────────────────────────
   const visibleIds = useMemo(
@@ -271,16 +429,40 @@ const RecycleBin: React.FC = () => {
 
   const handleRestoreSelected = useCallback(async () => {
     const ids = [...selected];
-    for (const id of ids) await ipc('recycle-bin:restore', id);
-    setSelected(new Set());
-    reload();
+    if (ids.length === 0) return;
+    setBusy(true);
+    let ok = 0;
+    try {
+      for (const id of ids) {
+        try { await ipc('recycle-bin:restore', id); ok++; }
+        catch (err) { console.warn('[RecycleBin] bulk restore failed for', id, err); }
+      }
+      toast(ok > 0 ? 'success' : 'error',
+        ok > 0 ? `Restored ${ok} item${ok === 1 ? '' : 's'}` : 'Could not restore items');
+    } finally {
+      setSelected(new Set());
+      setBusy(false);
+      reload();
+    }
   }, [selected, reload]);
 
   const handleDeleteSelected = useCallback(async () => {
     const ids = [...selected];
-    for (const id of ids) await ipc('recycle-bin:permanentlyDelete', id);
-    setSelected(new Set());
-    reload();
+    if (ids.length === 0) return;
+    setBusy(true);
+    let ok = 0;
+    try {
+      for (const id of ids) {
+        try { await ipc('recycle-bin:permanentlyDelete', id); ok++; }
+        catch (err) { console.warn('[RecycleBin] bulk delete failed for', id, err); }
+      }
+      toast(ok > 0 ? 'success' : 'error',
+        ok > 0 ? `Permanently deleted ${ok} item${ok === 1 ? '' : 's'}` : 'Could not delete items');
+    } finally {
+      setSelected(new Set());
+      setBusy(false);
+      reload();
+    }
   }, [selected, reload]);
 
   // ── Render ─────────────────────────────────────────────────
@@ -292,26 +474,54 @@ const RecycleBin: React.FC = () => {
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Trash</div>
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-              {totalCount} {totalCount === 1 ? 'item' : 'items'} &middot; auto-deleted after 30 days
+              {totalCount} {totalCount === 1 ? 'item' : 'items'}
+              {totalReclaimable > 0 && <> &middot; {formatBytes(totalReclaimable)} reclaimable</>}
+              {' '}&middot; auto-deleted after 30 days
             </div>
           </div>
           {totalCount > 0 && (
             confirmEmpty ? (
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
-                  style={{ ...btnSmall, background: 'rgba(255,69,58,0.2)', color: 'var(--color-error)' }}
+                  disabled={busy}
+                  style={{ ...btnSmall, background: 'rgba(255,69,58,0.2)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
                   onClick={handleEmptyAll}
                 >Confirm Empty</button>
                 <button
+                  disabled={busy}
                   style={{ ...btnSmall, background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #e5e5ea)' }}
                   onClick={() => setConfirmEmpty(false)}
                 >Cancel</button>
               </div>
             ) : (
-              <button
-                style={{ ...btnSmall, background: 'rgba(255,69,58,0.12)', color: 'var(--color-error)' }}
-                onClick={() => setConfirmEmpty(true)}
-              >Empty Trash</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Empty items older than N days */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>older than</span>
+                  <select
+                    value={olderDays}
+                    onChange={e => setOlderDays(Number(e.target.value))}
+                    aria-label="Age threshold in days"
+                    style={{
+                      ...btnSmall, padding: '4px 6px',
+                      background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {[1, 3, 7, 14, 30].map(d => <option key={d} value={d}>{d}d</option>)}
+                  </select>
+                  <button
+                    disabled={busy}
+                    style={{ ...btnSmall, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', opacity: busy ? 0.5 : 1 }}
+                    onClick={handleEmptyOlderThan}
+                    title={`Permanently delete items deleted more than ${olderDays} days ago`}
+                  >Clear old</button>
+                </div>
+                <button
+                  disabled={busy}
+                  style={{ ...btnSmall, background: 'rgba(255,69,58,0.12)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
+                  onClick={() => setConfirmEmpty(true)}
+                >Empty Trash</button>
+              </div>
             )
           )}
         </div>
@@ -341,15 +551,35 @@ const RecycleBin: React.FC = () => {
           </div>
         )}
 
-        {/* Search */}
-        <DexSearchInput
-          size="sm"
-          fullWidth
-          placeholder="Search trash..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onClear={() => setSearch('')}
-        />
+        {/* Search + sort */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <DexSearchInput
+              size="sm"
+              fullWidth
+              placeholder="Search by name or app..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Sort</span>
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value as SortKey)}
+              aria-label="Sort items"
+              style={{
+                ...btnSmall, padding: '4px 8px',
+                background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+              }}
+            >
+              <option value="date">Date deleted</option>
+              <option value="size">Size</option>
+              <option value="folder">Original folder</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Selection toolbar */}
@@ -364,20 +594,25 @@ const RecycleBin: React.FC = () => {
               style={{ cursor: 'pointer', accentColor: 'var(--color-accent)' }}
             />
             <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-              {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+              {selected.size > 0
+                ? `${selected.size} selected`
+                : `${totalVisible} shown · ${formatBytes(visibleReclaimable)}`}
             </span>
           </label>
           {selected.size > 0 && (
             <div style={{ display: 'flex', gap: 6 }}>
               <button
-                style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)' }}
+                disabled={busy}
+                style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
                 onClick={handleRestoreSelected}
               >Restore {selected.size}</button>
               <button
-                style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)' }}
+                disabled={busy}
+                style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
                 onClick={handleDeleteSelected}
               >Delete {selected.size}</button>
               <button
+                disabled={busy}
                 style={{ ...btnSmall, background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #e5e5ea)' }}
                 onClick={() => setSelected(new Set())}
               >Clear</button>
@@ -416,6 +651,7 @@ const RecycleBin: React.FC = () => {
                   key={item.id}
                   item={item}
                   selected={selected.has(item.id)}
+                  busy={busy}
                   onToggleSelect={toggleSelect}
                   onRestore={handleRestore}
                   onDelete={handleDelete}

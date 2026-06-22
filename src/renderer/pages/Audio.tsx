@@ -221,8 +221,34 @@ export const Audio: React.FC = () => {
     return [...DEFAULT_PLAYLISTS];
   });
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState(false);
+  // Loop / shuffle / playback-speed user prefs are persisted to localStorage
+  // (see PREFS_KEY). Loop is a 3-state cycle: 'off' -> 'all' -> 'one'.
+  // loopMode === 'one' drives the existing single-track-repeat logic in the
+  // onended effect; 'all' wraps the list; 'off' stops at the end.
+  type LoopMode = 'off' | 'all' | 'one';
+  const PREFS_KEY = 'dex-audio-prefs';
+  const loadPrefs = (): { shuffle: boolean; loopMode: LoopMode; speed: number } => {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        const speed = typeof p.speed === 'number' && p.speed >= 0.5 && p.speed <= 2 ? p.speed : 1;
+        const loopMode: LoopMode = p.loopMode === 'all' || p.loopMode === 'one' ? p.loopMode : 'off';
+        return { shuffle: !!p.shuffle, loopMode, speed };
+      }
+    } catch { /* ignore corrupt prefs */ }
+    return { shuffle: false, loopMode: 'off', speed: 1 };
+  };
+  const initialPrefs = loadPrefs();
+  const [shuffle, setShuffle] = useState(initialPrefs.shuffle);
+  const [loopMode, setLoopMode] = useState<LoopMode>(initialPrefs.loopMode);
+  const [speed, setSpeed] = useState<number>(initialPrefs.speed);
+  // A-B repeat: when both points are set, playback loops within [abA, abB].
+  const [abA, setAbA] = useState<number | null>(null);
+  const [abB, setAbB] = useState<number | null>(null);
+  // Mirror of `speed` for use inside event handlers created once (the audio
+  // element setup effect), so a new source re-applies the current rate.
+  const speedRef = useRef(initialPrefs.speed);
   // `isLoading` (the library scan) is now provided by useAsyncResource below.
   // Playback readiness, distinct from `isLoading` (which is the library scan).
   // `isBuffering` shows a brief loading state while a track URL loads/buffers;
@@ -300,18 +326,51 @@ export const Audio: React.FC = () => {
     setEditingTrack(null);
   }, [editingTrack, editMeta, currentTrack]);
 
-  // Sleep timer effect
+  // Sleep timer: counts down, fades the audio volume out over the final
+  // SLEEP_FADE_SECONDS, then pauses. The pre-fade volume is restored on the
+  // element afterwards so the next manual play isn't silent. Volume UI state
+  // is untouched -- only the element gain is faded.
+  const SLEEP_FADE_SECONDS = 10;
+  const sleepFadeRef = useRef<{ raf: number; startVol: number } | null>(null);
+
+  const stopSleepFade = useCallback(() => {
+    if (sleepFadeRef.current) {
+      cancelAnimationFrame(sleepFadeRef.current.raf);
+      sleepFadeRef.current = null;
+    }
+  }, []);
+
   const startSleepTimer = useCallback((minutes: number) => {
     if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    stopSleepFade();
     if (minutes <= 0) { setSleepTimer(0); setSleepRemaining(0); return; }
     setSleepTimer(minutes);
     setSleepRemaining(minutes * 60);
     sleepTimerRef.current = setInterval(() => {
       setSleepRemaining(prev => {
+        // Begin a smooth volume fade-out as we enter the final fade window.
+        if (prev === SLEEP_FADE_SECONDS && audioRef.current && !sleepFadeRef.current) {
+          const audio = audioRef.current;
+          const startVol = audio.volume;
+          const fadeStart = performance.now();
+          const tick = () => {
+            const t = Math.min(1, (performance.now() - fadeStart) / (SLEEP_FADE_SECONDS * 1000));
+            try { audio.volume = Math.max(0, startVol * (1 - t)); } catch { /* ignore */ }
+            if (t < 1 && sleepFadeRef.current) {
+              sleepFadeRef.current.raf = requestAnimationFrame(tick);
+            }
+          };
+          sleepFadeRef.current = { raf: requestAnimationFrame(tick), startVol };
+        }
         if (prev <= 1) {
           if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
           setSleepTimer(0);
-          if (audioRef.current) { audioRef.current.pause(); }
+          stopSleepFade();
+          if (audioRef.current) {
+            audioRef.current.pause();
+            // Restore the user's volume so the next manual play isn't silent.
+            try { audioRef.current.volume = volume / 100; } catch { /* ignore */ }
+          }
           setIsPlaying(false);
           toast.info('Sleep timer ended');
           return 0;
@@ -319,11 +378,14 @@ export const Audio: React.FC = () => {
         return prev - 1;
       });
     }, 1000);
-  }, [toast]);
+  }, [toast, stopSleepFade, volume]);
 
   useEffect(() => {
-    return () => { if (sleepTimerRef.current) clearInterval(sleepTimerRef.current); };
-  }, []);
+    return () => {
+      if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+      stopSleepFade();
+    };
+  }, [stopSleepFade]);
 
   // Revoke blob URLs for imported tracks on unmount
   useEffect(() => {
@@ -341,6 +403,39 @@ export const Audio: React.FC = () => {
     const custom = playlists.filter(p => !DEFAULT_PLAYLISTS.some(d => d.id === p.id));
     localStorage.setItem('dex-audio-playlists', JSON.stringify(custom));
   }, [playlists]);
+
+  // Persist loop / shuffle / speed user prefs.
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ shuffle, loopMode, speed }));
+    } catch { /* storage full / disabled */ }
+  }, [shuffle, loopMode, speed]);
+
+  // Sync playback speed to the audio element (0.5x - 2x). Re-applied on every
+  // speed change and re-asserted on the loadedmetadata effect when a new src
+  // loads (browsers reset playbackRate to 1 on a new source).
+  useEffect(() => {
+    speedRef.current = speed;
+    try {
+      if (audioRef.current) audioRef.current.playbackRate = speed;
+    } catch { /* invalid rate ignored */ }
+  }, [speed]);
+
+  // A-B repeat: while both points are set, loop back to A whenever playback
+  // passes B. Guarded so it only attaches when a region is active.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || abA === null || abB === null || abB <= abA) return;
+    const onTime = () => {
+      try {
+        if (audio.currentTime >= abB || audio.currentTime < abA - 0.25) {
+          audio.currentTime = abA;
+        }
+      } catch { /* seek failed */ }
+    };
+    audio.addEventListener('timeupdate', onTime);
+    return () => audio.removeEventListener('timeupdate', onTime);
+  }, [abA, abB]);
 
   const createPlaylist = useCallback(() => {
     setPlaylistNameDraft('');
@@ -390,7 +485,12 @@ export const Audio: React.FC = () => {
     // Buffering / readiness feedback so a slow load shows a loading state
     // and a ready stream clears it (rather than a silent stall).
     const onWaiting = () => setIsBuffering(true);
-    const onReady = () => { setIsBuffering(false); setLoadError(null); };
+    const onReady = () => {
+      setIsBuffering(false);
+      setLoadError(null);
+      // Browsers reset playbackRate to 1 on a new source -- re-assert the user's rate.
+      try { audio.playbackRate = speedRef.current; } catch { /* ignore */ }
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
@@ -601,25 +701,6 @@ export const Audio: React.FC = () => {
   }, []);
 
 
-  // Handle ended arrow-right next track
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleEnded = () => {
-      if (repeat) {
-        audio.currentTime = 0;
-        audio.play().catch((e: unknown) => { console.warn('[DEX]', e); });
-        setIsPlaying(true);
-      } else {
-        setIsPlaying(false);
-        setProgress(0);
-        skipToNext();
-      }
-    };
-    audio.addEventListener('ended', handleEnded);
-    return () => audio.removeEventListener('ended', handleEnded);
-  }, [repeat, shuffle, currentTrack, filteredTracks]);
-
   // Load favorites on mount (independent of the track scan).
   React.useEffect(() => {
     let mounted = true;
@@ -716,6 +797,9 @@ export const Audio: React.FC = () => {
     setCurrentTime(0);
     setLoadError(null);
     setIsBuffering(true);
+    // A-B repeat is per-track: clear the region when switching tracks.
+    setAbA(null);
+    setAbB(null);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'audioTracksPlayed', amount: 1 } }));
     if (audioRef.current && (track.url || track.id)) {
       let src = track.url || track.id;
@@ -802,16 +886,23 @@ export const Audio: React.FC = () => {
   }, []);
 
   const skipToNext = useCallback(() => {
+    // The "Up Next" queue takes priority: dequeue and play the head if present.
+    if (queue.length > 0) {
+      const [head, ...rest] = queue;
+      setQueue(rest);
+      playTrack(head);
+      return;
+    }
     if (filteredTracks.length === 0) return;
     const idx = currentTrack ? filteredTracks.findIndex(t => t.id === currentTrack.id) : -1;
     let nextIdx: number;
     if (shuffle) {
-      nextIdx = Math.floor(Math.random() * filteredTracks.length);
+      nextIdx = filteredTracks.length === 1 ? 0 : Math.floor(Math.random() * filteredTracks.length);
     } else {
       nextIdx = idx < filteredTracks.length - 1 ? idx + 1 : 0;
     }
     playTrack(filteredTracks[nextIdx]);
-  }, [currentTrack, filteredTracks, shuffle, playTrack]);
+  }, [currentTrack, filteredTracks, shuffle, playTrack, queue]);
 
   const skipToPrev = useCallback(() => {
     if (filteredTracks.length === 0) return;
@@ -824,6 +915,39 @@ export const Audio: React.FC = () => {
     const prevIdx = idx > 0 ? idx - 1 : filteredTracks.length - 1;
     playTrack(filteredTracks[prevIdx]);
   }, [currentTrack, filteredTracks, playTrack]);
+
+  // On track end: repeat-one restarts; the queue always plays next; otherwise
+  // loopMode decides whether to advance ('all' wraps, 'off' stops at list end).
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleEnded = () => {
+      if (loopMode === 'one') {
+        audio.currentTime = 0;
+        audio.play().catch((e: unknown) => { console.warn('[DEX]', e); });
+        setIsPlaying(true);
+        return;
+      }
+      if (queue.length > 0) {
+        setProgress(0);
+        skipToNext();
+        return;
+      }
+      if (loopMode === 'off') {
+        const idx = currentTrack ? filteredTracks.findIndex(t => t.id === currentTrack.id) : -1;
+        const isLast = idx === filteredTracks.length - 1;
+        if (!shuffle && isLast) {
+          setIsPlaying(false);
+          setProgress(0);
+          return;
+        }
+      }
+      setProgress(0);
+      skipToNext();
+    };
+    audio.addEventListener('ended', handleEnded);
+    return () => audio.removeEventListener('ended', handleEnded);
+  }, [loopMode, shuffle, currentTrack, filteredTracks, queue, skipToNext]);
 
   // --- Global MiniPlayer bridge ---------------------------------------------
   // Register this engine's transport so the floating remote can drive it, and
@@ -862,6 +986,8 @@ export const Audio: React.FC = () => {
       if (e.key === ' ') { e.preventDefault(); togglePlayPause(); }
       else if (e.key === 'ArrowRight' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); seekTo(Math.min(100, progress + 5)); }
       else if (e.key === 'ArrowLeft' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); seekTo(Math.max(0, progress - 5)); }
+      else if (e.key === 'ArrowUp' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setVolume(v => Math.min(100, v + 5)); }
+      else if (e.key === 'ArrowDown' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setVolume(v => Math.max(0, v - 5)); }
       else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowRight') { e.preventDefault(); skipToNext(); }
       else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft') { e.preventDefault(); skipToPrev(); }
     };
@@ -1046,6 +1172,7 @@ export const Audio: React.FC = () => {
               onKeyDown={e => { if (e.key === 'Enter') submitPlaylistCreate(); if (e.key === 'Escape') setPlaylistNameDraft(null); }}
               onBlur={submitPlaylistCreate}
               placeholder="Playlist name"
+              aria-label="New playlist name"
               style={{ width: '100%', padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none' }}
             />
           ) : (
@@ -1261,7 +1388,7 @@ export const Audio: React.FC = () => {
               <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, padding: '0 4px' }}>
                 {['32', '64', '125', '250', '500', '1K', '2K', '4K', '8K', '16K'].map((freq, i) => (
                   <div key={freq} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <input type="range" min="-12" max="12" value={eqBands[i]} onChange={e => setEqBands(b => b.map((v, j) => j === i ? Number(e.target.value) : v))} style={{ width: 80, height: 6, accentColor: 'var(--color-accent)', transform: 'rotate(-90deg)', transformOrigin: 'center' }} />
+                    <input type="range" min="-12" max="12" value={eqBands[i]} onChange={e => setEqBands(b => b.map((v, j) => j === i ? Number(e.target.value) : v))} aria-label={`${freq}Hz band gain`} style={{ width: 80, height: 6, accentColor: 'var(--color-accent)', transform: 'rotate(-90deg)', transformOrigin: 'center' }} />
                     <span style={{ fontSize: 7, color: 'var(--color-text-tertiary)', marginTop: 30 }}>{freq}</span>
                     <span style={{ fontSize: 7, color: eqBands[i] > 0 ? 'var(--color-success)' : eqBands[i] < 0 ? 'var(--color-error)' : 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{eqBands[i] > 0 ? '+' : ''}{eqBands[i]}</span>
                   </div>
@@ -1291,10 +1418,24 @@ export const Audio: React.FC = () => {
                 <div key={t.id + i} draggable onDragStart={() => setQueueDragIdx(i)} onDragOver={(e) => { e.preventDefault(); setQueueOverIdx(i); }} onDragEnd={() => { if (queueDragIdx !== null && queueOverIdx !== null && queueDragIdx !== queueOverIdx) { setQueue(prev => { const next = [...prev]; const [moved] = next.splice(queueDragIdx, 1); next.splice(queueOverIdx, 0, moved); return next; }); } setQueueDragIdx(null); setQueueOverIdx(null); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 6px', borderRadius: 4, marginBottom: 1, cursor: 'grab', background: queueOverIdx === i ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent', opacity: queueDragIdx === i ? 0.4 : 1, transition: 'background 0.15s, opacity 0.15s' }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 14, textAlign: 'center' }}>{i + 1}</span>
                   <div style={{ width: 24, height: 24, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { playTrack(t); setQueue(q => q.filter((_, j) => j !== i)); }} title="Play now">
                     <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>{t.title}</div>
                     <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{t.artist}</div>
                   </div>
+                  <button
+                    onClick={() => setQueue(q => { if (i <= 0) return q; const n = [...q]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}
+                    disabled={i === 0}
+                    aria-label={`Move ${t.title} up`}
+                    title="Move up"
+                    style={{ background: 'none', border: 'none', color: i === 0 ? 'var(--color-text-muted)' : 'var(--color-text-tertiary)', cursor: i === 0 ? 'default' : 'pointer', opacity: i === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', padding: 0 }}
+                  ><DexIcon name="chevron-up" size={10} /></button>
+                  <button
+                    onClick={() => setQueue(q => { if (i >= q.length - 1) return q; const n = [...q]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}
+                    disabled={i === queue.length - 1}
+                    aria-label={`Move ${t.title} down`}
+                    title="Move down"
+                    style={{ background: 'none', border: 'none', color: i === queue.length - 1 ? 'var(--color-text-muted)' : 'var(--color-text-tertiary)', cursor: i === queue.length - 1 ? 'default' : 'pointer', opacity: i === queue.length - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', padding: 0 }}
+                  ><DexIcon name="chevron-down" size={10} /></button>
                   <button onClick={() => setQueue(q => q.filter((_, j) => j !== i))} aria-label={`Remove ${t.title} from queue`} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 10 }}><DexIcon name="close" size={10} /></button>
                 </div>
               ))}
@@ -1363,7 +1504,7 @@ export const Audio: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Duration</span>
                 <span style={{ fontSize: 9, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{crossfadeDuration}s</span>
               </div>
-              <input type="range" min="0" max="12" value={crossfadeDuration} onChange={e => setCrossfadeDuration(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 6 }} />
+              <input type="range" min="0" max="12" value={crossfadeDuration} onChange={e => setCrossfadeDuration(Number(e.target.value))} aria-label="Crossfade duration in seconds" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 6 }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--color-text-tertiary)' }}>
                 <span>Off</span><span>12s</span>
               </div>
@@ -1412,8 +1553,9 @@ export const Audio: React.FC = () => {
                 </div>
                 {(['title', 'artist', 'album', 'genre', 'year', 'composer'] as const).map(field => (
                   <div key={field}>
-                    <label className="dex-label-caps">{field}</label>
+                    <label className="dex-label-caps" htmlFor={`dex-audio-meta-${field}`}>{field}</label>
                     <input
+                      id={`dex-audio-meta-${field}`}
                       type="text"
                       value={editMeta[field]}
                       onChange={e => setEditMeta(prev => ({ ...prev, [field]: e.target.value }))}
@@ -1480,11 +1622,15 @@ export const Audio: React.FC = () => {
               </button>
               <button style={styles.controlBtn} onClick={skipToNext} aria-label="Next track">{Icons.skipForward}</button>
               <button
-                style={{...styles.controlBtn, color: repeat ? 'var(--color-accent)' : 'var(--color-text-secondary)'}}
-                onClick={() => setRepeat(!repeat)}
-                aria-label="Repeat"
+                style={{...styles.controlBtn, color: loopMode !== 'off' ? 'var(--color-accent)' : 'var(--color-text-secondary)', position: 'relative'}}
+                onClick={() => setLoopMode(m => m === 'off' ? 'all' : m === 'all' ? 'one' : 'off')}
+                aria-label={`Loop: ${loopMode}`}
+                title={loopMode === 'off' ? 'Loop off' : loopMode === 'all' ? 'Loop all' : 'Loop one'}
               >
                 {Icons.repeat}
+                {loopMode === 'one' && (
+                  <span style={{ position: 'absolute', top: 1, right: 3, fontSize: 8, fontWeight: 700, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>1</span>
+                )}
               </button>
             </div>
             
@@ -1492,6 +1638,10 @@ export const Audio: React.FC = () => {
               <span style={styles.progressTime}>{formatTime(Math.floor(currentTime))}</span>
               <div style={styles.progressBar}>
                 <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
+                {/* A-B loop region highlight on the track */}
+                {abA !== null && (duration || 0) > 0 && (
+                  <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', height: 6, left: `${(abA / (duration || 1)) * 100}%`, width: `${(((abB ?? abA) - abA) / (duration || 1)) * 100}%`, minWidth: abB !== null ? 0 : 2, background: 'color-mix(in srgb, var(--color-accent) 35%, transparent)', borderRadius: 2, pointerEvents: 'none' }} />
+                )}
                 <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${progress}%`, ...styles.progressFill }} />
                 <input
                   type="range"
@@ -1499,10 +1649,78 @@ export const Audio: React.FC = () => {
                   max="100"
                   value={progress}
                   onChange={(e) => seekTo(parseInt(e.target.value))}
+                  aria-label="Seek track position"
                   style={styles.progressInput}
                 />
               </div>
               <span style={styles.progressTime}>{formatTime(Math.floor(duration || currentTrack.duration))}</span>
+            </div>
+
+            {/* Speed + A-B repeat row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+              {/* Playback speed 0.5x - 2x */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title="Playback speed">
+                <span style={{ fontSize: 9, letterSpacing: 0.3 }}>SPEED</span>
+                {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setSpeed(s)}
+                    aria-label={`Set speed ${s}x`}
+                    aria-pressed={speed === s}
+                    style={{
+                      padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
+                      border: '1px solid ' + (speed === s ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'transparent'),
+                      background: speed === s ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                      color: speed === s ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                      fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >{s}x</button>
+                ))}
+              </div>
+
+              <div style={{ width: 1, height: 14, background: 'var(--color-border-subtle)' }} />
+
+              {/* A-B repeat */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title="A-B repeat: set two points to loop that region">
+                <span style={{ fontSize: 9, letterSpacing: 0.3 }}>A-B</span>
+                <button
+                  onClick={() => setAbA(prev => prev === null ? currentTime : null)}
+                  aria-label={abA === null ? 'Set loop point A' : 'Clear loop point A'}
+                  aria-pressed={abA !== null}
+                  style={{
+                    padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+                    border: '1px solid ' + (abA !== null ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-border-subtle)'),
+                    background: abA !== null ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                    color: abA !== null ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    fontSize: 10, fontWeight: 600,
+                  }}
+                >A{abA !== null ? ` ${formatTime(Math.floor(abA))}` : ''}</button>
+                <button
+                  onClick={() => setAbB(prev => {
+                    if (prev !== null) return null;
+                    // B must be after A; ignore an out-of-order point.
+                    if (abA !== null && currentTime <= abA) { toast.info('Set point B after point A'); return prev; }
+                    return currentTime;
+                  })}
+                  aria-label={abB === null ? 'Set loop point B' : 'Clear loop point B'}
+                  aria-pressed={abB !== null}
+                  style={{
+                    padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+                    border: '1px solid ' + (abB !== null ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-border-subtle)'),
+                    background: abB !== null ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                    color: abB !== null ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    fontSize: 10, fontWeight: 600,
+                  }}
+                >B{abB !== null ? ` ${formatTime(Math.floor(abB))}` : ''}</button>
+                {(abA !== null || abB !== null) && (
+                  <button
+                    onClick={() => { setAbA(null); setAbB(null); }}
+                    aria-label="Clear A-B loop"
+                    title="Clear A-B loop"
+                    style={{ padding: '2px 4px', borderRadius: 4, cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center' }}
+                  ><DexIcon name="close" size={10} /></button>
+                )}
+              </div>
             </div>
           </div>
           

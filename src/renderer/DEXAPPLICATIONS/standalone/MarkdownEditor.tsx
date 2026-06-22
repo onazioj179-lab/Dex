@@ -6,16 +6,49 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import DOMPurify from 'dompurify';
 import { lintMarkdown } from '../../../shared/format/markdownLint';
+import { sendToNotes } from '../../services/sendTo';
+
+const STORAGE_KEY = 'dex-markdown-content';
+const FILE_KEY = 'dex-markdown-filename';
+
+function toast(type: 'success' | 'error' | 'info', message: string): void {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+}
 
 const MarkdownEditor: React.FC = () => {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
+  });
   const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split');
   const [wordWrap, setWordWrap] = useState(true);
   const [showToc, setShowToc] = useState(false);
-  const [fileName, setFileName] = useState('untitled.md');
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [fileName, setFileName] = useState(() => {
+    try { return localStorage.getItem(FILE_KEY) || 'untitled.md'; } catch { return 'untitled.md'; }
+  });
 
-  // Simple markdown to HTML parser
+  // Find / replace state
+  const [showFind, setShowFind] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [replaceValue, setReplaceValue] = useState('');
+  const [useRegex, setUseRegex] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  // Guards re-entrant scroll events while we mirror one pane onto the other.
+  const syncingFrom = useRef<'editor' | 'preview' | null>(null);
+
+  // Persist content + filename (debounced) so a reload keeps the document.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try { localStorage.setItem(STORAGE_KEY, content); } catch { /* ignore */ }
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [content]);
+  useEffect(() => {
+    try { localStorage.setItem(FILE_KEY, fileName); } catch { /* ignore */ }
+  }, [fileName]);
+
   // Document outline (v6 Track G): parse ATX headings + their source offset so the
   // TOC can jump the editor caret to a section. Pure derivation from content.
   const headings = useMemo(() => {
@@ -33,6 +66,37 @@ const MarkdownEditor: React.FC = () => {
     ta.focus();
     ta.setSelectionRange(index, index); // Chromium scrolls the caret into view
   };
+
+  // Build the find regex (shared by match-count + replace-all). Returns null on
+  // an empty query or an invalid user-supplied pattern in regex mode.
+  const buildFindRegex = useCallback((): RegExp | null => {
+    if (!findQuery) return null;
+    const flags = 'g' + (caseSensitive ? '' : 'i');
+    try {
+      const source = useRegex ? findQuery : findQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(source, flags);
+    } catch {
+      return null; // invalid regex while typing -> treat as no match
+    }
+  }, [findQuery, useRegex, caseSensitive]);
+
+  const matchCount = useMemo(() => {
+    const re = buildFindRegex();
+    if (!re) return 0;
+    return (content.match(re) || []).length;
+  }, [buildFindRegex, content]);
+
+  const replaceAll = useCallback(() => {
+    const re = buildFindRegex();
+    if (!re) { toast('info', 'No matches to replace'); return; }
+    const count = (content.match(re) || []).length;
+    if (count === 0) { toast('info', 'No matches to replace'); return; }
+    // $-substitution in replacement is only meaningful in regex mode; escape it
+    // for literal mode so "$1" in the replacement field stays literal.
+    const repl = useRegex ? replaceValue : replaceValue.replace(/\$/g, '$$$$');
+    setContent(content.replace(re, repl));
+    toast('success', `Replaced ${count} match${count === 1 ? '' : 'es'}`);
+  }, [buildFindRegex, content, replaceValue, useRegex]);
 
   const renderMarkdown = useMemo(() => {
     let html = content;
@@ -54,6 +118,26 @@ const MarkdownEditor: React.FC = () => {
     html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:17px;margin:16px 0 8px">$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:20px;margin:20px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--color-border, rgba(255,255,255,0.1))">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:26px;margin:24px 0 12px;font-weight:700">$1</h1>');
+
+    // GitHub-flavored task list checkboxes. Render BEFORE generic bullet lists so
+    // the checkbox markup wins. data-line carries the 0-based source line index so
+    // a click in the preview can flip the matching "- [ ] / - [x]" in the source.
+    {
+      // Map each task entry back to its RAW source line index. We match against
+      // raw lines (not the entity-escaped html) and track a cursor so duplicate
+      // task lines each resolve to a distinct, correct source index.
+      const rawTaskLines: number[] = [];
+      content.split('\n').forEach((l, i) => { if (/^- \[[ xX]\] .+$/.test(l)) rawTaskLines.push(i); });
+      let taskCursor = 0;
+      html = html.replace(/^- \[([ xX])\] (.+)$/gm, (_full, mark: string, label: string) => {
+        const checked = mark.toLowerCase() === 'x';
+        const lineIdx = taskCursor < rawTaskLines.length ? rawTaskLines[taskCursor++] : -1;
+        // label is already entity-escaped here (we ran on escaped html), so it is
+        // safe to embed directly without re-escaping.
+        const idAttr = lineIdx >= 0 ? ` data-task-line="${lineIdx}"` : '';
+        return `<div style="display:flex;align-items:flex-start;gap:8px;margin:3px 0;margin-left:20px"><input type="checkbox"${checked ? ' checked' : ''}${idAttr} style="margin-top:4px;cursor:pointer" /><span${checked ? ' style="opacity:0.6;text-decoration:line-through"' : ''}>${label}</span></div>`;
+      });
+    }
 
     // Bold + Italic
     html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -87,10 +171,6 @@ const MarkdownEditor: React.FC = () => {
     // Ordered lists
     html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:2px 0;margin-left:20px;list-style:decimal">$1</li>');
 
-    // Checkboxes
-    html = html.replace(/\[x\]/g, '[x]');
-    html = html.replace(/\[ \]/g, '[ ]');
-
     // Links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--color-accent, #4a9eff);text-decoration:none">$1</a>');
 
@@ -107,8 +187,31 @@ const MarkdownEditor: React.FC = () => {
     // markup (DOMPurify keeps style attrs + standard tags this renderer emits).
     // USE_PROFILES html-only: this renderer emits plain HTML, never SVG/MathML,
     // so disallowing those namespaces removes that whole attack surface for free.
-    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    // ADD_ATTR keeps the data-task-line hook + checkbox checked state that the
+    // task-list toggle relies on (DOMPurify strips unknown data-* otherwise).
+    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['data-task-line', 'checked', 'type'] });
   }, [content]);
+
+  // Toggle a task list checkbox from the rendered preview. Flips the source line's
+  // "- [ ]" <-> "- [x]" by line index carried on the checkbox's data attribute.
+  const handlePreviewClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'INPUT' || (target as HTMLInputElement).type !== 'checkbox') return;
+    const lineAttr = target.getAttribute('data-task-line');
+    if (lineAttr == null) return;
+    e.preventDefault();
+    const lineIdx = parseInt(lineAttr, 10);
+    if (Number.isNaN(lineIdx)) return;
+    setContent(prev => {
+      const lines = prev.split('\n');
+      const line = lines[lineIdx];
+      if (line == null) return prev;
+      if (/^- \[ \] /.test(line)) lines[lineIdx] = line.replace(/^- \[ \] /, '- [x] ');
+      else if (/^- \[[xX]\] /.test(line)) lines[lineIdx] = line.replace(/^- \[[xX]\] /, '- [ ] ');
+      else return prev;
+      return lines.join('\n');
+    });
+  }, []);
 
   const insertFormatting = useCallback((prefix: string, suffix: string = prefix) => {
     const el = editorRef.current;
@@ -126,6 +229,42 @@ const MarkdownEditor: React.FC = () => {
     }, 0);
   }, [content]);
 
+  // Insert a block snippet at the start of the current line(s). Used by the
+  // list / quote / heading toolbar actions where wrapping a selection is wrong.
+  const insertBlock = useCallback((makeLine: (line: string, i: number) => string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = content;
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    const block = text.substring(lineStart, end);
+    const transformed = block.split('\n').map(makeLine).join('\n');
+    const newText = text.substring(0, lineStart) + transformed + text.substring(end);
+    setContent(newText);
+    setTimeout(() => {
+      el.focus();
+      el.selectionStart = lineStart;
+      el.selectionEnd = lineStart + transformed.length;
+    }, 0);
+  }, [content]);
+
+  const insertSnippet = useCallback((snippet: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = content;
+    const newText = text.substring(0, start) + snippet + text.substring(end);
+    setContent(newText);
+    setTimeout(() => {
+      el.focus();
+      const pos = start + snippet.length;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
+    }, 0);
+  }, [content]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -134,6 +273,7 @@ const MarkdownEditor: React.FC = () => {
       if (e.key === 'i') { e.preventDefault(); insertFormatting('*'); }
       if (e.key === 'k') { e.preventDefault(); insertFormatting('[', '](url)'); }
       if (e.key === 'e') { e.preventDefault(); insertFormatting('`'); }
+      if (e.key === 'f') { e.preventDefault(); setShowFind(true); }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -143,20 +283,73 @@ const MarkdownEditor: React.FC = () => {
     const words = content.trim().split(/\s+/).filter(Boolean).length;
     const chars = content.length;
     const lines = content.split('\n').length;
-    return { words, chars, lines };
+    // Average adult reading speed ~ 200 wpm.
+    const minutes = Math.max(1, Math.round(words / 200));
+    const readTime = words === 0 ? '0 min' : `${minutes} min`;
+    return { words, chars, lines, readTime };
   }, [content]);
 
   const lintIssues = useMemo(() => lintMarkdown(content), [content]);
 
+  // Proportional scroll sync between editor + preview panes.
+  const handleEditorScroll = useCallback(() => {
+    if (viewMode !== 'split') return;
+    if (syncingFrom.current === 'preview') return;
+    const ed = editorRef.current;
+    const pv = previewRef.current;
+    if (!ed || !pv) return;
+    syncingFrom.current = 'editor';
+    const edMax = ed.scrollHeight - ed.clientHeight;
+    const pvMax = pv.scrollHeight - pv.clientHeight;
+    const ratio = edMax > 0 ? ed.scrollTop / edMax : 0;
+    pv.scrollTop = ratio * pvMax;
+    requestAnimationFrame(() => { syncingFrom.current = null; });
+  }, [viewMode]);
+
+  const handlePreviewScroll = useCallback(() => {
+    if (viewMode !== 'split') return;
+    if (syncingFrom.current === 'editor') return;
+    const ed = editorRef.current;
+    const pv = previewRef.current;
+    if (!ed || !pv) return;
+    syncingFrom.current = 'preview';
+    const edMax = ed.scrollHeight - ed.clientHeight;
+    const pvMax = pv.scrollHeight - pv.clientHeight;
+    const ratio = pvMax > 0 ? pv.scrollTop / pvMax : 0;
+    ed.scrollTop = ratio * edMax;
+    requestAnimationFrame(() => { syncingFrom.current = null; });
+  }, [viewMode]);
+
   const exportMd = useCallback(() => {
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName.endsWith('.md') ? fileName : `${fileName}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('success', 'Markdown downloaded');
+    } catch {
+      toast('error', 'Could not download file');
+    }
   }, [content, fileName]);
+
+  const copyHtml = useCallback(async () => {
+    try {
+      await navigator.clipboard?.writeText(renderMarkdown);
+      toast('success', 'HTML copied to clipboard');
+    } catch {
+      toast('error', 'Could not copy HTML');
+    }
+  }, [renderMarkdown]);
+
+  const handleSendToNotes = useCallback(() => {
+    if (!content.trim()) { toast('info', 'Nothing to send'); return; }
+    void sendToNotes(content, fileName.replace(/\.md$/, ''));
+  }, [content, fileName]);
+
+  const tableSnippet = '\n| Column A | Column B |\n| --- | --- |\n| Cell 1 | Cell 2 |\n';
 
   return (
     <div style={s.container}>
@@ -172,14 +365,17 @@ const MarkdownEditor: React.FC = () => {
           <div style={s.divider} />
           <button style={s.fmtBtn} onClick={() => insertFormatting('**')} title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button>
           <button style={s.fmtBtn} onClick={() => insertFormatting('*')} title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button>
-          <button style={s.fmtBtn} onClick={() => insertFormatting('`')} title="Code (Ctrl+E)" aria-label="Inline code">&lt;/&gt;</button>
+          <button style={s.fmtBtn} onClick={() => insertFormatting('`')} title="Inline code (Ctrl+E)" aria-label="Inline code">&lt;/&gt;</button>
+          <button style={s.fmtBtn} onClick={() => insertSnippet('```\n\n```\n')} title="Code block" aria-label="Code block">{ '{ }' }</button>
           <button style={s.fmtBtn} onClick={() => insertFormatting('[', '](url)')} title="Link (Ctrl+K)" aria-label="Link">LNK</button>
-          <button style={s.fmtBtn} onClick={() => insertFormatting('# ', '')} title="Heading" aria-label="Heading">H</button>
-          <button style={s.fmtBtn} onClick={() => insertFormatting('- ', '')} title="List" aria-label="List">•</button>
-          <button style={s.fmtBtn} onClick={() => insertFormatting('> ', '')} title="Quote" aria-label="Blockquote">"</button>
-          <button style={s.fmtBtn} onClick={() => insertFormatting('```\n', '\n```')} title="Code block" aria-label="Code block">{ '{ }' }</button>
+          <button style={s.fmtBtn} onClick={() => insertBlock(l => l.startsWith('# ') ? l : `# ${l}`)} title="Heading" aria-label="Heading">H</button>
+          <button style={s.fmtBtn} onClick={() => insertBlock(l => l.startsWith('- ') ? l : `- ${l}`)} title="Bullet list" aria-label="Bullet list">•</button>
+          <button style={s.fmtBtn} onClick={() => insertBlock((l, i) => `${i + 1}. ${l.replace(/^\d+\.\s*/, '')}`)} title="Numbered list" aria-label="Numbered list">1.</button>
+          <button style={s.fmtBtn} onClick={() => insertBlock(l => l.startsWith('> ') ? l : `> ${l}`)} title="Blockquote" aria-label="Blockquote">"</button>
+          <button style={s.fmtBtn} onClick={() => insertSnippet(tableSnippet)} title="Table" aria-label="Table">⊞</button>
         </div>
         <div style={s.toolbarRight}>
+          <button style={{ ...s.fmtBtn, ...(showFind ? { color: 'var(--color-accent, #4a9eff)' } : {}) }} onClick={() => setShowFind(v => !v)} title="Find / replace (Ctrl+F)" aria-label="Find and replace" aria-pressed={showFind}>⌕</button>
           <button style={{ ...s.fmtBtn, ...(showToc ? { color: 'var(--color-accent, #4a9eff)' } : {}) }} onClick={() => setShowToc(v => !v)} title="Outline" aria-label="Toggle outline" aria-pressed={showToc}>TOC</button>
           <div style={s.viewToggle}>
             {(['editor', 'split', 'preview'] as const).map(mode => (
@@ -196,11 +392,52 @@ const MarkdownEditor: React.FC = () => {
           <button style={s.fmtBtn} onClick={() => setWordWrap(!wordWrap)} title="Toggle word wrap" aria-label="Toggle word wrap">
             {wordWrap ? '↩' : '→'}
           </button>
+          <div style={s.divider} />
+          <button style={s.fmtBtn} onClick={copyHtml} title="Copy rendered HTML" aria-label="Copy HTML">HTML</button>
+          <button style={s.fmtBtn} onClick={handleSendToNotes} title="Send to Notes" aria-label="Send to Notes">→N</button>
           <button style={{ ...s.fmtBtn, color: 'var(--color-accent, #4a9eff)' }} onClick={exportMd} title="Download .md" aria-label="Export markdown">
             DL
           </button>
         </div>
       </div>
+
+      {/* Find / replace bar */}
+      {showFind && (
+        <div style={s.findBar}>
+          <input
+            value={findQuery}
+            onChange={e => setFindQuery(e.target.value)}
+            placeholder="Find"
+            style={s.findInput}
+            aria-label="Find"
+            autoFocus
+          />
+          <input
+            value={replaceValue}
+            onChange={e => setReplaceValue(e.target.value)}
+            placeholder="Replace"
+            style={s.findInput}
+            aria-label="Replace with"
+          />
+          <span style={s.matchCount}>{matchCount} match{matchCount === 1 ? '' : 'es'}</span>
+          <button
+            style={{ ...s.findToggle, ...(useRegex ? s.findToggleOn : {}) }}
+            onClick={() => setUseRegex(v => !v)}
+            title="Use regular expression"
+            aria-label="Use regular expression"
+            aria-pressed={useRegex}
+          >.*</button>
+          <button
+            style={{ ...s.findToggle, ...(caseSensitive ? s.findToggleOn : {}) }}
+            onClick={() => setCaseSensitive(v => !v)}
+            title="Match case"
+            aria-label="Match case"
+            aria-pressed={caseSensitive}
+          >Aa</button>
+          <button style={s.findAction} onClick={replaceAll} disabled={matchCount === 0}>Replace all</button>
+          <button style={s.findClose} onClick={() => setShowFind(false)} aria-label="Close find">✕</button>
+        </div>
+      )}
 
       {/* Editor / Preview Panes */}
       <div style={s.panes}>
@@ -222,11 +459,12 @@ const MarkdownEditor: React.FC = () => {
           </div>
         )}
         {viewMode !== 'preview' && (
-          <div style={{ ...s.pane, borderRight: viewMode === 'split' ? '1px solid var(--color-border, rgba(255,255,255,0.08))' : 'none' }}>
+          <div style={{ ...s.pane, borderRight: viewMode === 'split' ? '1px solid var(--color-border, rgba(255,255,255,0.08))' : 'none', overflow: 'hidden' }}>
             <textarea
               ref={editorRef}
               value={content}
               onChange={e => setContent(e.target.value)}
+              onScroll={handleEditorScroll}
               style={{ ...s.editor, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
               spellCheck={false}
               aria-label="Markdown editor"
@@ -234,9 +472,10 @@ const MarkdownEditor: React.FC = () => {
           </div>
         )}
         {viewMode !== 'editor' && (
-          <div style={s.pane}>
+          <div ref={previewRef} style={s.pane} onScroll={handlePreviewScroll}>
             <div
               style={s.preview}
+              onClick={handlePreviewClick}
               dangerouslySetInnerHTML={{ __html: renderMarkdown }}
             />
           </div>
@@ -248,6 +487,7 @@ const MarkdownEditor: React.FC = () => {
         <span>{stats.words} words</span>
         <span>{stats.chars} chars</span>
         <span>{stats.lines} lines</span>
+        <span>{stats.readTime} read</span>
         {lintIssues.length > 0 && (
           <span
             style={{ color: 'var(--color-warning)', cursor: 'default' }}
@@ -283,7 +523,7 @@ const s: Record<string, React.CSSProperties> = {
     width: 1, height: 18, background: 'var(--color-border, rgba(255,255,255,0.1))', margin: '0 4px',
   },
   fmtBtn: {
-    width: 28, height: 28, borderRadius: 4, border: 'none',
+    minWidth: 28, height: 28, padding: '0 4px', borderRadius: 4, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'var(--font-family)',
@@ -295,6 +535,36 @@ const s: Record<string, React.CSSProperties> = {
   viewBtn: {
     padding: '4px var(--space-2)', borderRadius: 3, border: 'none',
     fontSize: 12, cursor: 'pointer',
+  },
+  findBar: {
+    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+    padding: '6px var(--space-3)',
+    borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
+    background: 'var(--color-bg-elevated)',
+  },
+  findInput: {
+    background: 'var(--color-bg-base)', border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 13,
+    padding: '4px 8px', outline: 'none', width: 160, fontFamily: 'var(--font-family)',
+  },
+  matchCount: { fontSize: 11, color: 'var(--color-text-secondary)', minWidth: 64 },
+  findToggle: {
+    width: 26, height: 26, borderRadius: 4, border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)',
+  },
+  findToggleOn: {
+    background: 'var(--color-accent-soft, rgba(74,158,255,0.2))', color: 'var(--color-accent, #4a9eff)',
+    borderColor: 'var(--color-accent, #4a9eff)',
+  },
+  findAction: {
+    padding: '4px 10px', borderRadius: 4, border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    background: 'transparent', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
+    fontFamily: 'var(--font-family)',
+  },
+  findClose: {
+    marginLeft: 'auto', width: 26, height: 26, borderRadius: 4, border: 'none',
+    background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 13, cursor: 'pointer',
   },
   panes: {
     display: 'flex', flex: 1, overflow: 'hidden',
@@ -308,7 +578,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     fontSize: 14, lineHeight: 1.6, padding: 'var(--space-4) var(--space-5)',
     fontFamily: 'var(--font-mono)',
-    outline: 'none', tabSize: 2,
+    outline: 'none', tabSize: 2, overflow: 'auto',
   },
   preview: {
     padding: 'var(--space-4) var(--space-6)', fontSize: 14, lineHeight: 1.7,

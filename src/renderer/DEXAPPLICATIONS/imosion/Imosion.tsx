@@ -55,6 +55,7 @@ import {
   getAutomationValue,
   drawAutomationLane,
 } from './ImosionEngine';
+import { BuiltInSynth, DEFAULT_SYNTH_PARAMS, type SynthWaveform, type BuiltInSynthParams } from './synth';
 import { computeSignalLevels } from '../../../shared/audio/dsp';
 import { generateDrumPattern, DRUM_GENRES, type DrumGenre } from '../../../shared/audio/drumPattern';
 import { generateRiff, RIFF_SCALES, type RiffScale } from '../../../shared/audio/riffMachine';
@@ -1985,6 +1986,11 @@ const Imosion: React.FC = () => {
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
+      // Close any open collaboration BroadcastChannel
+      if (collabChannelRef.current) {
+        try { collabChannelRef.current.close(); } catch { /* */ }
+        collabChannelRef.current = null;
+      }
       // Revoke all blob URLs to prevent memory leaks
       blobUrlsRef.current.forEach(url => {
         try { URL.revokeObjectURL(url); } catch { /* */ }
@@ -2259,7 +2265,13 @@ const Imosion: React.FC = () => {
     };
 
     input.onmidimessage = handleMidiMessage;
-    return () => { input.onmidimessage = null; };
+    return () => {
+      input.onmidimessage = null;
+      // Stop any still-sounding MIDI voices so oscillators don't leak on unmount
+      // or when the active input changes.
+      midiActiveNotesRef.current.forEach(note => { try { note.osc.stop(); } catch { /* already stopped */ } });
+      midiActiveNotesRef.current.clear();
+    };
   }, [midiAccess, activeMidiInput, midiCCMap]);
 
   // Enumerate audio devices on mount.
@@ -2552,6 +2564,124 @@ const Imosion: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<string | null>(null);
   const [showInstrumentBrowser, setShowInstrumentBrowser] = useState(false);
   const [showInstrumentEditor, setShowInstrumentEditor] = useState(false);
+
+  // ===== BUILT-IN SOFTWARE SYNTHESIZER =====
+  // A real, dependency-free Web Audio instrument so MIDI / piano-roll notes
+  // sound without any external VST/AU plugin (native VST hosting is out of
+  // scope). One BuiltInSynth per instrument track that opts in, plus a shared
+  // preview synth used by the keyboard column and piano-roll note drawing.
+  const builtinSynthsRef = useRef<Map<string, BuiltInSynth>>(new Map());
+  const previewSynthRef = useRef<BuiltInSynth | null>(null);
+  // trackId -> whether it routes notes through the built-in synth.
+  const [builtinSynthEnabled, setBuiltinSynthEnabled] = useState<Record<string, boolean>>({});
+  // Per-track synth parameters (waveform / ADSR / filter). Shared default until edited.
+  const [builtinSynthParams, setBuiltinSynthParams] = useState<Record<string, BuiltInSynthParams>>({});
+  // Mirror of builtinSynthEnabled readable inside the playback effect without
+  // re-subscribing it, plus timers scheduled for built-in-synth piano-roll playback.
+  const builtinSynthEnabledRef = useRef<Record<string, boolean>>({});
+  const pianoRollSynthTimersRef = useRef<number[]>([]);
+  const selectedInstrumentRef = useRef<string | null>(null);
+  useEffect(() => { builtinSynthEnabledRef.current = builtinSynthEnabled; }, [builtinSynthEnabled]);
+  useEffect(() => { selectedInstrumentRef.current = selectedInstrument; }, [selectedInstrument]);
+
+  // Resolve the mixer destination for synth output: prefer the track's mixer
+  // input node (so it flows through the existing channel strip), else the
+  // master limiter, else the raw destination. Never goes straight to speakers
+  // when a mixer node exists.
+  const getSynthDestination = useCallback((trackId?: string): AudioNode | null => {
+    const engine = getAudioEngine();
+    const ctx = engine.getContext();
+    if (!ctx) return null;
+    if (trackId) {
+      const trackInput = engine.getTrackInput(trackId);
+      if (trackInput) return trackInput;
+    }
+    return engine.getMasterLimiter() || ctx.destination;
+  }, [getAudioEngine]);
+
+  // Get (or lazily create) the built-in synth bound to an instrument track,
+  // routed through the mixer. Returns null if audio is unavailable.
+  const getTrackSynth = useCallback((trackId: string): BuiltInSynth | null => {
+    try {
+      const ctx = getAudioEngine().getContext();
+      if (!ctx) return null;
+      let synth = builtinSynthsRef.current.get(trackId);
+      if (!synth) {
+        const dest = getSynthDestination(trackId);
+        if (!dest) return null;
+        synth = new BuiltInSynth(ctx, dest, builtinSynthParams[trackId]);
+        builtinSynthsRef.current.set(trackId, synth);
+      }
+      return synth;
+    } catch (e) { console.warn('[DEX]', e); return null; }
+  }, [getAudioEngine, getSynthDestination, builtinSynthParams]);
+
+  // Shared preview synth (keyboard column clicks, piano-roll note previews).
+  const getPreviewSynth = useCallback((): BuiltInSynth | null => {
+    try {
+      const ctx = getAudioEngine().getContext();
+      if (!ctx) return null;
+      // Resume a suspended context on first interaction so previews are audible.
+      if (ctx.state === 'suspended') { ctx.resume().catch(() => { /* ignore */ }); }
+      // Prefer the selected instrument's synth so previews match its sound.
+      if (selectedInstrument && builtinSynthEnabled[selectedInstrument]) {
+        const ts = getTrackSynth(selectedInstrument);
+        if (ts) return ts;
+      }
+      if (!previewSynthRef.current) {
+        const dest = getSynthDestination(undefined);
+        if (!dest) return null;
+        previewSynthRef.current = new BuiltInSynth(ctx, dest);
+      }
+      return previewSynthRef.current;
+    } catch (e) { console.warn('[DEX]', e); return null; }
+  }, [getAudioEngine, getSynthDestination, getTrackSynth, selectedInstrument, builtinSynthEnabled]);
+
+  // Click/keyboard preview: play a note for a short, fixed duration.
+  const previewSynthNote = useCallback((pitch: number, velocity = 100, durationSec = 0.4) => {
+    const synth = getPreviewSynth();
+    if (!synth) return;
+    try { synth.playNoteFor(pitch, velocity, durationSec); } catch (e) { console.warn('[DEX]', e); }
+  }, [getPreviewSynth]);
+
+  // Toggle a track's built-in synth on/off and surface a toast.
+  const toggleBuiltinSynth = useCallback((trackId: string) => {
+    setBuiltinSynthEnabled(prev => {
+      const next = { ...prev, [trackId]: !prev[trackId] };
+      const enabled = next[trackId];
+      if (enabled) {
+        // Warm up the synth so the channel strip is wired immediately.
+        getTrackSynth(trackId);
+      } else {
+        const s = builtinSynthsRef.current.get(trackId);
+        if (s) { try { s.allNotesOff(); } catch { /* */ } }
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: enabled ? 'success' : 'info', message: enabled ? 'Built-in Synth enabled - piano-roll notes now play through the mixer' : 'Built-in Synth disabled' } }));
+      } catch { /* */ }
+      return next;
+    });
+  }, [getTrackSynth]);
+
+  // Push live param edits into the running synth so changes are heard instantly.
+  const updateBuiltinSynthParam = useCallback((trackId: string, patch: Partial<BuiltInSynthParams>) => {
+    setBuiltinSynthParams(prev => {
+      const merged: BuiltInSynthParams = { ...DEFAULT_SYNTH_PARAMS, ...prev[trackId], ...patch };
+      const synth = builtinSynthsRef.current.get(trackId);
+      if (synth) { try { synth.setParams(merged); } catch (e) { console.warn('[DEX]', e); } }
+      return { ...prev, [trackId]: merged };
+    });
+  }, []);
+
+  // Clean up all synth voices/nodes on unmount (no stuck notes / leaks).
+  useEffect(() => {
+    const synths = builtinSynthsRef.current;
+    return () => {
+      synths.forEach(s => { try { s.destroy(); } catch { /* */ } });
+      synths.clear();
+      if (previewSynthRef.current) { try { previewSynthRef.current.destroy(); } catch { /* */ } previewSynthRef.current = null; }
+    };
+  }, []);
 
   // ===== AUTOMATION =====
   const [trackAutomations, setTrackAutomations] = useState<TrackAutomation[]>([]);
@@ -4164,7 +4294,28 @@ const Imosion: React.FC = () => {
       }
 
       // Schedule Piano Roll MIDI notes as synthesized oscillators
-      if (pianoRollNotes.length > 0) {
+      // If the selected instrument routes through the built-in synth, play the
+      // piano-roll notes through it (so they flow through the mixer with the
+      // synth's ADSR / filter) instead of the lightweight inline oscillators.
+      const selInst = selectedInstrumentRef.current;
+      const synthTrackId = selInst && builtinSynthEnabledRef.current[selInst] ? selInst : null;
+      const synthPlayer = synthTrackId ? getTrackSynth(synthTrackId) : null;
+
+      if (pianoRollNotes.length > 0 && synthPlayer) {
+        const beatsToSec = (beats: number) => beats * 60 / bpm;
+        const pianoRollSynthTimers: number[] = [];
+        for (const note of pianoRollNotes) {
+          const noteStartSec = beatsToSec(note.startTime);
+          const noteDurSec = beatsToSec(note.duration);
+          const noteEndSec = noteStartSec + noteDurSec;
+          if (noteEndSec <= cursorTime) continue;
+          const onDelay = Math.max(0, (noteStartSec - cursorTime)) * 1000;
+          const offDelay = Math.max(0, (noteEndSec - cursorTime)) * 1000;
+          pianoRollSynthTimers.push(window.setTimeout(() => { try { synthPlayer.noteOn(note.pitch, note.velocity); } catch { /* */ } }, onDelay));
+          pianoRollSynthTimers.push(window.setTimeout(() => { try { synthPlayer.noteOff(note.pitch); } catch { /* */ } }, offDelay));
+        }
+        pianoRollSynthTimersRef.current.push(...pianoRollSynthTimers);
+      } else if (pianoRollNotes.length > 0) {
         const midiToFreq = (note: number) => 440 * Math.pow(2, (note - 69) / 12);
         const beatsToSec = (beats: number) => beats * 60 / bpm;
 
@@ -4233,6 +4384,10 @@ const Imosion: React.FC = () => {
       sources.forEach(s => { try { s.stop(); } catch (e) { console.warn('[DEX]', e); } });
       playbackSourcesRef.current.forEach(s => { try { s.stop(); } catch (e) { console.warn('[DEX]', e); } });
       playbackSourcesRef.current = [];
+      // Stop any built-in-synth piano-roll playback (timers + sounding voices).
+      pianoRollSynthTimersRef.current.forEach(t => clearTimeout(t));
+      pianoRollSynthTimersRef.current = [];
+      builtinSynthsRef.current.forEach(s => { try { s.allNotesOff(); } catch { /* */ } });
     };
   }, [isPlaying, tracks, pianoRollNotes, bpm, synthesizeDemoBuffer]);
 
@@ -4435,7 +4590,8 @@ const Imosion: React.FC = () => {
         ctx.stroke();
       } else {
         // No data - draw flat line
-        ctx.strokeStyle = 'var(--color-bg-hover)';
+        ctx.strokeStyle = getComputedStyle(document.documentElement)
+          .getPropertyValue('--color-bg-hover').trim() || '#2a2a35';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, h / 2);
@@ -6196,7 +6352,11 @@ const Imosion: React.FC = () => {
                     const black = isBlackKey(noteNum);
                     const inScale = isNoteInScale(noteNum, musicalKey, musicalScale);
                     return (
-                      <div key={noteNum} style={{ height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px', background: black ? '#080809' : (noteNum % 12 === 0 ? 'var(--color-border-subtle)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #27272a' : '1px solid #141417', cursor: 'pointer' }}>
+                      <div key={noteNum} title={`Click to preview ${midiNoteName(noteNum)}`}
+                        onMouseDown={() => { const s = getPreviewSynth(); if (s) { try { s.noteOn(noteNum, 110); } catch { /* */ } } }}
+                        onMouseUp={() => { const s = getPreviewSynth(); if (s) { try { s.noteOff(noteNum); } catch { /* */ } } }}
+                        onMouseLeave={() => { const s = previewSynthRef.current; if (s) { try { s.noteOff(noteNum); } catch { /* */ } } }}
+                        style={{ height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px', background: black ? '#080809' : (noteNum % 12 === 0 ? 'var(--color-border-subtle)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #27272a' : '1px solid #141417', cursor: 'pointer' }}>
                         <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: inScale ? (black ? 'var(--color-text-secondary)' : '#d4d4d8') : '#3f3f46', fontWeight: noteNum % 12 === 0 ? 600 : 400 }}>{midiNoteName(noteNum)}</span>
                       </div>
                     );
@@ -6219,6 +6379,8 @@ const Imosion: React.FC = () => {
                     if (pitch >= 0 && pitch < 128) {
                       const newNote: MidiNote = { id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, pitch, startTime: startBeat, duration: pianoRollSnap, velocity: 100, selected: false };
                       setPianoRollNotes(prev => [...prev, newNote]);
+                      // Audible feedback through the built-in synth when drawing a note.
+                      previewSynthNote(pitch, 100, 0.3);
                     }
                   } else if (pianoRollTool === 'erase' && e.button === 0) {
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -6262,7 +6424,7 @@ const Imosion: React.FC = () => {
                     const velocityAlpha = 0.4 + (note.velocity / 127) * 0.6;
                     return (
                       <div key={note.id} title={note.slide ? 'Glide note (Alt+click to toggle)' : 'Alt+click to make a glide note'} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: isSelected ? 'rgba(255,149,0,0.85)' : note.slide ? `rgba(100,210,255,${velocityAlpha})` : `rgba(191,90,242,${velocityAlpha})`, borderRadius: '2px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: isSelected ? '1px solid #ff9f0a' : note.slide ? '1px solid #64d2ff' : '1px solid var(--color-border)', boxShadow: note.slide ? '0 0 6px rgba(100,210,255,0.4)' : isSelected ? '0 0 6px rgba(255,149,0,0.3)' : 'none', transition: 'box-shadow 0.1s' }}
-                        onClick={e => { e.stopPropagation(); if (e.altKey) { setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, slide: !n.slide } : n)); return; } if (pianoRollTool === 'select') { const newSel = new Set(e.shiftKey ? pianoRollSelectedNotes : []); if (newSel.has(note.id)) newSel.delete(note.id); else newSel.add(note.id); setPianoRollSelectedNotes(newSel); } else if (pianoRollTool === 'erase') { setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); } }}
+                        onClick={e => { e.stopPropagation(); if (e.altKey) { setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, slide: !n.slide } : n)); return; } if (pianoRollTool === 'select') { previewSynthNote(note.pitch, note.velocity, 0.35); const newSel = new Set(e.shiftKey ? pianoRollSelectedNotes : []); if (newSel.has(note.id)) newSel.delete(note.id); else newSel.add(note.id); setPianoRollSelectedNotes(newSel); } else if (pianoRollTool === 'erase') { setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); } }}
                       >
                         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '4px', cursor: 'ew-resize', borderRadius: '0 2px 2px 0' }} onMouseDown={e => { e.stopPropagation(); setPianoRollDrag({ type: 'resize', noteId: note.id, startX: e.clientX, startY: e.clientY, startTime: note.startTime }); }} />
                         <span style={{ fontSize: '6px', color: 'var(--color-text-secondary)', padding: '0 2px', lineHeight: `${noteHeight - 1}px`, overflow: 'hidden', whiteSpace: 'nowrap', userSelect: 'none' }}>{midiNoteName(note.pitch)}</span>
@@ -6761,6 +6923,71 @@ const Imosion: React.FC = () => {
                       ))}
                     </div>
                   </div>
+
+                  {/* Built-in Software Synthesizer (real Web Audio, no external plugin) */}
+                  {(() => {
+                    const sp: BuiltInSynthParams = { ...DEFAULT_SYNTH_PARAMS, ...(builtinSynthParams[inst.id] || {}) };
+                    const enabled = !!builtinSynthEnabled[inst.id];
+                    const accent = INSTRUMENT_COLORS[inst.instrument.type];
+                    return (
+                      <div style={{ border: `1px solid ${enabled ? 'rgba(191,90,242,0.35)' : '#1a1a1e'}`, borderRadius: 6, padding: 'var(--space-3)', background: enabled ? 'rgba(191,90,242,0.04)' : 'transparent' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: enabled ? '#bf5af2' : 'var(--color-text-secondary)' }}>Built-in Synth</div>
+                            <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Real internal instrument - no external VST/AU plugin needed</div>
+                          </div>
+                          <button aria-label="Toggle Built-in Synth" onClick={() => toggleBuiltinSynth(inst.id)} style={{ padding: '4px 12px', borderRadius: 4, border: `1px solid ${enabled ? '#bf5af2' : '#27272a'}`, background: enabled ? 'rgba(191,90,242,0.2)' : '#18181b', color: enabled ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{enabled ? 'ON' : 'OFF'}</button>
+                        </div>
+                        {enabled && (
+                          <>
+                            {/* Waveform */}
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>WAVEFORM</div>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                {(['sawtooth', 'square', 'sine', 'triangle'] as SynthWaveform[]).map(w => (
+                                  <button key={w} aria-label={`Waveform ${w}`} onClick={() => updateBuiltinSynthParam(inst.id, { waveform: w })} style={{ flex: 1, padding: '5px 0', borderRadius: 3, border: '1px solid #27272a', background: sp.waveform === w ? 'rgba(191,90,242,0.2)' : '#18181b', color: sp.waveform === w ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{w === 'sawtooth' ? 'Saw' : w}</button>
+                                ))}
+                              </div>
+                            </div>
+                            {/* ADSR */}
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>AMP ENVELOPE (ADSR)</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                                {([
+                                  { key: 'attack', label: 'A', min: 0, max: 2000, val: Math.round(sp.attack * 1000), set: (ms: number) => updateBuiltinSynthParam(inst.id, { attack: ms / 1000 }), fmt: (ms: number) => `${ms}ms` },
+                                  { key: 'decay', label: 'D', min: 0, max: 2000, val: Math.round(sp.decay * 1000), set: (ms: number) => updateBuiltinSynthParam(inst.id, { decay: ms / 1000 }), fmt: (ms: number) => `${ms}ms` },
+                                  { key: 'sustain', label: 'S', min: 0, max: 100, val: Math.round(sp.sustain * 100), set: (pct: number) => updateBuiltinSynthParam(inst.id, { sustain: pct / 100 }), fmt: (pct: number) => `${pct}%` },
+                                  { key: 'release', label: 'R', min: 0, max: 5000, val: Math.round(sp.release * 1000), set: (ms: number) => updateBuiltinSynthParam(inst.id, { release: ms / 1000 }), fmt: (ms: number) => `${ms}ms` },
+                                ] as const).map(({ key, label, min, max, val, set, fmt }) => (
+                                  <div key={key} style={{ background: 'var(--color-bg-base)', borderRadius: 4, padding: '6px var(--space-2)', border: '1px solid #1a1a1e' }}>
+                                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 3 }}>{label}</div>
+                                    <input type="range" min={min} max={max} value={val} onChange={e => set(Number(e.target.value))} style={{ width: '100%', accentColor: accent, height: 3 }} />
+                                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{fmt(val)}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Filter */}
+                            <div>
+                              <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>LOW-PASS FILTER</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                                <div style={{ background: 'var(--color-bg-base)', borderRadius: 4, padding: '6px var(--space-2)', border: '1px solid #1a1a1e' }}>
+                                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 3 }}>Cutoff</div>
+                                  <input type="range" min={20} max={18000} value={Math.round(sp.filterCutoff)} onChange={e => updateBuiltinSynthParam(inst.id, { filterCutoff: Number(e.target.value) })} style={{ width: '100%', accentColor: accent, height: 3 }} />
+                                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{Math.round(sp.filterCutoff)}Hz</div>
+                                </div>
+                                <div style={{ background: 'var(--color-bg-base)', borderRadius: 4, padding: '6px var(--space-2)', border: '1px solid #1a1a1e' }}>
+                                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 3 }}>Resonance</div>
+                                  <input type="range" min={0} max={24} step={0.1} value={sp.filterResonance} onChange={e => updateBuiltinSynthParam(inst.id, { filterResonance: Number(e.target.value) })} style={{ width: '100%', accentColor: accent, height: 3 }} />
+                                  <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{sp.filterResonance.toFixed(1)}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Synth-specific: LFO */}
                   {isSynth && (
@@ -8095,18 +8322,21 @@ const Imosion: React.FC = () => {
                   el.width = rect.width; el.height = rect.height;
                   const w = el.width, h = el.height, mid = h / 2;
                   const wf = forgeClip.clip.waveform;
+                  const cs = getComputedStyle(document.documentElement);
+                  const bgElevated = cs.getPropertyValue('--color-bg-elevated').trim() || '#1c1c22';
+                  const bgHover = cs.getPropertyValue('--color-bg-hover').trim() || '#2a2a35';
                   // Background
                   ctx.fillStyle = '#080810';
                   ctx.fillRect(0, 0, w, h);
                   // Grid lines
-                  ctx.strokeStyle = 'var(--color-bg-elevated)';
+                  ctx.strokeStyle = bgElevated;
                   ctx.lineWidth = 1;
                   for (let i = 0; i <= 10; i++) {
                     const x = (i / 10) * w;
                     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
                   }
                   ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
-                  ctx.strokeStyle = 'var(--color-bg-hover)'; ctx.lineWidth = 0.5;
+                  ctx.strokeStyle = bgHover; ctx.lineWidth = 0.5;
                   ctx.beginPath(); ctx.moveTo(0, mid * 0.5); ctx.lineTo(w, mid * 0.5); ctx.stroke();
                   ctx.beginPath(); ctx.moveTo(0, mid * 1.5); ctx.lineTo(w, mid * 1.5); ctx.stroke();
                   // Waveform fill

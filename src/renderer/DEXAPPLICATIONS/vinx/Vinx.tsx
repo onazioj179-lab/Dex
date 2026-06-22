@@ -28,6 +28,7 @@ import { Viewer } from './Viewer';
 import { Inspector } from './Inspector';
 import { Timeline } from './Timeline';
 import { ExportDialog } from './ExportDialog';
+import { runQuickExport, isQuickExportSupported, type QuickExportController } from './quickExport';
 import { MulticamPanel } from './MulticamPanel';
 import { formatTimecode, generateId } from './VinxTypes';
 import DexIcon from '../../components/DexIcon';
@@ -52,6 +53,7 @@ async function runMotionTrack(direction: 'forward' | 'backward', frames: number)
 }
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 // ==================== APP IDENTITY ====================
@@ -207,7 +209,9 @@ const VinxEditor: React.FC = () => {
   useEffect(() => {
     const eng = loadEngagement();
     const updated = recordAppUsage(eng, 'videoeditor');
-    saveEngagement(checkAchievements(updated).state);
+    const checkRes = checkAchievements(updated);
+    saveEngagement(checkRes.state);
+    rewardUnlocks(checkRes.newUnlocks);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addMedia = useVinxStore(s => s.addMedia);
@@ -472,6 +476,13 @@ const VinxEditor: React.FC = () => {
   const sourceCanvasRef = useRef<HTMLDivElement>(null);
   const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
 
+  // Quick Export (WebM) — real canvas.captureStream + MediaRecorder render of
+  // the live timeline playback. Tracks an in-flight capture + its progress.
+  const quickExportRef = useRef<QuickExportController | null>(null);
+  const [quickExport, setQuickExport] = useState<{ active: boolean; percent: number; elapsedMs: number; totalMs: number }>(
+    { active: false, percent: 0, elapsedMs: 0, totalMs: 0 }
+  );
+
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number; clipId: string | null; trackId: string | null }>({ visible: false, x: 0, y: 0, clipId: null, trackId: null });
 
@@ -675,6 +686,77 @@ const VinxEditor: React.FC = () => {
 
   const unregisterVideo = useCallback((clipId: string) => {
     engineRef.current?.unregisterVideoElement(clipId);
+  }, []);
+
+  // -- Quick Export (WebM): genuine render of timeline playback --
+  const handleQuickExport = useCallback(() => {
+    if (quickExportRef.current) return; // already running
+    if (!isQuickExportSupported()) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Quick Export unavailable: this environment lacks canvas.captureStream / MediaRecorder' } }));
+      return;
+    }
+    const state = useVinxStore.getState();
+    const proj = state.project;
+    const durationFrames = state.getSequenceDuration();
+    if (durationFrames <= 0) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Nothing to export — the timeline is empty' } }));
+      return;
+    }
+    const programCanvas = (programCanvasRef.current
+      ?? document.querySelector('[data-vinx-program-canvas]')) as HTMLElement | null;
+    const fps = proj.frameRate || 30;
+    const fileName = (proj.name || 'vinx-export').replace(/[\\/:*?"<>|]+/g, '_');
+
+    setQuickExport({ active: true, percent: 0, elapsedMs: 0, totalMs: (durationFrames / fps) * 1000 });
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Quick Export started — recording timeline playback to WebM' } }));
+
+    quickExportRef.current = runQuickExport({
+      programCanvas,
+      width: proj.width || 1920,
+      height: proj.height || 1080,
+      fps,
+      durationFrames,
+      filename: fileName,
+      videoBitsPerSecond: 8_000_000,
+      startPlayback: () => {
+        setIsPlaying(true);
+        engineRef.current?.play(0, 1);
+      },
+      stopPlayback: () => {
+        setIsPlaying(false);
+        engineRef.current?.pause();
+      },
+      seek: (frame) => {
+        setCurrentFrame(frame);
+        engineRef.current?.seekToFrame(frame);
+      },
+      onProgress: (elapsedMs, totalMs, percent) => {
+        setQuickExport({ active: true, percent, elapsedMs, totalMs });
+      },
+      onComplete: () => {
+        quickExportRef.current = null;
+        setQuickExport({ active: false, percent: 100, elapsedMs: 0, totalMs: 0 });
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Exported "${fileName}.webm"` } }));
+      },
+      onError: (message) => {
+        quickExportRef.current = null;
+        setQuickExport({ active: false, percent: 0, elapsedMs: 0, totalMs: 0 });
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Quick Export failed: ${message}` } }));
+      },
+    });
+  }, [setIsPlaying, setCurrentFrame]);
+
+  const handleCancelQuickExport = useCallback(() => {
+    quickExportRef.current?.cancel();
+    quickExportRef.current = null;
+    setQuickExport({ active: false, percent: 0, elapsedMs: 0, totalMs: 0 });
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Quick Export cancelled' } }));
+  }, []);
+
+  // Abort any in-flight Quick Export on unmount so streams/recorders are freed.
+  useEffect(() => () => {
+    quickExportRef.current?.cancel();
+    quickExportRef.current = null;
   }, []);
 
   // -- Keyboard shortcuts (space, J/K/L, tools, undo/redo, etc.) --
@@ -1026,12 +1108,25 @@ const VinxEditor: React.FC = () => {
             setShowExportDialog(true);
             // Record engagement stat
             const eng = loadEngagement();
-            saveEngagement(checkAchievements(incrementStat(eng, 'videosEdited')).state);
+            const checkRes = checkAchievements(incrementStat(eng, 'videosEdited'));
+            saveEngagement(checkRes.state);
+            rewardUnlocks(checkRes.newUnlocks);
           }}
           title="Export (Ctrl+E)"
           aria-label="Export project"
         >
           {ExportIcon} Export
+        </button>
+
+        {/* Quick Export (WebM) — real captureStream + MediaRecorder render */}
+        <button
+          style={quickExport.active ? toolbarBtnActiveStyle : toolbarBtnStyle}
+          onClick={quickExport.active ? handleCancelQuickExport : handleQuickExport}
+          title={quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM) — records the timeline as it plays'}
+          aria-label={quickExport.active ? 'Cancel Quick Export' : 'Quick Export to WebM'}
+        >
+          {ExportIcon}
+          {quickExport.active ? `Recording ${quickExport.percent}%` : 'Quick WebM'}
         </button>
 
         {/* Send To */}
@@ -1201,6 +1296,53 @@ const VinxEditor: React.FC = () => {
 
       {/* Export dialog overlay */}
       <ExportDialog />
+
+      {/* Quick Export progress indicator (elapsed / duration) */}
+      {quickExport.active && (() => {
+        const fmt = (ms: number) => {
+          const total = Math.max(0, Math.floor(ms / 1000));
+          const mm = Math.floor(total / 60);
+          const ss = total % 60;
+          return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        };
+        return (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
+              width: 'min(360px, calc(100% - 32px))', background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)', borderRadius: 10,
+              boxShadow: 'var(--pg-shadow-popover)', padding: '10px 14px',
+              zIndex: 'var(--z-modal)' as React.CSSProperties['zIndex'],
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                <span style={{ width: 6, height: 6, borderRadius: 3, background: 'var(--color-error)' }} />
+                Quick Export (WebM)
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+                {fmt(quickExport.elapsedMs)} / {fmt(quickExport.totalMs)}
+              </span>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${quickExport.percent}%`, background: 'var(--color-accent)', borderRadius: 2, transition: 'width 0.12s linear' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{quickExport.percent}%</span>
+              <button
+                aria-label="Cancel Quick Export"
+                style={{ ...toolbarBtnStyle, fontSize: 10, color: 'var(--color-text-secondary)' }}
+                onClick={handleCancelQuickExport}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Multicam angle panel (side drawer) */}
       {showMulticamPanel && (() => {

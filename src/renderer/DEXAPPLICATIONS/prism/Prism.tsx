@@ -13,6 +13,7 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { capHistoryTail } from '../../../shared/creative/history';
@@ -33,6 +34,14 @@ import {
   generateId as prismGenerateId,
 } from './PrismFeatures';
 import type { AdjustmentType as PrismAdjustmentType, BlendMode as PrismBlendMode } from './PrismFeatures';
+import {
+  type BooleanOp,
+  type CompositeSource,
+  BOOLEAN_OP_INFO,
+  compositeBooleanLayers,
+  flattenSourcesToDataURL,
+  diffusionInpaint,
+} from './PrismCompositing';
 // ==================== APP IDENTITY ====================
 export const PRISM_VERSION = '1.0.0';
 export const PRISM_BUILD_DATE = '2026-04-11';
@@ -320,7 +329,9 @@ const Prism: React.FC = () => {
   useEffect(() => {
     const eng = loadEngagement();
     const updated = recordAppUsage(eng, 'prism');
-    saveEngagement(checkAchievements(updated).state);
+    const checkRes = checkAchievements(updated);
+    saveEngagement(checkRes.state);
+    rewardUnlocks(checkRes.newUnlocks);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { dropProps, dropOverlayStyle } = useFileDrop(
@@ -594,6 +605,14 @@ const Prism: React.FC = () => {
   // Content-Aware Fill
   const [showContentAwareFill, setShowContentAwareFill] = useState(false);
   const [contentAwareSampling, setContentAwareSampling] = useState<'auto' | 'rectangular' | 'custom'>('auto');
+  // Layer Boolean / Combine (real canvas compositing)
+  const [showLayerBoolean, setShowLayerBoolean] = useState(false);
+  useEffect(() => {
+    if (!showLayerBoolean) return;
+    const close = () => setShowLayerBoolean(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [showLayerBoolean]);
   // Liquify
   const [showLiquify, setShowLiquify] = useState(false);
   const [liquifyTool, setLiquifyTool] = useState<'push' | 'pull' | 'bloat' | 'pinch' | 'twirl'>('push');
@@ -787,6 +806,10 @@ const Prism: React.FC = () => {
       window.removeEventListener('keydown', handleKey);
     };
   }, []);
+
+  // Cancel any pending canvas-drag rAF on unmount so a frame scheduled mid-drag
+  // (hand/lasso/pen) cannot fire setState after the component is gone.
+  useEffect(() => () => { cancelAnimationFrame(canvasDragRafRef.current); }, []);
 
   // ===== RETENTIVE MEMORY - Load/Save Workspace State =====
   useEffect(() => {
@@ -1013,16 +1036,169 @@ const Prism: React.FC = () => {
     });
   }, []);
 
-  const mergeLayerDown = useCallback((id: string) => {
-    setLayers(prev => {
-      const idx = prev.findIndex(l => l.id === id);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const merged = { ...prev[idx + 1], name: `${prev[idx + 1].name} + ${prev[idx].name}` };
-      const next = prev.filter((_, i) => i !== idx);
-      next[idx] = merged;
-      return next;
-    });
-  }, []);
+  // Decode a layer's data-URL pixels into an HTMLImageElement (for compositing).
+  // Layers without raster pixels (text/shape/adjustment placeholders) resolve to
+  // null so callers can skip them rather than crash.
+  const loadLayerImage = useCallback((dataUrl?: string): Promise<HTMLImageElement | null> => new Promise((resolve) => {
+    if (!dataUrl) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  }), []);
+
+  // REAL merge down: composite the upper layer's pixels onto the lower layer
+  // using the same blend/opacity stacking the live canvas uses, captured to a
+  // single flat raster. Layers are stored top-first, so `idx` is the upper
+  // layer and `idx+1` is the lower one it merges into.
+  const pushHistory = useCallback((name: string) => {
+    const state: HistoryState = {
+      id: `hist-${Date.now()}`,
+      name,
+      layers: structuredClone(layers),
+      timestamp: Date.now(),
+    };
+    // Append after the current index (dropping any redo tail), then cap growth.
+    // Each entry is a full deep clone of all layers, so an unbounded stack leaks
+    // memory over a long session; capHistoryTail (shared, unit-tested) trims the
+    // oldest while keeping the index valid — consistent undo behaviour across apps.
+    const appended = [...history.slice(0, historyIndex + 1), state];
+    const capped = capHistoryTail(appended, appended.length - 1, PRISM_HISTORY_LIMIT);
+    setHistory(capped.history);
+    setHistoryIndex(capped.index);
+    setIsDirty(true);
+  }, [layers, history, historyIndex]);
+
+  const mergeLayerDown = useCallback(async (id: string) => {
+    const idx = layers.findIndex(l => l.id === id);
+    if (idx < 0 || idx >= layers.length - 1) return;
+    const upper = layers[idx];
+    const lower = layers[idx + 1];
+    try {
+      const [upImg, loImg] = await Promise.all([loadLayerImage(upper.imageData), loadLayerImage(lower.imageData)]);
+      if (!upImg && !loImg) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Merge Down needs raster (image) layers' } }));
+        return;
+      }
+      // Bottom-first source list so the lower layer is painted, then the upper.
+      const sources: CompositeSource[] = [];
+      if (loImg) sources.push({ image: loImg, x: lower.x, y: lower.y, width: lower.width, height: lower.height, rotation: lower.rotation, alpha: lower.opacity / 100, blend: BLEND_MODE_TO_CSS[lower.blendMode] || 'source-over' });
+      if (upImg) sources.push({ image: upImg, x: upper.x, y: upper.y, width: upper.width, height: upper.height, rotation: upper.rotation, alpha: upper.opacity / 100, blend: BLEND_MODE_TO_CSS[upper.blendMode] || 'source-over' });
+      const url = flattenSourcesToDataURL(sources, canvasSize.width, canvasSize.height);
+      pushHistory('Merge Down');
+      setLayers(prev => {
+        const i = prev.findIndex(l => l.id === id);
+        if (i < 0 || i >= prev.length - 1) return prev;
+        // The merged layer occupies the lower slot, covers the full canvas (the
+        // composite was rendered at document size), and is reset to normal/100%
+        // since its blend has been baked into the pixels.
+        const merged: Layer = {
+          ...prev[i + 1],
+          name: `${prev[i + 1].name} + ${prev[i].name}`,
+          type: 'image',
+          imageData: url,
+          x: 0, y: 0,
+          width: canvasSize.width, height: canvasSize.height,
+          rotation: 0, opacity: 100, blendMode: 'normal',
+        };
+        const next = prev.filter((_, j) => j !== i);
+        next[i] = merged;
+        return next;
+      });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Merged layer down (pixels composited)' } }));
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Merge Down failed' } }));
+    }
+  }, [layers, canvasSize, loadLayerImage, pushHistory]);
+
+  // REAL flatten: composite every visible layer's pixels into one image layer.
+  const flattenImage = useCallback(async () => {
+    const visible = layers.filter(l => l.visible);
+    if (visible.length === 0) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'No visible layers to flatten' } }));
+      return;
+    }
+    try {
+      // layers are top-first; paint bottom-first so stacking is correct.
+      const ordered = [...visible].reverse();
+      const imgs = await Promise.all(ordered.map(l => loadLayerImage(l.imageData)));
+      const sources: CompositeSource[] = [];
+      ordered.forEach((l, i) => {
+        const img = imgs[i];
+        if (!img) return;
+        sources.push({ image: img, x: l.x, y: l.y, width: l.width, height: l.height, rotation: l.rotation, alpha: l.opacity / 100, blend: BLEND_MODE_TO_CSS[l.blendMode] || 'source-over' });
+      });
+      if (sources.length === 0) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'No raster pixels to flatten' } }));
+        return;
+      }
+      const url = flattenSourcesToDataURL(sources, canvasSize.width, canvasSize.height);
+      pushHistory('Flatten Image');
+      const flat: Layer = {
+        id: `layer-flat-${Date.now()}`,
+        name: 'Flattened',
+        type: 'image',
+        visible: true, locked: false, opacity: 100, blendMode: 'normal',
+        x: 0, y: 0, width: canvasSize.width, height: canvasSize.height, rotation: 0,
+        imageData: url,
+      };
+      setLayers([flat]);
+      setSelectedLayerId(flat.id);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Flattened all layers into one' } }));
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Flatten failed' } }));
+    }
+  }, [layers, canvasSize, loadLayerImage, pushHistory]);
+
+  // REAL layer boolean / combine op: composite the selected layer with the one
+  // directly below it using globalCompositeOperation, committing the result as a
+  // new raster layer. union/intersect/subtract/difference(xor) are exact canvas
+  // compositing, not stubs.
+  const applyLayerBooleanOp = useCallback(async (op: BooleanOp) => {
+    const idx = layers.findIndex(l => l.id === selectedLayerId);
+    if (idx < 0) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Select a layer first' } }));
+      return;
+    }
+    if (idx >= layers.length - 1) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Boolean op needs a layer below the selected one' } }));
+      return;
+    }
+    const top = layers[idx];        // upper = operand A
+    const base = layers[idx + 1];   // lower = operand B
+    try {
+      const [topImg, baseImg] = await Promise.all([loadLayerImage(top.imageData), loadLayerImage(base.imageData)]);
+      if (!topImg || !baseImg) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Boolean ops need two raster layers' } }));
+        return;
+      }
+      const baseSrc: CompositeSource = { image: baseImg, x: base.x, y: base.y, width: base.width, height: base.height, rotation: base.rotation };
+      const topSrc: CompositeSource = { image: topImg, x: top.x, y: top.y, width: top.width, height: top.height, rotation: top.rotation };
+      const url = compositeBooleanLayers(baseSrc, topSrc, op, canvasSize.width, canvasSize.height);
+      pushHistory(`Boolean: ${BOOLEAN_OP_INFO[op].label}`);
+      const result: Layer = {
+        id: `layer-bool-${Date.now()}`,
+        name: `${BOOLEAN_OP_INFO[op].label} (${top.name} ∙ ${base.name})`,
+        type: 'image',
+        visible: true, locked: false, opacity: 100, blendMode: 'normal',
+        x: 0, y: 0, width: canvasSize.width, height: canvasSize.height, rotation: 0,
+        imageData: url,
+      };
+      // Replace the two operands with the single combined result, in the upper slot.
+      setLayers(prev => {
+        const i = prev.findIndex(l => l.id === selectedLayerId);
+        if (i < 0 || i >= prev.length - 1) return prev;
+        const next = prev.filter((_, j) => j !== i && j !== i + 1);
+        next.splice(i, 0, result);
+        return next;
+      });
+      setSelectedLayerId(result.id);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${BOOLEAN_OP_INFO[op].label} applied` } }));
+      setShowLayerBoolean(false);
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Boolean op failed' } }));
+    }
+  }, [layers, selectedLayerId, canvasSize, loadLayerImage, pushHistory]);
 
   const updateLayerOpacity = useCallback((id: string, opacity: number) => {
     setLayers(prev => prev.map(l => l.id === id ? { ...l, opacity } : l));
@@ -1141,24 +1317,6 @@ const Prism: React.FC = () => {
     }
     if (layers.length === 0) hasInitialHistoryRef.current = false;
   }, [layers]);
-
-  const pushHistory = useCallback((name: string) => {
-    const state: HistoryState = {
-      id: `hist-${Date.now()}`,
-      name,
-      layers: structuredClone(layers),
-      timestamp: Date.now(),
-    };
-    // Append after the current index (dropping any redo tail), then cap growth.
-    // Each entry is a full deep clone of all layers, so an unbounded stack leaks
-    // memory over a long session; capHistoryTail (shared, unit-tested) trims the
-    // oldest while keeping the index valid — consistent undo behaviour across apps.
-    const appended = [...history.slice(0, historyIndex + 1), state];
-    const capped = capHistoryTail(appended, appended.length - 1, PRISM_HISTORY_LIMIT);
-    setHistory(capped.history);
-    setHistoryIndex(capped.index);
-    setIsDirty(true);
-  }, [layers, history, historyIndex]);
 
   const undo = useCallback(() => {
     if (historyIndex <= 0) return;
@@ -3421,6 +3579,34 @@ const Prism: React.FC = () => {
                     </div>
                   )}
                 </div>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className="prism-icon-btn"
+                    style={styles.iconBtn}
+                    onClick={(e) => { e.stopPropagation(); setShowLayerBoolean(v => !v); }}
+                    title="Combine Layers (Boolean)"
+                    aria-label="Combine layers with boolean operation"
+                    aria-haspopup="menu"
+                    aria-expanded={showLayerBoolean}
+                  >&cap;</button>
+                  {showLayerBoolean && (
+                    <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 4, padding: 4, minWidth: 180, zIndex: 50, boxShadow: 'var(--pg-shadow-context)' }}>
+                      <div style={{ padding: '4px 8px', fontSize: 9, color: 'var(--color-text-tertiary)' }}>Selected layer &amp; the one below</div>
+                      {(['union', 'intersect', 'subtract', 'difference'] as BooleanOp[]).map(op => (
+                        <div
+                          key={op}
+                          role="menuitem"
+                          tabIndex={0}
+                          title={BOOLEAN_OP_INFO[op].description}
+                          style={{ padding: '6px 10px', fontSize: 11, color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: 3 }}
+                          onClick={() => { void applyLayerBooleanOp(op); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void applyLayerBooleanOp(op); } }}
+                        >{BOOLEAN_OP_INFO[op].label}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => { void flattenImage(); }} title="Flatten Image" aria-label="Flatten all layers">&#9633;&#9633;</button>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
@@ -3602,6 +3788,38 @@ const Prism: React.FC = () => {
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowContentAwareFill(false);
             }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Generate Fill</button>
+            <button aria-label="Content-aware fill via diffusion inpaint" onClick={() => {
+              // Content-Aware Fill (diffusion): a real isotropic-diffusion inpaint.
+              // The selected region is reconstructed by repeatedly averaging each
+              // hole pixel from its known neighbours, so colour diffuses inward
+              // from the actual surrounding content (not a flat fill).
+              try {
+                const canvas = canvasRef.current; if (!canvas) return;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true }); if (!ctx) return;
+                const sel = selection;
+                if (!sel.mask) {
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Make a selection to fill first' } }));
+                  return;
+                }
+                const fullW = canvas.width, fullH = canvas.height;
+                if (sel.mask.length !== fullW * fullH) {
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Selection does not match canvas size' } }));
+                  return;
+                }
+                pushHistory('Content-Aware Fill (diffusion)');
+                const fullData = ctx.getImageData(0, 0, fullW, fullH);
+                // mask[i] != 0 -> pixel to inpaint. Selection mask is the hole.
+                const holeMask = new Uint8Array(fullW * fullH);
+                for (let i = 0; i < holeMask.length; i++) holeMask[i] = sel.mask[i] ? 1 : 0;
+                const filled = diffusionInpaint(fullData, holeMask, 80);
+                ctx.putImageData(filled, 0, 0);
+                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+                window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Filled via diffusion inpaint' } }));
+                setShowContentAwareFill(false);
+              } catch (err) {
+                window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Diffusion fill failed' } }));
+              }
+            }} style={{ width: '100%', marginTop: 6, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Content-Aware Fill (diffusion)</button>
           </div>
         </div>
       )}
@@ -5164,7 +5382,8 @@ const Prism: React.FC = () => {
           { label: ctxLayer.visible ? 'Hide Layer' : 'Show Layer', fn: () => toggleLayerVisibility(ctxLayer.id) },
           { label: ctxLayer.locked ? 'Unlock Layer' : 'Lock Layer', fn: () => toggleLayerLock(ctxLayer.id) },
           { label: 'Duplicate Layer', fn: () => duplicateLayer(ctxLayer.id) },
-          { label: 'Merge Down', fn: () => mergeLayerDown(ctxLayer.id), disabled: layers.indexOf(ctxLayer) >= layers.length - 1 },
+          { label: 'Merge Down', fn: () => { void mergeLayerDown(ctxLayer.id); }, disabled: layers.indexOf(ctxLayer) >= layers.length - 1 },
+          { label: 'Flatten Image', fn: () => { void flattenImage(); }, disabled: layers.length <= 1 },
           null,
           { label: 'Delete Layer', fn: () => deleteLayer(ctxLayer.id), disabled: layers.length <= 1, danger: true },
         ];

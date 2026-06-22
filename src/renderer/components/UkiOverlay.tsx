@@ -19,7 +19,8 @@ import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
-import { streamConfiguredLLM, hasConfiguredProvider } from '../uki/providers/connect';
+import { hasConfiguredProvider } from '../uki/providers/connect';
+import { runUkiAgent, webSearch } from '../uki/agentRunner';
 import { formatUkiContexts } from '../uki/appContextRegistry';
 import { getActiveWorkspace } from '../uki/context';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../uki/answerEngine';
@@ -1167,7 +1168,8 @@ function trySystemTool(text: string): ToolResult {
 function trySearchCommand(text: string): string | null {
   const lower = text.toLowerCase().trim();
   const patterns = [
-    /^(?:search|search for|look up|lookup|google|find|find me)\s+(.+)$/,
+    // Longer prefixes first so "search for X" extracts "X", not "for X".
+    /^(?:search for|search up|search|look up|lookup|google|find me|find)\s+(.+)$/,
     /^(?:what is|what's|who is|who's|where is|when is|how to|how do)\s+(.+)$/,
   ];
   for (const pat of patterns) {
@@ -1237,9 +1239,16 @@ const UkiOverlay: React.FC = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [inputText, setInputText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem('dex-uki-panel-pos');
+      if (raw) { const p = JSON.parse(raw); if (p && typeof p.x === 'number' && typeof p.y === 'number') return p; }
+    } catch { /* ignore */ }
+    return null;
+  });
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const draggingRef = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   // Animated waveform state — use refs to avoid 60fps state re-renders
   const [waveHeights, setWaveHeights] = useState([4, 4, 4, 4, 4]);
   const waveRafRef = useRef<number>(0);
@@ -1338,37 +1347,62 @@ const UkiOverlay: React.FC = () => {
     return () => { cancelled = true; };
   }, [showPanel]);
 
-  useEffect(() => {
-    if (panelPos) return;
-    setPanelPos({
-      x: Math.max(20, Math.round((window.innerWidth - 380) / 2)),
-      y: Math.max(20, window.innerHeight - 260),
-    });
-  }, [panelPos]);
-
-  useEffect(() => {
-    const handleMove = (event: MouseEvent) => {
-      if (!draggingRef.current) return;
-      setPanelPos(prev => {
-        const width = 380;
-        const height = 320;
-        const nextX = Math.min(Math.max(12, event.clientX - dragOffsetRef.current.x), Math.max(12, window.innerWidth - width - 12));
-        const nextY = Math.min(Math.max(12, event.clientY - dragOffsetRef.current.y), Math.max(12, window.innerHeight - height - 12));
-        if (prev && prev.x === nextX && prev.y === nextY) return prev;
-        return { x: nextX, y: nextY };
-      });
-    };
-    const handleUp = () => {
-      draggingRef.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
+  // Clamp an (x,y) so the panel stays fully on-screen, using its MEASURED size
+  // (the old hard-coded 380x320 mis-clamped a taller panel against the bottom).
+  const clampPanelPos = useCallback((x: number, y: number) => {
+    const el = panelRef.current;
+    const width = el?.offsetWidth || 380;
+    const height = el?.offsetHeight || 320;
+    return {
+      x: Math.min(Math.max(12, x), Math.max(12, window.innerWidth - width - 12)),
+      y: Math.min(Math.max(12, y), Math.max(12, window.innerHeight - height - 12)),
     };
   }, []);
+
+  // First mount: center a fresh panel, or clamp a restored position into view.
+  useEffect(() => {
+    if (!panelPos) {
+      setPanelPos({
+        x: Math.max(20, Math.round((window.innerWidth - 380) / 2)),
+        y: Math.max(20, window.innerHeight - 260),
+      });
+      return;
+    }
+    const c = clampPanelPos(panelPos.x, panelPos.y);
+    if (c.x !== panelPos.x || c.y !== panelPos.y) setPanelPos(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Robust drag via pointer events (survives fast moves / leaving the window),
+  // with body cursor + selection lock while dragging, persistence on release,
+  // and a re-clamp on window resize.
+  useEffect(() => {
+    const handleMove = (event: PointerEvent) => {
+      if (!draggingRef.current) return;
+      const next = clampPanelPos(event.clientX - dragOffsetRef.current.x, event.clientY - dragOffsetRef.current.y);
+      setPanelPos(prev => (prev && prev.x === next.x && prev.y === next.y) ? prev : next);
+    };
+    const handleUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setPanelPos(prev => {
+        if (prev) { try { localStorage.setItem('dex-uki-panel-pos', JSON.stringify(prev)); } catch { /* ignore */ } }
+        return prev;
+      });
+    };
+    const handleResize = () => setPanelPos(prev => (prev ? clampPanelPos(prev.x, prev.y) : prev));
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [clampPanelPos]);
 
   const [streamingResponse, setStreamingResponse] = useState('');
   const streamTarget = useRef('');
@@ -1610,8 +1644,14 @@ const UkiOverlay: React.FC = () => {
     pushStep('Probing web-search intent');
     const searchQuery = grounding ? null : trySearchCommand(text);
     if (searchQuery) {
-      pushStep('Routing to web search');
-      const reply = dispatchWebSearch(searchQuery);
+      pushStep('Searching the web');
+      // Real keyless web search (DuckDuckGo + Wikipedia) -- answer inline instead
+      // of just bouncing the user to a browser tab. Falls back to opening the
+      // browser only when no usable result comes back.
+      const results = await webSearch(searchQuery);
+      const found = !!results && !/^No web results/.test(results);
+      const reply = found ? `Here's what I found:\n\n${results}` : dispatchWebSearch(searchQuery);
+      pushStep(found ? 'Answered from live web results' : 'No direct result -- opened the browser');
       streamResponse(empathyPrefix + reply, 'web-search', text);
       return;
     }
@@ -1654,28 +1694,24 @@ const UkiOverlay: React.FC = () => {
         { role: 'user' as const, content: t.userText || '' },
         { role: 'assistant' as const, content: t.response || '' },
       ])).filter(m => m.content);
-      // Stream tokens straight into the live response area as they arrive.
-      setIsThinking(false);
-      // Coalesce token updates to one setState per frame: tokens arrive far
-      // faster than the display refreshes, and each setStreamingResponse
-      // re-renders the whole overlay (conversation history, thought steps).
-      // Keep the latest accumulated text and flush it on the animation frame.
-      let pendingAcc: string | null = null;
-      let streamRaf = 0;
-      const flushStream = () => { streamRaf = 0; if (pendingAcc !== null) setStreamingResponse(empathyPrefix + pendingAcc); };
-      const llmReply = await streamConfiguredLLM(normalized, groundedPrompt, (_tok, acc) => {
-        pendingAcc = acc;
-        if (!streamRaf) streamRaf = requestAnimationFrame(flushStream);
-      }, { history });
-      // Ensure the final tokens are shown even if the last frame hadn't fired.
-      if (streamRaf) cancelAnimationFrame(streamRaf);
-      if (pendingAcc !== null) setStreamingResponse(empathyPrefix + pendingAcc);
-      if (llmReply) {
-        pushStep('LLM stream complete');
-        commitTurn(empathyPrefix + llmReply, 'llm', text, [...thoughtStepsRef.current], false);
+      // Agentic loop: hand the model real tools (live web search, app control,
+      // notifications, current context) and let it act across multiple steps
+      // before answering -- this is what makes UKI act instead of just talk.
+      // Degrades to the local/HF fallback below if the provider call fails.
+      setIsThinking(true);
+      const agentReply = await runUkiAgent({
+        userText: normalized,
+        systemPrompt: groundedPrompt,
+        history,
+        pushStep,
+      });
+      if (agentReply) {
+        pushStep('Agent complete');
+        // streamResponse types the answer out and commits the turn to history.
+        streamResponse(empathyPrefix + agentReply, 'agent', text, false);
         return;
       }
-      pushStep('LLM stream failed/empty -- continuing to local fallback');
+      pushStep('AI provider failed/empty -- continuing to local fallback');
       setStreamingResponse('');
     }
 
@@ -1758,16 +1794,21 @@ const UkiOverlay: React.FC = () => {
 
   const stateInfo = STATE_LABELS[state] || { label: '', color: 'var(--color-text-tertiary)' };
   const displayText = transcript || partialTranscript;
-  const handleDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest('button, input, textarea, a, [role="button"]')) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+    // Offset is relative to the positioned panel root, not the header, so the
+    // panel doesn't jump when the drag begins.
+    const rect = (panelRef.current ?? event.currentTarget).getBoundingClientRect();
     dragOffsetRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     draggingRef.current = true;
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
   };
 
   return (
     <div
+      ref={panelRef}
       onMouseEnter={() => { hoveredRef.current = true; if (autoHideRef.current) { clearTimeout(autoHideRef.current); autoHideRef.current = null; } }}
       onMouseLeave={() => { hoveredRef.current = false; if (state === 'idle' && showTranscript && response) { if (autoHideRef.current) clearTimeout(autoHideRef.current); autoHideRef.current = setTimeout(() => { useUkiStore.getState().reset(); }, 8000); } }}
       style={{
@@ -1795,7 +1836,7 @@ const UkiOverlay: React.FC = () => {
         }
       `}</style>
 
-      <div onMouseDown={handleDragStart} style={{
+      <div style={{
         // Solid surface matching the app-menu panel -- no washed-out translucent
         // glass (was bg-hover + blur-xl saturate) and no gloss sheen highlight.
         background: 'var(--color-bg-elevated, #1c1c1e)',
@@ -1803,13 +1844,15 @@ const UkiOverlay: React.FC = () => {
         borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover)',
         overflow: 'hidden',
-        cursor: draggingRef.current ? 'grabbing' : 'grab',
       }}>
-        {/* State bar */}
-        <div style={{
+        {/* State bar — the drag handle (only the header moves the panel, so
+            clicking the content/response area never starts a drag) */}
+        <div onPointerDown={handleDragStart} style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           padding: '10px 14px',
           borderBottom: '1px solid var(--color-bg-hover)',
+          cursor: 'grab',
+          touchAction: 'none',
         }}>
           {/* Animated indicator */}
           <div style={{

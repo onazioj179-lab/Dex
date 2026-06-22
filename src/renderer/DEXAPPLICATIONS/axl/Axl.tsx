@@ -21,6 +21,7 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { rewardUnlocks } from '../../services/achievementEngine';
 import DexIcon from '../../components/DexIcon';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { DexSearchInput } from '../../styles/components';
@@ -31,14 +32,14 @@ import type {
   ViewMode, ToolMode, Part, PartFeature, Measurement, GDTAnnotation,
 } from './types';
 import { MATERIAL_DB, STD_PARTS_LIBRARY, GDT_SYMBOLS } from './constants';
-import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor, computeVonMisesSimple } from './utils/math';
+import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor } from './utils/math';
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
 import { exportProject as doExport } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
 import { useViewportStore } from './stores/viewportStore';
 import { useUIStore } from './stores/uiStore';
-import { AXLRenderer } from './engine';
-import type { RenderState } from './engine';
+import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel } from './engine';
+import type { RenderState, FEResult } from './engine';
 import AXLToolbar from './components/Toolbar';
 import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -61,7 +62,9 @@ const AXL: React.FC = () => {
   useEffect(() => {
     const eng = loadEngagement();
     const updated = recordAppUsage(eng, 'axl');
-    saveEngagement(checkAchievements(updated).state);
+    const checkRes = checkAchievements(updated);
+    saveEngagement(checkRes.state);
+    rewardUnlocks(checkRes.newUnlocks);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Stores ───────────────────────────────────────────────────────────
@@ -283,20 +286,83 @@ const AXL: React.FC = () => {
       const t0 = performance.now();
       const parts = project.assembly.parts;
       if (simType === 'stress') {
-        const results = parts.map(p => {
-          const feat = p.features[0];
-          const params = feat?.params || {};
-          const vol = calcVolume((params.primitiveType as PrimitiveType) || 'box', params as Record<string, number>);
-          const area = Math.pow(vol, 2 / 3);
-          const I = area * area / 12;
-          const stress = computeVonMisesSimple(simForce, area, I, Math.sqrt(area) / 2, Math.pow(vol, 1 / 3));
-          const ratio = Math.min(stress / p.material.tensileStrength, 1.5);
-          return { partId: p.id, ratio, stress };
-        });
-        const maxStress = Math.max(...results.map(r => r.stress));
-        const minTensile = Math.min(...parts.map(p => p.material.tensileStrength));
-        pStore.setSimResults({ maxStress, safetyFactor: minTensile / maxStress, stressMap: results.map(r => ({ partId: r.partId, ratio: r.ratio })), converged: true, timestamp: Date.now() });
-        ui.showToast(`Stress analysis complete -- SF: ${(minTensile / maxStress).toFixed(2)}`);
+        // ── REAL 2D truss finite-element analysis (direct-stiffness method) ──
+        // Derive an FE model from the parts (one node per part, members from
+        // assembly constraints or a chain/frame fallback); solve K.u = F for
+        // nodal displacements; recover per-element axial stress / von Mises /
+        // safety factor. Geometry/material are in consistent N-mm-MPa units.
+        try {
+          // Representative cross-sectional area from the part's primitive
+          // volume: A ~ vol^(2/3) in mm^2 (vol returned in mm^3).
+          const fePartsInput = parts.map(p => {
+            const feat = p.features[0];
+            const params = (feat?.params || {}) as Record<string, any>;
+            const vol = calcVolume((params.primitiveType as PrimitiveType) || 'box', params);
+            const area = Math.max(Math.pow(Math.max(vol, 1), 2 / 3), 1); // mm^2
+            // Young's modulus: type stores GPa -> convert to MPa (N/mm^2).
+            const E = Math.max(p.material.youngsModulus * 1000, 1);
+            return { id: p.id, x: p.transform.position.x, y: p.transform.position.y, E, area };
+          });
+          const edges = project.assembly.constraints.map(c => ({ a: c.partA, b: c.partB }));
+          // Yield input: prefer material yieldStrength, fall back to a fraction
+          // of tensile strength; use the weakest part as the global yield.
+          const yieldOf = (mat: typeof parts[number]['material']) =>
+            mat.yieldStrength && mat.yieldStrength > 0 ? mat.yieldStrength : mat.tensileStrength * 0.6;
+          const minYield = Math.min(...parts.map(p => yieldOf(p.material)));
+
+          const derived = deriveTrussFromParts(fePartsInput, edges, simForce, minYield);
+          let fe: FEResult;
+          const stressByPart = new Map<string, number>();
+          let isDefaultModel = false;
+
+          if (derived) {
+            fe = solveTruss(derived.model);
+            // Assign each element's von Mises stress to both connected parts;
+            // keep the worst-case stress seen at each part for coloring.
+            fe.elements.forEach((er, i) => {
+              const ep = derived.elementParts[i];
+              for (const id of [ep.a, ep.b]) {
+                stressByPart.set(id, Math.max(stressByPart.get(id) ?? 0, er.vonMises));
+              }
+            });
+          } else {
+            // Geometry can't map to >=2 FE nodes: solve a real default demo
+            // truss so the study still produces meaningful numbers.
+            isDefaultModel = true;
+            const E = Math.max((parts[0]?.material.youngsModulus ?? 200) * 1000, 1);
+            const area = 100; // mm^2 representative member
+            fe = solveTruss(defaultTrussModel(simForce, E, area, minYield));
+            const single = parts[0];
+            if (single) stressByPart.set(single.id, fe.maxVonMises);
+          }
+
+          // Build the per-part stress map (ratio = stress / yield).
+          const stressMap = parts.map(p => {
+            const stress = stressByPart.get(p.id) ?? 0;
+            const y = yieldOf(p.material);
+            return { partId: p.id, ratio: y > 0 ? stress / y : 0 };
+          });
+
+          pStore.setSimResults({
+            type: 'stress',
+            maxStress: fe.maxVonMises,
+            safetyFactor: Number.isFinite(fe.minSafetyFactor) ? fe.minSafetyFactor : 999,
+            maxDisplacement: fe.maxDisplacement,
+            feaSolved: true,
+            elementCount: fe.elements.length,
+            stressMap,
+            converged: fe.converged,
+            timestamp: Date.now(),
+          });
+          ui.showToast(
+            `FEA complete -- ${fe.elements.length} elements, ` +
+            `max ${fe.maxVonMises.toFixed(1)} MPa, SF ${(Number.isFinite(fe.minSafetyFactor) ? fe.minSafetyFactor : 999).toFixed(2)}` +
+            (isDefaultModel ? ' (default truss)' : '')
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'FEA solve failed.';
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Simulation failed: ${msg}` } }));
+        }
       } else if (simType === 'thermal') {
         const ambientTemp = 25;
         const heatInput = simForce;
@@ -1457,9 +1523,18 @@ const AXL: React.FC = () => {
                     {simResults.safetyFactor.toFixed(2)}&times;
                   </div>
                 </div>
+                {simType === 'stress' && simResults.feaSolved && (
+                  <div>
+                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Max Displ.</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {(simResults.maxDisplacement ?? 0).toFixed(3)}{project.units}
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ marginTop: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>
                 {simType === 'thermal' ? `Heat: ${simForce}W` : `Force: ${simForce}N`} | {project.assembly.parts.length} parts analyzed
+                {simType === 'stress' && simResults.feaSolved ? ` | ${simResults.elementCount ?? 0} FE elements (direct stiffness)` : ''}
               </div>
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 60, height: 6, borderRadius: 3, background: 'linear-gradient(to right, rgb(0,255,40), rgb(255,255,40), rgb(255,0,40))' }} />
