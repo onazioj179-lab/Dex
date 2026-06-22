@@ -16,8 +16,8 @@
  *     click to focus, search to filter.
  *   - Sharp corner read-outs wired to real numbers (tier, activity count,
  *     security blocks) and two live dial gauges.
- *   - A command cradle: ask UKI a question or arm the mic. The ask field drives
- *     the full UKI reasoning pipeline via the `dex-uki-ask` bridge.
+ *   - Selecting a node routes it to the UKI assistant (the draggable popup) via
+ *     the `dex-uki-ask` bridge. Nexus itself has no inline chat surface.
  *
  * COLOUR: everything is sourced from the DEX design tokens so Nexus inherits the
  * app's accent and theme. DOM chrome uses `var(--color-*)` directly; the canvas
@@ -150,11 +150,19 @@ interface Marker {
 const markerColor = (m: Marker, p: Palette): string =>
   m.colorKey ? palKey(p, m.colorKey) : (m.rawColor || p.info);
 
+// Marker ring cap by device perf tier — denser HUDs only where the GPU/CPU can
+// keep the RAF smooth. The overflow count is surfaced so nothing is silently hidden.
+function markerCapForTier(tier: ReturnType<typeof getPerfTier>): number {
+  return tier === 'low' ? 16 : tier === 'mid' ? 28 : tier === 'high' ? 40 : 56;
+}
+
 // Pull a bounded, recency-ranked marker set from the live model + UKI knowledge.
+// Returns the visible slice plus the pre-slice total for the "shown/total" read-out.
 function collectMarkers(
   knowledge: ReadonlyArray<{ id: string; label: string; color: string; weight: number; timestamp: number }>,
   pal: Palette,
-): Marker[] {
+  cap: number,
+): { markers: Marker[]; total: number } {
   const model = getNexusModel();
   const out: Marker[] = [];
   const seen = new Set<string>();
@@ -176,7 +184,7 @@ function collectMarkers(
   }
 
   out.sort((a, b) => b.ts - a.ts);
-  return out.slice(0, 28);
+  return { markers: out.slice(0, cap), total: out.length };
 }
 
 function ago(ts: number): string {
@@ -211,10 +219,24 @@ const Nexus: React.FC = () => {
 
   const [selected, setSelected] = useState<Marker | null>(null);
   const [hover, setHover] = useState<Marker | null>(null);
-  const [query, setQuery] = useState('');
-  const queryRef = useRef('');
   const [markerCount, setMarkerCount] = useState(0);
-  const askInputRef = useRef<HTMLInputElement>(null);
+  const [markerTotal, setMarkerTotal] = useState(0);
+
+  // Minimal mode (persisted) collapses the read-outs/gauges to just the reticle;
+  // a narrow container auto-collapses too. `compact` is the effective state.
+  const [minimal, setMinimal] = useState(() => {
+    try { return localStorage.getItem('dex-nexus-minimal') === '1'; } catch { return false; }
+  });
+  const [narrow, setNarrow] = useState(false);
+  const compact = minimal || narrow;
+  const compactRef = useRef(compact);
+  useEffect(() => { compactRef.current = compact; }, [compact]);
+  const toggleMinimal = useCallback(() => {
+    setMinimal(v => { const n = !v; try { localStorage.setItem('dex-nexus-minimal', n ? '1' : '0'); } catch { /* noop */ } return n; });
+  }, []);
+  const closeApp = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('dex-close-app', { detail: { id: 'nexus' } }));
+  }, []);
 
   // Live, throttled HUD read-outs (tier + security). Refreshed on an interval.
   const [readout, setReadout] = useState(() => ({
@@ -235,13 +257,12 @@ const Nexus: React.FC = () => {
   const isActiveRef = useRef(isActive);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
-  useEffect(() => { queryRef.current = query.trim().toLowerCase(); }, [query]);
-
   // --- Live data: subscribe Nexus ingest + rebuild markers on change ---------
   const rebuild = useCallback(() => {
-    const next = collectMarkers(knowledgeNodes, paletteRef.current);
+    const { markers: next, total } = collectMarkers(knowledgeNodes, paletteRef.current, markerCapForTier(getPerfTier()));
     markersRef.current = next;
     setMarkerCount(next.length);
+    setMarkerTotal(total);
     if (selectedRef.current >= 0) {
       const sel = selected;
       const idx = sel ? next.findIndex(m => m.id === sel.id) : -1;
@@ -253,6 +274,18 @@ const Nexus: React.FC = () => {
   useEffect(() => {
     const off = installNexusIngest();
     return off;
+  }, []);
+
+  // Auto-collapse the HUD chrome on a narrow container so a small window stays legible.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const obs = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? el.clientWidth;
+      setNarrow(w < 520);
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
   }, []);
 
   useEffect(() => {
@@ -351,16 +384,6 @@ const Nexus: React.FC = () => {
       canvas.style.cursor = 'grabbing';
     };
 
-    const isOverCore = () => {
-      const r = canvas.getBoundingClientRect();
-      const cx = r.width / 2;
-      const cy = r.height / 2;
-      const dx = mouseRef.current.x - cx;
-      const dy = mouseRef.current.y - cy;
-      const coreR = Math.min(r.width, r.height) * 0.34 * 0.34;
-      return dx * dx + dy * dy < coreR * coreR;
-    };
-
     const onUp = () => {
       const wasDrag = dragRef.current.moved;
       dragRef.current.active = false;
@@ -370,10 +393,6 @@ const Nexus: React.FC = () => {
         const m = markersRef.current[hoverRef.current];
         selectedRef.current = hoverRef.current;
         setSelected(m);
-      } else if (isOverCore()) {
-        const uki = useUkiStore.getState();
-        if (uki.state === 'listening') uki.stopListening();
-        else uki.startListening();
       } else {
         selectedRef.current = -1;
         setSelected(null);
@@ -403,12 +422,16 @@ const Nexus: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA';
-      if (e.key === '/' && !typing) { e.preventDefault(); askInputRef.current?.focus(); }
-      else if (e.key === 'Escape' && !typing) { selectedRef.current = -1; setSelected(null); }
+      if (e.key === 'Escape' && !typing) {
+        // First Esc clears a selection; a second Esc (nothing selected) closes the
+        // app -- fixes the "Esc does nothing / no way to close" glitch.
+        if (selectedRef.current >= 0) { selectedRef.current = -1; setSelected(null); }
+        else { closeApp(); }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [closeApp]);
 
   // --- The render loop -------------------------------------------------------
   useEffect(() => {
@@ -419,6 +442,7 @@ const Nexus: React.FC = () => {
 
     const tier = getPerfTier();
     const dotStep = tier === 'low' ? 14 : tier === 'mid' ? 10 : 8; // dotted-ring density (deg)
+    const lowTier = tier === 'low'; // drop the most expensive passes on weak GPUs
 
     const draw = (now: number) => {
       rafRef.current = requestAnimationFrame(draw);
@@ -451,22 +475,25 @@ const Nexus: React.FC = () => {
       const live = uki.state === 'listening' || uki.state === 'speaking' || uki.state === 'processing' || uki.state === 'thinking';
       const pulse = 0.5 + 0.5 * Math.sin(t * (live ? 3.2 : 1.1));
 
-      // (1) Diagonal framing lines to the corners, with endpoint pips.
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = accentA(pal, 0.10);
-      const corners = [[0.10, 0.16], [0.90, 0.16], [0.10, 0.84], [0.90, 0.84]];
-      for (const [fx, fy] of corners) {
-        const ex = w * fx;
-        const ey = h * fy;
-        const a = Math.atan2(ey - ccy, ex - ccx);
-        ctx.beginPath();
-        ctx.moveTo(ccx + Math.cos(a) * R * 1.18, ccy + Math.sin(a) * R * 1.18);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = accentA(pal, 0.28);
-        ctx.fill();
+      // (1) Diagonal framing lines to the corners, with endpoint pips. Skipped on
+      // low-tier devices (a pure-decoration pass) to protect the frame budget.
+      if (!lowTier) {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = accentA(pal, 0.10);
+        const corners = [[0.10, 0.16], [0.90, 0.16], [0.10, 0.84], [0.90, 0.84]];
+        for (const [fx, fy] of corners) {
+          const ex = w * fx;
+          const ey = h * fy;
+          const a = Math.atan2(ey - ccy, ex - ccx);
+          ctx.beginPath();
+          ctx.moveTo(ccx + Math.cos(a) * R * 1.18, ccy + Math.sin(a) * R * 1.18);
+          ctx.lineTo(ex, ey);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = accentA(pal, 0.28);
+          ctx.fill();
+        }
       }
 
       // (2) Outer dotted tick ring.
@@ -520,8 +547,8 @@ const Nexus: React.FC = () => {
         ctx.stroke();
       }
 
-      // (6) Sweep arc — radar style, tinted by UKI state.
-      if (motion) {
+      // (6) Sweep arc — radar style, tinted by UKI state. Off on low tier.
+      if (motion && !lowTier) {
         const sweep = (t * (live ? 1.8 : 0.7)) % (Math.PI * 2);
         const ex = ccx + Math.cos(sweep) * R * 0.8;
         const ey = ccy + Math.sin(sweep) * R * 0.8;
@@ -538,9 +565,8 @@ const Nexus: React.FC = () => {
         ctx.globalAlpha = 1;
       }
 
-      // (7) Marker ring — live entities. Filtered/dimmed by the search query.
+      // (7) Marker ring — live entities, recency-ranked around the reticle.
       const markers = markersRef.current;
-      const q = queryRef.current;
       const markerR = R * 0.6;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -552,12 +578,10 @@ const Nexus: React.FC = () => {
         m.sx = mx;
         m.sy = my;
         const color = markerColor(m, pal);
-        const match = !q || m.label.toLowerCase().includes(q);
         const isHover = hoverRef.current === i;
         const isSel = selectedRef.current === i;
-        const alpha = match ? 1 : 0.16;
 
-        ctx.globalAlpha = alpha * 0.18;
+        ctx.globalAlpha = 0.18;
         ctx.strokeStyle = color;
         ctx.lineWidth = 0.6;
         ctx.beginPath();
@@ -567,14 +591,14 @@ const Nexus: React.FC = () => {
 
         const rad = (isSel ? 6 : isHover ? 5 : 3.4) + (m.weight > 0.7 ? 1 : 0);
         if (isHover || isSel) {
-          ctx.globalAlpha = alpha * 0.9;
+          ctx.globalAlpha = 0.9;
           ctx.beginPath();
           ctx.arc(mx, my, rad + 4, 0, Math.PI * 2);
           ctx.strokeStyle = color;
           ctx.lineWidth = 1;
           ctx.stroke();
         }
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = 1;
         ctx.beginPath();
         ctx.arc(mx, my, rad, 0, Math.PI * 2);
         ctx.fillStyle = color;
@@ -614,11 +638,13 @@ const Nexus: React.FC = () => {
       ctx.arc(ccx, ccy, 2.4, 0, Math.PI * 2);
       ctx.fillStyle = pal.bg;
       ctx.fill();
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = stateColor;
-      ctx.font = `700 8px ${pal.fontUI || FALLBACK_FONT_UI}`;
-      ctx.fillText(sm.label, ccx, ccy + coreR + 14);
-      ctx.globalAlpha = 1;
+      if (!compactRef.current) {
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = stateColor;
+        ctx.font = `700 8px ${pal.fontUI || FALLBACK_FONT_UI}`;
+        ctx.fillText(sm.label, ccx, ccy + coreR + 14);
+        ctx.globalAlpha = 1;
+      }
 
       // (10) Corner brackets framing the HUD box.
       ctx.strokeStyle = accentA(pal, 0.30);
@@ -644,32 +670,14 @@ const Nexus: React.FC = () => {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // --- Ask UKI ---------------------------------------------------------------
-  const askUki = useCallback(() => {
-    const q = (askInputRef.current?.value || '').trim();
-    if (!q) return;
-    window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query: q } }));
-    // Open UKI so the user actually SEES the answer (was fire-and-forget before).
-    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { id: 'uki' } }));
-    if (askInputRef.current) askInputRef.current.value = '';
-  }, []);
-
-  // Marker selection used to be a dead end (highlight only). Inspecting a node now
-  // routes it to UKI and opens the assistant, so the HUD becomes a real query
-  // surface over the knowledge graph.
+  // Marker selection routes the node to the UKI assistant (the draggable popup)
+  // and opens it, so Nexus stays a pure visualisation -- no inline chat surface.
   const inspectMarker = useCallback((m: Marker | null) => {
     if (!m) return;
     window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query: `Tell me about "${m.label}" (${m.tag})` } }));
     window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { id: 'uki' } }));
   }, []);
 
-  const toggleMic = useCallback(() => {
-    const uki = useUkiStore.getState();
-    if (uki.state === 'listening') uki.stopListening();
-    else uki.startListening();
-  }, []);
-
-  const micArmed = ukiState === 'listening';
   const stateVar = (STATE_META[ukiState] || STATE_META.idle).cssVar;
 
   // ---------------------------------------------------------------------------
@@ -681,6 +689,23 @@ const Nexus: React.FC = () => {
     }}>
       <canvas ref={canvasRef} role="img" aria-label="Nexus command HUD" style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab' }} />
 
+      {/* Window controls: minimal-mode toggle + close (fixes the no-close glitch) */}
+      <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 18, display: 'flex', gap: 6, pointerEvents: 'auto' }}>
+        <button onClick={toggleMinimal} aria-label={minimal ? 'Show HUD details' : 'Minimal mode'} title={minimal ? 'Show HUD details' : 'Minimal mode'} style={hudCtrlBtn}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>
+          {minimal
+            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>}
+        </button>
+        <button onClick={closeApp} aria-label="Close Nexus" title="Close Nexus" style={hudCtrlBtn}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.borderColor = 'var(--color-error)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+
+      {!compact && (<>
       {/* Top-left identity */}
       <div style={cornerBox('tl')}>
         <div style={chipLabel}>NEXUS</div>
@@ -688,14 +713,14 @@ const Nexus: React.FC = () => {
         <div style={{ ...chipSub, color: 'var(--color-text-muted)' }}>TIER · {readout.tier}</div>
       </div>
 
-      {/* Top-right status — "target locator" */}
-      <div style={{ ...cornerBox('tr'), alignItems: 'flex-end', textAlign: 'right' }}>
+      {/* Top-right status — "target locator" (offset below the window controls) */}
+      <div style={{ ...cornerBox('tr'), top: 46, alignItems: 'flex-end', textAlign: 'right' }}>
         <div style={{ ...chipLabel, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end' }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateVar, boxShadow: `0 0 6px ${stateVar}` }} />
           TARGET LOCATOR
         </div>
-        <div style={{ ...chipValue, color: 'var(--color-accent)' }}>{markerCount} TRACKED</div>
-        <div style={{ ...chipSub, color: 'var(--color-text-muted)' }}>{readout.active} ACTIVE · 5M</div>
+        <div style={{ ...chipValue, color: 'var(--color-accent)' }}>{markerCount}{markerTotal > markerCount ? `/${markerTotal}` : ''} TRACKED</div>
+        <div style={{ ...chipSub, color: 'var(--color-text-muted)' }}>{readout.active} ACTIVE{markerTotal > markerCount ? ` · +${markerTotal - markerCount}` : ' · 5M'}</div>
       </div>
 
       {/* Bottom-left warning chip (real numbers) */}
@@ -727,6 +752,7 @@ const Nexus: React.FC = () => {
       <Gauge side="left" label="MEMORY" value={Math.min(100, markerCount * 4)} color="var(--color-accent)" />
       {/* Right dial — activity */}
       <Gauge side="right" label="ACTIVITY" value={Math.min(100, readout.active * 12)} color={readout.active > 0 ? 'var(--color-success)' : 'var(--color-accent)'} />
+      </>)}
 
       {/* Hover tooltip */}
       {hover && (
@@ -767,57 +793,6 @@ const Nexus: React.FC = () => {
         </div>
       )}
 
-      {/* Command cradle — search + ask + mic */}
-      <div style={{
-        position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', alignItems: 'center', gap: 8, zIndex: 16,
-        maxWidth: 'calc(100% - 32px)',
-        padding: '7px 8px 7px 12px', borderRadius: 12,
-        background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-      }}>
-        {/* Filter markers */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 8, borderRight: '1px solid var(--color-border-subtle)' }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.4" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Filter nodes"
-            aria-label="Filter Nexus nodes"
-            style={{ width: 110, background: 'none', border: 'none', outline: 'none', color: 'var(--color-accent)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--dex-font-ui)' }}
-          />
-        </div>
-        {/* Ask UKI */}
-        <span style={{ color: stateVar, fontSize: 12, fontWeight: 800, fontFamily: 'var(--dex-font-ui)' }}>›</span>
-        <input
-          ref={askInputRef}
-          placeholder="Ask UKI…"
-          aria-label="Ask UKI"
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); askUki(); } }}
-          style={{ width: 'min(34vw, 240px)', minWidth: 120, background: 'none', border: 'none', outline: 'none', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--dex-font-ui)' }}
-        />
-        <button
-          onClick={askUki}
-          aria-label="Send to UKI"
-          title="Send to UKI"
-          style={cradleBtn(false)}
-          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.25)')}
-          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-        </button>
-        <button
-          onClick={toggleMic}
-          aria-label={micArmed ? 'Stop listening' : 'Start listening'}
-          title={micArmed ? 'Stop listening' : 'Start listening'}
-          aria-pressed={micArmed}
-          style={cradleBtn(micArmed)}
-          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.25)')}
-          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /></svg>
-        </button>
-      </div>
     </div>
   );
 };
@@ -825,6 +800,13 @@ const Nexus: React.FC = () => {
 // ---------------------------------------------------------------------------
 // Sub-components + style helpers
 // ---------------------------------------------------------------------------
+
+const hudCtrlBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: 26, height: 26, borderRadius: 7,
+  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
+  color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.15s ease',
+};
 
 const chipLabel: React.CSSProperties = { fontSize: 8, fontWeight: 700, letterSpacing: 1.6, color: 'var(--color-text-muted)' };
 const chipValue: React.CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.4, marginTop: 2, fontVariantNumeric: 'tabular-nums' };
@@ -841,17 +823,6 @@ function cornerBox(pos: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties {
   if (pos === 'tr') return { ...base, top: m, right: m };
   if (pos === 'bl') return { ...base, bottom: m, left: m };
   return { ...base, bottom: m, right: m };
-}
-
-function cradleBtn(armed: boolean): React.CSSProperties {
-  return {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-    background: armed ? 'var(--color-success-muted, rgba(52,199,89,0.16))' : 'var(--color-accent-light)',
-    border: `1px solid ${armed ? 'var(--color-success)' : 'var(--color-accent)'}`,
-    color: armed ? 'var(--color-success)' : 'var(--color-accent)',
-    cursor: 'pointer', transition: 'all 0.15s ease',
-  };
 }
 
 const Gauge = memo(({ side, label, value, color }: { side: 'left' | 'right'; label: string; value: number; color: string }) => {

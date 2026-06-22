@@ -1,15 +1,17 @@
 /**
  * DEX Platform - World Clock
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * Multiple timezone display with analog/digital toggle
+ * Multiple timezone display with analog/digital toggle, timezone search,
+ * reordering, home pinning, day/night shading and working-hours highlight.
  */
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useReducedMotion } from '../../utils/useReducedMotion';
 
 interface ClockZone {
   id: string;
   label: string;
   timezone: string;
-  offset: number; // hours from UTC
+  offset: number; // hours from UTC (static fallback / sort hint)
 }
 
 const PRESET_ZONES: ClockZone[] = [
@@ -29,24 +31,119 @@ const PRESET_ZONES: ClockZone[] = [
   { id: 'sin', label: 'Singapore', timezone: 'Asia/Singapore', offset: 8 },
   { id: 'hk', label: 'Hong Kong', timezone: 'Asia/Hong_Kong', offset: 8 },
   { id: 'seo', label: 'Seoul', timezone: 'Asia/Seoul', offset: 9 },
+  // Extra named cities so the static catalog has good search coverage.
+  { id: 'sf', label: 'San Francisco', timezone: 'America/Los_Angeles', offset: -8 },
+  { id: 'tor', label: 'Toronto', timezone: 'America/Toronto', offset: -5 },
+  { id: 'mex', label: 'Mexico City', timezone: 'America/Mexico_City', offset: -6 },
+  { id: 'sao', label: 'Sao Paulo', timezone: 'America/Sao_Paulo', offset: -3 },
+  { id: 'bue', label: 'Buenos Aires', timezone: 'America/Argentina/Buenos_Aires', offset: -3 },
+  { id: 'mad', label: 'Madrid', timezone: 'Europe/Madrid', offset: 1 },
+  { id: 'rom', label: 'Rome', timezone: 'Europe/Rome', offset: 1 },
+  { id: 'ams', label: 'Amsterdam', timezone: 'Europe/Amsterdam', offset: 1 },
+  { id: 'ist', label: 'Istanbul', timezone: 'Europe/Istanbul', offset: 3 },
+  { id: 'cai', label: 'Cairo', timezone: 'Africa/Cairo', offset: 2 },
+  { id: 'jnb', label: 'Johannesburg', timezone: 'Africa/Johannesburg', offset: 2 },
+  { id: 'lag', label: 'Lagos', timezone: 'Africa/Lagos', offset: 1 },
+  { id: 'nbo', label: 'Nairobi', timezone: 'Africa/Nairobi', offset: 3 },
+  { id: 'tlv', label: 'Tel Aviv', timezone: 'Asia/Jerusalem', offset: 2 },
+  { id: 'kar', label: 'Karachi', timezone: 'Asia/Karachi', offset: 5 },
+  { id: 'dha', label: 'Dhaka', timezone: 'Asia/Dhaka', offset: 6 },
+  { id: 'bkk', label: 'Bangkok', timezone: 'Asia/Bangkok', offset: 7 },
+  { id: 'jak', label: 'Jakarta', timezone: 'Asia/Jakarta', offset: 7 },
+  { id: 'man', label: 'Manila', timezone: 'Asia/Manila', offset: 8 },
+  { id: 'akl', label: 'Auckland', timezone: 'Pacific/Auckland', offset: 13 },
+  { id: 'hnl', label: 'Honolulu', timezone: 'Pacific/Honolulu', offset: -10 },
 ];
+
+const LS_ZONES = 'dex-worldclock-zones';
+const LS_24H = 'dex-worldclock-24h';
+const LS_HOME = 'dex-worldclock-home';
+const LS_CUSTOM = 'dex-worldclock-custom';
+
+// Day/night and working-hours thresholds (local wall-clock hour).
+const DAY_START = 6;
+const DAY_END = 18;
+const WORK_START = 9;
+const WORK_END = 17;
+
+// Friendly label from an IANA timezone id, e.g. "Asia/Kolkata" -> "Kolkata".
+const labelFromTimezone = (tz: string) =>
+  (tz.split('/').pop() || tz).replace(/_/g, ' ');
+
+// Best-effort list of all supported IANA timezones for autocomplete.
+const ALL_TIMEZONES: string[] = (() => {
+  try {
+    const fn = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+    if (typeof fn === 'function') return fn('timeZone');
+  } catch { /* ignore */ }
+  return [];
+})();
 
 const WorldClock: React.FC = () => {
   const [now, setNow] = useState(new Date());
+  // Honour OS reduced-motion: the analog hands sweep with an easing transition
+  // by default; when reduced motion is requested we let them tick instantly.
+  const reducedMotion = useReducedMotion();
+
+  // User-created zones (from timezone search) kept separately so they survive
+  // reloads even though they are not in PRESET_ZONES.
+  const [customZones, setCustomZones] = useState<ClockZone[]>(() => {
+    try {
+      const saved = localStorage.getItem(LS_CUSTOM);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.filter(
+          (z): z is ClockZone => z && typeof z.id === 'string' && typeof z.timezone === 'string',
+        );
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
+
+  // Combined catalog used to resolve ids and to search.
+  const catalog = useMemo(() => {
+    const map = new Map<string, ClockZone>();
+    for (const z of PRESET_ZONES) map.set(z.id, z);
+    for (const z of customZones) map.set(z.id, z);
+    return map;
+  }, [customZones]);
+
   const [activeZones, setActiveZones] = useState<ClockZone[]>(() => {
     try {
-      const saved = localStorage.getItem('dex-worldclock-zones');
+      const saved = localStorage.getItem(LS_ZONES);
       if (saved) {
         const ids: string[] = JSON.parse(saved);
-        const zones = ids.map(id => PRESET_ZONES.find(z => z.id === id)).filter(Boolean) as ClockZone[];
+        const all = new Map<string, ClockZone>();
+        for (const z of PRESET_ZONES) all.set(z.id, z);
+        try {
+          const custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
+          if (Array.isArray(custom)) for (const z of custom) if (z?.id) all.set(z.id, z);
+        } catch { /* ignore */ }
+        const zones = ids.map(id => all.get(id)).filter(Boolean) as ClockZone[];
         if (zones.length > 0) return zones;
       }
     } catch { /* ignore */ }
     return [PRESET_ZONES[0], PRESET_ZONES[1], PRESET_ZONES[6], PRESET_ZONES[7]];
   });
+
   const [showAnalog, setShowAnalog] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [is24h, setIs24h] = useState(true);
+  const [query, setQuery] = useState('');
+
+  const [is24h, setIs24h] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(LS_24H);
+      if (saved !== null) return saved === 'true';
+    } catch { /* ignore */ }
+    return true;
+  });
+
+  const [homeId, setHomeId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(LS_HOME);
+    } catch { /* ignore */ }
+    return null;
+  });
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = setInterval(() => setNow(new Date()), 1000);
@@ -65,20 +162,112 @@ const WorldClock: React.FC = () => {
     };
   }, []);
 
+  // --- Persistence (each in its own safe try/catch) ---
   useEffect(() => {
-    localStorage.setItem('dex-worldclock-zones', JSON.stringify(activeZones.map(z => z.id)));
+    try { localStorage.setItem(LS_ZONES, JSON.stringify(activeZones.map(z => z.id))); } catch { /* ignore */ }
   }, [activeZones]);
 
+  useEffect(() => {
+    try { localStorage.setItem(LS_CUSTOM, JSON.stringify(customZones)); } catch { /* ignore */ }
+  }, [customZones]);
+
+  useEffect(() => {
+    try { localStorage.setItem(LS_24H, String(is24h)); } catch { /* ignore */ }
+  }, [is24h]);
+
+  useEffect(() => {
+    try {
+      if (homeId) localStorage.setItem(LS_HOME, homeId);
+      else localStorage.removeItem(LS_HOME);
+    } catch { /* ignore */ }
+  }, [homeId]);
+
+  // If the home zone is removed, clear the home pin so offsets stay coherent.
+  useEffect(() => {
+    if (homeId && !activeZones.find(z => z.id === homeId)) setHomeId(null);
+  }, [activeZones, homeId]);
+
   const addZone = useCallback((zone: ClockZone) => {
-    if (!activeZones.find(z => z.id === zone.id)) {
-      setActiveZones(prev => [...prev, zone]);
-    }
-    setShowAdd(false);
-  }, [activeZones]);
+    setActiveZones(prev => (prev.find(z => z.id === zone.id) ? prev : [...prev, zone]));
+  }, []);
 
   const removeZone = useCallback((id: string) => {
     setActiveZones(prev => prev.filter(z => z.id !== id));
   }, []);
+
+  const moveZone = useCallback((id: string, dir: -1 | 1) => {
+    setActiveZones(prev => {
+      const idx = prev.findIndex(z => z.id === id);
+      if (idx < 0) return prev;
+      const next = idx + dir;
+      if (next < 0 || next >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[next]] = [copy[next], copy[idx]];
+      return copy;
+    });
+  }, []);
+
+  // --- Drag & drop reordering ---
+  const [dragId, setDragId] = useState<string | null>(null);
+  const onDrop = useCallback((targetId: string) => {
+    setActiveZones(prev => {
+      if (!dragId || dragId === targetId) return prev;
+      const from = prev.findIndex(z => z.id === dragId);
+      const to = prev.findIndex(z => z.id === targetId);
+      if (from < 0 || to < 0) return prev;
+      const copy = [...prev];
+      const [moved] = copy.splice(from, 1);
+      copy.splice(to, 0, moved);
+      return copy;
+    });
+    setDragId(null);
+  }, [dragId]);
+
+  // --- Search results: catalog cities first, then raw IANA timezones ---
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const activeIds = new Set(activeZones.map(z => z.id));
+    const results: ClockZone[] = [];
+    const seenTz = new Set<string>();
+
+    const catalogList = Array.from(catalog.values());
+    for (const z of catalogList) {
+      if (activeIds.has(z.id)) continue;
+      const hay = `${z.label} ${z.timezone}`.toLowerCase();
+      if (!q || hay.includes(q)) {
+        results.push(z);
+        seenTz.add(z.timezone);
+      }
+      if (results.length >= 40) break;
+    }
+
+    if (q) {
+      for (const tz of ALL_TIMEZONES) {
+        if (results.length >= 40) break;
+        if (seenTz.has(tz)) continue;
+        if (!tz.toLowerCase().includes(q)) continue;
+        const id = `tz:${tz}`;
+        if (activeIds.has(id)) continue;
+        results.push({
+          id,
+          label: labelFromTimezone(tz),
+          timezone: tz,
+          offset: liveOffsetHours(tz, now),
+        });
+        seenTz.add(tz);
+      }
+    }
+    return results;
+  }, [query, activeZones, catalog, now]);
+
+  // When a raw-timezone result is chosen, remember it as a custom zone.
+  const chooseResult = useCallback((zone: ClockZone) => {
+    if (zone.id.startsWith('tz:')) {
+      setCustomZones(prev => (prev.find(z => z.id === zone.id) ? prev : [...prev, zone]));
+    }
+    addZone(zone);
+    setQuery('');
+  }, [addZone]);
 
   const getTimeInZone = (zone: ClockZone) => {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -140,7 +329,7 @@ const WorldClock: React.FC = () => {
     const rad = (deg: number) => (deg * Math.PI) / 180;
 
     // Hand rendered as vertical line from center going up, rotated by transform
-    const Hand: React.FC<{ angle: number; len: number; w: number; color: string; smooth?: boolean }> = 
+    const Hand: React.FC<{ angle: number; len: number; w: number; color: string; smooth?: boolean }> =
       ({ angle, len, w, color, smooth = true }) => (
         <line
           x1={cx} y1={cy} x2={cx} y2={cy - len}
@@ -148,7 +337,7 @@ const WorldClock: React.FC = () => {
           style={{
             transformOrigin: `${cx}px ${cy}px`,
             transform: `rotate(${angle}deg)`,
-            transition: smooth ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            transition: smooth && !reducedMotion ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           }}
         />
       );
@@ -169,7 +358,12 @@ const WorldClock: React.FC = () => {
     );
   };
 
-  const isDayTime = (d: Date) => d.getHours() >= 6 && d.getHours() < 18;
+  const isDayTime = (d: Date) => d.getHours() >= DAY_START && d.getHours() < DAY_END;
+  const isWorkingHours = (d: Date) => d.getHours() >= WORK_START && d.getHours() < WORK_END;
+
+  // Home reference time used to compute relative offsets.
+  const homeZone = homeId ? activeZones.find(z => z.id === homeId) : undefined;
+  const homeTime = homeZone ? getTimeInZone(homeZone) : null;
 
   return (
     <div style={s.container}>
@@ -185,21 +379,43 @@ const WorldClock: React.FC = () => {
             onClick={() => setShowAnalog(!showAnalog)}
             aria-label="Toggle analog clocks"
           >CLK</button>
-          <button style={s.addBtn} onClick={() => setShowAdd(!showAdd)} aria-label="Add timezone">+</button>
+          <button
+            style={{ ...s.addBtn, background: showAdd ? 'var(--color-text-secondary)' : 'var(--color-accent)' }}
+            onClick={() => setShowAdd(!showAdd)}
+            aria-label="Add city"
+          >+</button>
         </div>
       </div>
 
-      {/* Add Zone Panel */}
+      {/* Add City Panel with search + autocomplete */}
       {showAdd && (
         <div style={s.addPanel}>
-          <div style={s.addGrid}>
-            {PRESET_ZONES.filter(z => !activeZones.find(a => a.id === z.id)).map(zone => (
-              <button key={zone.id} style={s.zoneOption} onClick={() => addZone(zone)} aria-label={`Add ${zone.label}`}>
-                <span style={s.zoneOptLabel}>{zone.label}</span>
-                <span style={s.zoneOptOffset}>UTC{zone.offset >= 0 ? '+' : ''}{zone.offset}</span>
-              </button>
-            ))}
-          </div>
+          <input
+            style={s.searchInput}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search a city or timezone (e.g. Tokyo, America/Denver)"
+            aria-label="Search city or timezone"
+            autoFocus
+          />
+          {searchResults.length === 0 ? (
+            <div style={s.searchEmpty}>No matching cities or timezones.</div>
+          ) : (
+            <div style={s.resultsList}>
+              {searchResults.map(zone => (
+                <button
+                  key={zone.id}
+                  style={s.resultRow}
+                  onClick={() => chooseResult(zone)}
+                  aria-label={`Add ${zone.label}`}
+                >
+                  <span style={s.resultLabel}>{zone.label}</span>
+                  <span style={s.resultTz}>{zone.timezone}</span>
+                  <span style={s.resultOffset}>{formatOffset(zone)}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -207,28 +423,92 @@ const WorldClock: React.FC = () => {
       {activeZones.length === 0 ? (
         <div style={s.emptyState}>
           <div style={s.emptyTitle}>No timezones added</div>
-          <div style={s.emptyHint}>Use the + button to add a city.</div>
+          <div style={s.emptyHint}>Use the + button to search and add a city.</div>
         </div>
       ) : (
       <div style={s.clockGrid}>
-        {activeZones.map(zone => {
+        {activeZones.map((zone, idx) => {
           const zoneTime = getTimeInZone(zone);
           const isDay = isDayTime(zoneTime);
+          const working = isWorkingHours(zoneTime);
+          const isHome = zone.id === homeId;
+
+          // Offset relative to the home clock when one is pinned, otherwise
+          // relative to the user's local time. Both sides are wall-clock Dates
+          // so the ms delta is DST-correct.
+          const ref = homeTime ?? now;
+          const dh = Math.round((zoneTime.getTime() - ref.getTime()) / 3600000);
+          const refLabel = homeTime ? 'home' : 'here';
+
+          const cardBg = isHome
+            ? 'var(--color-accent-light, rgba(10,132,255,0.14))'
+            : isDay ? 'var(--color-border-subtle)' : 'rgba(0,0,0,0.2)';
+
           return (
-            <div key={zone.id} style={{ ...s.clockCard, background: isDay ? 'var(--color-border-subtle)' : 'rgba(0,0,0,0.2)' }}>
-              <button style={s.removeBtn} onClick={() => removeZone(zone.id)} aria-label={`Remove ${zone.label}`}>×</button>
-              <div style={s.clockLabel}>{zone.label}</div>
+            <div
+              key={zone.id}
+              draggable
+              onDragStart={() => setDragId(zone.id)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => onDrop(zone.id)}
+              onDragEnd={() => setDragId(null)}
+              style={{
+                ...s.clockCard,
+                background: cardBg,
+                border: isHome
+                  ? '1px solid var(--color-accent)'
+                  : working
+                    ? '1px solid var(--color-success, #30D158)'
+                    : '1px solid var(--color-border, var(--color-bg-hover))',
+                opacity: dragId === zone.id ? 0.5 : 1,
+                cursor: 'grab',
+              }}
+            >
+              {/* Top-right controls */}
+              <div style={s.cardControls}>
+                <button
+                  style={{ ...s.iconBtn, color: isHome ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+                  onClick={() => setHomeId(isHome ? null : zone.id)}
+                  aria-label={isHome ? `Unpin ${zone.label} as home` : `Pin ${zone.label} as home`}
+                  title={isHome ? 'Home (click to unpin)' : 'Set as home'}
+                >{isHome ? '★' : '☆'}</button>
+                <button
+                  style={{ ...s.iconBtn, opacity: idx === 0 ? 0.3 : 1 }}
+                  onClick={() => moveZone(zone.id, -1)}
+                  disabled={idx === 0}
+                  aria-label={`Move ${zone.label} left`}
+                  title="Move left"
+                >{'‹'}</button>
+                <button
+                  style={{ ...s.iconBtn, opacity: idx === activeZones.length - 1 ? 0.3 : 1 }}
+                  onClick={() => moveZone(zone.id, 1)}
+                  disabled={idx === activeZones.length - 1}
+                  aria-label={`Move ${zone.label} right`}
+                  title="Move right"
+                >{'›'}</button>
+                <button
+                  style={s.iconBtn}
+                  onClick={() => removeZone(zone.id)}
+                  aria-label={`Remove ${zone.label}`}
+                  title="Remove"
+                >{'×'}</button>
+              </div>
+
+              <div style={s.clockLabel}>
+                {zone.label}
+                {isHome && <span style={s.homeTag}>HOME</span>}
+              </div>
               <div style={s.clockOffset}>{formatOffset(zone)}</div>
-              {(() => {
-                // Hour difference vs the user's local time (DST-correct: both are
-                // wall-clock Dates, so the ms delta is the true offset).
-                const dh = Math.round((zoneTime.getTime() - now.getTime()) / 3600000);
-                return <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{dh === 0 ? 'Same as here' : `${dh > 0 ? '+' : ''}${dh}h vs here`}</div>;
-              })()}
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                {dh === 0 ? `Same as ${refLabel}` : `${dh > 0 ? '+' : ''}${dh}h vs ${refLabel}`}
+              </div>
               {showAnalog && <AnalogClock time={zoneTime} size={100} />}
               <div style={s.clockTime}>{formatTime(zoneTime)}</div>
               <div style={s.clockDate}>{formatDate(zoneTime)}</div>
-              <div style={{ fontSize: 16, marginTop: 4 }}>{isDay ? 'DAY' : 'NIGHT'}</div>
+              <div style={s.statusRow}>
+                <span style={{ fontSize: 13 }}>{isDay ? '☀ Day' : '☾ Night'}</span>
+                {working && <span style={s.workBadge}>Working hours</span>}
+              </div>
             </div>
           );
         })}
@@ -237,6 +517,24 @@ const WorldClock: React.FC = () => {
     </div>
   );
 };
+
+// Live UTC offset (hours) for a timezone at a given instant, used to seed the
+// static `offset` field of search-created custom zones.
+function liveOffsetHours(timezone: string, at: Date): number {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
+      .formatToParts(at).find(p => p.type === 'timeZoneName')?.value;
+    if (name) {
+      const m = name.match(/GMT([+-]\d{1,2})(?::(\d{2}))?/);
+      if (m) {
+        const h = Number(m[1]);
+        const min = m[2] ? Number(m[2]) : 0;
+        return h + (h < 0 ? -min / 60 : min / 60);
+      }
+    }
+  } catch { /* ignore */ }
+  return 0;
+}
 
 const s: Record<string, React.CSSProperties> = {
   container: {
@@ -263,18 +561,30 @@ const s: Record<string, React.CSSProperties> = {
   },
   addPanel: {
     padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
+    display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)',
   },
-  addGrid: {
-    display: 'flex', flexWrap: 'wrap' as const, gap: 6,
-  },
-  zoneOption: {
-    padding: '6px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))',
+  searchInput: {
+    width: '100%', boxSizing: 'border-box' as const,
+    padding: '8px var(--space-3)', borderRadius: 6,
+    border: '1px solid var(--color-border, var(--color-border-subtle))',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
-    cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-family)',
-    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 2,
+    fontSize: 13, fontFamily: 'var(--font-family)', outline: 'none',
   },
-  zoneOptLabel: { fontWeight: 600, fontSize: 12 },
-  zoneOptOffset: { fontSize: 10, color: 'var(--color-text-secondary)' },
+  searchEmpty: { fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 2px' },
+  resultsList: {
+    display: 'flex', flexDirection: 'column' as const, gap: 2,
+    maxHeight: 220, overflowY: 'auto' as const,
+  },
+  resultRow: {
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
+    background: 'transparent', color: 'var(--color-text-primary)',
+    cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-family)',
+    textAlign: 'left' as const, width: '100%',
+  },
+  resultLabel: { fontWeight: 600, flex: '0 0 auto' },
+  resultTz: { color: 'var(--color-text-tertiary)', flex: 1, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  resultOffset: { color: 'var(--color-text-secondary)', fontSize: 11, flex: '0 0 auto' },
   clockGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
     gap: 'var(--space-3)', padding: 'var(--space-5)', flex: 1,
@@ -285,18 +595,35 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border, var(--color-bg-hover))',
     position: 'relative' as const, gap: 4,
   },
-  removeBtn: {
-    position: 'absolute' as const, top: 6, right: 8,
-    background: 'none', border: 'none', color: 'var(--color-text-tertiary)',
-    fontSize: 16, cursor: 'pointer', padding: 2, lineHeight: 1,
+  cardControls: {
+    position: 'absolute' as const, top: 6, right: 6,
+    display: 'flex', alignItems: 'center', gap: 2,
   },
-  clockLabel: { fontSize: 14, fontWeight: 600 },
+  iconBtn: {
+    background: 'none', border: 'none', color: 'var(--color-text-tertiary)',
+    fontSize: 15, cursor: 'pointer', padding: 2, lineHeight: 1,
+    fontFamily: 'var(--font-family)',
+  },
+  homeTag: {
+    marginLeft: 6, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+    color: 'var(--color-accent)', verticalAlign: 'middle',
+  },
+  clockLabel: { fontSize: 14, fontWeight: 600, marginTop: 12 },
   clockOffset: { fontSize: 11, color: 'var(--color-text-secondary)' },
   clockTime: {
     fontSize: 24, fontWeight: 300, fontVariantNumeric: 'tabular-nums',
     letterSpacing: '-0.01em', marginTop: 4,
   },
   clockDate: { fontSize: 11, color: 'var(--color-text-secondary)' },
+  statusRow: {
+    display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' as const, justifyContent: 'center',
+  },
+  workBadge: {
+    fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
+    color: 'var(--color-success, #30D158)',
+    border: '1px solid var(--color-success, #30D158)',
+    borderRadius: 4, padding: '1px 5px',
+  },
   emptyState: {
     flex: 1, display: 'flex', flexDirection: 'column' as const,
     alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',

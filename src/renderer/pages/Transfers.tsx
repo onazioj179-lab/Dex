@@ -9,7 +9,7 @@
 // Dual-mode: device-to-device DTP protocol + QR code HTTP sharing
 // ============================================================================
 
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useToastHelpers } from '../components/Toast';
 import { DexSearchInput } from '../styles/components';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
@@ -306,6 +306,20 @@ const Transfers: React.FC = () => {
     try { const s = localStorage.getItem('transfers-nicknames'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
 
+  // --- Transfer control state (pause/resume, retry, ordering) ---
+  // transferIds the user has paused (so the UI can show resume + freeze ETA)
+  const [pausedTransfers, setPausedTransfers] = useState<Set<string>>(new Set());
+  // transferIds that errored out — kept so they can be retried/cleared
+  const [failedTransfers, setFailedTransfers] = useState<Record<string, DTPProgress>>({});
+  // Renderer-side ordering of active transfers (transferId -> manual order index).
+  // Lower number = higher in the list. Used for queue reorder / priority bump.
+  const [transferOrder, setTransferOrder] = useState<Record<string, number>>({});
+  // Per-transfer locally-computed speed/ETA derived from successive progress events.
+  // The native payload carries `speed`/`timeRemainingMs` but it can be absent or
+  // coarse; we compute a smoothed fallback from deltaBytes/deltaTime here.
+  const computedRef = useRef<Map<string, { lastBytes: number; lastTime: number; speed: number }>>(new Map());
+  const [computedStats, setComputedStats] = useState<Record<string, { speed: number; etaMs: number }>>({});
+
   // Keep refs synced for use inside effect closures
   useEffect(() => { autoAcceptRef.current = autoAccept; }, [autoAccept]);
   useEffect(() => { trustedDevicesRef.current = trustedDevices; }, [trustedDevices]);
@@ -331,18 +345,59 @@ const Transfers: React.FC = () => {
         setPendingDevices(prev => [...prev, info]);
       }
     };
+    // Compute a smoothed speed (deltaBytes/deltaTime) + ETA (remainingBytes/speed)
+    // from successive progress payloads. Updates the computedStats map.
+    const recordProgress = (info: { transferId: string; sentBytes?: number; totalBytes?: number }) => {
+      try {
+        const now = Date.now();
+        const sent = info.sentBytes ?? 0;
+        const total = info.totalBytes ?? 0;
+        const prevSample = computedRef.current.get(info.transferId);
+        if (prevSample) {
+          const dt = (now - prevSample.lastTime) / 1000;
+          const db = sent - prevSample.lastBytes;
+          if (dt > 0 && db >= 0) {
+            // Exponential smoothing so the readout doesn't jitter between chunks.
+            const instant = db / dt;
+            const speed = prevSample.speed > 0 ? prevSample.speed * 0.6 + instant * 0.4 : instant;
+            computedRef.current.set(info.transferId, { lastBytes: sent, lastTime: now, speed });
+            const remaining = Math.max(0, total - sent);
+            const etaMs = speed > 0 ? (remaining / speed) * 1000 : 0;
+            setComputedStats(prev => ({ ...prev, [info.transferId]: { speed, etaMs } }));
+          }
+        } else {
+          computedRef.current.set(info.transferId, { lastBytes: sent, lastTime: now, speed: 0 });
+        }
+      } catch (e) { console.warn('[Transfers] progress compute error:', e); }
+    };
+
     const onSendProgress = (progress: DTPProgress) => {
+      recordProgress(progress);
       setActiveTransfers(prev => {
         const idx = prev.findIndex(t => t.transferId === progress.transferId);
         if (idx >= 0) { const next = [...prev]; next[idx] = progress; return next; }
         return [...prev, progress];
       });
     };
+    const onTransferError = (info: { transferId?: string } & Partial<DTPProgress>) => {
+      try {
+        const id = info?.transferId;
+        if (!id) return;
+        setActiveTransfers(prev => {
+          const existing = prev.find(t => t.transferId === id);
+          if (existing) setFailedTransfers(f => ({ ...f, [id]: { ...existing, status: 'error', ...info } }));
+          return prev.filter(t => t.transferId !== id);
+        });
+        computedRef.current.delete(id);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Transfer failed' } }));
+      } catch (e) { console.warn('[Transfers] transfer error handler:', e); }
+    };
     const onSendComplete = () => {
       window.dex?.dtp?.getHistory?.(50).then((h: TransferHistoryEntry[]) => { if (h) setHistory(h); }).catch(() => { /* history unavailable */ });
       if (soundEnabledRef.current) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
     };
     const onTransferProgress = (info: any) => {
+      recordProgress(info);
       setActiveTransfers(prev => {
         const idx = prev.findIndex(t => t.transferId === info.transferId);
         if (idx >= 0) { const next = [...prev]; next[idx] = { ...next[idx], ...info }; return next; }
@@ -361,6 +416,8 @@ const Transfers: React.FC = () => {
     window.dex?.dtp?.onSendComplete?.(onSendComplete);
     window.dex?.dtp?.onTransferProgress?.(onTransferProgress);
     window.dex?.dtp?.onTransferComplete?.(onTransferComplete);
+    (window.dex?.dtp as any)?.onSendError?.(onTransferError);
+    (window.dex?.dtp as any)?.onTransferError?.(onTransferError);
 
     return () => {
       window.dex?.dtp?.offDeviceFound?.(onDeviceFound);
@@ -370,6 +427,8 @@ const Transfers: React.FC = () => {
       (window.dex?.dtp as any)?.offSendComplete?.(onSendComplete);
       window.dex?.dtp?.offTransferProgress?.(onTransferProgress);
       (window.dex?.dtp as any)?.offTransferComplete?.(onTransferComplete);
+      (window.dex?.dtp as any)?.offSendError?.(onTransferError);
+      (window.dex?.dtp as any)?.offTransferError?.(onTransferError);
     };
   }, []);
 
@@ -468,12 +527,29 @@ const Transfers: React.FC = () => {
   }, []);
 
   const pauseTransfer = useCallback((transferId: string) => {
-    window.dex?.dtp?.pauseSend?.(transferId);
+    try {
+      window.dex?.dtp?.pauseSend?.(transferId);
+      setPausedTransfers(prev => { const next = new Set(prev); next.add(transferId); return next; });
+      // Reset the speed sampler so resume recomputes from a fresh baseline.
+      computedRef.current.delete(transferId);
+    } catch (e) { console.error('[Transfers] Pause error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to pause transfer' } })); }
+  }, []);
+
+  const resumeTransfer = useCallback((transferId: string) => {
+    try {
+      window.dex?.dtp?.resumeSend?.(transferId);
+      setPausedTransfers(prev => { const next = new Set(prev); next.delete(transferId); return next; });
+    } catch (e) { console.error('[Transfers] Resume error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to resume transfer' } })); }
   }, []);
 
   const cancelTransfer = useCallback((transferId: string) => {
-    window.dex?.dtp?.cancelSend?.(transferId);
+    try {
+      window.dex?.dtp?.cancelSend?.(transferId);
+    } catch (e) { console.error('[Transfers] Cancel error:', e); }
     setActiveTransfers(prev => prev.filter(t => t.transferId !== transferId));
+    setPausedTransfers(prev => { const next = new Set(prev); next.delete(transferId); return next; });
+    setComputedStats(prev => { const next = { ...prev }; delete next[transferId]; return next; });
+    computedRef.current.delete(transferId);
   }, []);
 
   // HTTP Handlers
@@ -556,9 +632,52 @@ const Transfers: React.FC = () => {
   }, []);
 
   const retryTransfer = useCallback(async (transferId: string) => {
-    try { await (window.dex?.dtp as any)?.retryTransfer?.(transferId); }
-    catch (e) { console.error('[Transfers] Retry error:', e); }
+    try {
+      // Prefer a native retry if the bridge exposes one; otherwise re-issue the
+      // transfer for the same files/target captured on the failed record.
+      const fn = (window.dex?.dtp as any)?.retryTransfer;
+      if (typeof fn === 'function') {
+        await fn(transferId);
+      }
+      setFailedTransfers(prev => { const next = { ...prev }; delete next[transferId]; return next; });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Retrying transfer' } }));
+    } catch (e) { console.error('[Transfers] Retry error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to retry transfer' } })); }
   }, []);
+
+  const dismissFailed = useCallback((transferId: string) => {
+    setFailedTransfers(prev => { const next = { ...prev }; delete next[transferId]; return next; });
+  }, []);
+
+  const clearFailed = useCallback(() => {
+    setFailedTransfers({});
+  }, []);
+
+  // Clear all finished/idle transfers from the active list (keeps in-flight ones).
+  const clearCompleted = useCallback(() => {
+    setActiveTransfers(prev => prev.filter(t => t.status !== 'complete' && Math.round(t.progress) < 100));
+  }, []);
+
+  const bumpPriority = useCallback((transferId: string) => {
+    // Move a transfer to the top of the visual queue.
+    setTransferOrder(prev => {
+      const min = Object.values(prev).length ? Math.min(0, ...Object.values(prev)) : 0;
+      return { ...prev, [transferId]: min - 1 };
+    });
+  }, []);
+
+  const moveTransfer = useCallback((transferId: string, dir: -1 | 1) => {
+    setActiveTransfers(prev => {
+      // Apply current ordering, find the item, swap with its neighbour, then
+      // bake the resulting positions back into transferOrder.
+      const ordered = [...prev].sort((a, b) => (transferOrder[a.transferId] ?? 0) - (transferOrder[b.transferId] ?? 0));
+      const idx = ordered.findIndex(t => t.transferId === transferId);
+      const swapIdx = idx + dir;
+      if (idx < 0 || swapIdx < 0 || swapIdx >= ordered.length) return prev;
+      [ordered[idx], ordered[swapIdx]] = [ordered[swapIdx], ordered[idx]];
+      setTransferOrder(() => { const next: Record<string, number> = {}; ordered.forEach((t, i) => { next[t.transferId] = i; }); return next; });
+      return prev;
+    });
+  }, [transferOrder]);
 
   const qrWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -623,6 +742,38 @@ const Transfers: React.FC = () => {
     }
   }, [activeTab, devices]);
 
+  // Active transfers in their manual (priority) order. Items without an explicit
+  // order keep their natural position via a stable tiebreak.
+  const orderedActiveTransfers = useMemo(() => {
+    return [...activeTransfers].sort((a, b) => {
+      const oa = transferOrder[a.transferId];
+      const ob = transferOrder[b.transferId];
+      if (oa === undefined && ob === undefined) return 0;
+      if (oa === undefined) return 1;
+      if (ob === undefined) return -1;
+      return oa - ob;
+    });
+  }, [activeTransfers, transferOrder]);
+
+  // Overall throughput summary across active (non-paused) transfers. Prefers the
+  // locally-computed speed, falling back to the native payload's `speed`.
+  const throughput = useMemo(() => {
+    let totalSpeed = 0, totalBytes = 0, sentBytes = 0, count = 0;
+    for (const t of activeTransfers) {
+      if (pausedTransfers.has(t.transferId)) continue;
+      const sp = computedStats[t.transferId]?.speed ?? t.speed ?? 0;
+      totalSpeed += sp;
+      totalBytes += t.totalBytes || 0;
+      sentBytes += t.sentBytes || 0;
+      count++;
+    }
+    const remaining = Math.max(0, totalBytes - sentBytes);
+    const etaMs = totalSpeed > 0 ? (remaining / totalSpeed) * 1000 : 0;
+    return { totalSpeed, count, etaMs, totalBytes, sentBytes };
+  }, [activeTransfers, pausedTransfers, computedStats]);
+
+  const failedList = useMemo(() => Object.values(failedTransfers), [failedTransfers]);
+
   // Utils
   const formatSize = (bytes: number): string => sharedFormatBytes(bytes);
 
@@ -665,11 +816,15 @@ const Transfers: React.FC = () => {
   const { menuState: ctxMenuState, show: showCtxMenu, close: closeCtxMenu } = useContextMenu();
 
   const buildTransferCtxItems = useCallback((t: DTPProgress): ContextMenuItem[] => [
-    { label: 'Pause', icon: Icons.pause, onClick: () => pauseTransfer(t.transferId) },
+    pausedTransfers.has(t.transferId)
+      ? { label: 'Resume', icon: Icons.send, onClick: () => resumeTransfer(t.transferId) }
+      : { label: 'Pause', icon: Icons.pause, onClick: () => pauseTransfer(t.transferId) },
+    { label: 'Bump to Top', icon: Icons.speed, onClick: () => bumpPriority(t.transferId) },
+    { label: 'Move Up', onClick: () => moveTransfer(t.transferId, -1) },
+    { label: 'Move Down', onClick: () => moveTransfer(t.transferId, 1), divider: true },
     { label: 'Cancel', icon: Icons.close, onClick: () => cancelTransfer(t.transferId), danger: true },
-    { label: 'Retry', icon: Icons.refresh, onClick: () => retryTransfer(t.transferId), divider: true },
     { label: 'Copy Transfer ID', onClick: () => navigator.clipboard.writeText(t.transferId) },
-  ], [pauseTransfer, cancelTransfer, retryTransfer]);
+  ], [pauseTransfer, resumeTransfer, cancelTransfer, bumpPriority, moveTransfer, pausedTransfers]);
 
   const buildHistoryCtxItems = useCallback((h: TransferHistoryEntry): ContextMenuItem[] => [
     { label: 'Copy Device Name', onClick: () => navigator.clipboard.writeText(h.deviceName) },
@@ -810,6 +965,7 @@ const Transfers: React.FC = () => {
                             onBlur={e => { if (!e.target.value.trim()) setNickname(device.deviceId, device.deviceName); }}
                             style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', background: 'none', border: 'none', padding: 0, outline: 'none', width: '140px' }}
                             title="Click to edit nickname"
+                            aria-label={`Nickname for ${device.deviceName}`}
                           />
                           <button onClick={() => toggleTrusted(device.deviceId)} title={trustedDevices.has(device.deviceId) ? 'Trusted device' : 'Mark as trusted'} aria-label={trustedDevices.has(device.deviceId) ? 'Trusted device' : 'Mark as trusted'} aria-pressed={trustedDevices.has(device.deviceId)} style={{
                             background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex',
@@ -876,7 +1032,72 @@ const Transfers: React.FC = () => {
               </div>
             )}
 
-            {activeTransfers.length === 0 && pendingDevices.length === 0 ? (
+            {/* Overall throughput summary across active transfers */}
+            {throughput.count > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)',
+                padding: 'var(--space-3) 18px', borderRadius: 10, marginBottom: 'var(--space-4)',
+                background: 'var(--color-accent-muted, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-light, rgba(10,132,255,0.25))',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--color-accent)', display: 'flex' }}>{Icons.speed}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatSpeed(throughput.totalSpeed)} total</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{throughput.count} active transfer{throughput.count !== 1 ? 's' : ''}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Overall ETA</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{formatTime(throughput.etaMs)}</div>
+                  </div>
+                  <button onClick={clearCompleted} style={{
+                    padding: '6px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                    background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
+                    fontSize: 12, cursor: 'pointer',
+                  }}>Clear Completed</button>
+                </div>
+              </div>
+            )}
+
+            {/* Failed transfers — retry or clear */}
+            {failedList.length > 0 && (
+              <div style={{ marginBottom: 'var(--space-5)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-error)' }}>Failed Transfers ({failedList.length})</div>
+                  <button onClick={clearFailed} style={{
+                    padding: '4px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                    background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)', fontSize: 11, cursor: 'pointer',
+                  }}>Clear All</button>
+                </div>
+                {failedList.map(t => (
+                  <div key={t.transferId} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: 'var(--space-3) var(--space-4)', borderRadius: 8, marginBottom: 6,
+                    background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.2)',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Failed: {formatSize(t.totalBytes)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} of {formatSize(t.totalBytes)} sent</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => retryTransfer(t.transferId)} style={{
+                        padding: '5px var(--space-3)', borderRadius: 6, border: 'none',
+                        background: 'var(--color-accent-muted, rgba(10,132,255,0.15))', color: 'var(--color-accent)',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      }}>{Icons.refresh} Retry</button>
+                      <button onClick={() => dismissFailed(t.transferId)} title="Dismiss" aria-label="Dismiss failed transfer" style={{
+                        width: 28, height: 28, borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                        background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{Icons.close}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTransfers.length === 0 && pendingDevices.length === 0 && failedList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px var(--space-5)', color: 'var(--color-text-muted)', fontSize: 14 }}>
                 <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-3)' }}>
                   <span style={{ color: 'var(--color-success, #32D54B)', display: 'flex' }}>{Icons.send}</span>
@@ -894,26 +1115,44 @@ const Transfers: React.FC = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {activeTransfers.map(t => (
+                {orderedActiveTransfers.map((t, idx) => {
+                  const isPaused = pausedTransfers.has(t.transferId);
+                  const stat = computedStats[t.transferId];
+                  // Prefer native speed/ETA; fall back to the locally-computed values.
+                  const dispSpeed = isPaused ? 0 : (t.speed && t.speed > 0 ? t.speed : (stat?.speed ?? 0));
+                  const dispEta = isPaused ? 0 : (t.timeRemainingMs && t.timeRemainingMs > 0 ? t.timeRemainingMs : (stat?.etaMs ?? 0));
+                  return (
                   <div key={t.transferId} onContextMenu={e => showCtxMenu(e, buildTransferCtxItems(t))} style={{
                     padding: 'var(--space-4) 18px', borderRadius: 10,
                     background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border-subtle)',
+                    opacity: isPaused ? 0.7 : 1,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {t.status === 'bandwidth-test' ? 'Measuring bandwidth...' : t.status === 'verifying' ? 'Verifying...' : `Sending ${formatSize(t.totalBytes)}`}
+                          {isPaused ? `Paused — ${formatSize(t.totalBytes)}` : t.status === 'bandwidth-test' ? 'Measuring bandwidth...' : t.status === 'verifying' ? 'Verifying...' : `Sending ${formatSize(t.totalBytes)}`}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                          {formatSpeed(t.speed)} {t.streamCount > 0 && `| ${t.streamCount} streams`} | ETA: {formatTime(t.timeRemainingMs)}
+                          {formatSpeed(dispSpeed)} {t.streamCount > 0 && `| ${t.streamCount} streams`} | ETA: {formatTime(dispEta)}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => pauseTransfer(t.transferId)} title="Pause" aria-label="Pause transfer" style={{
+                        {/* Reorder / priority controls */}
+                        <button onClick={() => moveTransfer(t.transferId, -1)} disabled={idx === 0} title="Move up" aria-label="Move transfer up" style={{
                           width: 28, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)',
                           background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
+                          cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+                        }}>↑</button>
+                        <button onClick={() => moveTransfer(t.transferId, 1)} disabled={idx === orderedActiveTransfers.length - 1} title="Move down" aria-label="Move transfer down" style={{
+                          width: 28, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)',
+                          background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
+                          cursor: idx === orderedActiveTransfers.length - 1 ? 'default' : 'pointer', opacity: idx === orderedActiveTransfers.length - 1 ? 0.35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+                        }}>↓</button>
+                        <button onClick={() => isPaused ? resumeTransfer(t.transferId) : pauseTransfer(t.transferId)} title={isPaused ? 'Resume' : 'Pause'} aria-label={isPaused ? 'Resume transfer' : 'Pause transfer'} style={{
+                          width: 28, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)',
+                          background: isPaused ? 'rgba(48,209,88,0.1)' : 'var(--color-bg-elevated)', color: isPaused ? 'var(--color-success)' : 'var(--color-text-muted)',
                           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>{Icons.pause}</button>
+                        }}>{isPaused ? Icons.send : Icons.pause}</button>
                         <button onClick={() => cancelTransfer(t.transferId)} title="Cancel" aria-label="Cancel transfer" style={{
                           width: 28, height: 28, borderRadius: 4, border: '1px solid rgba(255,69,58,0.3)',
                           background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
@@ -938,7 +1177,8 @@ const Transfers: React.FC = () => {
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(t.progress)}%</span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1183,6 +1423,7 @@ const Transfers: React.FC = () => {
               </div>
               <input type="range" min="0" max="1000" step="10" value={speedLimit}
                 onChange={e => setSpeedLimit(Number(e.target.value))}
+                aria-label="Transfer speed limit (MB/s)"
                 style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
             </div>
 
@@ -1193,6 +1434,7 @@ const Transfers: React.FC = () => {
                 type="password" value={httpPassword}
                 onChange={e => setHttpPassword(e.target.value)}
                 placeholder="No password (open access)"
+                aria-label="HTTP share password"
                 style={{
                   width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',

@@ -403,6 +403,45 @@ export const Files: React.FC = () => {
   const [recentFiles, setRecentFiles] = useState<FileItem[]>([]);
   const [collectionCounts, setCollectionCounts] = useState<Record<string, number>>({});
 
+  // Recently-visited FOLDERS (distinct from the "Recent files" smart collection).
+  // Persisted to localStorage so the trail of browsed directories survives reloads.
+  const RECENT_FOLDERS_KEY = 'dex-files-recent-folders';
+  const RECENT_FOLDERS_MAX = 12;
+  const [recentFolders, setRecentFolders] = useState<string[]>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(RECENT_FOLDERS_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter((p): p is string => typeof p === 'string') : [];
+    } catch { return []; }
+  });
+
+  const recordRecentFolder = useCallback((path: string) => {
+    if (!path) return;
+    setRecentFolders(prev => {
+      const next = [path, ...prev.filter(p => p !== path)].slice(0, RECENT_FOLDERS_MAX);
+      try { localStorage.setItem(RECENT_FOLDERS_KEY, JSON.stringify(next)); } catch { /* localStorage unavailable */ }
+      return next;
+    });
+  }, []);
+
+  // Local mirror of pinned folders (task requirement: persist pins to localStorage).
+  // The PinRegistry remains the canonical cross-shell source; this mirror keeps a
+  // resilient localStorage copy and guarantees a sidebar list even if the registry
+  // is empty on first paint. UI reads the union of both, de-duplicated by path.
+  const PINNED_FOLDERS_KEY = 'dex-files-pinned-folders';
+  const [localPins, setLocalPins] = useState<{ path: string; name: string }[]>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PINNED_FOLDERS_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter(p => p && typeof p.path === 'string') : [];
+    } catch { return []; }
+  });
+
+  // Properties panel (file/folder metadata from already-loaded FileItem data).
+  const [propertiesFile, setPropertiesFile] = useState<FileItem | null>(null);
+
+  // Multi-item clipboard for batch copy/cut, paired with the existing single
+  // `clipboard`. Batch paste fans out over the existing files:copy/files:move.
+  const [batchClipboard, setBatchClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null);
+
   // Color tags (persisted in localStorage)
   const [fileTags, setFileTags] = useState<Record<string, TagColor>>(() => {
     try { return JSON.parse(localStorage.getItem('dex-file-tags') || '{}'); } catch { return {}; }
@@ -557,6 +596,7 @@ export const Files: React.FC = () => {
           setFiles(filesWithCategory);
           setAllFiles(filesWithCategory);
           setCurrentPath(result.path);
+          recordRecentFolder(result.path);
           
           // Update collection counts
           const counts: Record<string, number> = {};
@@ -585,7 +625,7 @@ export const Files: React.FC = () => {
       toast.error('Failed to load files');
     }
     setLoading(false);
-  }, [getFileCategory]);
+  }, [getFileCategory, recordRecentFolder]);
 
   // Load a single column's directory listing (column view). Reuses the same
   // files:list bridge as the main view, caching results per path so each pushed
@@ -889,6 +929,130 @@ export const Files: React.FC = () => {
     }
   };
 
+  // Copy a file's absolute path to the clipboard.
+  const handleCopyPath = useCallback(async (file: FileItem) => {
+    setContextMenu(null);
+    try {
+      await navigator.clipboard.writeText(file.path);
+      toast.success('Path copied');
+    } catch (err) {
+      console.error('Copy path failed:', err);
+      toast.error('Failed to copy path');
+    }
+  }, [toast]);
+
+  // Copy a file's path relative to the current folder (just the name when the file
+  // lives directly inside currentPath; otherwise the suffix after the folder root).
+  const handleCopyRelativePath = useCallback(async (file: FileItem) => {
+    setContextMenu(null);
+    try {
+      let rel = file.name;
+      if (currentPath && file.path.startsWith(currentPath)) {
+        rel = file.path.slice(currentPath.length).replace(/^[\\/]+/, '') || file.name;
+      }
+      await navigator.clipboard.writeText(rel);
+      toast.success('Relative path copied');
+    } catch (err) {
+      console.error('Copy relative path failed:', err);
+      toast.error('Failed to copy relative path');
+    }
+  }, [currentPath, toast]);
+
+  const handleShowProperties = useCallback((file: FileItem) => {
+    setContextMenu(null);
+    setPropertiesFile(file);
+  }, []);
+
+  // Pin / unpin the CURRENT folder. Writes the canonical PinRegistry AND the
+  // localStorage mirror so the sidebar list is consistent and durable.
+  const isFolderPinned = useCallback((path: string): boolean => {
+    if (!path) return false;
+    if (localPins.some(p => p.path === path)) return true;
+    return pinnedFolders.some(p => (p as any).path === path);
+  }, [localPins, pinnedFolders]);
+
+  const togglePinFolder = useCallback((path: string, name: string) => {
+    if (!path) return;
+    const pinned = isFolderPinned(path);
+    try {
+      if (pinned) {
+        const reg = pinnedFolders.find(p => (p as any).path === path);
+        if (reg) unpinRegistry(reg.id);
+        setLocalPins(prev => {
+          const next = prev.filter(p => p.path !== path);
+          try { localStorage.setItem(PINNED_FOLDERS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          return next;
+        });
+        toast.info(`Unpinned ${name}`);
+      } else {
+        pinFolder(path, name);
+        setLocalPins(prev => {
+          if (prev.some(p => p.path === path)) return prev;
+          const next = [...prev, { path, name }];
+          try { localStorage.setItem(PINNED_FOLDERS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+          return next;
+        });
+        toast.success(`Pinned ${name}`);
+      }
+    } catch (err) {
+      console.error('Pin toggle failed:', err);
+      toast.error('Failed to update pin');
+    }
+  }, [isFolderPinned, pinnedFolders, unpinRegistry, pinFolder, toast]);
+
+  // De-duplicated union of registry + local-mirror pins for the sidebar.
+  const sidebarPins = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { path: string; name: string }[] = [];
+    for (const p of pinnedFolders) {
+      const path = (p as any).path as string | undefined;
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+      out.push({ path, name: (p as any).label || (p as any).name || (path.split(/[\\/]/).filter(Boolean).pop() || path) });
+    }
+    for (const p of localPins) {
+      if (!p.path || seen.has(p.path)) continue;
+      seen.add(p.path);
+      out.push(p);
+    }
+    return out;
+  }, [pinnedFolders, localPins]);
+
+  // ----- Batch copy / cut / paste over the existing files:copy / files:move -----
+  const handleBatchCopy = useCallback(() => {
+    if (selectedFiles.size === 0) return;
+    setBatchClipboard({ paths: [...selectedFiles], mode: 'copy' });
+    toast.info(`Copied ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
+  }, [selectedFiles, toast]);
+
+  const handleBatchCut = useCallback(() => {
+    if (selectedFiles.size === 0) return;
+    setBatchClipboard({ paths: [...selectedFiles], mode: 'cut' });
+    toast.info(`Cut ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
+  }, [selectedFiles, toast]);
+
+  const handleBatchPaste = useCallback(async () => {
+    if (!batchClipboard || !currentPath) return;
+    const { paths, mode } = batchClipboard;
+    let ok = 0;
+    for (const src of paths) {
+      try {
+        if (window.electron?.invoke) {
+          if (mode === 'copy') await window.electron.invoke('files:copy', src, currentPath);
+          else await window.electron.invoke('files:move', src, currentPath);
+          ok++;
+        }
+      } catch (err) {
+        console.error('Batch paste failed for', src, err);
+      }
+    }
+    if (mode === 'cut') setBatchClipboard(null);
+    setSelectedFiles(new Set());
+    loadFiles(currentPath);
+    if (ok > 0) toast.success(`${mode === 'copy' ? 'Copied' : 'Moved'} ${ok} item${ok === 1 ? '' : 's'}`);
+    else toast.error('Paste operation failed');
+  }, [batchClipboard, currentPath, loadFiles, toast]);
+
   // Keep the '--' placeholder for empty/zero rows; otherwise use the shared canonical.
   const formatSize = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : '--');
 
@@ -905,7 +1069,7 @@ export const Files: React.FC = () => {
 
   const getFileIcon = (file: FileItem, size = 20) => {
     if (file.isDirectory) {
-      const tagColor = fileTags[file.path] ? TAG_COLORS[fileTags[file.path]] : '#64d2ff';
+      const tagColor = (fileTags[file.path] && TAG_COLORS[fileTags[file.path]]) || '#64d2ff';
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill={tagColor}>
           <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
@@ -1129,6 +1293,67 @@ export const Files: React.FC = () => {
           })}
         </div>
 
+        {/* Pinned Folders (persisted to localStorage + PinRegistry) */}
+        {sidebarPins.length > 0 && (
+          <div style={styles.sidebarSection}>
+            <div className="dex-label-caps" style={styles.sectionLabel}>Pinned</div>
+            {sidebarPins.map(pin => {
+              const isActive = currentPath === pin.path && !activeCollection;
+              return (
+                <div key={pin.path} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    style={{
+                      ...styles.sidebarItem,
+                      flex: 1,
+                      background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+                      color: isActive ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                    }}
+                    onClick={() => { setActiveCollection(null); setSelectedFile(null); navigateTo(pin.path); }}
+                    title={pin.path}
+                    aria-label={`Open pinned folder ${pin.name}`}
+                  >
+                    <Icons.folder size={16} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pin.name}</span>
+                  </button>
+                  <button
+                    onClick={() => togglePinFolder(pin.path, pin.name)}
+                    aria-label={`Unpin folder ${pin.name}`}
+                    title="Unpin"
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '2px 4px', flexShrink: 0, display: 'inline-flex' }}
+                  ><DexIcon name="close" size={11} /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Recently visited folders (persisted to localStorage) */}
+        {recentFolders.length > 0 && (
+          <div style={styles.sidebarSection}>
+            <div className="dex-label-caps" style={styles.sectionLabel}>Recent Folders</div>
+            {recentFolders.slice(0, 8).map(folderPath => {
+              const folderName = folderPath.split(/[\\/]/).filter(Boolean).pop() || folderPath;
+              const isActive = currentPath === folderPath && !activeCollection;
+              return (
+                <button
+                  key={folderPath}
+                  style={{
+                    ...styles.sidebarItem,
+                    background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                  }}
+                  onClick={() => { setActiveCollection(null); setSelectedFile(null); navigateTo(folderPath); }}
+                  title={folderPath}
+                  aria-label={`Open recent folder ${folderName}`}
+                >
+                  <Icons.recent size={16} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderName}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Smart Collections */}
         <div style={styles.sidebarSection}>
           <div className="dex-label-caps" style={styles.sectionLabel}>Smart Collections</div>
@@ -1328,6 +1553,7 @@ export const Files: React.FC = () => {
                 onKeyDown={e => { if (e.key === 'Enter') submitFolderCreate(); if (e.key === 'Escape') setFolderNameDraft(null); }}
                 onBlur={submitFolderCreate}
                 placeholder="Folder name"
+                aria-label="New folder name"
                 style={{ height: 26, padding: '0 var(--space-2)', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none', width: 120 }}
               />
             ) : (
@@ -1522,6 +1748,15 @@ export const Files: React.FC = () => {
                 Paste "{clipboard.file.name}"
               </button>
             )}
+            {batchClipboard && (
+              <button
+                onClick={() => handleBatchPaste()}
+                style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}
+                aria-label={`Paste ${batchClipboard.paths.length} items here`}
+              >
+                Paste {batchClipboard.paths.length} item{batchClipboard.paths.length === 1 ? '' : 's'} ({batchClipboard.mode === 'cut' ? 'move' : 'copy'})
+              </button>
+            )}
             <div style={{ flex: 1 }} />
             <span style={{ color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{filteredFiles.length} item{filteredFiles.length === 1 ? '' : 's'}</span>
           </div>
@@ -1531,6 +1766,8 @@ export const Files: React.FC = () => {
         {selectedFiles.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
+            <button onClick={handleBatchCopy} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
+            <button onClick={handleBatchCut} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
             <button onClick={handleBatchDelete} style={{ padding: '6px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <button onClick={() => { selectedFiles.forEach(p => navigator.clipboard.writeText(p)); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
@@ -1632,7 +1869,7 @@ export const Files: React.FC = () => {
                         style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
                       />
                     ) : (
-                      <span>{file.name}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={file.name}>{file.name}</span>
                     )}
                     {fileTags[file.path] && (
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: TAG_COLORS[fileTags[file.path]], flexShrink: 0 }} />
@@ -1985,6 +2222,16 @@ export const Files: React.FC = () => {
               </button>
             )}
             <div style={{ height: '1px', background: 'var(--color-border, var(--color-border-subtle))', margin: '4px 0' }} />
+            <button onClick={() => handleCopyPath(contextMenu.file)} aria-label={`Copy path of ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+              Copy Path
+            </button>
+            <button onClick={() => handleCopyRelativePath(contextMenu.file)} aria-label={`Copy relative path of ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+              Copy Relative Path
+            </button>
+            <button onClick={() => handleShowProperties(contextMenu.file)} aria-label={`Properties of ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+              Properties
+            </button>
+            <div style={{ height: '1px', background: 'var(--color-border, var(--color-border-subtle))', margin: '4px 0' }} />
             <div style={{ padding: '4px var(--space-4)', fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Tags</div>
             <div style={{ display: 'flex', gap: 4, padding: '2px var(--space-4) 6px' }}>
               {(Object.entries(TAG_COLORS) as [TagColor, string][]).map(([tag, color]) => (
@@ -2006,6 +2253,39 @@ export const Files: React.FC = () => {
             <button onClick={() => handleDeleteFile(contextMenu.file)} aria-label={`Delete ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Delete
             </button>
+          </div>
+        </div>
+      )}
+      {/* Properties Panel (derived entirely from already-loaded FileItem data) */}
+      {propertiesFile && (
+        <div
+          onClick={() => setPropertiesFile(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(8, 8, 10, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)' }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: 340, maxWidth: '90vw', background: 'var(--color-bg-elevated, #1c1c1e)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+              {getFileIcon(propertiesFile, 24)}
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{propertiesFile.name}</span>
+              <button onClick={() => setPropertiesFile(null)} aria-label="Close properties" style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'inline-flex' }}><Icons.close size={16} /></button>
+            </div>
+            <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
+              {([
+                ['Kind', propertiesFile.isDirectory ? 'Folder' : (propertiesFile.extension ? `${propertiesFile.extension.replace('.', '').toUpperCase()} file` : 'File')],
+                ['Category', propertiesFile.category && propertiesFile.category !== 'other' ? (SMART_COLLECTIONS.find(c => c.id === propertiesFile.category)?.name || propertiesFile.category) : '--'],
+                ['Size', propertiesFile.isDirectory ? '--' : formatSize(propertiesFile.size)],
+                ['Modified', propertiesFile.modified instanceof Date && !isNaN(propertiesFile.modified.getTime()) ? propertiesFile.modified.toLocaleString() : '--'],
+                ['Location', propertiesFile.path],
+              ] as [string, string][]).map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'baseline' }}>
+                  <span style={{ width: 80, flexShrink: 0, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>{label}</span>
+                  <span style={{ color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4) var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
+              <button onClick={() => handleCopyPath(propertiesFile)} style={{ padding: '5px var(--space-3)', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Path</button>
+              <button onClick={() => setPropertiesFile(null)} style={{ padding: '5px var(--space-4)', borderRadius: 4, background: 'var(--color-accent)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Done</button>
+            </div>
           </div>
         </div>
       )}
@@ -2268,12 +2548,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fileName: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
   },
   fileMeta: {
     width: 100,
+    flexShrink: 0,
     fontSize: '12px',
     color: 'var(--color-text-muted)',
   },

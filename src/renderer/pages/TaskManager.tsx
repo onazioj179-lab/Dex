@@ -11,6 +11,7 @@ import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
+import { sendToNotes } from '../services/sendTo';
 
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
@@ -98,6 +99,42 @@ const formatBps = (bps: number): string => {
   let i = 0;
   while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
   return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[i]}`;
+};
+
+// Group key for "by application": collapse a process name into the application
+// it most likely belongs to. Strips a trailing PID-ish suffix, a file
+// extension, and the " Helper (Renderer)"-style qualifiers Chromium apps spawn,
+// so e.g. "chrome.exe", "Code Helper (GPU)" and "node" each cluster sensibly.
+const PINNED_KEY = 'dex-taskmanager-pinned';
+const GROUP_BY_KEY = 'dex-taskmanager-groupby';
+
+const groupKeyFor = (name: string): string => {
+  let base = (name || 'unknown').trim();
+  // Drop a Windows/Unix extension.
+  base = base.replace(/\.(exe|app|bin|dll|sh)$/i, '');
+  // Drop Chromium-style helper qualifiers: "Foo Helper (Renderer)" -> "Foo".
+  base = base.replace(/\s+Helper(\s*\([^)]*\))?$/i, '');
+  base = base.replace(/\s*\(([^)]*)\)\s*$/i, '');
+  return base.trim() || (name || 'unknown');
+};
+
+const loadPinned = (): number[] => {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((n): n is number => typeof n === 'number');
+  } catch { /* ignore */ }
+  return [];
+};
+
+const loadGroupBy = (): boolean => {
+  try { return localStorage.getItem(GROUP_BY_KEY) === '1'; } catch { /* ignore */ }
+  return false;
+};
+
+const toastEvent = (type: 'success' | 'error' | 'info', message: string): void => {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* ignore */ }
 };
 
 interface SparklineProps {
@@ -235,6 +272,19 @@ const TaskManager: React.FC = () => {
   const [hoveredPid, setHoveredPid] = useState<number | null>(null);
   const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean; tree?: boolean } | null>(null);
 
+  // -- Feature state (all renderer-local, persisted where it makes sense) --
+  // Pinned watch-list of PIDs: pinned processes are floated to the top of the
+  // table and rendered in their own always-visible strip.
+  const [pinned, setPinned] = useState<number[]>(loadPinned);
+  // Group-by-application toggle + which group rows are collapsed.
+  const [groupBy, setGroupBy] = useState<boolean>(loadGroupBy);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  // Selected process for the detail panel (by pid).
+  const [selectedPid, setSelectedPid] = useState<number | null>(null);
+  // First-seen timestamps so the detail panel can show how long a PID has been
+  // observed in this session (the native payload carries no start time).
+  const firstSeenRef = useRef<Map<number, number>>(new Map());
+
   // Pulse v2: workspace grouping + governance state.
   const stages = useStageStore(s => s.stages);
   const activeStageId = useStageStore(s => s.activeStageId);
@@ -282,6 +332,19 @@ const TaskManager: React.FC = () => {
     try {
       const processList = await dexApi.system.getProcesses().catch(() => []);
       const list = Array.isArray(processList) ? processList : [];
+      // Record the first time each PID is observed so the detail panel can show
+      // an approximate age (the native payload has no start time).
+      const seen = firstSeenRef.current;
+      const now = Date.now();
+      const livePids = new Set<number>();
+      for (const proc of list) {
+        if (typeof proc?.pid === 'number') {
+          livePids.add(proc.pid);
+          if (!seen.has(proc.pid)) seen.set(proc.pid, now);
+        }
+      }
+      // Prune PIDs that are gone so the map cannot grow unbounded.
+      for (const pid of Array.from(seen.keys())) if (!livePids.has(pid)) seen.delete(pid);
       setProcesses(list);
       pushSample(setProcessHistory, list.length);
       setBridgeAvailable(true);
@@ -353,6 +416,14 @@ const TaskManager: React.FC = () => {
     try { localStorage.setItem(DETAIL_LEVEL_KEY, String(detailLevel)); } catch { /* ignore */ }
   }, [detailLevel]);
 
+  // Persist the pinned watch-list and the group-by toggle.
+  useEffect(() => {
+    try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinned)); } catch { /* ignore */ }
+  }, [pinned]);
+  useEffect(() => {
+    try { localStorage.setItem(GROUP_BY_KEY, groupBy ? '1' : '0'); } catch { /* ignore */ }
+  }, [groupBy]);
+
   const visibleProcesses = useMemo(() => {
     const query = filter.trim().toLowerCase();
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -381,8 +452,78 @@ const TaskManager: React.FC = () => {
   }, []);
   const sortArrow = (key: 'name' | 'pid' | 'cpu' | 'memory') => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
 
+  const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
+
+  const togglePin = useCallback((pid: number) => {
+    setPinned(prev => (prev.includes(pid) ? prev.filter(p => p !== pid) : [...prev, pid]));
+  }, []);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  // Aggregate application groups (CPU/mem sums + child count) over the filtered,
+  // sorted process list. Group order follows the active sort applied to each
+  // group's aggregate, so "sort by CPU" surfaces the heaviest app first.
+  interface ProcGroup { key: string; processes: SystemProcess[]; cpu: number; memory: number }
+  const groups = useMemo<ProcGroup[]>(() => {
+    const map = new Map<string, ProcGroup>();
+    for (const proc of visibleProcesses) {
+      const key = groupKeyFor(proc.name);
+      let group = map.get(key);
+      if (!group) { group = { key, processes: [], cpu: 0, memory: 0 }; map.set(key, group); }
+      group.processes.push(proc);
+      group.cpu += proc.cpu || 0;
+      group.memory += proc.memory || 0;
+    }
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return Array.from(map.values()).sort((a, b) => {
+      if (sortKey === 'name') return dir * a.key.localeCompare(b.key);
+      if (sortKey === 'memory') return dir * (a.memory - b.memory);
+      if (sortKey === 'pid') return dir * (a.processes[0].pid - b.processes[0].pid);
+      return dir * (a.cpu - b.cpu);
+    });
+  }, [visibleProcesses, sortKey, sortDir]);
+
+  // Flatten everything the table renders into a single uniform-height row list,
+  // so virtualization stays valid. Row kinds: pinned process, group header,
+  // process. Pinned processes always lead, regardless of grouping.
+  type TableRow =
+    | { kind: 'pinned'; process: SystemProcess }
+    | { kind: 'group'; group: ProcGroup }
+    | { kind: 'process'; process: SystemProcess; grouped: boolean };
+  const tableRows = useMemo<TableRow[]>(() => {
+    const rows: TableRow[] = [];
+    const pinnedProcs = visibleProcesses.filter(p => pinnedSet.has(p.pid));
+    for (const proc of pinnedProcs) rows.push({ kind: 'pinned', process: proc });
+    if (groupBy) {
+      for (const group of groups) {
+        rows.push({ kind: 'group', group });
+        if (!collapsedGroups[group.key]) {
+          for (const proc of group.processes) {
+            if (pinnedSet.has(proc.pid)) continue;
+            rows.push({ kind: 'process', process: proc, grouped: true });
+          }
+        }
+      }
+    } else {
+      for (const proc of visibleProcesses) {
+        if (pinnedSet.has(proc.pid)) continue;
+        rows.push({ kind: 'process', process: proc, grouped: false });
+      }
+    }
+    return rows;
+  }, [visibleProcesses, groups, groupBy, collapsedGroups, pinnedSet]);
+
+  // The detail-panel target, resolved from the live process list (so its metrics
+  // update each refresh). Falls back to null once the PID disappears.
+  const selectedProcess = useMemo(
+    () => (selectedPid == null ? null : processes.find(p => p.pid === selectedPid) || null),
+    [selectedPid, processes],
+  );
+
   // Windowed process table: drives padTop/visible-rows/padBottom from scrollTop.
-  const procVirtual = useVirtualList({ itemCount: visibleProcesses.length, rowHeight: PROCESS_ROW_H, bufferRows: 6 });
+  const procVirtual = useVirtualList({ itemCount: tableRows.length, rowHeight: PROCESS_ROW_H, bufferRows: 6 });
 
   const shellApps = runningApps.filter(app => app.id !== 'home');
   const cpuUsage = status.cpu?.usage ?? 0;
@@ -414,6 +555,39 @@ const TaskManager: React.FC = () => {
   const diskDetail = status.disk
     ? `${(status.disk.used / 1024 ** 3).toFixed(0)} / ${(status.disk.total / 1024 ** 3).toFixed(0)} GB`
     : 'No disk data';
+
+  // -- Snapshot export: a plain-text table of the top processes -> Notes. ----
+  const handleExportSnapshot = useCallback(() => {
+    try {
+      const top = [...processes]
+        .sort((a, b) => (b.cpu || 0) - (a.cpu || 0))
+        .slice(0, 25);
+      if (top.length === 0) { toastEvent('info', 'No process data to export yet'); return; }
+      const stamp = new Date().toLocaleString();
+      const padR = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length));
+      const padL = (s: string, n: number) => (s.length >= n ? s : ' '.repeat(n - s.length) + s);
+      const headerRow = `${padR('PROCESS', 28)} ${padL('PID', 8)} ${padL('CPU%', 7)} ${padL('MEM(MB)', 9)}`;
+      const divider = '-'.repeat(headerRow.length);
+      const lines = top.map(p =>
+        `${padR(p.name || 'unknown', 28)} ${padL(String(p.pid), 8)} ${padL((p.cpu || 0).toFixed(1), 7)} ${padL(String(Math.round(p.memory || 0)), 9)}`,
+      );
+      const summary = [
+        `DEX Task Manager snapshot — ${stamp}`,
+        '',
+        `CPU: ${cpuUsage}%   Memory: ${memoryPercent}%   Processes: ${processes.length}`,
+        hasBattery ? `Battery: ${batteryPercent}% (${battery?.charging ? 'charging' : 'on battery'})` : '',
+        `Top ${top.length} processes by CPU:`,
+        '',
+        headerRow,
+        divider,
+        ...lines,
+      ].filter(line => line !== '').join('\n');
+      void sendToNotes(summary, `Task Manager snapshot — ${stamp}`);
+    } catch (e) {
+      console.warn('[TaskManager] snapshot export failed', e);
+      toastEvent('error', 'Could not export snapshot');
+    }
+  }, [processes, cpuUsage, memoryPercent, hasBattery, batteryPercent, battery]);
 
   // -- Health monitoring (Task Manager 2.0) --------------------------------
   // Detect resource spikes, frozen apps, and runaway processes, and surface a
@@ -550,6 +724,15 @@ const TaskManager: React.FC = () => {
               </button>
             ))}
           </div>
+          <button
+            style={{ ...styles.refreshButton, opacity: processes.length === 0 ? 0.5 : 1 }}
+            onClick={handleExportSnapshot}
+            disabled={processes.length === 0}
+            aria-label="Send a snapshot of current usage to Notes"
+            title="Send a text table of the top processes to Notes"
+          >
+            <DexIcon name="file-text" size={14} /> Send to Notes
+          </button>
           <button style={styles.refreshButton} onClick={handleManualRefresh} aria-label="Refresh Task Manager">
             <DexIcon name="refresh" size={14} /> Refresh
           </button>
@@ -774,15 +957,31 @@ const TaskManager: React.FC = () => {
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
-            <DexSearchInput
-              size="sm"
-              value={filter}
-              onChange={event => setFilter(event.target.value)}
-              onClear={() => setFilter('')}
-              placeholder="Filter by name"
-              aria-label="Filter system processes"
-              style={{ width: 170 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {pinned.length > 0 && (
+                <span style={{ ...styles.countPill, background: 'rgba(255,159,10,0.16)', color: '#FFB340' }} title="Pinned to watch list">
+                  {pinned.length} pinned
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setGroupBy(g => !g)}
+                aria-pressed={groupBy}
+                title="Group processes by application"
+                style={{ ...styles.toggleButton, ...(groupBy ? styles.toggleButtonActive : null) }}
+              >
+                <DexIcon name="layers" size={12} /> Group
+              </button>
+              <DexSearchInput
+                size="sm"
+                value={filter}
+                onChange={event => setFilter(event.target.value)}
+                onClear={() => setFilter('')}
+                placeholder="Filter by name"
+                aria-label="Filter system processes"
+                style={{ width: 150 }}
+              />
+            </div>
           </div>
           <div style={styles.processTableHead}>
             <button type="button" style={styles.sortHeader} onClick={() => handleSort('name')} aria-label="Sort by name">Name{sortArrow('name')}</button>
@@ -794,28 +993,86 @@ const TaskManager: React.FC = () => {
           <div ref={procVirtual.ref as React.RefObject<HTMLDivElement>} onScroll={procVirtual.onScroll} style={styles.processTable}>
             {!bridgeAvailable ? (
               <div style={styles.empty}>Native process bridge is unavailable in this build. DEX app management remains active.</div>
-            ) : visibleProcesses.length === 0 ? (
+            ) : tableRows.length === 0 ? (
               <div style={styles.empty}>No processes to show yet.</div>
             ) : (
               <>
                 <div style={{ height: procVirtual.slice.padTop }} aria-hidden="true" />
-                {visibleProcesses.slice(procVirtual.slice.start, procVirtual.slice.end).map(process => {
+                {tableRows.slice(procVirtual.slice.start, procVirtual.slice.end).map((row, sliceIndex) => {
+                  if (row.kind === 'group') {
+                    const group = row.group;
+                    const collapsed = !!collapsedGroups[group.key];
+                    const groupCpuColor = group.cpu > 50 ? '#FF453A' : group.cpu > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
+                    return (
+                      <button
+                        type="button"
+                        key={`group-${group.key}`}
+                        style={styles.groupRow}
+                        onClick={() => toggleGroup(group.key)}
+                        aria-expanded={!collapsed}
+                        title={`${collapsed ? 'Expand' : 'Collapse'} ${group.key} (${group.processes.length} processes)`}
+                      >
+                        <span style={styles.groupName}>
+                          <span style={{ display: 'inline-block', width: 12, color: 'var(--color-text-tertiary)' }}>{collapsed ? '▸' : '▾'}</span>
+                          {group.key}
+                          <span style={styles.groupCount}>{group.processes.length}</span>
+                        </span>
+                        <span style={styles.processPid} />
+                        <span style={{ ...styles.processMetric, color: groupCpuColor }}>{group.cpu.toFixed(1)}%</span>
+                        <span style={styles.processMetric}>{Math.round(group.memory)} MB</span>
+                        <span />
+                      </button>
+                    );
+                  }
+                  const process = row.process;
+                  const isPinnedRow = row.kind === 'pinned';
                   const cpuValue = process.cpu || 0;
                   const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
                   const isKilling = killing === process.pid;
                   const hovered = hoveredPid === process.pid;
+                  const isPinned = pinnedSet.has(process.pid);
+                  const isSelected = selectedPid === process.pid;
+                  const grouped = row.kind === 'process' && row.grouped;
                   return (
                     <div
-                      key={`${process.pid}-${process.name}`}
-                      style={{ ...styles.processRow, ...(hovered ? styles.processRowHover : null) }}
+                      key={`${isPinnedRow ? 'pin-' : ''}${process.pid}-${process.name}-${sliceIndex}`}
+                      style={{
+                        ...styles.processRow,
+                        ...(grouped ? styles.processRowNested : null),
+                        ...(isPinnedRow ? styles.processRowPinned : null),
+                        ...(isSelected ? styles.processRowSelected : null),
+                        ...(hovered ? styles.processRowHover : null),
+                      }}
                       onMouseEnter={() => setHoveredPid(process.pid)}
                       onMouseLeave={() => setHoveredPid(prev => (prev === process.pid ? null : prev))}
+                      onClick={() => setSelectedPid(prev => (prev === process.pid ? null : process.pid))}
                     >
-                      <span style={styles.processName} title={process.name}>{process.name}</span>
+                      <span style={styles.processName} title={process.name}>
+                        {isPinnedRow && <span style={{ color: '#FFB340', marginRight: 5 }}>★</span>}
+                        {process.name}
+                      </span>
                       <span style={styles.processPid}>{process.pid}</span>
                       <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
                       <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
-                      <div style={styles.processActions}>
+                      <div style={styles.processActions} onClick={e => e.stopPropagation()}>
+                        <button
+                          style={{ ...styles.iconAction, color: isPinned ? '#FFB340' : 'var(--color-text-tertiary)' }}
+                          onClick={() => togglePin(process.pid)}
+                          aria-label={isPinned ? `Unpin ${process.name}` : `Pin ${process.name} to watch list`}
+                          aria-pressed={isPinned}
+                          title={isPinned ? 'Unpin from watch list' : 'Pin to watch list'}
+                        >
+                          {isPinned ? '★' : '☆'}
+                        </button>
+                        <button
+                          style={{ ...styles.iconAction, color: isSelected ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+                          onClick={() => setSelectedPid(prev => (prev === process.pid ? null : process.pid))}
+                          aria-label={`Details for ${process.name}`}
+                          aria-pressed={isSelected}
+                          title="Show process details"
+                        >
+                          <DexIcon name="info" size={12} />
+                        </button>
                         <button
                           style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
                           onClick={() => handleEndProcess(process.pid, process.name)}
@@ -842,6 +1099,42 @@ const TaskManager: React.FC = () => {
               </>
             )}
           </div>
+          {selectedProcess && (
+            <div style={styles.detailPanel} role="region" aria-label={`Details for ${selectedProcess.name}`}>
+              <div style={styles.detailHeader}>
+                <span style={styles.detailTitle} title={selectedProcess.name}>{selectedProcess.name}</span>
+                <button
+                  style={{ ...styles.iconAction, color: pinnedSet.has(selectedProcess.pid) ? '#FFB340' : 'var(--color-text-tertiary)' }}
+                  onClick={() => togglePin(selectedProcess.pid)}
+                  aria-label={pinnedSet.has(selectedProcess.pid) ? 'Unpin' : 'Pin to watch list'}
+                  title={pinnedSet.has(selectedProcess.pid) ? 'Unpin from watch list' : 'Pin to watch list'}
+                >
+                  {pinnedSet.has(selectedProcess.pid) ? '★' : '☆'}
+                </button>
+                <button style={styles.detailClose} onClick={() => setSelectedPid(null)} aria-label="Close details" title="Close">✕</button>
+              </div>
+              <div style={styles.detailGrid}>
+                <div style={styles.detailKey}>PID</div>
+                <div style={styles.detailVal}>{selectedProcess.pid}</div>
+                <div style={styles.detailKey}>Application</div>
+                <div style={styles.detailVal}>{groupKeyFor(selectedProcess.name)}</div>
+                <div style={styles.detailKey}>CPU</div>
+                <div style={styles.detailVal}>{(selectedProcess.cpu || 0).toFixed(1)}%</div>
+                <div style={styles.detailKey}>Memory</div>
+                <div style={styles.detailVal}>{Math.round(selectedProcess.memory || 0)} MB</div>
+                <div style={styles.detailKey}>First seen</div>
+                <div style={styles.detailVal}>
+                  {firstSeenRef.current.has(selectedProcess.pid)
+                    ? `${formatAge(firstSeenRef.current.get(selectedProcess.pid)!)} ago (this session)`
+                    : 'just now'}
+                </div>
+              </div>
+              <div style={styles.detailActions}>
+                <button style={styles.ghostButton} onClick={() => handleEndProcess(selectedProcess.pid, selectedProcess.name)} aria-label={`End ${selectedProcess.name}`}>End Process</button>
+                <button style={styles.ghostButton} onClick={() => handleEndTree(selectedProcess.pid, selectedProcess.name)} aria-label={`End tree ${selectedProcess.name}`}>End Tree</button>
+              </div>
+            </div>
+          )}
         </section>
         )}
       </div>
@@ -892,6 +1185,29 @@ const styles: Record<string, React.CSSProperties> = {
   processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },
   processActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   processRowHover: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' },
+  processRowNested: { paddingLeft: 'calc(var(--space-3) + 14px)' },
+  processRowPinned: { background: 'rgba(255,159,10,0.08)', borderLeft: '2px solid #FFB340' },
+  processRowSelected: { background: 'rgba(74,158,255,0.12)' },
+  groupRow: {
+    display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)',
+    height: PROCESS_ROW_H, padding: '0 var(--space-3)', alignItems: 'center', fontSize: 12,
+    boxSizing: 'border-box', width: '100%', textAlign: 'left', borderTop: 'none', borderLeft: 'none',
+    borderRight: 'none', borderBottom: '1px solid var(--color-border-subtle)',
+    background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-primary)', cursor: 'pointer', fontWeight: 700,
+  },
+  groupName: { display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  groupCount: { padding: '1px 6px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600 },
+  toggleButton: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  toggleButtonActive: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' },
+  iconAction: { display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0 },
+  detailPanel: { flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', background: 'var(--color-bg-surface)', display: 'flex', flexDirection: 'column', gap: 8 },
+  detailHeader: { display: 'flex', alignItems: 'center', gap: 8 },
+  detailTitle: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  detailClose: { width: 22, height: 22, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 14, rowGap: 4, fontSize: 12 },
+  detailKey: { color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10 },
+  detailVal: { color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  detailActions: { display: 'flex', gap: 8 },
   processName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   processPid: { color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
   processMetric: { color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },

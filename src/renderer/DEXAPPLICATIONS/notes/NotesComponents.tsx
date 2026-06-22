@@ -253,6 +253,26 @@ FolderTree.displayName = 'FolderTree';
 // NoteListPanel
 // ---------------------------------------------------------------------------
 
+// Maps a stored color_label to a CSS color. The toolbar stores named values
+// (e.g. "red"), the row context menu stores raw hex/var() strings -- handle
+// both so the list border renders consistently regardless of where it was set.
+const NAMED_NOTE_COLORS: Record<string, string> = {
+  red: 'var(--color-error)',
+  orange: 'var(--color-warning)',
+  yellow: '#FFD60A',
+  green: 'var(--color-success)',
+  blue: 'var(--color-accent)',
+  purple: '#BF5AF2',
+};
+
+function resolveNoteColor(color_label: string | null): string | null {
+  if (!color_label) return null;
+  const key = color_label.toLowerCase();
+  if (NAMED_NOTE_COLORS[key]) return NAMED_NOTE_COLORS[key];
+  // Already a usable CSS color (hex, rgb(), or var(--...)).
+  return color_label;
+}
+
 interface NoteListPanelProps {
   notes: NoteListItem[];
   selectedNoteId: string | null;
@@ -364,6 +384,9 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   const renderNoteItem = (note: NoteListItem) => {
     const isSelected = note.id === selectedNoteId;
     const preview = note.plain_text?.slice(0, 100) || '';
+    // Resolve the stored color label to a CSS color so a colored note shows a
+    // left border + dot in the list (set from the toolbar or row context menu).
+    const swatch = resolveNoteColor(note.color_label);
     return (
       <div
         key={note.id}
@@ -377,7 +400,9 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           borderRadius: 4,
           cursor: 'pointer',
           background: isSelected ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-          borderLeft: isSelected ? '2px solid var(--dex-focus-color, #fff)' : '2px solid transparent',
+          borderLeft: isSelected
+            ? '2px solid var(--dex-focus-color, #fff)'
+            : swatch ? `2px solid ${swatch}` : '2px solid transparent',
           transition: 'background 0.1s',
           marginBottom: 1,
         }}
@@ -385,15 +410,24 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
             fontSize: 13,
             fontWeight: 500,
             color: isSelected ? 'var(--color-text-primary)' : colors.text,
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
             flex: 1,
           }}>
-            {note.locked ? '[Locked] ' : ''}{note.title || 'Untitled'}
+            {swatch && (
+              <span
+                aria-hidden="true"
+                style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: swatch }}
+              />
+            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {note.locked ? '[Locked] ' : ''}{note.title || 'Untitled'}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             {onToggleFavorite && (

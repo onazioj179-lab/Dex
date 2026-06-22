@@ -18,6 +18,7 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS, getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
@@ -32,6 +33,7 @@ import {
   getPointOnPath,
 } from './FluxFeatures';
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
+import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 
 // ===========================================================================
 // DEX FLUX - Professional Motion Graphics
@@ -67,6 +69,10 @@ interface Layer {
   shapeStyle?: { fill: string; stroke: string; strokeWidth: number; type: 'rectangle' | 'ellipse' | 'polygon' | 'star' };
   particleEmitter?: { birthRate: number; life: number; lifeRange: number; speed: number; speedRange: number; angle: number; angleRange: number; spin: number; spinRange: number; scale: number; scaleRange: number; color: string; colorRange: number; opacity: number; shape: 'circle' | 'point' | 'rectangle' | 'line' | 'image' };
   animations?: Animation[];
+  // Live per-frame expressions keyed by transform property name (e.g. 'x',
+  // 'opacity', 'rotationZ'). Evaluated every frame during render/preview; a
+  // malformed expression degrades to the static/keyframe value. See expressions.ts.
+  expressions?: Record<string, string>;
   easing?: { p1x: number; p1y: number; p2x: number; p2y: number };
   pathKeyframes?: { time: number; d: string }[];
 }
@@ -406,7 +412,9 @@ const Flux: React.FC = () => {
   useEffect(() => {
     const eng = loadEngagement();
     const updated = recordAppUsage(eng, 'flux');
-    saveEngagement(checkAchievements(updated).state);
+    const checkRes = checkAchievements(updated);
+    saveEngagement(checkRes.state);
+    rewardUnlocks(checkRes.newUnlocks);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Crash-recovery autosave is wired further down, after the document state
   // (layers/settings) is declared — at this point those are not yet in scope,
@@ -1387,7 +1395,7 @@ const Flux: React.FC = () => {
         ctx.globalAlpha = 1;
       }
     }
-  }, [layers, currentTime, canvasSize, strokeDash, strokeGap, strokeCap, trimStart, trimEnd, trimOffset, extrudeDepth, bevelSize, showMotionBlur, motionBlurSamples, motionBlurShutter]);
+  }, [layers, currentTime, fps, canvasSize, strokeDash, strokeGap, strokeCap, trimStart, trimEnd, trimOffset, extrudeDepth, bevelSize, showMotionBlur, motionBlurSamples, motionBlurShutter]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1968,7 +1976,8 @@ const Flux: React.FC = () => {
     return enginePendingApplier('Flux')(op);
   }, [selectedLayerId, layers, fps]);
 
-  const getAnimatedValue = useCallback((layer: Layer, property: string, time: number): number | undefined => {
+  // Resolve the keyframe-interpolated value for a property (no expression).
+  const getKeyframeValue = useCallback((layer: Layer, property: string, time: number): number | undefined => {
     const anim = (layer.animations || []).find(a => a.property === property);
     if (!anim || anim.keyframes.length === 0) return undefined;
     if (anim.keyframes.length === 1) return anim.keyframes[0].value;
@@ -1990,6 +1999,27 @@ const Flux: React.FC = () => {
     }
     return undefined;
   }, []);
+
+  // Resolve a property at `time` (in frames), applying — in order — keyframes,
+  // then any live expression. Expressions receive the keyframe/static value as
+  // `value`, so an expression like `value + wiggle(2, 30)` layers on top of the
+  // existing animation. A malformed expression degrades to the static value
+  // (handled inside expressions.ts), never throwing during render.
+  const getAnimatedValue = useCallback((layer: Layer, property: string, time: number): number | undefined => {
+    const kf = getKeyframeValue(layer, property, time);
+    const expr = layer.expressions?.[property];
+    if (!expr) return kf;
+    const staticValue = kf ?? (layer.transform as unknown as Record<string, number>)[property] ?? 0;
+    const ctx: ExpressionContext = {
+      time: time / fps,
+      value: staticValue,
+      index: Math.max(0, layers.findIndex(l => l.id === layer.id)),
+      frame: time,
+      fps,
+    };
+    const out = getCompiled(expr).eval(ctx);
+    return Array.isArray(out) ? out[0] : out;
+  }, [getKeyframeValue, fps, layers]);
 
 
   // ===== RESTORE HISTORY =====
@@ -2077,7 +2107,9 @@ const Flux: React.FC = () => {
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       // Record engagement
       const eng = loadEngagement();
-      saveEngagement(checkAchievements(incrementStat(eng, 'animationsCreated')).state);
+      const checkRes = checkAchievements(incrementStat(eng, 'animationsCreated'));
+      saveEngagement(checkRes.state);
+      rewardUnlocks(checkRes.newUnlocks);
     };
 
     // Store ref so the animation loop stops recording when done
@@ -3280,70 +3312,78 @@ const Flux: React.FC = () => {
                 {['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'z', 'scaleZ', 'rotationX', 'rotationY'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-            <textarea value={expressionCode} onChange={e => { setExpressionCode(e.target.value); setExpressionError(null); }} placeholder="// Write expressions here&#10;// time, value, index available&#10;Math.sin(time * 2) * 100" style={{ width: '100%', height: 100, padding: 'var(--space-2)', borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
+            <textarea value={expressionCode} onChange={e => { const v = e.target.value; setExpressionCode(v); setExpressionError(v.trim() ? validateExpression(v) : null); }} placeholder="// time (sec), value, index, frame, fps&#10;// helpers: Math, wiggle(freq,amp), random(seed),&#10;//          noise(x), clamp, lerp, smoothstep&#10;value + wiggle(2, 30)" style={{ width: '100%', height: 100, padding: 'var(--space-2)', borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
             {expressionError && <div style={{ fontSize: 11, color: '#ff375f', marginTop: 4, fontFamily: 'var(--font-mono)' }}>{expressionError}</div>}
-            <button onClick={() => {
-              if (!selectedLayerId || !expressionCode.trim()) return;
-              try {
-                // Validate expression by doing a test evaluation
-                const seedRng = (s: number) => () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
-                const rng = seedRng(42);
-                const testScope = {
-                  time: 0, value: 0, index: 0, fps,
-                  wiggle: (freq: number, amp: number) => Math.sin(0 * freq * Math.PI * 2) * amp * (rng() * 2 - 1),
-                  random: (min: number, max: number) => min + rng() * (max - min),
-                  loopOut: () => 0,
-                  loopIn: () => 0,
-                  clamp: (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v)),
-                  lerp: (a: number, b: number, t: number) => a + (b - a) * t,
-                  noise: (x: number) => (Math.sin(x * 127.1 + 311.7) * 43758.5453) % 1,
-                  spring: (t: number, stiffness = 10, damping = 0.7) => 1 - Math.exp(-stiffness * t) * Math.cos(2 * Math.PI * damping * t),
-                  valueAtTime: () => 0,
-                };
-                // Validate expression code — block access to dangerous globals
-                const blockedPatterns = /\b(window|document|globalThis|eval|Function|fetch|XMLHttpRequest|import|require|process|__dirname|__filename|localStorage|sessionStorage|indexedDB|navigator|location|setTimeout|setInterval|postMessage|Worker|SharedWorker|ServiceWorker|WebSocket)\b/;
-                if (blockedPatterns.test(expressionCode)) {
-                  throw new Error('Expression contains blocked keywords. Only math and animation helpers are allowed.');
-                }
-                const testFn = new Function(...Object.keys(testScope), `"use strict"; return (${expressionCode});`);
-                testFn(...Object.values(testScope));
-                // Generate keyframes from expression across the timeline
-                const numSamples = Math.min(duration, 60);
-                const step = Math.max(1, Math.floor(duration / numSamples));
-                const newKeyframes: Keyframe[] = [];
-                for (let f = 0; f <= duration; f += step) {
-                  const t = f / fps;
-                  const evalRng = seedRng(f);
-                  const scope = {
-                    time: t, value: 0, index: f, fps,
-                    wiggle: (freq: number, amp: number) => Math.sin(t * freq * Math.PI * 2) * amp * (evalRng() * 2 - 1),
-                    random: (min: number, max: number) => min + evalRng() * (max - min),
-                    loopOut: () => t % (duration / fps),
-                    loopIn: () => t % (duration / fps),
-                    clamp: (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v)),
-                    lerp: (a: number, b: number, tp: number) => a + (b - a) * tp,
-                    noise: (x: number) => (Math.sin(x * 127.1 + 311.7) * 43758.5453) % 1,
-                    spring: (st: number, stiffness = 10, damping = 0.7) => 1 - Math.exp(-stiffness * st) * Math.cos(2 * Math.PI * damping * st),
-                    valueAtTime: (vt: number) => { const prevKf = newKeyframes.filter(k => k.time / fps <= vt).pop(); return prevKf?.value ?? 0; },
-                  };
-                  const fn = new Function(...Object.keys(scope), `"use strict"; return (${expressionCode});`);
-                  const val = Number(fn(...Object.values(scope)));
-                  if (!isFinite(val)) throw new Error(`Non-finite value at frame ${f}`);
-                  newKeyframes.push({ time: f, value: Math.round(val * 1000) / 1000, easing: 'linear' as const });
-                }
-                setLayers(prev => prev.map(l => {
-                  if (l.id !== selectedLayerId) return l;
-                  const anims = l.animations || [];
-                  const existing = anims.findIndex(a => a.property === expressionTarget);
-                  const newAnim: Animation = { property: expressionTarget, keyframes: newKeyframes };
-                  const updated = existing >= 0 ? anims.map((a, i) => i === existing ? newAnim : a) : [...anims, newAnim];
-                  return { ...l, animations: updated };
-                }));
+            {!expressionError && selectedLayer?.expressions?.[expressionTarget] && (
+              <div style={{ fontSize: 11, color: '#bf5af2', marginTop: 4, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <span>Live on {expressionTarget}: {selectedLayer.expressions[expressionTarget]}</span>
+                <button aria-label="Remove live expression" title="Remove live expression" onClick={() => {
+                  if (!selectedLayerId) return;
+                  setLayers(prev => prev.map(l => {
+                    if (l.id !== selectedLayerId || !l.expressions) return l;
+                    const next = { ...l.expressions };
+                    delete next[expressionTarget];
+                    return { ...l, expressions: Object.keys(next).length ? next : undefined };
+                  }));
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `Expression removed from ${expressionTarget}` } }));
+                }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>clear</button>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 'var(--space-2)' }}>
+              <button onClick={() => {
+                if (!selectedLayerId || !expressionCode.trim()) return;
+                const err = validateExpression(expressionCode);
+                if (err) { setExpressionError(err); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: err } })); return; }
+                // Live expression: stored on the layer and evaluated per frame
+                // during render (see getAnimatedValue). Existing keyframes are
+                // preserved — the expression receives them as `value`.
+                setLayers(prev => prev.map(l => l.id === selectedLayerId
+                  ? { ...l, expressions: { ...(l.expressions || {}), [expressionTarget]: expressionCode } }
+                  : l));
                 setExpressionError(null);
-              } catch (err: any) {
-                setExpressionError(err.message || 'Invalid expression');
-              }
-            }} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px 0', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
+                window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Live expression applied to ${expressionTarget}` } }));
+              }} style={{ flex: 1, padding: '6px 0', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.4)', background: 'rgba(191,90,242,0.18)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Live</button>
+              <button onClick={() => {
+                if (!selectedLayerId || !expressionCode.trim()) return;
+                const err = validateExpression(expressionCode);
+                if (err) { setExpressionError(err); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: err } })); return; }
+                try {
+                  // Bake the expression into linear keyframes across the timeline,
+                  // sampling the shared evaluator so the baked result matches live
+                  // playback exactly. `value` seeds from any existing keyframe.
+                  const idx = Math.max(0, layers.findIndex(l => l.id === selectedLayerId));
+                  const numSamples = Math.min(duration, 60);
+                  const step = Math.max(1, Math.floor(duration / numSamples));
+                  const compiled = getCompiled(expressionCode);
+                  const newKeyframes: Keyframe[] = [];
+                  for (let f = 0; f <= duration; f += step) {
+                    const base = getKeyframeValue(selectedLayer as Layer, expressionTarget, f)
+                      ?? ((selectedLayer?.transform as unknown as Record<string, number>)?.[expressionTarget] ?? 0);
+                    const ctx: ExpressionContext = { time: f / fps, value: base, index: idx, frame: f, fps };
+                    const out = compiled.eval(ctx);
+                    const val = Array.isArray(out) ? out[0] : out;
+                    newKeyframes.push({ time: f, value: Math.round(val * 1000) / 1000, easing: 'linear' as const });
+                  }
+                  setLayers(prev => prev.map(l => {
+                    if (l.id !== selectedLayerId) return l;
+                    const anims = l.animations || [];
+                    const existing = anims.findIndex(a => a.property === expressionTarget);
+                    const newAnim: Animation = { property: expressionTarget, keyframes: newKeyframes };
+                    const updatedAnims = existing >= 0 ? anims.map((a, i) => i === existing ? newAnim : a) : [...anims, newAnim];
+                    // Baking removes any live expression on the same property to
+                    // avoid double-applying it on top of the baked keyframes.
+                    const nextExpr = l.expressions ? { ...l.expressions } : undefined;
+                    if (nextExpr) delete nextExpr[expressionTarget];
+                    return { ...l, animations: updatedAnims, expressions: nextExpr && Object.keys(nextExpr).length ? nextExpr : undefined };
+                  }));
+                  setExpressionError(null);
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Baked ${newKeyframes.length} keyframes on ${expressionTarget}` } }));
+                } catch (err: any) {
+                  setExpressionError(err.message || 'Invalid expression');
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: err.message || 'Invalid expression' } }));
+                }
+              }} style={{ flex: 1, padding: '6px 0', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Bake Keyframes</button>
+            </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
               <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>

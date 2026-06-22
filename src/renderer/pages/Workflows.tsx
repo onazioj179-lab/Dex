@@ -33,11 +33,47 @@ interface WorkflowNode {
   x: number;
   y: number;
   config: Record<string, string>;
+  // Per-step execution behavior (optional, backward-compatible).
+  retry?: number;          // extra attempts on failure (0 = no retry)
+  continueOnError?: boolean; // keep running the workflow if this step fails
 }
 
 interface WorkflowConnection {
   from: string; // node id
   to: string;   // node id
+}
+
+// How a workflow is triggered. 'manual' is the legacy default; the schedule
+// and app-event variants carry their own optional config.
+type TriggerType = 'manual' | 'schedule' | 'app-event';
+
+interface WorkflowTrigger {
+  type: TriggerType;
+  // schedule
+  scheduleTime?: string;   // HH:MM
+  scheduleRepeat?: 'once' | 'daily' | 'weekly';
+  // app-event
+  appEvent?: string;       // e.g. 'app-launch', 'file-added', 'note-created'
+}
+
+// One step's outcome inside a recorded run.
+interface RunStepLog {
+  nodeId: string;
+  name: string;
+  status: 'success' | 'failed' | 'skipped';
+  attempts: number;
+  message?: string;
+}
+
+// A recorded execution (real run or dry-run preview).
+interface WorkflowRun {
+  id: string;
+  workflowId: string;
+  startedAt: string;       // ISO timestamp
+  durationMs: number;
+  status: 'success' | 'failed' | 'partial';
+  dryRun: boolean;
+  steps: RunStepLog[];
 }
 
 interface Workflow {
@@ -50,6 +86,9 @@ interface Workflow {
   lastRun: Date | null;
   nodes?: WorkflowNode[];
   connections?: WorkflowConnection[];
+  // New, backward-compatible optional fields.
+  enabled?: boolean;       // undefined treated as enabled
+  trigger?: WorkflowTrigger;
 }
 
 interface ActionBlock {
@@ -323,7 +362,7 @@ const ACTION_BLOCKS: ActionBlock[] = [
     configFields: [] },
 ];
 
-const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNode[]; connections: WorkflowConnection[] }[] = [
+const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNode[]; connections: WorkflowConnection[]; trigger?: WorkflowTrigger }[] = [
   {
     name: 'File Backup',
     description: 'Copy files from source to backup folder',
@@ -353,7 +392,77 @@ const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNo
     ],
     connections: [{ from: 't3n1', to: 't3n2' }, { from: 't3n2', to: 't3n3' }],
   },
+  {
+    name: 'Backup',
+    description: 'Zip a folder into a dated archive and confirm',
+    trigger: { type: 'schedule', scheduleTime: '02:00', scheduleRepeat: 'daily' },
+    nodes: [
+      { id: 't4n1', actionId: 'a57', name: 'Format Date', category: 'Text', x: 80, y: 60, config: { format: 'YYYY-MM-DD' } },
+      { id: 't4n2', actionId: 'a14', name: 'Zip Files', category: 'Files', x: 80, y: 200, config: { source: '/documents', dest: '/backup/documents.zip' }, continueOnError: true, retry: 1 },
+      { id: 't4n3', actionId: 'a5', name: 'Send Notification', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Documents archived to /backup' } },
+    ],
+    connections: [{ from: 't4n1', to: 't4n2' }, { from: 't4n2', to: 't4n3' }],
+  },
+  {
+    name: 'Daily Note',
+    description: 'Create a dated note for today’s journal',
+    trigger: { type: 'schedule', scheduleTime: '08:00', scheduleRepeat: 'daily' },
+    nodes: [
+      { id: 't5n1', actionId: 'a57', name: 'Format Date', category: 'Text', x: 80, y: 60, config: { format: 'YYYY-MM-DD' } },
+      { id: 't5n2', actionId: 'a4', name: 'Create Note', category: 'Notes', x: 80, y: 200, config: { title: 'Daily Note', content: 'Agenda for today:' } },
+      { id: 't5n3', actionId: 'a5', name: 'Send Notification', category: 'Communication', x: 80, y: 340, config: { title: 'Daily Note', body: 'Today’s note is ready' } },
+    ],
+    connections: [{ from: 't5n1', to: 't5n2' }, { from: 't5n2', to: 't5n3' }],
+  },
+  {
+    name: 'Cleanup',
+    description: 'Empty the trash and report freed space',
+    nodes: [
+      { id: 't6n1', actionId: 'a49', name: 'Empty Trash', category: 'System', x: 80, y: 60, config: {}, continueOnError: true },
+      { id: 't6n2', actionId: 'a45', name: 'Get System Info', category: 'System', x: 80, y: 200, config: {} },
+      { id: 't6n3', actionId: 'a5', name: 'Send Notification', category: 'Communication', x: 80, y: 340, config: { title: 'Cleanup Done', body: 'Trash emptied' } },
+    ],
+    connections: [{ from: 't6n1', to: 't6n2' }, { from: 't6n2', to: 't6n3' }],
+  },
 ];
+
+// ===========================================================================
+// RUN HISTORY (localStorage, capped, per-workflow)
+// ===========================================================================
+
+const RUN_HISTORY_KEY = 'dex-workflow-runs';
+const MAX_RUNS_PER_WORKFLOW = 20;
+
+const loadRunHistory = (): Record<string, WorkflowRun[]> => {
+  try {
+    const saved = localStorage.getItem(RUN_HISTORY_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch { /* localStorage unavailable */ }
+  return {};
+};
+
+const persistRunHistory = (history: Record<string, WorkflowRun[]>) => {
+  try {
+    localStorage.setItem(RUN_HISTORY_KEY, JSON.stringify(history));
+  } catch { /* quota / unavailable */ }
+};
+
+const TRIGGER_LABELS: Record<TriggerType, string> = {
+  manual: 'Manual',
+  schedule: 'Schedule',
+  'app-event': 'App Event',
+};
+
+const APP_EVENTS = ['app-launch', 'app-close', 'file-added', 'file-changed', 'note-created', 'clipboard-copy'];
+
+const dexToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+  } catch { /* event dispatch unavailable */ }
+};
 
 // ===========================================================================
 // PERSISTENCE (IPC + localStorage fallback)
@@ -498,16 +607,35 @@ export const Workflows: React.FC = () => {
   const canvasRef = useRef<SVGSVGElement>(null);
   const dragRafRef = useRef<number>(0);
 
+  // Run history keyed by workflow id (persisted to localStorage).
+  const [runHistory, setRunHistory] = useState<Record<string, WorkflowRun[]>>({});
+  // Step-list drag-to-reorder state.
+  const [reorderIndex, setReorderIndex] = useState<number | null>(null);
+  const [reorderOverIndex, setReorderOverIndex] = useState<number | null>(null);
+  // Right-panel mode in the editor: actions library, run history, or config (auto when a node is selected).
+  const [panelTab, setPanelTab] = useState<'library' | 'steps' | 'history'>('library');
+
   // Cancel any pending drag rAF on unmount so it can't fire after teardown.
   useEffect(() => () => { if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current); }, []);
 
-  // Load workflows
+  // Load workflows + run history
   useEffect(() => {
     let cancelled = false;
     loadWorkflows().then(loaded => {
       if (!cancelled) { setWorkflows(loaded); setLoading(false); }
     }).catch(() => { if (!cancelled) setLoading(false); });
+    setRunHistory(loadRunHistory());
     return () => { cancelled = true; };
+  }, []);
+
+  // Record a run into history (capped per workflow) and persist.
+  const recordRun = useCallback((run: WorkflowRun) => {
+    setRunHistory(prev => {
+      const existing = prev[run.workflowId] || [];
+      const next = { ...prev, [run.workflowId]: [run, ...existing].slice(0, MAX_RUNS_PER_WORKFLOW) };
+      persistRunHistory(next);
+      return next;
+    });
   }, []);
 
   const filteredWorkflows = useMemo(() => workflows.filter(w =>
@@ -528,7 +656,14 @@ export const Workflows: React.FC = () => {
   const toast = useToastHelpers();
 
   const runWorkflow = useCallback((id: string) => {
-    setWorkflows(prev => prev.map(w => w.id === id ? { ...w, lastRun: new Date() } : w));
+    setWorkflows(prev => {
+      const target = prev.find(w => w.id === id);
+      if (target && target.enabled === false) {
+        dexToast('This shortcut is disabled. Enable it to run.', 'warning');
+        return prev;
+      }
+      return prev.map(w => w.id === id ? { ...w, lastRun: new Date() } : w);
+    });
     const dex = window.dex;
     if (dex?.workflows?.execute) {
       dex.workflows.execute(id).catch((err: unknown) => {
@@ -544,11 +679,33 @@ export const Workflows: React.FC = () => {
     if (selectedWorkflow?.id === id) setSelectedWorkflow(null);
   }, [selectedWorkflow]);
 
+  // Enable / disable a workflow without deleting it. Persisted immediately.
+  const toggleWorkflowEnabled = useCallback((id: string) => {
+    setWorkflows(prev => prev.map(w => {
+      if (w.id !== id) return w;
+      const updated = { ...w, enabled: !(w.enabled ?? true) };
+      saveWorkflow(updated);
+      if (selectedWorkflow?.id === id) setSelectedWorkflow(updated);
+      dexToast(`${updated.name} ${updated.enabled ? 'enabled' : 'disabled'}`, updated.enabled ? 'success' : 'info');
+      return updated;
+    }));
+  }, [selectedWorkflow]);
+
+  // Update the active workflow's trigger config (editor only).
+  const updateTrigger = useCallback((patch: Partial<WorkflowTrigger>) => {
+    setSelectedWorkflow(prev => {
+      if (!prev) return prev;
+      const base: WorkflowTrigger = prev.trigger || { type: 'manual' };
+      return { ...prev, trigger: { ...base, ...patch } };
+    });
+  }, []);
+
   const createWorkflow = useCallback(() => {
     const newWf: Workflow = {
       id: crypto.randomUUID(), name: 'New Shortcut', description: '',
       icon: 'W', color: 'var(--color-accent)', steps: 0, lastRun: null,
       nodes: [], connections: [],
+      enabled: true, trigger: { type: 'manual' },
     };
     setWorkflows(prev => [newWf, ...prev]);
     setSelectedWorkflow(newWf);
@@ -600,9 +757,34 @@ export const Workflows: React.FC = () => {
     setConnections(newConns);
     setShowTemplates(false);
     if (selectedWorkflow) {
-      setSelectedWorkflow(prev => prev ? { ...prev, name: tmpl.name, description: tmpl.description } : prev);
+      setSelectedWorkflow(prev => prev ? {
+        ...prev,
+        name: tmpl.name,
+        description: tmpl.description,
+        trigger: tmpl.trigger ? { ...tmpl.trigger } : prev.trigger,
+      } : prev);
     }
+    dexToast(`Template "${tmpl.name}" applied`, 'success');
   }, [selectedWorkflow]);
+
+  // ---- Step list: drag-to-reorder + per-step toggles ----
+
+  // Reorder a node within the steps array. Connections are index-independent
+  // (keyed by node id) so they survive reordering untouched.
+  const moveStep = useCallback((from: number, to: number) => {
+    setNodes(prev => {
+      if (from < 0 || to < 0 || from >= prev.length || to >= prev.length || from === to) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
+  // Update one node's per-step execution config (retry / continueOnError).
+  const updateNodeBehavior = useCallback((nodeId: string, patch: Partial<Pick<WorkflowNode, 'retry' | 'continueOnError'>>) => {
+    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, ...patch } : n));
+  }, []);
 
   // ---- Canvas interactions ----
 
@@ -693,13 +875,9 @@ export const Workflows: React.FC = () => {
     [nodes, connections],
   );
 
-  const executeWorkflow = useCallback(async () => {
-    if (nodes.length === 0) return;
-    setIsRunning(true);
-    setExecutingNodes(new Set());
-    setExecutedNodes(new Set());
-
-    // Build execution order: topological sort
+  // Resolve a deterministic execution order (topological sort, stable for
+  // disconnected/orphan nodes). Shared by real runs and dry-run previews.
+  const resolveExecutionOrder = useCallback((): string[] => {
     const inDegree: Record<string, number> = {};
     const adj: Record<string, string[]> = {};
     nodes.forEach(n => { inDegree[n.id] = 0; adj[n.id] = []; });
@@ -720,16 +898,65 @@ export const Workflows: React.FC = () => {
       }
     }
     nodes.forEach(n => { if (!visited.has(n.id)) order.push(n.id); });
+    return order;
+  }, [nodes, connections]);
+
+  // Dry-run / preview: report the steps that WOULD execute, in order, with no
+  // side effects and no IPC. Records a dry-run entry into history.
+  const previewWorkflow = useCallback(() => {
+    if (nodes.length === 0) return;
+    const order = resolveExecutionOrder();
+    const startedAt = new Date();
+    const steps: RunStepLog[] = order.map(id => {
+      const node = nodes.find(n => n.id === id)!;
+      return {
+        nodeId: id,
+        name: node.name,
+        status: 'skipped',
+        attempts: 0,
+        message: 'Preview only — not executed',
+      };
+    });
+    if (selectedWorkflow) {
+      recordRun({
+        id: crypto.randomUUID(),
+        workflowId: selectedWorkflow.id,
+        startedAt: startedAt.toISOString(),
+        durationMs: 0,
+        status: 'success',
+        dryRun: true,
+        steps,
+      });
+    }
+    setPanelTab('history');
+    const names = steps.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+    dexToast(`Dry run: ${steps.length} step${steps.length === 1 ? '' : 's'} would execute`, 'info');
+    if (names) console.info('[Workflow] Dry-run order:\n' + names);
+  }, [nodes, resolveExecutionOrder, selectedWorkflow, recordRun]);
+
+  const executeWorkflow = useCallback(async () => {
+    if (nodes.length === 0) return;
+    if (selectedWorkflow && selectedWorkflow.enabled === false) {
+      dexToast('This shortcut is disabled. Enable it to run.', 'warning');
+      return;
+    }
+    setIsRunning(true);
+    setExecutingNodes(new Set());
+    setExecutedNodes(new Set());
+
+    const runStart = Date.now();
+    const stepLogs: RunStepLog[] = [];
+    let failedCount = 0;
+
+    const order = resolveExecutionOrder();
 
     // Variable context for data passing between nodes
     const context: Record<string, any> = { files: [], result: null, output: '' };
 
-    // Execute each node with real action logic
-    for (const nodeId of order) {
-      setExecutingNodes(new Set([nodeId]));
-      const node = nodes.find(n => n.id === nodeId);
-      if (node) {
-        try {
+    // Run a single node's action logic (no UI / history side effects). Throws
+    // on failure so the caller can apply retry / continue-on-error policy.
+    const runNodeAction = async (node: WorkflowNode) => {
+        {
           // Nodes carry ACTION_BLOCKS catalog ids (a1..a60) -- NOT kebab-case
           // ids. Switch on those ids, reading each node's real config keys, so
           // the per-action logic actually runs instead of falling through.
@@ -1065,9 +1292,41 @@ export const Workflows: React.FC = () => {
               context[`${node.actionId}_dispatched`] = true;
               break;
           }
-        } catch (err) {
-          console.warn(`[Workflow] Node ${node.name} failed:`, err);
         }
+    };
+
+    // Execute each node in order, applying per-step retry + continue-on-error.
+    for (const nodeId of order) {
+      setExecutingNodes(new Set([nodeId]));
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) continue;
+
+      const maxAttempts = 1 + Math.max(0, node.retry ?? 0);
+      let attempts = 0;
+      let lastError: unknown = null;
+      let succeeded = false;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          await runNodeAction(node);
+          succeeded = true;
+          break;
+        } catch (err) {
+          lastError = err;
+          console.warn(`[Workflow] Node ${node.name} failed (attempt ${attempts}/${maxAttempts}):`, err);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
+      }
+
+      if (succeeded) {
+        stepLogs.push({ nodeId, name: node.name, status: 'success', attempts });
+      } else {
+        failedCount++;
+        const message = lastError instanceof Error ? lastError.message : String(lastError ?? 'Unknown error');
+        stepLogs.push({ nodeId, name: node.name, status: 'failed', attempts, message });
       }
 
       // Brief visual pause for feedback
@@ -1075,9 +1334,39 @@ export const Workflows: React.FC = () => {
       setExecutingNodes(new Set());
       setExecutedNodes(prev => new Set([...prev, nodeId]));
 
+      // A hard failure halts the workflow unless the step opts into continue-on-error.
+      if (!succeeded && !node.continueOnError) {
+        // Remaining steps never ran.
+        for (const remaining of order.slice(order.indexOf(nodeId) + 1)) {
+          const rn = nodes.find(n => n.id === remaining);
+          if (rn) stepLogs.push({ nodeId: remaining, name: rn.name, status: 'skipped', attempts: 0 });
+        }
+        break;
+      }
+
       // Stop Workflow (a28) halts the remaining steps.
       if (context.stopped) break;
     }
+
+    const durationMs = Date.now() - runStart;
+    const runStatus: WorkflowRun['status'] =
+      failedCount === 0 ? 'success' : (failedCount === stepLogs.filter(s => s.status !== 'skipped').length ? 'failed' : 'partial');
+
+    if (selectedWorkflow) {
+      recordRun({
+        id: crypto.randomUUID(),
+        workflowId: selectedWorkflow.id,
+        startedAt: new Date(runStart).toISOString(),
+        durationMs,
+        status: runStatus,
+        dryRun: false,
+        steps: stepLogs,
+      });
+    }
+
+    if (failedCount === 0) dexToast('Workflow completed', 'success');
+    else if (runStatus === 'partial') dexToast(`Workflow finished with ${failedCount} failed step${failedCount === 1 ? '' : 's'}`, 'warning');
+    else dexToast('Workflow failed', 'error');
 
     // Also run via IPC if available
     if (selectedWorkflow) {
@@ -1085,7 +1374,7 @@ export const Workflows: React.FC = () => {
     }
 
     setIsRunning(false);
-  }, [nodes, connections, selectedWorkflow, runWorkflow, toast]);
+  }, [nodes, selectedWorkflow, runWorkflow, toast, resolveExecutionOrder, recordRun]);
 
   const formatLastRun = (date: Date | null): string => {
     if (!date) return 'Never run';
@@ -1095,6 +1384,26 @@ export const Workflows: React.FC = () => {
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
   };
+
+  const formatRunTime = (iso: string): string => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const RUN_STATUS_COLOR: Record<WorkflowRun['status'], string> = {
+    success: 'var(--color-success, #30d158)',
+    failed: 'var(--color-error, #ff453a)',
+    partial: 'var(--color-warning, #ff9f0a)',
+  };
+  const STEP_STATUS_COLOR: Record<RunStepLog['status'], string> = {
+    success: 'var(--color-success, #30d158)',
+    failed: 'var(--color-error, #ff453a)',
+    skipped: 'var(--color-text-tertiary)',
+  };
+
+  // Runs for the workflow currently open in the editor.
+  const currentRuns = selectedWorkflow ? (runHistory[selectedWorkflow.id] || []) : [];
 
   // ===========================================================================
   // RENDER
@@ -1194,7 +1503,7 @@ export const Workflows: React.FC = () => {
                 </div>
               ) : (
                 filteredWorkflows.map(workflow => (
-                  <div key={workflow.id} onContextMenu={e => showCtxMenu(e, buildWorkflowCtxItems(workflow))} style={styles.workflowCard}>
+                  <div key={workflow.id} onContextMenu={e => showCtxMenu(e, buildWorkflowCtxItems(workflow))} style={{ ...styles.workflowCard, opacity: workflow.enabled === false ? 0.6 : 1 }}>
                     <div style={styles.cardHeader}>
                       <div style={{ ...styles.cardIcon, background: `${workflow.color}20` }}>
                         {Icons.bolt}
@@ -1206,11 +1515,38 @@ export const Workflows: React.FC = () => {
                     </div>
                     <h3 style={styles.cardTitle}>{workflow.name}</h3>
                     <p style={styles.cardDescription}>{workflow.description || 'No description'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
+                      <span style={styles.cardBadge}>{Icons.bolt}{TRIGGER_LABELS[workflow.trigger?.type || 'manual']}</span>
+                      <span style={{ ...styles.cardBadge, color: workflow.enabled === false ? 'var(--color-text-muted)' : 'var(--color-success, #30d158)' }}>
+                        {workflow.enabled === false ? 'Disabled' : 'Enabled'}
+                      </span>
+                    </div>
                     <div style={styles.cardFooter}>
                       <span style={styles.cardMeta}>{workflow.nodes?.length || workflow.steps || 0} steps · {formatLastRun(workflow.lastRun)}</span>
-                      <button style={{ ...styles.runBtn, background: `${workflow.color}22`, border: `1px solid ${workflow.color}40`, color: workflow.color }} aria-label="Run workflow" onClick={() => runWorkflow(workflow.id)}>
-                        {Icons.play}
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          role="switch"
+                          aria-checked={workflow.enabled !== false}
+                          aria-label={`${workflow.enabled === false ? 'Enable' : 'Disable'} ${workflow.name}`}
+                          onClick={(e) => { e.stopPropagation(); toggleWorkflowEnabled(workflow.id); }}
+                          style={{
+                            width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
+                            background: workflow.enabled === false ? 'var(--color-border)' : 'var(--color-success, #30d158)',
+                            display: 'flex', alignItems: 'center', justifyContent: workflow.enabled === false ? 'flex-start' : 'flex-end',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
+                        </button>
+                        <button
+                          style={{ ...styles.runBtn, background: `${workflow.color}22`, border: `1px solid ${workflow.color}40`, color: workflow.color, opacity: workflow.enabled === false ? 0.5 : 1, cursor: workflow.enabled === false ? 'default' : 'pointer' }}
+                          aria-label="Run workflow"
+                          disabled={workflow.enabled === false}
+                          onClick={() => runWorkflow(workflow.id)}
+                        >
+                          {Icons.play}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -1230,6 +1566,7 @@ export const Workflows: React.FC = () => {
               <input
                 type="text" value={selectedWorkflow?.name || ''} placeholder="Workflow name"
                 onChange={(e) => setSelectedWorkflow(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                aria-label="Workflow name"
                 style={styles.workflowNameInput}
               />
               <div style={styles.editorActions}>
@@ -1259,6 +1596,15 @@ export const Workflows: React.FC = () => {
                   {Icons.template} Templates
                 </button>
                 <button
+                  style={{ ...styles.backBtn, opacity: nodes.length === 0 ? 0.5 : 1, cursor: nodes.length === 0 ? 'default' : 'pointer' }}
+                  onClick={previewWorkflow}
+                  disabled={nodes.length === 0 || isRunning}
+                  aria-label="Dry run (preview steps without executing)"
+                  title="Preview the steps that would run, with no side effects"
+                >
+                  <DexIcon name="eye" size={14} /> Dry Run
+                </button>
+                <button
                   style={{ ...styles.runEditorBtn, opacity: isRunning || nodes.length === 0 ? 0.5 : 1, cursor: isRunning || nodes.length === 0 ? 'default' : 'pointer' }}
                   onClick={executeWorkflow}
                   disabled={isRunning || nodes.length === 0}
@@ -1268,6 +1614,73 @@ export const Workflows: React.FC = () => {
                 </button>
                 <button style={styles.saveBtn} aria-label="Save workflow" onClick={saveCurrentWorkflow}><DexIcon name="save" size={14} /> Save</button>
               </div>
+            </div>
+
+            {/* Trigger + enabled config strip */}
+            <div style={styles.triggerBar}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Trigger</span>
+              <select
+                value={selectedWorkflow?.trigger?.type || 'manual'}
+                onChange={(e) => updateTrigger({ type: e.target.value as TriggerType })}
+                style={styles.triggerSelect}
+                aria-label="Trigger type"
+              >
+                {(Object.keys(TRIGGER_LABELS) as TriggerType[]).map(t => (
+                  <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>
+                ))}
+              </select>
+
+              {selectedWorkflow?.trigger?.type === 'schedule' && (
+                <>
+                  <input
+                    type="time"
+                    value={selectedWorkflow?.trigger?.scheduleTime || ''}
+                    onChange={(e) => updateTrigger({ scheduleTime: e.target.value })}
+                    style={styles.triggerSelect}
+                    aria-label="Schedule time"
+                  />
+                  <select
+                    value={selectedWorkflow?.trigger?.scheduleRepeat || 'daily'}
+                    onChange={(e) => updateTrigger({ scheduleRepeat: e.target.value as 'once' | 'daily' | 'weekly' })}
+                    style={styles.triggerSelect}
+                    aria-label="Schedule repeat"
+                  >
+                    <option value="once">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </>
+              )}
+
+              {selectedWorkflow?.trigger?.type === 'app-event' && (
+                <select
+                  value={selectedWorkflow?.trigger?.appEvent || APP_EVENTS[0]}
+                  onChange={(e) => updateTrigger({ appEvent: e.target.value })}
+                  style={styles.triggerSelect}
+                  aria-label="App event"
+                >
+                  {APP_EVENTS.map(ev => <option key={ev} value={ev}>{ev}</option>)}
+                </select>
+              )}
+
+              <div style={{ flex: 1 }} />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                <span>{selectedWorkflow?.enabled === false ? 'Disabled' : 'Enabled'}</span>
+                <button
+                  role="switch"
+                  aria-checked={selectedWorkflow?.enabled !== false}
+                  aria-label="Toggle workflow enabled"
+                  onClick={() => selectedWorkflow && toggleWorkflowEnabled(selectedWorkflow.id)}
+                  style={{
+                    width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
+                    background: selectedWorkflow?.enabled === false ? 'var(--color-border)' : 'var(--color-success, #30d158)',
+                    display: 'flex', alignItems: 'center', justifyContent: selectedWorkflow?.enabled === false ? 'flex-start' : 'flex-end',
+                  }}
+                >
+                  <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
+                </button>
+              </label>
             </div>
 
             {/* Templates Dropdown */}
@@ -1394,6 +1807,7 @@ export const Workflows: React.FC = () => {
                           <select
                             value={selectedNode.config[field.key] || ''}
                             onChange={e => updateNodeConfig(selectedNode.id, field.key, e.target.value)}
+                            aria-label={field.label}
                             style={styles.configSelect}
                           >
                             <option value="">Select...</option>
@@ -1405,6 +1819,7 @@ export const Workflows: React.FC = () => {
                             value={selectedNode.config[field.key] || ''}
                             onChange={e => updateNodeConfig(selectedNode.id, field.key, e.target.value)}
                             placeholder={field.label}
+                            aria-label={field.label}
                             style={styles.configInput}
                           />
                         )}
@@ -1412,6 +1827,39 @@ export const Workflows: React.FC = () => {
                     )) || (
                       <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No configuration needed</div>
                     )}
+
+                    {/* Per-step execution behavior: retry + continue-on-error */}
+                    <div style={{ marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-bg-hover)' }}>
+                      <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>ON FAILURE</div>
+                      <div style={{ marginBottom: 'var(--space-3)' }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>Retry attempts</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={selectedNode.retry ?? 0}
+                          onChange={e => updateNodeBehavior(selectedNode.id, { retry: Math.max(0, Math.min(10, parseInt(e.target.value || '0', 10) || 0)) })}
+                          style={styles.configInput}
+                          aria-label="Retry attempts"
+                        />
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                        <span>Continue on error</span>
+                        <button
+                          role="switch"
+                          aria-checked={!!selectedNode.continueOnError}
+                          aria-label="Continue on error"
+                          onClick={() => updateNodeBehavior(selectedNode.id, { continueOnError: !selectedNode.continueOnError })}
+                          style={{
+                            width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
+                            background: selectedNode.continueOnError ? 'var(--color-success, #30d158)' : 'var(--color-border)',
+                            display: 'flex', alignItems: 'center', justifyContent: selectedNode.continueOnError ? 'flex-end' : 'flex-start',
+                          }}
+                        >
+                          <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
+                        </button>
+                      </label>
+                    </div>
 
                     {/* Connections info */}
                     <div style={{ marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-bg-hover)' }}>
@@ -1437,38 +1885,150 @@ export const Workflows: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  /* Action Library */
+                  /* Tabbed panel: Actions library / Steps (reorder) / Run history */
                   <div style={styles.actionLibrary}>
-                    <div style={styles.libraryHeader}>
-                      <span style={styles.libraryTitle}>Actions</span>
-                    </div>
-                    <div style={{ padding: 'var(--space-2) var(--space-2) 0' }}>
-                      <DexSearchInput
-                        size="sm"
-                        fullWidth
-                        placeholder="Search"
-                        value={actionSearch}
-                        onChange={e => setActionSearch(e.target.value)}
-                        onClear={() => setActionSearch('')}
-                      />
-                    </div>
-                    <div style={styles.actionList}>
-                      {filteredActions.map(action => (
+                    <div style={styles.panelTabs}>
+                      {([['library', 'Actions'], ['steps', `Steps${nodes.length ? ` (${nodes.length})` : ''}`], ['history', `History${currentRuns.length ? ` (${currentRuns.length})` : ''}`]] as const).map(([key, label]) => (
                         <button
-                          key={action.id}
-                          style={styles.actionItem}
-                          onClick={() => addNodeFromAction(action)}
-                          aria-label={`Add ${action.name} action`}
+                          key={key}
+                          onClick={() => setPanelTab(key)}
+                          style={{
+                            ...styles.panelTab,
+                            color: panelTab === key ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                            borderBottom: panelTab === key ? '2px solid var(--color-accent)' : '2px solid transparent',
+                          }}
+                          aria-label={`Show ${label}`}
+                          aria-selected={panelTab === key}
+                          role="tab"
                         >
-                          <span style={styles.actionIcon}>{CATEGORY_ICONS[action.category] || Icons.bolt}</span>
-                          <div style={styles.actionInfo}>
-                            <span style={styles.actionName}>{action.name}</span>
-                            <span style={styles.actionDesc}>{action.description}</span>
-                          </div>
-                          <span style={{ color: 'var(--color-text-tertiary)' }}>{Icons.plus}</span>
+                          {label}
                         </button>
                       ))}
                     </div>
+
+                    {panelTab === 'library' && (
+                      <>
+                        <div style={{ padding: 'var(--space-2) var(--space-2) 0' }}>
+                          <DexSearchInput
+                            size="sm"
+                            fullWidth
+                            placeholder="Search"
+                            value={actionSearch}
+                            onChange={e => setActionSearch(e.target.value)}
+                            onClear={() => setActionSearch('')}
+                          />
+                        </div>
+                        <div style={styles.actionList}>
+                          {filteredActions.map(action => (
+                            <button
+                              key={action.id}
+                              style={styles.actionItem}
+                              onClick={() => addNodeFromAction(action)}
+                              aria-label={`Add ${action.name} action`}
+                            >
+                              <span style={styles.actionIcon}>{CATEGORY_ICONS[action.category] || Icons.bolt}</span>
+                              <div style={styles.actionInfo}>
+                                <span style={styles.actionName}>{action.name}</span>
+                                <span style={styles.actionDesc}>{action.description}</span>
+                              </div>
+                              <span style={{ color: 'var(--color-text-tertiary)' }}>{Icons.plus}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {panelTab === 'steps' && (
+                      <div style={styles.actionList}>
+                        {nodes.length === 0 ? (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: 'var(--space-3)' }}>No steps yet. Add actions from the Actions tab.</div>
+                        ) : (
+                          nodes.map((node, idx) => (
+                            <div
+                              key={node.id}
+                              draggable
+                              onDragStart={() => setReorderIndex(idx)}
+                              onDragOver={(e) => { e.preventDefault(); if (reorderOverIndex !== idx) setReorderOverIndex(idx); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (reorderIndex !== null && reorderIndex !== idx) moveStep(reorderIndex, idx);
+                                setReorderIndex(null); setReorderOverIndex(null);
+                              }}
+                              onDragEnd={() => { setReorderIndex(null); setReorderOverIndex(null); }}
+                              onClick={() => setSelectedNodeId(node.id)}
+                              style={{
+                                ...styles.stepItem,
+                                opacity: reorderIndex === idx ? 0.5 : 1,
+                                borderTop: reorderOverIndex === idx && reorderIndex !== null && reorderIndex > idx ? '2px solid var(--color-accent)' : '2px solid transparent',
+                                borderBottom: reorderOverIndex === idx && reorderIndex !== null && reorderIndex < idx ? '2px solid var(--color-accent)' : '2px solid transparent',
+                              }}
+                            >
+                              <span style={{ color: 'var(--color-text-tertiary)', cursor: 'grab', display: 'flex' }} aria-label="Drag to reorder">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                              </span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', width: 16, textAlign: 'center' as const }}>{idx + 1}</span>
+                              <span style={styles.actionIcon}>{CATEGORY_ICONS[node.category] || Icons.bolt}</span>
+                              <div style={styles.actionInfo}>
+                                <span style={styles.actionName}>{node.name}</span>
+                                <span style={styles.actionDesc}>
+                                  {node.category}
+                                  {(node.retry ?? 0) > 0 ? ` · retry ${node.retry}` : ''}
+                                  {node.continueOnError ? ' · continue on error' : ''}
+                                </span>
+                              </div>
+                              <span style={{ display: 'flex', flexDirection: 'column' as const, gap: 2 }}>
+                                <button
+                                  style={styles.stepArrow}
+                                  onClick={(e) => { e.stopPropagation(); moveStep(idx, idx - 1); }}
+                                  disabled={idx === 0}
+                                  aria-label="Move step up"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+                                </button>
+                                <button
+                                  style={styles.stepArrow}
+                                  onClick={(e) => { e.stopPropagation(); moveStep(idx, idx + 1); }}
+                                  disabled={idx === nodes.length - 1}
+                                  aria-label="Move step down"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {panelTab === 'history' && (
+                      <div style={styles.actionList}>
+                        {currentRuns.length === 0 ? (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: 'var(--space-3)' }}>No runs yet. Run or dry-run this workflow to see history here.</div>
+                        ) : (
+                          currentRuns.map(run => (
+                            <div key={run.id} style={styles.runItem}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: RUN_STATUS_COLOR[run.status], flexShrink: 0 }} />
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', textTransform: 'capitalize' as const }}>{run.status}</span>
+                                {run.dryRun && <span style={styles.dryRunBadge}>Dry run</span>}
+                                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{formatRunTime(run.startedAt)}</span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+                                {run.steps.length} step{run.steps.length === 1 ? '' : 's'}{run.dryRun ? '' : ` · ${run.durationMs} ms`}
+                              </div>
+                              {run.steps.map((s, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0', color: 'var(--color-text-secondary)' }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: STEP_STATUS_COLOR[s.status], flexShrink: 0 }} />
+                                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{i + 1}. {s.name}</span>
+                                  {s.attempts > 1 && <span style={{ color: 'var(--color-text-tertiary)' }}>×{s.attempts}</span>}
+                                  <span style={{ color: STEP_STATUS_COLOR[s.status], textTransform: 'capitalize' as const }}>{s.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1566,6 +2126,44 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 'auto', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-border-subtle)',
   },
   cardMeta: { fontSize: '12px', color: 'var(--color-text-muted)' },
+  cardBadge: {
+    display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6,
+    fontSize: 11, fontWeight: 600, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+  },
+  triggerBar: {
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-4)',
+    borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)',
+    minWidth: 0, overflowX: 'auto', flexWrap: 'nowrap' as const,
+  },
+  triggerSelect: {
+    padding: '5px 8px', borderRadius: 6, border: '1px solid var(--color-border)',
+    background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12,
+    cursor: 'pointer', outline: 'none', flexShrink: 0,
+  },
+  panelTabs: {
+    display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
+  },
+  panelTab: {
+    flex: 1, padding: '10px 6px', background: 'transparent', border: 'none',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const,
+  },
+  stepItem: {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '8px var(--space-3)',
+    borderRadius: 6, marginBottom: 2, background: 'var(--color-bg-elevated)',
+    cursor: 'pointer', minWidth: 0,
+  },
+  stepArrow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 14,
+    border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0,
+  },
+  runItem: {
+    padding: 'var(--space-3)', borderRadius: 6, marginBottom: 6,
+    background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
+  },
+  dryRunBadge: {
+    fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+    background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)',
+  },
   runBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '32px', height: '32px', borderRadius: '50%', border: 'none',

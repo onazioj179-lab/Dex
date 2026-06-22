@@ -450,6 +450,9 @@ export function drawLevelMeter(
   x: number, y: number,
   width: number, height: number,
 ): void {
+  const cs = getComputedStyle(document.documentElement);
+  const textPrimary = cs.getPropertyValue('--color-text-primary').trim() || '#ffffff';
+
   // Background
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.fillRect(x, y, width, height);
@@ -466,7 +469,7 @@ export function drawLevelMeter(
 
   // Peak indicator line
   const peakY = y + height - reading.peak * height;
-  ctx.fillStyle = reading.clipping ? '#ef4444' : 'var(--color-text-primary)';
+  ctx.fillStyle = reading.clipping ? '#ef4444' : textPrimary;
   ctx.fillRect(x, peakY, width, 2);
 }
 
@@ -561,10 +564,12 @@ export function drawAutomationLane(
 
   // Draw points
   ctx.globalAlpha = 1;
+  const pointFill = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-text-primary').trim() || '#ffffff';
   lane.points.forEach(pt => {
     const px = timeToX(pt.time);
     const py = valueToY(pt.value);
-    ctx.fillStyle = 'var(--color-text-primary)';
+    ctx.fillStyle = pointFill;
     ctx.strokeStyle = lane.color;
     ctx.lineWidth = 2;
     ctx.beginPath();

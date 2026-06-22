@@ -15,6 +15,7 @@ import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
 import { getDiskInfo } from '../../utils/nativeBridge';
 import { planExport } from '../../../shared/video/pipeline';
+import { isNativeOnlyFormat } from './quickExport';
 import DexIcon from '../../components/DexIcon';
 
 // Track active export intervals for cleanup
@@ -174,6 +175,30 @@ export const ExportDialog: React.FC = memo(() => {
 
   const handleExport = useCallback(() => {
     const isAudioOnly = settings.format === 'mp3' || settings.format === 'wav' || settings.format === 'flac';
+
+    // Honest guard: codecs/containers the browser MediaRecorder cannot produce
+    // (ProRes, H.265/HEVC, DNxHD, AV1, MXF, etc.) require the native encoder.
+    // Do NOT fake a completed render for these — queue a failed job with a clear
+    // note and point the user at the working WebM path.
+    if (!isAudioOnly && isNativeOnlyFormat(String(settings.format))) {
+      const failJob: ExportJob = {
+        id: generateId('export'),
+        projectId: '',
+        settings: { ...settings },
+        outputPath: `${outputName}.${settings.format}`,
+        filename: outputName,
+        status: 'failed',
+        progress: 0,
+        encodingFps: 0,
+        startTime: null,
+        endTime: null,
+        error: `${String(settings.format).toUpperCase()} needs the native encoder (not bundled). Use WebM or MP4 for an in-app render.`,
+      };
+      addExportJob(failJob);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `${String(settings.format).toUpperCase()} requires the native encoder — choose WebM/MP4 for an in-app render` } }));
+      return;
+    }
+
     const ext = isAudioOnly ? settings.format : 'webm';
 
     // ROADMAP-600 #571-572: plan the export through the shared video pipeline.

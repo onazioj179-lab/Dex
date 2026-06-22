@@ -12,6 +12,11 @@ export { InputHandler } from './InputHandler';
 export type { InputCallbacks, InputState } from './InputHandler';
 export { runSimulation } from './Simulation';
 export type { SimulationType, SimulationConfig, PartStressResult } from './Simulation';
+export { solveTruss, solveLinearSystem, deriveTrussFromParts, defaultTrussModel } from './fea';
+export type {
+  FENode, FEElement, FELoad, FESupport, FEModel, FEElementResult, FEResult,
+  FEPartInput, FEEdgeInput, DerivedModel,
+} from './fea';
 export { buildFeatureChain, featureToMesh, extrude, revolve, booleanOp, extractProfile,
   createBoxMesh, createCylinderMesh, createSphereMesh, computeVolume, computeSurfaceArea } from './SolidKernel';
 export type { SolidMesh, ProfilePoint } from './SolidKernel';

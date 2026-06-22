@@ -1,49 +1,37 @@
 /**
  * DEX Platform - Stopwatch
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * Professional stopwatch with lap tracking
+ * Professional stopwatch with lap tracking — shared timer state survives
+ * app switches and reload (elapsed derived from wall-clock anchors).
  */
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { computeLapStats } from '../../../shared/format/lapStats';
+import { useTimerStore, stopwatchElapsed } from '../../store/timerStore';
 
 const Stopwatch: React.FC = () => {
-  const [elapsed, setElapsed] = useState(0);
-  const [laps, setLaps] = useState<number[]>([]);
-  const [running, setRunning] = useState(false);
+  const stopwatch = useTimerStore(s => s.stopwatch);
+  const start = useTimerStore(s => s.startStopwatch);
+  const stop = useTimerStore(s => s.stopStopwatch);
+  const reset = useTimerStore(s => s.resetStopwatch);
+  const lap = useTimerStore(s => s.lapStopwatch);
+
+  const { running, laps } = stopwatch;
+
+  // Live elapsed for display. The store holds wall-clock anchors; a local ticker
+  // only drives re-render while running, so unmounting never loses time.
+  const [elapsed, setElapsed] = useState(() => stopwatchElapsed(stopwatch));
   const rafRef = useRef<number>(0);
-  const startRef = useRef(0);
-  const offsetRef = useRef(0);
 
-  const tick = useCallback(() => {
-    setElapsed(performance.now() - startRef.current + offsetRef.current);
+  useEffect(() => {
+    setElapsed(stopwatchElapsed(stopwatch));
+    if (!running) return;
+    const tick = () => {
+      setElapsed(stopwatchElapsed(useTimerStore.getState().stopwatch));
+      rafRef.current = requestAnimationFrame(tick);
+    };
     rafRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const start = useCallback(() => {
-    startRef.current = performance.now();
-    rafRef.current = requestAnimationFrame(tick);
-    setRunning(true);
-  }, [tick]);
-
-  const stop = useCallback(() => {
-    cancelAnimationFrame(rafRef.current);
-    offsetRef.current += performance.now() - startRef.current;
-    setRunning(false);
-  }, []);
-
-  const reset = useCallback(() => {
-    cancelAnimationFrame(rafRef.current);
-    offsetRef.current = 0;
-    setElapsed(0);
-    setLaps([]);
-    setRunning(false);
-  }, []);
-
-  const lap = useCallback(() => {
-    setLaps(prev => [elapsed, ...prev]);
-  }, [elapsed]);
-
-  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [running, stopwatch]);
 
   const fmt = (ms: number) => {
     const mins = Math.floor(ms / 60000);
@@ -52,15 +40,32 @@ const Stopwatch: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
   };
 
-  // Lap deltas depend only on `laps`, but the component re-renders ~60x/sec
-  // via the RAF `elapsed` tick while running — memoize so the two passes over
-  // `laps` don't run every frame.
-  const { bestLap, worstLap, stats } = useMemo(() => {
-    // Per-lap split durations (oldest lap counts from zero, hence the last entry).
-    const splits = laps.map((l, i) => i === laps.length - 1 ? l : l - (laps[i + 1] ?? 0));
-    if (laps.length <= 1) return { bestLap: -1, worstLap: -1, stats: null };
-    return { bestLap: Math.min(...splits), worstLap: Math.max(...splits), stats: computeLapStats(splits) };
+  // Per-lap split durations (oldest lap counts from zero, hence the last entry).
+  const { bestLap, worstLap, stats, splits } = useMemo(() => {
+    const sp = laps.map((l, i) => i === laps.length - 1 ? l : l - (laps[i + 1] ?? 0));
+    if (laps.length <= 1) return { bestLap: -1, worstLap: -1, stats: null, splits: sp };
+    return { bestLap: Math.min(...sp), worstLap: Math.max(...sp), stats: computeLapStats(sp), splits: sp };
   }, [laps]);
+
+  // Export lap splits + totals to the clipboard as a tidy table.
+  const [exporting, setExporting] = useState(false);
+  const exportLaps = useCallback(async () => {
+    if (laps.length === 0 || exporting) return;
+    setExporting(true);
+    const lines = ['Lap\tSplit\tTime'];
+    for (let i = 0; i < laps.length; i++) {
+      lines.push(`${laps.length - i}\t${fmt(splits[i])}\t${fmt(laps[i])}`);
+    }
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Copied ${laps.length} laps` } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Clipboard unavailable' } }));
+    } finally {
+      setExporting(false);
+    }
+  }, [laps, splits, exporting]);
 
   return (
     <div style={s.container}>
@@ -92,10 +97,11 @@ const Stopwatch: React.FC = () => {
             <span className="dex-label-caps" style={s.lapHeaderText}>Lap</span>
             <span className="dex-label-caps" style={s.lapHeaderText}>Split</span>
             <span className="dex-label-caps" style={s.lapHeaderText}>Time</span>
+            <button style={s.exportBtn} onClick={exportLaps} disabled={exporting} title="Copy laps to clipboard" aria-label="Copy laps to clipboard">Copy</button>
           </div>
           <div style={s.lapList}>
             {laps.map((l, i) => {
-              const split = i === laps.length - 1 ? l : l - (laps[i + 1] ?? 0);
+              const split = splits[i];
               const isBest = laps.length > 2 && split === bestLap;
               const isWorst = laps.length > 2 && split === worstLap;
               return (
@@ -178,11 +184,17 @@ const s: Record<string, React.CSSProperties> = {
     overflow: 'hidden', borderTop: '1px solid var(--color-border-subtle)',
   },
   lapHeader: {
-    display: 'flex', padding: '10px var(--space-5)', gap: 'var(--space-2)',
+    display: 'flex', alignItems: 'center', padding: '10px var(--space-5)', gap: 'var(--space-2)',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   lapHeaderText: {
     flex: 1,
+  },
+  exportBtn: {
+    border: '1px solid var(--color-border)', borderRadius: 6,
+    background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
+    fontSize: 11, fontWeight: 600, padding: '4px 10px', cursor: 'pointer',
+    fontFamily: 'var(--font-family)', flexShrink: 0,
   },
   lapList: { flex: 1, overflow: 'auto', padding: '4px 0' },
   lapRow: {

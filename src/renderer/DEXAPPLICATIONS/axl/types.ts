@@ -180,6 +180,10 @@ export interface SimulationResult {
   converged?: boolean;
   timestamp?: number;
   type?: SimulationType;
+  // Real FE solver outputs (present when the stress study ran the truss FEA).
+  maxDisplacement?: number;   // largest nodal displacement magnitude (model units)
+  feaSolved?: boolean;        // true when produced by the direct-stiffness solver
+  elementCount?: number;      // number of FE members solved
 }
 
 export interface AXLProject {

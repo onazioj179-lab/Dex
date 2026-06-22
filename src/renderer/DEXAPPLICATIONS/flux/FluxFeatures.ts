@@ -227,19 +227,25 @@ export interface Expression {
   error?: string;
 }
 
+// Expression templates. Each is a valid, evaluable formula for the live
+// expression engine (see flux/expressions.ts). Available context: time (sec),
+// value (the static/keyframe value), index (layer index), frame, fps. Helpers:
+// Math, wiggle(freq, amp), random(seed?), noise(x), clamp(v, lo, hi),
+// lerp(a, b, t), smoothstep(e0, e1, x). An expression returns a number (or an
+// [x, y] pair) and may layer on top of the existing value.
 export const EXPRESSION_TEMPLATES: { name: string; description: string; code: string }[] = [
-  { name: 'Wiggle', description: 'Random oscillation', code: 'wiggle(5, 20)' },
-  { name: 'Loop Out', description: 'Loop after last keyframe', code: 'loopOut("cycle")' },
-  { name: 'Loop In', description: 'Loop before first keyframe', code: 'loopIn("cycle")' },
-  { name: 'Bounce', description: 'Ping-pong loop', code: 'loopOut("pingpong")' },
-  { name: 'Time', description: 'Current time value', code: 'time * 100' },
-  { name: 'Sin Wave', description: 'Sine wave motion', code: 'Math.sin(time * 3) * 50' },
-  { name: 'Cos Wave', description: 'Cosine wave motion', code: 'Math.cos(time * 3) * 50' },
-  { name: 'Random', description: 'Random value each frame', code: 'random(0, 100)' },
-  { name: 'Smooth Random', description: 'Smooth random motion', code: 'noise(time) * 100' },
-  { name: 'Delay', description: 'Delayed value', code: 'valueAtTime(time - 0.1)' },
-  { name: 'Spring', description: 'Spring physics', code: 'spring(10, 0.5)' },
-  { name: 'Decay', description: 'Exponential decay', code: 'velocity * Math.exp(-time * 3)' },
+  { name: 'Wiggle', description: 'Organic noise oscillation around the value', code: 'value + wiggle(2, 30)' },
+  { name: 'Sin Wave', description: 'Sine wave motion around the value', code: 'value + Math.sin(time * 3) * 50' },
+  { name: 'Cos Wave', description: 'Cosine wave motion around the value', code: 'value + Math.cos(time * 3) * 50' },
+  { name: 'Time Ramp', description: 'Linear ramp driven by time', code: 'time * 100' },
+  { name: 'Pulse', description: 'Pulsing scale via absolute sine', code: '100 + Math.abs(Math.sin(time * 4)) * 50' },
+  { name: 'Random', description: 'Deterministic per-frame random 0-100', code: 'random() * 100' },
+  { name: 'Smooth Random', description: 'Smooth continuous noise drift', code: 'value + noise(time) * 80' },
+  { name: 'Decay', description: 'Exponential decay of the value', code: 'value * Math.exp(-time * 3)' },
+  { name: 'Clamped Sine', description: 'Sine motion clamped to a range', code: 'clamp(value + Math.sin(time * 5) * 100, 0, 100)' },
+  { name: 'Ease In', description: 'Smoothstep ease over 2 seconds', code: 'smoothstep(0, 2, time) * 100' },
+  { name: 'Stagger', description: 'Per-layer phase offset by index', code: 'value + Math.sin(time * 3 + index) * 40' },
+  { name: 'Bounce', description: 'Bouncing motion from absolute sine decay', code: 'value + Math.abs(Math.sin(time * 6)) * Math.exp(-time) * 120' },
 ];
 
 // ==================== LAYER EFFECTS ====================
