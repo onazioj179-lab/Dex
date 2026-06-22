@@ -17,6 +17,7 @@ import { useLearningStore } from '../../store/learningStore';
 import { platform } from '../../utils';
 import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
 import { sendToNotes } from '../../services/sendTo';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // -- Helpers ---------------------------------------------------------------
 const fmtMs = (ms: number): string => {
@@ -619,6 +620,32 @@ const Learn: React.FC = () => {
     const ipc = (window as any).electron;
     ipc?.invoke?.('patterns:cleanup').catch((e: unknown) => console.warn('[Learn] cleanup:', e));
   }, [reset]);
+
+  // UKI app-context: expose the current course/lesson, its module, and overall
+  // progress so the assistant knows what the user is learning. A ref keeps the
+  // resolver reading live state — register once at mount.
+  const ukiCtxRef = useRef({ tab, activeLesson, completedCount, streak });
+  ukiCtxRef.current = { tab, activeLesson, completedCount, streak };
+  useEffect(() => {
+    registerUkiAppContext('learn', () => {
+      const s = ukiCtxRef.current;
+      const lesson = s.activeLesson ? ALL_LESSONS.find(l => l.id === s.activeLesson) : undefined;
+      const mod = s.activeLesson ? LESSON_MODULE[s.activeLesson] : undefined;
+      const pct = TOTAL_LESSON_COUNT ? Math.round((s.completedCount / TOTAL_LESSON_COUNT) * 100) : 0;
+      return {
+        appId: 'learn',
+        focusedItemId: lesson?.id,
+        custom: {
+          tab: s.tab,
+          course: mod?.title,
+          lesson: lesson?.title,
+          progress: `${s.completedCount}/${TOTAL_LESSON_COUNT} lessons (${pct}%)`,
+          dayStreak: s.streak.current,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('learn');
+  }, []);
 
   // Render one lesson row (status dot, title, time, bookmark, expandable body).
   const renderLesson = useCallback((lesson: Lesson, accent: string) => {

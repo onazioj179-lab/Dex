@@ -2361,6 +2361,18 @@ REMAINING (lower leverage / deferred):
 > marketplace registry — which can't exist in a renderer-only repo; the local-first foundations above are
 > ready for it (see docs/NEXT-STAGE.md).
 
+> **DONE — "Agentic DEX: AI everywhere" (AI track).** UKI now knows what the user is looking at
+> across the app and can be asked about any selection. (1) Extended the UKI app-context registry
+> (`registerUkiAppContext`) from 6 apps to 21: added Kanban, Calendar, MarkdownEditor, Browser, Audio,
+> Weather, Maps, Calculator, UnitConverter, Learn, EnvManager, WorldClock, Workflows, GitClient,
+> PresentationBuilder — each registers once (live state via a ref) and unregisters on unmount, exposing
+> meaningful per-app context (board/card, selected date+events, file+word-count, tab+URL, now-playing,
+> location+temp, centered place, expression+result, course+progress, profile+keys, cities, workflow+steps,
+> repo+branch+staged, deck+slide). (2) New `components/AskUkiSelection.tsx` mounted in the shell: selecting
+> text in ANY surface shows a floating "Ask UKI" chip (or Ctrl/Cmd+Shift+U) that routes the selection to the
+> agent loop via `dex-uki-ask` — no per-app wiring. Builds on the provider-agnostic ReAct agent (web search +
+> app control) shipped earlier. tsc 0, watermark lint 0 (2162).
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.

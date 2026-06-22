@@ -7,6 +7,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from '
 import DOMPurify from 'dompurify';
 import { lintMarkdown } from '../../../shared/format/markdownLint';
 import { sendToNotes } from '../../services/sendTo';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 const STORAGE_KEY = 'dex-markdown-content';
 const FILE_KEY = 'dex-markdown-filename';
@@ -290,6 +291,31 @@ const MarkdownEditor: React.FC = () => {
   }, [content]);
 
   const lintIssues = useMemo(() => lintMarkdown(content), [content]);
+
+  // -- uki context: surface the open document to the assistant. Registered once
+  // on mount; a latest-value ref (refreshed each render) keeps the pure resolver
+  // reading live state without re-registering. "Unsaved" compares the live
+  // content against the value last persisted to localStorage (debounced save).
+  const ukiCtxRef = useRef({ fileName, content, words: stats.words });
+  useEffect(() => { ukiCtxRef.current = { fileName, content, words: stats.words }; });
+  useEffect(() => {
+    registerUkiAppContext('markdown', () => {
+      const c = ukiCtxRef.current;
+      let unsaved = false;
+      try { unsaved = (localStorage.getItem(STORAGE_KEY) ?? '') !== c.content; } catch { /* ignore */ }
+      return {
+        appId: 'markdown',
+        currentFile: c.fileName,
+        custom: {
+          fileName: c.fileName,
+          words: c.words,
+          chars: c.content.length,
+          unsaved,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('markdown');
+  }, []);
 
   // Proportional scroll sync between editor + preview panes.
   const handleEditorScroll = useCallback(() => {

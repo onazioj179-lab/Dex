@@ -7,6 +7,7 @@ import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { DexSearchInput } from '../../styles/components';
 import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../../shared/time/dateHelpers';
 import { textIncludesAll, priorityRank, byField } from '../../../shared/collections/sortFilter';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // -- Types --------------------------------------------------------------
 
@@ -465,6 +466,35 @@ const KanbanApp: React.FC = () => {
 
   const totalCards = board.columns.reduce((sum, c) => sum + c.cards.length, 0);
   const doneCards = board.columns.find(c => c.title.toLowerCase().includes('done'))?.cards.length || 0;
+
+  // -- uki context: surface the active board + selected card to the assistant.
+  // Registered once on mount; a latest-value ref (refreshed each render) lets the
+  // pure resolver read live state without re-registering.
+  const selectedCardTitle = editingCardData?.title;
+  const ukiCtxRef = useRef({ board, totalCards, search, filterPriority, sortField, selectedCardTitle });
+  useEffect(() => { ukiCtxRef.current = { board, totalCards, search, filterPriority, sortField, selectedCardTitle }; });
+  useEffect(() => {
+    registerUkiAppContext('kanban', () => {
+      const c = ukiCtxRef.current;
+      const b = c.board;
+      return {
+        appId: 'kanban',
+        focusedItemId: c.selectedCardTitle ? b?.name : undefined,
+        selectionText: c.selectedCardTitle,
+        custom: {
+          board: b?.name,
+          columns: b?.columns.length ?? 0,
+          totalCards: c.totalCards,
+          columnCounts: b ? b.columns.map(col => ({ title: col.title, cards: col.cards.length })) : [],
+          selectedCard: c.selectedCardTitle || undefined,
+          search: c.search || undefined,
+          priorityFilter: c.filterPriority,
+          sort: c.sortField,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('kanban');
+  }, []);
 
   return (
     <div style={styles.container}>
