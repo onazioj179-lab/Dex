@@ -106,9 +106,19 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
   ],
   [
     { id: 'table', label: 'Insert Table', icon: 'TBL', glyph: 'grid', command: 'table' },
+    { id: 'columns', label: 'Two Columns', icon: 'Col', command: 'columns' },
     { id: 'callout-note', label: 'Callout: Note', icon: 'Note', glyph: 'info', command: 'callout', arg: 'note' },
     { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', glyph: 'alert-triangle', command: 'callout', arg: 'warning' },
     { id: 'callout-tip', label: 'Callout: Tip', icon: 'Tip', glyph: 'lightbulb', command: 'callout', arg: 'tip' },
+  ],
+  [
+    // Native execCommand verbs -- routed through the toolbar's default dispatcher,
+    // so they persist exactly like Bold/Heading do. Indentation drives nested lists.
+    { id: 'outdent', label: 'Decrease Indent', icon: 'Out', command: 'outdent' },
+    { id: 'indent', label: 'Increase Indent', icon: 'In', command: 'indent' },
+    { id: 'align-left', label: 'Align Left', icon: 'AL', glyph: 'align-left', command: 'justifyLeft' },
+    { id: 'align-center', label: 'Align Center', icon: 'AC', glyph: 'align-center', command: 'justifyCenter' },
+    { id: 'align-right', label: 'Align Right', icon: 'AR', glyph: 'align-right', command: 'justifyRight' },
   ],
 ];
 
@@ -389,6 +399,11 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const [charCount, setCharCount] = useState(0);
   const [wdCount, setWdCount] = useState(0);
   const [sentenceCount, setSentenceCount] = useState(0);
+  // Per-editor word-count goal (persisted); session baseline powers "+N this session".
+  const [wordGoal, setWordGoal] = useState(() => {
+    try { return parseInt(localStorage.getItem('dex-notes-wordgoal') || '0', 10) || 0; } catch { return 0; }
+  });
+  const sessionBaseRef = useRef<number | null>(null);
   // Reading level (Flesch-Kincaid grade + ease band) -- shown once a note is long
   // enough for the score to be meaningful. Computed in the debounced pass below.
   const [readability, setReadability] = useState('');
@@ -560,6 +575,18 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     editorRef.current?.focus();
     emitChange();
   }, [pushUndo, emitChange]);
+
+  // Capture the session's starting word count once, then prompt to set a goal.
+  useEffect(() => {
+    if (sessionBaseRef.current === null) sessionBaseRef.current = wdCount;
+  }, [wdCount]);
+  const editGoal = useCallback(() => {
+    const v = window.prompt('Set a word-count goal (0 to clear):', String(wordGoal));
+    if (v === null) return;
+    const n = Math.max(0, parseInt(v, 10) || 0);
+    setWordGoal(n);
+    try { localStorage.setItem('dex-notes-wordgoal', String(n)); } catch { /* noop */ }
+  }, [wordGoal]);
 
   // -- [[wiki-link]] autocomplete ----------------------------------------
 
@@ -806,6 +833,17 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
           html += '</tr>';
         }
         html += '</tbody></table><p><br></p>';
+        editorRef.current?.focus();
+        document.execCommand('insertHTML', false, html);
+        emitChange();
+        break;
+      }
+      case 'columns': {
+        // Two side-by-side editable columns, backed by a 1-row 2-cell table so
+        // the layout ROUND-TRIPS through the document model (a raw flex div would
+        // be dropped on save). No header row -- both cells are body columns.
+        pushUndo();
+        const html = '<table><tbody><tr><td><br></td><td><br></td></tr></tbody></table><p><br></p>';
         editorRef.current?.focus();
         document.execCommand('insertHTML', false, html);
         emitChange();
@@ -1326,6 +1364,32 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
           {readability ? ` · ${readability}` : ''}
         </span>
         {aiStatus && <span style={styles.aiStatus}>{aiStatus}</span>}
+        {(() => {
+          const base = sessionBaseRef.current ?? wdCount;
+          const session = Math.max(0, wdCount - base);
+          const pct = wordGoal > 0 ? Math.min(100, Math.round((wdCount / wordGoal) * 100)) : 0;
+          const reached = wordGoal > 0 && wdCount >= wordGoal;
+          return (
+            <span
+              role="button"
+              tabIndex={0}
+              title="Click to set a word-count goal"
+              onClick={editGoal}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editGoal(); } }}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, color: reached ? 'var(--color-success)' : undefined }}
+            >
+              {wordGoal > 0 ? (
+                <>
+                  <span style={{ display: 'inline-block', width: 44, height: 4, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.1))', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: reached ? 'var(--color-success)' : 'var(--color-accent)' }} />
+                  </span>
+                  Goal {wdCount.toLocaleString()}/{wordGoal.toLocaleString()}
+                </>
+              ) : 'Set goal'}
+              {session > 0 ? ` · +${session.toLocaleString()} this session` : ''}
+            </span>
+          );
+        })()}
         <span>{editorMode === 'edit' ? 'Editing' : editorMode === 'preview' ? 'Preview' : 'Split View'}</span>
       </div>
     </div>

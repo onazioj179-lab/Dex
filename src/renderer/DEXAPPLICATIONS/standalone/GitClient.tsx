@@ -51,6 +51,37 @@ const getBridge = (): GitBridge | null => {
 };
 
 const LS_PATH = 'dex-git-repo-path';
+const LS_LAST_MSG = 'dex-git-last-message';
+const LS_TEMPLATES = 'dex-git-templates';
+
+// Built-in conventional-commit templates, merged with any the user has saved.
+const BUILTIN_TEMPLATES: { label: string; body: string }[] = [
+  { label: 'feat', body: 'feat: ' },
+  { label: 'fix', body: 'fix: ' },
+  { label: 'docs', body: 'docs: ' },
+  { label: 'refactor', body: 'refactor: ' },
+  { label: 'chore', body: 'chore: ' },
+];
+
+const loadTemplates = (): { label: string; body: string }[] => {
+  try {
+    const raw = localStorage.getItem(LS_TEMPLATES);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (t): t is { label: string; body: string } =>
+        t && typeof t.label === 'string' && typeof t.body === 'string',
+    );
+  } catch { return []; }
+};
+
+// Lightweight toast via the shared dex-toast CustomEvent contract.
+const toast = (msg: string, kind: 'info' | 'success' | 'error' = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: msg, type: kind } }));
+  } catch { /* ignore */ }
+};
 
 // Status char -> { label, color } for the small leading badge.
 const statusMeta = (f: GitStatusFile): { ch: string; color: string; title: string } => {
@@ -91,10 +122,21 @@ export default function GitClient(): React.ReactElement {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [selectedCommit, setSelectedCommit] = useState<GitCommit | null>(null);
+  const [userTemplates, setUserTemplates] = useState<{ label: string; body: string }[]>(() => loadTemplates());
+  const [lastMessage, setLastMessage] = useState<string>(() => {
+    try { return localStorage.getItem(LS_LAST_MSG) || ''; } catch { return ''; }
+  });
   const noteTimer = useRef<number | null>(null);
 
-  const flash = useCallback((m: string) => {
+  const templates = useMemo(
+    () => [...BUILTIN_TEMPLATES, ...userTemplates],
+    [userTemplates],
+  );
+
+  const flash = useCallback((m: string, kind: 'info' | 'success' | 'error' = 'info') => {
     setNote(m);
+    toast(m, kind);
     if (noteTimer.current) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setNote(''), 4000);
   }, []);
@@ -105,6 +147,11 @@ export default function GitClient(): React.ReactElement {
     bridge.check().then(r => { if (alive) setAvailable(!!r?.available); }).catch(() => { if (alive) setAvailable(false); });
     return () => { alive = false; };
   }, [bridge]);
+
+  // Clear the pending flash-note timeout on unmount so it can't fire after teardown.
+  useEffect(() => () => {
+    if (noteTimer.current) window.clearTimeout(noteTimer.current);
+  }, []);
 
   const refresh = useCallback(async (path = repoPath) => {
     if (!bridge || !path) return;
@@ -140,10 +187,10 @@ export default function GitClient(): React.ReactElement {
     setBusy(true);
     try {
       const r = await fn();
-      flash(r?.success ? (okMsg) : (r?.message || 'Command failed'));
+      flash(r?.success ? okMsg : (r?.message || 'Command failed'), r?.success ? 'success' : 'error');
       await refresh();
     } catch (e) {
-      flash(e instanceof Error ? e.message : String(e));
+      flash(e instanceof Error ? e.message : String(e), 'error');
     } finally {
       setBusy(false);
     }
@@ -158,10 +205,44 @@ export default function GitClient(): React.ReactElement {
   }, [bridge, repoPath, run]);
 
   const commit = useCallback(() => {
-    if (!message.trim()) { flash('Enter a commit message'); return; }
-    if (staged.length === 0) { flash('Stage at least one file first'); return; }
-    void run(() => bridge!.commit(repoPath, message.trim()), 'Committed').then(() => setMessage(''));
+    const msg = message.trim();
+    if (!msg) { flash('Enter a commit message', 'error'); return; }
+    if (staged.length === 0) { flash('Stage at least one file first', 'error'); return; }
+    try { localStorage.setItem(LS_LAST_MSG, msg); } catch { /* ignore */ }
+    setLastMessage(msg);
+    void run(() => bridge!.commit(repoPath, msg), 'Committed').then(() => setMessage(''));
   }, [bridge, repoPath, message, staged.length, run, flash]);
+
+  // Insert a template body at the start of the message (renderer-side only).
+  const applyTemplate = useCallback((body: string) => {
+    setMessage(prev => (prev.trim() ? `${body}${prev}` : body));
+  }, []);
+
+  // Save the current message as a reusable template, keyed by its first line.
+  const saveTemplate = useCallback(() => {
+    const body = message.trim();
+    if (!body) { flash('Type a message to save as a template', 'error'); return; }
+    const label = (body.split('\n')[0] || body).slice(0, 24);
+    setUserTemplates(prev => {
+      const next = [...prev.filter(t => t.label !== label), { label, body }];
+      try { localStorage.setItem(LS_TEMPLATES, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+    flash(`Saved template "${label}"`, 'success');
+  }, [message, flash]);
+
+  const removeTemplate = useCallback((label: string) => {
+    setUserTemplates(prev => {
+      const next = prev.filter(t => t.label !== label);
+      try { localStorage.setItem(LS_TEMPLATES, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const recallLast = useCallback(() => {
+    if (!lastMessage) { flash('No previous commit message to recall', 'error'); return; }
+    setMessage(lastMessage);
+  }, [lastMessage, flash]);
 
   // ---- Render: bridge / availability gates ---------------------------------
   if (available === false) {
@@ -203,11 +284,18 @@ export default function GitClient(): React.ReactElement {
           <div>
             <h1 className="text-2xl font-semibold" style={{ margin: 0 }}>Git</h1>
             {status?.isRepo && (
-              <div className="text-xs opacity-70">
-                {status.branch ?? 'detached'}
-                {status.ahead > 0 ? ` ↑${status.ahead}` : ''}
-                {status.behind > 0 ? ` ↓${status.behind}` : ''}
-                {status.upstream ? ` · ${status.upstream}` : ''}
+              <div className="text-xs" style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.75 }}>
+                <span>{status.branch ?? 'detached'}</span>
+                {status.ahead > 0 && (
+                  <span title={`${status.ahead} commit(s) to push`} style={{ color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>↑{status.ahead}</span>
+                )}
+                {status.behind > 0 && (
+                  <span title={`${status.behind} commit(s) to pull`} style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-mono)' }}>↓{status.behind}</span>
+                )}
+                {status.upstream && status.ahead === 0 && status.behind === 0 && (
+                  <span title="Up to date with upstream" style={{ color: 'var(--color-text-muted)' }}>· up to date</span>
+                )}
+                {status.upstream ? <span style={{ opacity: 0.7 }}>· {status.upstream}</span> : <span style={{ color: 'var(--color-text-muted)' }}>· no upstream</span>}
               </div>
             )}
           </div>
@@ -224,8 +312,26 @@ export default function GitClient(): React.ReactElement {
               {branches.branches.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           )}
-          {status?.isRepo && <button style={{ ...glassButton, ...disabledVisual(busy) }} disabled={busy} onClick={() => run(() => bridge!.pull(repoPath), 'Pulled')}>Pull</button>}
-          {status?.isRepo && <button style={{ ...glassButton, ...disabledVisual(busy) }} disabled={busy} onClick={() => run(() => bridge!.push(repoPath), 'Pushed')}>Push</button>}
+          {status?.isRepo && (
+            <button
+              title={status.behind > 0 ? `Pull ${status.behind} commit(s)` : 'Pull from upstream'}
+              style={{ ...glassButton, ...(status.behind > 0 ? { borderColor: 'var(--color-warning)', color: 'var(--color-warning)' } : {}), ...disabledVisual(busy) }}
+              disabled={busy}
+              onClick={() => run(() => bridge!.pull(repoPath), 'Pulled')}
+            >
+              Pull{status.behind > 0 ? ` (${status.behind})` : ''}
+            </button>
+          )}
+          {status?.isRepo && (
+            <button
+              title={status.ahead > 0 ? `Push ${status.ahead} commit(s)` : 'Push to upstream'}
+              style={{ ...glassButton, ...(status.ahead > 0 ? { borderColor: 'var(--color-success)', color: 'var(--color-success)' } : {}), ...disabledVisual(busy) }}
+              disabled={busy}
+              onClick={() => run(() => bridge!.push(repoPath), 'Pushed')}
+            >
+              Push{status.ahead > 0 ? ` (${status.ahead})` : ''}
+            </button>
+          )}
           <button style={{ ...glassButton, ...disabledVisual(busy || !repoPath) }} disabled={busy || !repoPath} onClick={() => refresh()}>Refresh</button>
         </div>
       </header>
@@ -299,6 +405,52 @@ export default function GitClient(): React.ReactElement {
 
           {/* Commit */}
           <section style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Templates + recall */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
+              {templates.map(t => {
+                const custom = !BUILTIN_TEMPLATES.some(b => b.label === t.label);
+                return (
+                  <span key={t.label} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <button
+                      title={`Insert "${t.body.trim() || t.label}"`}
+                      style={{ ...glassButton, padding: '2px 8px', fontSize: 11, ...disabledVisual(busy) }}
+                      disabled={busy}
+                      onClick={() => applyTemplate(t.body)}
+                    >
+                      {t.label}
+                    </button>
+                    {custom && (
+                      <button
+                        aria-label={`Delete template ${t.label}`}
+                        title="Delete template"
+                        style={{ ...glassButton, padding: '2px 6px', fontSize: 11, marginLeft: 2, color: 'var(--color-error)', ...disabledVisual(busy) }}
+                        disabled={busy}
+                        onClick={() => removeTemplate(t.label)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+              <span style={{ flex: 1 }} />
+              <button
+                title="Recall the last commit message"
+                style={{ ...glassButton, padding: '2px 8px', fontSize: 11, ...disabledVisual(busy || !lastMessage) }}
+                disabled={busy || !lastMessage}
+                onClick={recallLast}
+              >
+                Recall last
+              </button>
+              <button
+                title="Save the current message as a template"
+                style={{ ...glassButton, padding: '2px 8px', fontSize: 11, ...disabledVisual(busy || !message.trim()) }}
+                disabled={busy || !message.trim()}
+                onClick={saveTemplate}
+              >
+                Save template
+              </button>
+            </div>
             <textarea
               aria-label="Commit message"
               value={message}
@@ -321,21 +473,95 @@ export default function GitClient(): React.ReactElement {
             </button>
           </section>
 
-          {/* Log */}
-          <section style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-sm font-semibold" style={{ margin: '0 0 6px', opacity: 0.85 }}>History</h2>
-            {commits.length === 0 ? (
-              <div className="text-sm opacity-70">No commits yet.</div>
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {commits.map(c => (
-                  <li key={c.hash} style={{ display: 'flex', gap: 10, padding: '5px 8px', borderRadius: 6, alignItems: 'baseline' }}>
-                    <code style={{ color: 'var(--color-accent)', fontSize: 11 }}>{c.shortHash}</code>
-                    <span className="truncate" style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{c.subject}</span>
-                    <span className="text-xs" style={{ opacity: 0.55, whiteSpace: 'nowrap' }}>{c.author} · {c.date}</span>
-                  </li>
-                ))}
-              </ul>
+          {/* Log + details */}
+          <section style={{ flex: 1, minHeight: 0, display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <h2 className="text-sm font-semibold" style={{ margin: '0 0 6px', opacity: 0.85 }}>History</h2>
+              {commits.length === 0 ? (
+                <div className="text-sm opacity-70">No commits yet.</div>
+              ) : (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {commits.map(c => {
+                    const active = selectedCommit?.hash === c.hash;
+                    return (
+                      <li
+                        key={c.hash}
+                        onClick={() => setSelectedCommit(active ? null : c)}
+                        style={{
+                          display: 'flex', gap: 10, padding: '5px 8px', borderRadius: 6, alignItems: 'baseline', cursor: 'pointer',
+                          background: active ? 'var(--color-bg-surface)' : 'transparent',
+                          border: active ? '1px solid var(--color-accent)' : '1px solid transparent',
+                        }}
+                      >
+                        <code style={{ color: 'var(--color-accent)', fontSize: 11 }}>{c.shortHash}</code>
+                        <span className="truncate" style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{c.subject}</span>
+                        <span className="text-xs" style={{ opacity: 0.55, whiteSpace: 'nowrap' }}>{c.author} · {c.date}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Details panel */}
+            {selectedCommit && (
+              <aside
+                style={{
+                  width: 280, flexShrink: 0, overflow: 'auto', padding: 'var(--space-3)', borderRadius: 8,
+                  border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 className="text-sm font-semibold" style={{ margin: 0 }}>Commit details</h3>
+                  <button
+                    aria-label="Close details"
+                    style={{ ...glassButton, padding: '0 8px', fontSize: 14 }}
+                    onClick={() => setSelectedCommit(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <dt className="text-xs" style={{ opacity: 0.55, marginBottom: 2 }}>Subject</dt>
+                    <dd style={{ margin: 0, fontSize: 13, wordBreak: 'break-word' }}>{selectedCommit.subject}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs" style={{ opacity: 0.55, marginBottom: 2 }}>Hash</dt>
+                    <dd style={{ margin: 0 }}>
+                      <code style={{ fontSize: 11, color: 'var(--color-accent)', wordBreak: 'break-all' }}>{selectedCommit.hash}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs" style={{ opacity: 0.55, marginBottom: 2 }}>Author</dt>
+                    <dd style={{ margin: 0, fontSize: 13 }}>{selectedCommit.author}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs" style={{ opacity: 0.55, marginBottom: 2 }}>Date</dt>
+                    <dd style={{ margin: 0, fontSize: 13 }}>{selectedCommit.date}</dd>
+                  </div>
+                </dl>
+                <button
+                  title="Copy full hash"
+                  style={{ ...glassButton, alignSelf: 'flex-start', padding: '4px 12px', fontSize: 12 }}
+                  onClick={() => {
+                    try {
+                      const p = navigator.clipboard?.writeText(selectedCommit.hash);
+                      if (p && typeof p.catch === 'function') {
+                        p.then(() => flash('Hash copied', 'success'))
+                         .catch(() => flash('Copy failed', 'error'));
+                      } else {
+                        flash('Hash copied', 'success');
+                      }
+                    } catch (e) {
+                      flash(e instanceof Error ? e.message : 'Copy failed', 'error');
+                    }
+                  }}
+                >
+                  Copy hash
+                </button>
+              </aside>
             )}
           </section>
         </div>

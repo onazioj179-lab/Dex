@@ -337,9 +337,18 @@ interface SpotlightProps {
   onNavigate?: (appId: string) => void;
   /** Fires when the results dropdown opens or closes (variant=home). */
   onResultsOpenChange?: (open: boolean) => void;
+  /** home variant: pill height (default 50 hero; pass ~32 for a compact dock field). */
+  pillHeight?: number;
+  /** home variant: drop the results UP instead of down (for a bottom-docked bar). */
+  dropUp?: boolean;
+  /** home variant: placeholder text (default "Search"). */
+  placeholder?: string;
+  /** home variant: hide the built-in voice mic (e.g. in the dock, where the
+   *  adjacent UKI button is already the mic/voice entry -- avoids two mics). */
+  hideVoice?: boolean;
 }
 
-export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen, onClose, onNavigate, onResultsOpenChange }) => {
+export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen, onClose, onNavigate, onResultsOpenChange, pillHeight, dropUp, placeholder, hideVoice }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotlightResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -571,12 +580,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // HOME VARIANT: Embedded search bar with dropdown results
   // -----------------------------------------------------------------------
   if (variant === 'home') {
+    // Compact/height + drop-direction are parameterized so the same field works
+    // as the Home hero (50px, drops down) AND as the bottom-docked launcher
+    // search (~32px, drops UP so results don't run off the bottom of the screen).
+    const ph = pillHeight ?? 50;
+    const dropStyle: React.CSSProperties = dropUp ? { bottom: ph + 8 } : { top: ph + 8 };
     return (
       <div data-dex-spotlight style={{ width: '100%', maxWidth: 560, position: 'relative' }}>
         {/* Search Bar — canonical search pill (calm, no highlight); hero height retained */}
         <div className="dex-home-search-pill" style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          height: 50, padding: '0 14px', boxSizing: 'border-box',
+          height: ph, padding: '0 14px', boxSizing: 'border-box',
           background: 'var(--color-bg-inset)',
           border: `1px solid ${showResults ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
           borderRadius: 9999,
@@ -598,7 +612,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               e.currentTarget.selectionStart = e.currentTarget.selectionEnd = e.currentTarget.value.length;
             }}
             onBlur={() => setTimeout(() => setShowResults(false), 300)}
-            placeholder="Search"
+            placeholder={placeholder ?? 'Search'}
             aria-label="Spotlight Search"
             role="combobox"
             aria-expanded={showResults}
@@ -612,7 +626,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               flex: 1, height: '100%',
               background: 'transparent', border: 'none', outline: 'none',
               color: 'var(--color-text-primary)',
-              fontSize: 16, fontWeight: 400,
+              fontSize: ph < 44 ? 14 : 16, fontWeight: 400,
               fontFamily: 'var(--font-family)',
               letterSpacing: '-0.01em',
             }}
@@ -636,7 +650,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               </svg>
             </button>
           )}
-          <VoiceMicButton onTranscript={(text) => { handleSearch(text); inputRef.current?.focus(); }} />
+          {!hideVoice && <VoiceMicButton onTranscript={(text) => { handleSearch(text); inputRef.current?.focus(); }} />}
         </div>
 
         {/* Scrollable results dropdown */}
@@ -649,7 +663,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             className="spotlight-results-scroll"
             onMouseDown={e => e.preventDefault()}
             style={{
-              position: 'absolute', top: 58, left: 0, right: 0,
+              position: 'absolute', left: 0, right: 0, ...dropStyle,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
               // Fully opaque so Home wallpaper/widgets never bleed through and

@@ -254,6 +254,46 @@ const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
 const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
 
 // ===========================================================================
+// PER-SECTION RESET MAP (DEX 5.5)
+// Maps a section id to the exact `dex-settings` keys that section's panel
+// writes, plus any standalone localStorage keys the file mirrors for that
+// section. Reset-to-defaults uses this to restore ONLY that section's keys
+// (the rest of the user's settings are untouched). Data only — declaring a
+// section here does not change what any control does. Sections rendered by
+// external components (Permissions, Plugins, Nexus, Account, AI Providers,
+// Creative Suite, Snap, Creator) manage their own storage and are omitted so
+// no Reset action is offered for them.
+// `defaultKeys` are validated against DEFAULT_SETTINGS at reset time; unknown
+// keys are skipped defensively. `localKeys` are removed in a try/catch.
+// ===========================================================================
+const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: string[] }> = {
+  general: { defaultKeys: ['launchAtStartup', 'checkForUpdates', 'restoreLastSession', 'autoSave', 'analytics'] },
+  appearance: {
+    defaultKeys: ['darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'fontScale', 'windowControls', 'stageManager', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
+    localKeys: ['darkMode', 'dex-font-scale', 'dex-window-controls'],
+  },
+  sound: { defaultKeys: ['masterVolume', 'alertVolume', 'outputDevice', 'inputDevice', 'spatialAudio', 'spatialAudioProfile', 'audioBalance', 'enhancedDialogue', 'mediaAutoPlay', 'creativeAppAudioBypass'] },
+  display: { defaultKeys: ['displayResolution', 'displayScaling', 'blurIntensity', 'glassOpacity', 'adaptiveBrightness', 'truetoneBrightness', 'nightShift', 'nightShiftWarmth', 'displayRefreshRate', 'hdrContent'] },
+  notifications: { defaultKeys: ['enableNotifications', 'soundEnabled', 'badgeEnabled', 'doNotDisturb'] },
+  privacy: { defaultKeys: ['locationServices', 'crashReports', 'antiHacker', 'firewallEnabled', 'vpnProtection', 'encryptData', 'blockMalware', 'sandboxApps', 'autoLockMinutes', 'requireAuthOnWake'] },
+  network: { defaultKeys: ['networkOptIn', 'wifiEnabled', 'wifiProtection', 'preferredNetwork', 'wifiBand', 'bluetoothEnabled', 'bluetoothMode', 'bluetoothDiscoverable', 'blockTrackerDomains', 'dnsOverHttps', 'ipv6Enabled', 'networkMonitor', 'bandwidthOptimization', 'allowWebGL', 'allowJavaScript', 'strictSecurity'] },
+  performance: {
+    defaultKeys: ['performanceMode', 'hardwareAcceleration', 'lowPowerMode', 'memoryOptimization', 'preloadApps', 'backgroundBoost', 'performanceReservation', 'predictivePrewarm', 'cpuPriority', 'gpuRendering', 'cacheSizeGB', 'maxRamGB'],
+    localKeys: ['dex-predictive-prewarm'],
+  },
+  accessibility: { defaultKeys: ['highContrast', 'largeText', 'reduceTransparency', 'screenReader', 'letterSpacing', 'lineHeight', 'wordSpacing'] },
+  window: {
+    defaultKeys: ['snapWindows', 'doubleClickTitlebar', 'showWindowShadows', 'animateWindowResize', 'rememberWindowPositions', 'maxFloatingWindows', 'showAppTabBar'],
+    localKeys: ['dex-app-tab-bar'],
+  },
+  keyboard: { defaultKeys: ['enableGlobalShortcuts', 'cmdPaletteShortcut', 'quickSearchShortcut', 'screenshotShortcut'] },
+  files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'defaultView', 'sortBy', 'indexFolders', 'watchForChanges', 'thumbnailSize', 'maxStorageGB'] },
+  storage: { defaultKeys: ['cacheSizeGB', 'autoCleanCache', 'cacheCleanIntervalDays', 'compressOldFiles', 'encryptData'] },
+  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'doNotTrack', 'clearOnExit', 'blockThirdPartyCookies', 'enableTorMode', 'defaultSearchEngine', 'maxDownloadSpeed', 'parallelDownloads'] },
+  uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiWakeWordEnabled', 'ukiWakePhrase', 'ukiRecallMode', 'ukiRetentionDays', 'ukiCacheSizeGB', 'ukiAutoCleanup', 'ukiShowTranscript', 'ukiPersonality'] },
+};
+
+// ===========================================================================
 // UPDATE MANAGER SECTION
 // ===========================================================================
 
@@ -1930,6 +1970,7 @@ export const Settings: React.FC = () => {
     const label = pendingScrollRef.current;
     if (!label) return;
     pendingScrollRef.current = null;
+    let flashTimeout = 0;
     const id = window.requestAnimationFrame(() => {
       try {
         const esc = (window as any).CSS?.escape ? (window as any).CSS.escape(label) : label.replace(/"/g, '\\"');
@@ -1941,11 +1982,11 @@ export const Settings: React.FC = () => {
           row.style.transition = 'background-color 0.2s ease';
           const prev = row.style.backgroundColor;
           row.style.backgroundColor = 'var(--color-accent-soft, rgba(10,132,255,0.14))';
-          window.setTimeout(() => { row.style.backgroundColor = prev; }, 1100);
+          flashTimeout = window.setTimeout(() => { row.style.backgroundColor = prev; }, 1100);
         }
       } catch { /* best-effort scroll */ }
     });
-    return () => window.cancelAnimationFrame(id);
+    return () => { window.cancelAnimationFrame(id); if (flashTimeout) window.clearTimeout(flashTimeout); };
   }, [activeSection]);
 
   // Activate the currently-focused (or first) search result.
@@ -1981,6 +2022,52 @@ export const Settings: React.FC = () => {
     const t = window.setTimeout(() => searchInputRef.current?.focus(), 60);
     return () => window.clearTimeout(t);
   }, []);
+
+  // =========================================================================
+  // PER-SECTION RESET-TO-DEFAULTS (DEX 5.5)
+  // Restore ONLY the active section's keys to their DEFAULT_SETTINGS values
+  // (other sections are untouched), then clear any standalone localStorage
+  // keys the section mirrors. The persist effect on `settings` re-saves the
+  // blob, and applySettings reapplies it, so values reload immediately. Guarded
+  // throughout; confirms before clearing.
+  // =========================================================================
+  const resetSection = useCallback((sectionId: string) => {
+    const map = SECTION_RESET_MAP[sectionId];
+    if (!map) return;
+    const sectionName = sectionMap.get(sectionId)?.name || 'this section';
+    confirmReset({
+      title: `Reset ${sectionName}?`,
+      message: `Restore every ${sectionName} setting to its default value. Your other settings are not affected. This cannot be undone.`,
+      confirmLabel: 'Reset',
+      tone: 'destructive',
+    }).then((ok) => {
+      if (!ok) return;
+      try {
+        // Restore only this section's keys from defaults.
+        setSettings(prev => {
+          const next: Record<string, unknown> = { ...prev };
+          for (const key of map.defaultKeys) {
+            if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) {
+              next[key] = (DEFAULT_SETTINGS as Record<string, unknown>)[key];
+            }
+          }
+          return next as typeof DEFAULT_SETTINGS;
+        });
+        // Clear any standalone localStorage keys this section mirrors so they
+        // re-derive from the defaults on next read.
+        for (const lk of map.localKeys || []) {
+          try { localStorage.removeItem(lk); } catch { /* storage blocked */ }
+        }
+        window.dispatchEvent(new CustomEvent('dex-toast', {
+          detail: { type: 'success', message: `${sectionName} reset to defaults` },
+        }));
+      } catch {
+        window.dispatchEvent(new CustomEvent('dex-toast', {
+          detail: { type: 'error', message: `Could not reset ${sectionName}` },
+        }));
+      }
+    }).catch(() => { /* dialog dismissed */ });
+  }, [confirmReset]);
 
   const openPolicyViewer = useCallback((slug: PolicySlug) => {
     setPolicyViewerInitial(slug);
@@ -4817,6 +4904,27 @@ export const Settings: React.FC = () => {
           <span style={styles.headerTitle}>
             {SECTIONS.find(s => s.id === activeSection)?.name}
           </span>
+          {SECTION_RESET_MAP[activeSection] && (
+            <button
+              type="button"
+              className="settings-btn"
+              aria-label={`Reset ${SECTIONS.find(s => s.id === activeSection)?.name} settings to defaults`}
+              title="Restore this section's settings to their defaults"
+              onClick={() => resetSection(activeSection)}
+              style={{
+                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+                color: 'var(--color-text-secondary)', cursor: 'pointer',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M3 12a9 9 0 109-9 9 9 0 00-6.36 2.64L3 8" />
+                <polyline points="3 3 3 8 8 8" />
+              </svg>
+              Reset
+            </button>
+          )}
         </div>
         {renderContent()}
       </div>

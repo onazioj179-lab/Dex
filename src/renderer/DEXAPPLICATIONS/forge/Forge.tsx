@@ -31,6 +31,12 @@ import {
   getAllPresets as getForgePresets,
 } from './ForgeFeatures';
 import type { EncodingPreset, QueueSettings, HardwareInfo } from './ForgeFeatures';
+import {
+  detectSourceKind,
+  planTarget,
+  transcodeImage,
+  transcodeAudioToWav,
+} from './transcode';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 
 // ===========================================================================
@@ -52,7 +58,8 @@ interface Job {
   destination: string;
   preset: string;
   format: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'paused';
+  // 'unsupported' = real outcome: job needs the native encoder (no fake completion).
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'paused' | 'unsupported';
   progress: number;
   duration: number;
   estimatedTime: number;
@@ -63,6 +70,10 @@ interface Job {
   inputSize?: number;
   outputBlobUrl?: string;
   isAudio?: boolean;
+  // Real output container produced by the in-browser transcode (drives the
+  // download filename + MIME): 'png' | 'jpg' | 'webp' | 'wav'.
+  outputExt?: string;
+  outputMime?: string;
 }
 
 interface Preset {
@@ -400,6 +411,9 @@ const Forge: React.FC = () => {
   const [audioNormTarget, setAudioNormTarget] = useState(-14);
   const [dragOverMain, setDragOverMain] = useState(false);
   const [customOutputDir, setCustomOutputDir] = useState('Desktop/Exports/');
+  // True while an async media operation (audio extract / smart join) is running,
+  // so its trigger button is disabled and can't kick off overlapping work.
+  const [mediaBusy, setMediaBusy] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const previewSourceUrlRef = useRef<string | null>(null);
 
@@ -443,13 +457,15 @@ const Forge: React.FC = () => {
     if (!files || files.length === 0) return;
     const newJobs: Job[] = [];
     for (const file of Array.from(files)) {
-      const isAudio = file.type.startsWith('audio/') || /\.(wav|mp3|aac|flac|ogg|m4a|aiff?)$/i.test(file.name);
+      const kind = detectSourceKind(file);
+      const isAudio = kind === 'audio';
       const estimatedDuration = Math.ceil(file.size / (isAudio ? 128000 : 2000000));
       const preset = presets.find(p => p.id === selectedPreset);
+      const defaultFormat = kind === 'image' ? 'png' : kind === 'audio' ? 'wav' : (preset?.format || 'H.264');
       const newJob: Job = {
         id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name, source: file.name, destination: customOutputDir,
-        preset: selectedPreset, format: preset?.format || 'H.264',
+        preset: selectedPreset, format: defaultFormat,
         status: 'queued', progress: 0, duration: estimatedDuration,
         estimatedTime: Math.ceil(estimatedDuration * 0.3),
         inputSize: file.size, isAudio,
@@ -553,296 +569,6 @@ const Forge: React.FC = () => {
     }
   }, []);
 
-  // ===== REAL ENCODING ENGINE =====
-  // Re-encodes video via HTMLVideoElement + canvas.captureStream() + MediaRecorder
-  const encodeVideoFile = useCallback((jobId: string, file: File, preset?: Preset): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.playsInline = true;
-      const objectUrl = URL.createObjectURL(file);
-      video.src = objectUrl;
-      const cleanup = () => { try { URL.revokeObjectURL(objectUrl); } catch (e) { console.warn('[DEX]', e); } };
-
-      // Read job metadata for trim/watermark
-      const jobData = jobs.find(j => j.id === jobId) as any;
-      const trimIn = jobData?.trimIn ?? 0; // 0-1 fraction
-      const trimOut = jobData?.trimOut ?? 1;
-      const watermark = jobData?.watermark as { type: string; text: string; opacity: number; position: string } | undefined;
-      const subtitleCues = jobData?.subtitleCues as Array<{ start: number; end: number; text: string }> | undefined;
-      const subtitleBurnIn = jobData?.subtitleBurnIn as { font: string; size: number; position: string; style: string } | undefined;
-
-      const onMetadataReady = async () => {
-        const canvas = document.createElement('canvas');
-        const targetW = preset?.width || video.videoWidth || 1280;
-        const targetH = preset?.height || video.videoHeight || 720;
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Cannot acquire canvas 2D context for video encoding')); return; }
-        const targetFps = preset?.framerate || 30;
-        const canvasStream = canvas.captureStream(targetFps);
-
-        // Mux audio from video into the canvas stream
-        try {
-          video.muted = false;
-          const audioCtx = new AudioContext();
-          // Ensure AudioContext is active (autoplay policy)
-          if (audioCtx.state === 'suspended') {
-            await audioCtx.resume().catch(() => { /* will fall through to catch block if still blocked */ });
-          }
-          if (audioCtx.state !== 'running') {
-            throw new Error('AudioContext blocked by autoplay policy');
-          }
-          const mediaSource = audioCtx.createMediaElementSource(video);
-          const audioDest = audioCtx.createMediaStreamDestination();
-          mediaSource.connect(audioDest);
-          mediaSource.connect(audioCtx.destination);
-          audioDest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
-        } catch (audioErr) {
-          // Audio capture failed — notify user clearly before continuing video-only
-          console.warn('[Forge] Audio capture unavailable:', audioErr);
-          video.muted = true;
-          const msg = 'Audio excluded from export — browser blocked audio capture. Click the preview first to unlock audio.';
-          setJobs(prev => prev.map(j => j.id === jobId ? { ...j, warning: msg } : j));
-          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: msg, type: 'warning' } }));
-        }
-
-        const candidates = [
-          'video/webm;codecs=vp9,opus',
-          'video/webm;codecs=vp9',
-          'video/webm;codecs=vp8,opus',
-          'video/webm;codecs=vp8',
-          'video/webm',
-        ];
-        let mimeType = candidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
-
-        const recorderOptions: MediaRecorderOptions = { mimeType };
-        if (preset?.bitrate) recorderOptions.videoBitsPerSecond = preset.bitrate * 1000;
-        if (preset?.audioBitrate) recorderOptions.audioBitsPerSecond = preset.audioBitrate * 1000;
-
-        const recorder = new MediaRecorder(canvasStream, recorderOptions);
-        const chunks: Blob[] = [];
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-        recorder.onstop = () => { cleanup(); resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' })); };
-        recorder.onerror = () => { cleanup(); reject(new Error('MediaRecorder error during video encoding')); };
-
-        // Apply trim — seek to start point before encoding
-        const startTime = trimIn * video.duration;
-        const endTime = trimOut * video.duration;
-        if (startTime > 0) {
-          video.currentTime = startTime;
-          await new Promise<void>(r => { video.onseeked = () => r(); });
-        }
-
-        recorder.start(100);
-        video.play().catch((err) => { cleanup(); reject(new Error(`Browser blocked video playback — ${err?.message || 'autoplay policy may be active'}. Click the preview first to unlock.`)); });
-
-        let drawFrameId = 0;
-        const drawFrame = () => {
-          if (video.ended || video.paused) return;
-          // Stop at trim out point
-          if (video.currentTime >= endTime) {
-            video.pause();
-            cancelAnimationFrame(drawFrameId);
-            if (recorder.state === 'recording') recorder.stop();
-            return;
-          }
-          ctx.drawImage(video, 0, 0, targetW, targetH);
-
-          // Composite watermark overlay
-          if (watermark && watermark.text) {
-            ctx.save();
-            ctx.globalAlpha = watermark.opacity ?? 0.5;
-            ctx.font = `${Math.round(targetH / 20)}px sans-serif`;
-            ctx.fillStyle = 'var(--color-text-primary)';
-            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-            ctx.lineWidth = 2;
-            const metrics = ctx.measureText(watermark.text);
-            const pad = 20;
-            let wx = pad, wy = targetH - pad;
-            if (watermark.position === 'top-left') { wx = pad; wy = pad + targetH / 20; }
-            else if (watermark.position === 'top-right') { wx = targetW - metrics.width - pad; wy = pad + targetH / 20; }
-            else if (watermark.position === 'bottom-right') { wx = targetW - metrics.width - pad; wy = targetH - pad; }
-            else if (watermark.position === 'center') { wx = (targetW - metrics.width) / 2; wy = targetH / 2; }
-            ctx.strokeText(watermark.text, wx, wy);
-            ctx.fillText(watermark.text, wx, wy);
-            ctx.restore();
-          }
-
-          // Composite subtitle burn-in: draw the cue whose range contains the current time
-          if (subtitleBurnIn && subtitleCues && subtitleCues.length > 0) {
-            const t = video.currentTime;
-            const active = subtitleCues.find(c => t >= c.start && t <= c.end);
-            if (active && active.text) {
-              const fontSize = Math.max(8, subtitleBurnIn.size || 24);
-              const fontFamily = subtitleBurnIn.font || 'Arial';
-              const lines = active.text.split('\n');
-              const lineHeight = fontSize * 1.25;
-              const margin = Math.round(targetH * 0.06);
-              const cx = targetW / 2;
-
-              ctx.save();
-              ctx.font = `${fontSize}px ${fontFamily}`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'alphabetic';
-
-              // Vertical anchor (baseline of the first line) by position
-              const blockHeight = lines.length * lineHeight;
-              let firstBaseline: number;
-              if (subtitleBurnIn.position === 'Top') {
-                firstBaseline = margin + fontSize;
-              } else if (subtitleBurnIn.position === 'Center') {
-                firstBaseline = (targetH - blockHeight) / 2 + fontSize;
-              } else { // Bottom (default)
-                firstBaseline = targetH - margin - blockHeight + fontSize;
-              }
-
-              // Box style: filled rounded rect behind the whole text block
-              if (subtitleBurnIn.style === 'Box') {
-                let maxWidth = 0;
-                for (const line of lines) { maxWidth = Math.max(maxWidth, ctx.measureText(line).width); }
-                const boxPad = Math.round(fontSize * 0.35);
-                const boxX = cx - maxWidth / 2 - boxPad;
-                const boxY = firstBaseline - fontSize - boxPad;
-                const boxW = maxWidth + boxPad * 2;
-                const boxH = blockHeight + boxPad * 2;
-                const r = Math.min(boxPad, boxW / 2, boxH / 2);
-                ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.beginPath();
-                ctx.moveTo(boxX + r, boxY);
-                ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + boxH, r);
-                ctx.arcTo(boxX + boxW, boxY + boxH, boxX, boxY + boxH, r);
-                ctx.arcTo(boxX, boxY + boxH, boxX, boxY, r);
-                ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
-                ctx.closePath();
-                ctx.fill();
-              }
-
-              lines.forEach((line, i) => {
-                const baseline = firstBaseline + i * lineHeight;
-                if (subtitleBurnIn.style === 'Outline') {
-                  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-                  ctx.lineWidth = Math.max(2, fontSize / 10);
-                  ctx.lineJoin = 'round';
-                  ctx.strokeText(line, cx, baseline);
-                } else if (subtitleBurnIn.style === 'Shadow') {
-                  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-                  ctx.shadowBlur = Math.max(2, fontSize / 6);
-                  ctx.shadowOffsetX = Math.max(1, fontSize / 16);
-                  ctx.shadowOffsetY = Math.max(1, fontSize / 16);
-                }
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillText(line, cx, baseline);
-                // Reset shadow so it does not bleed onto subsequent draws
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-              });
-              ctx.restore();
-            }
-          }
-
-          const effectiveStart = startTime;
-          const effectiveDuration = endTime - effectiveStart;
-          const pct = effectiveDuration > 0 ? ((video.currentTime - effectiveStart) / effectiveDuration) * 100 : 0;
-          setJobs(prev => prev.map(j => j.id === jobId
-            ? { ...j, progress: Math.min(99, Math.round(pct * 10) / 10) }
-            : j));
-          drawFrameId = requestAnimationFrame(drawFrame);
-        };
-        drawFrameId = requestAnimationFrame(drawFrame);
-
-        video.onended = () => {
-          cancelAnimationFrame(drawFrameId);
-          if (recorder.state === 'recording') recorder.stop();
-        };
-      };
-      // Fix race: if metadata is already loaded, fire immediately
-      if (video.readyState >= 1) {
-        onMetadataReady();
-      } else {
-        video.onloadedmetadata = onMetadataReady;
-      }
-      video.onerror = () => { cleanup(); reject(new Error('Cannot load video -- unsupported format or corrupt file')); };
-    });
-  }, [jobs]);
-
-  // Re-encodes audio via AudioContext + MediaRecorder
-  const encodeAudioFile = useCallback(async (jobId: string, file: File, preset?: Preset): Promise<Blob> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const audioCtx = new AudioContext();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-    return new Promise((resolve, reject) => {
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      const dest = audioCtx.createMediaStreamDestination();
-      // Apply audio normalization if enabled
-      if (audioNormalize) {
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 2048;
-        const gainNode = audioCtx.createGain();
-        // Measure RMS of the buffer to estimate loudness
-        const channelData = audioBuffer.getChannelData(0);
-        let sumSq = 0;
-        for (let i = 0; i < channelData.length; i++) sumSq += channelData[i] * channelData[i];
-        const rms = Math.sqrt(sumSq / channelData.length);
-        const currentLUFS = 20 * Math.log10(Math.max(rms, 1e-10)) - 0.691;
-        const gainDB = audioNormTarget - currentLUFS;
-        const gainLinear = Math.pow(10, Math.min(gainDB, 24) / 20);
-        gainNode.gain.value = gainLinear;
-        source.connect(gainNode);
-        gainNode.connect(dest);
-      } else {
-        source.connect(dest);
-      }
-
-      // Determine best audio mime type
-      const candidates = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-      ];
-      let mimeType = candidates.find(m => MediaRecorder.isTypeSupported(m)) || 'audio/webm';
-
-      // Build recorder options with bitrate from preset
-      const recorderOptions: MediaRecorderOptions = { mimeType };
-      if (preset?.audioBitrate) {
-        recorderOptions.audioBitsPerSecond = preset.audioBitrate * 1000;
-      } else if (preset?.bitrate) {
-        recorderOptions.audioBitsPerSecond = preset.bitrate * 1000;
-      }
-
-      const recorder = new MediaRecorder(dest.stream, recorderOptions);
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => { audioCtx.close(); resolve(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })); };
-      recorder.onerror = () => { audioCtx.close(); reject(new Error('MediaRecorder error during audio encoding')); };
-
-      recorder.start(100);
-      source.start(0);
-
-      const totalDuration = audioBuffer.duration;
-      const startTime = audioCtx.currentTime;
-      let progressFrameId = 0;
-      const updateProgress = () => {
-        const elapsed = audioCtx.currentTime - startTime;
-        const pct = totalDuration > 0 ? Math.min(99, (elapsed / totalDuration) * 100) : 0;
-        setJobs(prev => prev.map(j => j.id === jobId
-          ? { ...j, progress: Math.round(pct * 10) / 10 }
-          : j));
-        if (elapsed < totalDuration) progressFrameId = requestAnimationFrame(updateProgress);
-      };
-      progressFrameId = requestAnimationFrame(updateProgress);
-
-      source.onended = () => {
-        cancelAnimationFrame(progressFrameId);
-        if (recorder.state === 'recording') recorder.stop();
-      };
-    });
-  }, []);
 
   // Process one job with real browser-based transcoding
   const processJob = useCallback(async (jobId: string) => {
@@ -861,56 +587,117 @@ const Forge: React.FC = () => {
       return;
     }
 
-    const isAudio = file.type.startsWith('audio/') || /\.(wav|mp3|aac|flac|ogg|m4a|aiff?)$/i.test(file.name);
+    // Determine what the source actually is and whether the chosen target is
+    // achievable in-browser. Image->PNG/JPEG/WebP and audio->WAV produce REAL
+    // files; everything else is honestly flagged as needing the native encoder.
+    const targetFormat = (job?.format || preset?.format || '').toString();
+    const plan = planTarget(file, targetFormat);
 
-    // Evaluate conditional rules — apply adjustments to preset if conditions match
-    let effectivePreset = preset ? { ...preset } : undefined;
-    if (effectivePreset) {
-      for (const rule of conditionalRules) {
-        if (!rule.enabled) continue;
-        const cond = rule.condition.toLowerCase();
-        const action = rule.action.toLowerCase();
-        // Resolution condition
-        if (cond.includes('resolution') && cond.includes('1080') && effectivePreset.height && effectivePreset.height > 1080) {
-          if (action.includes('downscale') && action.includes('1080')) {
-            effectivePreset = { ...effectivePreset, width: 1920, height: 1080 };
-          }
+    // ----- REAL IMAGE TRANSCODE (decode -> canvas -> toBlob) -----
+    if (plan.route === 'image' && plan.imageTarget) {
+      try {
+        // Honor resolution from per-job override or preset; honor quality from
+        // per-job audio/quality controls is N/A for images — use preset quality
+        // when present, else a sensible default.
+        const jobAny = job as any;
+        let width: number | undefined;
+        let height: number | undefined;
+        const overrideRes: string | undefined = jobAny?.overrideRes;
+        if (overrideRes && /^\d+x\d+$/.test(overrideRes)) {
+          const [w, h] = overrideRes.split('x').map(Number);
+          width = w; height = h;
+        } else if (preset?.width && preset?.height) {
+          width = preset.width; height = preset.height;
         }
-        // Bitrate condition
-        const bitrateMatch = cond.match(/bitrate\s*>\s*(\d+)/);
-        if (bitrateMatch && effectivePreset.bitrate && effectivePreset.bitrate > parseInt(bitrateMatch[1]) * 1000) {
-          const actionBitrateMatch = action.match(/(\d+)\s*mbps/);
-          if (actionBitrateMatch) effectivePreset = { ...effectivePreset, bitrate: parseInt(actionBitrateMatch[1]) * 1000 };
+        // Quality: prefer an explicit per-job override (0-100), else default high.
+        const rawQuality = jobAny?.imageQuality;
+        const quality = typeof rawQuality === 'number' ? rawQuality / 100 : 0.92;
+
+        const result = await transcodeImage(file, plan.imageTarget, {
+          quality,
+          width,
+          height,
+          preserveAspect: !(width && height), // only force exact dims when both supplied
+        });
+        if (!mountedRef.current) return;
+        const blobUrl = URL.createObjectURL(result.blob);
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'completed' as const, progress: 100,
+          outputBlobUrl: blobUrl, outputSize: result.blob.size,
+          outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('FORGE — Image Encoded', { body: `${file.name} → ${result.ext.toUpperCase()}` });
         }
+      } catch (err: any) {
+        if (!mountedRef.current) return;
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'failed' as const, error: err?.message || 'Image transcode failed',
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Image transcode failed: ${err?.message || file.name}` } }));
+      } finally {
+        activeEncodings.current.delete(jobId);
+        fileMapRef.current.delete(jobId);
       }
+      return;
     }
 
-    try {
-      const outputBlob = isAudio
-        ? await encodeAudioFile(jobId, file, effectivePreset)
-        : await encodeVideoFile(jobId, file, effectivePreset);
-
-      if (!mountedRef.current) return;
-      const blobUrl = URL.createObjectURL(outputBlob);
-      setJobs(prev => prev.map(j => j.id === jobId ? {
-        ...j, status: 'completed' as const, progress: 100,
-        outputBlobUrl: blobUrl, outputSize: outputBlob.size, endTime: Date.now(),
-      } : j));
-
-      if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('FORGE -- Encoding Complete', { body: file.name });
+    // ----- REAL AUDIO -> WAV (PCM WAV encoder) -----
+    if (plan.route === 'audio-wav') {
+      try {
+        const jobAny = job as any;
+        // 24-bit if the preset/codec asks for it, else CD-quality 16-bit.
+        const wantsHi = /24|pcm_s24/i.test(`${preset?.codec || ''} ${jobAny?.overrideAudioCodec || ''} ${preset?.name || ''}`);
+        const bitDepth: 16 | 24 = wantsHi ? 24 : 16;
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 30 } : j));
+        const result = await transcodeAudioToWav(file, { bitDepth });
+        if (!mountedRef.current) return;
+        const blobUrl = URL.createObjectURL(result.blob);
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'completed' as const, progress: 100,
+          outputBlobUrl: blobUrl, outputSize: result.blob.size,
+          outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('FORGE — Audio Encoded', { body: `${file.name} → WAV ${bitDepth}-bit` });
+        }
+      } catch (err: any) {
+        if (!mountedRef.current) return;
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'failed' as const, error: err?.message || 'Audio decode/WAV encode failed',
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `WAV encode failed: ${err?.message || file.name}` } }));
+      } finally {
+        activeEncodings.current.delete(jobId);
+        fileMapRef.current.delete(jobId);
       }
-      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
-    } catch (err: any) {
-      if (!mountedRef.current) return;
+      return;
+    }
+
+    // ----- NATIVE-ONLY (lossy audio, all video codecs, TIFF/AVIF/GIF, etc.) -----
+    // Honestly flag it. Never report a fake "completed" with no real file.
+    if (plan.route === 'native') {
+      const reason = plan.reason || 'This target requires the native encoder.';
       setJobs(prev => prev.map(j => j.id === jobId ? {
-        ...j, status: 'failed' as const, error: err?.message || 'Encoding failed -- file may be unsupported in browser',
+        ...j, status: 'unsupported' as const, progress: 0, error: reason, endTime: Date.now(),
       } : j));
-    } finally {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: reason } }));
       activeEncodings.current.delete(jobId);
       fileMapRef.current.delete(jobId);
+      return;
     }
-  }, [encodeVideoFile, encodeAudioFile, notifyOnComplete, jobs, presets]);
+
+    // Defensive fallback: planTarget routes every job to image / audio-wav /
+    // native above, so this is unreachable. If a future plan route slips
+    // through, fail honestly rather than fake a completion.
+    setJobs(prev => prev.map(j => j.id === jobId ? {
+      ...j, status: 'failed' as const, error: 'No in-browser transcoder for this job',
+    } : j));
+    activeEncodings.current.delete(jobId);
+    fileMapRef.current.delete(jobId);
+  }, [notifyOnComplete, jobs, presets]);
 
   // Mirror encode jobs into the Home "Live Activity" feed (DEX 5.7) so encoding
   // progress shows as a live card on the Home screen. Centralized + throttled to
@@ -954,7 +741,7 @@ const Forge: React.FC = () => {
 
     // Auto-stop when all jobs finished
     const allDone = jobs.length > 0
-      && jobs.every(j => j.status === 'completed' || j.status === 'failed')
+      && jobs.every(j => j.status === 'completed' || j.status === 'failed' || j.status === 'unsupported')
       && activeEncodings.current.size === 0;
     if (allDone) {
       setIsEncoding(false);
@@ -973,7 +760,7 @@ const Forge: React.FC = () => {
   const addFiles = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'video/*,audio/*,.mov,.mp4,.avi,.mkv,.webm,.m4v,.flv,.wmv,.mpg,.mpeg,.m2ts,.mts,.mxf,.r3d,.braw,.ari,.wav,.mp3,.aac,.flac,.ogg,.m4a,.aiff,.aif';
+    input.accept = 'video/*,audio/*,image/*,.mov,.mp4,.avi,.mkv,.webm,.m4v,.flv,.wmv,.mpg,.mpeg,.m2ts,.mts,.mxf,.r3d,.braw,.ari,.wav,.mp3,.aac,.flac,.ogg,.m4a,.aiff,.aif,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.tif,.avif';
     input.multiple = true;
     
     input.onchange = (e) => {
@@ -984,19 +771,24 @@ const Forge: React.FC = () => {
       
       for (const file of Array.from(files)) {
         // Estimate duration based on file size (rough approximation)
-        const isAudio = file.type.startsWith('audio/') || /\.(wav|mp3|aac|flac|ogg|m4a|aiff?)$/i.test(file.name);
+        const kind = detectSourceKind(file);
+        const isAudio = kind === 'audio';
         const estimatedDuration = Math.ceil(file.size / (isAudio ? 128000 : 2000000)); // Rough bytes per second
         const estimatedEncodeTime = Math.ceil(estimatedDuration * 0.3); // 30% of realtime for encoding estimate
-        
+
         const preset = presets.find(p => p.id === selectedPreset);
-        
+        // Default the target to one the browser can REALLY produce for this
+        // source kind: images -> PNG, audio -> WAV; video keeps the preset format
+        // (which will be honestly flagged as native-only at encode time).
+        const defaultFormat = kind === 'image' ? 'png' : kind === 'audio' ? 'wav' : (preset?.format || 'H.264');
+
         const newJob: Job = {
           id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: file.name,
           source: file.name, // In Electron, would be full path
           destination: customOutputDir,
           preset: selectedPreset,
-          format: preset?.format || 'H.264',
+          format: defaultFormat,
           status: 'queued',
           progress: 0,
           duration: estimatedDuration,
@@ -1280,6 +1072,7 @@ const Forge: React.FC = () => {
       case 'completed': return 'var(--color-success)';
       case 'processing': return 'var(--color-accent)';
       case 'failed': return 'var(--color-error)';
+      case 'unsupported': return 'var(--color-warning)';
       case 'paused': return '#6b7280';
       default: return '#6b7280';
     }
@@ -1290,10 +1083,15 @@ const Forge: React.FC = () => {
       case 'completed': return Icons.check;
       case 'processing': return Icons.refresh;
       case 'failed': return Icons.alert;
+      case 'unsupported': return Icons.alertCircle;
       case 'paused': return Icons.pause;
       default: return Icons.clock;
     }
   }, []);
+
+  const getStatusLabel = useCallback((status: Job['status']) =>
+    status === 'unsupported' ? 'Needs Native' : status.charAt(0).toUpperCase() + status.slice(1),
+  []);
 
   const selectedJob = useMemo(() => jobs.find(j => j.id === selectedJobId), [jobs, selectedJobId]);
   // Single pass for the header counts instead of three separate filters per render
@@ -1330,8 +1128,8 @@ const Forge: React.FC = () => {
     jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
     jobItemSelected: { borderColor: 'var(--color-accent)', background: '#0d1a2e' },
     jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
-    jobInfo: { flex: 1 },
-    jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)' },
+    jobInfo: { flex: 1, minWidth: 0 },
+    jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     jobMeta: { display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--color-text-muted)' },
     jobProgress: { width: '100px' },
     progressBar: { height: '3px', background: 'var(--color-border-subtle)', borderRadius: '2px', overflow: 'hidden' },
@@ -1340,7 +1138,7 @@ const Forge: React.FC = () => {
     jobActions: { display: 'flex', gap: '2px' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' },
     inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, background: 'var(--color-bg-inset)', borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', overflow: 'auto' },
-    inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)' },
+    inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     inspectorSection: { marginBottom: 'var(--space-3)' },
     sectionTitle: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', letterSpacing: '0.5px', fontWeight: 600 },
     infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '11px' },
@@ -1407,17 +1205,17 @@ const Forge: React.FC = () => {
         if (files.length === 0) return;
         const newJobs: any[] = [];
         for (const file of files) {
-          const ext = file.name.split('.').pop()?.toLowerCase() || '';
-          const isAudio = ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a', 'wma'].includes(ext);
-          const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv', 'ts', 'm4v'].includes(ext);
-          if (!isAudio && !isVideo) continue;
+          const kind = detectSourceKind(file);
+          if (kind === 'unknown') continue;
+          const isAudio = kind === 'audio';
           const resolvedPreset = presets.find(p => p.id === selectedPreset);
+          const defaultFormat = kind === 'image' ? 'png' : kind === 'audio' ? 'wav' : (resolvedPreset?.format || 'H.264');
           const newJob = {
             id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: file.name,
             source: file.name,
             destination: '',
-            format: resolvedPreset?.format || 'H.264',
+            format: defaultFormat,
             preset: selectedPreset,
             status: 'queued' as const,
             progress: 0,
@@ -1748,7 +1546,7 @@ const Forge: React.FC = () => {
                 </div>
                 <div style={{ ...styles.jobStatus, color: getStatusColor(job.status) }}>
                   {getStatusIcon(job.status)}
-                  <span>{job.status.charAt(0).toUpperCase() + job.status.slice(1)}</span>
+                  <span>{getStatusLabel(job.status)}</span>
                 </div>
                 <div style={styles.jobActions}>
                   <button style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); removeJob(job.id); }} aria-label={`Remove job ${job.name}`}>{Icons.trash}</button>
@@ -1808,7 +1606,7 @@ const Forge: React.FC = () => {
               <div style={styles.infoRow}>
                 <span style={styles.infoLabel}>Status</span>
                 <span style={{ ...styles.infoValue, color: getStatusColor(selectedJob.status) }}>
-                  {selectedJob.status.charAt(0).toUpperCase() + selectedJob.status.slice(1)}
+                  {getStatusLabel(selectedJob.status)}
                 </span>
               </div>
               <div style={styles.infoRow}>
@@ -1845,7 +1643,10 @@ const Forge: React.FC = () => {
                 </select>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Output Format</div>
                 <select value={selectedJob.format} onChange={e => { const format = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, format } : j)); }} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
-                  {['mp4', 'webm', 'mkv', 'mov', 'avi', 'gif', 'mp3', 'wav', 'flac', 'aac'].map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
+                  {(/\.(png|jpe?g|jfif|webp|gif|bmp|avif|tiff?)$/i.test(selectedJob.source) && !selectedJob.isAudio
+                    ? ['png', 'jpg', 'webp', 'tiff', 'avif']
+                    : ['mp4', 'webm', 'mkv', 'mov', 'avi', 'gif', 'mp3', 'wav', 'flac', 'aac']
+                  ).map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                 </select>
 
                 {/* Per-Job Video Overrides */}
@@ -1938,11 +1739,18 @@ const Forge: React.FC = () => {
             {selectedJob.status === 'completed' && selectedJob.outputBlobUrl && (
               <a
                 href={selectedJob.outputBlobUrl}
-                download={selectedJob.name.replace(/\.[^.]+$/, '') + '.webm'}
+                download={selectedJob.name.replace(/\.[^.]+$/, '') + '.' + (selectedJob.outputExt || 'webm')}
                 style={{ ...styles.btn, ...styles.btnPrimary, width: '100%', justifyContent: 'center', marginTop: 'var(--space-4)', textDecoration: 'none', textAlign: 'center', display: 'inline-flex' } as React.CSSProperties}
               >
-                {Icons.download} Download Encoded File
+                {Icons.download} Download {(selectedJob.outputExt || '').toUpperCase() || 'Encoded File'}
               </a>
+            )}
+
+            {/* Native-only: honestly flag jobs that need the native encoder — no fake file. */}
+            {selectedJob.status === 'unsupported' && (
+              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-warning-muted, rgba(255,159,10,0.12))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-warning)', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                {Icons.alert} <span>{selectedJob.error || 'Requires the native encoder.'}</span>
+              </div>
             )}
 
             {selectedJob.status === 'failed' && selectedJob.error && (
@@ -2026,13 +1834,16 @@ const Forge: React.FC = () => {
                 <div key={i.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{i.label}</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{i.value}</span></div>
               ))}
             </div>
-            <button aria-label="Extract audio from video" onClick={async () => {
+            <button aria-label="Extract audio from video" disabled={mediaBusy} onClick={async () => {
+              if (mediaBusy) return;
               if (!selectedJob || !fileMapRef.current.has(selectedJob.id)) { toast.warning('Select a video file first'); return; }
               const file = fileMapRef.current.get(selectedJob.id)!;
               toast.info('Extracting audio...');
+              setMediaBusy(true);
+              let audioCtx: AudioContext | null = null;
               try {
                 const arrayBuffer = await file.arrayBuffer();
-                const audioCtx = new AudioContext();
+                audioCtx = new AudioContext();
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffer;
@@ -2044,18 +1855,19 @@ const Forge: React.FC = () => {
                 const chunks: Blob[] = [];
                 recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
                 recorder.onstop = () => {
-                  audioCtx.close();
+                  try { audioCtx?.close(); } catch { /* already closed */ }
                   const blob = new Blob(chunks, { type: mime });
                   const a = document.createElement('a');
                   a.href = URL.createObjectURL(blob);
                   a.download = selectedJob.name.replace(/\.[^.]+$/, '') + '.' + audioExtractFormat;
                   a.click(); URL.revokeObjectURL(a.href);
                   toast.success('Audio extracted successfully'); setShowAudioExtract(false);
+                  setMediaBusy(false);
                 };
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
-              } catch (err: any) { console.error('[Forge] audio extraction failed:', err); toast.error('Could not extract audio. Try a different file or format.'); }
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
+              } catch (err: any) { console.error('[Forge] audio extraction failed:', err); toast.error('Could not extract audio. Try a different file or format.'); try { audioCtx?.close(); } catch { /* */ } setMediaBusy(false); }
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: mediaBusy ? 'not-allowed' : 'pointer', opacity: mediaBusy ? 0.5 : 1 }}>{mediaBusy ? 'Extracting…' : 'Extract Audio'}</button>
           </div>
         </div>
       )}
@@ -2406,7 +2218,8 @@ const Forge: React.FC = () => {
                 setJobs(prev => [...prev, mergedJob]);
                 setShowConcat(false);
               }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Merge to Single File</button>
-              <button onClick={async () => {
+              <button disabled={mediaBusy} onClick={async () => {
+                if (mediaBusy) return;
                 if (concatOrder.length < 2) return;
                 toast.info('Joining files via sequential re-encode...');
                 // Collect source files in order
@@ -2417,9 +2230,11 @@ const Forge: React.FC = () => {
                 }
                 if (sourceFiles.length < 2) { toast.warning('Need at least 2 files with source data'); return; }
 
+                setMediaBusy(true);
+                let audioCtx: AudioContext | null = null;
                 try {
                   // Decode all source files as AudioBuffers and concat
-                  const audioCtx = new AudioContext();
+                  audioCtx = new AudioContext();
                   const buffers: AudioBuffer[] = [];
                   for (const f of sourceFiles) {
                     const ab = await f.arrayBuffer();
@@ -2453,7 +2268,8 @@ const Forge: React.FC = () => {
                   source.start(0);
                   source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
                   const mergedBlob = await done;
-                  audioCtx.close();
+                  try { audioCtx.close(); } catch { /* already closed */ }
+                  audioCtx = null;
 
                   const mergeJobId = `merge-${Date.now()}`;
                   const mergedFile = new File([mergedBlob], 'smart_join_output.webm', { type: mime });
@@ -2471,9 +2287,12 @@ const Forge: React.FC = () => {
                 } catch (err: any) {
                   console.error('[Forge] smart join failed:', err);
                   toast.error('Unable to combine audio. Please check file compatibility.');
+                  try { audioCtx?.close(); } catch { /* */ }
+                } finally {
+                  setMediaBusy(false);
                 }
                 setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>{mediaBusy ? 'Joining…' : 'Smart Join (re-encode)'}</button>
             </div>
           </div>
         </div>

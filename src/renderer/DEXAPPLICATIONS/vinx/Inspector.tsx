@@ -402,6 +402,9 @@ const ColorWheel: React.FC<{
     const cx = size / 2;
     const cy = size / 2;
     const radius = size / 2 - 4;
+    const cs = getComputedStyle(document.documentElement);
+    const bgBase = cs.getPropertyValue('--color-bg-base').trim() || '#0a0a0c';
+    const textPrimary = cs.getPropertyValue('--color-text-primary').trim() || '#ffffff';
 
     ctx.clearRect(0, 0, size, size);
 
@@ -418,7 +421,7 @@ const ColorWheel: React.FC<{
     // Inner circle (dark)
     ctx.beginPath();
     ctx.arc(cx, cy, radius * 0.3, 0, Math.PI * 2);
-    ctx.fillStyle = 'var(--color-bg-base)';
+    ctx.fillStyle = bgBase;
     ctx.fill();
 
     // Indicator
@@ -426,7 +429,7 @@ const ColorWheel: React.FC<{
     const offsetY = (g - 1) * radius * 0.6;
     ctx.beginPath();
     ctx.arc(cx + offsetX, cy - offsetY, 3, 0, Math.PI * 2);
-    ctx.fillStyle = 'var(--color-text-primary)';
+    ctx.fillStyle = textPrimary;
     ctx.fill();
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 1;
@@ -838,6 +841,9 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#080808';
     ctx.fillRect(0, 0, width, height);
+    const cs = getComputedStyle(document.documentElement);
+    const accent = cs.getPropertyValue('--color-accent').trim() || '#4a9eff';
+    const textTertiary = cs.getPropertyValue('--color-text-tertiary').trim() || '#71717a';
 
     // Grid
     ctx.strokeStyle = '#1A1A1A';
@@ -934,7 +940,7 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
         const bh = (bBins[i] / maxVal) * height * 0.9;
         ctx.fillStyle = '#FF6B6B'; ctx.fillRect(x, height - rh, bw - 0.5, rh);
         ctx.fillStyle = '#6BCB77'; ctx.fillRect(x, height - gh, bw - 0.5, gh);
-        ctx.fillStyle = 'var(--color-accent)'; ctx.fillRect(x, height - bh, bw - 0.5, bh);
+        ctx.fillStyle = accent; ctx.fillRect(x, height - bh, bw - 0.5, bh);
       }
       ctx.globalAlpha = 1;
     } else if (type === 'parade') {
@@ -968,7 +974,7 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
     }
 
     // Label
-    ctx.fillStyle = 'var(--color-text-tertiary)';
+    ctx.fillStyle = textTertiary;
     ctx.font = '9px system-ui';
     ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), 4, 12);
   }, [type, width, height, colorGrade]);

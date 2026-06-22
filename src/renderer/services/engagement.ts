@@ -24,6 +24,8 @@ export { ACHIEVEMENTS, DEFAULT_STATS, CATEGORY_META, RARITY_META };
 export interface EngagementState {
   stats: UserStats;
   unlockedAchievements: string[];
+  /** Unlock timestamp (ms) per achievement id -- powers "Recently unlocked". */
+  unlockedAt?: Record<string, number>;
   lastTipIndex: number;
   dismissedTips: string[];
 }
@@ -31,6 +33,7 @@ export interface EngagementState {
 const DEFAULT_STATE: EngagementState = {
   stats: { ...DEFAULT_STATS },
   unlockedAchievements: [],
+  unlockedAt: {},
   lastTipIndex: -1,
   dismissedTips: [],
 };
@@ -166,6 +169,8 @@ export function checkAchievements(
   const newUnlocks: Achievement[] = [];
   const unlockedSet = new Set(state.unlockedAchievements); // O(1) has() vs O(n) includes()
   let unlocked = [...state.unlockedAchievements];
+  const unlockedAt: Record<string, number> = { ...(state.unlockedAt || {}) };
+  const now = Date.now();
   const unlockedCount = unlocked.length;
   const pts = totalPoints ?? getTotalPoints(unlocked);
 
@@ -208,12 +213,13 @@ export function checkAchievements(
     if (passes) {
       unlocked.push(ach.id);
       unlockedSet.add(ach.id);
+      unlockedAt[ach.id] = now;
       newUnlocks.push(ach);
     }
   }
 
   return {
-    state: { ...state, unlockedAchievements: unlocked },
+    state: { ...state, unlockedAchievements: unlocked, unlockedAt },
     newUnlocks,
   };
 }

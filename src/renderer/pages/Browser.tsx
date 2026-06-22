@@ -17,6 +17,7 @@ import DexIcon from '../components/DexIcon';
 import DOMPurify from 'dompurify';
 import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
+import { sendToNotes } from '../services/sendTo';
 
 // ===========================================================================
 // TYPES
@@ -134,6 +135,31 @@ const BOOKMARK_LIMIT = 5000; // Max bookmarks
 const KEYCHAIN_STORAGE_KEY = 'dex-browser-keychain';
 const CARDS_STORAGE_KEY = 'dex-browser-cards';
 const SESSION_STORAGE_KEY = 'dex-browser-session'; // Persisted open tabs + active tab for restore
+const ZOOM_STORAGE_KEY = 'dex-browser-zoom'; // Per-hostname zoom factors { [hostname]: factor }
+
+// Zoom bounds + step (mirrors Chrome's discrete zoom levels loosely).
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.1;
+
+// Restore the persisted per-hostname zoom map. Shape: { [hostname]: number }.
+// Never throws — returns an empty map on any parse/storage failure.
+const loadZoomMap = (): Record<string, number> => {
+  try {
+    const saved = localStorage.getItem(ZOOM_STORAGE_KEY);
+    if (!saved) return {};
+    const parsed = JSON.parse(saved);
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<string, number> = {};
+    for (const k of Object.keys(parsed)) {
+      const v = parsed[k];
+      if (typeof v === 'number' && isFinite(v) && v >= ZOOM_MIN && v <= ZOOM_MAX) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
 
 // Shape persisted under SESSION_STORAGE_KEY. Only durable fields are stored —
 // transient state (loading, background, crash flags, nav stacks) is dropped and
@@ -214,6 +240,9 @@ const Icon = {
   settings: _svg(16, <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>),
   bookmarkList: _svg(15, <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>),
   reader: _svg(15, <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></>),
+  zoomIn: _svg(15, <><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M11 8v6" /><path d="M8 11h6" /></>),
+  zoomOut: _svg(15, <><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M8 11h6" /></>),
+  sendToNotes: _svg(15, <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M12 18v-6" /><path d="M9 15h6" /></>),
 };
 
 // Download state
@@ -307,6 +336,10 @@ export const Browser: React.FC = () => {
 
   const webviewRefs = useRef<Map<string, any>>(new Map());
   const webviewEventsRef = useRef<Set<string>>(new Set());
+  // Per-tab webview DOM listeners, retained so they can be detached when the
+  // webview element unmounts (leak-safety: symmetric removal of every
+  // addEventListener attached in attachWebviewEvents).
+  const webviewListenersRef = useRef<Map<string, Array<[string, (...args: any[]) => void]>>>(new Map());
   // Per-tab window message handlers for credential capture (stored for cleanup)
   const credMsgHandlersRef = useRef<Map<string, (ev: MessageEvent) => void>>(new Map());
   // Stable src ref: stores the initial URL each webview mounts with.
@@ -322,6 +355,9 @@ export const Browser: React.FC = () => {
   // a ref to avoid a stale closure or a re-binding cascade on every render.
   const createTabRef = useRef<((background?: boolean) => void) | null>(null);
   const refreshRef = useRef<(() => void) | null>(null);
+  // Points at the latest applyZoomForWebview. attachWebviewEvents is defined
+  // before that callback exists, so the webview event handlers reach it via ref.
+  const applyZoomRef = useRef<((webview: any, tabId: string) => void) | null>(null);
 
   // Reconcile credential-capture message listeners against live tabs. Bulk-close
   // paths (closeAllTabs / closeTabsToRight / closeOtherTabs) drop tabs without
@@ -347,6 +383,12 @@ export const Browser: React.FC = () => {
     }
     for (const id of webviewSrcRef.current.keys()) {
       if (!liveIds.has(id)) webviewSrcRef.current.delete(id);
+    }
+    // Drop any retained webview-listener records for tabs that are gone (the
+    // element is already unmounted, so the listeners died with it; this just
+    // prevents the record map from growing across long tab-churn sessions).
+    for (const id of webviewListenersRef.current.keys()) {
+      if (!liveIds.has(id)) webviewListenersRef.current.delete(id);
     }
   }, [tabs]);
 
@@ -418,6 +460,15 @@ export const Browser: React.FC = () => {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const bookmarkSaveRef = useRef<ReturnType<typeof setTimeout>>();
 
+  // Per-site zoom — persisted per hostname, applied on navigation. Held in a ref
+  // (mutated imperatively as pages load) plus a state mirror for the live readout.
+  const zoomMapRef = useRef<Record<string, number>>(loadZoomMap());
+  const zoomSaveRef = useRef<ReturnType<typeof setTimeout>>();
+  const [activeZoom, setActiveZoom] = useState(1); // current active-tab zoom factor (for the readout)
+
+  // Searchable bookmark store — live filter text for the bookmarks panel.
+  const [bookmarkQuery, setBookmarkQuery] = useState('');
+
   // Reading mode
   const [readingMode, setReadingMode] = useState(false);
   const [readingContent, setReadingContent] = useState('');
@@ -488,6 +539,49 @@ export const Browser: React.FC = () => {
       } catch { setReadingContent('<p>Could not parse page content.</p>'); setReadingMode(true); }
     }).catch(() => { setReadingContent('<p>Could not access page content.</p>'); setReadingMode(true); });
   }, [readingMode, tabs, activeTab]);
+  // Send the active tab's URL (link) to Notes via the shared cross-app sink.
+  const sendUrlToNotes = useCallback(() => {
+    try {
+      const tab = tabsRef.current.find(t => t.id === activeTabRef.current);
+      const url = tab?.url || '';
+      if (!url) { toast.info?.('Open a page first'); return; }
+      const title = tab?.title || url;
+      void sendToNotes(`${title}\n${url}`, title);
+    } catch (e) { console.warn('[DEX]', e); }
+  }, [toast]);
+
+  // Reader-mode hand-off: extract the article text from the active page and save
+  // it to Notes as an article (title + source URL + readable body). Falls back to
+  // a link-only note if content extraction is unavailable.
+  const sendArticleToNotes = useCallback(() => {
+    try {
+      const tab = tabsRef.current.find(t => t.id === activeTabRef.current);
+      const url = tab?.url || '';
+      if (!url) { toast.info?.('Open a page first'); return; }
+      const wv = webviewRefs.current.get(activeTabRef.current);
+      const fallback = () => void sendToNotes(`${tab?.title || url}\n${url}`, tab?.title || url);
+      if (!wv || typeof wv.executeJavaScript !== 'function') { fallback(); return; }
+      wv.executeJavaScript(`
+        (function() {
+          var article = document.querySelector('article') || document.querySelector('[role="main"]') || document.querySelector('main') || document.body;
+          var clone = article.cloneNode(true);
+          clone.querySelectorAll('nav, header, footer, aside, .ad, .ads, [class*="sidebar"], script, style, iframe, noscript').forEach(function(el) { el.remove(); });
+          return JSON.stringify({ title: document.title || '', text: (clone.innerText || '').trim() });
+        })()
+      `).then((result: string) => {
+        try {
+          const parsed = JSON.parse(result);
+          const articleTitle = (parsed.title || tab?.title || url).slice(0, 80);
+          const body = (parsed.text || '').slice(0, 50000);
+          const noteText = body
+            ? `${articleTitle}\nSource: ${url}\n\n${body}`
+            : `${articleTitle}\n${url}`;
+          void sendToNotes(noteText, articleTitle);
+        } catch { fallback(); }
+      }).catch(() => fallback());
+    } catch (e) { console.warn('[DEX]', e); }
+  }, [toast]);
+
   const historySaveRef = useRef<ReturnType<typeof setTimeout>>();
   const settingsSaveRef = useRef<ReturnType<typeof setTimeout>>();
   const sessionSaveRef = useRef<ReturnType<typeof setTimeout>>();
@@ -518,6 +612,7 @@ export const Browser: React.FC = () => {
       if (historySaveRef.current) clearTimeout(historySaveRef.current);
       if (settingsSaveRef.current) clearTimeout(settingsSaveRef.current);
       if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
+      if (zoomSaveRef.current) clearTimeout(zoomSaveRef.current);
     };
   }, []);
 
@@ -795,6 +890,66 @@ export const Browser: React.FC = () => {
     try { return new URL(url).hostname.replace(/^www\\./, ''); } catch { return ''; }
   }, []);
 
+  // ---- Per-site zoom ----
+  // Persist the zoom map (debounced) to localStorage.
+  const persistZoomMap = useCallback(() => {
+    if (zoomSaveRef.current) clearTimeout(zoomSaveRef.current);
+    zoomSaveRef.current = setTimeout(() => {
+      try { localStorage.setItem(ZOOM_STORAGE_KEY, JSON.stringify(zoomMapRef.current)); }
+      catch (e) { console.warn('[DEX]', e); }
+    }, 400);
+  }, []);
+
+  // Apply the remembered zoom for a webview's current host (default 1). Safe no-op
+  // when the webview or its URL is unavailable. Updates the readout for the active tab.
+  const applyZoomForWebview = useCallback((webview: any, tabId: string) => {
+    try {
+      if (!webview) return;
+      const url = webview.getURL?.() || tabsRef.current.find(t => t.id === tabId)?.url || '';
+      const host = domainFromUrl(url);
+      const factor = (host && zoomMapRef.current[host]) || 1;
+      if (typeof webview.setZoomFactor === 'function') webview.setZoomFactor(factor);
+      if (tabId === activeTabRef.current) setActiveZoom(factor);
+    } catch (e) { console.warn('[DEX]', e); }
+  }, [domainFromUrl]);
+  applyZoomRef.current = applyZoomForWebview;
+
+  // Adjust the active tab's zoom: 'in' | 'out' | 'reset'. Persists per hostname.
+  const adjustZoom = useCallback((dir: 'in' | 'out' | 'reset') => {
+    try {
+      const tabId = activeTabRef.current;
+      const webview = webviewRefs.current.get(tabId);
+      const url = webview?.getURL?.() || tabsRef.current.find(t => t.id === tabId)?.url || '';
+      const host = domainFromUrl(url);
+      if (!host) { toast.info?.('Open a page to zoom'); return; }
+      const current = zoomMapRef.current[host] || 1;
+      let next = current;
+      if (dir === 'in') next = Math.min(ZOOM_MAX, Math.round((current + ZOOM_STEP) * 100) / 100);
+      else if (dir === 'out') next = Math.max(ZOOM_MIN, Math.round((current - ZOOM_STEP) * 100) / 100);
+      else next = 1;
+      if (next === 1) delete zoomMapRef.current[host];
+      else zoomMapRef.current[host] = next;
+      if (webview && typeof webview.setZoomFactor === 'function') webview.setZoomFactor(next);
+      setActiveZoom(next);
+      persistZoomMap();
+    } catch (e) { console.warn('[DEX]', e); }
+  }, [domainFromUrl, persistZoomMap, toast]);
+
+  // Keep the zoom readout in sync with the active tab's host. Reflects the stored
+  // factor (default 1) whenever the active tab or its URL changes. Derives the
+  // active tab's url locally so it does not depend on `currentTab` (declared later).
+  const activeTabUrl = tabs.find(t => t.id === activeTab)?.url || '';
+  useEffect(() => {
+    try {
+      const host = domainFromUrl(activeTabUrl);
+      const factor = (host && zoomMapRef.current[host]) || 1;
+      setActiveZoom(factor);
+      // Best-effort re-apply to the live webview (e.g. switching back to a tab)
+      const webview = webviewRefs.current.get(activeTab);
+      if (webview && typeof webview.setZoomFactor === 'function') webview.setZoomFactor(factor);
+    } catch (e) { console.warn('[DEX]', e); }
+  }, [activeTab, activeTabUrl, domainFromUrl]);
+
   // Autofill: inject credentials into login forms on dom-ready
   const injectAutofill = useCallback((webview: any, tabId: string) => {
     if (autofillInjectedRef.current.has(tabId)) return;
@@ -866,16 +1021,25 @@ export const Browser: React.FC = () => {
     if (!webview || webviewEventsRef.current.has(tabId)) return;
     webviewEventsRef.current.add(tabId);
 
-    webview.addEventListener('did-start-loading', () => {
+    // Record every listener so detachWebviewEvents can remove them symmetrically
+    // when the webview element unmounts (leak-safety).
+    const recorded: Array<[string, (...args: any[]) => void]> = [];
+    const on = (evt: string, handler: (...args: any[]) => void) => {
+      recorded.push([evt, handler]);
+      webview.addEventListener(evt, handler);
+    };
+    webviewListenersRef.current.set(tabId, recorded);
+
+    on('did-start-loading', () => {
       patchTab(tabId, { loading: true });
     });
-    webview.addEventListener('did-stop-loading', () => {
+    on('did-stop-loading', () => {
       patchTab(tabId, { loading: false });
     });
-    webview.addEventListener('did-finish-load', () => {
+    on('did-finish-load', () => {
       patchTab(tabId, { loading: false });
     });
-    webview.addEventListener('page-title-updated', (e: { title?: string }) => {
+    on('page-title-updated', (e: { title?: string }) => {
       const title = e.title || 'New Tab';
       patchTab(tabId, { title });
       try {
@@ -883,39 +1047,41 @@ export const Browser: React.FC = () => {
         if (url) addToHistory(url, title);
       } catch (e) { console.warn('[DEX]', e); }
     });
-    webview.addEventListener('did-navigate', (e: { url: string }) => {
+    on('did-navigate', (e: { url: string }) => {
       // Only update loading state — do NOT update tab.url here.
       // Updating tab.url would change the webview src attribute and cause a reload loop.
       patchTab(tabId, { loading: false });
       if (activeTabRef.current === tabId) setUrlInput(e.url);
+      // Re-apply per-site zoom — host may have changed across the navigation
+      applyZoomRef.current?.(webview, tabId);
     });
-    webview.addEventListener('did-navigate-in-page', (e: { url: string }) => {
+    on('did-navigate-in-page', (e: { url: string }) => {
       // SPA navigation — update URL bar only, not tab.url (avoids reload loop)
       if (activeTabRef.current === tabId) setUrlInput(e.url);
     });
-    webview.addEventListener('crashed', () => {
+    on('crashed', () => {
       console.error('[Browser] Webview crashed:', tabId);
       patchTab(tabId, { loading: false, title: 'Page Crashed' });
       setTabErrors(prev => ({ ...prev, [tabId]: 'Page crashed. Click reload to try again.' }));
       setCrashedTabs(prev => { const next = new Set(prev); next.add(tabId); return next; });
     });
-    webview.addEventListener('unresponsive', () => {
+    on('unresponsive', () => {
       setTabErrors(prev => ({ ...prev, [tabId]: 'Page is not responding...' }));
     });
-    webview.addEventListener('responsive', () => {
+    on('responsive', () => {
       setTabErrors(prev => ({ ...prev, [tabId]: null }));
     });
-    webview.addEventListener('did-fail-load', (e: { errorCode: number; errorDescription?: string }) => {
+    on('did-fail-load', (e: { errorCode: number; errorDescription?: string }) => {
       if (e.errorCode === -3) return;
       console.error('[Browser] Load failed:', tabId, e.errorCode, e.errorDescription);
       patchTab(tabId, { loading: false });
       setTabErrors(prev => ({ ...prev, [tabId]: e.errorDescription || 'Failed to load page' }));
     });
-    webview.addEventListener('console-message', (e: { level: number; message: string }) => {
+    on('console-message', (e: { level: number; message: string }) => {
       if (e.level === 2) console.warn('[Browser] Page error:', tabId, e.message);
     });
     // Detect credential save signal via secure ipc-message channel (not console.log)
-    webview.addEventListener('ipc-message', (e: any) => {
+    on('ipc-message', (e: any) => {
       if (e.channel === 'dex-cred-capture') {
         try {
           const data = e.args?.[0];
@@ -928,7 +1094,7 @@ export const Browser: React.FC = () => {
       }
     });
     // Handle new-window events — download links open a new window in webviews
-    webview.addEventListener('new-window', (e: { url: string; disposition?: string }) => {
+    on('new-window', (e: { url: string; disposition?: string }) => {
       const url = e.url;
       if (!url) return;
       // Detect downloadable extensions — trigger IPC download directly
@@ -964,18 +1130,32 @@ export const Browser: React.FC = () => {
     };
     credMsgHandlersRef.current.set(tabId, handleCredMsg);
     window.addEventListener('message', handleCredMsg);
-    webview.addEventListener('dom-ready', () => {
+    on('dom-ready', () => {
       // Autofill saved credentials on page load
       autofillInjectedRef.current.delete(tabId); // allow re-injection on new page
       injectAutofill(webview, tabId);
+      // Apply remembered per-site zoom for this page's host
+      applyZoomRef.current?.(webview, tabId);
     });
-    webview.addEventListener('enter-html-full-screen', () => {
+    on('enter-html-full-screen', () => {
       setFullscreenTabId(tabId);
     });
-    webview.addEventListener('leave-html-full-screen', () => {
+    on('leave-html-full-screen', () => {
       setFullscreenTabId(prev => prev === tabId ? null : prev);
     });
   }, [addToHistory, injectAutofill, domainFromUrl, setDownloads, setShowDownloads, patchTab]);
+
+  // Symmetric teardown for attachWebviewEvents: remove every recorded DOM
+  // listener from the webview element before it unmounts (leak-safety).
+  const detachWebviewEvents = useCallback((webview: any, tabId: string) => {
+    const recorded = webviewListenersRef.current.get(tabId);
+    if (recorded && webview) {
+      for (const [evt, handler] of recorded) {
+        try { webview.removeEventListener(evt, handler); } catch { /* element already gone */ }
+      }
+    }
+    webviewListenersRef.current.delete(tabId);
+  }, []);
 
   // Ref callback factory for webviews
   const getWebviewRef = useCallback((tabId: string) => (el: any) => {
@@ -984,10 +1164,12 @@ export const Browser: React.FC = () => {
       // Schedule event attachment after DOM initialization
       requestAnimationFrame(() => attachWebviewEvents(el, tabId));
     } else {
+      // Element unmounting — detach the listeners we attached to it.
+      detachWebviewEvents(webviewRefs.current.get(tabId), tabId);
       webviewRefs.current.delete(tabId);
       webviewEventsRef.current.delete(tabId);
     }
-  }, [attachWebviewEvents]);
+  }, [attachWebviewEvents, detachWebviewEvents]);
 
   // Listen for download progress
   useEffect(() => {
@@ -1481,7 +1663,7 @@ export const Browser: React.FC = () => {
   refreshRef.current = refresh;
 
   const addBookmark = (folderId?: string) => {
-    if (!currentTab?.url) return;
+    if (!currentTab?.url) { toast.info?.('Open a page to bookmark'); return; }
     const exists = bookmarks.some(b => b.url === currentTab.url);
     if (!exists) {
       setBookmarks([...bookmarks, {
@@ -1491,6 +1673,11 @@ export const Browser: React.FC = () => {
         folderId,
       }]);
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'bookmarksCreated', amount: 1 } }));
+      toast.success?.('Bookmarked');
+    } else {
+      // Already bookmarked — toggle off so the same control removes it.
+      setBookmarks(prev => prev.filter(b => b.url !== currentTab.url));
+      toast.info?.('Bookmark removed');
     }
   };
 
@@ -1532,6 +1719,16 @@ export const Browser: React.FC = () => {
     }
     return groups;
   }, [history]);
+
+  // Searchable + folder-scoped bookmark list for the bookmarks panel.
+  const filteredBookmarks = useMemo(() => {
+    const q = bookmarkQuery.trim().toLowerCase();
+    return bookmarks.filter(b => {
+      if (activeBookmarkFolder && b.folderId !== activeBookmarkFolder) return false;
+      if (!q) return true;
+      return (b.title || '').toLowerCase().includes(q) || (b.url || '').toLowerCase().includes(q);
+    });
+  }, [bookmarks, activeBookmarkFolder, bookmarkQuery]);
 
   const isSecure = currentTab?.url?.startsWith('https://');
 
@@ -1735,7 +1932,45 @@ export const Browser: React.FC = () => {
             )}
           </div>
         </form>
-        <button style={styles.navBtnSmall} onClick={() => addBookmark()} aria-label="Bookmark">{Icon.bookmark}</button>
+        <button style={styles.navBtnSmall} onClick={() => addBookmark()} aria-label="Bookmark" title="Bookmark this page">{Icon.bookmark}</button>
+
+        {/* Per-site zoom controls — remembered per hostname */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <button
+            style={{ ...styles.navBtnSmall, ...(currentTab?.url ? {} : { opacity: 0.4, cursor: 'not-allowed' }) }}
+            onClick={() => adjustZoom('out')}
+            disabled={!currentTab?.url}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >{Icon.zoomOut}</button>
+          <button
+            style={{
+              background: 'transparent', border: 'none', color: 'var(--color-text-secondary)',
+              cursor: currentTab?.url ? 'pointer' : 'not-allowed', fontSize: 11, minWidth: 34,
+              padding: '3px 2px', borderRadius: 4,
+            }}
+            onClick={() => adjustZoom('reset')}
+            disabled={!currentTab?.url}
+            aria-label="Reset zoom"
+            title="Reset zoom to 100%"
+          >{Math.round(activeZoom * 100)}%</button>
+          <button
+            style={{ ...styles.navBtnSmall, ...(currentTab?.url ? {} : { opacity: 0.4, cursor: 'not-allowed' }) }}
+            onClick={() => adjustZoom('in')}
+            disabled={!currentTab?.url}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >{Icon.zoomIn}</button>
+        </div>
+
+        <button
+          style={{...styles.navBtnSmall, ...(currentTab?.url ? {} : { opacity: 0.4, cursor: 'not-allowed' })}}
+          onClick={sendUrlToNotes}
+          disabled={!currentTab?.url}
+          aria-disabled={!currentTab?.url}
+          aria-label="Send link to Notes"
+          title="Send link to Notes"
+        >{Icon.sendToNotes}</button>
         <button
           style={{...styles.navBtnSmall, ...(currentTab ? {} : { opacity: 0.4, cursor: 'not-allowed' })}}
           onClick={toggleReadingMode}
@@ -1827,6 +2062,22 @@ export const Browser: React.FC = () => {
               <button style={styles.panelClose} onClick={() => setShowBookmarks(false)} aria-label="Close">{Icon.close}</button>
             </div>
           </div>
+          {/* Bookmark search */}
+          <div style={{ padding: '6px 10px 2px' }}>
+            <input
+              type="text"
+              value={bookmarkQuery}
+              onChange={e => setBookmarkQuery(e.target.value)}
+              placeholder="Search bookmarks..."
+              aria-label="Search bookmarks"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '5px var(--space-2)',
+                borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)',
+                fontSize: 12,
+              }}
+            />
+          </div>
           {/* Folder tabs */}
           <div style={{ display: 'flex', gap: 4, padding: '6px 10px', flexWrap: 'wrap' as const }}>
             <button
@@ -1844,8 +2095,7 @@ export const Browser: React.FC = () => {
           </div>
           {/* Bookmarks list */}
           <div style={styles.panelList}>
-            {bookmarks
-              .filter(b => !activeBookmarkFolder || b.folderId === activeBookmarkFolder)
+            {filteredBookmarks
               .map(b => (
                 <div key={b.id} style={styles.historyRow} onClick={() => navigate(b.url)}>
                   <span style={styles.historyRowIcon}>{Icon.bookmark}</span>
@@ -1874,8 +2124,12 @@ export const Browser: React.FC = () => {
                   </div>
                 </div>
               ))}
-            {bookmarks.filter(b => !activeBookmarkFolder || b.folderId === activeBookmarkFolder).length === 0 && (
-              <div style={styles.emptyPanel}>No bookmarks{activeBookmarkFolder ? ' in this folder' : ''}</div>
+            {filteredBookmarks.length === 0 && (
+              <div style={styles.emptyPanel}>
+                {bookmarkQuery
+                  ? 'No bookmarks match your search'
+                  : `No bookmarks${activeBookmarkFolder ? ' in this folder' : ''}`}
+              </div>
             )}
           </div>
         </div>
@@ -2325,17 +2579,32 @@ export const Browser: React.FC = () => {
             display: 'flex', justifyContent: 'center', padding: 'var(--space-10) var(--space-5)',
           }}>
             <div style={{ maxWidth: 680, width: '100%' }}>
-              <button
-                onClick={toggleReadingMode}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
-                  cursor: 'pointer', fontSize: 12, marginBottom: 'var(--space-6)',
-                }}
-              >
-                {Icon.back} Exit Reading Mode
-              </button>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)' }}>
+                <button
+                  onClick={toggleReadingMode}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+                    borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
+                    cursor: 'pointer', fontSize: 12,
+                  }}
+                >
+                  {Icon.back} Exit Reading Mode
+                </button>
+                <button
+                  onClick={sendArticleToNotes}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+                    borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
+                    cursor: 'pointer', fontSize: 12,
+                  }}
+                  aria-label="Save article to Notes"
+                  title="Save this article to Notes"
+                >
+                  {Icon.sendToNotes} Save to Notes
+                </button>
+              </div>
               <div
                 style={{
                   fontFamily: 'Georgia, "Times New Roman", serif',

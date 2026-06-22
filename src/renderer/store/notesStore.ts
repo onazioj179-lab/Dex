@@ -194,7 +194,33 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       fbSave(s);
       return true;
     }
-    case 'dexnotes:search': return [];
+    case 'dexnotes:search': {
+      // Real cross-folder search over every note's title + plain text (the
+      // fallback used to return [] so search found nothing without native FTS).
+      const raw = String(args[0] ?? '').trim().toLowerCase();
+      if (!raw) return [];
+      const terms = raw.split(/\s+/).filter(Boolean);
+      const results: NoteSearchResult[] = [];
+      for (const n of Object.values(s.notes) as any[]) {
+        const title = (n.title || '').toLowerCase();
+        const plain = n.plain_text || '';
+        const body = plain.toLowerCase();
+        if (!terms.every(t => title.includes(t) || body.includes(t))) continue;
+        let rank = 0;
+        for (const t of terms) { if (title.includes(t)) rank += 2; if (body.includes(t)) rank += 1; }
+        const idx = body.indexOf(terms[0]);
+        let snippet: string;
+        if (idx >= 0) {
+          const start = Math.max(0, idx - 30);
+          snippet = (start > 0 ? '…' : '') + plain.slice(start, idx + 90).trim() + (idx + 90 < plain.length ? '…' : '');
+        } else {
+          snippet = plain.slice(0, 90);
+        }
+        results.push({ id: n.id, title: n.title || 'Untitled', snippet, rank, folder_id: n.folder_id || null, updated_at: n.updated_at || 0, tags: n.tags || [] });
+      }
+      results.sort((a, b) => b.rank - a.rank || b.updated_at - a.updated_at);
+      return results.slice(0, 100);
+    }
     case 'dexnotes:getSuggestions': return [];
     case 'dexnotes:recordWord': return true;
     default: return null;

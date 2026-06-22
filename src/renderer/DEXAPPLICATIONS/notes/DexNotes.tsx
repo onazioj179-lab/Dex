@@ -13,7 +13,7 @@
 // ==========================================================================
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
-import { useNotesStore } from '../../store/notesStore';
+import { useNotesStore, type NoteListItem } from '../../store/notesStore';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import {
@@ -159,10 +159,18 @@ function useResizer(
   const startX = useRef(0);
   const startW = useRef(0);
   const rafId = useRef<number>(0);
+  // Track active listeners so an unmount mid-drag can tear them down.
+  const teardownRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setWidth(initialWidth);
   }, [initialWidth]);
+
+  // Safety net: cancel any pending RAF and detach drag listeners on unmount.
+  useEffect(() => () => {
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    teardownRef.current?.();
+  }, []);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true;
@@ -183,10 +191,15 @@ function useResizer(
       onResize(width);
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      teardownRef.current = null;
     };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    teardownRef.current = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
   }, [width, minWidth, maxWidth, onResize]);
 
   return { width, onMouseDown };
@@ -202,7 +215,7 @@ const DexNotes: React.FC = () => {
   const store = useNotesStore();
   const {
     notes, folders, activeNote, templates, allTags, stats,
-    selectedFolderId, selectedNoteId, searchQuery,
+    selectedFolderId, selectedNoteId, searchQuery, searchResults,
     sortField, sortDirection, viewMode, editorMode, focusMode,
     sidebarCollapsed, listCollapsed, paneSize,
     loading, saving, searching,
@@ -219,6 +232,10 @@ const DexNotes: React.FC = () => {
   const [showStats, setShowStats] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [titleValue, setTitleValue] = useState('');
+  // Inline #tag filter: when set, the list narrows to notes containing the tag.
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  // Local "New from template" menu (Meeting / Standup / Retro / Blank).
+  const [showDocTemplateMenu, setShowDocTemplateMenu] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteToast, setDeleteToast] = useState<{ title: string; visible: boolean } | null>(null);
@@ -515,16 +532,162 @@ const DexNotes: React.FC = () => {
   // list pane renders this `notes` array, so a live client-side filter is what
   // actually narrows what the user sees -- instant, no IPC round-trip, and it
   // matches across title, preview text, and tags. Empty query => full list.
+  // Fire the backend cross-folder search whenever the query changes, so matches
+  // from OTHER folders are available (the list itself is folder-scoped).
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q) store.search(q);
+    // store.search is a stable zustand action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
   const visibleNotes = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return notes;
+    // Inline-tag filter: keep notes whose title/body contains the active #tag
+    // as a whole token (so "#design" doesn't match "#designer").
+    const tagRe = activeTag
+      ? new RegExp(`#${activeTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i')
+      : null;
+    const matchesTag = (n: NoteListItem) =>
+      !tagRe || tagRe.test(`${n.title || ''}\n${n.plain_text || ''}`);
+
+    if (!q) return tagRe ? notes.filter(matchesTag) : notes;
     // Support multi-term AND search ("project todo" matches notes with both).
     const terms = q.split(/\s+/);
-    return notes.filter(n => {
+    const localMatches = notes.filter(n => {
+      if (!matchesTag(n)) return false;
       const haystack = `${n.title || ''}\n${n.plain_text || ''}\n${(n.tags || []).join(' ')}`.toLowerCase();
       return terms.every(t => haystack.includes(t));
     });
-  }, [notes, searchQuery]);
+    // Append cross-folder hits from the backend search, de-duped by id, so search
+    // spans the whole vault rather than just the selected folder.
+    const seen = new Set(localMatches.map(n => n.id));
+    const crossFolder = (searchResults || [])
+      .filter(r => !seen.has(r.id))
+      .map<NoteListItem>(r => ({
+        id: r.id, title: r.title, plain_text: r.snippet, word_count: 0,
+        created_at: r.updated_at, updated_at: r.updated_at, pinned: 0, pin_order: 0,
+        locked: 0, color_label: null, folder_id: r.folder_id, is_daily_note: 0,
+        is_template: 0, favorite: 0, tags: r.tags || [],
+      }))
+      .filter(matchesTag);
+    return [...localMatches, ...crossFolder];
+  }, [notes, searchQuery, searchResults, activeTag]);
+
+  // -- Inline #tags: distinct tokens scanned from titles + body ----------
+  // Detects `#tag` tokens across the in-folder notes and exposes them as
+  // clickable filter chips. Sorted by frequency so the most-used tags lead.
+  const inlineTags = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    const re = /#([\w][\w-]*)/g;
+    for (const n of notes) {
+      const text = `${n.title || ''}\n${n.plain_text || ''}`;
+      const localSeen = new Set<string>();
+      let m: RegExpExecArray | null;
+      re.lastIndex = 0;
+      while ((m = re.exec(text)) !== null) {
+        const tag = m[1].toLowerCase();
+        // Skip pure-number tokens (e.g. "#1") -- those are rarely real tags.
+        if (/^\d+$/.test(tag)) continue;
+        if (localSeen.has(tag)) continue; // count each tag once per note
+        localSeen.add(tag);
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+      .map(([tag, count]) => ({ tag, count }));
+  }, [notes]);
+
+  // If the active tag disappears from the corpus, clear the filter.
+  useEffect(() => {
+    if (activeTag && !inlineTags.some(t => t.tag === activeTag)) {
+      setActiveTag(null);
+    }
+  }, [inlineTags, activeTag]);
+
+  // -- Note templates: pre-filled doc-JSON bodies ------------------------
+  // Mirrors the store's doc-JSON content shape so the editor renders them
+  // immediately. Each builds via createNote() then updateNote(id, {...}).
+  const docTemplates = React.useMemo(() => {
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const doc = (content: any[]) => JSON.stringify({ type: 'doc', content });
+    const h = (level: number, text: string) => ({ type: 'heading', attrs: { level }, content: [{ type: 'text', text }] });
+    const p = (text = '') => (text
+      ? { type: 'paragraph', content: [{ type: 'text', text }] }
+      : { type: 'paragraph' });
+
+    return [
+      {
+        id: 'blank',
+        label: 'Blank',
+        title: 'Untitled',
+        plain_text: '',
+        content: doc([p()]),
+      },
+      {
+        id: 'meeting',
+        label: 'Meeting',
+        title: `Meeting Notes - ${today}`,
+        plain_text: `Meeting Notes - ${today}\nAttendees:\nAgenda:\nDiscussion:\nAction Items:`,
+        content: doc([
+          h(1, `Meeting Notes - ${today}`),
+          h(2, 'Attendees'),
+          p(),
+          h(2, 'Agenda'),
+          p(),
+          h(2, 'Discussion'),
+          p(),
+          h(2, 'Action Items'),
+          p(),
+        ]),
+      },
+      {
+        id: 'standup',
+        label: 'Standup',
+        title: `Standup - ${today}`,
+        plain_text: `Standup - ${today}\nYesterday:\nToday:\nBlockers:`,
+        content: doc([
+          h(1, `Standup - ${today}`),
+          h(2, 'Yesterday'),
+          p(),
+          h(2, 'Today'),
+          p(),
+          h(2, 'Blockers'),
+          p(),
+        ]),
+      },
+      {
+        id: 'retro',
+        label: 'Retro',
+        title: `Retrospective - ${today}`,
+        plain_text: `Retrospective - ${today}\nWhat went well:\nWhat could improve:\nAction items:`,
+        content: doc([
+          h(1, `Retrospective - ${today}`),
+          h(2, 'What went well'),
+          p(),
+          h(2, 'What could improve'),
+          p(),
+          h(2, 'Action items'),
+          p(),
+        ]),
+      },
+    ];
+  }, []);
+
+  const createFromDocTemplate = useCallback((tmplId: string) => {
+    const tmpl = docTemplates.find(t => t.id === tmplId);
+    if (!tmpl) return;
+    setShowDocTemplateMenu(false);
+    store.createNote(selectedFolderId || undefined).then(id => {
+      if (!id) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Could not create note' } }));
+        return;
+      }
+      store.updateNote(id, { title: tmpl.title, content: tmpl.content, plain_text: tmpl.plain_text });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Created "${tmpl.label}" note` } }));
+    });
+  }, [docTemplates, selectedFolderId, store]);
 
   // -- Outline / table of contents --------------------------------------
   const headings = React.useMemo(() => {
@@ -773,6 +936,93 @@ const DexNotes: React.FC = () => {
       {!listCollapsed && (
         <>
           <div style={{ ...S.listPane, width: listResizer.width }}>
+            {/* Inline #tag filter chips + "New from template" menu. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px var(--space-2) 4px', flexShrink: 0,
+              borderBottom: '1px solid var(--color-border-subtle)',
+            }}>
+                {inlineTags.length > 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto', flex: 1 }}>
+                    {inlineTags.map(({ tag, count }) => {
+                      const on = activeTag === tag;
+                      return (
+                        <button
+                          key={tag}
+                          aria-label={`Filter by #${tag}`}
+                          aria-pressed={on}
+                          title={`${count} note${count !== 1 ? 's' : ''} tagged #${tag}`}
+                          onClick={() => setActiveTag(on ? null : tag)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
+                            fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                            padding: '2px 8px', borderRadius: 8,
+                            border: `1px solid ${on ? '#64d2ff' : 'var(--color-border-subtle)'}`,
+                            background: on ? 'rgba(100,210,255,0.18)' : 'transparent',
+                            color: on ? '#64d2ff' : 'var(--color-text-tertiary)',
+                            transition: 'all 0.12s ease',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          #{tag}
+                          <span style={{ opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Add <span style={{ color: '#64d2ff' }}>#tags</span> in notes to filter here
+                  </div>
+                )}
+                {/* New-from-template menu */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    aria-label="New note from template"
+                    aria-expanded={showDocTemplateMenu}
+                    title="New from template"
+                    onClick={() => setShowDocTemplateMenu(v => !v)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer',
+                      fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 6,
+                      border: '1px solid var(--color-border-subtle)', background: 'transparent',
+                      color: 'var(--color-text-tertiary)', transition: 'all 0.12s ease',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#64d2ff'; e.currentTarget.style.borderColor = '#64d2ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.borderColor = 'var(--color-border-subtle)'; }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>
+                    Template
+                  </button>
+                  {showDocTemplateMenu && (
+                    <>
+                      <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-max)' }} onClick={() => setShowDocTemplateMenu(false)} />
+                      <div role="menu" style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                        minWidth: 150, padding: '4px 0', borderRadius: 6,
+                        background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
+                        border: '1px solid var(--color-bg-hover)',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                        zIndex: 'var(--z-max)',
+                      }}>
+                        <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 6px' }}>New from template</div>
+                        {docTemplates.map(t => (
+                          <div
+                            key={t.id}
+                            role="menuitem"
+                            onClick={() => createFromDocTemplate(t.id)}
+                            style={{ padding: '6px var(--space-3)', fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.1s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-subtle)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            {t.label}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             <NoteListPanel
               notes={visibleNotes}
               selectedNoteId={selectedNoteId}
@@ -783,6 +1033,7 @@ const DexNotes: React.FC = () => {
               onDelete={handleDeleteWithConfirm}
               onTogglePin={store.togglePin}
               onToggleFavorite={store.toggleFavorite}
+              onSetColor={(id, color) => store.updateNote(id, { color_label: color })}
               sortField={sortField}
               sortDirection={sortDirection}
               onSortFieldChange={store.setSortField}
@@ -822,6 +1073,33 @@ const DexNotes: React.FC = () => {
               saving={saving}
               lastSavedAt={lastSavedAt}
             />
+            {(() => {
+              // Folder breadcrumb: walk the selected folder up to the root so the
+              // user always sees where the current note lives, and can jump back.
+              if (!selectedFolderId) return null;
+              const byId = new Map(folders.map(f => [f.id, f]));
+              const path: typeof folders = [];
+              let cur = byId.get(selectedFolderId);
+              let guard = 0;
+              while (cur && guard++ < 30) { path.unshift(cur); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined; }
+              if (!path.length) return null;
+              const crumb: React.CSSProperties = { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 11, fontWeight: 500 };
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', padding: '6px var(--space-4) 0' }}>
+                  <button style={crumb} onClick={() => store.selectFolder(null)}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>All Notes</button>
+                  {path.map(f => (
+                    <React.Fragment key={f.id}>
+                      <span style={{ opacity: 0.4, fontSize: 11 }}>/</span>
+                      <button style={crumb} onClick={() => store.selectFolder(f.id)}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>{f.name}</button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              );
+            })()}
             <TitleInput
               title={titleValue}
               onChange={handleTitleChange}
@@ -918,13 +1196,20 @@ const DexNotes: React.FC = () => {
               {activeNote.backlinks.map(bl => (
                 <div
                   key={bl.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open backlink: ${bl.source_title || 'Untitled'}`}
                   style={{
                     fontSize: 12,
                     color: '#64d2ff',
                     cursor: 'pointer',
                     padding: '3px 0',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                   onClick={() => store.selectNote(bl.source_note_id)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); store.selectNote(bl.source_note_id); } }}
                 >
                   {bl.source_title || 'Untitled'}
                 </div>

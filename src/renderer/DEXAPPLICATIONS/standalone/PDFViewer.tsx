@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassToolbar } from '../../styles/glassMenu';
+import { sendToNotes } from '../../services/sendTo';
 
 interface Annotation {
   x: number;
@@ -22,6 +23,17 @@ interface OpenDialogResult {
 }
 
 const HIGHLIGHT_COLOR = 'rgba(255, 224, 102, 0.45)';
+
+/** Fit modes map to the native Chromium PDF plugin `#view=` fragment values. */
+type FitMode = 'custom' | 'width' | 'page';
+/** Layout maps to the plugin scroll mode (#scrollbar / view) — best-effort. */
+type Layout = 'continuous' | 'single';
+
+const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 300, 400];
+
+const toast = (type: 'success' | 'error' | 'info', message: string): void => {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+};
 
 const sha1Hex = async (input: string): Promise<string> => {
   try {
@@ -48,11 +60,48 @@ const PDFViewer: React.FC = () => {
   const [annotateMode, setAnnotateMode] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('1');
+  const [fitMode, setFitMode] = useState<FitMode>('custom');
+  const [layout, setLayout] = useState<Layout>('continuous');
+  const [rotation, setRotation] = useState(0); // 0 | 90 | 180 | 270 (CSS-only)
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; rect: HTMLDivElement | null } | null>(null);
+  // Holds the in-flight drag window listeners so an unmount mid-drag can detach them.
+  const dragListenersRef = useRef<{ move: (e: MouseEvent) => void; up: (e: MouseEvent) => void } | null>(null);
+  const [stageSize, setStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // Safety net: if the component unmounts while a highlight drag is in progress,
+  // remove the global listeners and the floating preview node so nothing leaks.
+  useEffect(() => () => {
+    if (dragListenersRef.current) {
+      window.removeEventListener('mousemove', dragListenersRef.current.move);
+      window.removeEventListener('mouseup', dragListenersRef.current.up);
+      dragListenersRef.current = null;
+    }
+    if (dragRef.current?.rect) {
+      try { dragRef.current.rect.remove(); } catch { /* noop */ }
+    }
+    dragRef.current = null;
+  }, []);
+
+  // Keep the page-jump input in sync with the active page.
+  useEffect(() => { setPageInput(String(page)); }, [page]);
+
+  // Track the rendering stage size so rotated (90/270) pages can swap their
+  // logical width/height to keep filling the viewport.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { try { ro.disconnect(); } catch { /* noop */ } };
+  }, [filePath]);
 
   // Load annotations when document changes
   useEffect(() => {
@@ -94,6 +143,10 @@ const PDFViewer: React.FC = () => {
       setFileName(name);
       setDocKey(digest);
       setPage(1);
+      setZoom(100);
+      setFitMode('custom');
+      setLayout('continuous');
+      setRotation(0);
     } catch (err) {
       console.error('[PDFViewer] open failed:', err);
       setErrorMsg('Could not open this PDF. The file may be unsupported or unavailable.');
@@ -136,6 +189,7 @@ const PDFViewer: React.FC = () => {
     const up = (uv: MouseEvent) => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
+      dragListenersRef.current = null;
       const st = dragRef.current;
       dragRef.current = null;
       if (!st || !overlayRef.current) return;
@@ -151,13 +205,72 @@ const PDFViewer: React.FC = () => {
         setAnnotations(prev => [...prev, { x, y, width: w, height: h, color: HIGHLIGHT_COLOR }]);
       }
     };
+    dragListenersRef.current = { move, up };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   }, [annotateMode]);
 
   const clearAnnotations = useCallback(() => setAnnotations([]), []);
 
-  const fileUrl = filePath ? `file://${filePath.replace(/\\/g, '/')}#page=${page}&zoom=${zoom}` : '';
+  // --- Zoom / fit ----------------------------------------------------------
+  const applyZoom = useCallback((value: number) => {
+    const clamped = Math.max(25, Math.min(400, Math.round(value)));
+    setFitMode('custom');
+    setZoom(clamped);
+  }, []);
+  const zoomIn = useCallback(() => applyZoom(zoom + 10), [applyZoom, zoom]);
+  const zoomOut = useCallback(() => applyZoom(zoom - 10), [applyZoom, zoom]);
+  const fitWidth = useCallback(() => setFitMode('width'), []);
+  const fitPage = useCallback(() => setFitMode('page'), []);
+
+  // --- Rotation (CSS-only; native plugin has no rotate fragment) ----------
+  const rotateCW = useCallback(() => setRotation(r => (r + 90) % 360), []);
+  const rotateCCW = useCallback(() => setRotation(r => (r + 270) % 360), []);
+
+  // --- Page jump -----------------------------------------------------------
+  const commitPageInput = useCallback(() => {
+    try {
+      const n = parseInt(pageInput, 10);
+      if (Number.isFinite(n) && n >= 1) setPage(n);
+      else setPageInput(String(page));
+    } catch { setPageInput(String(page)); }
+  }, [pageInput, page]);
+
+  // --- Send selected text to Notes ----------------------------------------
+  // The PDF itself renders inside a cross-origin file:// iframe whose selection
+  // is not reachable, but text selected anywhere in this app's own document
+  // (e.g. copied out of the PDF into the page) can be forwarded.
+  const sendSelectionToNotes = useCallback(async () => {
+    try {
+      const sel = window.getSelection?.()?.toString().trim() || '';
+      if (!sel) {
+        toast('info', 'Select some text first, then send to Notes');
+        return;
+      }
+      await sendToNotes(sel, fileName ? `From ${fileName}` : undefined);
+    } catch (err) {
+      console.error('[PDFViewer] send to notes failed:', err);
+      toast('error', 'Could not send selection to Notes');
+    }
+  }, [fileName]);
+
+  // Build the native PDF-plugin URL fragment. The Chromium PDF viewer honours
+  // #page=, #zoom= and #view=FitH|Fit; rotation is applied via CSS instead.
+  const buildFragment = useCallback((): string => {
+    const parts: string[] = [`page=${Math.max(1, page)}`];
+    if (fitMode === 'width') parts.push('view=FitH');
+    else if (fitMode === 'page') parts.push('view=Fit');
+    else parts.push(`zoom=${zoom}`);
+    // Scroll/layout hint: the plugin uses view=FitV for single-page fitting.
+    if (layout === 'single' && fitMode !== 'page') parts.push('view=FitV');
+    return parts.join('&');
+  }, [page, zoom, fitMode, layout]);
+
+  const fileUrl = filePath
+    ? `file://${filePath.replace(/\\/g, '/')}#${buildFragment()}`
+    : '';
+
+  const rotated = rotation % 180 !== 0;
 
   return (
     <div style={{
@@ -173,18 +286,79 @@ const PDFViewer: React.FC = () => {
             {fileName || 'No document'}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {/* Page navigation + jump-to-page */}
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={!filePath} style={btn} title="Previous page" aria-label="Previous page">Prev</button>
-          <span style={{ fontSize: 12, minWidth: 36, textAlign: 'center' }}>{page}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+            <input
+              value={pageInput}
+              onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={commitPageInput}
+              onKeyDown={e => { if (e.key === 'Enter') { commitPageInput(); (e.target as HTMLInputElement).blur(); } }}
+              disabled={!filePath}
+              aria-label="Page number"
+              title="Jump to page"
+              style={{
+                width: 44, padding: '4px 6px', textAlign: 'center', borderRadius: 4, fontSize: 12,
+                background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border-subtle)',
+              }}
+            />
+          </span>
           <button onClick={() => setPage(p => p + 1)} disabled={!filePath} style={btn} title="Next page" aria-label="Next page">Next</button>
           <span style={{ width: 8 }} />
-          <button onClick={() => setZoom(z => Math.max(25, z - 10))} disabled={!filePath} style={btn} title="Zoom out" aria-label="Zoom out">&#8722;</button>
-          <span style={{ fontSize: 12, minWidth: 44, textAlign: 'center' }}>{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(400, z + 10))} disabled={!filePath} style={btn} title="Zoom in" aria-label="Zoom in">+</button>
+
+          {/* Zoom: out / preset select / in */}
+          <button onClick={zoomOut} disabled={!filePath} style={btn} title="Zoom out" aria-label="Zoom out">&#8722;</button>
+          <select
+            value={fitMode === 'custom' ? String(zoom) : fitMode}
+            onChange={e => {
+              const v = e.target.value;
+              if (v === 'width') fitWidth();
+              else if (v === 'page') fitPage();
+              else applyZoom(parseInt(v, 10));
+            }}
+            disabled={!filePath}
+            aria-label="Zoom level"
+            title="Zoom level"
+            style={{
+              fontSize: 12, padding: '5px 6px', borderRadius: 4,
+              background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
+            }}
+          >
+            {fitMode === 'custom' && !ZOOM_PRESETS.includes(zoom) && (
+              <option value={String(zoom)}>{zoom}%</option>
+            )}
+            {ZOOM_PRESETS.map(z => <option key={z} value={String(z)}>{z}%</option>)}
+            <option value="width">Fit width</option>
+            <option value="page">Fit page</option>
+          </select>
+          <button onClick={zoomIn} disabled={!filePath} style={btn} title="Zoom in" aria-label="Zoom in">+</button>
           <span style={{ width: 8 }} />
+
+          {/* Rotate */}
+          <button onClick={rotateCCW} disabled={!filePath} style={btn} title="Rotate counter-clockwise" aria-label="Rotate counter-clockwise">&#8634;</button>
+          <button onClick={rotateCW} disabled={!filePath} style={btn} title="Rotate clockwise" aria-label="Rotate clockwise">&#8635;</button>
+          <span style={{ width: 8 }} />
+
+          {/* Single / continuous layout toggle */}
+          <button
+            onClick={() => setLayout(l => (l === 'continuous' ? 'single' : 'continuous'))}
+            disabled={!filePath}
+            style={btn}
+            title="Toggle single / continuous layout"
+            aria-label="Toggle layout"
+          >{layout === 'continuous' ? 'Continuous' : 'Single'}</button>
+          <span style={{ width: 8 }} />
+
+          <button onClick={sendSelectionToNotes} disabled={!filePath} style={btn} title="Send selected text to Notes" aria-label="Send selected text to Notes">To Notes</button>
           <button
             onClick={() => setAnnotateMode(m => !m)}
             disabled={!filePath}
+            aria-pressed={annotateMode}
+            aria-label="Toggle highlight annotation mode"
+            title="Toggle highlight annotation mode"
             style={{
               ...btn,
               background: annotateMode ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
@@ -198,17 +372,29 @@ const PDFViewer: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--color-bg-base, #1a1a1f)' }}>
+      <div ref={stageRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--color-bg-base, #1a1a1f)' }}>
         {filePath ? (
           <>
-            <iframe
-              src={fileUrl}
-              title="PDF document"
-              style={{
-                width: '100%', height: '100%', border: 'none',
-                pointerEvents: annotateMode ? 'none' : 'auto',
-              }}
-            />
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            }}>
+              <iframe
+                key={fileUrl}
+                src={fileUrl}
+                title="PDF document"
+                style={{
+                  // When rotated 90/270 swap the logical width/height (using the
+                  // measured stage size) so the rotated page still fills the view.
+                  width: rotated && stageSize.h ? stageSize.h : '100%',
+                  height: rotated && stageSize.w ? stageSize.w : '100%',
+                  border: 'none',
+                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  transformOrigin: 'center center',
+                  pointerEvents: annotateMode ? 'none' : 'auto',
+                }}
+              />
+            </div>
             <div
               ref={overlayRef}
               onMouseDown={onOverlayMouseDown}

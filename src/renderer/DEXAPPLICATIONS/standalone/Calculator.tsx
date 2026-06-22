@@ -11,9 +11,75 @@ import { useAppTracking } from '../../services/usePatternLearning';
 // Professional, minimal, Apple-inspired calculator
 // ===========================================================================
 
+// Natural-language input: arithmetic ("sqrt(2)", "2+2*3"), percent ("20% of 80"),
+// and common unit conversions ("5 km in mi", "180 lb to kg", "100 c in f"). Pure +
+// self-contained so it stays easy to reason about. Returns null when unparseable.
+const UNIT_ALIAS: Record<string, string> = {
+  kilometers: 'km', kilometres: 'km', kilometer: 'km', kilometre: 'km', kms: 'km',
+  meters: 'm', metres: 'm', meter: 'm', metre: 'm', centimeters: 'cm', millimeters: 'mm',
+  miles: 'mi', mile: 'mi', yards: 'yd', yard: 'yd', feet: 'ft', foot: 'ft', inches: 'in', inch: 'in',
+  kilograms: 'kg', kilogram: 'kg', kilo: 'kg', kilos: 'kg', grams: 'g', gram: 'g',
+  milligrams: 'mg', pounds: 'lb', pound: 'lb', lbs: 'lb', ounces: 'oz', ounce: 'oz', tonnes: 't', tonne: 't', tons: 't',
+  bytes: 'b', byte: 'b', kilobytes: 'kb', megabytes: 'mb', gigabytes: 'gb', terabytes: 'tb',
+  celsius: 'c', centigrade: 'c', fahrenheit: 'f', kelvin: 'k',
+};
+const UNIT_FACTOR: Record<string, { dim: string; f: number }> = {
+  km: { dim: 'len', f: 1000 }, m: { dim: 'len', f: 1 }, cm: { dim: 'len', f: 0.01 }, mm: { dim: 'len', f: 0.001 },
+  mi: { dim: 'len', f: 1609.344 }, yd: { dim: 'len', f: 0.9144 }, ft: { dim: 'len', f: 0.3048 }, in: { dim: 'len', f: 0.0254 },
+  kg: { dim: 'mass', f: 1000 }, g: { dim: 'mass', f: 1 }, mg: { dim: 'mass', f: 0.001 }, lb: { dim: 'mass', f: 453.592 }, oz: { dim: 'mass', f: 28.3495 }, t: { dim: 'mass', f: 1e6 },
+  b: { dim: 'data', f: 1 }, kb: { dim: 'data', f: 1024 }, mb: { dim: 'data', f: 1024 ** 2 }, gb: { dim: 'data', f: 1024 ** 3 }, tb: { dim: 'data', f: 1024 ** 4 },
+};
+function toCelsius(v: number, u: string): number | null {
+  if (u === 'c') return v; if (u === 'f') return (v - 32) * 5 / 9; if (u === 'k') return v - 273.15; return null;
+}
+function fromCelsius(c: number, u: string): number | null {
+  if (u === 'c') return c; if (u === 'f') return c * 9 / 5 + 32; if (u === 'k') return c + 273.15; return null;
+}
+function convertUnits(amount: number, from: string, to: string): number | null {
+  const f = UNIT_ALIAS[from] ?? from, t = UNIT_ALIAS[to] ?? to;
+  if (['c', 'f', 'k'].includes(f) && ['c', 'f', 'k'].includes(t)) {
+    const c = toCelsius(amount, f); return c === null ? null : fromCelsius(c, t);
+  }
+  const fu = UNIT_FACTOR[f], tu = UNIT_FACTOR[t];
+  if (!fu || !tu || fu.dim !== tu.dim) return null;
+  return (amount * fu.f) / tu.f;
+}
+export function evaluateNatural(raw: string): { value: number; expr: string } | null {
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+  // Unit conversion: "<n> <unit> in|to <unit>"
+  const conv = s.match(/^([\d.]+)\s*([a-z°]+)\s*(?:in|to|->)\s*([a-z°]+)$/);
+  if (conv) {
+    const r = convertUnits(parseFloat(conv[1]), conv[2], conv[3]);
+    if (r !== null && isFinite(r)) return { value: r, expr: raw.trim() };
+  }
+  // "<n>% of <n>"
+  const pct = s.match(/^([\d.]+)\s*%\s*of\s*([\d.]+)$/);
+  if (pct) return { value: (parseFloat(pct[1]) / 100) * parseFloat(pct[2]), expr: raw.trim() };
+  // Arithmetic with Math functions / constants / percent.
+  let e = s.replace(/\^/g, '**')
+    .replace(/\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|log2|log10|abs|round|floor|ceil|exp|sign)\s*\(/g, 'Math.$1(')
+    .replace(/\blog\s*\(/g, 'Math.log10(')
+    .replace(/\bln\s*\(/g, 'Math.log(')
+    .replace(/\bpi\b/g, 'Math.PI').replace(/(?<![a-z])e(?![a-z])/g, 'Math.E')
+    .replace(/(\d(?:\.\d+)?)\s*%/g, '($1/100)');
+  // Whitelist: digits, operators, parens, dot, comma, whitespace, and Math.* calls.
+  if (!/^[\d+\-*/().,%\s]*(?:Math\.[a-z0-9]+\([^)]*\)|Math\.(PI|E)|[\d+\-*/().,%\s])*$/i.test(e.replace(/Math\.[a-z0-9]+/gi, 'Math'))) {
+    // Looser fallback: strip everything not in the safe set, then require it changed nothing illegal.
+    if (/[a-z]/i.test(e.replace(/Math\.[a-z0-9]+/gi, ''))) return null;
+  }
+  try {
+    // eslint-disable-next-line no-new-func
+    const val = Function(`"use strict"; return (${e});`)() as unknown;
+    if (typeof val === 'number' && isFinite(val)) return { value: val, expr: raw.trim() };
+  } catch { /* not an expression */ }
+  return null;
+}
+
 const Calculator: React.FC = () => {
   // ===== PATTERN LEARNING =====
   useAppTracking('calculator');
+  const [naturalInput, setNaturalInput] = useState('');
 
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
@@ -200,9 +266,27 @@ const Calculator: React.FC = () => {
     }
   }, [display, expression]);
 
+  // Natural-language entry: evaluate the typed query, show the result, and log it.
+  const runNatural = () => {
+    const res = evaluateNatural(naturalInput);
+    if (!res) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Could not parse that' } }));
+      return;
+    }
+    const resultStr = formatNumber(res.value);
+    setHistory(prev => [{ id: `calc-${Date.now()}`, expr: res.expr, result: resultStr }, ...prev].slice(0, 50));
+    setDisplay(resultStr);
+    setExpression(res.expr);
+    setNaturalInput('');
+    setWaitingForOperand(true);
+  };
+
   // Keyboard support -- use ref to always capture latest closures without re-registering
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>();
   keyHandlerRef.current = (e: KeyboardEvent) => {
+    // Don't hijack keystrokes while the user types in the natural-input field.
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (e.key >= '0' && e.key <= '9') inputDigit(e.key);
     else if (e.key === '.') inputDecimal();
     else if (e.key === '+') performOperation('+');
@@ -302,6 +386,18 @@ const Calculator: React.FC = () => {
       </div>
 
       <div style={styles.main}>
+        {/* Natural-language input: units, percents, functions */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input
+            value={naturalInput}
+            onChange={e => setNaturalInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') runNatural(); }}
+            placeholder="Try: 5 km in mi · 20% of 80 · sqrt(2)"
+            aria-label="Natural calculation input"
+            style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
+          />
+          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
+        </div>
         {/* Display */}
         <div style={styles.displayArea}>
           {expression && <div style={styles.expression}>{expression}</div>}
@@ -372,7 +468,7 @@ const Calculator: React.FC = () => {
               <div style={styles.emptyHistory}>No calculations yet</div>
             ) : (
               history.map((item) => (
-                <div key={item.id} style={styles.historyItem} onClick={() => { setDisplay(item.result); setWaitingForOperand(true); }}>
+                <div key={item.id} role="button" tabIndex={0} title={`${item.expr} = ${item.result}`} aria-label={`Reuse result ${item.result}`} style={styles.historyItem} onClick={() => { setDisplay(item.result); setWaitingForOperand(true); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDisplay(item.result); setWaitingForOperand(true); } }}>
                   <div style={styles.historyExpr}>{item.expr}</div>
                   <div style={styles.historyResult}>= {item.result}</div>
                 </div>
@@ -470,6 +566,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 'var(--space-2)',
     fontWeight: 500,
     letterSpacing: '0.5px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   display: {
     fontSize: '36px',
@@ -555,12 +654,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-muted)',
     marginBottom: '4px',
     fontWeight: 500,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   historyResult: {
     fontSize: '18px',
     fontWeight: 600,
     letterSpacing: '-0.5px',
     color: 'var(--color-text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
 };
 
