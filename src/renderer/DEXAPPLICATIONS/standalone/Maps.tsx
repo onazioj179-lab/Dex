@@ -33,6 +33,7 @@ import { DexSearchInput } from '../../styles/components';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // Free, key-less basemap styles. Vector styles come from OpenFreeMap; the
 // satellite + terrain styles are built inline from key-less raster tile sources
@@ -383,6 +384,28 @@ const DexMaps: React.FC = () => {
     window.addEventListener('dex-maps-goto', onGoto as EventListener);
     return () => window.removeEventListener('dex-maps-goto', onGoto as EventListener);
   }, [goTo]);
+
+  // UKI app-context: expose the centered place / dropped-pin coordinates and the
+  // count of saved places so the assistant knows what the map is showing. A ref
+  // keeps the resolver reading live state — register once at mount.
+  const ukiCtxRef = useRef({ place, pin, savedCount: saved.length, styleKey });
+  ukiCtxRef.current = { place, pin, savedCount: saved.length, styleKey };
+  useEffect(() => {
+    registerUkiAppContext('maps', () => {
+      const s = ukiCtxRef.current;
+      return {
+        appId: 'maps',
+        focusedItemId: s.place,
+        custom: {
+          centeredOn: s.place,
+          coordinates: s.pin ? fmtCoord(s.pin.lat, s.pin.lon) : undefined,
+          savedPlaces: s.savedCount,
+          basemap: MAP_STYLES[s.styleKey]?.label,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('maps');
+  }, []);
 
   // Debounced search-as-you-type.
   useEffect(() => {

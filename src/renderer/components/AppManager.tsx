@@ -34,6 +34,7 @@ import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
+import AskUkiSelection from './AskUkiSelection';
 import AskUkiContextMenu from './AskUkiContextMenu';
 // Deep import (not the '../uki' barrel): AppManager only needs these two static
 // data constants, but the barrel re-exports the entire assistant (answerEngine,
@@ -4361,6 +4362,7 @@ export const AppManager: React.FC = () => {
 
       {/* UKI Voice Assistant Transcript Overlay */}
       <UkiOverlay />
+      <AskUkiSelection />
 
       {/* Global "right-click selected text -> Ask UKI" affordance (one more
           path to the assistant). Self-contained; defers to any existing menu. */}

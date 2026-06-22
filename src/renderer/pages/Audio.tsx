@@ -22,6 +22,7 @@ import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/Cont
 import { getAudioPlaybackService } from '../services/media/AudioPlaybackService';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useAsyncResource } from '../utils/useAsyncResource';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 
 // ===========================================================================
 // TYPES
@@ -280,6 +281,30 @@ export const Audio: React.FC = () => {
   const [eqPreset, setEqPreset] = useState('flat');
   const [showQueue, setShowQueue] = useState(false);
   const [queue, setQueue] = useState<Track[]>([]);
+
+  // -- uki context: surface now-playing state to the assistant. Registered once
+  // on mount; a latest-value ref (refreshed each render) keeps the pure resolver
+  // reading live state without re-registering.
+  const ukiCtxRef = useRef({ currentTrack, isPlaying, queue, tracks });
+  useEffect(() => { ukiCtxRef.current = { currentTrack, isPlaying, queue, tracks }; });
+  useEffect(() => {
+    registerUkiAppContext('audio', () => {
+      const c = ukiCtxRef.current;
+      const t = c.currentTrack;
+      return {
+        appId: 'audio',
+        focusedItemId: t?.id,
+        selectionText: t ? `${t.title} — ${t.artist}` : undefined,
+        custom: {
+          nowPlaying: t ? { title: t.title, artist: t.artist, album: t.album } : undefined,
+          state: t ? (c.isPlaying ? 'playing' : 'paused') : 'stopped',
+          queueLength: c.queue.length,
+          libraryTracks: c.tracks.length,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('audio');
+  }, []);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
   const [vizMode, setVizMode] = useState<'bars' | 'wave' | 'spectrum'>('bars');

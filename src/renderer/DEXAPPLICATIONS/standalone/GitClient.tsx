@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { glassPanel, glassButton } from '../../styles/glassMenu';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface GitStatusFile {
   path: string;
@@ -198,6 +199,32 @@ export default function GitClient(): React.ReactElement {
 
   const staged = status?.files.filter(f => f.staged) ?? [];
   const unstaged = status?.files.filter(f => !f.staged) ?? [];
+
+  // UKI app-context: expose the open repo, current branch, and staged / changed
+  // counts. A ref keeps the resolver reading live state (register once at mount).
+  const ukiCtxRef = useRef({ status, repoPath, staged, unstaged });
+  ukiCtxRef.current = { status, repoPath, staged, unstaged };
+  useEffect(() => {
+    registerUkiAppContext('git', () => {
+      const s = ukiCtxRef.current;
+      if (!s.repoPath) return { appId: 'git', custom: { repo: '(no repo open)' } };
+      const repoName = (s.status?.root || s.repoPath).split(/[\\/]/).filter(Boolean).pop() || s.repoPath;
+      return {
+        appId: 'git',
+        currentFile: s.status?.root || s.repoPath,
+        focusedItemId: s.repoPath,
+        custom: {
+          repo: repoName,
+          branch: s.status?.branch || '(detached)',
+          staged: s.staged.length,
+          changed: s.unstaged.length,
+          ahead: s.status?.ahead ?? 0,
+          behind: s.status?.behind ?? 0,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('git');
+  }, []);
 
   const toggleStage = useCallback((f: GitStatusFile) => {
     if (f.staged) void run(() => bridge!.unstage(repoPath, [f.path]), 'Unstaged');

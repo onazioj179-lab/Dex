@@ -20,6 +20,7 @@ import { DexSearchInput } from '../styles/components';
 import { validateWorkflow } from '../../shared/workflow/validate';
 import { useNotesStore } from '../store/notesStore';
 import { useClipboardStore } from '../store/clipboardStore';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 
 // ===========================================================================
 // TYPES
@@ -617,6 +618,31 @@ export const Workflows: React.FC = () => {
 
   // Cancel any pending drag rAF on unmount so it can't fire after teardown.
   useEffect(() => () => { if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current); }, []);
+
+  // UKI app-context: expose the selected workflow's name, its step count, and
+  // whether it's enabled. While editing, the live node count reflects unsaved
+  // edits. A ref keeps the resolver reading live state (register once at mount).
+  const ukiCtxRef = useRef({ selectedWorkflow, nodes, isEditing });
+  ukiCtxRef.current = { selectedWorkflow, nodes, isEditing };
+  useEffect(() => {
+    registerUkiAppContext('workflows', () => {
+      const s = ukiCtxRef.current;
+      const wf = s.selectedWorkflow;
+      if (!wf) return { appId: 'workflows', custom: { view: 'library' } };
+      const stepCount = s.isEditing ? s.nodes.length : (wf.steps ?? wf.nodes?.length ?? 0);
+      return {
+        appId: 'workflows',
+        focusedItemId: wf.id,
+        custom: {
+          workflow: wf.name,
+          steps: stepCount,
+          enabled: (wf.enabled ?? true) ? 'yes' : 'no',
+          mode: s.isEditing ? 'editing' : 'viewing',
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('workflows');
+  }, []);
 
   // Load workflows + run history
   useEffect(() => {

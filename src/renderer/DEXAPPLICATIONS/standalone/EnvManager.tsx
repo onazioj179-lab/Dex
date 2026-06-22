@@ -19,6 +19,7 @@ import { DexSearchInput } from '../../styles/components';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface EnvBridge {
   listSystem: () => Promise<Array<{ name: string; value: string }>>;
@@ -230,6 +231,33 @@ export default function EnvManager(): React.ReactElement {
       .filter(e => !q || e.name.toLowerCase().includes(q) || e.value.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [isProfile, activeProfile, isSystem, scope, system, managed, query]);
+
+  // UKI app-context: expose the active scope / profile, its key count, and
+  // whether values are currently masked. A ref keeps the resolver reading live
+  // state so we register once at mount without re-registering on every edit.
+  const ukiCtxRef = useRef({ scope, isProfile, isSystem, activeProfile, rows, revealed });
+  ukiCtxRef.current = { scope, isProfile, isSystem, activeProfile, rows, revealed };
+  useEffect(() => {
+    registerUkiAppContext('env', () => {
+      const s = ukiCtxRef.current;
+      const scopeLabel = s.isProfile
+        ? (s.activeProfile?.name || 'profile')
+        : s.isSystem ? 'System' : s.scope === 'global' ? 'DEX Global' : s.scope;
+      const masked = s.rows.some(r => !s.revealed.has(r.name));
+      return {
+        appId: 'env',
+        focusedItemId: s.isProfile ? s.activeProfile?.id : s.scope,
+        custom: {
+          scope: scopeLabel,
+          profile: s.isProfile ? (s.activeProfile?.name || '(none)') : '(not a profile)',
+          keys: s.rows.length,
+          masked: masked ? 'yes' : 'no',
+          readOnly: s.isSystem ? 'yes' : 'no',
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('env');
+  }, []);
 
   // ---- bridge-backed mutations (unchanged behavior) -----------------------
   const save = useCallback(async (name: string, value: string) => {
