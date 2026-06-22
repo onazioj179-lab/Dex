@@ -20,6 +20,12 @@ import ShareDialog from '../../components/ShareDialog';
 import { EmptyState } from '../../components/EmptyState';
 import ChatPanel from '../../components/ChatPanel';
 import { DexSearchInput } from '../../styles/components';
+import {
+  createCollabSession,
+  CollabSession,
+  CollabPeer,
+  CollabChatMessage,
+} from '../../services/collabSession';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -796,6 +802,102 @@ const CollabHub: React.FC = () => {
     }));
     toast('info', `Opening ${room.appId}…`);
   }, [me, toast]);
+
+  // -------------------------------------------------------------------------
+  // LIVE SESSION (real same-device multi-window sync via BroadcastChannel)
+  // -------------------------------------------------------------------------
+  // A CollabSession is bound to the active room while it is joined. Open a
+  // second DEX window, join the same room, and the peers / shared scratch /
+  // chat below sync in real time across windows on THIS device.
+  const sessionRef = React.useRef<CollabSession | null>(null);
+  const [livePeers, setLivePeers] = useState<CollabPeer[]>([]);
+  const [liveScratch, setLiveScratch] = useState<string>('');
+  const [liveChat, setLiveChat] = useState<CollabChatMessage[]>([]);
+  const [liveDraft, setLiveDraft] = useState<string>('');
+  const [liveSupported, setLiveSupported] = useState<boolean>(true);
+  // Track whether a scratch edit originated locally so remote updates don't
+  // clobber the field the user is actively typing into.
+  const scratchEditingRef = React.useRef<boolean>(false);
+  const liveChatScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Stable per-window presence color, derived from the user id.
+  const myColor = useMemo(() => avatarColor(me.id + me.name), [me.id, me.name]);
+
+  // Bind/unbind a live session to the active room only while it is joined.
+  const liveRoomKey = activeRoom && isJoined(activeRoom.id) ? activeRoom.id : null;
+
+  useEffect(() => {
+    if (!liveRoomKey) {
+      // Not in a joined room — ensure any prior session is torn down.
+      if (sessionRef.current) {
+        sessionRef.current.destroy();
+        sessionRef.current = null;
+      }
+      setLivePeers([]);
+      setLiveChat([]);
+      setLiveScratch('');
+      setLiveDraft('');
+      return;
+    }
+
+    const session = createCollabSession();
+    sessionRef.current = session;
+    setLiveChat([]);
+    setLiveDraft('');
+
+    const supported = session.join(liveRoomKey, {
+      id: me.id,
+      name: me.name,
+      color: myColor,
+    });
+    setLiveSupported(supported);
+
+    const unsubPresence = session.subscribePresence(peers => setLivePeers(peers));
+    const unsubState = session.subscribeState(state => {
+      const next = typeof state.scratch === 'string' ? state.scratch : '';
+      // Don't overwrite while the local user is mid-edit.
+      if (!scratchEditingRef.current) setLiveScratch(next);
+    });
+    const unsubChat = session.subscribeChat(message => {
+      setLiveChat(prev => {
+        if (prev.some(m => m.id === message.id)) return prev;
+        return [...prev, message].slice(-200);
+      });
+    });
+
+    return () => {
+      unsubPresence();
+      unsubState();
+      unsubChat();
+      session.destroy();
+      if (sessionRef.current === session) sessionRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveRoomKey, me.id, me.name, myColor]);
+
+  // Auto-scroll the live chat to bottom on new messages.
+  useEffect(() => {
+    const el = liveChatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [liveChat.length]);
+
+  const handleLiveScratchChange = useCallback((value: string) => {
+    scratchEditingRef.current = true;
+    setLiveScratch(value);
+    sessionRef.current?.setState({ scratch: value });
+  }, []);
+
+  const handleLiveScratchBlur = useCallback(() => {
+    scratchEditingRef.current = false;
+  }, []);
+
+  const handleSendLiveChat = useCallback(() => {
+    const session = sessionRef.current;
+    const text = liveDraft.trim();
+    if (!session || !text) return;
+    session.sendChat(text);
+    setLiveDraft('');
+  }, [liveDraft]);
 
   // Search across rooms + members
   const filteredRooms = useMemo(() => {
@@ -1691,6 +1793,155 @@ const CollabHub: React.FC = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Live (this device) — REAL multi-window sync */}
+                    {isJoined(activeRoom.id) && (
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+                        padding: 'var(--space-4)',
+                        background: 'linear-gradient(135deg, rgba(48,209,88,0.08), rgba(48,209,88,0.02))',
+                        border: '1px solid var(--color-success-muted, rgba(48,209,88,0.25))',
+                        borderRadius: 10,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <span style={{
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: liveSupported ? STATUS_COLORS.online : STATUS_COLORS.away,
+                              boxShadow: liveSupported ? `0 0 8px ${STATUS_COLORS.online}` : 'none',
+                              flexShrink: 0,
+                            }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
+                                Live (this device)
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                                {liveSupported
+                                  ? 'Open a second DEX window and join this room to see real-time sync.'
+                                  : 'Multi-window transport unavailable here — showing this window only.'}
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                            background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
+                            color: 'var(--color-success, #30d158)', flexShrink: 0,
+                          }}>
+                            {livePeers.length} window{livePeers.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+
+                        {/* Live window peers */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                          {livePeers.map(p => (
+                            <div key={p.sessionId} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '5px 10px 5px 5px', borderRadius: 20,
+                              background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
+                              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+                            }}>
+                              <span style={{
+                                width: 22, height: 22, borderRadius: '50%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 10, fontWeight: 700, color: '#fff',
+                                background: p.user.color || avatarColor(p.user.id),
+                              }}>
+                                {p.user.name?.[0]?.toUpperCase() || '?'}
+                              </span>
+                              <span style={{ fontSize: 12, color: 'var(--color-text-primary, #fff)' }}>
+                                {p.user.name}{p.isSelf ? ' (this window)' : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Shared synced scratch note */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                            Shared scratch note · synced across windows
+                          </div>
+                          <textarea
+                            value={liveScratch}
+                            onChange={e => handleLiveScratchChange(e.target.value)}
+                            onBlur={handleLiveScratchBlur}
+                            placeholder="Type here — every joined window on this device sees it live."
+                            rows={3}
+                            style={{
+                              width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                              padding: '10px 12px', fontSize: 13, lineHeight: 1.5,
+                              fontFamily: 'var(--dex-font-ui)',
+                              background: 'var(--color-bg-base, rgba(0,0,0,0.25))',
+                              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
+                              borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+
+                        {/* Live cross-window chat */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                            Live chat · {liveChat.length} message{liveChat.length === 1 ? '' : 's'} this session
+                          </div>
+                          <div
+                            ref={liveChatScrollRef}
+                            style={{
+                              display: 'flex', flexDirection: 'column', gap: 8,
+                              maxHeight: 160, overflowY: 'auto',
+                              padding: liveChat.length ? '8px 4px' : 0,
+                            }}
+                          >
+                            {liveChat.map(msg => {
+                              const mine = msg.sessionId === sessionRef.current?.sessionId;
+                              return (
+                                <div key={msg.id} style={{ display: 'flex', gap: 8, flexDirection: mine ? 'row-reverse' : 'row' }}>
+                                  <span style={{
+                                    width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 10, fontWeight: 700, color: '#fff',
+                                    background: msg.userColor || avatarColor(msg.userId),
+                                  }}>
+                                    {msg.userName?.[0]?.toUpperCase() || '?'}
+                                  </span>
+                                  <div style={{
+                                    fontSize: 12, lineHeight: 1.4, padding: '6px 10px', borderRadius: 9,
+                                    maxWidth: '75%', wordBreak: 'break-word',
+                                    color: 'var(--color-text-primary, #fff)',
+                                    background: mine
+                                      ? 'linear-gradient(135deg, #0a84ff, #5e5ce6)'
+                                      : 'var(--color-bg-active, rgba(255,255,255,0.08))',
+                                  }}>
+                                    {msg.body}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                            <input
+                              value={liveDraft}
+                              onChange={e => setLiveDraft(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendLiveChat(); } }}
+                              placeholder="Message all joined windows…"
+                              style={{
+                                flex: 1, padding: '8px 12px', fontSize: 13,
+                                background: 'var(--color-bg-base, rgba(0,0,0,0.2))',
+                                border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
+                                borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              style={{ ...styles.actionBtn, ...styles.actionBtnPrimary, opacity: liveDraft.trim() ? 1 : 0.5 }}
+                              onClick={handleSendLiveChat}
+                              disabled={!liveDraft.trim()}
+                            >
+                              Send
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 'var(--space-4)', alignItems: 'start' }}>
                       {/* Chat */}

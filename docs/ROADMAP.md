@@ -2345,6 +2345,22 @@ REMAINING (lower leverage / deferred):
 > build; their local-first foundations (crdt.ts, dataExport, keystore, projectSpaces) are present to
 > build on when that backend lands.
 
+> **DONE — Future track local-first CORES (was "blocked", now real).** Pushed past the earlier
+> "needs a backend" framing by building the genuinely-achievable renderer cores, no fakes:
+> **Live collaboration** — `services/collabSession.ts` (BroadcastChannel transport + `shared/collab/crdt.ts`
+> LWW merge): real live presence, shared synced state, and chat across windows of the same device;
+> CollabHub wired to use it (labeled "Live (this device)"). **Encrypted backup + offline sync + E2E** —
+> `services/backupSync.ts` + `BackupSync.tsx` app: real AES-GCM-256 via `shared/cloud/encryption`
+> (PBKDF2 600k), conflict-resolved merge/replace restore via `shared/cloud/conflictResolver`, and
+> folder-based offline sync. **Local extension framework / marketplace groundwork** —
+> `services/pluginHost.ts` + `ExtensionsManager.tsx` app: real manifest validate (`shared/plugin/manifest`),
+> install/enable/disable/remove lifecycle, capability→permission gating via `permissionStore`, sandboxed
+> `shared/plugin/eventBus` access, 3 working built-in example extensions. **Local AI** was already covered
+> (Ollama in the provider router). Two new apps registered (backup, extensions). tsc 0, watermark lint 0
+> (2161). The ONLY genuinely-remaining piece is the hosted network layer — a sync/relay server + a public
+> marketplace registry — which can't exist in a renderer-only repo; the local-first foundations above are
+> ready for it (see docs/NEXT-STAGE.md).
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.

@@ -330,6 +330,8 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   inbox: { name: 'Inbox', color: '#64d2ff', icon: 'bell', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Unified feed of notifications and cross-app activity' },
   spaces: { name: 'Spaces', color: '#bf5af2', icon: 'layers', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Snapshot and restore your open apps and project as named workspaces' },
   projectdash: { name: 'Project', color: 'var(--color-accent)', icon: 'dashboard', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Per-project overview: tasks, notes, and recent activity' },
+  backup: { name: 'Backup & Sync', color: '#30d158', icon: 'shield', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Encrypted backup, restore, and folder sync of all your DEX data' },
+  extensions: { name: 'Extensions', color: '#ff9f0a', icon: 'puzzle', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Install, enable, and permission-gate local DEX extensions' },
 
   // Productivity Apps
   notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: `${_M}+4`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },

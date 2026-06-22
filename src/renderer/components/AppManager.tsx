@@ -207,6 +207,8 @@ const SshClient = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SshClien
 const WorkspaceSpaces = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/WorkspaceSpaces'));
 const SmartInbox = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SmartInbox'));
 const ProjectDashboard = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ProjectDashboard'));
+const BackupSync = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/BackupSync'));
+const ExtensionsManager = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ExtensionsManager'));
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
@@ -216,7 +218,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -351,6 +353,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   env: EnvManager,
   ssh: SshClient,
   spaces: WorkspaceSpaces, inbox: SmartInbox, projectdash: ProjectDashboard,
+  backup: BackupSync, extensions: ExtensionsManager,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -444,6 +447,8 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'inbox', label: 'Inbox' },
   { id: 'spaces', label: 'Spaces' },
   { id: 'projectdash', label: 'Project' },
+  { id: 'backup', label: 'Backup & Sync' },
+  { id: 'extensions', label: 'Extensions' },
   { id: 'power', label: 'Power' },
   { id: 'recyclebin', label: 'Trash' },
   // Productivity
