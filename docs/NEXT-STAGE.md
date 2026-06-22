@@ -6,6 +6,21 @@
 > faked**, and are queued here as the next stage. Each lists the local-first foundation already in
 > the codebase to build on.
 
+## Status update — local-first cores now BUILT (this PR)
+The renderer-buildable core of most of these is now real and shipped, so what truly remains is only
+the **hosted network layer** (a server/relay/registry) that cannot live in this repo:
+- **Live collaboration** — REAL via `services/collabSession.ts` (BroadcastChannel + CRDT): live presence,
+  shared synced state, and chat across windows of the same device. Remaining: a relay for cross-DEVICE.
+- **Encrypted backup / offline sync / E2E (#9/#10)** — REAL via `services/backupSync.ts` (AES-GCM-256 from
+  `shared/cloud/encryption`, conflict-resolved merge/replace restore, folder-based sync). Remaining: an
+  account-bound cloud relay for automatic cross-device push.
+- **Extension framework / marketplace groundwork (#1)** — REAL local host via `services/pluginHost.ts`
+  (manifest validate, install/enable/disable/remove, permission gating, sandboxed event bus). Remaining:
+  a hosted registry + third-party submission/review/signing.
+- **Local offline AI (#34)** — already covered: the provider stack includes **Ollama** (local) in routing.
+
+So the items below now mean specifically their **server/registry/relay** portion.
+
 ## Why these are "next stage", not "skipped"
 A renderer-only build has no backend, no sync service, no signalling/relay server, and no bundled
 local model. Shipping a fake marketplace or a sync toggle that does nothing would violate the
