@@ -7,6 +7,7 @@
 // DexCode — code editor for DexScript (DEX's scripting language).
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { TerminalTabs } from '../../components/TerminalTabs';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
@@ -73,6 +74,20 @@ const DexCode: React.FC = () => {
       return next;
     });
   }, []);
+  // Full-screen / Zen mode (DEX 6.0: "be a pro IDE"). Portals the whole editor
+  // over the entire viewport — above the DEX top bar + launcher — so DexCode
+  // truly fills the screen like VS Code, not just the floating app window.
+  // F11 toggles, Esc exits; persisted so it reopens the way you left it.
+  const [fullscreen, setFullscreen] = useState(() => {
+    try { return localStorage.getItem('dex-code-fullscreen') === 'true'; } catch { return false; }
+  });
+  const toggleFullscreen = useCallback(() => {
+    setFullscreen(v => {
+      const next = !v;
+      try { localStorage.setItem('dex-code-fullscreen', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   // Bottom terminal panel height — resizable + persisted (DEX 5.6: nothing locked).
   const [panelHeight, setPanelHeight] = useState(() => {
     try {
@@ -95,6 +110,27 @@ const DexCode: React.FC = () => {
   // Outline / precision navigation: the live symbol map of the current file.
   const [showOutline, setShowOutline] = useState(true);
   const [outlineFilter, setOutlineFilter] = useState('');
+  // Templates tucked behind a collapsible header (hidden by default) so the
+  // sidebar stays focused on your files, not the starter list. Persisted.
+  const [showTemplates, setShowTemplates] = useState(() => {
+    try { return localStorage.getItem('dex-code-show-templates') === 'true'; } catch { return false; }
+  });
+  const toggleTemplates = useCallback(() => {
+    setShowTemplates(v => {
+      const next = !v;
+      try { localStorage.setItem('dex-code-show-templates', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  // Collapsible Output pane — hide it to give the editor the full width, like a
+  // pro IDE panel toggle. Persisted; auto-reveals when you Run so results show.
+  const [outputCollapsed, setOutputCollapsed] = useState(() => {
+    try { return localStorage.getItem('dex-code-output-collapsed') === 'true'; } catch { return false; }
+  });
+  const setOutputCollapsedPersist = useCallback((next: boolean) => {
+    setOutputCollapsed(next);
+    try { localStorage.setItem('dex-code-output-collapsed', String(next)); } catch { /* ignore */ }
+  }, []);
   // Go to Line (Ctrl+G).
   const [showGoToLine, setShowGoToLine] = useState(false);
   const [goToLineInput, setGoToLineInput] = useState('');
@@ -286,6 +322,11 @@ const DexCode: React.FC = () => {
     setIsRunning(true);
     setOutput([]);
     setError(null);
+    // Reveal the output panel if it was collapsed -- you ran it, you want results.
+    setOutputCollapsed(prev => {
+      if (prev) { try { localStorage.setItem('dex-code-output-collapsed', 'false'); } catch { /* ignore */ } }
+      return false;
+    });
     // Defer with setTimeout (not requestAnimationFrame) so the "running" state
     // paints first AND execution still fires when the DEX window is backgrounded
     // -- rAF is paused for hidden/unfocused tabs, which silently dropped runs.
@@ -372,6 +413,16 @@ const DexCode: React.FC = () => {
         setShowGoToLine(false);
         editorRef.current?.focus();
       }
+      // Full screen: F11 toggles; Escape exits (only when no dialog is open, so
+      // a single Esc still closes Find/GoTo first).
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+      if (e.key === 'Escape' && fullscreen && !showFind && !showGoToLine) {
+        setFullscreen(false);
+        try { localStorage.setItem('dex-code-fullscreen', 'false'); } catch { /* ignore */ }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === '=') {
         e.preventDefault();
         setFontSize(s => Math.min(s + 1, 24));
@@ -388,7 +439,7 @@ const DexCode: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, showGoToLine, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar]);
+  }, [code, fileName, runCode, showFind, showGoToLine, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen]);
 
   // Tab key, bracket auto-close, auto-indent
   // Live symbol map of the current file (functions / classes / top-level vars).
@@ -722,8 +773,8 @@ const DexCode: React.FC = () => {
     return { lines, chars, words };
   }, [code]);
 
-  return (
-    <div style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)' }}>
+  const shell = (
+    <div style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)', ...(fullscreen ? { height: '100vh', width: '100vw' } : null) }}>
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
         <button
@@ -1003,20 +1054,34 @@ const DexCode: React.FC = () => {
         )}
 
         <div style={S.sidebarBlock}>
-          <div style={S.sectionHeading}>Templates</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {TEMPLATES.map(t => (
-              <button
-                key={t.id}
-                onClick={() => { setFileName(t.fileName); setCode(t.code); }}
-                style={{...S.templateBtn, padding: '6px var(--space-2)'}}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-inset, var(--color-border-subtle, rgba(255,255,255,0.04)))')}
-              >
-                <span style={{ fontSize: 11, fontWeight: 600 }}>{t.label}</span>
-              </button>
-            ))}
+          <div
+            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={toggleTemplates}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showTemplates}
+            aria-label="Toggle Templates section"
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTemplates(); } }}
+          >
+            <DexIcon name={showTemplates ? 'chevron-down' : 'chevron-right'} size={10} />
+            Templates
+            <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{TEMPLATES.length}</span>
           </div>
+          {showTemplates && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setFileName(t.fileName); setCode(t.code); }}
+                  style={{...S.templateBtn, padding: '6px var(--space-2)'}}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-inset, var(--color-border-subtle, rgba(255,255,255,0.04)))')}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={S.sidebarBlock}>
@@ -1097,17 +1162,43 @@ const DexCode: React.FC = () => {
             >
               <DexIcon name="search" size={11} />
             </button>
+            <button
+              onClick={toggleFullscreen}
+              style={fullscreen ? { ...S.clearBtn, background: 'var(--color-bg-hover)' } : S.clearBtn}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = fullscreen ? 'var(--color-bg-hover)' : 'transparent')}
+              title={fullscreen ? 'Exit full screen (F11 / Esc)' : 'Full screen (F11)'}
+              aria-label={fullscreen ? 'Exit full screen' : 'Enter full screen'}
+              aria-pressed={fullscreen}
+            >
+              <DexIcon name={fullscreen ? 'minimize' : 'fullscreen'} size={11} />
+            </button>
             <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Ctrl+Enter to run</span>
           </div>
         </div>
 
         {/* Editor + Output */}
-        <div style={S.editorLayout}>
+        <div style={{ ...S.editorLayout, gridTemplateColumns: outputCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 3fr) minmax(0, 2fr)' }}>
           {/* Code Editor */}
           <div style={S.editorPane}>
             <div style={S.paneHeader}>
               <span>Editor</span>
-              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>.dex</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>.dex</span>
+                {outputCollapsed && (
+                  <button
+                    onClick={() => setOutputCollapsedPersist(false)}
+                    style={S.paneToggleBtn}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    title="Show output panel"
+                    aria-label="Show output panel"
+                  >
+                    <DexIcon name="chevron-left" size={12} />
+                    <span style={{ fontSize: 10 }}>Output</span>
+                  </button>
+                )}
+              </div>
             </div>
             {/* Find/Replace bar */}
             {showFind && (
@@ -1201,6 +1292,7 @@ const DexCode: React.FC = () => {
           </div>
 
           {/* Output Panel */}
+          {!outputCollapsed && (
           <div style={S.outputPane}>
             <div style={S.paneHeader}>
               <span>Output</span>
@@ -1209,8 +1301,9 @@ const DexCode: React.FC = () => {
                   {duration < 1 ? '<1' : Math.round(duration)}ms
                 </span>
               )}
-              {output.length > 0 && (
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
+                {output.length > 0 && (
+                <>
                   <button
                     onClick={async () => { try { await navigator.clipboard.writeText(output.join('\n')); setOutputCopied(true); setTimeout(() => setOutputCopied(false), 1200); } catch { /* clipboard unavailable */ } }}
                     style={S.findNavBtn}
@@ -1221,8 +1314,19 @@ const DexCode: React.FC = () => {
                     style={S.findNavBtn}
                     title="Send output to another app (DEX Flow)"
                   >Send</button>
-                </div>
-              )}
+                </>
+                )}
+                <button
+                  onClick={() => setOutputCollapsedPersist(true)}
+                  style={S.paneToggleBtn}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  title="Hide output panel"
+                  aria-label="Hide output panel"
+                >
+                  <DexIcon name="chevron-right" size={12} />
+                </button>
+              </div>
             </div>
             <div ref={outputRef} style={S.outputContent}>
               {output.length === 0 && !error && (
@@ -1257,6 +1361,7 @@ const DexCode: React.FC = () => {
               />
             </div>
           </div>
+          )}
         </div>
 
         {/* Status bar */}
@@ -1340,6 +1445,16 @@ const DexCode: React.FC = () => {
       </section>
     </div>
   );
+
+  // Full-screen mode: portal the editor over the whole viewport (above the DEX
+  // top bar + launcher) so it truly fills the screen — the window-frame `contain`
+  // would otherwise trap a fixed overlay inside the app window.
+  return fullscreen
+    ? createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'var(--color-bg-base)' }}>{shell}</div>,
+        document.body,
+      )
+    : shell;
 };
 
 // ======================================================================
@@ -1606,6 +1721,11 @@ const S: Record<string, React.CSSProperties> = {
     position: 'relative' as const,
     overflow: 'hidden',
     display: 'flex',
+    // Base layer sits BEHIND both the syntax-highlight <pre> and the textarea.
+    // The textarea itself must stay transparent (below) so the coloured code
+    // shows through — otherwise its opaque background hides the highlight layer
+    // and the editor looks empty.
+    background: 'var(--color-bg-base, #0C0C0E)',
   },
   lineNumbers: {
     display: 'flex',
@@ -1655,7 +1775,10 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 13,
     lineHeight: '20px',
     fontFamily: 'var(--font-mono)',
-    background: 'var(--color-bg-base, #0C0C0E)',
+    // MUST be transparent: the textarea is layered ON TOP of the syntax-highlight
+    // <pre>. An opaque background here hides the coloured code (the long-standing
+    // "can't see my code in DexCode" bug). The dark base lives on editorWrapper.
+    background: 'transparent',
     color: 'transparent',
     caretColor: 'var(--color-text-primary)',
     border: 'none',
@@ -1763,6 +1886,21 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10,
     fontWeight: 700,
     padding: 0,
+  },
+  paneToggleBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 3,
+    height: 22,
+    padding: '0 6px',
+    borderRadius: 4,
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--color-text-secondary)',
+    cursor: 'pointer',
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+    textTransform: 'none' as const,
   },
   panelDock: {
     display: 'flex',

@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { AppErrorState, AppLoadingState } from '../../ui/AppStates';
 import { evaluateWeatherAlerts } from '../../../shared/weather/alerts';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface WeatherDay {
   day: string;
@@ -375,6 +376,31 @@ const Weather: React.FC = () => {
     : [];
 
   void nowTick; // referenced so the 60s tick re-renders the "updated" label
+
+  // UKI app-context: expose the active location + current temperature + condition
+  // + units so the assistant knows what weather the user is looking at. A ref
+  // keeps the resolver reading live state, so we register once at mount.
+  const ukiCtxRef = useRef({ location, current, unit, windUnit });
+  ukiCtxRef.current = { location, current, unit, windUnit };
+  useEffect(() => {
+    registerUkiAppContext('weather', () => {
+      const s = ukiCtxRef.current;
+      const cur = s.current;
+      return {
+        appId: 'weather',
+        focusedItemId: s.location,
+        custom: {
+          location: s.location,
+          temperature: cur ? `${s.unit === 'F' ? Math.round(cur.temp * 9 / 5 + 32) : cur.temp}°${s.unit}` : undefined,
+          feelsLike: cur ? `${s.unit === 'F' ? Math.round(cur.feelsLike * 9 / 5 + 32) : cur.feelsLike}°${s.unit}` : undefined,
+          condition: cur ? cur.condition.replace(/([A-Z])/g, ' $1').trim() : undefined,
+          tempUnit: `°${s.unit}`,
+          windUnit: s.windUnit === 'mph' ? 'mph' : 'km/h',
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('weather');
+  }, []);
 
   return (
     <div style={s.container}>

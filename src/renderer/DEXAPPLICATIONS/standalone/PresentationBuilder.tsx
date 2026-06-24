@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -188,6 +189,30 @@ const PresentationBuilder: React.FC = () => {
 
   const currentSlide = slides[currentIdx] ?? slides[0];
   const selectedBlock = currentSlide?.blocks.find(b => b.id === selectedBlockId) ?? null;
+
+  // UKI app-context: expose the deck title (first text block of slide 1), the
+  // slide count, the current slide position, and present-mode. A ref keeps the
+  // resolver reading live state (register once at mount).
+  const ukiCtxRef = useRef({ slides, currentIdx, presenting });
+  ukiCtxRef.current = { slides, currentIdx, presenting };
+  useEffect(() => {
+    registerUkiAppContext('presentation', () => {
+      const s = ukiCtxRef.current;
+      const firstText = s.slides[0]?.blocks.find(b => b.type === 'text')?.content?.trim();
+      const title = firstText && firstText !== 'Click to edit title' ? firstText : 'Untitled deck';
+      return {
+        appId: 'presentation',
+        focusedItemId: s.slides[s.currentIdx]?.id,
+        custom: {
+          deck: title,
+          slides: s.slides.length,
+          currentSlide: `${s.currentIdx + 1} of ${s.slides.length}`,
+          mode: s.presenting ? 'presenting' : 'editing',
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('presentation');
+  }, []);
 
   // ---- Slide ops ----
   const addSlide = useCallback((layout: SlideLayout = 'title-content') => {

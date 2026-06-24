@@ -47,6 +47,14 @@ is raw *capacity*: ~1000 slots, all unassigned. We do
   `Ctrl+Shift+U`, Compact `Ctrl+Shift+M`, Lock `Ctrl+Shift+L`.
 - **Window** — Close `Ctrl+W`, Maximize `Ctrl+Up`, Tile L/R `Ctrl+Alt+←/→`,
   Split `Ctrl+Shift+S`, Arrange `Ctrl+Shift+Z`.
+- **Tiling layouts** — Apply to all open windows: `Alt+Shift+1` Master+Stack,
+  `2` Columns, `3` Rows, `4` Grid, `5` Dwindle, `6` Monocle. Cycle focus through
+  floating windows `Meta+\`` (or `Ctrl+Alt+\``; add `Shift` to reverse).
+- **Custom snap zones (FancyZones)** — Open the Zone Editor `Ctrl+Alt+Z` (or the
+  "Edit Snap Zones" palette command). With a layout active: drag a window onto a
+  zone to snap it; expand the focused window across the adjacent zone
+  `Ctrl+Alt+Shift+←/→/↑/↓`; cycle focus among windows sharing a zone
+  `Ctrl+Alt+[` / `Ctrl+Alt+]`.
 - **Navigation** — Back/Forward `Ctrl+←/→`.
 
 That is roughly **40 assigned slots**; the other ~960 stay **unbound and reserved**

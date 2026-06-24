@@ -3,8 +3,9 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * Professional unit converter — length, weight, temperature, volume, speed, data
  */
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { resolveUnitQuery } from '../../../shared/format/unitSearch';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface RecentConversion { cat: Category; from: number; to: number; }
 
@@ -137,6 +138,31 @@ const UnitConverter: React.FC = () => {
     setFromIdx(0);
     setToIdx(1);
     setInputValue('1');
+  }, []);
+
+  // UKI app-context: expose the active category, the from/to units, and the
+  // current value + converted result so the assistant knows what conversion the
+  // user is performing. A ref keeps the resolver reading live state — register once.
+  const ukiCtxRef = useRef({ category, units, fromIdx, toIdx, inputValue, result });
+  ukiCtxRef.current = { category, units, fromIdx, toIdx, inputValue, result };
+  useEffect(() => {
+    registerUkiAppContext('unitconverter', () => {
+      const s = ukiCtxRef.current;
+      const fromUnit = s.units[s.fromIdx];
+      const toUnit = s.units[s.toIdx];
+      return {
+        appId: 'unitconverter',
+        focusedItemId: s.category,
+        custom: {
+          category: s.category,
+          from: fromUnit ? `${fromUnit.label} (${fromUnit.symbol})` : undefined,
+          to: toUnit ? `${toUnit.label} (${toUnit.symbol})` : undefined,
+          value: s.inputValue || undefined,
+          result: s.result || undefined,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('unitconverter');
   }, []);
 
   return (

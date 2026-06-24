@@ -18,7 +18,8 @@ import { chatWithFallback, type FetchLike, type ChatOptions } from './orchestrat
 import { createStreamParser, type StreamFormat } from './stream';
 import { getPreferredModel, getRoutingGoal } from './modelPrefs';
 import { configuredProviders, getApiKey } from '../keystore';
-import { routeModels, classifyTask, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
+import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
+import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
 import type { ChatMessage, ProviderId } from './types';
 
 /**
@@ -84,8 +85,26 @@ export function configuredCandidates(goal: RoutingGoal): RouteCandidate[] {
  * Returns model ids best-first for `chatWithFallback`, or [] when nothing usable
  * is available (e.g. `offline` with no local model — the caller then degrades).
  */
+// Detect the device's compute backends once (WebGPU => gpu; NPU not web-exposed).
+// Used to gate local models this machine can't run acceptably (deviceRuntime).
+let cachedRuntime: DeviceRuntime | null = null;
+function deviceRuntime(): DeviceRuntime {
+  if (!cachedRuntime) cachedRuntime = detectBrowserRuntime();
+  return cachedRuntime;
+}
+
 export function routeConfiguredModels(goal: RoutingGoal, userText: string): string[] {
-  return routeModels(goal, classifyTask(userText), configuredCandidates(goal));
+  const task = classifyTask(userText);
+  const ranked = routeModels(goal, task, configuredCandidates(goal));
+  // Tiered on-device-first for the DEFAULT 'auto' goal: a routine task tries a
+  // configured local model (Ollama) first, with hosted models as automatic
+  // fallback — but only a local model THIS device can actually run well (an 8B
+  // model on a CPU-only laptop is excluded and stays at its ranked position).
+  // Explicit goals (smartest/fastest/cheapest/offline) are the user's stated
+  // intent and are left exactly as ranked.
+  if (goal !== 'auto') return ranked;
+  const rt = deviceRuntime();
+  return preferOnDeviceFirst(ranked, task, (id) => canRunLocalModel(rt, id));
 }
 
 export interface AskOptions {

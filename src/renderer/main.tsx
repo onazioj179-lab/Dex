@@ -24,6 +24,13 @@ import './styles/print.css';
 import { installTauriCompat } from './services/platform/tauriCompat';
 installTauriCompat();
 
+// Multi-window: if this renderer was opened as a detached single-app OS window
+// (`?detached=<appId>`, created by the native multiwindow:detach handler), put
+// the shell into single-app mode and auto-open that app. No-op in the main
+// window. Runs before React mounts so the chrome-hiding CSS applies pre-paint.
+import { initDetachedWindow } from './services/detachedWindow';
+initDetachedWindow();
+
 // RC4: CSS Containment -- inject before first paint
 import { injectContainmentCSS } from './utils/CSSContainment';
 injectContainmentCSS();

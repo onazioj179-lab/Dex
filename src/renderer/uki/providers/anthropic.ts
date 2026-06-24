@@ -55,6 +55,10 @@ export const anthropicProvider: LLMProvider = {
         'Content-Type': 'application/json',
         'x-api-key': config.apiKey ?? '',
         'anthropic-version': API_VERSION,
+        // Required for direct browser/WebView fetch (Tauri's WebView2): without
+        // this Anthropic-sanctioned opt-in, the request is CORS-blocked. Harmless
+        // under Electron. This is what makes UKI streaming work natively in Tauri.
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model: req.model,

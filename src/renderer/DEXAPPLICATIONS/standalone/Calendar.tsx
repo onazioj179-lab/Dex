@@ -5,10 +5,11 @@
  * Apple-Calendar-inspired event manager with month / week views,
  * drag-to-create slots, recurring events, and ICS import/export.
  */
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
 import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface CalendarEvent {
   id: string;
@@ -636,6 +637,32 @@ const Calendar: React.FC = () => {
     };
     input.click();
   };
+
+  // -- uki context: let the assistant see the calendar view + selection.
+  // Registered once on mount; a latest-value ref (refreshed each render) keeps
+  // the pure resolver reading live state without re-registering.
+  const selectedDayEventCount = selectedDate ? getEventsForDate(selectedDate).length : 0;
+  const ukiCtxRef = useRef({ view, selectedDate, currentDate, events, search, selectedDayEventCount });
+  useEffect(() => { ukiCtxRef.current = { view, selectedDate, currentDate, events, search, selectedDayEventCount }; });
+  useEffect(() => {
+    registerUkiAppContext('calendar', () => {
+      const c = ukiCtxRef.current;
+      const selectedStr = c.selectedDate ? formatDate(c.selectedDate) : undefined;
+      return {
+        appId: 'calendar',
+        focusedItemId: selectedStr,
+        custom: {
+          view: c.view,
+          selectedDate: selectedStr,
+          visibleDate: formatDate(c.currentDate),
+          eventsOnSelectedDay: c.selectedDayEventCount,
+          totalEvents: c.events.length,
+          search: c.search || undefined,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('calendar');
+  }, []);
 
   return (
     <div style={styles.container} role="region" aria-label="Calendar">

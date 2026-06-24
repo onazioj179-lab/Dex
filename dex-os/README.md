@@ -3,7 +3,9 @@
 Bare-metal operating system that boots directly into the DEX desktop environment.
 
 Built on a minimal Linux kernel using Buildroot. No traditional desktop environment --
-DEX (Electron) is the shell. Same model as ChromeOS and SteamOS.
+the DEX desktop is the shell. Same model as ChromeOS and SteamOS. The shell is
+migrating from Electron to a Tauri (Rust core + system WebView) runtime; see
+[../docs/TAURI-MIGRATION.md](../docs/TAURI-MIGRATION.md).
 
 
 ## Architecture
@@ -21,9 +23,9 @@ Hardware
   |
   Xorg (modesetting driver, no window manager)
   |
-  DEX (Electron, kiosk mode, fullscreen)
-    |-- React UI (renderer)
-    |-- Node.js (main process)
+  DEX shell (Tauri target / Electron today, kiosk mode, fullscreen)
+    |-- React UI (renderer / system WebView)
+    |-- Rust core (Tauri) / Node.js (Electron) main process
     |-- dex-cpp (C++ kernel: thread pool, mempool, cache, scheduler, profiler, I/O)
     |-- dex-native (Rust: audio, image, video, system, health, files)
 ```
