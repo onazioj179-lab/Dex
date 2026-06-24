@@ -150,6 +150,10 @@ const Banner: React.FC<{
   // Auto dismiss with progress (rAF -- auto-throttles when hidden, smoother
   // than a 250ms interval, no extra wake-ups when paused).
   useEffect(() => {
+    // duration <= 0 means "persistent" (critical urgency / alarm / incoming-call
+    // scenarios per the freedesktop+MS notification model): never auto-dismiss,
+    // keep the progress bar full, and rely on manual dismissal.
+    if (duration <= 0) { setProgress(1); return; }
     startTimeRef.current = performance.now();
     const tick = () => {
       if (pausedAtRef.current !== null) {

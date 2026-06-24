@@ -402,3 +402,30 @@ html, body, #root {
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: none; }
 }
+
+/* ==========================================================================
+ * SHARP TYPOGRAPHY PASS — owner direction (2026-06-23): "fonts are too thick,
+ * make all of DEX sharp". On WebView2 / Windows, -webkit-font-smoothing is a
+ * no-op, so perceived weight is driven purely by font-weight. Most DEX text
+ * sets weight INLINE (style="font-weight: …"), which a normal class rule can't
+ * override — so this layer matches the inline style string and uses !important
+ * (an author !important DOES beat a non-important inline declaration). Every
+ * heavy weight steps down exactly one notch, app-wide; each element matches by
+ * its ORIGINAL inline value, so there is no double-stepping. Headings also get
+ * tight tracking — the "sharp", precise DEX identity. Loads last = authoritative.
+ * ====================================================================== */
+[style*="font-weight: 800"], [style*="font-weight:800"],
+[style*="font-weight: 900"], [style*="font-weight:900"] { font-weight: 700 !important; }
+[style*="font-weight: 700"], [style*="font-weight:700"],
+[style*="font-weight: bold"], [style*="font-weight:bold"] { font-weight: 600 !important; }
+[style*="font-weight: 600"], [style*="font-weight:600"] { font-weight: 500 !important; }
+
+/* Class-based weight utilities (no inline style to match) — same one-notch drop. */
+.font-black { font-weight: 700 !important; }
+.font-extrabold { font-weight: 700 !important; }
+.font-bold { font-weight: 600 !important; }
+.font-semibold { font-weight: 500 !important; }
+
+/* Native heavy elements + headings: lighter + tighter tracking = sharp. */
+strong, b { font-weight: 600; }
+h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -0.012em; }

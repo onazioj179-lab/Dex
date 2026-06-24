@@ -320,9 +320,14 @@ export default function Store(): React.ReactElement {
   const AppCard = ({ app, compact = false }: { app: StoreApp; compact?: boolean }) => {
     const isFav = favorites.has(app.id);
     return (
-      <button
-        type="button"
+      // Card is a role="button" div, NOT a <button>: it contains the favorite
+      // <button>, and a button-inside-a-button is invalid HTML (React warns and
+      // the inner button's clicks misbehave). The div keeps full keyboard access.
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setSelectedId(app.id)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(app.id); } }}
         style={{ ...styles.card, ...(compact ? styles.cardCompact : null) }}
         title={`${app.name} — view details`}
       >
@@ -349,7 +354,7 @@ export default function Store(): React.ReactElement {
             <DexIcon name="check-circle" size={12} /> Installed
           </span>
         </div>
-      </button>
+      </div>
     );
   };
 

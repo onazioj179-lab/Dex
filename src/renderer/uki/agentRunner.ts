@@ -31,8 +31,7 @@ import { TtlCache, createToolBudget, chargeTool, type ToolBudget } from '../../s
 import { notify } from '../services/notify';
 import { APP_DEFINITIONS } from '../store/runningApps';
 
-const KNOWN_TOOLS = ['web_search', 'open_app', 'close_app', 'notify', 'get_context', 'list_apps'] as const;
-type ToolName = typeof KNOWN_TOOLS[number];
+import { isKnownTool, validateToolCall, renderToolCatalog, type ToolName } from '../../shared/uki/toolValidation';
 
 const AGENT_PROTOCOL = `
 You are UKI, the in-OS assistant for DEX, and you can ACT, not just talk. You have tools.
@@ -47,12 +46,7 @@ I will run it and reply with a line that starts with "RESULT:" containing the ou
 (use another tool, or give your final answer). When you have the answer, reply NORMALLY with no TOOL line.
 
 Use tools deliberately:
-- web_search {"query": string} -- CURRENT or factual info from the live web (news, prices, people, "latest", anything you are unsure about). Prefer this over guessing.
-- open_app {"app": string} -- open a DEX app for the user (name or id, e.g. "notes", "Settings", "kanban").
-- close_app {"app": string} -- close a running DEX app.
-- notify {"title": string, "body": string} -- show the user a notification.
-- get_context {} -- see what the user is currently looking at (active app, file, selection).
-- list_apps {} -- list the DEX apps you can open.
+${renderToolCatalog()}
 
 Rules: take real action when the user asks you to control DEX. Search the web before answering about current
 events or anything you cannot be sure of. Keep final answers concise and friendly. Never invent a tool result.
@@ -62,17 +56,22 @@ events or anything you cannot be sure of. Keep final answers concise and friendl
 // a follow-up turn in the same conversation.
 const webSearchCache = new TtlCache<string, string>(5 * 60 * 1000, 200);
 
-interface ToolCall { name: ToolName; args: Record<string, unknown>; }
+interface ToolCall { name: ToolName; args: Record<string, unknown>; jsonError: boolean; }
+
+// Tool-argument schemas + validation live in shared/uki/toolValidation.ts (pure,
+// testable, main+renderer). The loop below gates every call through
+// validateToolCall so a structurally-invalid call is repaired, never run.
 
 /** Extract the first valid `TOOL <name> {json}` directive, or null for a final answer. */
 function parseToolDirective(reply: string): ToolCall | null {
   const m = reply.match(/(?:^|\n)\s*(?:`{3}\s*)?TOOL\s+([a-zA-Z_]+)[ \t]*(\{[\s\S]*?\})?/);
   if (!m) return null;
-  const name = m[1] as ToolName;
-  if (!(KNOWN_TOOLS as readonly string[]).includes(name)) return null;
+  const name = m[1];
+  if (!isKnownTool(name)) return null;
   let args: Record<string, unknown> = {};
-  if (m[2]) { try { args = JSON.parse(m[2]); } catch { /* tolerate malformed args */ } }
-  return { name, args };
+  let jsonError = false;
+  if (m[2]) { try { args = JSON.parse(m[2]); } catch { jsonError = true; } }
+  return { name, args, jsonError };
 }
 
 function dispatch(event: string, detail: Record<string, unknown>): void {
@@ -157,6 +156,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   let budget: ToolBudget = createToolBudget({
     web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
   });
+  let repairCount = 0; // consecutive invalid tool calls — bounds the repair loop
 
   for (let step = 0; step < maxSteps; step++) {
     const reply = await askConfiguredLLM(userTurn, sys, {
@@ -171,6 +171,22 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
     // Record the model's tool request turn so it sees its own prior steps.
     messages.push({ role: 'user', content: userTurn });
     messages.push({ role: 'assistant', content: reply });
+
+    // Constrained-output gate: reject structurally-invalid calls (bad JSON,
+    // missing / mis-typed / empty required args) BEFORE charging budget or
+    // running, and hand the model a precise repair instruction. Bounded so a
+    // model that keeps mis-calling is forced to a final answer (also capped by
+    // maxSteps). A degenerate tool run never happens.
+    const validation = validateToolCall(call.name, call.args, call.jsonError);
+    if (!validation.ok) {
+      repairCount++;
+      pushStep(`Rejected ${call.name}: ${validation.error}`);
+      userTurn = repairCount > 2
+        ? 'RESULT: Too many invalid tool calls. Give your best final answer now without using tools.'
+        : `RESULT: INVALID TOOL CALL — ${validation.error}`;
+      continue;
+    }
+    repairCount = 0;
 
     const charged = chargeTool(budget, call.name);
     budget = charged.budget;

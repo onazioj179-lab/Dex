@@ -12,6 +12,38 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v6.0.0 — A real desktop: windows, zones, and a faster core (2026-06-24)
+
+DEX becomes an OS-grade shell, not just an app — proper window management, a
+faster core, and quiet accessibility polish throughout.
+
+### New
+
+- **Window management.** Floating windows you can drag, snap, and tile —
+  side-by-side halves, quarters, columns/rows, and Master/Dwindle/Monocle layouts,
+  driven from the keyboard or the command palette.
+- **Custom snap zones.** A FancyZones-style editor (`Ctrl+Alt+Z`): draw and save
+  zone layouts, drag a window to snap it, and grow it across zones with
+  `Ctrl+Alt+Shift+Arrow` (cycle within a zone with `Ctrl+Alt+[` / `]`).
+- **On-device-first assistant.** UKI prefers a local model for quick tasks and
+  escalates to the cloud only when needed — faster, more private replies.
+
+### Improvements
+
+- **Accessibility + motion.** Larger pointer targets (WCAG 2.2), motion that
+  scales with element size and honours "reduce motion", and notifications that can
+  stay put when they matter (alarms, calls) instead of auto-vanishing.
+- **Safer add-ons.** Store apps run capability-scoped and sandboxed — an add-on
+  only gets the access it declares.
+- **Lighter + faster.** Heavy apps load only when opened; packaged-app start-up
+  was cut down.
+
+### Fixes
+
+- Fixed a packaged-app blank-screen (production chunk ordering), a Maps
+  worker/CSP failure, the floating-launcher orb scatter, and a startup IPC race;
+  plus a batch of real crash and visual fixes found by driving the packaged build.
+
 ## v5.5.0 — System refinement: search, calm, and consistency (2026-06-13)
 
 A refinement release. Nothing new to learn — everything is faster, calmer, and

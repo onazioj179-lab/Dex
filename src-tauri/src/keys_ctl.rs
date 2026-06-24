@@ -269,7 +269,7 @@ fn compute_checksum(key: &[u8]) -> String {
 
 // --- OS CSPRNG (crypto.randomBytes equivalent) ------------------------------
 
-fn os_random_bytes(n: usize) -> Vec<u8> {
+pub(crate) fn os_random_bytes(n: usize) -> Vec<u8> {
     #[cfg(unix)]
     {
         use std::io::Read;
