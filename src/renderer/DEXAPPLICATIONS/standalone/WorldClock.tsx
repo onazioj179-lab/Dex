@@ -4,8 +4,9 @@
  * Multiple timezone display with analog/digital toggle, timezone search,
  * reordering, home pinning, day/night shading and working-hours highlight.
  */
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useReducedMotion } from '../../utils/useReducedMotion';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface ClockZone {
   id: string;
@@ -186,6 +187,29 @@ const WorldClock: React.FC = () => {
   useEffect(() => {
     if (homeId && !activeZones.find(z => z.id === homeId)) setHomeId(null);
   }, [activeZones, homeId]);
+
+  // UKI app-context: expose the displayed cities, the pinned home city, and the
+  // 12/24h preference. A ref keeps the resolver reading live state so we
+  // register once at mount (no churn as clocks tick).
+  const ukiCtxRef = useRef({ activeZones, homeId, is24h });
+  ukiCtxRef.current = { activeZones, homeId, is24h };
+  useEffect(() => {
+    registerUkiAppContext('worldclock', () => {
+      const s = ukiCtxRef.current;
+      const home = s.homeId ? s.activeZones.find(z => z.id === s.homeId) : undefined;
+      return {
+        appId: 'worldclock',
+        focusedItemId: s.homeId || undefined,
+        custom: {
+          cities: s.activeZones.map(z => z.label).join(', ') || '(none)',
+          cityCount: s.activeZones.length,
+          home: home?.label || '(none)',
+          hourFormat: s.is24h ? '24h' : '12h',
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('worldclock');
+  }, []);
 
   const addZone = useCallback((zone: ClockZone) => {
     setActiveZones(prev => (prev.find(z => z.id === zone.id) ? prev : [...prev, zone]));

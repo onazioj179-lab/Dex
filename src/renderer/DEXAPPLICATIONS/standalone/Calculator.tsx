@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // ===========================================================================
 // DEX CALCULATOR - Clean Native Design
@@ -305,6 +306,26 @@ const Calculator: React.FC = () => {
     const handler = (e: KeyboardEvent) => keyHandlerRef.current?.(e);
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // UKI app-context: expose the current expression, displayed value (last
+  // result), and the active mode so the assistant knows what the user is
+  // computing. A ref keeps the resolver reading live state — register once.
+  const ukiCtxRef = useRef({ display, expression, mode });
+  ukiCtxRef.current = { display, expression, mode };
+  useEffect(() => {
+    registerUkiAppContext('calculator', () => {
+      const s = ukiCtxRef.current;
+      return {
+        appId: 'calculator',
+        custom: {
+          expression: s.expression || undefined,
+          lastResult: s.display,
+          mode: s.mode,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('calculator');
   }, []);
 
   const btnStyle = (variant: 'num' | 'op' | 'func' | 'equal'): React.CSSProperties => {

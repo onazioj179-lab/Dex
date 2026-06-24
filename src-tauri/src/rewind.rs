@@ -224,6 +224,150 @@ pub fn dispatch(channel: &str, args: &Value) -> Value {
             })
         }
 
+        // -- Analytics: per-day activity summary -----------------------------
+        // `rewind:getDaySummary` (args: `[dateStr?]`) -> day rollup.
+        // Ports the Electron `RewindEngine` handler: count entries for one
+        // calendar day, bucketed by activity type, by app, and by hour. The
+        // Electron engine kept a separate per-day log keyed by the LOCAL date;
+        // here we derive the day from the single activity stream. To stay
+        // tz-crate-free (the analytics.rs precedent) the day + hour buckets are
+        // UTC — so the date string and hour histogram match `analytics:*`, which
+        // also buckets in UTC. Shape is byte-identical to Electron:
+        //   { date, totalEntries, byType:{type:count}, topApps:[{name,count}] (<=10),
+        //     hours:number[24] }   (empty day -> totalEntries 0, hours []).
+        "rewind:getDaySummary" => {
+            let date = args
+                .get(0)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| crate::cmd_export_bundle::utc_date(now_ms()));
+            summarize_day(&load_events(), &date)
+        }
+
         _ => Value::Null,
+    }
+}
+
+/// Pure day-summary aggregation (the testable core of `rewind:getDaySummary`).
+/// Keeps only events on `date` (UTC `YYYY-MM-DD`), then rolls them up by type,
+/// by app (top 10), and by hour — byte-identical to the Electron handler's
+/// shape. An empty day returns `totalEntries:0` with `hours:[]`.
+fn summarize_day(events: &[dex_rewind::ActivityEvent], date: &str) -> Value {
+    use crate::cmd_export_bundle::{civil_from_ms, utc_date};
+
+    let day_events: Vec<&dex_rewind::ActivityEvent> =
+        events.iter().filter(|e| utc_date(e.ts) == date).collect();
+
+    if day_events.is_empty() {
+        return json!({
+            "date": date, "totalEntries": 0,
+            "byType": {}, "topApps": [], "hours": [],
+        });
+    }
+
+    let mut by_type = serde_json::Map::new();
+    // First-seen order preserved for app counts so ties are stable (matches the
+    // JS stable sort over insertion order).
+    let mut app_order: Vec<String> = Vec::new();
+    let mut app_counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut hours = [0i64; 24];
+
+    for e in &day_events {
+        let t = by_type.entry(e.kind.clone()).or_insert(json!(0));
+        *t = json!(t.as_i64().unwrap_or(0) + 1);
+
+        if !app_counts.contains_key(&e.app_id) {
+            app_order.push(e.app_id.clone());
+        }
+        *app_counts.entry(e.app_id.clone()).or_insert(0) += 1;
+
+        let (_, _, _, h, _, _, _) = civil_from_ms(e.ts);
+        hours[(h as usize) % 24] += 1;
+    }
+
+    // Sort by count desc, breaking ties by first-seen order.
+    let mut ranked: Vec<(usize, &String)> = app_order.iter().enumerate().collect();
+    ranked.sort_by(|a, b| {
+        let ca = app_counts.get(a.1).copied().unwrap_or(0);
+        let cb = app_counts.get(b.1).copied().unwrap_or(0);
+        cb.cmp(&ca).then(a.0.cmp(&b.0))
+    });
+    let top_apps: Vec<Value> = ranked
+        .into_iter()
+        .take(10)
+        .map(|(_, name)| json!({ "name": name, "count": app_counts.get(name).copied().unwrap_or(0) }))
+        .collect();
+
+    json!({
+        "date": date,
+        "totalEntries": day_events.len(),
+        "byType": Value::Object(by_type),
+        "topApps": top_apps,
+        "hours": hours.to_vec(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ev(ts: i64, app: &str, kind: &str) -> dex_rewind::ActivityEvent {
+        dex_rewind::ActivityEvent {
+            ts,
+            app_id: app.to_string(),
+            kind: kind.to_string(),
+            label: None,
+        }
+    }
+
+    // 2026-06-22T10:00:00Z and 2026-06-22T14:00:00Z (same UTC day).
+    const T_10H: i64 = 1_782_122_400_000; // 2026-06-22T10:00:00Z
+    const T_14H: i64 = 1_782_136_800_000; // 2026-06-22T14:00:00Z
+    const T_NEXT_DAY: i64 = 1_782_208_800_000; // 2026-06-23T10:00:00Z
+
+    #[test]
+    fn empty_day_has_zero_entries_and_empty_hours() {
+        let out = summarize_day(&[], "2026-06-22");
+        assert_eq!(out["totalEntries"], json!(0));
+        assert_eq!(out["byType"], json!({}));
+        assert_eq!(out["topApps"], json!([]));
+        assert_eq!(out["hours"], json!([]));
+        assert_eq!(out["date"], json!("2026-06-22"));
+    }
+
+    #[test]
+    fn buckets_by_type_app_and_hour_for_the_day_only() {
+        let events = vec![
+            ev(T_10H, "notes", "edit"),
+            ev(T_10H, "notes", "edit"),
+            ev(T_14H, "browser", "visit"),
+            ev(T_NEXT_DAY, "notes", "edit"), // excluded — different day
+        ];
+        let out = summarize_day(&events, "2026-06-22");
+
+        assert_eq!(out["totalEntries"], json!(3));
+        assert_eq!(out["byType"]["edit"], json!(2));
+        assert_eq!(out["byType"]["visit"], json!(1));
+
+        // Top app is notes (2) ahead of browser (1).
+        assert_eq!(out["topApps"][0]["name"], json!("notes"));
+        assert_eq!(out["topApps"][0]["count"], json!(2));
+        assert_eq!(out["topApps"][1]["name"], json!("browser"));
+
+        // Hour histogram has 24 slots; 2 at 10:00, 1 at 14:00.
+        let hours = out["hours"].as_array().unwrap();
+        assert_eq!(hours.len(), 24);
+        assert_eq!(hours[10], json!(2));
+        assert_eq!(hours[14], json!(1));
+        assert_eq!(hours[0], json!(0));
+    }
+
+    #[test]
+    fn top_apps_caps_at_ten() {
+        let events: Vec<dex_rewind::ActivityEvent> =
+            (0..15).map(|i| ev(T_10H, &format!("app{}", i), "k")).collect();
+        let out = summarize_day(&events, "2026-06-22");
+        assert_eq!(out["topApps"].as_array().unwrap().len(), 10);
+        assert_eq!(out["totalEntries"], json!(15));
     }
 }

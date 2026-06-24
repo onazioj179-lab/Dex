@@ -72,6 +72,42 @@ export function classifyTask(prompt: string): TaskFeatures {
 }
 
 /**
+ * A "routine" task has no hard requirements — no vision, no tool use, not code,
+ * and not long-context. These are the summarize / extract / rewrite / short-Q&A
+ * tasks a small on-device model handles well (Apple Foundation Models guidance),
+ * so they are the ones worth routing on-device first.
+ */
+export function isRoutineTask(task: TaskFeatures): boolean {
+  return !task.needsVision && !task.needsTools && !task.isCode && !task.isLongContext;
+}
+
+/**
+ * Tiered on-device-first ordering (DEX_FEATURE_BACKLOG P0). For a ROUTINE task,
+ * move configured LOCAL models (e.g. Ollama) to the front of the already-ranked
+ * list so the caller tries the local model first and falls back to hosted models
+ * automatically (chatWithFallback walks the list in order) — the Apple Foundation
+ * Models + Private Cloud Compute tiered pattern, adapted to UKI's existing
+ * provider-agnostic routing. Hard tasks (vision / tools / code / long-context)
+ * keep their quality-ranked order. Pure; relative order is preserved per tier.
+ *
+ * `canRunLocal` lets the on-device runtime abstraction (deviceRuntime) exclude
+ * local models this machine can't run acceptably (e.g. an 8B model on a CPU-only
+ * laptop) — such models are NOT fronted and fall back to their ranked position.
+ * Defaults to "all local models runnable" so existing callers are unaffected.
+ */
+export function preferOnDeviceFirst(
+  modelIds: readonly string[],
+  task: TaskFeatures,
+  canRunLocal: (id: string) => boolean = () => true,
+): string[] {
+  if (!isRoutineTask(task)) return [...modelIds];
+  const runnableLocal = modelIds.filter((id) => getModelProfile(id).local && canRunLocal(id));
+  if (runnableLocal.length === 0) return [...modelIds];
+  const rest = modelIds.filter((id) => !runnableLocal.includes(id));
+  return [...runnableLocal, ...rest];
+}
+
+/**
  * Drop candidates that cannot satisfy the task's hard requirements (vision,
  * tools, context size). Never strands the caller: if the capability filter
  * empties the set, it relaxes to a context-only filter, then to all candidates.

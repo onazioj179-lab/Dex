@@ -18,6 +18,7 @@ import DOMPurify from 'dompurify';
 import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import { sendToNotes } from '../services/sendTo';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 
 // ===========================================================================
 // TYPES
@@ -278,6 +279,31 @@ export const Browser: React.FC = () => {
   });
   const [tabErrors, setTabErrors] = useState<Record<string, string | null>>({});
   const [crashedTabs, setCrashedTabs] = useState<Set<string>>(new Set());
+
+  // -- uki context: surface the active tab (title + URL) to the assistant.
+  // Registered once on mount; a latest-value ref (refreshed each render) keeps
+  // the pure resolver reading live state without re-registering.
+  const ukiCtxRef = useRef({ tabs, activeTab });
+  useEffect(() => { ukiCtxRef.current = { tabs, activeTab }; });
+  useEffect(() => {
+    registerUkiAppContext('browser', () => {
+      const c = ukiCtxRef.current;
+      const tab = c.tabs.find(t => t.id === c.activeTab);
+      return {
+        appId: 'browser',
+        focusedItemId: c.activeTab,
+        currentFile: tab?.url,
+        selectionText: tab?.title,
+        custom: {
+          activeTabTitle: tab?.title,
+          url: tab?.url,
+          loading: tab?.loading ?? false,
+          openTabs: c.tabs.length,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('browser');
+  }, []);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try {
       const saved = localStorage.getItem('dex-browser-bookmarks');

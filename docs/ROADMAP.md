@@ -1,5 +1,37 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-23) — Window-management backlog (section 01) CLEARED:
+> persistent custom snap zones shipped.** The last open item from
+> `docs/DEX_FEATURE_BACKLOG.md` is done end-to-end. A pure FancyZones model
+> (`shared/shell/customZones.ts`: grid build, bounds conversion, hit-test,
+> coverage, and the `expandAcross` engine — 16 unit tests), a persisted zone
+> store (`store/zoneStore.ts`, localStorage + capability:storage mirror like the
+> dock store), and a visual editor (`components/ZoneEditor.tsx` — grid templates,
+> free-form draw/move/resize, named save, active-layout picker; opens on
+> `Ctrl+Alt+Z` or the "Edit Snap Zones" palette command). Wired into AppManager:
+> drag-to-zone snapping takes priority on drop when a layout is active;
+> **expand-across-zones** (`Ctrl+Alt+Shift+Arrow`) and **cycle-within-zone**
+> (`Ctrl+Alt+[` / `]`) build on the persisted state; plus "Tile: Into Active
+> Zones". This closes the FancyZones zone editor + the two remaining keyboard
+> snap bindings the backlog flagged. tsc 0, 31 WM unit tests green, renderer
+> build green.
+>
+> **SAME DAY — security (03) + AI (04) policy layers SHIPPED (whole implementable
+> backlog now cleared).** Built the host-agnostic DEX policy for every remaining
+> P1/P2 implementation row (kernel enforcement stays native-driver work):
+> `shared/runtime/networkPolicy.ts` (Windows AppContainer network-class gating,
+> loopback-deny-by-default), `shared/runtime/linuxSandbox.ts` (bubblewrap argv
+> from caps, maximal-isolation default), `shared/runtime/brokeredIpc.ts`
+> (capability-scoped IPC, no app→app loopback), and
+> `shared/runtime/sandboxProfile.ts` composing them into one `buildSandboxProfile`.
+> Plus `shared/uki/deviceRuntime.ts` (CPU/GPU/NPU tier selection + local-model
+> gating) wired LIVE into `smartRouter.preferOnDeviceFirst` + `connect.ts`. 38 new
+> unit tests (24 sandbox + 14 device), back-compat preserved, tsc 0, build green.
+> What's left is genuinely NOT headless-buildable: native execution
+> (WFP/AppContainer SIDs, real `bwrap` spawn, DirectML/CoreML/NPU EPs), the
+> commodity-silicon SLM benchmark, and the 05-10 deep-research pass (which ADDS
+> scope rather than clearing it).
+>
 > **CHECKPOINT (2026-06-19) — Tauri migration rounds 1-3 DONE (data + heavy channels); final usage gap-check + flip to Tauri next.**
 > This block is the single consolidated current plan (older per-slice goals folded in;
 > full detail in docs/TAURI-MIGRATION.md).
@@ -10,19 +42,25 @@
 > — analytics, power, mode, projects, dev-platform (git/env/ssh/fs/watch), ~140 data/CRUD
 > subsystems (round 1+2), and round 3's HEAVY channels (timers/process-exec/Tauri-events/
 > HTTP/file-IO) across 122 modules, each its own `src-tauri/src/<name>.rs`. `cargo check`
-> 0 errors, `tsc` GREEN. Only genuinely-impossible channels (LLM streaming, IoT hardware,
-> live OS windows, sandboxed JS) still degrade — honest gaps, never faked.
+> 0 errors, `tsc` GREEN. **UPDATE 2026-06-22:** the previously-"genuinely-impossible"
+> trio is now addressed (see TAURI-MIGRATION.md): LLM streaming works via renderer
+> fetch in WebView2 (fixed CSP openrouter.ai + Anthropic browser-access header);
+> live OS windows are REAL Tauri WebviewWindows (multi_window.rs + detached-boot
+> renderer mode); IoT device discovery/pairing is already native (only vendor-driver
+> fan/GPU-voltage control honestly degrades). Sandboxed JS (workflow:runScript) now
+> runs in the renderer's DexScript interpreter. The catalogued degrade list is EMPTY.
 >
-> **NEXT MIGRATION — final gap-check + flip.** Round 3 implemented the buildable heavy
-> channels (timers/exec/events/HTTP/file-IO) across 122 modules. What remains are the
-> genuinely-impossible channels (LLM provider streaming, IoT hardware, live OS windows,
-> sandboxed JS) which degrade honestly. STRATEGY: run `npm run dev:tauri`, exercise DEX,
+> **NEXT MIGRATION — final gap-check + flip.** The buildable channels — heavy
+> (timers/exec/events/HTTP/file-IO) AND the once-"impossible" trio — are done.
+> STRATEGY: run `npm run dev:tauri`, exercise DEX,
 > read the auto-saved degrade report (`dex-kv.json` -> `__dex_degrade`, or
 > `__dexDegradeReport()` in the app-window console); the remaining list should be small
 > -> build or accept each, then flip the default shell to Tauri and retire Electron.
 >
-> **Deferred (small, currently degrade to null):** rewind:getDaySummary, auth:setup:*,
-> files:organizeByType. **Parked:** Calendar 15/16 icon-render edge case.
+> **Deferred (small, degrade to null): DONE 2026-06-22** — rewind:getDaySummary
+> (rewind.rs summarize_day), files:organizeByType (main.rs files_organize_by_type),
+> auth:setup:* (new auth.rs, salted SHA-256 in dex-kv.json + Windows Hello). cargo
+> check 0, cargo test 38/38, tsc 0. **Parked:** Calendar 15/16 icon-render edge case.
 >
 > **HARD RULES (from the round-2 git-checkout incident that wiped uncommitted wiring):**
 > COMMIT before any multi-agent workflow; workflow agents write ONLY their own new module
@@ -2360,6 +2398,18 @@ REMAINING (lower leverage / deferred):
 > (2161). The ONLY genuinely-remaining piece is the hosted network layer — a sync/relay server + a public
 > marketplace registry — which can't exist in a renderer-only repo; the local-first foundations above are
 > ready for it (see docs/NEXT-STAGE.md).
+
+> **DONE — "Agentic DEX: AI everywhere" (AI track).** UKI now knows what the user is looking at
+> across the app and can be asked about any selection. (1) Extended the UKI app-context registry
+> (`registerUkiAppContext`) from 6 apps to 21: added Kanban, Calendar, MarkdownEditor, Browser, Audio,
+> Weather, Maps, Calculator, UnitConverter, Learn, EnvManager, WorldClock, Workflows, GitClient,
+> PresentationBuilder — each registers once (live state via a ref) and unregisters on unmount, exposing
+> meaningful per-app context (board/card, selected date+events, file+word-count, tab+URL, now-playing,
+> location+temp, centered place, expression+result, course+progress, profile+keys, cities, workflow+steps,
+> repo+branch+staged, deck+slide). (2) New `components/AskUkiSelection.tsx` mounted in the shell: selecting
+> text in ANY surface shows a floating "Ask UKI" chip (or Ctrl/Cmd+Shift+U) that routes the selection to the
+> agent loop via `dex-uki-ask` — no per-app wiring. Builds on the provider-agnostic ReAct agent (web search +
+> app control) shipped earlier. tsc 0, watermark lint 0 (2162).
 
 ## Build / run
 

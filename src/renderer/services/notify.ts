@@ -29,6 +29,10 @@
  */
 
 import type { NotificationPriority } from '../../shared/notifications/group';
+import {
+  resolveExpiry, urgencyToPriority, persistsUntilDismissed,
+  type Urgency, type Scenario,
+} from '../../shared/notifications/actionable';
 
 export type NotificationIcon = 'info' | 'success' | 'warning' | 'error';
 
@@ -52,6 +56,21 @@ export interface NotifyInput {
   icon?: NotificationIcon;
   /** Auto-dismiss duration for the transient banner (ms). */
   duration?: number;
+  /**
+   * freedesktop urgency (low/normal/critical). When set and `priority` is
+   * omitted, it derives the priority; `critical` is never auto-dismissed.
+   */
+  urgency?: Urgency;
+  /**
+   * freedesktop `expire_timeout` (−1 server-default, 0 never, >0 ms). Resolved
+   * against urgency to compute the banner's auto-dismiss when `duration` is unset.
+   */
+  expireTimeout?: number;
+  /**
+   * Microsoft toast scenario. `reminder`/`alarm`/`incomingCall` stay on screen
+   * until dismissed (persistent banner).
+   */
+  scenario?: Scenario;
   /** Deep-link / action payload (persisted, used on center click). */
   action?: NotifyAction;
   /** Transient action buttons for the banner (NOT persisted — closures). */
@@ -217,13 +236,34 @@ export async function persistToHub(
  */
 export async function notify(input: NotifyInput): Promise<number> {
   if (!input || !input.title) return -1;
-  const icon = input.icon ? normalizeIcon(input.icon) : iconFromPriority(input.priority ?? priorityFromIcon(input.icon));
-  const priority = normalizePriority(input.priority ?? priorityFromIcon(input.icon));
+  // Urgency (freedesktop) derives priority when no explicit priority is given.
+  const derivedPriority = input.priority
+    ?? (input.urgency ? urgencyToPriority(input.urgency) : priorityFromIcon(input.icon));
+  const icon = input.icon ? normalizeIcon(input.icon) : iconFromPriority(derivedPriority);
+  const priority = normalizePriority(derivedPriority);
 
-  emitBanner(input, icon, priority);
+  // Resolve the banner's auto-dismiss from the verified notification model
+  // (DEX_FEATURE_BACKLOG 08): critical urgency + reminder/alarm/incomingCall
+  // scenarios are persistent (duration<=0 = no auto-dismiss); otherwise an
+  // explicit `expireTimeout` is resolved against urgency. A caller-set `duration`
+  // always wins (back-compat).
+  let resolved = input;
+  if (input.duration === undefined && (input.urgency || input.scenario || input.expireTimeout !== undefined)) {
+    const u: Urgency = input.urgency ?? 'normal';
+    let duration: number | undefined;
+    if (persistsUntilDismissed({ scenario: input.scenario, urgency: u })) {
+      duration = 0; // never auto-dismiss
+    } else if (input.expireTimeout !== undefined) {
+      const e = resolveExpiry(input.expireTimeout, u);
+      duration = e.expires ? e.ms : 0;
+    }
+    if (duration !== undefined) resolved = { ...input, duration };
+  }
 
-  if (input.transientOnly) return -1;
-  return persistToHub(input, icon, priority);
+  emitBanner(resolved, icon, priority);
+
+  if (resolved.transientOnly) return -1;
+  return persistToHub(resolved, icon, priority);
 }
 
 // ---------------------------------------------------------------------------

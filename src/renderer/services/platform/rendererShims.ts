@@ -175,6 +175,31 @@ const HANDLERS: Record<string, (args: unknown[]) => Promise<unknown>> = {
 
   // WebAuthn platform-authenticator probe — a browser API, no main process.
   'auth:biometricsAvailable': async () => biometricsAvailable(),
+
+  // Workflow "Run Script" node. Electron shelled out to a sandboxed process;
+  // under Tauri we run it in the renderer's OWN DexScript interpreter (the same
+  // engine that backs DexCode) — fully sandboxed JS, no shell-out, no native
+  // process surface. Lazy-imported so the DexCode runtime stays out of the
+  // platform-core chunk. Returns `{ output, error, success }`; the workflow
+  // engine reads `res.output` (a string), so the line array is joined.
+  'workflow:runScript': async (args) => {
+    const source = typeof args[0] === 'string' ? (args[0] as string) : '';
+    if (!source.trim()) return { output: '', error: null, success: true };
+    try {
+      const { executeDexScript } = await import(
+        '../../DEXAPPLICATIONS/standalone/dexCode/runtime'
+      );
+      const r = executeDexScript(source);
+      return {
+        output: r.output.join('\n'),
+        error: r.error,
+        durationMs: r.duration,
+        success: !r.error,
+      };
+    } catch (e) {
+      return { output: '', error: e instanceof Error ? e.message : String(e), success: false };
+    }
+  },
 };
 
 /**
@@ -202,11 +227,22 @@ const TELEMETRY_SINKS = new Set<string>([
   'stability:reportFrameTime',
   'stability:reportIdle',
   'enforce:reportMetrics',
+  // Xenon push-metrics: the renderer reports the foreground app id so the (push-
+  // model) system collector can attribute activity. Fire-and-forget (the caller
+  // ignores the result); no native xenon collector under Tauri, so accept-and-
+  // discard rather than degrade.
+  'xenon:reportActiveApp',
   // Crash/memory fire-and-forget reporters. In Electron these wrote to a
   // main-process state file / crash log / alert sink; under Tauri there is no
   // such collector (the recovery READER isn't ported either), so the honest
   // behaviour is accept-and-discard — exactly what a sink is. No data lost that
   // anything currently reads. (Wire to a real native sink if/when recovery lands.)
+  // Proactive renderer->main liveness ping (RendererHeartbeat). Electron's main
+  // recorded a last-seen timestamp for freeze detection; under Tauri there is no
+  // such watchdog collector, and the sender ignores the result (fire-and-forget),
+  // so accept-and-discard is the honest behaviour. Keeps the heaviest single
+  // degrade (~1/sec) out of the report.
+  'renderer:heartbeat',
   'renderer:save-emergency-state',
   'renderer:memory-critical',
   'render-error:report',
@@ -238,8 +274,23 @@ export const NATIVE_PENDING: ReadonlyArray<{ channel: string; needs: string }> =
   // move-log port; server-side undo-history is the one documented gap, see
   // docs/TAURI-MIGRATION.md).
   //
-  // GENUINE REMAINDER (still degraded until ported):
-  { channel: 'workflow:runScript', needs: 'process (sandboxed script execution)' },
+  // workflow:runScript is NO LONGER degraded — it runs in the renderer's own
+  // sandboxed DexScript interpreter (see HANDLERS above), not a native process.
+  //
+  // Previously-"impossible" categories now addressed (2026-06-22):
+  //   - LLM streaming: works via the renderer's own fetch/ReadableStream in
+  //     WebView2 (uki/providers) once a key is set. Fixed the two transport gaps
+  //     that blocked it under Tauri — CSP connect-src now allows openrouter.ai,
+  //     and the Anthropic provider sends `anthropic-dangerous-direct-browser-
+  //     access` so its CORS preflight passes.
+  //   - Live OS windows: multiwindow:* now creates REAL Tauri WebviewWindows
+  //     (src-tauri/src/multi_window.rs) + this renderer boots single-app mode on
+  //     `?detached=<appId>` (services/detachedWindow.ts).
+  //   - Device discovery/pairing is already native (device_ctl.rs).
+  //
+  // GENUINE REMAINDER: none catalogued. The only things that still degrade are
+  // truly host-impossible (vendor-driver hardware control: fan curves / GPU
+  // voltage), handled at their call sites with an honest success:false.
 ];
 
 /** True when `channel` has a complete renderer-native answer below. */

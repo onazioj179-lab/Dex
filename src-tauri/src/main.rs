@@ -59,6 +59,8 @@ mod cloudsync_ctl;
 mod code_ctl;
 mod connectors_ctl;
 mod containment_ctl;
+mod sandbox_ctl;
+mod gpu_priority;
 mod context_ctl;
 mod controls_ctl;
 mod corepc_ctl;
@@ -181,6 +183,7 @@ mod cmd_scratchpad;
 mod cmd_window_monitor;
 mod notifications;
 mod ai_runtime;
+mod auth;
 mod http_transfer;
 mod read_later;
 mod recycle_bin;
@@ -370,6 +373,104 @@ fn files_delete(path: &str) -> Value {
 
 fn files_mkdir(path: &str) -> Value {
     io_result(std::fs::create_dir_all(path), path)
+}
+
+/// `files:organizeByType` — sort the immediate (non-recursive) files of a
+/// directory into type subfolders (images/documents/spreadsheets/audio/video/
+/// archives/other), returning the `FileOperation[]` move log the Electron
+/// `FileManager.organizeByType` produced. Each entry mirrors the TS
+/// `FileOperation` shape exactly: { id, type:'move', sourcePath, targetPath,
+/// timestamp, success, error?, undoable:true, undoData:{originalPath,
+/// originalName} }. The extension -> folder map is byte-identical to Electron.
+/// NOTE: the server-side, cross-call undo *history* the Electron engine kept
+/// (so `undoLastOperation` could replay) is not ported — each call is stateless
+/// (documented gap in docs/TAURI-MIGRATION.md); the per-op `undoData` is still
+/// returned so the renderer has everything needed to reverse a move itself.
+fn files_organize_by_type(dir: &str) -> Value {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    // Same extension -> folder map as the Electron FileManager (lowercased).
+    let type_map: &[(&str, &[&str])] = &[
+        ("images", &[".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg"]),
+        ("documents", &[".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"]),
+        ("spreadsheets", &[".xls", ".xlsx", ".csv", ".ods"]),
+        ("audio", &[".mp3", ".wav", ".flac", ".aac", ".ogg"]),
+        ("video", &[".mp4", ".avi", ".mkv", ".mov", ".wmv"]),
+        ("archives", &[".zip", ".rar", ".7z", ".tar", ".gz"]),
+    ];
+
+    let read = match std::fs::read_dir(dir) {
+        Ok(r) => r,
+        Err(_) => return json!([]),
+    };
+
+    let mut operations: Vec<Value> = Vec::new();
+    for entry in read.flatten() {
+        let path = entry.path();
+        // Skip directories (only files are organized).
+        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+
+        let ext = path
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+            .unwrap_or_default();
+        let folder = type_map
+            .iter()
+            .find(|(_, exts)| exts.contains(&ext.as_str()))
+            .map(|(name, _)| *name)
+            .unwrap_or("other");
+
+        let target_dir = PathBuf::from(dir).join(folder);
+        // Create the destination folder on demand; skip this file if it fails
+        // (matches the Electron `continue` on mkdir error).
+        if !target_dir.exists() && std::fs::create_dir_all(&target_dir).is_err() {
+            continue;
+        }
+
+        let src = path.to_string_lossy().to_string();
+        let original_name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let target_path = target_dir.join(&original_name);
+        let target_str = target_path.to_string_lossy().to_string();
+
+        // Build the operation record (success filled in after the move).
+        let mut op = json!({
+            "id": crate::util::pseudo_uuid_v4(),
+            "type": "move",
+            "sourcePath": src,
+            "targetPath": target_str,
+            "timestamp": now_ms,
+            "success": false,
+            "undoable": true,
+            "undoData": { "originalPath": src, "originalName": original_name },
+        });
+
+        if target_path.exists() {
+            op["error"] = json!("Target file already exists");
+        } else {
+            match std::fs::rename(&path, &target_path) {
+                Ok(()) => op["success"] = json!(true),
+                // Cross-volume rename fails — fall back to copy + remove.
+                Err(_) => match std::fs::copy(&path, &target_path) {
+                    Ok(_) => match std::fs::remove_file(&path) {
+                        Ok(()) => op["success"] = json!(true),
+                        Err(e) => op["error"] = json!(e.to_string()),
+                    },
+                    Err(e) => op["error"] = json!(e.to_string()),
+                },
+            }
+        }
+        operations.push(op);
+    }
+
+    Value::Array(operations)
 }
 
 /// `system:getStatus` / `power:getStats` — memory + uptime snapshot.
@@ -1339,9 +1440,9 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("fts:") {
         return full_text_index::dispatch(conn, channel, args);
     }
-    if channel.starts_with("multiwindow:") {
-        return multi_window::dispatch(conn, channel, args);
-    }
+    // multiwindow:* is handled natively at the top level (needs the AppHandle to
+    // create real OS windows); it never reaches db_dispatch. ensure_schema below
+    // still creates the detached_windows table for dex.db schema parity.
     if channel.starts_with("multimonitor:") {
         return multi_monitor::dispatch(conn, channel, args);
     }
@@ -1493,6 +1594,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("code:") { return code_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("connectors:") { return connectors_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("containment:") { return containment_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("sandbox:") { return sandbox_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("gpu-priority:") { return gpu_priority::dispatch(&app, &channel, &args); }
     if channel.starts_with("context:") { return context_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("controls:") { return controls_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("corepc:") { return corepc_ctl::dispatch(&app, &channel, &args); }
@@ -1599,7 +1702,12 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("intelligence:getState" | "intelligence:getConfig") => intelligence_ctl::dispatch(&app, ch, &args),
         ch @ ("learning:getModels") => learning_ctl::dispatch(&app, ch, &args),
         ch @ ("monitor:getBaseline" | "monitor:getDigests") => monitor_ctl::dispatch(&app, ch, &args),
-        ch @ ("network:summary" | "network:getStatus") => network_ctl::dispatch(&app, ch, &args),
+        // Full network:* surface (summary/getStatus + config/setConfig/setMode/
+        // setOffline/connections/history/usage/policies). Was a 2-channel arm, so
+        // network:config (which load_config answers with a real default object)
+        // silently degraded; prefix-route the tier. networkHygiene:/connection:
+        // are separate prefixes and unaffected.
+        ch if ch.starts_with("network:") => network_ctl::dispatch(&app, ch, &args),
         ch @ ("security:getPolicy") => security_ctl::dispatch(&app, ch, &args),
         ch @ ("store:list" | "store:installed") => store_ctl::dispatch(&app, ch, &args),
         ch @ ("tags:list" | "tags:get") => tagging_ctl::dispatch(&app, ch, &args),
@@ -1607,7 +1715,12 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("timeline:getEvents" | "timeline:getEvent") => timeline_ctl::dispatch(&app, ch, &args),
         ch @ ("trust:list") => trust_ctl::dispatch(&app, ch, &args),
         ch @ "update:getStatus" => update_ctl::dispatch(&app, ch, &args),
-        ch @ ("updates:getInfo" | "updates:getPreferences" | "update:getConfig") => updates_ctl::dispatch(&app, ch, &args),
+        // Full updates:* surface (getInfo/getPreferences + canDowngrade, install
+        // history, changelog, skip/remindLater, pruneCache, ...). Was an explicit
+        // 3-channel arm, so canDowngrade et al. silently degraded; prefix-route
+        // the whole tier (updates_ctl returns Null only for the genuinely
+        // updater-runtime-bound channels). `update:getConfig` (singular) stays.
+        ch if ch.starts_with("updates:") || ch == "update:getConfig" => updates_ctl::dispatch(&app, ch, &args),
         ch @ ("workflow:getAll" | "workflow:get") => workflow_ctl::dispatch(&app, ch, &args),
         "app:ping" => json!("pong"),
 
@@ -1643,6 +1756,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "files:copy" => files_copy(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
         "files:delete" => files_delete(&arg_str(0).unwrap_or_default()),
         "files:mkdir" => files_mkdir(&arg_str(0).unwrap_or_default()),
+        "files:organizeByType" => files_organize_by_type(&arg_str(0).unwrap_or_default()),
 
         // --- System / power -------------------------------------------------
         "system:getStatus" => system_status(),
@@ -1968,6 +2082,18 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // db_dispatch, which short-circuits to null when SQLite is unavailable.
         ch if ch.starts_with("rewind:") => rewind::dispatch(ch, &args),
         ch if ch.starts_with("ai-runtime:") => ai_runtime::dispatch(ch, &args),
+
+        // --- Auth enrolment (AuthController setPin/setPassword/enableBiometric)
+        // Salted-SHA-256 credential writes to the shared KV; biometric runs the
+        // real OS verifier. Read/verify side stays renderer-managed for now.
+        ch if ch.starts_with("auth:setup:") || ch == "auth:getState" || ch == "auth:getConfig" => {
+            auth::dispatch(&app, ch, &args)
+        }
+
+        // --- Multi-window: detach an inner app into a REAL OS window ---------
+        // Tauri WebviewWindow creation (the live-window surface Electron had).
+        // Routed here, not via db_dispatch, because it needs the AppHandle.
+        ch if ch.starts_with("multiwindow:") => multi_window::dispatch_native(&app, ch, &args),
 
         // --- Terminal / PTY (core/PtyService parity) -----------------------
         // Piped-stdio shell sessions; output streams back as pty:data/pty:exit
