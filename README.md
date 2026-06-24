@@ -1,6 +1,6 @@
 # DEX — your calm, all-in-one desktop
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 5.5.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 6.0.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
 
 **DEX is one app that replaces a dozen — and it's 100% free.** Notes, tasks,
 files, a browser, a calendar, drawing, photo and video editing, music, a
@@ -66,7 +66,7 @@ unlock features.
 
 ## Download DEX
 
-**Latest release: v5.5.0** ·
+**Latest release: v6.0.0** ·
 [All downloads & notes →](https://github.com/onazioj179-lab/Dex/releases/latest)
 
 | Platform | Download |
@@ -84,27 +84,26 @@ unlock features.
 
 ---
 
-## What's new in 5.5
+## What's new in 6.0
 
-5.5 is a refinement release — nothing new to learn, everything more finished:
-faster, calmer, and more consistent end to end.
+6.0 turns DEX into a real desktop, not just an app — a calm, OS-grade shell with
+proper windows, a faster core, and quiet polish end to end.
 
-- **One search for everything.** A single palette fans across notes, files,
-  tasks, projects, workflows, commands, screenshots, and conversations, ranked by
-  relevance, recency, and what you're working on right now.
-- **Calmer notifications.** Every alert now flows through one center — grouped by
-  source, prioritized by importance, and persistent, instead of scattered popups.
-- **Search-first Settings.** Type what you want to change and jump straight to the
-  control. New AI and Developer sections surface the right toggles.
-- **A real Home.** A dashboard of your recent projects and notes, current tasks,
-  active workflows, a rewind summary, and pinned apps — with honest empty states.
-- **Deeper, smoother creative apps.** Across the suite (Prism, Flux, Imosion,
-  Axl, Vinx, the whiteboard) — zoom-to-cursor, snappier timelines, fixed leaks,
-  and editing that stays out of your way.
-- **Lighter under the hood.** Duplicate internal systems (caches, motion, file
-  watching) were consolidated, so DEX does the same work with less overhead.
-- **Still free for everyone, now stated plainly.** See "Your data, in plain
-  words" below.
+- **Real window management.** Floating windows you can drag, snap, and tile —
+  side-by-side halves, quarters, columns/rows, and Master/Dwindle/Monocle layouts,
+  all from the keyboard or the command palette.
+- **Custom snap zones.** A FancyZones-style editor (`Ctrl+Alt+Z`): draw your own
+  zones, save layouts, drag a window to snap it, and grow it across zones with
+  `Ctrl+Alt+Shift+Arrow`.
+- **Calmer, more accessible.** Bigger, easier hit targets, motion that scales with
+  the element and respects your "reduce motion" setting, and notifications that can
+  stay put when they matter (alarms, calls) instead of vanishing.
+- **A smarter assistant.** UKI now prefers on-device models for quick tasks and
+  falls back to the cloud only when needed — faster, more private replies.
+- **Safer add-ons.** Store apps run capability-scoped and sandboxed, so an add-on
+  only gets the access it declares — nothing more.
+- **Faster, more reliable.** Heavy apps load only when opened, the packaged app
+  start-up was cut down, and a batch of real crash/visual fixes landed.
 
 See the full history in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

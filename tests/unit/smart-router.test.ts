@@ -11,6 +11,8 @@ import {
   fanOutModels,
   routingGoalLabel,
   ROUTING_GOALS,
+  isRoutineTask,
+  preferOnDeviceFirst,
   type RouteCandidate,
 } from '../../src/shared/uki/smartRouter';
 
@@ -112,5 +114,42 @@ describe('routing goal metadata', () => {
     expect(ROUTING_GOALS).toContain('auto');
     expect(routingGoalLabel('cheapest')).toBe('Cheapest');
     expect(routingGoalLabel('auto')).toBe('Auto');
+  });
+});
+
+describe('tiered on-device-first routing', () => {
+  const routine = classifyTask('summarize this paragraph for me');
+  const codeTask = classifyTask('write a python function to sort a list');
+  const longTask = classifyTask('x'.repeat(40000)); // > long-context threshold
+
+  it('classifies routine vs hard tasks', () => {
+    expect(isRoutineTask(routine)).toBe(true);
+    expect(isRoutineTask(codeTask)).toBe(false); // isCode
+    expect(isRoutineTask(longTask)).toBe(false); // isLongContext
+  });
+
+  it('moves a configured local model to the front for routine tasks', () => {
+    // llama3.1/mistral are local; gpt-4o/sonnet are hosted (per modelProfiles).
+    const ranked = ['gpt-4o', 'claude-3-5-sonnet-latest', 'llama3.1'];
+    expect(preferOnDeviceFirst(ranked, routine)).toEqual([
+      'llama3.1', 'gpt-4o', 'claude-3-5-sonnet-latest',
+    ]);
+  });
+
+  it('preserves relative order within each tier', () => {
+    const ranked = ['gpt-4o', 'mistral', 'claude-3-5-sonnet-latest', 'llama3.1'];
+    expect(preferOnDeviceFirst(ranked, routine)).toEqual([
+      'mistral', 'llama3.1', 'gpt-4o', 'claude-3-5-sonnet-latest',
+    ]);
+  });
+
+  it('leaves the order untouched for hard tasks (quality ranking wins)', () => {
+    const ranked = ['gpt-4o', 'llama3.1'];
+    expect(preferOnDeviceFirst(ranked, codeTask)).toEqual(['gpt-4o', 'llama3.1']);
+  });
+
+  it('is a no-op when no local model is configured', () => {
+    const ranked = ['gpt-4o', 'claude-3-5-sonnet-latest'];
+    expect(preferOnDeviceFirst(ranked, routine)).toEqual(['gpt-4o', 'claude-3-5-sonnet-latest']);
   });
 });

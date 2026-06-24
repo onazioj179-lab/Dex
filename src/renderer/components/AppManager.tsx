@@ -62,6 +62,12 @@ import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { computeTiling, type TilingLayout } from '../../shared/shell/tilingLayouts';
+import { zoneAtPoint, zoneToBounds, expandAcross, coveredZoneIds, layoutBounds, type ExpandDir } from '../../shared/shell/customZones';
+import { useZoneStore } from '../store/zoneStore';
+import ZoneEditor from './ZoneEditor';
+import { auditDomTargets } from '../../shared/a11y/targetSize';
+import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { useStageStore, type StageWindowRef } from '../store/stageStore';
@@ -2270,11 +2276,162 @@ export const AppManager: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, [getMaximizedWindowBounds, getShellWorkspace]);
 
-  // Surface the existing Auto-Tile-All (dock context menu) to any UI — the
-  // Command Palette "Arrange Windows" command dispatches this event. Reuses the
-  // proven predefined-layout tiler rather than a separate grid implementation.
+  // Selectable tiling layouts (DEX_FEATURE_BACKLOG P1): arrange every detached
+  // window under a chosen strategy (master/columns/rows/grid/dwindle/monocle)
+  // via the pure `computeTiling` engine. Windows are reassigned in their current
+  // key order; each tile is fitted to the work area (min-size aware).
+  const applyTilingLayout = useCallback((layout: TilingLayout) => {
+    const ids = Array.from(detachedApps.keys());
+    if (ids.length === 0) return;
+    const workspace = getShellWorkspace(0);
+    const rects = computeTiling(layout, ids.length, workspace, { gap: 6 });
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      ids.forEach((id, i) => {
+        const cur = next.get(id);
+        const r = rects[i];
+        if (!cur || !r) return;
+        // Keep the tile's POSITION; only guard a usable min size, then clamp to
+        // the work area (clampWindowToWorkspace preserves x/y, unlike fit which
+        // re-centers).
+        const placed = clampWindowToWorkspace(
+          { x: r.x, y: r.y, w: Math.max(260, r.w), h: Math.max(220, r.h) },
+          workspace,
+        );
+        next.set(id, { ...cur, ...placed });
+      });
+      return next;
+    });
+  }, [detachedApps, getShellWorkspace]);
+
+  // -- Persistent custom snap zones (DEX_FEATURE_BACKLOG 01) ---------------------
+  // The active zone layout (authored in the Zone Editor) drives drag-to-snap, the
+  // expand-across-zones keyboard grammar, and cycle-within-zone. Read via
+  // getState() inside handlers so the WM does not re-render on store changes.
+
+  // Convert a viewport point to work-area-relative coords. Detached windows are
+  // positioned inside the content surface, so zone hit-tests must use the same
+  // space (getShellWorkspace's origin), not raw viewport coords.
+  const clientToWorkspacePoint = useCallback((cx: number, cy: number) => {
+    const r = contentRef.current?.getBoundingClientRect();
+    return { x: cx - (r?.left ?? 0), y: cy - (r?.top ?? 0) };
+  }, []);
+
+  // Snap a dragged window into a custom zone on drop. Returns true if it snapped.
+  const snapToCustomZone = useCallback((appId: AppId, clientX: number, clientY: number): boolean => {
+    const layout = useZoneStore.getState().getActiveLayout();
+    if (!layout) return false;
+    const workspace = getShellWorkspace(0);
+    const p = clientToWorkspacePoint(clientX, clientY);
+    const zone = zoneAtPoint(layout, workspace, p.x, p.y);
+    if (!zone) return false;
+    const rect = zoneToBounds(zone, workspace, 6);
+    const z = nextDetachZ();
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      const cur = next.get(appId);
+      if (!cur) return prev;
+      next.set(appId, { ...rect, z });
+      return next;
+    });
+    return true;
+  }, [getShellWorkspace, clientToWorkspacePoint]);
+
+  // Expand-across-zones: grow the focused window from its current zone(s) to also
+  // cover the adjacent zone(s) in `dir`, using the pure `expandAcross` engine.
+  const expandFocusedAcross = useCallback((dir: ExpandDir) => {
+    const appId = focusedFloatingAppId || (detachedApps.has(currentAppId) ? currentAppId : null);
+    if (!appId) return;
+    const layout = useZoneStore.getState().getActiveLayout();
+    if (!layout) return;
+    const cur = detachedApps.get(appId);
+    if (!cur) return;
+    const workspace = getShellWorkspace(0);
+    const rect = expandAcross({ x: cur.x, y: cur.y, w: cur.w, h: cur.h }, layout, workspace, dir, 6);
+    if (!rect) return;
+    const z = nextDetachZ();
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      const c = next.get(appId);
+      if (!c) return prev;
+      next.set(appId, { ...rect, z });
+      return next;
+    });
+  }, [focusedFloatingAppId, currentAppId, detachedApps, getShellWorkspace]);
+
+  // Cycle focus among windows that share the focused window's zone(s).
+  const cycleWithinZone = useCallback((backward: boolean) => {
+    const appId = focusedFloatingAppId || (detachedApps.has(currentAppId) ? currentAppId : null);
+    if (!appId) return;
+    const layout = useZoneStore.getState().getActiveLayout();
+    if (!layout) return;
+    const workspace = getShellWorkspace(0);
+    const cur = detachedApps.get(appId);
+    if (!cur) return;
+    const mine = new Set(coveredZoneIds({ x: cur.x, y: cur.y, w: cur.w, h: cur.h }, layout, workspace));
+    if (mine.size === 0) return;
+    const peers = Array.from(detachedApps.entries())
+      .filter(([, b]) => coveredZoneIds({ x: b.x, y: b.y, w: b.w, h: b.h }, layout, workspace).some(id => mine.has(id)))
+      .map(([id]) => id);
+    if (peers.length <= 1) return;
+    const idx = peers.indexOf(appId);
+    const next = peers[(idx + (backward ? -1 : 1) + peers.length) % peers.length];
+    bringToFront(next as AppId);
+  }, [focusedFloatingAppId, currentAppId, detachedApps, getShellWorkspace]);
+
+  // Place every detached window into the active layout's zones (one per zone, in
+  // key order, wrapping if there are more windows than zones).
+  const applyActiveZoneLayout = useCallback(() => {
+    const layout = useZoneStore.getState().getActiveLayout();
+    const ids = Array.from(detachedApps.keys());
+    if (ids.length === 0) return;
+    if (!layout) {
+      void notify({ title: 'No active zone layout', body: 'Open the Zone Editor to create one', source: 'workspace' });
+      return;
+    }
+    const workspace = getShellWorkspace(0);
+    const rects = layoutBounds(layout, workspace, 6);
+    if (rects.length === 0) return;
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      ids.forEach((id, i) => {
+        const cur = next.get(id);
+        const r = rects[i % rects.length];
+        if (cur && r) next.set(id, { ...cur, ...r });
+      });
+      return next;
+    });
+  }, [detachedApps, getShellWorkspace]);
+
   useEffect(() => {
-    const onArrange = () => autoTileAll();
+    const onZoneEdit = () => window.dispatchEvent(new CustomEvent('dex-open-zone-editor'));
+    const onApplyZones = () => applyActiveZoneLayout();
+    window.addEventListener('dex-edit-zones', onZoneEdit);
+    window.addEventListener('dex-apply-zone-layout', onApplyZones);
+    return () => {
+      window.removeEventListener('dex-edit-zones', onZoneEdit);
+      window.removeEventListener('dex-apply-zone-layout', onApplyZones);
+    };
+  }, [applyActiveZoneLayout]);
+
+  // WCAG 2.2 SC 2.5.8 audit hook: `__dexAuditTargets()` in the console returns any
+  // pointer target under 24x24 CSS px (dock, window controls, palette, editor) so
+  // the shell's hit-areas can be checked against the verified accessibility target.
+  useEffect(() => {
+    (window as any).__dexAuditTargets = () => auditDomTargets();
+    return () => { try { delete (window as any).__dexAuditTargets; } catch { /* noop */ } };
+  }, []);
+
+  // Surface the existing Auto-Tile-All (dock context menu) to any UI — the
+  // Command Palette "Arrange Windows" command dispatches this event. A layout
+  // can be requested via `detail.layout`; with none, the proven predefined-layout
+  // tiler runs (back-compat).
+  useEffect(() => {
+    const onArrange = (e: Event) => {
+      const layout = (e as CustomEvent).detail?.layout as TilingLayout | undefined;
+      if (layout) applyTilingLayout(layout);
+      else autoTileAll();
+    };
     const onSplit = (e: Event) => {
       const ratios = (e as CustomEvent).detail?.ratios as number[] | undefined;
       if (Array.isArray(ratios) && ratios.length) applySplitRatio(ratios);
@@ -2291,7 +2448,7 @@ export const AppManager: React.FC = () => {
       window.removeEventListener('dex-split-layout', onSplit);
       window.removeEventListener('dex-grid-layout', onGrid);
     };
-  }, [autoTileAll, applySplitRatio, applyGridLayout]);
+  }, [autoTileAll, applySplitRatio, applyGridLayout, applyTilingLayout]);
 
   // Keyboard shortcuts -- use ref-based handler to avoid re-registering on every state change
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -2320,8 +2477,30 @@ export const AppManager: React.FC = () => {
       // F3 or Ctrl+Up -- App Overview (Mission Control)
       if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp')) { e.preventDefault(); setShowOverview(p => !p); return; }
 
+      // Ctrl+Alt+Z -- open the FancyZones-style Zone Editor (custom snap zones).
+      if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('dex-open-zone-editor'));
+        return;
+      }
+
       // Window positioning shortcuts (Win+Arrow or Ctrl+Alt+Arrow)
       const focusedApp = focusedFloatingAppId || (detachedApps.has(currentAppId) ? currentAppId : null);
+      // Expand-across-zones (FancyZones grammar): with a custom zone layout active,
+      // Ctrl+Alt+Shift+Arrow (or Meta+Shift+Arrow) grows the focused window to also
+      // cover the adjacent zone(s). Only claims the key when a layout is active, so
+      // it otherwise falls through to the standard half/quadrant tiling below.
+      if (focusedApp && e.shiftKey && (e.metaKey || (e.ctrlKey && e.altKey))) {
+        const dirMap: Record<string, ExpandDir> = {
+          ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+        };
+        const dir = dirMap[e.key];
+        if (dir && useZoneStore.getState().getActiveLayout()) {
+          e.preventDefault();
+          expandFocusedAcross(dir);
+          return;
+        }
+      }
       if (focusedApp && (e.metaKey || (e.ctrlKey && e.altKey))) {
         if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'left'); return; }
         if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'right'); return; }
@@ -2343,6 +2522,41 @@ export const AppManager: React.FC = () => {
         if (e.key === 'ArrowDown') { e.preventDefault(); tileWindow(focusedApp as AppId, 'bottom'); return; }
         if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-left'); return; }
         if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-right'); return; }
+      }
+
+      // Apply-layout-by-hotkey (FancyZones grammar): Alt+Shift+1..6 tile ALL open
+      // windows under a selectable strategy. `e.code` (Digit1..Digit6) is used so
+      // it is keyboard-layout independent (Shift+1 may produce "!"). Ctrl+Alt+digit
+      // is deliberately avoided — it switches Project Spaces.
+      if (e.altKey && e.shiftKey && /^Digit[1-6]$/.test(e.code)) {
+        e.preventDefault();
+        const layouts: TilingLayout[] = ['master', 'columns', 'rows', 'grid', 'dwindle', 'monocle'];
+        applyTilingLayout(layouts[parseInt(e.code.slice(5), 10) - 1]);
+        return;
+      }
+      // Cycle focus through open floating windows (FancyZones "cycle within zone",
+      // generalised to all detached windows): Meta+` or Ctrl+Alt+`.
+      if ((e.metaKey || (e.ctrlKey && e.altKey)) && e.code === 'Backquote') {
+        e.preventDefault();
+        const ids = Array.from(detachedApps.keys());
+        if (ids.length > 1) {
+          const cur = focusedFloatingAppId && ids.includes(focusedFloatingAppId)
+            ? ids.indexOf(focusedFloatingAppId) : -1;
+          const dir = e.shiftKey ? -1 : 1;
+          const next = ids[(cur + dir + ids.length) % ids.length];
+          bringToFront(next as AppId);
+        }
+        return;
+      }
+      // Cycle focus among windows that SHARE the focused window's zone(s)
+      // (FancyZones "cycle within zone"): Ctrl+Alt+] forward, Ctrl+Alt+[ back.
+      // Needs an active custom zone layout, else falls through.
+      if (e.ctrlKey && e.altKey && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+        if (useZoneStore.getState().getActiveLayout()) {
+          e.preventDefault();
+          cycleWithinZone(e.code === 'BracketLeft');
+          return;
+        }
       }
 
       // Ctrl+W -- close current app (go home)
@@ -2910,6 +3124,13 @@ export const AppManager: React.FC = () => {
                 let currentY = origY;
                 let rafId = 0;
                 let hasMoved = false;
+                // Cache the work area ONCE for the whole drag. getShellWorkspace()
+                // reads clientWidth/clientHeight, which forces a layout reflow --
+                // calling it every rAF frame was a per-frame forced reflow that made
+                // the window stutter / lag behind the cursor (the "ghost" feel). The
+                // work area cannot change mid-drag, so a single read is both correct
+                // and smooth -- matching the FloatingLauncher's cheap per-frame path.
+                const dragWorkspace = getShellWorkspace(0);
                 const el = titleBar.parentElement as HTMLElement;
                 if (el) {
                   // Disable transitions and enable GPU acceleration for smooth drag
@@ -2934,16 +3155,20 @@ export const AppManager: React.FC = () => {
                   rafScheduled = true;
                   rafId = requestAnimationFrame(() => {
                     rafScheduled = false;
-                    const workspace = getShellWorkspace(0);
                     // Free-drag: allow movement past edges, only keep part of title bar reachable
                     const loose = clampWindowForDrag(
                       { x: origX + pendingPX - startX, y: origY + pendingPY - startY, w: dragBounds.w, h: dragBounds.h },
-                      workspace,
+                      dragWorkspace,
                     );
                     currentX = loose.x;
                     currentY = loose.y;
                     if (el) {
-                      // GPU-accelerated transform (no layout/reflow during drag)
+                      // GPU-accelerated transform (no layout/reflow during drag). Re-assert
+                      // the drag styles every frame: a mid-drag React re-render (e.g. the
+                      // snap-zone setState) reconciles the window's style prop and would
+                      // otherwise restore transition/will-change, degrading the drag.
+                      el.style.transition = 'none';
+                      el.style.willChange = 'transform';
                       el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
                     }
                     // Live snap-zone preview -- throttled to ~64ms. It's a hit-test
@@ -2975,18 +3200,29 @@ export const AppManager: React.FC = () => {
                   // Clear preview
                   snapPreviewRef.current = null;
                   setSnapPreviewZone(null);
-                  // Final position — free drag (only require a slice of title bar visible)
-                  const workspace = getShellWorkspace(0);
+                  // Final position — free drag (only require a slice of title bar visible).
+                  // Reuse the cached work area (same drag, unchanged) — no extra reflow.
+                  const workspace = dragWorkspace;
                   const looseFinal = clampWindowForDrag(
                     { x: origX + ev.clientX - startX, y: origY + ev.clientY - startY, w: dragBounds.w, h: dragBounds.h },
                     workspace,
                   );
                   const finalX = looseFinal.x;
                   const finalY = looseFinal.y;
-                  // Commit snap or final position
+                  // Commit snap or final position. A custom zone layout (FancyZones
+                  // editor) takes priority: drop onto the zone under the cursor.
+                  // Size-proportional motion (Fluent): a larger window animates
+                  // longer; reduced-motion collapses it to a single frame.
+                  const snapMs = motionDurationForSize(Math.max(dragBounds.w, dragBounds.h), { reducedMotion: prefersReducedMotion() });
+                  const ease = 'cubic-bezier(0.2,0.9,0.3,1)';
+                  const snapEase = `left ${snapMs}ms ${ease}, top ${snapMs}ms ${ease}, width ${snapMs}ms ${ease}, height ${snapMs}ms ${ease}`;
+                  if (snapToCustomZone(appId, ev.clientX, ev.clientY)) {
+                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
+                    return;
+                  }
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
-                    if (el) { el.style.transform = ''; el.style.transition = 'left 0.25s cubic-bezier(0.2,0.9,0.3,1), top 0.25s cubic-bezier(0.2,0.9,0.3,1), width 0.25s cubic-bezier(0.2,0.9,0.3,1), height 0.25s cubic-bezier(0.2,0.9,0.3,1)'; }
+                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
                     tileWindow(appId, zone);
                   } else {
                     // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
@@ -4363,6 +4599,9 @@ export const AppManager: React.FC = () => {
       {/* UKI Voice Assistant Transcript Overlay */}
       <UkiOverlay />
       <AskUkiSelection />
+
+      {/* FancyZones-style custom snap-zone editor (opens on dex-open-zone-editor) */}
+      <ZoneEditor />
 
       {/* Global "right-click selected text -> Ask UKI" affordance (one more
           path to the assistant). Self-contained; defers to any existing menu. */}
