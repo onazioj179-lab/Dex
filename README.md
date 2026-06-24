@@ -78,9 +78,12 @@ unlock features.
 
 - The installer asks you to **read and accept the License** before any files are
   written — no silent installs.
-- Updates are **signed and verified** against the publisher key before they can
-  replace anything on disk, and DEX updates itself automatically from the
-  official release feed.
+- **App updates are verified** against the publisher key before they can replace
+  anything on disk, and DEX updates itself from the official release feed.
+- **First-run note:** the current Windows installer is **not yet OS code-signed**,
+  so SmartScreen may show an "unknown publisher" prompt — choose *More info →
+  Run anyway*. Signing is being added (see
+  [docs/SIGNING.md](docs/SIGNING.md)).
 
 ---
 
