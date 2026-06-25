@@ -373,8 +373,8 @@ const Calculator: React.FC = () => {
   return (
     <div style={styles.container}>
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.modeToggle}>
+      <div className="dex-liquid-glass" style={styles.header}>
+        <div className="dex-liquid-glass" style={styles.modeToggle}>
           <button
             aria-label="Basic mode"
             style={{ ...styles.modeBtn, ...(mode === 'basic' ? styles.modeBtnActive : {}) }}
@@ -387,17 +387,17 @@ const Calculator: React.FC = () => {
           >Scientific</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button style={styles.historyBtn} onClick={copyResult} aria-label="Copy result" title="Copy result">
+          <button className="dex-liquid-glass" style={styles.historyBtn} onClick={copyResult} aria-label="Copy result" title="Copy result">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
           </button>
-          <button style={styles.historyBtn} onClick={sendResult} aria-label="Send result to app" title="Send to app (Flow)">
+          <button className="dex-liquid-glass" style={styles.historyBtn} onClick={sendResult} aria-label="Send result to app" title="Send to app (Flow)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
             </svg>
           </button>
-          <button style={styles.historyBtn} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" title="History">
+          <button className="dex-liquid-glass" style={styles.historyBtn} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" title="History">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
@@ -410,17 +410,18 @@ const Calculator: React.FC = () => {
         {/* Natural-language input: units, percents, functions */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <input
+            className="dex-liquid-glass"
             value={naturalInput}
             onChange={e => setNaturalInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') runNatural(); }}
             placeholder="Try: 5 km in mi · 20% of 80 · sqrt(2)"
             aria-label="Natural calculation input"
-            style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
+            style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 12, color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
           />
-          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
+          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
         </div>
         {/* Display */}
-        <div style={styles.displayArea}>
+        <div className="dex-liquid-glass-strong" style={styles.displayArea}>
           {expression && <div style={styles.expression}>{expression}</div>}
           <div style={styles.display}>{display}</div>
           {memory !== 0 && <div style={styles.memoryBadge}>M</div>}
@@ -477,7 +478,7 @@ const Calculator: React.FC = () => {
 
       {/* History Panel */}
       {showHistory && (
-        <div style={styles.historyPanel}>
+        <div className="dex-liquid-glass-strong" style={styles.historyPanel}>
           <div style={styles.historyHeader}>
             <span className="dex-label-caps">History</span>
             {history.length > 0 && (
@@ -519,21 +520,18 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     padding: 'var(--space-3) var(--space-4)',
     height: '44px',
-    background: 'var(--color-bg-surface-solid, #1C1C1E)',
-    borderBottom: '1px solid var(--color-border-subtle)',
+    borderRadius: 0,
   },
   modeToggle: {
     display: 'flex',
-    background: 'var(--color-bg-hover)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     padding: '2px',
-    border: '1px solid var(--color-border-subtle)',
     gap: '2px',
   },
   modeBtn: {
     padding: 'var(--space-2) var(--space-4)',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     background: 'transparent',
     color: 'var(--color-text-muted)',
     fontSize: '11px',
@@ -549,12 +547,10 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 2px 8px rgba(10,132,255,0.4)',
   },
   historyBtn: {
-    background: 'var(--color-bg-hover)',
-    border: '1px solid var(--color-border-subtle)',
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
     padding: 'var(--space-2)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -576,10 +572,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     justifyContent: 'flex-end',
     position: 'relative',
-    background: 'var(--color-bg-surface)',
-    borderRadius: '10px',
+    borderRadius: '12px',
     marginBottom: '10px',
-    border: '1px solid var(--color-border-subtle)',
   },
   expression: {
     fontSize: '14px',
@@ -607,7 +601,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent-light)',
     color: 'var(--color-accent)',
     padding: '4px 10px',
-    borderRadius: '3px',
+    borderRadius: '8px',
     fontSize: '10px',
     fontWeight: 700,
     letterSpacing: '0.5px',
@@ -624,8 +618,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '0',
     bottom: '0',
     width: 'min(260px, 82vw)',
-    background: 'var(--color-bg-surface)',
-    borderLeft: '1px solid var(--color-border-subtle)',
+    borderRadius: 0,
     display: 'flex',
     flexDirection: 'column',
     boxShadow: 'var(--shadow-lg)',
@@ -645,7 +638,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     padding: '4px var(--space-2)',
-    borderRadius: '3px',
+    borderRadius: '8px',
     transition: 'all 0.2s ease',
     letterSpacing: '0.3px',
   },
@@ -663,7 +656,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyItem: {
     padding: 'var(--space-3)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     marginBottom: 'var(--space-2)',
     background: 'var(--color-bg-surface)',
     cursor: 'pointer',

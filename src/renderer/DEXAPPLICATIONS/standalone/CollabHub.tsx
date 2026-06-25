@@ -1083,8 +1083,9 @@ const CollabHub: React.FC = () => {
 
   const handleOpenProject = useCallback((project: SharedProject) => {
     setActiveProject(project.id);
-    // Launch the app
-    window.dispatchEvent(new CustomEvent('dex-launch-app', {
+    // Launch the app. The shell's launch listener (AppManager) keys off
+    // 'dex-open-app' { appId }; the old 'dex-launch-app' name had no handler.
+    window.dispatchEvent(new CustomEvent('dex-open-app', {
       detail: { appId: project.appId }
     }));
   }, [setActiveProject]);

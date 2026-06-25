@@ -293,11 +293,11 @@ const QRCodeGenerator: React.FC = () => {
       <div style={s.body}>
         {/* Quick actions */}
         <div style={s.quickRow}>
-          <button onClick={pasteFromClipboard} disabled={busy} style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Paste from clipboard">
+          <button onClick={pasteFromClipboard} disabled={busy} className="dex-liquid-glass" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Paste from clipboard">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
             Paste
           </button>
-          <button onClick={encodeCurrentUrl} disabled={busy} style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Encode current URL">
+          <button onClick={encodeCurrentUrl} disabled={busy} className="dex-liquid-glass" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Encode current URL">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
             Encode URL
           </button>
@@ -310,6 +310,7 @@ const QRCodeGenerator: React.FC = () => {
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="Enter text to encode..."
+              className="dex-liquid-glass-strong"
               style={s.textarea}
               maxLength={300}
               aria-label="Text to encode"
@@ -320,15 +321,16 @@ const QRCodeGenerator: React.FC = () => {
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://example.com"
+              className="dex-liquid-glass"
               style={s.input}
               aria-label="URL to encode"
             />
           )}
           {mode === 'wifi' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Network name (SSID)" style={s.input} aria-label="Wi-Fi network name (SSID)" />
-              <input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Password" type="password" style={s.input} aria-label="Wi-Fi password" />
-              <select value={wifiType} onChange={e => setWifiType(e.target.value as any)} style={s.select} aria-label="Wi-Fi security type">
+              <input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Network name (SSID)" className="dex-liquid-glass" style={s.input} aria-label="Wi-Fi network name (SSID)" />
+              <input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Password" type="password" className="dex-liquid-glass" style={s.input} aria-label="Wi-Fi password" />
+              <select value={wifiType} onChange={e => setWifiType(e.target.value as any)} className="dex-liquid-glass" style={s.select} aria-label="Wi-Fi security type">
                 <option value="WPA">WPA/WPA2</option>
                 <option value="WEP">WEP</option>
                 <option value="nopass">No Password</option>
@@ -337,15 +339,15 @@ const QRCodeGenerator: React.FC = () => {
           )}
           {mode === 'contact' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" style={s.input} aria-label="Contact full name" />
-              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone number" style={s.input} aria-label="Contact phone number" />
-              <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" style={s.input} aria-label="Contact email" />
+              <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" className="dex-liquid-glass" style={s.input} aria-label="Contact full name" />
+              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone number" className="dex-liquid-glass" style={s.input} aria-label="Contact phone number" />
+              <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" className="dex-liquid-glass" style={s.input} aria-label="Contact email" />
             </div>
           )}
           {mode === 'geo' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={geoLat} onChange={e => setGeoLat(e.target.value)} placeholder="Latitude (e.g. 37.7749)" inputMode="decimal" style={s.input} aria-label="Latitude" />
-              <input value={geoLng} onChange={e => setGeoLng(e.target.value)} placeholder="Longitude (e.g. -122.4194)" inputMode="decimal" style={s.input} aria-label="Longitude" />
+              <input value={geoLat} onChange={e => setGeoLat(e.target.value)} placeholder="Latitude (e.g. 37.7749)" inputMode="decimal" className="dex-liquid-glass" style={s.input} aria-label="Latitude" />
+              <input value={geoLng} onChange={e => setGeoLng(e.target.value)} placeholder="Longitude (e.g. -122.4194)" inputMode="decimal" className="dex-liquid-glass" style={s.input} aria-label="Longitude" />
             </div>
           )}
         </div>
@@ -362,15 +364,15 @@ const QRCodeGenerator: React.FC = () => {
         {/* Actions */}
         {qrMatrix && (
           <div style={s.actions}>
-            <button onClick={downloadQR} style={s.actionBtn} aria-label="Download QR code as PNG">
+            <button onClick={downloadQR} className="dex-liquid-glass" style={s.actionBtn} aria-label="Download QR code as PNG">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download PNG
             </button>
-            <button onClick={downloadSVG} style={s.actionBtn} aria-label="Download QR code as SVG">
+            <button onClick={downloadSVG} className="dex-liquid-glass" style={s.actionBtn} aria-label="Download QR code as SVG">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               SVG
             </button>
-            <button onClick={copyQR} disabled={busy} style={{ ...s.actionBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Copy QR code to clipboard">
+            <button onClick={copyQR} disabled={busy} className="dex-liquid-glass" style={{ ...s.actionBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Copy QR code to clipboard">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               Copy
             </button>
@@ -393,7 +395,7 @@ const QRCodeGenerator: React.FC = () => {
         <div style={s.settingsRow}>
           <div style={s.settingGroup}>
             <span style={s.settingLabel}>Error correction</span>
-            <div style={s.segmented} role="group" aria-label="Error correction level">
+            <div className="dex-liquid-glass" style={s.segmented} role="group" aria-label="Error correction level">
               {(['L', 'M', 'Q', 'H'] as ECLevel[]).map(level => (
                 <button
                   key={level}
@@ -435,6 +437,7 @@ const QRCodeGenerator: React.FC = () => {
                 <button
                   key={`${entry.ts}-${i}`}
                   onClick={() => restoreEntry(entry)}
+                  className="dex-liquid-glass"
                   style={s.historyItem}
                   title={entry.data}
                 >
@@ -712,7 +715,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -726,20 +729,17 @@ const s: Record<string, React.CSSProperties> = {
   },
   inputArea: {},
   textarea: {
-    width: '100%', minHeight: 80, padding: '10px var(--space-3)', borderRadius: 8,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    width: '100%', minHeight: 80, padding: '10px var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 14, resize: 'vertical',
     outline: 'none', fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   input: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 14, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   select: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 14, cursor: 'pointer',
     outline: 'none', fontFamily: 'var(--font-family)',
   },
@@ -747,11 +747,11 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'center', padding: 'var(--space-4)',
   },
   canvas: {
-    width: 240, height: 240, borderRadius: 10,
+    width: 240, height: 240, borderRadius: 12,
     border: '1px solid var(--color-border-subtle)',
   },
   placeholder: {
-    width: 240, height: 240, borderRadius: 10,
+    width: 240, height: 240, borderRadius: 12,
     border: '2px dashed var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center',
@@ -762,8 +762,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   actionBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none',
-    background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)',
+    padding: 'var(--space-2) var(--space-4)', borderRadius: 12, border: 'none',
+    color: 'var(--color-text-primary)',
     fontSize: 13, fontWeight: 500, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
@@ -774,7 +774,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
   },
   colorInput: {
-    width: 28, height: 28, border: 'none', borderRadius: 4,
+    width: 28, height: 28, border: 'none', borderRadius: 10,
     cursor: 'pointer', background: 'transparent',
   },
   quickRow: {
@@ -782,8 +782,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   quickBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px var(--space-3)', borderRadius: 6,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    padding: '6px var(--space-3)', borderRadius: 10,
     color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500,
     cursor: 'pointer', transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
@@ -799,11 +798,10 @@ const s: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase', color: 'var(--color-text-muted)',
   },
   segmented: {
-    display: 'flex', gap: 2, padding: 2, borderRadius: 8,
-    background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)',
+    display: 'flex', gap: 2, padding: 2, borderRadius: 10,
   },
   segment: {
-    flex: 1, padding: '6px 0', borderRadius: 6, border: 'none',
+    flex: 1, padding: '6px 0', borderRadius: 8, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -830,13 +828,13 @@ const s: Record<string, React.CSSProperties> = {
   },
   historyItem: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-    padding: '6px var(--space-2)', borderRadius: 6, border: 'none',
-    background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
+    padding: '6px var(--space-2)', borderRadius: 10, border: 'none',
+    color: 'var(--color-text-secondary)',
     fontSize: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   historyBadge: {
-    flexShrink: 0, width: 18, height: 18, borderRadius: 4,
+    flexShrink: 0, width: 18, height: 18, borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'var(--color-accent-light)', color: 'var(--color-accent)',
     fontSize: 11, fontWeight: 700,

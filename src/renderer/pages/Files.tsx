@@ -442,6 +442,21 @@ export const Files: React.FC = () => {
   // `clipboard`. Batch paste fans out over the existing files:copy/files:move.
   const [batchClipboard, setBatchClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null);
 
+  // Anchor index (into the live filteredFiles order) for Shift+click range
+  // selection. A ref so updating it never forces a re-render; range math reads
+  // the latest filteredFiles via the same memoized order the rows render in.
+  const selectionAnchorRef = useRef<number | null>(null);
+  // Latest filteredFiles paths in render order, kept in a ref so the selection
+  // handler (declared before the filteredFiles memo) can resolve a Shift+click
+  // range without a temporal-dead-zone reference. Refreshed each render below.
+  const orderedPathsRef = useRef<string[]>([]);
+
+  // Progress/result for a copy-or-move-to-destination transfer. Drives the
+  // inline transfer banner; null when no transfer is running or being reported.
+  const [transferState, setTransferState] = useState<
+    { mode: 'copy' | 'move'; total: number; done: number; failed: number; finished: boolean } | null
+  >(null);
+
   // Color tags (persisted in localStorage)
   const [fileTags, setFileTags] = useState<Record<string, TagColor>>(() => {
     try { return JSON.parse(localStorage.getItem('dex-file-tags') || '{}'); } catch { return {}; }
@@ -699,7 +714,10 @@ export const Files: React.FC = () => {
         setQuickLookFile(null);
       } else if (e.key === 'Escape' && quickLookFile) {
         setQuickLookFile(null);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      } else if (e.key === 'Escape' && !inEditable) {
+        // No Quick Look open: Escape clears the current multi-selection.
+        clearSelection();
+      } else if (!inEditable && (e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
         handleSelectAll();
       } else if (!inEditable && e.key === 'Backspace' && historyIndex > 0) {
@@ -859,37 +877,79 @@ export const Files: React.FC = () => {
     }
   };
 
-  const handleSelectFile = useCallback((path: string, e: React.MouseEvent) => {
-    if (e.ctrlKey || e.metaKey) {
+  // Multi-select click handler. `index` is the row's position in the live
+  // filteredFiles order so Shift+click can resolve a contiguous range.
+  //  - Ctrl/Cmd+click: toggle this item, move the range anchor here.
+  //  - Shift+click: select the inclusive range from the anchor to here
+  //    (falls back to a single add when no anchor is set yet).
+  //  - plain click via this path is handled by handleItemClick; this function
+  //    is only invoked for modifier clicks.
+  const handleSelectFile = useCallback((path: string, index: number, e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      const ordered = orderedPathsRef.current;
+      const anchor = selectionAnchorRef.current ?? index;
+      const lo = Math.min(anchor, index);
+      const hi = Math.max(anchor, index);
+      const range = ordered.slice(lo, hi + 1);
       setSelectedFiles(prev => {
         const next = new Set(prev);
-        if (next.has(path)) next.delete(path); else next.add(path);
+        range.forEach(p => next.add(p));
         return next;
       });
-    } else {
-      setSelectedFiles(new Set());
       setSelectedFile(path);
+      return;
     }
+    // Ctrl/Cmd toggle.
+    selectionAnchorRef.current = index;
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+    setSelectedFile(path);
+  }, []);
+
+  // Clear the whole multi-selection (Deselect action / Escape / empty click).
+  const clearSelection = useCallback(() => {
+    selectionAnchorRef.current = null;
+    setSelectedFiles(new Set());
   }, []);
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedFiles.size === 0) return;
+    const count = selectedFiles.size;
     const confirmed = await confirm({
-      title: 'Delete selected items?',
-      message: `${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'} will be deleted.`,
-      confirmLabel: 'Delete',
+      title: 'Move selected to Trash?',
+      message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
+      confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
     if (!confirmed) return;
-    for (const path of selectedFiles) {
+    const paths = [...selectedFiles];
+    let done = 0;
+    let failed = 0;
+    for (const path of paths) {
+      const item = files.find(f => f.path === path);
       try {
-        if (window.electron?.invoke) await window.electron.invoke('files:delete', path);
-      } catch { toast.error(`Failed to delete ${path}`); }
+        // Record in the recycle bin first (best-effort), mirroring single delete.
+        if ((window as any).dex?.invoke && item) {
+          await (window as any).dex.invoke('recycle-bin:delete', 'files', item.isDirectory ? 'folder' : 'file', item.name, JSON.stringify({ path: item.path, size: item.size }), currentPath);
+        }
+        if (window.electron?.invoke) {
+          await window.electron.invoke('files:delete', path);
+          done++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
     }
-    setSelectedFiles(new Set());
+    clearSelection();
     loadFiles(currentPath);
-    toast.success(`Deleted ${selectedFiles.size} items`);
-  }, [selectedFiles, currentPath, loadFiles, toast]);
+    if (done > 0) toast.success(`Deleted ${done} item${done === 1 ? '' : 's'}`);
+    if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
+  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm]);
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
@@ -1053,6 +1113,93 @@ export const Files: React.FC = () => {
     else toast.error('Paste operation failed');
   }, [batchClipboard, currentPath, loadFiles, toast]);
 
+  // Prompt for a destination folder via the native open dialog (directory mode).
+  // Mirrors the picker pattern used elsewhere (Home / PDFViewer): try
+  // files:openDialog, fall back to dialog:showOpenDialog, read filePaths[0].
+  // Returns the chosen directory path, or null when canceled / unavailable.
+  const pickDestinationFolder = useCallback(async (): Promise<string | null> => {
+    const opts = { properties: ['openDirectory'] as string[], defaultPath: currentPath || undefined };
+    try {
+      let result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('files:openDialog', opts);
+      if (!result || (!result.filePaths && !result.canceled)) {
+        result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('dialog:showOpenDialog', opts);
+      }
+      const dest = result?.filePaths?.[0];
+      return dest || null;
+    } catch (err) {
+      console.error('Destination picker failed:', err);
+      toast.error('Could not open folder picker');
+      return null;
+    }
+  }, [currentPath, toast]);
+
+  // Copy or MOVE every selected item into a destination folder chosen via the
+  // native picker. Streams server-side through the existing files:copy /
+  // files:move handlers (so large files transfer without renderer work) and
+  // reports live progress through transferState. On move, the source folder is
+  // refreshed; on copy, the listing is left as-is unless dest === currentPath.
+  const handleTransferSelected = useCallback(async (mode: 'copy' | 'move') => {
+    if (selectedFiles.size === 0) return;
+    const paths = [...selectedFiles];
+    const dest = await pickDestinationFolder();
+    if (!dest) return;
+    setTransferState({ mode, total: paths.length, done: 0, failed: 0, finished: false });
+    let done = 0;
+    let failed = 0;
+    for (const src of paths) {
+      try {
+        if (window.electron?.invoke) {
+          await window.electron.invoke(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
+          done++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        console.error(`Failed to ${mode}`, src, '->', dest, err);
+        failed++;
+      }
+      setTransferState({ mode, total: paths.length, done, failed, finished: false });
+    }
+    setTransferState({ mode, total: paths.length, done, failed, finished: true });
+    clearSelection();
+    // A move always mutates the current folder; a copy only does when the
+    // destination is the folder being viewed. Refresh in either of those cases.
+    if (mode === 'move' || dest === currentPath) loadFiles(currentPath);
+    if (done > 0) toast.success(`${mode === 'copy' ? 'Copied' : 'Moved'} ${done} item${done === 1 ? '' : 's'}`);
+    if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} failed to ${mode}`);
+    // Auto-dismiss the result banner after a short delay.
+    window.setTimeout(() => setTransferState(null), 3200);
+  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles, toast]);
+
+  // Keyboard shortcuts for the multi-selection. Declared after the batch
+  // handlers so every reference is in scope. Delete removes the selection;
+  // Ctrl/Cmd+C and Ctrl/Cmd+X stage a copy/cut; Ctrl/Cmd+V drops the staged
+  // batch into the current folder. All guarded so typing in inputs is never
+  // hijacked, and gated on there being a selection (or a staged batch).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const inEditable = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (inEditable) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if ((e.key === 'Delete' || e.key === 'Del') && selectedFiles.size > 0) {
+        e.preventDefault();
+        handleBatchDelete();
+      } else if (mod && (e.key === 'c' || e.key === 'C') && selectedFiles.size > 0) {
+        e.preventDefault();
+        handleBatchCopy();
+      } else if (mod && (e.key === 'x' || e.key === 'X') && selectedFiles.size > 0) {
+        e.preventDefault();
+        handleBatchCut();
+      } else if (mod && (e.key === 'v' || e.key === 'V') && batchClipboard) {
+        e.preventDefault();
+        handleBatchPaste();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedFiles, batchClipboard, handleBatchDelete, handleBatchCopy, handleBatchCut, handleBatchPaste]);
+
   // Keep the '--' placeholder for empty/zero rows; otherwise use the shared canonical.
   const formatSize = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : '--');
 
@@ -1183,6 +1330,9 @@ export const Files: React.FC = () => {
     return result;
   }, [files, filters, activeCollection, recentFiles, activeTagFilter, fileTags]);
 
+  // Keep the render-order path list current for Shift+click range selection.
+  useEffect(() => { orderedPathsRef.current = filteredFiles.map(f => f.path); }, [filteredFiles]);
+
   // Whether the current empty result is caused by an active search/filter
   // (vs. a genuinely empty folder). Drives the "no matches" empty state.
   const hasActiveFilter = useMemo(() => (
@@ -1259,6 +1409,7 @@ export const Files: React.FC = () => {
         input:focus { outline: none; }
         .dex-crumb:not(:disabled):hover { background: var(--color-bg-hover); color: var(--color-text-primary) !important; }
         .dex-toolbtn:not(:disabled):hover { background: var(--color-bg-hover); }
+        @keyframes dex-files-spin { to { transform: rotate(360deg); } }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
@@ -1762,22 +1913,47 @@ export const Files: React.FC = () => {
           </div>
         )}
 
-        {/* Batch Action Bar */}
+        {/* Batch Action Bar — appears whenever one or more items are selected.
+            Copy/Move open a destination picker and stream through files:copy /
+            files:move; Delete batch-removes; Deselect clears. The in-place
+            Copy here / Cut staging and Copy Paths remain as secondary tools. */}
         {selectedFiles.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
-            <button onClick={handleBatchCopy} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
-            <button onClick={handleBatchCut} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
-            <button onClick={handleBatchDelete} style={{ padding: '6px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-            <button onClick={() => { selectedFiles.forEach(p => navigator.clipboard.writeText(p)); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={() => handleTransferSelected('copy')} title="Copy selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copy to...</button>
+            <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
+            <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
+            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
+            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
+            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
             <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
-            <button onClick={() => setSelectedFiles(new Set())} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Clear</button>
+            <button onClick={clearSelection} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
+          </div>
+        )}
+
+        {/* Transfer progress / result banner for Copy to.../Move to... */}
+        {transferState && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)', fontSize: 12 }}>
+            {!transferState.finished ? (
+              <>
+                <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--color-accent)', borderTopColor: 'transparent', display: 'inline-block', animation: 'dex-files-spin 0.7s linear infinite' }} />
+                <span style={{ color: 'var(--color-text-secondary)' }}>{transferState.mode === 'copy' ? 'Copying' : 'Moving'} {transferState.done + transferState.failed} of {transferState.total}...</span>
+              </>
+            ) : (
+              <span style={{ color: transferState.failed > 0 ? 'var(--color-error)' : 'var(--color-success)' }}>
+                {transferState.mode === 'copy' ? 'Copied' : 'Moved'} {transferState.done} of {transferState.total}{transferState.failed > 0 ? ` · ${transferState.failed} failed` : ''}
+              </span>
+            )}
           </div>
         )}
 
         {/* File List */}
-        <div style={styles.content}>
+        <div
+          style={styles.content}
+          onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}
+        >
           {loadError ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
               <div style={{ width: 64, height: 64, borderRadius: 10, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
@@ -1799,7 +1975,7 @@ export const Files: React.FC = () => {
               <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
             </div>
           ) : viewMode === 'list' ? (
-            <div style={styles.listContainer}>
+            <div style={styles.listContainer} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
               {/* Header */}
               <div style={styles.listHeader}>
                 <span style={{ flex: 1 }}>Name</span>
@@ -1841,13 +2017,20 @@ export const Files: React.FC = () => {
                     ...styles.listRow,
                     background: dragOverPath === file.path
                       ? 'var(--color-accent-soft)'
-                      : selectedFile === file.path 
-                        ? 'var(--color-bg-active)' 
-                        : 'var(--color-bg-surface-solid)',
+                      : selectedFiles.has(file.path)
+                        ? 'var(--color-accent-soft)'
+                        : selectedFile === file.path
+                          ? 'var(--color-bg-active)'
+                          : 'var(--color-bg-surface-solid)',
                     outline: dragOverPath === file.path ? '2px solid var(--color-accent)' : 'none',
                     borderRadius: dragOverPath === file.path ? 6 : 0,
+                    boxShadow: selectedFiles.has(file.path) ? 'inset 3px 0 0 var(--color-accent)' : 'none',
                   }}
-                  onClick={() => handleItemClick(file)}
+                  onClick={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.shiftKey) { handleSelectFile(file.path, idx, e); return; }
+                    if (selectedFiles.size > 0) clearSelection();
+                    handleItemClick(file);
+                  }}
                   onDoubleClick={() => handleItemDoubleClick(file)}
                   onContextMenu={(e) => handleFileContextMenu(e, file)}
                 >
@@ -1943,7 +2126,7 @@ export const Files: React.FC = () => {
               })}
             </div>
           ) : (
-            <div style={styles.gridContainer}>
+            <div style={styles.gridContainer} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
               {filteredFiles.length === 0 ? (
                 hasActiveFilter ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>
@@ -1963,7 +2146,7 @@ export const Files: React.FC = () => {
                     <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
-              ) : visibleFiles.map(file => (
+              ) : visibleFiles.map((file, idx) => (
                 <div
                   key={file.path}
                   draggable
@@ -1976,10 +2159,18 @@ export const Files: React.FC = () => {
                     ...styles.gridItem,
                     background: dragOverPath === file.path
                       ? 'var(--color-accent-soft)'
-                      : selectedFile === file.path ? 'var(--color-bg-active)' : 'var(--color-bg-surface-solid)',
-                    outline: dragOverPath === file.path ? '2px solid var(--color-accent)' : 'none',
+                      : selectedFiles.has(file.path)
+                        ? 'var(--color-accent-soft)'
+                        : selectedFile === file.path ? 'var(--color-bg-active)' : 'var(--color-bg-surface-solid)',
+                    outline: dragOverPath === file.path
+                      ? '2px solid var(--color-accent)'
+                      : selectedFiles.has(file.path) ? '1.5px solid var(--color-accent)' : 'none',
                   }}
-                  onClick={() => handleItemClick(file)}
+                  onClick={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.shiftKey) { handleSelectFile(file.path, idx, e); return; }
+                    if (selectedFiles.size > 0) clearSelection();
+                    handleItemClick(file);
+                  }}
                   onDoubleClick={() => handleItemDoubleClick(file)}
                   onContextMenu={(e) => handleFileContextMenu(e, file)}
                 >

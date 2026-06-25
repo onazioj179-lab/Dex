@@ -19,6 +19,7 @@ import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
+import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
 import {
   type DeviceTier, ALL_TIERS, getTierLabel, getTierDescription,
@@ -1885,6 +1886,8 @@ export const Settings: React.FC = () => {
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
+  const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
+  const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
 
   // =========================================================================
   // SEARCH-FIRST SETTINGS (DEX 5.5)
@@ -2498,6 +2501,20 @@ export const Settings: React.FC = () => {
               >{preset}</button>
             ))}
           </div>
+        </div>
+
+        <h3 style={styles.sectionTitle}>DEX Bar</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Show DEX Bar</span>
+            <span style={styles.settingDesc}>The floating command bar (search, UKI, suggestions). Hide it for a cleaner desktop; re-enable here anytime.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={dexBarEnabled}
+            onChange={(e) => setDexBarEnabled(e.target.checked)}
+            aria-label="Show DEX Bar"
+          />
         </div>
 
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>

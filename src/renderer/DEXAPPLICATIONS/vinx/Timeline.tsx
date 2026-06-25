@@ -20,8 +20,9 @@ import {
 } from './VinxTypes';
 import {
   createMoveClipCommand, createTrimClipCommand, createSplitClipCommand,
-  createRemoveClipCommand, createRippleDeleteCommand,
+  createRemoveClipCommand, createRippleDeleteCommand, createAddClipCommand,
 } from './VinxCommands';
+import { buildClipFromMedia, resolveDropTrack } from './mediaClip';
 
 // ---------------------------------------------------------------------------
 // CONSTANTS
@@ -629,6 +630,7 @@ const TimelineToolbar: React.FC = memo(() => {
             background: activeTool === t.tool ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
             color: activeTool === t.tool ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: 'pointer', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
           onClick={() => setTool(t.tool)}
           title={`${t.tool} (${t.label})`}
@@ -643,9 +645,10 @@ const TimelineToolbar: React.FC = memo(() => {
         aria-label="Add marker at playhead"
         title="Add marker at playhead (M)"
         style={{
-          height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
+          height: 20, fontSize: 9, fontWeight: 600, padding: '0 8px',
           border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
           background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
         onClick={() => addMarker(useVinxStore.getState().currentFrame, '')}
       >
@@ -658,10 +661,11 @@ const TimelineToolbar: React.FC = memo(() => {
         aria-label="Toggle snapping"
         aria-pressed={snapEnabled}
         style={{
-          height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
+          height: 20, fontSize: 9, fontWeight: 600, padding: '0 8px',
           border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
           background: snapEnabled ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
           color: snapEnabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}
         onClick={toggleSnap}
       >
@@ -690,9 +694,10 @@ const TimelineToolbar: React.FC = memo(() => {
 TimelineToolbar.displayName = 'TimelineToolbar';
 
 const addTrackBtnStyle: React.CSSProperties = {
-  height: 20, fontSize: 9, fontWeight: 600, padding: '0 4px',
+  height: 20, minWidth: 24, fontSize: 9, fontWeight: 600, padding: '0 6px',
   border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
   background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
 };
 
 const zoomBtnStyle: React.CSSProperties = {
@@ -906,7 +911,20 @@ export const Timeline: React.FC<{
   }, [getClipById, executeCommand]);
 
   const handleDropMedia = useCallback((trackId: string, frame: number, data: string) => {
-    // Handle drops from media browser
+    // `data` is the media item's id (set by the media browser drag source).
+    const state = useVinxStore.getState();
+    const media = state.project.mediaBin.find(m => m.id === data);
+    if (!media) return;
+    const seq = state.getActiveSequence();
+    const target = resolveDropTrack(seq, media, trackId);
+    if (!target) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `No ${media.type === 'audio' ? 'audio' : 'video'} track available — add one first` } }));
+      return;
+    }
+    const clip = buildClipFromMedia(media, target.id, frame, state.project.frameRate);
+    state.executeCommand(createAddClipCommand(useVinxStore.getState, clip));
+    state.selectClip(clip.id, false);
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Added "${media.name}" to timeline` } }));
   }, []);
 
   // -- Scroll --

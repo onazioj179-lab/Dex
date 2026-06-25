@@ -33,11 +33,30 @@ import { useUkiStore } from '../../store/ukiStore';
 import { getSecuritySummary } from '../../store/permissionStore';
 import { getStoredTier, getTierLabel } from '../../services/TierManager';
 import { getNexusModel, onNexusChange, installNexusIngest } from '../../services/nexus/nexusLiveStore';
+import { isReduceMotion } from '../../utils/MotionController';
 import type { NexusEntityKind } from '../../../shared/nexus/model';
 
 const PREFERS_REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
+
+// ---------------------------------------------------------------------------
+// Sci-fi "tech HUD" energy accents (Omnitrix teal/green + Generator-Rex nanite
+// amber). These are deliberate, fixed signature hues layered ON TOP of the
+// theme-aware DEX tokens — used only for structural glow: ring strokes, the
+// selected/active marker, the scan motifs and chrome border-glow. They are
+// NEVER applied to body text, which stays on the high-contrast token colours.
+// ---------------------------------------------------------------------------
+const ENERGY = '#2ee6c6';      // primary HUD glow (Omnitrix teal)
+const ENERGY_HOT = '#19ffb0';  // hotter green for the active/selected core
+const NANITE = '#ffae3c';      // secondary "nanite" amber for armed/active state
+const ENERGY_RGB: RGB = { r: 46, g: 230, b: 198 };
+const ENERGY_HOT_RGB: RGB = { r: 25, g: 255, b: 176 };
+const NANITE_RGB: RGB = { r: 255, g: 174, b: 60 };
+const rgba = (c: RGB, a: number): string => `rgba(${c.r},${c.g},${c.b},${a})`;
+// CSS-ready glow strings reused across the DOM chrome (search pill / list).
+const ENERGY_GLOW = `0 0 0 1px ${rgba(ENERGY_RGB, 0.35)}, 0 0 18px ${rgba(ENERGY_RGB, 0.28)}`;
+const NANITE_GLOW = `0 0 0 1px ${rgba(NANITE_RGB, 0.40)}, 0 0 18px ${rgba(NANITE_RGB, 0.26)}`;
 
 // ---------------------------------------------------------------------------
 // Palette — resolved from the DEX design tokens at runtime (theme-aware).
@@ -156,35 +175,64 @@ function markerCapForTier(tier: ReturnType<typeof getPerfTier>): number {
   return tier === 'low' ? 16 : tier === 'mid' ? 28 : tier === 'high' ? 40 : 56;
 }
 
-// Pull a bounded, recency-ranked marker set from the live model + UKI knowledge.
-// Returns the visible slice plus the pre-slice total for the "shown/total" read-out.
+// Active marker filter — a free-text query plus an optional kind allow-set.
+// Empty query + null kinds means "everything" (the default).
+interface MarkerFilter {
+  query: string;
+  /** When set, only these entity kinds pass. Knowledge ('MEM') markers use the
+   *  pseudo-kind 'memory' so they can be toggled alongside the real kinds. */
+  kinds: Set<string> | null;
+}
+
+const EMPTY_FILTER: MarkerFilter = { query: '', kinds: null };
+
+// Pull a bounded, recency-ranked marker set from the live model + UKI knowledge,
+// narrowed by the active filter. Returns the visible slice, the post-filter total
+// (for the "shown/total" read-out), and the unfiltered grand total so the UI can
+// tell the difference between "nothing here" and "filtered everything out".
 function collectMarkers(
   knowledge: ReadonlyArray<{ id: string; label: string; color: string; weight: number; timestamp: number }>,
   pal: Palette,
   cap: number,
-): { markers: Marker[]; total: number } {
+  filter: MarkerFilter = EMPTY_FILTER,
+): { markers: Marker[]; total: number; grandTotal: number } {
   const model = getNexusModel();
   const out: Marker[] = [];
   const seen = new Set<string>();
+  const q = filter.query.trim().toLowerCase();
+  const kinds = filter.kinds;
+  let grandTotal = 0;
+
+  const passes = (label: string, tag: string, kind: string): boolean => {
+    if (kinds && !kinds.has(kind)) return false;
+    if (q && !label.toLowerCase().includes(q) && !tag.toLowerCase().includes(q)) return false;
+    return true;
+  };
 
   for (const kind of ALL_KINDS) {
     for (const e of model.byKind(kind)) {
       const key = (e.label || e.id).toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
+      grandTotal++;
       const meta = KIND_META[kind];
-      out.push({ id: e.id, label: e.label || e.id, colorKey: meta.key, tag: meta.tag, ts: e.ts, weight: 1, sx: 0, sy: 0 });
+      const label = e.label || e.id;
+      if (!passes(label, meta.tag, kind)) continue;
+      out.push({ id: e.id, label, colorKey: meta.key, tag: meta.tag, ts: e.ts, weight: 1, sx: 0, sy: 0 });
     }
   }
   for (const k of knowledge) {
     const key = (k.label || k.id).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ id: k.id, label: k.label || k.id, rawColor: resolveColor(k.color, pal), tag: 'MEM', ts: k.timestamp || 0, weight: k.weight || 0.5, sx: 0, sy: 0 });
+    grandTotal++;
+    const label = k.label || k.id;
+    if (!passes(label, 'MEM', 'memory')) continue;
+    out.push({ id: k.id, label, rawColor: resolveColor(k.color, pal), tag: 'MEM', ts: k.timestamp || 0, weight: k.weight || 0.5, sx: 0, sy: 0 });
   }
 
   out.sort((a, b) => b.ts - a.ts);
-  return { markers: out.slice(0, cap), total: out.length };
+  return { markers: out.slice(0, cap), total: out.length, grandTotal };
 }
 
 function ago(ts: number): string {
@@ -208,6 +256,9 @@ const Nexus: React.FC = () => {
   const timeRef = useRef(0);
   const lastTsRef = useRef(0);
   const paletteRef = useRef<Palette>(readPalette());
+  // Live reduced-motion gate (in addition to the static PREFERS_REDUCED_MOTION
+  // snapshot) so the new scan-sweep respects a toggle made after mount.
+  const reduceMotionRef = useRef(isReduceMotion());
 
   const markersRef = useRef<Marker[]>([]);
   const rotationRef = useRef(0);
@@ -221,6 +272,32 @@ const Nexus: React.FC = () => {
   const [hover, setHover] = useState<Marker | null>(null);
   const [markerCount, setMarkerCount] = useState(0);
   const [markerTotal, setMarkerTotal] = useState(0);
+  const [grandTotal, setGrandTotal] = useState(0);
+  // Visible marker set, mirrored into React so the list panel can render the same
+  // nodes the canvas ring shows (single source of truth: markersRef).
+  const [visible, setVisible] = useState<Marker[]>([]);
+
+  // --- Search + kind filter (narrows the ring, the list, and the read-outs) ---
+  const [query, setQuery] = useState('');
+  const [kindFilter, setKindFilter] = useState<Set<string> | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // Default-collapsed node list: progressive disclosure of the ring contents.
+  // Auto-opens while a search is active so results are pickable without hunting
+  // for a small dot on a slowly rotating ring.
+  const [listOpen, setListOpen] = useState(false);
+  const filterRef = useRef<MarkerFilter>(EMPTY_FILTER);
+  useEffect(() => {
+    filterRef.current = { query, kinds: kindFilter };
+  }, [query, kindFilter]);
+  const toggleKind = useCallback((kind: string) => {
+    setKindFilter(prev => {
+      const next = new Set(prev ?? []);
+      if (next.has(kind)) next.delete(kind); else next.add(kind);
+      return next.size === 0 ? null : next;
+    });
+  }, []);
+  const clearFilters = useCallback(() => { setQuery(''); setKindFilter(null); }, []);
+  const filtering = query.trim().length > 0 || (kindFilter !== null && kindFilter.size > 0);
 
   // Minimal mode (persisted) collapses the read-outs/gauges to just the reticle;
   // a narrow container auto-collapses too. `compact` is the effective state.
@@ -258,11 +335,17 @@ const Nexus: React.FC = () => {
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
   // --- Live data: subscribe Nexus ingest + rebuild markers on change ---------
+  // Reads the active filter from filterRef (not deps) so rapid search keystrokes
+  // don't re-create rebuild and churn the onNexusChange subscription.
   const rebuild = useCallback(() => {
-    const { markers: next, total } = collectMarkers(knowledgeNodes, paletteRef.current, markerCapForTier(getPerfTier()));
+    const { markers: next, total, grandTotal: gt } = collectMarkers(
+      knowledgeNodes, paletteRef.current, markerCapForTier(getPerfTier()), filterRef.current,
+    );
     markersRef.current = next;
+    setVisible(next);
     setMarkerCount(next.length);
     setMarkerTotal(total);
+    setGrandTotal(gt);
     if (selectedRef.current >= 0) {
       const sel = selected;
       const idx = sel ? next.findIndex(m => m.id === sel.id) : -1;
@@ -270,6 +353,9 @@ const Nexus: React.FC = () => {
       if (idx < 0) setSelected(null);
     }
   }, [knowledgeNodes, selected]);
+
+  // Re-derive the marker set whenever the filter changes.
+  useEffect(() => { rebuild(); }, [query, kindFilter, rebuild]);
 
   useEffect(() => {
     const off = installNexusIngest();
@@ -298,6 +384,7 @@ const Nexus: React.FC = () => {
   useEffect(() => {
     const refresh = () => {
       paletteRef.current = readPalette(); // stay in sync with theme/accent changes
+      reduceMotionRef.current = isReduceMotion(); // honour a live reduced-motion toggle
       try {
         const sec = getSecuritySummary();
         const model = getNexusModel();
@@ -385,10 +472,14 @@ const Nexus: React.FC = () => {
     };
 
     const onUp = () => {
+      // Only act on gestures that actually started on the canvas (onDown set
+      // `active`). A mouseup that began on the search/list panel must not clear
+      // the canvas selection out from under the list's own click handler.
+      const wasCanvasGesture = dragRef.current.active;
       const wasDrag = dragRef.current.moved;
       dragRef.current.active = false;
       canvas.style.cursor = hoverRef.current >= 0 ? 'pointer' : 'grab';
-      if (wasDrag) return;
+      if (!wasCanvasGesture || wasDrag) return;
       if (hoverRef.current >= 0) {
         const m = markersRef.current[hoverRef.current];
         selectedRef.current = hoverRef.current;
@@ -417,21 +508,35 @@ const Nexus: React.FC = () => {
     };
   }, []);
 
-  // --- Keyboard: "/" focuses ask, Esc clears selection -----------------------
+  // --- Keyboard: "/" focuses search, Esc clears (selection -> filter -> close) -
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA';
-      if (e.key === 'Escape' && !typing) {
-        // First Esc clears a selection; a second Esc (nothing selected) closes the
-        // app -- fixes the "Esc does nothing / no way to close" glitch.
+      // "/" focuses the node search (wires up the long-documented shortcut).
+      if (e.key === '/' && !typing) {
+        e.preventDefault();
+        setListOpen(true);
+        searchRef.current?.focus();
+        return;
+      }
+      if (e.key === 'Escape') {
+        // While typing, Esc first clears the query, then blurs the field.
+        if (typing && tag === 'INPUT') {
+          if (searchRef.current?.value) { setQuery(''); }
+          else { searchRef.current?.blur(); }
+          return;
+        }
+        // First Esc clears a selection; next clears any active filter; finally a
+        // bare Esc closes the app -- fixes the "Esc does nothing" glitch.
         if (selectedRef.current >= 0) { selectedRef.current = -1; setSelected(null); }
+        else if (filterRef.current.query || (filterRef.current.kinds?.size ?? 0) > 0) { clearFilters(); }
         else { closeApp(); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [closeApp]);
+  }, [closeApp, clearFilters]);
 
   // --- The render loop -------------------------------------------------------
   useEffect(() => {
@@ -474,6 +579,60 @@ const Nexus: React.FC = () => {
       const stateColor = palKey(pal, sm.key);
       const live = uki.state === 'listening' || uki.state === 'speaking' || uki.state === 'processing' || uki.state === 'thinking';
       const pulse = 0.5 + 0.5 * Math.sin(t * (live ? 3.2 : 1.1));
+      // Live reduced-motion: kill the new scan-sweep animation when requested.
+      const sweepMotion = motion && !reduceMotionRef.current;
+
+      // (0) Sci-fi backdrop motif — faint hex grid + concentric scan-rings in the
+      // Omnitrix energy hue, drawn UNDER the existing reticle so it reads as a
+      // tech console without competing with the data. Hex grid is a flat-tier
+      // decoration; concentric rings are cheap and always drawn.
+      // ---- (0a) Faint hex grid (skipped on low tier to protect the budget) ----
+      if (!lowTier) {
+        const hexR = R * 0.30;                 // hex "radius" (centre→vertex)
+        const hexW = Math.sqrt(3) * hexR;      // flat-to-flat width
+        const colStep = hexW;
+        const rowStep = hexR * 1.5;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = rgba(ENERGY_RGB, 0.05);
+        for (let row = -1, ry = 0; ry < h + rowStep; row++, ry = row * rowStep) {
+          const xOff = (row & 1) ? hexW / 2 : 0;
+          for (let cx = -hexW + xOff; cx < w + hexW; cx += colStep) {
+            ctx.beginPath();
+            for (let k = 0; k < 6; k++) {
+              const ang = (Math.PI / 3) * k + Math.PI / 6; // pointy-top hexes
+              const px = cx + Math.cos(ang) * hexR;
+              const py = ry + Math.sin(ang) * hexR;
+              if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+          }
+        }
+      }
+      // ---- (0b) Concentric scan-rings — soft energy halos around the reticle ---
+      for (let ri = 0; ri < 3; ri++) {
+        const rr = R * (0.46 + ri * 0.30);
+        ctx.beginPath();
+        ctx.arc(ccx, ccy, rr, 0, Math.PI * 2);
+        ctx.strokeStyle = rgba(ENERGY_RGB, 0.06 + ri * 0.015);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // ---- (0c) Energy scan-sweep — a thin rotating wedge of the hex backdrop.
+      // Cheap (one arc + radial fade), respects reduced-motion + low tier.
+      if (sweepMotion && !lowTier) {
+        const scan = (t * 0.5) % (Math.PI * 2);
+        const span = 0.5;
+        const sg = ctx.createRadialGradient(ccx, ccy, R * 0.4, ccx, ccy, R * 1.18);
+        sg.addColorStop(0, rgba(ENERGY_RGB, 0));
+        sg.addColorStop(1, rgba(ENERGY_HOT_RGB, 0.10));
+        ctx.beginPath();
+        ctx.moveTo(ccx, ccy);
+        ctx.arc(ccx, ccy, R * 1.18, scan, scan + span);
+        ctx.closePath();
+        ctx.fillStyle = sg;
+        ctx.fill();
+      }
 
       // (1) Diagonal framing lines to the corners, with endpoint pips. Skipped on
       // low-tier devices (a pure-decoration pass) to protect the frame budget.
@@ -507,9 +666,15 @@ const Nexus: React.FC = () => {
         ctx.fill();
       }
 
-      // (3) Main + inner rings.
+      // (3) Main + inner rings — theme-accent base with an Omnitrix energy overlay
+      // so the HUD reads as "powered" while still re-colouring with the accent.
       ctx.strokeStyle = accentA(pal, 0.42);
       ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(ccx, ccy, R, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = rgba(ENERGY_RGB, 0.30);
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(ccx, ccy, R, 0, Math.PI * 2);
       ctx.stroke();
@@ -519,17 +684,21 @@ const Nexus: React.FC = () => {
       ctx.arc(ccx, ccy, R * 0.82, 0, Math.PI * 2);
       ctx.stroke();
 
-      // (4) Cardinal accent arcs — the "armed" segments (warning hue).
-      ctx.strokeStyle = pal.warning;
+      // (4) Cardinal accent arcs — the "armed" segments, in nanite amber with a
+      // soft glow (the secondary/active energy accent).
+      ctx.save();
+      ctx.strokeStyle = NANITE;
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
+      if (!lowTier) { ctx.shadowColor = rgba(NANITE_RGB, 0.7); ctx.shadowBlur = 6; }
       const arcSpan = 0.34;
       for (const base of [-Math.PI * 0.75, -Math.PI * 0.25, Math.PI * 0.15]) {
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.85;
         ctx.beginPath();
         ctx.arc(ccx, ccy, R, base, base + arcSpan);
         ctx.stroke();
       }
+      ctx.restore();
       ctx.globalAlpha = 1;
       ctx.lineCap = 'butt';
 
@@ -591,11 +760,22 @@ const Nexus: React.FC = () => {
 
         const rad = (isSel ? 6 : isHover ? 5 : 3.4) + (m.weight > 0.7 ? 1 : 0);
         if (isHover || isSel) {
-          ctx.globalAlpha = 0.9;
+          // Soft outer energy halo — the "powered up" glow on the active node.
+          const glowC = isSel ? ENERGY_HOT_RGB : ENERGY_RGB;
+          const glow = ctx.createRadialGradient(mx, my, rad, mx, my, rad + (isSel ? 14 : 10));
+          glow.addColorStop(0, rgba(glowC, isSel ? 0.55 : 0.35));
+          glow.addColorStop(1, rgba(glowC, 0));
+          ctx.globalAlpha = 1;
+          ctx.beginPath();
+          ctx.arc(mx, my, rad + (isSel ? 14 : 10), 0, Math.PI * 2);
+          ctx.fillStyle = glow;
+          ctx.fill();
+          // Crisp energy ring around the marker.
+          ctx.globalAlpha = 0.95;
           ctx.beginPath();
           ctx.arc(mx, my, rad + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isSel ? ENERGY_HOT : ENERGY;
+          ctx.lineWidth = 1.2;
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -618,8 +798,18 @@ const Nexus: React.FC = () => {
         ctx.stroke();
       }
 
-      // (9) The reticle — UKI core.
+      // (9) The reticle — UKI core, wrapped in an Omnitrix-style energy aura.
       const coreR = R * 0.1 + uki.audio * R * 0.05;
+      if (!lowTier) {
+        const auraR = coreR + 12 + pulse * 6;
+        const aura = ctx.createRadialGradient(ccx, ccy, coreR * 0.5, ccx, ccy, auraR);
+        aura.addColorStop(0, rgba(ENERGY_HOT_RGB, 0.30 + pulse * 0.18));
+        aura.addColorStop(1, rgba(ENERGY_RGB, 0));
+        ctx.beginPath();
+        ctx.arc(ccx, ccy, auraR, 0, Math.PI * 2);
+        ctx.fillStyle = aura;
+        ctx.fill();
+      }
       ctx.globalAlpha = 0.25 + pulse * 0.25;
       ctx.strokeStyle = stateColor;
       ctx.lineWidth = 1.4;
@@ -670,6 +860,15 @@ const Nexus: React.FC = () => {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
+  // Select a marker from the list panel: highlight it on the canvas ring (via the
+  // shared selectedRef) and surface the focused read-out -- same path a canvas
+  // click takes, so the two stay in lock-step.
+  const selectMarker = useCallback((m: Marker) => {
+    const idx = markersRef.current.findIndex(x => x.id === m.id);
+    selectedRef.current = idx;
+    setSelected(idx >= 0 ? markersRef.current[idx] : m);
+  }, []);
+
   // Marker selection routes the node to the UKI assistant (the draggable popup)
   // and opens it, so Nexus stays a pure visualisation -- no inline chat surface.
   const inspectMarker = useCallback((m: Marker | null) => {
@@ -684,23 +883,30 @@ const Nexus: React.FC = () => {
   return (
     <div ref={containerRef} style={{
       position: 'relative', width: '100%', height: '100%', overflow: 'hidden',
-      background: 'radial-gradient(circle at 50% 50%, var(--color-accent-soft, rgba(74,158,255,0.06)), transparent 55%), var(--color-bg-base)',
+      // Theme-accent wash layered over a faint Omnitrix energy bloom + a nanite
+      // amber glow rising from the bottom, for the "powered console" backdrop.
+      background: [
+        'radial-gradient(circle at 50% 50%, var(--color-accent-soft, rgba(74,158,255,0.06)), transparent 55%)',
+        `radial-gradient(circle at 50% 46%, ${rgba(ENERGY_RGB, 0.07)}, transparent 60%)`,
+        `radial-gradient(circle at 50% 116%, ${rgba(NANITE_RGB, 0.06)}, transparent 50%)`,
+        'var(--color-bg-base)',
+      ].join(', '),
       fontFamily: 'var(--dex-font-ui)',
     }}>
       <canvas ref={canvasRef} role="img" aria-label="Nexus command HUD" style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab' }} />
 
       {/* Window controls: minimal-mode toggle + close (fixes the no-close glitch) */}
       <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 18, display: 'flex', gap: 6, pointerEvents: 'auto' }}>
-        <button onClick={toggleMinimal} aria-label={minimal ? 'Show HUD details' : 'Minimal mode'} title={minimal ? 'Show HUD details' : 'Minimal mode'} style={hudCtrlBtn}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>
+        <button className="dex-liquid-glass" onClick={toggleMinimal} aria-label={minimal ? 'Show HUD details' : 'Minimal mode'} title={minimal ? 'Show HUD details' : 'Minimal mode'} style={hudCtrlBtn}
+          onMouseEnter={e => { e.currentTarget.style.color = ENERGY; e.currentTarget.style.boxShadow = ENERGY_GLOW; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.boxShadow = 'none'; }}>
           {minimal
             ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
             : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>}
         </button>
-        <button onClick={closeApp} aria-label="Close Nexus" title="Close Nexus" style={hudCtrlBtn}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.borderColor = 'var(--color-error)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}>
+        <button className="dex-liquid-glass" onClick={closeApp} aria-label="Close Nexus" title="Close Nexus" style={hudCtrlBtn}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.boxShadow = `0 0 0 1px var(--color-error), 0 0 14px rgba(255,69,58,0.30)`; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.boxShadow = 'none'; }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
@@ -719,8 +925,12 @@ const Nexus: React.FC = () => {
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateVar, boxShadow: `0 0 6px ${stateVar}` }} />
           TARGET LOCATOR
         </div>
-        <div style={{ ...chipValue, color: 'var(--color-accent)' }}>{markerCount}{markerTotal > markerCount ? `/${markerTotal}` : ''} TRACKED</div>
-        <div style={{ ...chipSub, color: 'var(--color-text-muted)' }}>{readout.active} ACTIVE{markerTotal > markerCount ? ` · +${markerTotal - markerCount}` : ' · 5M'}</div>
+        <div style={{ ...chipValue, color: filtering ? 'var(--color-info)' : 'var(--color-accent)' }}>{markerCount}{markerTotal > markerCount ? `/${markerTotal}` : ''} {filtering ? 'MATCHED' : 'TRACKED'}</div>
+        <div style={{ ...chipSub, color: 'var(--color-text-muted)' }}>
+          {filtering
+            ? `OF ${grandTotal} · ${readout.active} ACTIVE`
+            : `${readout.active} ACTIVE · 5M WINDOW${markerTotal > markerCount ? ` · +${markerTotal - markerCount}` : ''}`}
+        </div>
       </div>
 
       {/* Bottom-left warning chip (real numbers) */}
@@ -754,13 +964,136 @@ const Nexus: React.FC = () => {
       <Gauge side="right" label="ACTIVITY" value={Math.min(100, readout.active * 12)} color={readout.active > 0 ? 'var(--color-success)' : 'var(--color-accent)'} />
       </>)}
 
-      {/* Hover tooltip */}
+      {/* Search + filter + progressive node list. Docked bottom-centre so it never
+          fights the corner read-outs. Collapsed to a single search row by default;
+          the list (full node set) is opt-in, auto-opening while a search is active. */}
+      <div
+        style={{
+          position: 'absolute', left: '50%', bottom: 12, transform: 'translateX(-50%)',
+          zIndex: 16, pointerEvents: 'auto',
+          width: 'min(420px, calc(100% - 28px))',
+          display: 'flex', flexDirection: 'column', gap: 6,
+        }}
+      >
+        {/* Search row — real see-through liquid glass with an energy border-glow
+            while a filter is active (background/blur/rim come from the class). */}
+        <div className="dex-liquid-glass" style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '5px 6px 5px 10px', borderRadius: 'var(--radius-xl)',
+          boxShadow: filtering
+            ? `0 6px 18px rgba(0,0,0,0.35), ${ENERGY_GLOW}`
+            : '0 6px 18px rgba(0,0,0,0.35)',
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={e => { setQuery(e.target.value); if (e.target.value) setListOpen(true); }}
+            placeholder="Search nodes  (press /)"
+            aria-label="Search Nexus nodes"
+            spellCheck={false}
+            style={{
+              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+              color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600,
+              fontFamily: 'var(--dex-font-ui)', padding: 0,
+            }}
+          />
+          {filtering && (
+            <button onClick={clearFilters} aria-label="Clear filters" title="Clear filters (Esc)" style={hudPillBtn}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          )}
+          <button
+            onClick={() => setListOpen(v => !v)}
+            aria-label={listOpen ? 'Hide node list' : 'Show node list'}
+            aria-expanded={listOpen}
+            title={listOpen ? 'Hide node list' : 'Show node list'}
+            style={{ ...hudPillBtn, color: listOpen ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+            onMouseEnter={e => { if (!listOpen) e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+            onMouseLeave={e => { if (!listOpen) e.currentTarget.style.color = 'var(--color-text-muted)'; }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Expanded panel: kind filters + the node list (progressive disclosure).
+            Liquid glass with a soft energy rim so the active surface reads as a
+            powered console; background/blur/border come from the class. */}
+        {listOpen && (
+          <div className="dex-liquid-glass" style={{
+            display: 'flex', flexDirection: 'column',
+            borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+            boxShadow: `0 8px 22px rgba(0,0,0,0.4), ${ENERGY_GLOW}`,
+          }}>
+            {/* Kind filter chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '7px 8px', borderBottom: '1px solid var(--color-border)' }}>
+              {ALL_KINDS.map(kind => {
+                const on = kindFilter?.has(kind) ?? false;
+                const c = `var(--color-${KIND_META[kind].key === 'text' ? 'text-primary' : KIND_META[kind].key})`;
+                return (
+                  <button key={kind} onClick={() => toggleKind(kind)} aria-pressed={on} title={kind}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '2px 7px', borderRadius: 5, cursor: 'pointer',
+                      fontSize: 8, fontWeight: 700, letterSpacing: 1, fontFamily: 'var(--dex-font-ui)',
+                      color: on ? c : 'var(--color-text-muted)',
+                      background: on ? 'var(--color-bg-hover)' : 'transparent',
+                      border: `1px solid ${on ? c : 'var(--color-border)'}`,
+                      transition: 'all 0.12s ease',
+                    }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, opacity: on ? 1 : 0.5 }} />
+                    {KIND_META[kind].tag}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Node list — the same set the ring shows, recency-ranked */}
+            <div className="dex-scroll" style={{ maxHeight: 200, padding: '4px 0' }}>
+              {visible.length === 0 ? (
+                <div style={{ padding: '14px 12px', textAlign: 'center', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  {grandTotal === 0 ? 'No activity tracked yet.' : 'No nodes match the current filter.'}
+                </div>
+              ) : visible.map(m => {
+                const c = markerColor(m, paletteRef.current);
+                const isSel = selected?.id === m.id;
+                return (
+                  <button key={m.id} onClick={() => selectMarker(m)} onDoubleClick={() => inspectMarker(m)}
+                    title="Click to focus · double-click to ask UKI"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                      padding: '6px 12px', cursor: 'pointer', textAlign: 'left',
+                      background: isSel ? 'var(--color-bg-hover)' : 'transparent',
+                      border: 'none', borderLeft: `2px solid ${isSel ? c : 'transparent'}`,
+                      fontFamily: 'var(--dex-font-ui)', transition: 'background 0.12s ease',
+                    }}
+                    onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+                    onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent'; }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                    <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: 1, color: c, flexShrink: 0 }}>{m.tag}</span>
+                    <span style={{ fontSize: 9, color: 'var(--color-text-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{ago(m.ts)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Hover tooltip — glass surface; the marker-colour border (inline) wins
+          over the class border so the node's kind still reads at a glance. */}
       {hover && (
-        <div style={{
+        <div className="dex-liquid-glass" style={{
           position: 'absolute', left: hover.sx + 14, top: hover.sy - 10,
           pointerEvents: 'none', zIndex: 20,
-          background: 'var(--color-bg-elevated)', border: `1px solid ${markerColor(hover, paletteRef.current)}`,
-          borderRadius: 6, padding: '5px 9px', maxWidth: 220,
+          border: `1px solid ${markerColor(hover, paletteRef.current)}`,
+          borderRadius: 'var(--radius-lg)', padding: '5px 9px', maxWidth: 220,
           boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
         }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hover.label}</div>
@@ -768,28 +1101,31 @@ const Nexus: React.FC = () => {
         </div>
       )}
 
-      {/* Selected read-out */}
-      {selected && (
+      {/* Selected read-out — the floating "ask" pill. Suppressed while the list
+          panel is open, where the selected row is already highlighted (and the
+          panel would otherwise overlap this pill). */}
+      {selected && !listOpen && (
         <div
+          className="dex-liquid-glass"
           role="button"
           tabIndex={0}
           title="Ask UKI about this node"
           onClick={() => inspectMarker(selected)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inspectMarker(selected); } }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-elevated)')}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = NANITE_GLOW)}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = ENERGY_GLOW)}
           style={{
           position: 'absolute', top: 'calc(50% + 12px)', left: '50%', transform: 'translate(-50%, 0)',
           marginTop: 90, zIndex: 14, pointerEvents: 'auto', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '6px 12px', borderRadius: 8,
-          background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
+          padding: '6px 12px', borderRadius: 'var(--radius-lg)',
+          boxShadow: ENERGY_GLOW,
         }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: markerColor(selected, paletteRef.current), boxShadow: `0 0 8px ${markerColor(selected, paletteRef.current)}` }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.label}</span>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: markerColor(selected, paletteRef.current) }}>{selected.tag}</span>
           <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{ago(selected.ts)}</span>
-          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.5, color: 'var(--color-accent)', marginLeft: 2 }}>ASK ↵</span>
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.5, color: ENERGY, marginLeft: 2 }}>ASK ↵</span>
         </div>
       )}
 
@@ -801,11 +1137,21 @@ const Nexus: React.FC = () => {
 // Sub-components + style helpers
 // ---------------------------------------------------------------------------
 
+// Background/blur/border come from the .dex-liquid-glass class; only the box
+// geometry + the hover colour/glow transition live here.
 const hudCtrlBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 26, height: 26, borderRadius: 7,
-  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-  color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.15s ease',
+  width: 26, height: 26, borderRadius: 'var(--radius-lg)',
+  color: 'var(--color-text-muted)', cursor: 'pointer',
+  transition: 'color 0.15s ease, box-shadow 0.15s ease',
+};
+
+// Borderless icon button used inside the search pill (clear / list-toggle).
+const hudPillBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+  background: 'transparent', border: 'none',
+  color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'color 0.12s ease',
 };
 
 const chipLabel: React.CSSProperties = { fontSize: 8, fontWeight: 700, letterSpacing: 1.6, color: 'var(--color-text-muted)' };

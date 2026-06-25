@@ -541,9 +541,9 @@ const ViewerPanel: React.FC<{
       }}>
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin', flexShrink: 0 }}>
-          <button aria-label="Toggle safe zones overlay" style={overlayBtnStyle(overlay === 'safe-zones')} onClick={() => setOverlay(overlay === 'safe-zones' ? 'none' : 'safe-zones')}>Safe</button>
-          <button aria-label="Toggle grid overlay" style={overlayBtnStyle(overlay === 'grid')} onClick={() => setOverlay(overlay === 'grid' ? 'none' : 'grid')}>Grid</button>
-          <button aria-label="Toggle fullscreen" style={{ ...transportBtnStyle, width: 18, height: 18 }} onClick={handleFullscreen}>
+          <button aria-label="Toggle safe zones overlay" aria-pressed={overlay === 'safe-zones'} style={overlayBtnStyle(overlay === 'safe-zones')} onClick={() => setOverlay(overlay === 'safe-zones' ? 'none' : 'safe-zones')}>Safe</button>
+          <button aria-label="Toggle grid overlay" aria-pressed={overlay === 'grid'} style={overlayBtnStyle(overlay === 'grid')} onClick={() => setOverlay(overlay === 'grid' ? 'none' : 'grid')}>Grid</button>
+          <button aria-label="Toggle fullscreen" style={{ ...overlayBtnStyle(false), display: 'flex', alignItems: 'center' }} onClick={handleFullscreen}>
             <FullscreenIcon />
           </button>
         </div>
@@ -596,7 +596,7 @@ const ViewerPanel: React.FC<{
         <button aria-label="Stop" style={transportBtnStyle} onClick={onStop} title="Stop"><StopIcon /></button>
         <button aria-label="Next frame" style={transportBtnStyle} onClick={onStepForward} title="Next frame"><StepForwardIcon /></button>
         <button aria-label="Skip to end" style={transportBtnStyle} onClick={onSkipForward} title="Go to end"><SkipForwardIcon /></button>
-        <button aria-label="Toggle loop" style={transportBtnStyle} onClick={onToggleLoop} title="Loop"><LoopIcon active={loopEnabled} /></button>
+        <button aria-label="Toggle loop" aria-pressed={loopEnabled} style={{ ...transportBtnStyle, color: loopEnabled ? 'var(--color-accent)' : 'var(--color-text-secondary)' }} onClick={onToggleLoop} title="Loop"><LoopIcon active={loopEnabled} /></button>
         <div style={{ flex: '1 1 8px', minWidth: 8 }} />
         <div style={{ ...timecodeStyle, color: 'var(--color-text-tertiary)' }}>{formatTimecode(duration, frameRate)}</div>
       </div>

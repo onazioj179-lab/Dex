@@ -16,6 +16,7 @@ import { useNotesStore } from '../store/notesStore';
 import { useDockPins } from '../store/dockPinStore';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { usePatternLearning, type Suggestion } from '../services/usePatternLearning';
+import { useNowPlaying } from '../services/nowPlaying';
 import { sharedTick } from '../services/SharedTick';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
@@ -596,32 +597,67 @@ const NexusMiniWidget: React.FC = () => {
   return <canvas ref={canvasRef} width={260} height={260} style={{ width: '100%', height: '100%', borderRadius: 10 }} />;
 };
 
+// Real weather for the widget, with NO fabricated fallback. Reads the Weather
+// app's own keyless open-meteo cache (localStorage 'dex-weather-cache:<loc>' for
+// the active location 'dex-weather-active', temps stored in Celsius) so it shows
+// the user's genuine last-known conditions. If the user has never opened the
+// Weather app (no cache) and no 'weather:get' IPC exists, it honestly shows an
+// unavailable state instead of inventing a sunny 72 degrees.
+interface WidgetWeather { temp: number; condition: string; humidity: number }
+
+const readWeatherFromCache = (): WidgetWeather | null => {
+  try {
+    const active = localStorage.getItem('dex-weather-active');
+    if (!active) return null;
+    const raw = localStorage.getItem(`dex-weather-cache:${active.trim().toLowerCase()}`);
+    if (!raw) return null;
+    const cur = (JSON.parse(raw) as { current?: { temp: number; condition: string; humidity: number } }).current;
+    if (!cur || typeof cur.temp !== 'number') return null;
+    const unitF = localStorage.getItem('dex-weather-unit') === 'F';
+    return {
+      temp: unitF ? Math.round(cur.temp * 9 / 5 + 32) : cur.temp,
+      condition: String(cur.condition || 'Clear').replace(/([A-Z])/g, ' $1').trim(),
+      humidity: cur.humidity ?? 0,
+    };
+  } catch { return null; }
+};
+
 const WeatherWidget: React.FC = () => {
-  const [weather, setWeather] = useState({ temp: 72, condition: 'Sunny', humidity: 45 });
+  const [weather, setWeather] = useState<WidgetWeather | null>(null);
   useEffect(() => {
-    // Try to get real weather data
-    const fetchWeather = async () => {
+    const refresh = async () => {
+      // Prefer a native weather bridge if one is ever wired; otherwise fall back
+      // to the Weather app's cached real data. Never fabricate.
       try {
         const ipc = (window as any).electron;
         if (ipc?.invoke) {
           const data = await ipc.invoke('weather:get');
           if (data?.temp !== undefined) {
-            setWeather({ temp: data.temp, condition: data.condition || 'Clear', humidity: data.humidity || 50 });
+            setWeather({ temp: data.temp, condition: data.condition || 'Clear', humidity: data.humidity ?? 0 });
+            return;
           }
         }
-      } catch { /* use defaults */ }
+      } catch { /* fall through to cache */ }
+      setWeather(readWeatherFromCache());
     };
-    fetchWeather();
+    refresh();
     const tickId = `weather-widget-${Date.now()}`;
-    sharedTick.subscribe(tickId, fetchWeather, 300000); // Update every 5 min
+    sharedTick.subscribe(tickId, refresh, 300000); // Update every 5 min
     return () => sharedTick.unsubscribe(tickId);
   }, []);
+  const unavailable = weather == null;
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFD60A" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      <div style={{ fontSize: 28, fontWeight: 300, color: '#fff', marginTop: 6 }}>{weather.temp}°</div>
-      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{weather.condition}</div>
-      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Humidity: {weather.humidity}%</div>
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={unavailable ? 'var(--color-text-tertiary)' : '#FFD60A'} strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      {unavailable ? (
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8, textAlign: 'center' }}>Open Weather<br />to see conditions</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 28, fontWeight: 300, color: '#fff', marginTop: 6 }}>{weather.temp}°</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{weather.condition}</div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Humidity: {weather.humidity}%</div>
+        </>
+      )}
     </div>
   );
 };
@@ -730,56 +766,44 @@ const StorageWidget: React.FC = () => {
 };
 
 const MusicControlsWidget: React.FC = () => {
-  const [playing, setPlaying] = useState(false);
-  const [track, setTrack] = useState({ title: 'No track', artist: '' });
-  
-  useEffect(() => {
-    // Listen for now-playing updates
-    const handleNowPlaying = (e: CustomEvent) => {
-      const detail = e.detail as { title?: string; artist?: string; playing?: boolean };
-      if (detail?.title) {
-        setTrack({ title: detail.title, artist: detail.artist || '' });
-      }
-      if (detail?.playing !== undefined) setPlaying(detail.playing);
-    };
-    window.addEventListener('dex-now-playing' as any, handleNowPlaying as EventListener);
-    return () => window.removeEventListener('dex-now-playing' as any, handleNowPlaying as EventListener);
-  }, []);
-  
-  const sendControl = (action: 'play' | 'pause' | 'next' | 'prev') => {
-    window.dispatchEvent(new CustomEvent('dex-media-control', { detail: { action } }));
-    if (action === 'play') setPlaying(true);
-    if (action === 'pause') setPlaying(false);
-  };
-  
+  // Bind to the real now-playing store (services/nowPlaying), the same source
+  // the MiniPlayer and FloatingLauncher use, fed live by the Audio app. The old
+  // 'dex-now-playing' / 'dex-media-control' events had no dispatcher/listener,
+  // so the widget was permanently stuck and its buttons were no-ops.
+  const track = useNowPlaying(s => s.track);
+  const isPlaying = useNowPlaying(s => s.isPlaying);
+  const toggle = useNowPlaying(s => s.toggle);
+  const next = useNowPlaying(s => s.next);
+  const prev = useNowPlaying(s => s.prev);
+
   return (
     <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {track.title}
+        {track?.title ?? 'No track'}
       </div>
-      {track.artist && (
+      {track?.artist && (
         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{track.artist}</div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
-        <button onClick={() => sendControl('prev')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }} aria-label="Previous">
+        <button onClick={() => prev()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }} aria-label="Previous">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
         </button>
-        <button 
-          onClick={() => sendControl(playing ? 'pause' : 'play')} 
-          style={{ 
-            width: 36, height: 36, borderRadius: '50%', 
-            background: 'var(--color-accent)', border: 'none', 
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+        <button
+          onClick={() => toggle()}
+          style={{
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'var(--color-accent)', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
-          aria-label={playing ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {playing ? (
+          {isPlaying ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
           ) : (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           )}
         </button>
-        <button onClick={() => sendControl('next')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }} aria-label="Next">
+        <button onClick={() => next()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }} aria-label="Next">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
         </button>
       </div>
