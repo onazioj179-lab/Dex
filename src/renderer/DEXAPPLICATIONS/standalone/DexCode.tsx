@@ -27,8 +27,9 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appCon
 import {
   pickProjectFolder, loadProject, getStoredProjectRoot, clearStoredProject,
   readProjectFile, searchProject, projectName, buildSymbolIndex,
-  type DexProject, type WorkspaceHit, type ProjectSymbol,
+  type DexProject, type WorkspaceHit, type ProjectSymbol, type ProjectFile,
 } from './dexCode/project';
+import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -38,6 +39,55 @@ export { transpileDexScript, executeDexScript, highlightDexScript };
 // 70% of the editor area at drag time so the editor never collapses.
 const PANEL_HEIGHT_KEY = 'dex-code-panel-height';
 const PANEL_MIN_HEIGHT = 120;
+
+// Gutter line numbers, memoized so typing on a single line does not rebuild the
+// whole column of <div>s every keystroke -- it only re-renders when the line
+// count actually changes. A meaningful win on large files (the gutter was the
+// hottest list in the editor's render path).
+const LineNumbers = memo(function LineNumbers({ count }: { count: number }) {
+  return (
+    <div style={S.lineNumbers} aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={S.lineNum}>{i + 1}</div>
+      ))}
+    </div>
+  );
+});
+
+// One Quick Open result row. Memoized so re-rendering the palette (e.g. moving
+// the highlight) only repaints the rows whose props changed, not all 50.
+const QuickOpenRow = memo(function QuickOpenRow({
+  name, path, matches, active, onPick, onHover,
+}: {
+  name: string;
+  path: string;
+  matches: number[];
+  active: boolean;
+  onPick: () => void;
+  onHover: () => void;
+}) {
+  const matchSet = matches.length ? new Set(matches) : null;
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      onMouseEnter={onHover}
+      style={{ ...S.quickOpenRow, ...(active ? S.quickOpenRowActive : null) }}
+      title={path}
+    >
+      <DexIcon name="code" size={12} />
+      <span style={S.quickOpenName}>
+        {matchSet
+          ? Array.from(name).map((ch, i) =>
+              matchSet.has(i)
+                ? <mark key={i} style={S.quickOpenMark}>{ch}</mark>
+                : <span key={i}>{ch}</span>)
+          : name}
+      </span>
+      <span style={S.quickOpenPath}>{path}</span>
+    </button>
+  );
+});
 
 const DexCode: React.FC = () => {
   const [code, setCode] = useState(() => {
@@ -135,6 +185,12 @@ const DexCode: React.FC = () => {
   const [showGoToLine, setShowGoToLine] = useState(false);
   const [goToLineInput, setGoToLineInput] = useState('');
   const goToLineRef = useRef<HTMLInputElement>(null);
+  // Quick Open (Ctrl/Cmd+P): a fuzzy file finder over the open project's files +
+  // recent files. `quickOpenIndex` is the highlighted row for keyboard nav.
+  const [showQuickOpen, setShowQuickOpen] = useState(false);
+  const [quickOpenQuery, setQuickOpenQuery] = useState('');
+  const [quickOpenIndex, setQuickOpenIndex] = useState(0);
+  const quickOpenRef = useRef<HTMLInputElement>(null);
   // Output -> ecosystem (copy / send via DEX Flow).
   const [outputCopied, setOutputCopied] = useState(false);
   // Track original content for modified detection
@@ -380,6 +436,17 @@ const DexCode: React.FC = () => {
         e.preventDefault();
         handleOpenFile();
       }
+      // Quick Open fuzzy file finder (Ctrl/Cmd+P) -- VS Code convention.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setShowQuickOpen(prev => {
+          if (prev) { editorRef.current?.focus(); return false; }
+          setQuickOpenQuery('');
+          setQuickOpenIndex(0);
+          requestAnimationFrame(() => quickOpenRef.current?.focus());
+          return true;
+        });
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNewFile();
@@ -407,10 +474,11 @@ const DexCode: React.FC = () => {
         setGoToLineInput('');
         requestAnimationFrame(() => goToLineRef.current?.focus());
       }
-      if (e.key === 'Escape' && (showFind || showGoToLine)) {
+      if (e.key === 'Escape' && (showFind || showGoToLine || showQuickOpen)) {
         setShowFind(false);
         setShowReplace(false);
         setShowGoToLine(false);
+        setShowQuickOpen(false);
         editorRef.current?.focus();
       }
       // Full screen: F11 toggles; Escape exits (only when no dialog is open, so
@@ -419,7 +487,7 @@ const DexCode: React.FC = () => {
         e.preventDefault();
         toggleFullscreen();
       }
-      if (e.key === 'Escape' && fullscreen && !showFind && !showGoToLine) {
+      if (e.key === 'Escape' && fullscreen && !showFind && !showGoToLine && !showQuickOpen) {
         setFullscreen(false);
         try { localStorage.setItem('dex-code-fullscreen', 'false'); } catch { /* ignore */ }
       }
@@ -439,7 +507,7 @@ const DexCode: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, showGoToLine, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen]);
+  }, [code, fileName, runCode, showFind, showGoToLine, showQuickOpen, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen]);
 
   // Tab key, bracket auto-close, auto-indent
   // Live symbol map of the current file (functions / classes / top-level vars).
@@ -500,6 +568,46 @@ const DexCode: React.FC = () => {
     setRecentFiles(getRecentFiles());
     if (line && line > 0) setTimeout(() => jumpToLine(line), 60);
   }, [jumpToLine]);
+
+  // Quick Open results: fuzzy-rank the project's files against the query. Recent
+  // files (without an open project) are folded in so Ctrl+P is useful even before
+  // a folder is opened. Recomputed only when the inputs change.
+  const quickOpenItems = useMemo<ProjectFile[]>(() => {
+    const map = new Map<string, ProjectFile>();
+    if (project) for (const f of project.files) map.set(f.path, f);
+    for (const p of recentFiles) {
+      if (!map.has(p)) map.set(p, { name: p.split(/[\\/]/).pop() || p, path: p });
+    }
+    return Array.from(map.values());
+  }, [project, recentFiles]);
+
+  const quickOpenResults = useMemo<QuickOpenResult<ProjectFile>[]>(
+    () => fuzzyFilter(quickOpenItems, quickOpenQuery, 50),
+    [quickOpenItems, quickOpenQuery],
+  );
+
+  // Keep the highlighted row in range as the result set shrinks/grows.
+  useEffect(() => { setQuickOpenIndex(0); }, [quickOpenQuery]);
+
+  const openQuickOpen = useCallback(() => {
+    setShowQuickOpen(true);
+    setQuickOpenQuery('');
+    setQuickOpenIndex(0);
+    requestAnimationFrame(() => quickOpenRef.current?.focus());
+  }, []);
+
+  const closeQuickOpen = useCallback(() => {
+    setShowQuickOpen(false);
+    editorRef.current?.focus();
+  }, []);
+
+  // Open the highlighted (or an explicit) quick-open result in the editor.
+  const acceptQuickOpen = useCallback((index?: number) => {
+    const pick = quickOpenResults[index ?? quickOpenIndex];
+    if (!pick) return;
+    setShowQuickOpen(false);
+    loadEditorFromPath(pick.item.path);
+  }, [quickOpenResults, quickOpenIndex, loadEditorFromPath]);
 
   const openFolder = useCallback(async () => {
     const proj = await pickProjectFolder();
@@ -789,6 +897,17 @@ const DexCode: React.FC = () => {
           <DexIcon name="folder" size={16} />
         </button>
         <button
+          title="Quick Open file (Ctrl+P)"
+          aria-label="Quick open file"
+          aria-pressed={showQuickOpen}
+          style={showQuickOpen ? S.activityBtnActive : S.activityBtn}
+          onClick={() => { if (showQuickOpen) closeQuickOpen(); else openQuickOpen(); }}
+          onMouseEnter={e => { if (!showQuickOpen) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { if (!showQuickOpen) e.currentTarget.style.background = 'transparent'; }}
+        >
+          <DexIcon name="file-text" size={16} />
+        </button>
+        <button
           title="Find"
           aria-label="Find in file"
           aria-pressed={showFind}
@@ -922,7 +1041,7 @@ const DexCode: React.FC = () => {
                 />
                 {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>Searching…</div>}
                 {workspaceHits.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
+                  <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
                     <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
                     {workspaceHits.map((h, i) => (
                       <button
@@ -939,7 +1058,7 @@ const DexCode: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
+                  <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
                     {project.files.length === 0 ? (
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No source files</div>
                     ) : project.files.map((f, i) => (
@@ -994,7 +1113,7 @@ const DexCode: React.FC = () => {
                 {filteredSymbols.length === 0 ? (
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No matches</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
+                  <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
                     {filteredSymbols.map((s, i) => (
                       <button
                         key={`${s.name}-${s.line}-${i}`}
@@ -1177,6 +1296,52 @@ const DexCode: React.FC = () => {
           </div>
         </div>
 
+        {/* Quick Open (Ctrl/Cmd+P) — fuzzy file finder over the project + recents */}
+        {showQuickOpen && (
+          <div style={S.quickOpenScrim} onMouseDown={closeQuickOpen}>
+            <div style={S.quickOpenPanel} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Quick Open">
+              <div style={S.quickOpenSearch}>
+                <DexIcon name="search" size={13} color="var(--color-text-tertiary)" />
+                <input
+                  ref={quickOpenRef}
+                  value={quickOpenQuery}
+                  onChange={e => setQuickOpenQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setQuickOpenIndex(i => Math.min(i + 1, quickOpenResults.length - 1)); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setQuickOpenIndex(i => Math.max(i - 1, 0)); }
+                    else if (e.key === 'Enter') { e.preventDefault(); acceptQuickOpen(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); closeQuickOpen(); }
+                  }}
+                  placeholder={quickOpenItems.length ? 'Go to file…' : 'Open a folder to search files'}
+                  aria-label="Quick open file"
+                  spellCheck={false}
+                  style={S.quickOpenInput}
+                />
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>
+                  {quickOpenResults.length}{quickOpenItems.length > quickOpenResults.length ? '+' : ''}
+                </span>
+              </div>
+              <div className="dex-scroll" style={S.quickOpenList}>
+                {quickOpenResults.length === 0 ? (
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                    {quickOpenItems.length ? 'No matching files' : 'No files indexed yet'}
+                  </div>
+                ) : quickOpenResults.map((r, i) => (
+                  <QuickOpenRow
+                    key={r.item.path}
+                    name={r.item.name}
+                    path={r.item.path}
+                    matches={r.matches}
+                    active={i === quickOpenIndex}
+                    onPick={() => acceptQuickOpen(i)}
+                    onHover={() => setQuickOpenIndex(i)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Editor + Output */}
         <div style={{ ...S.editorLayout, gridTemplateColumns: outputCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 3fr) minmax(0, 2fr)' }}>
           {/* Code Editor */}
@@ -1258,12 +1423,8 @@ const DexCode: React.FC = () => {
               </div>
             )}
             <div style={S.editorWrapper}>
-              {/* Line numbers */}
-              <div style={S.lineNumbers} aria-hidden="true">
-                {Array.from({ length: lineCount }, (_, i) => (
-                  <div key={i} style={S.lineNum}>{i + 1}</div>
-                ))}
-              </div>
+              {/* Line numbers — memoized; only re-renders when the count changes */}
+              <LineNumbers count={lineCount} />
               {/* Syntax highlight overlay */}
               <pre
                 ref={highlightRef}
@@ -1328,7 +1489,7 @@ const DexCode: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div ref={outputRef} style={S.outputContent}>
+            <div ref={outputRef} className="dex-scroll" style={S.outputContent}>
               {output.length === 0 && !error && (
                 <div style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic', fontSize: 12 }}>
                   <span style={{opacity:0.5}}>$ </span>Run your code to see output here
@@ -1929,6 +2090,94 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     minHeight: 0,
     display: 'flex',
+  },
+  quickOpenScrim: {
+    position: 'absolute' as const,
+    inset: 0,
+    zIndex: 200,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingTop: 60,
+    background: 'rgba(0,0,0,0.35)',
+  },
+  quickOpenPanel: {
+    width: 'min(560px, 90%)',
+    maxHeight: '70%',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    background: 'var(--color-bg-elevated)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 8,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+    overflow: 'hidden',
+  },
+  quickOpenSearch: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '8px 12px',
+    borderBottom: '1px solid var(--color-border)',
+    flexShrink: 0,
+  },
+  quickOpenInput: {
+    flex: 1,
+    minWidth: 0,
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    color: 'var(--color-text-primary)',
+    fontSize: 13,
+    fontFamily: 'var(--font-mono)',
+  },
+  quickOpenList: {
+    overflow: 'auto',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    padding: 4,
+    minHeight: 0,
+  },
+  quickOpenRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '6px 8px',
+    borderRadius: 5,
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--color-text-secondary)',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    fontSize: 12,
+  },
+  quickOpenRowActive: {
+    background: 'var(--color-bg-hover)',
+    color: 'var(--color-text-primary)',
+  },
+  quickOpenName: {
+    flexShrink: 0,
+    fontWeight: 600,
+    maxWidth: '45%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  quickOpenMark: {
+    background: 'transparent',
+    color: 'var(--color-accent, #4A9EFF)',
+    fontWeight: 700,
+  },
+  quickOpenPath: {
+    marginLeft: 'auto',
+    fontSize: 10,
+    opacity: 0.5,
+    fontFamily: 'var(--font-mono)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    direction: 'rtl' as const,
+    textAlign: 'left' as const,
   },
 };
 

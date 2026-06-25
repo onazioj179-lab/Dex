@@ -13,6 +13,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
+import { rankAppSuggestions, type AppUsageStats } from '../services/suggestionEngine';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -31,6 +32,10 @@ interface UsagePattern {
   lastActive: Record<string, number>;
   /** Preferred default focus targets */
   focusPreferences: Record<string, string>;
+  /** Per-app launch histogram across the 24 hours of the day (time-of-day affinity) */
+  hourly: Record<string, number[]>;
+  /** App -> next-app transition counts (workflow pairings / co-occurrence) */
+  pairs: Record<string, Record<string, number>>;
 }
 
 interface LearningState {
@@ -44,6 +49,8 @@ interface LearningState {
   currentPage: string | null;
   /** Page enter timestamp */
   pageEnterTime: number | null;
+  /** Last app the user was on (transient, drives pairing transitions) */
+  lastTrackedApp: string | null;
 }
 
 interface LearningActions {
@@ -55,12 +62,16 @@ interface LearningActions {
   trackPageLeave: () => void;
   /** Track action execution */
   trackAction: (actionId: string) => void;
+  /** Track an app being opened/focused (frequency, recency, hour, pairing) */
+  trackAppOpen: (appId: string) => void;
   /** Track search query */
   trackSearch: (query: string) => void;
   /** Get ranked pages by usage */
   getRankedPages: () => string[];
   /** Get ranked actions by frequency */
   getRankedActions: () => string[];
+  /** Get learned app suggestions for the launcher (frequency + recency + hour + pairing) */
+  getAppSuggestions: (currentAppId: string | null, limit?: number) => string[];
   /** Get search suggestions */
   getSearchSuggestions: (partial: string) => string[];
   /** Reset all learning data */
@@ -78,6 +89,8 @@ const initialPatterns: UsagePattern = {
   searchPatterns: [],
   lastActive: {},
   focusPreferences: {},
+  hourly: {},
+  pairs: {},
 };
 
 const initialState: LearningState = {
@@ -86,6 +99,7 @@ const initialState: LearningState = {
   sessionStart: Date.now(),
   currentPage: null,
   pageEnterTime: null,
+  lastTrackedApp: null,
 };
 
 // -----------------------------------------------------------------------------
@@ -170,6 +184,44 @@ export const useLearningStore = create<LearningState & LearningActions>()(
         }));
       },
 
+      trackAppOpen: (appId) => {
+        const state = get();
+        if (!state.enabled || !appId || appId === 'home') return;
+
+        const now = Date.now();
+        const hour = new Date(now).getHours();
+        const prev = state.lastTrackedApp;
+
+        set((s) => {
+          // Time-of-day histogram: clone the app's 24-slot array, bump the hour.
+          const prevHourly = s.patterns.hourly[appId] ?? new Array(24).fill(0);
+          const hourly = prevHourly.slice();
+          hourly[hour] = (hourly[hour] || 0) + 1;
+
+          // Pairing transition: previous app -> this app (skip self + 'home').
+          let pairs = s.patterns.pairs;
+          if (prev && prev !== appId && prev !== 'home') {
+            const from = { ...(pairs[prev] ?? {}) };
+            from[appId] = (from[appId] || 0) + 1;
+            pairs = { ...pairs, [prev]: from };
+          }
+
+          return {
+            lastTrackedApp: appId,
+            patterns: {
+              ...s.patterns,
+              pageVisits: {
+                ...s.patterns.pageVisits,
+                [appId]: (s.patterns.pageVisits[appId] || 0) + 1,
+              },
+              lastActive: { ...s.patterns.lastActive, [appId]: now },
+              hourly: { ...s.patterns.hourly, [appId]: hourly },
+              pairs,
+            },
+          };
+        });
+      },
+
       trackSearch: (query) => {
         const state = get();
         if (!state.enabled || !query.trim()) return;
@@ -209,6 +261,19 @@ export const useLearningStore = create<LearningState & LearningActions>()(
           .map(([action]) => action);
       },
 
+      getAppSuggestions: (currentAppId, limit = 5) => {
+        const { patterns } = get();
+        const stats: AppUsageStats = {
+          visits: patterns.pageVisits,
+          lastActive: patterns.lastActive,
+          hourly: patterns.hourly,
+          pairs: patterns.pairs,
+        };
+        return rankAppSuggestions(stats, currentAppId ?? null)
+          .slice(0, limit)
+          .map((r) => r.appId);
+      },
+
       getSearchSuggestions: (partial) => {
         const { patterns } = get();
         if (!partial.trim()) return patterns.searchPatterns.slice(0, 5);
@@ -219,12 +284,26 @@ export const useLearningStore = create<LearningState & LearningActions>()(
           .slice(0, 5);
       },
 
-      reset: () => set({ patterns: initialPatterns }),
+      reset: () => set({ patterns: initialPatterns, lastTrackedApp: null }),
     }),
     {
       name: 'dex-learning',
       storage: debouncedJsonStorage,
-      version: 1,
+      version: 2,
+      // v1 -> v2 added `hourly` and `pairs`. Backfill them so older persisted
+      // data hydrates cleanly instead of leaving the new fields undefined.
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<LearningState>;
+        if (version < 2 && state.patterns) {
+          state.patterns = {
+            ...initialPatterns,
+            ...state.patterns,
+            hourly: state.patterns.hourly ?? {},
+            pairs: state.patterns.pairs ?? {},
+          };
+        }
+        return state as LearningState & LearningActions;
+      },
       partialize: (state) => ({
         enabled: state.enabled,
         patterns: state.patterns,

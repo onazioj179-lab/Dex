@@ -108,9 +108,7 @@ const styles = {
     flexDirection: 'column' as const,
     minWidth: 180,
     maxWidth: 'min(320px, calc(100vw - 48px))',
-    background: 'var(--color-bg-surface-solid, #141416)',
-    border: `1px solid ${colors.border.default}`,
-    borderRadius: 10,
+    borderRadius: 12,
     boxShadow: 'var(--pg-shadow-popover)',
     overflow: 'hidden',
     outline: 'none',
@@ -516,7 +514,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           role="menu"
           tabIndex={-1}
           aria-label={ariaLabel || 'Dropdown menu'}
-          className={className}
+          className={`dex-liquid-glass${className ? ` ${className}` : ''}`}
           style={containerStyle}
         >
           <div style={contentStyle}>

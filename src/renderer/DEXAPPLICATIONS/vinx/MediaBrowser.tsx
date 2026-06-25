@@ -21,6 +21,8 @@ import {
 import { Z_DROPDOWN_MAX } from '../../../shared/zIndex';
 import { EmptyState } from '../../components/EmptyState';
 import { DexSearchInput } from '../../styles/components';
+import { buildClipFromMedia, resolveDropTrack, appendFrameForTrack } from './mediaClip';
+import { createAddClipCommand } from './VinxCommands';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -141,6 +143,25 @@ const MediaTab: React.FC = memo(() => {
     const lower = search.toLowerCase();
     return mediaBin.filter(m => m.name.toLowerCase().includes(lower));
   }, [mediaBin, search]);
+
+  // Double-click a media item to insert it at the end of a compatible track
+  // (mirrors the drag-to-timeline path, but appends rather than placing at a
+  // dropped frame). Undoable via the command pipeline.
+  const insertMedia = useCallback((mediaId: string) => {
+    const state = useVinxStore.getState();
+    const media = state.project.mediaBin.find(m => m.id === mediaId);
+    if (!media) return;
+    const seq = state.getActiveSequence();
+    const target = resolveDropTrack(seq, media, null);
+    if (!target) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `No ${media.type === 'audio' ? 'audio' : 'video'} track available — add one first` } }));
+      return;
+    }
+    const clip = buildClipFromMedia(media, target.id, appendFrameForTrack(target), state.project.frameRate);
+    state.executeCommand(createAddClipCommand(useVinxStore.getState, clip));
+    state.selectClip(clip.id, false);
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Inserted "${media.name}" at end of timeline` } }));
+  }, []);
 
   const handleImport = useCallback(() => {
     const input = document.createElement('input');
@@ -311,15 +332,15 @@ const MediaTab: React.FC = memo(() => {
         display: 'flex', height: 28, alignItems: 'center', gap: 4, padding: '0 6px',
         borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
       }}>
-        <button aria-label="Import media" onClick={handleImport} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} title="Import Media">
+        <button aria-label="Import media" onClick={handleImport} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }} title="Import Media">
           <ImportIcon />
         </button>
-        <button aria-label="Create new bin" onClick={() => addBin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} title="New Bin">
+        <button aria-label="Create new bin" onClick={() => addBin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }} title="New Bin">
           <BinIcon />
         </button>
         <div style={{ flex: 1 }} />
         <button aria-label={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`} onClick={() => setMediaViewMode(viewMode === 'list' ? 'grid' : 'list')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: 'var(--color-text-secondary)' }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }}>
           {viewMode === 'list' ? <GridIcon /> : <ListIcon />}
         </button>
       </div>
@@ -360,6 +381,7 @@ const MediaTab: React.FC = memo(() => {
                 item={item}
                 selected={item.id === selectedMediaId}
                 onClick={() => setSelectedMedia(item.id)}
+                onInsert={() => insertMedia(item.id)}
                 onContextMenu={(e) => handleContextMenu(e, item.id)}
               />
             ))}
@@ -371,6 +393,7 @@ const MediaTab: React.FC = memo(() => {
               item={item}
               selected={item.id === selectedMediaId}
               onClick={() => setSelectedMedia(item.id)}
+              onInsert={() => insertMedia(item.id)}
               onContextMenu={(e) => handleContextMenu(e, item.id)}
             />
           ))
@@ -430,12 +453,20 @@ MediaTab.displayName = 'MediaTab';
 // MEDIA ITEMS
 // ---------------------------------------------------------------------------
 
-const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onContextMenu }) => {
+const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onInsert?: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onInsert, onContextMenu }) => {
   const typeIcon = item.type === 'video' ? 'V' : item.type === 'audio' ? 'A' : 'I';
   const typeColor = item.type === 'video' ? 'var(--color-accent)' : item.type === 'audio' ? '#3DAF72' : '#D4853A';
 
   return (
-    <div style={listItemStyle(selected)} onClick={onClick} onDoubleClick={onClick} onContextMenu={onContextMenu}>
+    <div
+      style={listItemStyle(selected)}
+      onClick={onClick}
+      onDoubleClick={onInsert ?? onClick}
+      onContextMenu={onContextMenu}
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('vinx/media', item.id); e.dataTransfer.effectAllowed = 'copy'; }}
+      title="Drag to timeline or double-click to insert"
+    >
       <div style={thumbnailStyle}>
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
@@ -458,12 +489,20 @@ const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () 
 
 MediaListItem.displayName = 'MediaListItem';
 
-const MediaGridItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onContextMenu }) => {
+const MediaGridItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onInsert?: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onInsert, onContextMenu }) => {
   const typeIcon = item.type === 'video' ? 'V' : item.type === 'audio' ? 'A' : 'I';
   const typeColor = item.type === 'video' ? 'var(--color-accent)' : item.type === 'audio' ? '#3DAF72' : '#D4853A';
 
   return (
-    <div style={gridItemStyle(selected)} onClick={onClick} onContextMenu={onContextMenu}>
+    <div
+      style={gridItemStyle(selected)}
+      onClick={onClick}
+      onDoubleClick={onInsert ?? onClick}
+      onContextMenu={onContextMenu}
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('vinx/media', item.id); e.dataTransfer.effectAllowed = 'copy'; }}
+      title="Drag to timeline or double-click to insert"
+    >
       <div style={{ ...thumbnailStyle, width: 72, height: 40 }}>
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />

@@ -59,6 +59,7 @@ import { installSendToBridge } from '../services/sendTo';
 import { notify } from '../services/notify';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
+import ControlCenter from './ControlCenter';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
@@ -4224,6 +4225,26 @@ export const AppManager: React.FC = () => {
           <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
 
+        {/* Control Center trigger -- opens the right-side glass panel. */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('dex-toggle-control-center'))}
+          title="Control Center"
+          aria-label="Open Control Center"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 18, borderRadius: 4,
+            background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+            transition: 'background 0.15s ease',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="8" x2="14" y2="8" /><line x1="18" y1="8" x2="20" y2="8" /><circle cx="16" cy="8" r="2" />
+            <line x1="4" y1="16" x2="8" y2="16" /><line x1="12" y1="16" x2="20" y2="16" /><circle cx="10" cy="16" r="2" />
+          </svg>
+        </button>
+
         {/* Notification Center bell removed at the owner's request -- the top bar
             stays minimal (system status + control center only). The hub-backed
             notification center is still reachable from the control-center menu. */}
@@ -4875,6 +4896,10 @@ export const AppManager: React.FC = () => {
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
       <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
+
+      {/* Control Center -- right-side glass panel; self-manages open state via
+          the `dex-toggle-control-center` window event dispatched from the top bar. */}
+      <ControlCenter />
 
       {/* App Switcher HUD -- Ctrl+Tab visual overlay */}
       <AppSwitcher visible={switcherVisible} apps={runningApps} selectedIndex={switcherIndex} />
