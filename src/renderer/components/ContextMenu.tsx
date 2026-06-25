@@ -121,6 +121,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
       ref={menuRef}
       role="menu"
       aria-label="Context menu"
+      className="dex-liquid-glass"
       style={{
         position: 'fixed',
         left: adjustedPos.x,
@@ -131,9 +132,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         maxHeight: 'calc(100vh - 32px)',
         overflowY: 'auto',
         padding: '5px 0',
-        borderRadius: 10,
-        background: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border)',
+        borderRadius: 12,
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px var(--color-border-subtle), var(--pg-gloss-top)',
         animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
       } as React.CSSProperties}

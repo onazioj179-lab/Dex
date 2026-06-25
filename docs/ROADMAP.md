@@ -1,5 +1,90 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-25) — Ultra-premium overhaul, wave 1: launcher motion + Glass 2.0 depth + Control Center.**
+> Against the ULTRA PREMIUM OVERHAUL brief. Shipped this wave (all tsc 0, watermark 0, verified live):
+> (1) **DEX Bar elevated** -- premium one-time entrance fade (opacity-only so it never fights the
+> left/top drag), springy widget-drawer reveal with overshoot (`dexDrawerIn` cubic-bezier, reduced-
+> motion aware), and an "interactive glass" hover (soft fill + brighter glyph + faint inset rim) on
+> every control. (2) **Glass Architecture 2.0 -- spatial depth**: `.dex-liquid-glass`/`-strong` now
+> cast a layered contact + mid + deep-ambient shadow so panels read as physical objects floating
+> above the desktop (verified: command palette visibly lifts off the wallpaper). (3) **Right-side
+> Control Center** (`components/ControlCenter.tsx`, slides from right, `.dex-liquid-glass-strong`,
+> monochrome with accent ONLY for active states): real-backend modules only -- Network
+> (networkStore), Liquid Glass + Night Shift (shellPreferences), a genuine screen-dimmer Brightness
+> (persisted overlay), Do-Not-Disturb (notificationCenterStore), Performance tier (TierManager),
+> Battery (navigator.getBattery); plus filter + persisted reorder. Wired into AppManager top bar via
+> `dex-toggle-control-center`. Skipped (no real renderer backend, NOT faked): Bluetooth, audio
+> routing, mic, real OS display brightness. Monochrome reconciliation: Nexus's energy accent reads
+> as its active-state color, which the monochrome-first rule permits, so it was NOT reverted.
+> **Remaining overhaul themes (multi-session, prioritized, NOT yet done):** Window Physics 3.0
+> (momentum/inertia/magnetic snap/states), Notification redesign (live actions/quick-reply/grouping/
+> AI summary), Dock live-previews + hover-reveal, Search-everywhere command execution, Settings
+> redesign (search-first/previews/favorites), spring-physics motion engine system-wide, audio
+> intelligence. These need their own verified waves -- landing each solid over faking breadth.
+>
+> **CHECKPOINT (2026-06-24c) — Liquid glass + Apple rounding + creative-app completion + dead-code purge.**
+> Made `.dex-liquid-glass` a REAL see-through frosted material (was orphaned + pointed at
+> zeroed tokens): translucent ~0.40-0.54 gradient, blur(30px) saturate(200%) brightness, fresnel
+> top rim; added `.dex-liquid-glass-strong` for text-heavy panels; both auto-solid in lite mode
+> (data-perf-tier=low) and reduced-transparency. (Inspired by liquid-glass-studio, MIT (c) Charles
+> Yin -- approximated in pure CSS; its WebGL2/WebGPU shader engine was judged too heavy to bolt onto
+> DEX's many CSS panels.) Applied across launcher, command palette, top notification banner +
+> notification center, context menu, quick-actions, unified dropdown, and (via 4 parallel agents)
+> ~30 Vinx panels, ~44 Prism panels, Nexus chrome, and 6 small apps. Bumped the radius scale up
+> (2-10px -> 4-18px) to kill boxiness. Nexus got a Ben10/Generator-Rex sci-fi theme (Omnitrix-teal +
+> nanite-amber energy ring, hex/scan motifs, glowing core) with all controls intact. Creative
+> completion: Prism wired ~11 dead tools (Photo Filter/LUT/Replace Color/Select Subject/Refine
+> Edge/Liquify Reconstruct/Actions Play/Rulers/Smart-Object replace); Vinx fixed media
+> drag-to-timeline (a true no-op) + aligned toolbars; Files got multi-select/batch-delete/copy-move;
+> DexCode got fuzzy quick-open. Purged 12 verified-dead modules (-5943 lines), keeping
+> searchIndexer.worker (false positive: dynamic `new Worker(URL)`). Verified live: 0 console errors,
+> app healthy, glass see-through over wallpaper, Nexus + Prism render clean. tsc 0, watermark 0
+> (unified across all agents + direct work). Deferred (not faked): top OS bar / dock glass
+> (AppManager layout -- needs its own verified pass).
+>
+> **CHECKPOINT (2026-06-24b) — Brutal-completion audit (47 verified defects) + 5 broken controls fixed.**
+> Ran a 16-slice parallel audit of the whole renderer with adversarial per-finding
+> verification (false positives are common here, so every claim was re-checked by an
+> independent skeptic). Result: 47 REAL, headless-fixable defects — full triaged
+> backlog in `docs/AUDIT-BRUTAL-COMPLETION.md` (fix-now / fix-careful / remove,
+> ranked by value-minus-risk). **Fixed this pass (5 highest-value, lowest-risk
+> user-facing controls):** (1) Home Music-Controls widget was bound to dead
+> `dex-now-playing`/`dex-media-control` events (display stuck, transport buttons
+> no-ops) -> now bound to the real `useNowPlaying` store like MiniPlayer;
+> (2) command-palette "Clear Clipboard" removed a retired legacy localStorage key
+> and never touched the live Omni Clipboard -> now calls `clipboardStore.clearAll()`;
+> (3) CollabHub "Open project" dispatched `dex-launch-app` (no listener) ->
+> canonical `dex-open-app`; (4) Home Weather widget shipped a hardcoded fake
+> "72 Sunny 45%" -> now reads the Weather app's real keyless open-meteo cache
+> (unit-converted) or shows an honest "Open Weather" unavailable state, never
+> fabricated data; (5) the DEX Bar could never be hidden (`setEnabled` had zero
+> callers) -> added an in-bar "Hide bar" control + a "Show DEX Bar" toggle in
+> Settings > Shell & Dock (the mandatory re-show path). Verified live in preview:
+> 0 boot/console errors, weather cache read returns real 57F/Partly Cloudy/71%
+> (null when absent), DEX Bar hide/show round-trips through persistence. tsc 0,
+> watermark 0. The remaining 42 (mostly orphaned modules recommended for removal,
+> plus settings-toggle->consumer wiring) are deferred to follow-up passes — NOT
+> faked or bulk-deleted blind, since several "remove" calls need a second look.
+>
+> **CHECKPOINT (2026-06-24) — Silent learning system wired end-to-end (v6.0.4
+> "every page teaches the system").** The `store/learningStore` accumulator
+> existed but was orphaned: nothing called `trackAppOpen`/`trackPageVisit` and
+> the rankings were never consumed. Now it learns from real usage and drives the
+> launcher. New pure, unit-tested ranking engine `services/suggestionEngine.ts`
+> (`rankAppSuggestions`) combines four signals — open **frequency** (log-scaled),
+> **recency** (7-day exponential decay), **time-of-day** affinity (per-app 24-slot
+> hour histogram), and app->app **pairing** (transition counts from the current
+> app) — 8 unit tests. The learning store gained `hourly` + `pairs` fields (persist
+> v1->v2 migration), a `trackAppOpen` collector, and a `getAppSuggestions`
+> selector. `services/learningWiring.ts` (`initLearningWiring`, booted from
+> App.tsx) feeds it from the running-apps store's `currentAppId` transitions
+> (direct store subscription, not the throttled ContextBus, so no switch is
+> dropped). `components/FloatingLauncher.tsx` now shows a learned **"Suggested
+> apps"** row (was recency-only "Recent apps"), falling back to raw recency on
+> cold start. Verified live: zero boot console errors, all four signals populate
+> on real app switches, persist v2 confirmed. tsc 0, watermark 0, 8/8 tests green.
+
+
 > **CHECKPOINT (2026-06-23) — Window-management backlog (section 01) CLEARED:
 > persistent custom snap zones shipped.** The last open item from
 > `docs/DEX_FEATURE_BACKLOG.md` is done end-to-end. A pure FancyZones model

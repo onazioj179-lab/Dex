@@ -248,6 +248,7 @@ const Banner: React.FC<{
     <div
       ref={bannerRef}
       role="alert"
+      className="dex-liquid-glass"
       aria-live={notification.icon === 'error' ? 'assertive' : 'polite'}
       aria-label={`${notification.icon || 'info'} notification: ${notification.title}`}
       onMouseEnter={() => setHovered(true)}
@@ -257,12 +258,13 @@ const Banner: React.FC<{
       onPointerUp={handlePointerUp}
       onClick={handleClick}
       style={{
+        // Apple-style frosted notification: background/blur/border + specular rim
+        // come from .dex-liquid-glass (auto-solid in lite mode). Keep the floating
+        // drop shadow inline (composed with the class's specular insets).
         width: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
         minHeight: 64,
-        borderRadius: 10,
-        background: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border-subtle)',
-        boxShadow: 'var(--pg-shadow-panel)',
+        borderRadius: 14,
+        boxShadow: 'var(--pg-shadow-panel), inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
         overflow: 'hidden',
         cursor: 'pointer',
         transform: `translateX(${swipeX}px)`,
@@ -611,13 +613,11 @@ export const NotificationCenter: React.FC<{
         } as React.CSSProperties}
         onClick={onClose}
       />
-      {/* Panel slides in from right with smooth spring */}
-      <div style={{
+      {/* Panel slides in from right with smooth spring -- frosted glass */}
+      <div className="dex-liquid-glass" style={{
         position: 'fixed', top: 30, right: 8, bottom: 8,
         width: 'min(360px, calc(100vw - 48px))', zIndex: 'var(--z-notification)',
-        background: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 10,
+        borderRadius: 14,
         boxShadow: 'var(--pg-shadow-popover-strong)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',

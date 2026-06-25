@@ -22,6 +22,7 @@ import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useLearningStore } from '../store/learningStore';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
@@ -84,7 +85,7 @@ export interface FloatingLauncherProps {
 }
 
 export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSearch }) => {
-  const { x, y, enabled, setPosition } = useFloatingLauncher();
+  const { x, y, enabled, setPosition, setEnabled } = useFloatingLauncher();
 
   // Widgets are opt-in: OFF by default. Persisted so they only ever show once
   // the user has turned them on.
@@ -134,24 +135,38 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     try { const def = APP_DEFINITIONS[id]; if (def) launchApp({ id, name: def.name, icon: def.icon, color: def.color }); } catch { /* not registered */ }
   }, [launchApp]);
 
-  // Recent apps (Phase I — quiet learning surface). Last ~5 DISTINCT recently
-  // used apps, most-recent first, excluding `home` and the current app. Reads
-  // the same sessionHistory the store maintains; degrades to empty silently.
+  // Suggested apps (quiet learning surface): learned ranking first (frequency,
+  // recency, time-of-day, app->app pairing from the silent learning store), then
+  // remaining slots filled from raw recency (sessionHistory) for cold start.
+  // Always excludes `home` and the current app; degrades to empty silently.
   const sessionHistory = useRunningApps(s => s.sessionHistory);
   const currentAppId = useRunningApps(s => s.currentAppId);
+  const learningEnabled = useLearningStore(s => s.enabled);
+  const learningPatterns = useLearningStore(s => s.patterns);
+  const getAppSuggestions = useLearningStore(s => s.getAppSuggestions);
   const recentApps = useMemo(() => {
     const seen = new Set<string>();
     const out: Array<{ id: string; name: string; icon: string; color: string }> = [];
-    for (const id of sessionHistory) {
-      if (id === 'home' || id === currentAppId || seen.has(id)) continue;
+    const push = (id: string) => {
+      if (id === 'home' || id === currentAppId || seen.has(id)) return;
       const def = APP_DEFINITIONS[id];
-      if (!def) continue; // unregistered / stale id — skip quietly
+      if (!def) return; // unregistered / stale id — skip quietly
       seen.add(id);
       out.push({ id, name: def.name, icon: def.icon, color: def.color });
+    };
+    void learningPatterns; // read so this recomputes as the model updates
+    if (learningEnabled) {
+      for (const id of getAppSuggestions(currentAppId, 5)) {
+        push(id);
+        if (out.length >= 5) break;
+      }
+    }
+    for (const id of sessionHistory) {
       if (out.length >= 5) break;
+      push(id);
     }
     return out;
-  }, [sessionHistory, currentAppId]);
+  }, [sessionHistory, currentAppId, learningEnabled, learningPatterns, getAppSuggestions]);
   const openRecent = useCallback((id: string) => {
     // Launch directly via the same reliable path the music/calendar buttons use.
     // The old code dispatched dex-open-app with { id }, but every handler keys
@@ -256,12 +271,14 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
   const ctrlBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 8, border: 'none', padding: 0,
+    width: 32, height: 32, borderRadius: 10, border: 'none', padding: 0,
     background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer',
-    transition: 'background 0.12s ease, color 0.12s ease',
+    transition: 'background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease',
   };
-  const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; };
-  const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; };
+  // Premium "interactive glass" hover: soft fill, brighter glyph, and a faint
+  // inset rim so each control reads as its own lit glass chip (monochrome).
+  const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.10)'; };
+  const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
 
   return (
     <div
@@ -269,6 +286,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
       role="region"
       aria-label="DEX menu"
       data-dex-nook
+      className="dex-liquid-glass"
       style={{
         // IMPORTANT: position via left/top, NOT transform. DEX has global rules
         // (globals.css `[data-perf-tier="low"] *:hover/active/focus` and
@@ -279,21 +297,24 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         // of the long-standing drag glitch across every prior launcher design.
         position: 'fixed', left: pos.x, top: pos.y, zIndex: 'var(--z-dock)' as unknown as number,
         boxSizing: 'border-box',
-        // Master-overhaul glass: floating HUD reads as frosted glass over the
-        // wallpaper (Part 1 glass tokens). Real backdrop blur, subtle glass border.
-        background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-        backdropFilter: 'var(--glass-blur, blur(20px))',
-        WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
-        border: '1px solid var(--glass-border, rgba(255,255,255,0.10))',
+        // Liquid glass via the .dex-liquid-glass class (real backdrop blur +
+        // saturation + specular rim; auto-solid in lite mode / reduced-transparency).
+        // Background/blur/border come from the class; only the DYNAMIC radius +
+        // drag-elevation shadow are inline. The inline box-shadow includes the
+        // specular insets so the lit-glass look survives the inline override.
         borderRadius: expanded ? PANEL_R : PILL_R,
         // visible (not hidden) so the search results dropdown can escape the bar.
         // The glass bg + border still clip to border-radius (background respects
         // the radius regardless of overflow); only overflowing children show.
         overflow: 'visible',
-        boxShadow: dragging
+        boxShadow: (dragging
           ? '0 16px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.5)'
-          : '0 8px 28px rgba(0,0,0,0.42), 0 0 0 0.5px rgba(0,0,0,0.45)',
+          : '0 8px 28px rgba(0,0,0,0.42), 0 0 0 0.5px rgba(0,0,0,0.45)')
+          + ', inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
         userSelect: 'none',
+        // Premium one-time entrance: opacity-only (no transform) so it never
+        // fights the left/top drag positioning. Plays once on mount.
+        animation: 'dexBarIn 0.34s ease both',
         // No position transition: the bar tracks the pointer 1:1 while dragging
         // and settles exactly where released -- no ease that could read as a
         // snap-back. Only the chrome (shadow/radius) eases.
@@ -381,9 +402,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         </button>
       </div>
 
-      {/* Widget drawer -- OPT-IN. Only present once the user expands. */}
+      {/* Widget drawer -- OPT-IN. Only present once the user expands. Springs in. */}
       {expanded && (
-        <>
+        <div className="dex-drawer-in">
         <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
           {/* Now Playing */}
           <div style={{ width: 178, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -468,11 +489,11 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           </div>
         </div>
 
-        {/* Recent apps -- quiet quick-launch. Renders nothing without history. */}
+        {/* Suggested apps -- learned quick-launch. Renders nothing without data. */}
         {recentApps.length > 0 && (
           <div
             role="group"
-            aria-label="Recent apps"
+            aria-label="Suggested apps"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 10px',
@@ -503,7 +524,28 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
             ))}
           </div>
         )}
-        </>
+
+        {/* Hide the bar. Re-show from Settings > Shell & Dock > Show DEX Bar. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
+          <button
+            type="button"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => setEnabled(false)}
+            title="Hide the DEX Bar (re-enable in Settings > Shell & Dock)"
+            aria-label="Hide DEX Bar"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 7,
+              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
+              background: 'transparent', cursor: 'pointer', fontSize: 11,
+              color: 'var(--color-text-secondary)', transition: 'background 0.12s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <DexIcon name="close" size={12} color="currentColor" /> Hide bar
+          </button>
+        </div>
+        </div>
       )}
     </div>
   );

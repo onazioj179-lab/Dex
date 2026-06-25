@@ -176,6 +176,7 @@ const UnitConverter: React.FC = () => {
           onKeyDown={e => { if (e.key === 'Enter') runUnitSearch(); }}
           onBlur={runUnitSearch}
           placeholder="Find a unit — e.g. km, pounds, MB, kWh"
+          className="dex-liquid-glass"
           style={s.search}
           aria-label="Find a unit"
         />
@@ -206,6 +207,7 @@ const UnitConverter: React.FC = () => {
           <select
             value={fromIdx}
             onChange={e => setFromIdx(Number(e.target.value))}
+            className="dex-liquid-glass"
             style={s.select}
             aria-label="Convert from unit"
           >
@@ -216,6 +218,7 @@ const UnitConverter: React.FC = () => {
             inputMode="decimal"
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
+            className="dex-liquid-glass-strong"
             style={s.input}
             placeholder="0"
             aria-label="Value to convert"
@@ -223,7 +226,7 @@ const UnitConverter: React.FC = () => {
         </div>
 
         {/* Swap button */}
-        <button onClick={swap} style={s.swapBtn} title="Swap units">
+        <button onClick={swap} className="dex-liquid-glass" style={s.swapBtn} title="Swap units">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
           </svg>
@@ -234,6 +237,7 @@ const UnitConverter: React.FC = () => {
           <select
             value={toIdx}
             onChange={e => setToIdx(Number(e.target.value))}
+            className="dex-liquid-glass"
             style={s.select}
             aria-label="Convert to unit"
           >
@@ -245,6 +249,7 @@ const UnitConverter: React.FC = () => {
             </div>
             <button
               onClick={copyResult}
+              className="dex-liquid-glass"
               style={{ ...s.copyBtn, ...(!result ? s.copyBtnDisabled : {}) }}
               title="Copy result"
               aria-label="Copy result"
@@ -286,7 +291,7 @@ const UnitConverter: React.FC = () => {
       )}
 
       {/* Quick reference grid */}
-      <div style={s.refGrid}>
+      <div className="dex-liquid-glass-strong" style={s.refGrid}>
         <div className="dex-label-caps" style={s.refHeader}>Quick Reference</div>
         <div style={s.refTable}>
           {[1, 10, 100, 1000].map(val => {
@@ -318,8 +323,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) var(--space-4) 0', flexShrink: 0,
   },
   search: {
-    width: '100%', padding: '8px var(--space-3)', borderRadius: 8,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    width: '100%', padding: '8px var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
@@ -329,7 +333,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', whiteSpace: 'nowrap',
@@ -347,14 +351,12 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
   },
   select: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
     cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
   },
   input: {
-    width: '100%', padding: '14px var(--space-4)', borderRadius: 10,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    width: '100%', padding: '14px var(--space-4)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 300,
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
@@ -363,7 +365,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', alignItems: 'stretch', gap: 'var(--space-2)',
   },
   resultDisplay: {
-    flex: 1, padding: '14px var(--space-4)', borderRadius: 10,
+    flex: 1, padding: '14px var(--space-4)', borderRadius: 12,
     background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
@@ -371,8 +373,7 @@ const s: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   copyBtn: {
-    width: 44, borderRadius: 10, flexShrink: 0,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    width: 44, borderRadius: 12, flexShrink: 0,
     color: 'var(--color-text-secondary)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.15s ease',
@@ -382,7 +383,6 @@ const s: Record<string, React.CSSProperties> = {
   },
   swapBtn: {
     width: 40, height: 40, borderRadius: '50%',
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.15s ease', flexShrink: 0,
@@ -393,7 +393,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   refGrid: {
     flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    borderTop: '1px solid var(--color-border-subtle)',
+    margin: '0 var(--space-4) var(--space-4)',
   },
   refHeader: {
     padding: 'var(--space-3) var(--space-5) var(--space-2)',

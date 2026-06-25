@@ -164,15 +164,15 @@ const ColorPicker: React.FC = () => {
 
       {/* Values */}
       <div style={s.values}>
-        <button onClick={() => copy(hex)} style={s.valueChip} title="Copy HEX">
+        <button onClick={() => copy(hex)} className="dex-liquid-glass" style={s.valueChip} title="Copy HEX">
           <span style={s.valueLabel}>HEX</span>
           <span style={s.valueText}>{hex.toUpperCase()}</span>
         </button>
-        <button onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} style={s.valueChip} title="Copy RGB">
+        <button onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} className="dex-liquid-glass" style={s.valueChip} title="Copy RGB">
           <span style={s.valueLabel}>RGB</span>
           <span style={s.valueText}>{rgb.r}, {rgb.g}, {rgb.b}</span>
         </button>
-        <button onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} style={s.valueChip} title="Copy HSL">
+        <button onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} className="dex-liquid-glass" style={s.valueChip} title="Copy HSL">
           <span style={s.valueLabel}>HSL</span>
           <span style={s.valueText}>{hsl.h}, {hsl.s}%, {hsl.l}%</span>
         </button>
@@ -181,6 +181,7 @@ const ColorPicker: React.FC = () => {
             `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
             `Color ${hex.toUpperCase()}`,
           )}
+          className="dex-liquid-glass"
           style={s.valueChip}
           title="Send swatch to Notes"
         >
@@ -196,6 +197,7 @@ const ColorPicker: React.FC = () => {
         <input
           value={hexInput}
           onChange={e => handleHexInput(e.target.value)}
+          className="dex-liquid-glass"
           style={s.hexInput}
           placeholder="#000000"
           maxLength={7}
@@ -304,8 +306,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   valueChip: {
     flex: 1, display: 'flex', flexDirection: 'column', gap: 2,
-    padding: 'var(--space-2) 10px', borderRadius: 6, border: 'none',
-    background: 'var(--color-bg-surface)', cursor: 'pointer',
+    padding: 'var(--space-2) 10px', borderRadius: 12,
+    cursor: 'pointer',
     transition: 'all 0.15s ease', textAlign: 'left',
     fontFamily: 'var(--font-family)',
   },
@@ -323,8 +325,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   hexRow: { padding: '0 var(--space-5) var(--space-3)' },
   hexInput: {
-    width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 12,
     color: 'var(--color-text-primary)', fontSize: 14,
     fontFamily: 'var(--font-mono)', outline: 'none',
     textAlign: 'center', boxSizing: 'border-box',
@@ -337,7 +338,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexWrap: 'wrap', gap: 6,
   },
   swatch: {
-    width: 28, height: 28, borderRadius: 4, border: 'none',
+    width: 28, height: 28, borderRadius: 10, border: 'none',
     cursor: 'pointer', transition: 'all 0.15s ease',
   },
 };
