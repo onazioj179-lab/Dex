@@ -103,7 +103,7 @@ export const QuickActionsMenu: React.FC = () => {
 
   const styles: Record<string, React.CSSProperties> = {
     overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20vh' },
-    panel: { width: '100%', maxWidth: '360px', background: 'var(--color-bg-elevated)', borderRadius: '10px', border: '1px solid var(--color-border)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden' },
+    panel: { width: '100%', maxWidth: '360px', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden' },
     head: { padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-border)' },
     title: { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' },
     preview: { fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' },
@@ -114,7 +114,7 @@ export const QuickActionsMenu: React.FC = () => {
 
   return (
     <div style={styles.overlay} onMouseDown={close}>
-      <div style={styles.panel} onMouseDown={e => e.stopPropagation()}>
+      <div className="dex-liquid-glass" style={styles.panel} onMouseDown={e => e.stopPropagation()}>
         <div style={styles.head}>
           <div style={styles.title}>Quick Actions</div>
           <div style={styles.preview}>{preview}</div>

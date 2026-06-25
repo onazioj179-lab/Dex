@@ -392,10 +392,10 @@ const WorldClock: React.FC = () => {
   return (
     <div style={s.container}>
       {/* Toolbar */}
-      <div style={s.toolbar}>
+      <div className="dex-liquid-glass" style={s.toolbar}>
         <span style={s.title}>World Clock</span>
         <div style={s.toolbarRight}>
-          <button style={{ ...s.toggleBtn, fontWeight: is24h ? 700 : 400 }} onClick={() => setIs24h(!is24h)} aria-label="Toggle 12/24 hour">
+          <button className="dex-liquid-glass" style={{ ...s.toggleBtn, fontWeight: is24h ? 700 : 400 }} onClick={() => setIs24h(!is24h)} aria-label="Toggle 12/24 hour">
             {is24h ? '24h' : '12h'}
           </button>
           <button
@@ -413,8 +413,9 @@ const WorldClock: React.FC = () => {
 
       {/* Add City Panel with search + autocomplete */}
       {showAdd && (
-        <div style={s.addPanel}>
+        <div className="dex-liquid-glass-strong" style={s.addPanel}>
           <input
+            className="dex-liquid-glass"
             style={s.searchInput}
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -568,30 +569,29 @@ const s: Record<string, React.CSSProperties> = {
   },
   toolbar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
+    padding: 'var(--space-3) var(--space-5)', borderRadius: 0,
     flexShrink: 0,
   },
   title: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em' },
   toolbarRight: { display: 'flex', gap: 6 },
   toggleBtn: {
-    padding: '5px 10px', borderRadius: 4, border: 'none',
-    background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+    padding: '5px 10px', borderRadius: 10, border: 'none',
+    color: 'var(--color-text-secondary)',
     fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   addBtn: {
-    width: 28, height: 28, borderRadius: 4, border: 'none',
+    width: 28, height: 28, borderRadius: 10, border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 16, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   addPanel: {
-    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
+    padding: 'var(--space-3) var(--space-5)', borderRadius: 0,
     display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)',
   },
   searchInput: {
     width: '100%', boxSizing: 'border-box' as const,
-    padding: '8px var(--space-3)', borderRadius: 6,
-    border: '1px solid var(--color-border, var(--color-border-subtle))',
-    background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
+    padding: '8px var(--space-3)', borderRadius: 10,
+    color: 'var(--color-text-primary)',
     fontSize: 13, fontFamily: 'var(--font-family)', outline: 'none',
   },
   searchEmpty: { fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 2px' },
@@ -601,7 +601,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   resultRow: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-primary)',
     cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-family)',
     textAlign: 'left' as const, width: '100%',
@@ -615,7 +615,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   clockCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: 'var(--space-5) var(--space-4)', borderRadius: 10,
+    padding: 'var(--space-5) var(--space-4)', borderRadius: 14,
     border: '1px solid var(--color-border, var(--color-bg-hover))',
     position: 'relative' as const, gap: 4,
   },
@@ -646,7 +646,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
     color: 'var(--color-success, #30D158)',
     border: '1px solid var(--color-success, #30D158)',
-    borderRadius: 4, padding: '1px 5px',
+    borderRadius: 8, padding: '1px 5px',
   },
   emptyState: {
     flex: 1, display: 'flex', flexDirection: 'column' as const,

@@ -673,7 +673,7 @@ const NoiseGenerator: React.FC = () => {
   return (
     <div style={st.container}>
       {/* Main Display */}
-      <div style={st.display}>
+      <div className="dex-liquid-glass-strong" style={st.display}>
         <div style={{ fontSize: 56, marginBottom: 'var(--space-1)', letterSpacing: 1 }}>
           {playing ? 'MX' : 'NG'}
         </div>
@@ -688,6 +688,7 @@ const NoiseGenerator: React.FC = () => {
       {/* Transport */}
       <div style={st.transport}>
         <button
+          className="dex-liquid-glass"
           style={st.shuffleBtn}
           onClick={shuffle}
           aria-label="Shuffle soundscape"
@@ -747,6 +748,7 @@ const NoiseGenerator: React.FC = () => {
             onChange={e => setPresetName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') savePreset(); }}
             placeholder="Preset name..."
+            className="dex-liquid-glass"
             style={st.presetInput}
             aria-label="Preset name"
           />
@@ -762,7 +764,7 @@ const NoiseGenerator: React.FC = () => {
         {presets.length > 0 && (
           <div style={st.presetChips}>
             {presets.map(p => (
-              <div key={p.id} style={st.presetChip}>
+              <div key={p.id} className="dex-liquid-glass" style={st.presetChip}>
                 <button
                   style={st.presetChipLoad}
                   onClick={() => loadPreset(p)}
@@ -829,7 +831,8 @@ const st: Record<string, React.CSSProperties> = {
   },
   display: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: 'var(--space-6) var(--space-5) var(--space-3)', flexShrink: 0,
+    padding: 'var(--space-6) var(--space-8) var(--space-4)', flexShrink: 0,
+    borderRadius: 14, marginTop: 'var(--space-4)',
   },
   presetName: { fontSize: 16, fontWeight: 600 },
   timerDisplay: {
@@ -841,8 +844,8 @@ const st: Record<string, React.CSSProperties> = {
     padding: '0 var(--space-5) var(--space-4)',
   },
   shuffleBtn: {
-    width: 40, height: 40, borderRadius: '50%', border: '1px solid var(--color-border)',
-    background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)',
+    width: 40, height: 40, borderRadius: '50%',
+    color: 'var(--color-text-primary)',
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   playBtn: {
@@ -868,7 +871,7 @@ const st: Record<string, React.CSSProperties> = {
   timerLabel: { fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' },
   timerOptions: { display: 'flex', gap: 4 },
   timerBtn: {
-    padding: '4px var(--space-2)', borderRadius: 4, border: 'none',
+    padding: '4px var(--space-2)', borderRadius: 10, border: 'none',
     fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetSection: {
@@ -877,19 +880,17 @@ const st: Record<string, React.CSSProperties> = {
   },
   presetSaveRow: { display: 'flex', gap: 'var(--space-2)' },
   presetInput: {
-    flex: 1, padding: '6px var(--space-3)', borderRadius: 6,
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-elevated, var(--color-border-subtle))',
+    flex: 1, padding: '6px var(--space-3)', borderRadius: 10,
     color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'var(--font-family)', outline: 'none',
   },
   savePresetBtn: {
-    padding: '6px var(--space-4)', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-4)', borderRadius: 10, border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetChips: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' },
   presetChip: {
-    display: 'flex', alignItems: 'center', borderRadius: 6, overflow: 'hidden',
-    border: '1px solid var(--color-border)', background: 'var(--color-border-subtle)',
+    display: 'flex', alignItems: 'center', borderRadius: 10, overflow: 'hidden',
   },
   presetChipLoad: {
     padding: '4px var(--space-3)', border: 'none', background: 'transparent',

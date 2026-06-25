@@ -19,7 +19,7 @@ interface Props {
 
 const wrapStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', height: '100%',
-  background: 'var(--color-bg-elevated)', overflow: 'auto',
+  background: 'transparent', overflow: 'auto',
 };
 
 const headerStyle: React.CSSProperties = {

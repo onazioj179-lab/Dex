@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useClipboardStore } from '../store/clipboardStore';
 import { toggleTheme } from '../utils/theme';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { safeMath, formatResult } from '../utils/safeMath';
@@ -251,7 +252,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'new-workflow', title: 'Create New Workflow', subtitle: 'Build automation', icon: Icons.workflows, category: 'action', action: () => { openApp('workflows'); }, keywords: ['automate', 'create'] },
     { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
-    { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { localStorage.removeItem('dex-clipboard-history'); }, keywords: ['clean', 'privacy'] },
+    { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { useClipboardStore.getState().clearAll(); }, keywords: ['clean', 'privacy'] },
     { id: 'save-diagnostics', title: 'Save Diagnostics Report', subtitle: 'Download crash + environment info', icon: Icons.files, category: 'action', action: () => { exportDiagnostics(); }, keywords: ['diagnostics', 'crash', 'report', 'debug', 'support', 'recovery', 'logs'] },
     { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
     { id: 'arrange-windows', title: 'Arrange Windows', subtitle: 'Tile open windows into a grid', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), keywords: ['tile', 'grid', 'arrange', 'organize', 'windows', 'layout', 'cascade'] },
@@ -441,9 +442,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     container: {
       width: '100%',
       maxWidth: 'min(560px, calc(100vw - 48px))',
-      background: 'var(--color-bg-elevated)',
-      borderRadius: '10px',
-      border: '1px solid var(--color-border)',
+      // background + border come from the .dex-liquid-glass class (real frosted
+      // glass, lite-mode-aware). Keep radius/clip/elevation inline.
+      borderRadius: '12px',
       boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
       overflow: 'hidden',
     },
@@ -539,7 +540,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
   return (
     <div style={styles.overlay} onMouseDown={onClose} role="presentation">
-      <div ref={trapRef} style={styles.container} onMouseDown={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Command palette">
+      <div ref={trapRef} className="dex-liquid-glass" style={styles.container} onMouseDown={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Command palette">
         <div style={styles.inputWrapper}>
           <DexSearchInput
             ref={inputRef}

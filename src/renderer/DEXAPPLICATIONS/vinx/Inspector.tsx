@@ -510,7 +510,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
     <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       {/* Three-way color wheels (per-clip primary correction) */}
       <div style={sectionHeaderStyle}>Primary (Lift / Gamma / Gain)</div>
-      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start', padding: '4px 4px var(--space-2)', gap: 4, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start', padding: '4px var(--space-2) var(--space-2)', gap: 4, flexWrap: 'wrap' }}>
         <PrimaryColorWheel label="Lift" value={wheels.lift} onChange={v => updateWheel('lift', v)} size={100} />
         <PrimaryColorWheel label="Gamma" value={wheels.gamma} onChange={v => updateWheel('gamma', v)} size={100} />
         <PrimaryColorWheel label="Gain" value={wheels.gain} onChange={v => updateWheel('gain', v)} size={100} />
@@ -541,7 +541,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
 
       {/* Legacy global wheels (sequence-wide grade) */}
       <div style={sectionHeaderStyle}>Global Wheels</div>
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px 4px var(--space-2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px var(--space-2) var(--space-2)' }}>
         <ColorWheel label="Lift" r={colorGrade.liftR} g={colorGrade.liftG} b={colorGrade.liftB}
           onChange={(r, g, b) => setColorGrade({ liftR: r, liftG: g, liftB: b })} />
         <ColorWheel label="Gamma" r={colorGrade.gammaR} g={colorGrade.gammaG} b={colorGrade.gammaB}

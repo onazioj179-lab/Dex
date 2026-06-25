@@ -47,6 +47,7 @@ import FlowSendMenu from './components/FlowSendMenu';
 import { wireFlowIntakes } from './services/flowIntakes';
 import ContextNowPanel from './components/ContextNowPanel';
 import { startContextEngine } from './services/contextEngineWiring';
+import { initLearningWiring } from './services/learningWiring';
 import LearnOverlay from './components/LearnOverlay';
 import { registerBuiltinLearn } from './services/learnRegistry';
 import QuickActionsMenu from './components/QuickActionsMenu';
@@ -242,7 +243,7 @@ export const App: React.FC = () => {
   // holds what you copied while working (not just whatever is on the clipboard
   // the moment the panel opens). Idempotent; runs once for the app's lifetime.
   // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
-  useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); registerBuiltinLearn(); }, []);
+  useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();

@@ -15,6 +15,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from '
 import { useToastHelpers } from '../components/Toast';
 import { glassPanel, glassButton, glassMenu } from '../styles/glassMenu';
 import { useRunningApps } from '../store/runningApps';
+import { useLearningStore } from '../store/learningStore';
 import { useConfirm } from '../components/ConfirmDialog';
 import { DexSearchInput } from '../styles/components';
 import {
@@ -200,7 +201,11 @@ export const Power: React.FC = () => {
 
   // Controls (original)
   const [automationsEnabled, setAutomationsEnabled] = useState(true);
-  const [learningEnabled, setLearningEnabled] = useState(true);
+  // "Learning" is bound to the real silent-learning store so this toggle
+  // actually turns usage learning (app suggestions, pattern tracking) on/off.
+  const learningEnabled = useLearningStore((s) => s.enabled);
+  const setLearningStoreEnabled = useLearningStore((s) => s.setEnabled);
+  const setLearningEnabled = (v: boolean) => setLearningStoreEnabled(v);
   const [appLocked, setAppLocked] = useState(false);
   const [safeMode, setSafeMode] = useState(false);
   const [panicStopped, setPanicStopped] = useState(false);
