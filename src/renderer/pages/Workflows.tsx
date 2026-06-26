@@ -1483,7 +1483,7 @@ export const Workflows: React.FC = () => {
         {!isEditing ? (
           <>
             {/* Header */}
-            <div style={styles.header}>
+            <div className="dex-liquid-glass" style={styles.header}>
               <div style={styles.headerLeft}>
                 <h1 style={styles.title}>All Shortcuts</h1>
                 <span style={styles.subtitle}>{workflows.length} shortcuts</span>
@@ -1529,7 +1529,7 @@ export const Workflows: React.FC = () => {
                 </div>
               ) : (
                 filteredWorkflows.map(workflow => (
-                  <div key={workflow.id} onContextMenu={e => showCtxMenu(e, buildWorkflowCtxItems(workflow))} style={{ ...styles.workflowCard, opacity: workflow.enabled === false ? 0.6 : 1 }}>
+                  <div key={workflow.id} className="dex-liquid-glass" onContextMenu={e => showCtxMenu(e, buildWorkflowCtxItems(workflow))} style={{ ...styles.workflowCard, opacity: workflow.enabled === false ? 0.6 : 1 }}>
                     <div style={styles.cardHeader}>
                       <div style={{ ...styles.cardIcon, background: `${workflow.color}20` }}>
                         {Icons.bolt}
@@ -1585,7 +1585,7 @@ export const Workflows: React.FC = () => {
              ============================================================ */
           <div style={styles.editor}>
             {/* Editor Header */}
-            <div style={styles.editorHeader}>
+            <div className="dex-liquid-glass" style={styles.editorHeader}>
               <button style={styles.backBtn} onClick={() => { saveCurrentWorkflow(); setIsEditing(false); }} aria-label="Go back">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, verticalAlign: 'middle' }}><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg> Back
               </button>
@@ -1643,7 +1643,7 @@ export const Workflows: React.FC = () => {
             </div>
 
             {/* Trigger + enabled config strip */}
-            <div style={styles.triggerBar}>
+            <div className="dex-liquid-glass" style={styles.triggerBar}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Trigger</span>
               <select
                 value={selectedWorkflow?.trigger?.type || 'manual'}
@@ -1711,7 +1711,7 @@ export const Workflows: React.FC = () => {
 
             {/* Templates Dropdown */}
             {showTemplates && (
-              <div style={styles.templatesPanel}>
+              <div className="dex-liquid-glass-strong" style={styles.templatesPanel}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-3)' }}>Templates</div>
                 {WORKFLOW_TEMPLATES.map((tmpl, i) => (
                   <button
@@ -1810,7 +1810,7 @@ export const Workflows: React.FC = () => {
               </div>
 
               {/* Right Panel: Action Library or Node Config */}
-              <div style={styles.rightPanel}>
+              <div className="dex-liquid-glass-strong" style={styles.rightPanel}>
                 {selectedNode ? (
                   /* Node Configuration */
                   <div style={styles.configPanel}>
@@ -2101,7 +2101,7 @@ const styles: Record<string, React.CSSProperties> = {
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border)',
+    padding: 'var(--space-3) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border)',
     gap: 'var(--space-3)', minWidth: 0,
   },
   headerLeft: { minWidth: 0 },
@@ -2121,7 +2121,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px', outline: 'none', width: '150px', minWidth: 0,
   },
   createBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px', padding: 'var(--space-2) var(--space-4)', borderRadius: '6px',
+    display: 'flex', alignItems: 'center', gap: '6px', padding: 'var(--space-2) var(--space-4)', borderRadius: '10px',
     border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
@@ -2131,7 +2131,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 'var(--space-4)', alignContent: 'start',
   },
   workflowCard: {
-    background: 'var(--color-bg-elevated)', borderRadius: '6px', padding: 'var(--space-5)',
+    borderRadius: '12px', padding: 'var(--space-5)',
     display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -2142,7 +2142,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardActions: { display: 'flex', gap: '4px' },
   cardActionBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: '28px', height: '28px', borderRadius: '4px', border: 'none',
+    width: '28px', height: '28px', borderRadius: '10px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', cursor: 'pointer',
   },
   cardTitle: { fontSize: '16px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -2158,11 +2158,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   triggerBar: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-4)',
-    borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)',
+    borderRadius: 0, borderBottom: '1px solid var(--color-border)',
     minWidth: 0, overflowX: 'auto', flexWrap: 'nowrap' as const,
   },
   triggerSelect: {
-    padding: '5px 8px', borderRadius: 6, border: '1px solid var(--color-border)',
+    padding: '5px 8px', borderRadius: 10, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12,
     cursor: 'pointer', outline: 'none', flexShrink: 0,
   },
@@ -2175,7 +2175,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   stepItem: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '8px var(--space-3)',
-    borderRadius: 6, marginBottom: 2, background: 'var(--color-bg-elevated)',
+    borderRadius: 10, marginBottom: 2, background: 'var(--color-bg-elevated)',
     cursor: 'pointer', minWidth: 0,
   },
   stepArrow: {
@@ -2183,7 +2183,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0,
   },
   runItem: {
-    padding: 'var(--space-3)', borderRadius: 6, marginBottom: 6,
+    padding: 'var(--space-3)', borderRadius: 10, marginBottom: 6,
     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
   },
   dryRunBadge: {
@@ -2200,11 +2200,11 @@ const styles: Record<string, React.CSSProperties> = {
   editor: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' as const, minWidth: 0 },
   editorHeader: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px var(--space-4)',
-    borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)',
+    borderRadius: 0, borderBottom: '1px solid var(--color-border)',
     minWidth: 0, overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
   backBtn: {
-    padding: '6px var(--space-3)', borderRadius: '4px', border: 'none',
+    padding: '6px var(--space-3)', borderRadius: '10px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-accent)',
     cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 4,
     whiteSpace: 'nowrap', flexShrink: 0,
@@ -2217,27 +2217,26 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0,
   },
   runEditorBtn: {
-    padding: '6px 14px', borderRadius: '6px', border: 'none',
+    padding: '6px 14px', borderRadius: '10px', border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
   },
   saveBtn: {
-    padding: '6px 14px', borderRadius: '6px', border: 'none',
+    padding: '6px 14px', borderRadius: '10px', border: 'none',
     background: 'var(--color-success, #30d158)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
   },
   templatesPanel: {
     position: 'absolute' as const, top: 52, right: 16, zIndex: 'var(--z-modal)',
-    background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border)', borderRadius: 10,
+    borderRadius: 14,
     padding: 'var(--space-4)', width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
     overflow: 'auto', boxShadow: 'var(--pg-shadow-panel)', boxSizing: 'border-box' as const,
   },
   templateCard: {
     display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px var(--space-3)',
-    borderRadius: 6, border: 'none', background: 'var(--color-border-subtle)',
+    borderRadius: 10, border: 'none', background: 'var(--color-border-subtle)',
     cursor: 'pointer', marginBottom: 6,
   },
   editorContent: { flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' as const },
@@ -2253,18 +2252,18 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Right panel
   rightPanel: {
-    width: 'clamp(240px, 28%, 320px)', borderLeft: '1px solid var(--color-border)',
-    display: 'flex', flexDirection: 'column', background: 'var(--color-bg-secondary)',
+    width: 'clamp(240px, 28%, 320px)', borderRadius: 0, borderLeft: '1px solid var(--color-border)',
+    display: 'flex', flexDirection: 'column',
     minWidth: 220, maxWidth: '42%', flexShrink: 0,
   },
   configPanel: { padding: 'var(--space-4)', overflowY: 'auto' as const, flex: 1 },
   configInput: {
-    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6, border: '1px solid var(--color-border)',
+    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 10, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
     boxSizing: 'border-box' as const,
   },
   configSelect: {
-    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6, border: '1px solid var(--color-border)',
+    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 10, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
     boxSizing: 'border-box' as const,
   },
@@ -2283,7 +2282,7 @@ const styles: Record<string, React.CSSProperties> = {
   actionList: { flex: 1, overflow: 'auto', padding: 'var(--space-2)' },
   actionItem: {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px var(--space-3)',
-    borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
+    borderRadius: '10px', cursor: 'pointer', marginBottom: '4px',
     background: 'var(--color-bg-elevated)', border: 'none', width: '100%',
     textAlign: 'left' as const, color: 'var(--color-text-primary)', minWidth: 0,
   },

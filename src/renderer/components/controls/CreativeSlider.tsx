@@ -16,6 +16,28 @@
 
 import React, { memo, useCallback } from 'react';
 
+// Custom slider chrome injected ONCE: a filled track + a premium light thumb that
+// grows and glows on hover/drag, so every creative-app slider reads like a pro
+// control instead of a browser default. The fill itself is set inline per-render
+// (it depends on the value), so the track here stays transparent.
+const CSLIDER_CSS = `
+.dex-cslider { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; outline: none; cursor: pointer; box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+.dex-cslider:disabled { cursor: not-allowed; }
+.dex-cslider::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: transparent; }
+.dex-cslider::-moz-range-track { height: 5px; border-radius: 3px; background: transparent; }
+.dex-cslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; margin-top: -4px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #ffffff, #c9c9d2); border: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.dex-cslider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #ffffff, #c9c9d2); border: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 3px rgba(0,0,0,0.55); }
+.dex-cslider:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.dex-cslider:active::-webkit-slider-thumb { transform: scale(1.14); box-shadow: 0 0 0 3px var(--cs-accent, rgba(10,132,255,0.28)); }
+.dex-cslider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--cs-accent, rgba(10,132,255,0.4)); }
+`;
+if (typeof document !== 'undefined' && !document.getElementById('dex-cslider-css')) {
+  const _el = document.createElement('style');
+  _el.id = 'dex-cslider-css';
+  _el.textContent = CSLIDER_CSS;
+  document.head.appendChild(_el);
+}
+
 export interface CreativeSliderProps {
   value: number;
   onChange: (value: number) => void;
@@ -82,9 +104,12 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
 
   const labelFs = dense ? 9 : 11;
 
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min || 1)) * 100));
+  const fill = `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${pct}%, #26262e ${pct}%, #26262e 100%)`;
   const sliderInput = (
     <input
       type="range"
+      className="dex-cslider"
       min={min}
       max={max}
       step={step}
@@ -92,9 +117,12 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
       onChange={handleChange}
       disabled={disabled}
       aria-label={rest['aria-label'] ?? label}
-      style={layout === 'inline'
-        ? { flex: 1, minWidth: 0, height: 4, accentColor, cursor: disabled ? 'not-allowed' : 'pointer' }
-        : { width: '100%', height: 4, accentColor, cursor: disabled ? 'not-allowed' : 'pointer' }}
+      style={{
+        ...(layout === 'inline' ? { flex: 1, minWidth: 0 } : { width: '100%' }),
+        background: fill,
+        ['--cs-accent' as any]: accentColor,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
     />
   );
 

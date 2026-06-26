@@ -203,11 +203,11 @@ const DesignTokensPanel: React.FC = () => {
           aria-label="Token hex"
           style={{ ...inputStyle, width: 64, fontVariantNumeric: 'tabular-nums' }}
         />
-        <button onClick={() => applyColor(tok)} title={selectedPart ? `Apply to ${selectedPart.name}` : 'Copy hex (no part selected)'}
+        <button onClick={() => applyColor(tok)}
           style={{ ...iconBtn, color: 'var(--color-accent)', borderColor: 'var(--color-accent-muted)', background: 'var(--color-accent-light)' }}>
           {selectedPart ? 'Apply' : 'Copy'}
         </button>
-        <button onClick={() => deleteToken(tok.id)} aria-label="Delete token" title="Delete"
+        <button onClick={() => deleteToken(tok.id)} aria-label="Delete token"
           style={{ ...iconBtn, color: 'var(--color-error)' }}>&times;</button>
       </div>
     );
@@ -228,11 +228,11 @@ const DesignTokensPanel: React.FC = () => {
         aria-label="Token value"
         style={{ ...inputStyle, width: 64, fontVariantNumeric: 'tabular-nums' }}
       />
-      <button onClick={() => copyValue(String(tok.value))} title="Copy value"
+      <button onClick={() => copyValue(String(tok.value))}
         style={{ ...iconBtn, color: 'var(--color-accent)', borderColor: 'var(--color-accent-muted)', background: 'var(--color-accent-light)' }}>
         Copy
       </button>
-      <button onClick={() => deleteToken(tok.id)} aria-label="Delete token" title="Delete"
+      <button onClick={() => deleteToken(tok.id)} aria-label="Delete token"
         style={{ ...iconBtn, color: 'var(--color-error)' }}>&times;</button>
     </div>
   );

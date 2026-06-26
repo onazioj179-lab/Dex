@@ -149,7 +149,7 @@ const PropertyRow: React.FC<{
         />
       </div>
       {onKeyframe && (
-        <div style={keyframeDiamondStyle(hasKeyframe)} onClick={onKeyframe} title="Toggle keyframe" />
+        <div style={keyframeDiamondStyle(hasKeyframe)} onClick={onKeyframe} />
       )}
     </div>
   );

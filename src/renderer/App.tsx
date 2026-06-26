@@ -58,6 +58,9 @@ import { SystemFeatures } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
 import { MiniPlayer } from './components/MiniPlayer';
+import { LiveActivityHost } from './components/LiveActivityHost';
+import { QuickLookHost } from './shell/QuickLookHost';
+import { WorkspaceTimeline } from './shell/WorkspaceTimeline';
 import MiniPulse from './components/MiniPulse';
 import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
 import { useShellPreferences } from './store/shellPreferencesStore';
@@ -284,9 +287,6 @@ export const App: React.FC = () => {
 
   // Initialize authentication system
   const authInitialize = useAuthStore(s => s.initialize);
-  const authLock = useAuthStore(s => s.lock);
-  const authIsEnabled = useAuthStore(s => s.isEnabled);
-  const authIsLocked = useAuthStore(s => s.isLocked);
   useEffect(() => {
     authInitialize();
   }, [authInitialize]);
@@ -297,35 +297,10 @@ export const App: React.FC = () => {
     return () => stopPermissionAutoDisable();
   }, []);
 
-  // Auto-lock on inactivity. Disabled by default (0 = Never) so the desktop session
-  // stays visually persistent during idle. Only arms when the user has BOTH enabled an
-  // auth method AND set a non-zero auto-lock minutes value in Settings.
-  useEffect(() => {
-    if (!authIsEnabled || authIsLocked) return;
-    let raw = 0;
-    try {
-      const saved = localStorage.getItem('dex-settings');
-      if (saved) { raw = JSON.parse(saved).autoLockMinutes ?? 0; }
-    } catch { /* defaults */ }
-    const minutes = Number(raw);
-    if (!minutes || minutes <= 0) return;
-    const ms = minutes * 60_000;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const reset = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => { authLock(); }, ms);
-    };
-
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const;
-    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
-    reset();
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      events.forEach(e => window.removeEventListener(e, reset));
-    };
-  }, [authIsEnabled, authIsLocked, authLock]);
+  // Auto-lock on inactivity: REMOVED (owner direction). DEX is a long-session,
+  // heavy-use desktop -- the monitor stays on for hours, so a screen that locks
+  // (or even warns) on inactivity only interrupts. Nothing here reacts to idle;
+  // explicit locking via Settings / the lock action still works on demand.
 
   // Item 140: Unified memory pressure detection — sets memory-pressure attribute
   // for selective CSS to hide decorative elements when heap is very high.
@@ -666,6 +641,21 @@ export const App: React.FC = () => {
       {/* Global music remote — persists playback control across the whole app */}
       <AppErrorBoundary instanceId="miniplayer" appId="miniplayer" appName="Music Remote" appColor="#ff375f">
         <MiniPlayer />
+      </AppErrorBoundary>
+
+      {/* Live activities — system-wide glass progress cards (file copy/move/share, exports) */}
+      <AppErrorBoundary instanceId="liveactivity" appId="liveactivity" appName="Live Activity" appColor="#4A9EFF">
+        <LiveActivityHost />
+      </AppErrorBoundary>
+
+      {/* Global Quick Look — any surface can preview a file via the dex-quicklook event */}
+      <AppErrorBoundary instanceId="quicklook" appId="quicklook" appName="Quick Look" appColor="#0A84FF">
+        <QuickLookHost />
+      </AppErrorBoundary>
+
+      {/* Workspace Time Machine — scrub back through auto-captured layout snapshots */}
+      <AppErrorBoundary instanceId="workspace-timeline" appId="workspace-timeline" appName="Time Machine" appColor="#0A84FF">
+        <WorkspaceTimeline />
       </AppErrorBoundary>
 
       {/* System Diagnostics overlay (Ctrl+Shift+D) */}

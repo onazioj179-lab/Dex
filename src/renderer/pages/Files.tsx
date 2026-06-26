@@ -21,6 +21,7 @@ import { useToastHelpers } from '../components/Toast';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
+import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
 import { usePinRegistry } from '../store/pinRegistry';
@@ -350,7 +351,6 @@ export const Files: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const [quickLookFile, setQuickLookFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
   // Column view (Miller columns): per-path entry cache + in-flight set so each
   // pushed column loads its own directory listing via the same files:list API.
@@ -453,10 +453,6 @@ export const Files: React.FC = () => {
 
   // Progress/result for a copy-or-move-to-destination transfer. Drives the
   // inline transfer banner; null when no transfer is running or being reported.
-  const [transferState, setTransferState] = useState<
-    { mode: 'copy' | 'move'; total: number; done: number; failed: number; finished: boolean } | null
-  >(null);
-
   // Color tags (persisted in localStorage)
   const [fileTags, setFileTags] = useState<Record<string, TagColor>>(() => {
     try { return JSON.parse(localStorage.getItem('dex-file-tags') || '{}'); } catch { return {}; }
@@ -705,16 +701,17 @@ export const Files: React.FC = () => {
       const target = e.target as HTMLElement | null;
       // Don't hijack typing in inputs (rename, search, etc.)
       const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-      if (e.key === ' ' && !quickLookFile && selectedFile) {
+      // Quick Look (Space): hand off to the global QuickLookHost, which reads
+      // real file content (text via files:read, media/pdf via file URL) and owns
+      // its own Space/Escape dismiss. Skip if it's already open so Space closes it.
+      const quickLookOpen = !!document.querySelector('[aria-labelledby="quicklook-title"]');
+      if (e.key === ' ' && selectedFile && !inEditable && !quickLookOpen) {
         e.preventDefault();
         const file = files.find(f => f.path === selectedFile);
-        if (file && !file.isDirectory) setQuickLookFile(file);
-      } else if (e.key === ' ' && quickLookFile) {
-        e.preventDefault();
-        setQuickLookFile(null);
-      } else if (e.key === 'Escape' && quickLookFile) {
-        setQuickLookFile(null);
-      } else if (e.key === 'Escape' && !inEditable) {
+        if (file && !file.isDirectory) {
+          window.dispatchEvent(new CustomEvent('dex-quicklook', { detail: { path: file.path, name: file.name, isDirectory: file.isDirectory } }));
+        }
+      } else if (e.key === 'Escape' && !inEditable && !quickLookOpen) {
         // No Quick Look open: Escape clears the current multi-selection.
         clearSelection();
       } else if (!inEditable && (e.ctrlKey || e.metaKey) && e.key === 'a') {
@@ -731,7 +728,7 @@ export const Files: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [quickLookFile, selectedFile, files, historyIndex, currentPath]);
+  }, [selectedFile, files, historyIndex, currentPath]);
 
   const navigateTo = (path: string) => {
     const newHistory = [...history.slice(0, historyIndex + 1), path];
@@ -1143,7 +1140,17 @@ export const Files: React.FC = () => {
     const paths = [...selectedFiles];
     const dest = await pickDestinationFolder();
     if (!dest) return;
-    setTransferState({ mode, total: paths.length, done: 0, failed: 0, finished: false });
+    const destName = dest.split(/[\\/]/).filter(Boolean).pop() || dest;
+    // Drive the system-wide live-activity glass card with real count-based progress.
+    const la = useLiveActivityStore.getState();
+    const verb = mode === 'copy' ? 'Copying' : 'Moving';
+    const activityId = la.start({
+      title: `${verb} to ${destName}`,
+      subtitle: `0 of ${paths.length} items`,
+      icon: 'files',
+      badge: 'FILES',
+      progress: 0,
+    });
     let done = 0;
     let failed = 0;
     for (const src of paths) {
@@ -1158,18 +1165,21 @@ export const Files: React.FC = () => {
         console.error(`Failed to ${mode}`, src, '->', dest, err);
         failed++;
       }
-      setTransferState({ mode, total: paths.length, done, failed, finished: false });
+      useLiveActivityStore.getState().update(activityId, {
+        subtitle: `${done + failed} of ${paths.length} items`,
+        progress: (done + failed) / paths.length,
+      });
     }
-    setTransferState({ mode, total: paths.length, done, failed, finished: true });
+    useLiveActivityStore.getState().complete(activityId, {
+      status: failed > 0 ? 'error' : 'success',
+      title: `${mode === 'copy' ? 'Copied' : 'Moved'} to ${destName}`,
+      subtitle: failed > 0 ? `${done} done · ${failed} failed` : `${done} item${done === 1 ? '' : 's'}`,
+    });
     clearSelection();
     // A move always mutates the current folder; a copy only does when the
     // destination is the folder being viewed. Refresh in either of those cases.
     if (mode === 'move' || dest === currentPath) loadFiles(currentPath);
-    if (done > 0) toast.success(`${mode === 'copy' ? 'Copied' : 'Moved'} ${done} item${done === 1 ? '' : 's'}`);
-    if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} failed to ${mode}`);
-    // Auto-dismiss the result banner after a short delay.
-    window.setTimeout(() => setTransferState(null), 3200);
-  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles, toast]);
+  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles]);
 
   // Keyboard shortcuts for the multi-selection. Declared after the batch
   // handlers so every reference is in scope. Delete removes the selection;
@@ -1933,21 +1943,8 @@ export const Files: React.FC = () => {
           </div>
         )}
 
-        {/* Transfer progress / result banner for Copy to.../Move to... */}
-        {transferState && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)', fontSize: 12 }}>
-            {!transferState.finished ? (
-              <>
-                <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--color-accent)', borderTopColor: 'transparent', display: 'inline-block', animation: 'dex-files-spin 0.7s linear infinite' }} />
-                <span style={{ color: 'var(--color-text-secondary)' }}>{transferState.mode === 'copy' ? 'Copying' : 'Moving'} {transferState.done + transferState.failed} of {transferState.total}...</span>
-              </>
-            ) : (
-              <span style={{ color: transferState.failed > 0 ? 'var(--color-error)' : 'var(--color-success)' }}>
-                {transferState.mode === 'copy' ? 'Copied' : 'Moved'} {transferState.done} of {transferState.total}{transferState.failed > 0 ? ` · ${transferState.failed} failed` : ''}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Transfer progress now shows in the system-wide live-activity glass card
+            (components/LiveActivityHost), driven by handleTransferSelected. */}
 
         {/* File List */}
         <div
@@ -2230,63 +2227,8 @@ export const Files: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Look Overlay (Spacebar) */}
-      {quickLookFile && (
-        <div
-          onClick={() => setQuickLookFile(null)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(8, 8, 10, 0.86)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)',
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            background: 'var(--color-bg-elevated, #2c2c2e)', borderRadius: 10,
-            boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', maxWidth: '80vw', maxHeight: '80vh',
-          }}>
-            {/* Quick Look header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--space-4)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{quickLookFile.name}</span>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{formatSize(quickLookFile.size)}</span>
-                <button onClick={() => setQuickLookFile(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 16 }} aria-label="Close Quick Look"><DexIcon name="close" size={14} /></button>
-              </div>
-            </div>
-            {/* Quick Look content */}
-            <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
-              {['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'].includes(quickLookFile.extension.toLowerCase()) && (
-                <img src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} alt={quickLookFile.name} style={{ maxWidth: '70vw', maxHeight: '65vh', objectFit: 'contain', borderRadius: 3 }} />
-              )}
-              {['.mp4', '.mov', '.webm'].includes(quickLookFile.extension.toLowerCase()) && (
-                <video src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ maxWidth: '70vw', maxHeight: '65vh', borderRadius: 3 }} />
-              )}
-              {['.mp3', '.wav', '.m4a', '.ogg'].includes(quickLookFile.extension.toLowerCase()) && (
-                <div style={{ padding: 'var(--space-8)' }}>
-                  <div style={{ marginBottom: 'var(--space-4)' }}><DexIcon name="music" size={48} /></div>
-                  <div style={{ marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)' }}>{quickLookFile.name}</div>
-                  <audio src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ width: 320 }} />
-                </div>
-              )}
-              {['.txt', '.md', '.json', '.js', '.ts', '.css', '.html'].includes(quickLookFile.extension.toLowerCase()) && (
-                <div className="dex-scroll-fade-y" style={{ textAlign: 'left', padding: 'var(--space-4)', background: 'var(--color-bg-primary)', borderRadius: 6, maxHeight: '60vh', overflow: 'auto', fontSize: 12, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' as const, color: 'var(--color-text-primary)' }}>
-                  {/* Text file preview - content loaded on demand */}
-                  <span style={{ opacity: 0.5 }}>Text preview for {quickLookFile.name}</span>
-                </div>
-              )}
-              {['.pdf'].includes(quickLookFile.extension.toLowerCase()) && (
-                <iframe src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} style={{ width: '70vw', height: '65vh', border: 'none', borderRadius: 3 }} title={quickLookFile.name} />
-              )}
-            </div>
-            {/* Quick Look footer */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-2) var(--space-4) var(--space-3)', gap: 'var(--space-3)', borderTop: '1px solid var(--color-border, var(--color-border-subtle))' }}>
-              <button
-                onClick={() => { handleItemDoubleClick(quickLookFile); setQuickLookFile(null); }}
-                style={{ padding: '5px var(--space-4)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
-              >Open</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quick Look (Spacebar) is now handled by the global QuickLookHost, which
+          reads real file content and is shared across every surface. */}
 
       {/* File Preview Modal */}
       {previewFile && (

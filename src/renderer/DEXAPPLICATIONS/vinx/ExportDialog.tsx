@@ -531,7 +531,7 @@ export const ExportDialog: React.FC = memo(() => {
                     <span style={{ fontSize: 10, color: 'var(--color-success, #3DAF72)' }}>Done</span>
                   )}
                   {job.status === 'failed' && (
-                    <span style={{ fontSize: 10, color: 'var(--color-error, #FF6B6B)' }} title={job.error || 'Export failed'}>{job.error || 'Export failed'}</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-error, #FF6B6B)' }}>{job.error || 'Export failed'}</span>
                   )}
                   <button
                     aria-label={`Remove export job ${job.outputPath}`}

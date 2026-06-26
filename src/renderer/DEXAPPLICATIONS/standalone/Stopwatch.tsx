@@ -33,6 +33,20 @@ const Stopwatch: React.FC = () => {
     return () => cancelAnimationFrame(rafRef.current);
   }, [running, stopwatch]);
 
+  // Keyboard control (Apple Clock parity): Space toggles start/stop, L laps while
+  // running, R resets when stopped. Ignored while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.code === 'Space') { e.preventDefault(); running ? stop() : start(); }
+      else if (e.key.toLowerCase() === 'l' && running) { e.preventDefault(); lap(); }
+      else if (e.key.toLowerCase() === 'r' && !running && elapsed > 0) { e.preventDefault(); reset(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [running, elapsed, start, stop, lap, reset]);
+
   const fmt = (ms: number) => {
     const mins = Math.floor(ms / 60000);
     const secs = Math.floor((ms % 60000) / 1000);
@@ -68,7 +82,14 @@ const Stopwatch: React.FC = () => {
   }, [laps, splits, exporting]);
 
   return (
-    <div style={s.container}>
+    <div style={s.container} className="dex-stopwatch">
+      <style>{`
+        .dex-stopwatch button { transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease; }
+        .dex-stopwatch button:hover { filter: brightness(1.08); }
+        .dex-stopwatch button:active { transform: scale(0.94); }
+        .dex-stopwatch .sw-lap-row { transition: background 0.1s ease; border-radius: 8px; }
+        .dex-stopwatch .sw-lap-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); }
+      `}</style>
       <div style={s.displayArea}>
         <div style={s.time}>{fmt(elapsed)}</div>
       </div>
@@ -91,6 +112,12 @@ const Stopwatch: React.FC = () => {
         )}
       </div>
 
+      <div style={s.hint}>
+        <kbd style={s.kbd}>Space</kbd> {running ? 'stop' : 'start'}
+        {running && <> &middot; <kbd style={s.kbd}>L</kbd> lap</>}
+        {!running && elapsed > 0 && <> &middot; <kbd style={s.kbd}>R</kbd> reset</>}
+      </div>
+
       {laps.length > 0 && (
         <div style={s.lapsContainer}>
           <div style={s.lapHeader}>
@@ -105,7 +132,7 @@ const Stopwatch: React.FC = () => {
               const isBest = laps.length > 2 && split === bestLap;
               const isWorst = laps.length > 2 && split === worstLap;
               return (
-                <div key={i} style={{
+                <div key={i} className="sw-lap-row" style={{
                   ...s.lapRow,
                   color: isBest ? 'var(--color-success)' : isWorst ? 'var(--color-error)' : 'var(--color-text-primary)',
                 }}>
@@ -117,7 +144,7 @@ const Stopwatch: React.FC = () => {
             })}
           </div>
           {stats && stats.count > 1 && (
-            <div style={s.statsBar}>
+            <div className="dex-liquid-glass" style={s.statsBar}>
               <div style={s.statCell}>
                 <span className="dex-label-caps" style={s.statLabel}>Avg</span>
                 <span style={s.statVal}>{fmt(stats.average)}</span>
@@ -179,6 +206,18 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
     boxShadow: 'inset 0 0 0 2px var(--color-border)',
   },
+  hint: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '0 var(--space-5) var(--space-5)', flexShrink: 0,
+    fontSize: 12, color: 'var(--color-text-tertiary)',
+  },
+  kbd: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    minWidth: 18, height: 18, padding: '0 5px', borderRadius: 5,
+    background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+    fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)',
+    color: 'var(--color-text-secondary)',
+  },
   lapsContainer: {
     flex: 1, display: 'flex', flexDirection: 'column',
     overflow: 'hidden', borderTop: '1px solid var(--color-border-subtle)',
@@ -191,7 +230,7 @@ const s: Record<string, React.CSSProperties> = {
     flex: 1,
   },
   exportBtn: {
-    border: '1px solid var(--color-border)', borderRadius: 6,
+    border: '1px solid var(--color-border)', borderRadius: 10,
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
     fontSize: 11, fontWeight: 600, padding: '4px 10px', cursor: 'pointer',
     fontFamily: 'var(--font-family)', flexShrink: 0,
@@ -206,8 +245,7 @@ const s: Record<string, React.CSSProperties> = {
   lapTime: { flex: 1, textAlign: 'right' },
   statsBar: {
     display: 'flex', flexShrink: 0,
-    borderTop: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface)',
+    borderRadius: 0,
   },
   statCell: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',

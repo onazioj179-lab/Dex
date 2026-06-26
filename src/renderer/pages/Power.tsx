@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import { useToastHelpers } from '../components/Toast';
-import { glassPanel, glassButton, glassMenu } from '../styles/glassMenu';
+import { glassButton } from '../styles/glassMenu';
 import { useRunningApps } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -642,7 +642,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* CPU Mini Chart */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>CPU Usage</div>
               <div style={{ display: 'flex', alignItems: 'end', gap: 1, height: 40 }}>
                 {cpuHistory.map((v, i) => (
@@ -655,7 +655,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Process Table */}
-            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+            <div className="dex-liquid-glass-strong" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 80px 90px 60px 70px 70px', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                 {[
                   { key: 'pid', label: 'PID' },
@@ -714,7 +714,7 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Battery</h3>
 
             {/* Main battery display */}
-            <div style={{ ...glassPanel, padding: 'var(--space-6)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 'var(--space-6)' }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-6)', borderRadius: 'var(--radius-xl)', display: 'flex', alignItems: 'center', gap: 'var(--space-6)' }}>
               <div style={{ position: 'relative', width: 80, height: 80 }}>
                 <svg width="80" height="80" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="35" fill="none" stroke="var(--color-border-subtle)" strokeWidth="6" />
@@ -745,7 +745,7 @@ export const Power: React.FC = () => {
                 { label: 'Temperature', value: `${battery.temperature}°C`, color: battery.temperature > 40 ? 'var(--color-error)' : 'var(--color-accent)' },
                 { label: 'Voltage', value: `${battery.voltage}V`, color: '#bf5af2' },
               ].map(s => (
-                <div key={s.label} style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+                <div key={s.label} className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 22, fontWeight: 500, color: s.color }}>{s.value}</div>
                 </div>
@@ -753,7 +753,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Optimized charging toggle */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Optimized Battery Charging</div>
@@ -764,7 +764,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Low power mode */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Low Power Mode</div>
@@ -775,7 +775,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Power mode (balanced / saver / performance) — persisted */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500, marginBottom: 'var(--space-3)' }}>Power Mode</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {([
@@ -795,7 +795,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Keep awake for N minutes (Screen Wake Lock) */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
                 <div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Keep Awake</div>
@@ -826,7 +826,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Per-app energy impact (derived from live process data) */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass-strong" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div className="dex-label-caps" style={{ marginBottom: 'var(--space-3)' }}>Energy Impact</div>
               {energyImpact.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No active energy consumers</div>
@@ -846,7 +846,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Wake / sleep / power-source timeline */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass-strong" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
                 <span className="dex-label-caps">Activity Log</span>
                 {powerLog.length > 0 && (
@@ -884,10 +884,10 @@ export const Power: React.FC = () => {
                 <button
                   key={key}
                   onClick={() => setProfile(key)}
+                  className="dex-liquid-glass"
                   style={{
-                    ...glassPanel,
-                    padding: 'var(--space-4)', borderRadius: 10, cursor: 'pointer',
-                    border: profile === key ? `2px solid ${info.color}` : '1px solid var(--color-border-subtle)',
+                    padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)', cursor: 'pointer',
+                    border: profile === key ? `2px solid ${info.color}` : undefined,
                     textAlign: 'left' as const,
                     transition: 'all 0.15s',
                   }}
@@ -906,7 +906,7 @@ export const Power: React.FC = () => {
 
             {/* Custom profile sliders */}
             {profile === 'custom' && (
-              <div style={{ ...glassPanel, padding: 'var(--space-5)', borderRadius: 10 }}>
+              <div className="dex-liquid-glass-strong" style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-xl)' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-4)' }}>Custom Profile Settings</div>
                 {[
                   { label: 'CPU Limit', value: cpuLimit, set: setCpuLimitWired, color: 'var(--color-accent)' },
@@ -943,7 +943,7 @@ export const Power: React.FC = () => {
                 { label: 'Available', value: `${(memInfo.available / 1024).toFixed(1)} GB`, total: '', pct: (memInfo.available / memInfo.total * 100), color: 'var(--color-success)' },
                 { label: 'Cached', value: `${(memInfo.cached / 1024).toFixed(1)} GB`, total: '', pct: (memInfo.cached / memInfo.total * 100), color: '#64d2ff' },
               ].map(s => (
-                <div key={s.label} style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+                <div key={s.label} className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 500, color: s.color }}>{s.value}</div>
                   {s.total && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{s.total}</div>}
@@ -955,7 +955,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Per-app memory */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass-strong" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>App Memory Usage</div>
               {memInfo.appMemory.length === 0 && (
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No per-app memory data</div>
@@ -972,7 +972,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Swap */}
-            <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+            <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Swap</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                 <span>{(memInfo.swapUsed / 1024).toFixed(1)} GB used</span>
@@ -990,7 +990,7 @@ export const Power: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 600 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Startup Items</h3>
 
-            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+            <div className="dex-liquid-glass-strong" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
               {startupItems.length === 0 && (
                 <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No startup items</div>
               )}
@@ -1010,7 +1010,7 @@ export const Power: React.FC = () => {
             </div>
 
             <h3 style={{ margin: 'var(--space-2) 0 0', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>Scheduled Tasks</h3>
-            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+            <div className="dex-liquid-glass-strong" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
               {scheduledTasks.length === 0 && (
                 <div style={{ padding: 'var(--space-5)', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No scheduled tasks</div>
               )}
@@ -1033,13 +1033,13 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Thermal Monitoring</h3>
 
             {thermals.length === 0 && (
-              <div style={{ ...glassPanel, padding: 'var(--space-8)', borderRadius: 10, textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No thermal sensor data available</div>
+              <div className="dex-liquid-glass" style={{ padding: 'var(--space-8)', borderRadius: 'var(--radius-xl)', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>No thermal sensor data available</div>
             )}
             {thermals.map(zone => {
               const pct = (zone.temp / zone.maxTemp) * 100;
               const color = pct > 80 ? 'var(--color-error)' : pct > 60 ? 'var(--color-warning)' : 'var(--color-success)';
               return (
-                <div key={zone.name} style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10 }}>
+                <div key={zone.name} className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>{zone.name}</span>
                     <span style={{ fontSize: 20, fontWeight: 500, color }}>{zone.temp.toFixed(0)}°C</span>
@@ -1063,7 +1063,7 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>System Controls</h3>
 
             {panicStopped && (
-              <div style={{ ...glassPanel, padding: 'var(--space-4)', borderRadius: 10, border: '1px solid rgba(255,69,58,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="dex-liquid-glass" style={{ padding: 'var(--space-4)', borderRadius: 'var(--radius-xl)', border: '1px solid rgba(255,69,58,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, color: 'var(--color-error)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}><WarningIcon size={14} color="#ff453a" /> All systems stopped</span>
                 <button onClick={() => { setPanicStopped(false); setAutomationsEnabled(true); }} style={{ ...glassButton, padding: '6px 14px', fontSize: 12, color: 'var(--color-success)', background: 'rgba(48,209,88,0.15)', border: '1px solid rgba(48,209,88,0.25)' }}>
                   Resume
@@ -1071,25 +1071,25 @@ export const Power: React.FC = () => {
               </div>
             )}
 
-            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+            <div className="dex-liquid-glass-strong" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
               <div className="dex-label-caps" style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)' }}>Automation</div>
               <ControlRow label="Automations" description="Run automated tasks and workflows" checked={automationsEnabled && !panicStopped} onChange={() => setAutomationsEnabled(!automationsEnabled)} disabled={panicStopped} />
               <ControlRow label="Learning" description="Learn from usage patterns" checked={learningEnabled && !panicStopped} onChange={() => setLearningEnabled(!learningEnabled)} disabled={panicStopped} />
             </div>
 
-            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
+            <div className="dex-liquid-glass-strong" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
               <div className="dex-label-caps" style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)' }}>Security</div>
               <ControlRow label="Lock DEX" description="Require authentication to access" checked={appLocked} onChange={() => setAppLocked(!appLocked)} />
               <ControlRow label="Safe Mode" description="Disable all extensions and custom scripts" checked={safeMode} onChange={() => setSafeMode(!safeMode)} />
             </div>
 
-            <div style={{ ...glassPanel, borderRadius: 10, padding: 'var(--space-4)' }}>
+            <div className="dex-liquid-glass" style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--space-4)' }}>
               <div className="dex-label-caps" style={{ marginBottom: 'var(--space-3)' }}>Emergency</div>
               <button
                 onClick={handlePanicStop}
                 disabled={panicStopped}
                 style={{
-                  width: '100%', padding: 14, borderRadius: 8,
+                  width: '100%', padding: 14, borderRadius: 'var(--radius-lg)',
                   background: 'rgba(255,69,58,0.15)', border: '1px solid rgba(255,69,58,0.25)',
                   color: 'var(--color-error)', fontSize: 14, fontWeight: 500, cursor: panicStopped ? 'default' : 'pointer',
                   opacity: panicStopped ? 0.5 : 1,
@@ -1178,7 +1178,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
       </div>
 
       {threats.length === 0 ? (
-        <div style={{ ...glassPanel, padding: 'var(--space-8)', borderRadius: 10, textAlign: 'center' }}>
+        <div className="dex-liquid-glass" style={{ padding: 'var(--space-8)', borderRadius: 'var(--radius-xl)', textAlign: 'center' }}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 'var(--space-3)' }}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
           </svg>
@@ -1188,8 +1188,8 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {threats.map(({ process: p, reasons, score }) => (
-            <div key={p.pid} style={{
-              ...glassPanel, borderRadius: 10, padding: 14,
+            <div key={p.pid} className="dex-liquid-glass" style={{
+              borderRadius: 'var(--radius-xl)', padding: 14,
               border: `1px solid ${score >= 3 ? 'rgba(255,69,58,0.25)' : 'rgba(255,159,10,0.2)'}`,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-2)' }}>
