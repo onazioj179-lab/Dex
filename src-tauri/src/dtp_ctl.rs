@@ -341,11 +341,10 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
             std::thread::sleep(Duration::from_millis(tick));
             since_broadcast += tick;
 
-            // Honour an explicit refresh request.
-            if refresh_flag().swap(false, Ordering::SeqCst) {
-                broadcast_packet(&socket, &id_bc);
-                since_broadcast = 0;
-            } else if since_broadcast >= BROADCAST_INTERVAL_MS {
+            // Broadcast on an explicit refresh request or when the interval
+            // elapses. The swap is the left operand so the refresh flag always
+            // clears, even on an interval-driven tick.
+            if refresh_flag().swap(false, Ordering::SeqCst) || since_broadcast >= BROADCAST_INTERVAL_MS {
                 broadcast_packet(&socket, &id_bc);
                 since_broadcast = 0;
             }

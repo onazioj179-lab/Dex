@@ -61,10 +61,17 @@ uniform vec3 uCameraPos;
 uniform float uAlpha;
 uniform int uShading; // 0=flat, 1=smooth, 2=pbr
 uniform int uSelected;
+uniform int uClipEnabled;   // 1 => section plane active
+uniform vec4 uClipPlane;    // xyz = world-space normal, w = signed offset
 
 out vec4 fragColor;
 
 void main() {
+  // Section view: discard fragments on the positive side of the cut plane so
+  // the interior is revealed. Cheap per-fragment test, no extra draw passes.
+  if (uClipEnabled == 1 && dot(vWorldPos, uClipPlane.xyz) > uClipPlane.w) {
+    discard;
+  }
   vec3 N = normalize(vNormal);
   vec3 L = normalize(uLightDir);
   vec3 V = normalize(uCameraPos - vWorldPos);
@@ -321,6 +328,41 @@ function generateWedgeMesh(w: number, h: number, d: number): MeshData {
   return { positions, normals, indices };
 }
 
+// Hollow box shell: six wall slabs of thickness `t` merged into one mesh — a
+// genuine thin-walled box (lower volume, real interior revealed under section).
+function generateShellBoxMesh(w: number, h: number, d: number, t: number): MeshData {
+  const wall = Math.max(0.5, Math.min(t, Math.min(w, h, d) / 2 - 0.5));
+  const hw = w / 2, hh = h / 2, hd = d / 2;
+  const slabs: MeshData[] = [
+    transformMesh(generateBoxMesh(w, wall, d), vec3(0, -(hh - wall / 2), 0)), // bottom
+    transformMesh(generateBoxMesh(w, wall, d), vec3(0, hh - wall / 2, 0)),    // top
+    transformMesh(generateBoxMesh(w, h, wall), vec3(0, 0, -(hd - wall / 2))), // back
+    transformMesh(generateBoxMesh(w, h, wall), vec3(0, 0, hd - wall / 2)),    // front
+    transformMesh(generateBoxMesh(wall, h, d), vec3(-(hw - wall / 2), 0, 0)), // left
+    transformMesh(generateBoxMesh(wall, h, d), vec3(hw - wall / 2, 0, 0)),    // right
+  ];
+  return mergeMeshes(slabs);
+}
+
+// Apply a draft taper: vertices are pulled toward the central (Y) axis in
+// proportion to their height, by `angle` degrees. Real geometry change.
+function applyDraftTaper(mesh: MeshData, angleDeg: number): MeshData {
+  if (angleDeg <= 0) return mesh;
+  const pos = mesh.positions;
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 1; i < pos.length; i += 3) { if (pos[i] < minY) minY = pos[i]; if (pos[i] > maxY) maxY = pos[i]; }
+  const range = Math.max(maxY - minY, 1e-3);
+  const k = Math.tan((Math.min(angleDeg, 45) * Math.PI) / 180);
+  const out = new Float32Array(pos);
+  for (let i = 0; i < out.length; i += 3) {
+    const t = (out[i + 1] - minY) / range;           // 0 at bottom, 1 at top
+    const factor = Math.max(0.05, 1 - k * t);         // shrink x/z toward the top
+    out[i] *= factor;
+    out[i + 2] *= factor;
+  }
+  return { positions: out, normals: new Float32Array(mesh.normals), indices: new Uint16Array(mesh.indices) };
+}
+
 function generatePrimitiveMesh(type: string, params: Record<string, number>): MeshData {
   const seg = Math.max(8, Math.round(params.segments || 32));
   switch (type) {
@@ -463,6 +505,17 @@ function filterMeshByPrimitive(mesh: MeshData, type: string, params: Record<stri
 }
 
 function meshForPart(part: Part): MeshData {
+  // Imported geometry (OBJ/STL/STEP) carries its own triangle mesh — draw it
+  // directly rather than synthesising from a primitive.
+  const meshFeature = part.features.find(feature => feature.mesh && feature.visible !== false);
+  if (meshFeature?.mesh && meshFeature.mesh.positions.length >= 3) {
+    return {
+      positions: Float32Array.from(meshFeature.mesh.positions),
+      normals: Float32Array.from(meshFeature.mesh.normals.length ? meshFeature.mesh.normals : meshFeature.mesh.positions),
+      indices: Uint16Array.from(meshFeature.mesh.indices),
+    };
+  }
+
   const primitiveFeature = part.features.find(feature => feature.type === 'primitive') || part.features[0];
   if (!primitiveFeature) return generateBoxMesh(50, 50, 50);
 
@@ -470,6 +523,10 @@ function meshForPart(part: Part): MeshData {
   let primitiveType = (primitiveFeature.params.primitiveType as string) || 'box';
   let patternCount = 1;
   let patternSpacing = 0;
+  let draftAngle = 0;     // taper (deg) accumulated from draft features
+  let ribThickness = 0;   // reinforcing web thickness (mm)
+  let shellThickness = 0; // hollow wall thickness (mm)
+  let shellBox = false;   // box/wedge shell routes to the hollow-box generator
   const booleanFeatures = part.features.filter(feature => feature.type === 'boolean' && feature.visible && !feature.suppressed);
 
   part.features.forEach(feature => {
@@ -527,12 +584,45 @@ function meshForPart(part: Part): MeshData {
         patternSpacing = Math.max(10, toNumber(feature.params.spacing, params.width || params.radius || 40));
         break;
       }
+      case 'draft': {
+        // Prefer the dedicated draftAngle; fall back to a legacy `angle` param.
+        const a = toNumber(feature.params.draftAngle, toNumber(feature.params.angle, 5));
+        draftAngle = Math.max(draftAngle, Math.min(45, a));
+        break;
+      }
+      case 'rib': {
+        ribThickness = Math.max(ribThickness, Math.max(1, toNumber(feature.params.thickness, 4)));
+        break;
+      }
+      case 'shell': {
+        const t = Math.max(0.5, toNumber(feature.params.thickness, 3));
+        shellThickness = Math.max(shellThickness, t);
+        // Round solids hollow exactly to a tube; prismatic ones use the shell-box
+        // generator. Both are genuine geometry, not a visual hint.
+        if (primitiveType === 'cylinder' || primitiveType === 'cone') {
+          const r = params.radius || 25;
+          primitiveType = 'tube';
+          params.outerRadius = r;
+          params.innerRadius = Math.max(1, r - t);
+          params.height = params.height || 50;
+        } else if (primitiveType === 'tube') {
+          params.innerRadius = Math.max(1, (params.outerRadius || 25) - t);
+        } else if (primitiveType === 'box' || primitiveType === 'wedge') {
+          shellBox = true;
+        }
+        break;
+      }
       default:
         break;
     }
   });
 
-  let mesh = generatePrimitiveMesh(primitiveType, params);
+  let mesh = shellBox
+    ? generateShellBoxMesh(params.width || 50, params.height || 50, params.depth || 50, shellThickness)
+    : generatePrimitiveMesh(primitiveType, params);
+
+  // Draft taper applied to the base solid before booleans/patterns.
+  if (draftAngle > 0) mesh = applyDraftTaper(mesh, draftAngle);
 
   booleanFeatures.forEach(feature => {
     const bType = (feature.params.bPrimType as string) || 'box';
@@ -565,6 +655,20 @@ function meshForPart(part: Part): MeshData {
       mesh = filterMeshByPrimitive(mesh, bType, bParams, offset, true);
     }
   });
+
+  // Rib: a thin reinforcing web through the part centre, spanning its current
+  // vertical/depth extent — real added geometry merged into the solid.
+  if (ribThickness > 0 && mesh.positions.length >= 3) {
+    let minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < mesh.positions.length; i += 3) {
+      const y = mesh.positions[i + 1], z = mesh.positions[i + 2];
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const ribH = Math.max(maxY - minY, 2);
+    const ribD = Math.max(maxZ - minZ, 2);
+    mesh = mergeMeshes([mesh, generateBoxMesh(ribThickness, ribH, ribD)]);
+  }
 
   if (patternCount > 1) {
     const patternedMeshes: MeshData[] = [];
@@ -611,7 +715,19 @@ interface GPUMesh {
   vao: WebGLVertexArrayObject;
   indexCount: number;
   indexBuffer: WebGLBuffer;
+  // Track the attribute buffers too: deleting a VAO does NOT free the buffers
+  // bound to it, so without these the position/normal VBOs leaked on every
+  // mesh regeneration (one pair per parametric edit). Held so dispose/evict
+  // can release them explicitly.
+  posBuffer: WebGLBuffer;
+  normBuffer: WebGLBuffer;
 }
+
+// Cap on cached GPU meshes. The cache is keyed by a full feature-stack hash, so
+// dragging a parameter slider mints a fresh entry every frame; without a bound
+// the VRAM footprint grows without limit across a modeling session. LRU-evict
+// the oldest once we exceed this.
+const MESH_CACHE_LIMIT = 48;
 
 // ── Main Renderer Class ──────────────────────────────────────────────────
 
@@ -626,6 +742,8 @@ export interface RenderState {
   selectedPartId: string | null;
   hoveredPartId: string | null;
   stressMap: { partId: string; ratio: number }[] | null;
+  // Section view: when present, fragments past the plane are clipped away.
+  section?: { axis: 'x' | 'y' | 'z'; offset: number; flip: boolean } | null;
 }
 
 export class AXLRenderer {
@@ -651,6 +769,8 @@ export class AXLRenderer {
   private uAlpha = -1 as unknown as WebGLUniformLocation;
   private uShading = -1 as unknown as WebGLUniformLocation;
   private uSelected = -1 as unknown as WebGLUniformLocation;
+  private uClipEnabled = -1 as unknown as WebGLUniformLocation;
+  private uClipPlane = -1 as unknown as WebGLUniformLocation;
 
   init(canvas: HTMLCanvasElement): boolean {
     this.canvas = canvas;
@@ -693,6 +813,8 @@ export class AXLRenderer {
     this.uAlpha = gl.getUniformLocation(this.mainProgram, 'uAlpha')!;
     this.uShading = gl.getUniformLocation(this.mainProgram, 'uShading')!;
     this.uSelected = gl.getUniformLocation(this.mainProgram, 'uSelected')!;
+    this.uClipEnabled = gl.getUniformLocation(this.mainProgram, 'uClipEnabled')!;
+    this.uClipPlane = gl.getUniformLocation(this.mainProgram, 'uClipPlane')!;
 
     // GL state
     gl.enable(gl.DEPTH_TEST);
@@ -730,6 +852,15 @@ export class AXLRenderer {
     this.gridIndexCount = lines.length / 3;
   }
 
+  private deleteGPUMesh(m: GPUMesh) {
+    const gl = this.gl;
+    if (!gl) return;
+    gl.deleteVertexArray(m.vao);
+    gl.deleteBuffer(m.indexBuffer);
+    gl.deleteBuffer(m.posBuffer);
+    gl.deleteBuffer(m.normBuffer);
+  }
+
   private getOrCreateMesh(part: Part): GPUMesh {
     const gl = this.gl!;
     const cacheKey = JSON.stringify(part.features.map(feature => ({
@@ -737,8 +868,17 @@ export class AXLRenderer {
       visible: feature.visible,
       suppressed: feature.suppressed,
       params: feature.params,
+      // Imported meshes share identical params ({primitiveType:'mesh'}), so key
+      // them by id + size too or distinct imports would collide on one GPU mesh.
+      m: feature.mesh ? `${feature.id}:${feature.mesh.positions.length}` : 0,
     })));
-    if (this.meshCache.has(cacheKey)) return this.meshCache.get(cacheKey)!;
+    const cached = this.meshCache.get(cacheKey);
+    if (cached) {
+      // Touch for LRU: re-insert so it becomes the most-recently-used entry.
+      this.meshCache.delete(cacheKey);
+      this.meshCache.set(cacheKey, cached);
+      return cached;
+    }
 
     const mesh = meshForPart(part);
     const vao = gl.createVertexArray()!;
@@ -762,8 +902,22 @@ export class AXLRenderer {
 
     gl.bindVertexArray(null);
 
-    const gpuMesh: GPUMesh = { vao, indexCount: mesh.indices.length, indexBuffer: idxBuf };
+    const gpuMesh: GPUMesh = {
+      vao, indexCount: mesh.indices.length,
+      indexBuffer: idxBuf, posBuffer: posBuf, normBuffer: normBuf,
+    };
     this.meshCache.set(cacheKey, gpuMesh);
+
+    // LRU eviction: Map preserves insertion order, so the first key is the
+    // oldest. Free its GPU resources before dropping it from the cache.
+    if (this.meshCache.size > MESH_CACHE_LIMIT) {
+      const oldestKey = this.meshCache.keys().next().value as string | undefined;
+      if (oldestKey !== undefined) {
+        const stale = this.meshCache.get(oldestKey)!;
+        this.deleteGPUMesh(stale);
+        this.meshCache.delete(oldestKey);
+      }
+    }
     return gpuMesh;
   }
 
@@ -809,6 +963,17 @@ export class AXLRenderer {
     gl.uniformMatrix4fv(this.uProjection, false, proj);
     gl.uniform3f(this.uLightDir, 0.5, 0.7, 0.3);
     gl.uniform3f(this.uCameraPos, pos.x, pos.y, pos.z);
+
+    // Section plane uniforms (shared across all parts this frame).
+    const sec = state.section;
+    if (sec) {
+      const sign = sec.flip ? -1 : 1;
+      const n = { x: sec.axis === 'x' ? sign : 0, y: sec.axis === 'y' ? sign : 0, z: sec.axis === 'z' ? sign : 0 };
+      gl.uniform1i(this.uClipEnabled, 1);
+      gl.uniform4f(this.uClipPlane, n.x, n.y, n.z, sec.offset * sign);
+    } else {
+      gl.uniform1i(this.uClipEnabled, 0);
+    }
 
     const shadingInt = state.shadingMode === 'flat' ? 0 : state.shadingMode === 'smooth' ? 1 : 2;
     gl.uniform1i(this.uShading, shadingInt);
@@ -1024,18 +1189,17 @@ export class AXLRenderer {
   }
 
   invalidateMesh(partId: string) {
-    // Remove cached mesh for a specific part type so it gets regenerated
-    // In practice, clear entire cache on geometry change
+    // Geometry changed: drop the whole cache so meshes regenerate. Free each
+    // entry's GPU resources first -- a bare .clear() orphaned every VAO/VBO on
+    // the GPU (one of the largest AXL leaks: triggered on every geometry edit).
+    this.meshCache.forEach(m => this.deleteGPUMesh(m));
     this.meshCache.clear();
   }
 
   dispose() {
     cancelAnimationFrame(this.animFrame);
     if (this.gl) {
-      this.meshCache.forEach(m => {
-        this.gl!.deleteVertexArray(m.vao);
-        this.gl!.deleteBuffer(m.indexBuffer);
-      });
+      this.meshCache.forEach(m => this.deleteGPUMesh(m));
       this.meshCache.clear();
       if (this.gridVAO) this.gl.deleteVertexArray(this.gridVAO);
       if (this.mainProgram) this.gl.deleteProgram(this.mainProgram);

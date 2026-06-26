@@ -941,8 +941,8 @@ export class AudioEditingEngine {
   
   private generateClipColor(): string {
     const colors = [
-      '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+      '#5a78a0', '#468a74', '#a08644', '#9e5a55', '#7c6a9c',
+      '#a06282', '#43808f', '#6f8a4e', '#a8744a', '#6b6c9c'
     ];
     return colors[Math.floor(Math.random() * colors.length)];
   }

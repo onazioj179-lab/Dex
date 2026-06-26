@@ -80,6 +80,13 @@ export interface NotifyInput {
    * (e.g. ultra-ephemeral UI feedback). Defaults to false.
    */
   transientOnly?: boolean;
+  /**
+   * When true, SKIP the transient popup banner but still persist to the
+   * notification center (the inverse of `transientOnly`). For low-value,
+   * non-interrupting events (e.g. achievement unlocks) that belong in the center
+   * but must never pop over the user's work. Defaults to false.
+   */
+  silent?: boolean;
 }
 
 /** Reserved key inside the hub `action` JSON for DEX notification metadata. */
@@ -260,7 +267,8 @@ export async function notify(input: NotifyInput): Promise<number> {
     if (duration !== undefined) resolved = { ...input, duration };
   }
 
-  emitBanner(resolved, icon, priority);
+  // `silent` notifications go straight to the center with no popup banner.
+  if (!resolved.silent) emitBanner(resolved, icon, priority);
 
   if (resolved.transientOnly) return -1;
   return persistToHub(resolved, icon, priority);
