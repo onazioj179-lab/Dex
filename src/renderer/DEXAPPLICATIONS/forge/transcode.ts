@@ -197,6 +197,95 @@ export interface WavEncodeOptions {
   bitDepth?: 16 | 24;
   /** Optional resample target. If omitted, the decoded sample rate is kept. */
   sampleRate?: number;
+  /** Trim start as a 0..1 fraction of the source duration. Defaults to 0. */
+  trimIn?: number;
+  /** Trim end as a 0..1 fraction of the source duration. Defaults to 1. */
+  trimOut?: number;
+}
+
+/** Real peak/amplitude data for drawing a waveform, plus the clip duration. */
+export interface AudioPeaks {
+  /** Per-bucket peak amplitude, each in 0..1. */
+  peaks: number[];
+  /** Decoded duration in seconds. */
+  duration: number;
+  sampleRate: number;
+  numChannels: number;
+}
+
+/**
+ * Decode an audio File and reduce it to `buckets` peak-amplitude samples for
+ * waveform rendering. Mixes all channels to mono and takes the max |sample| per
+ * bucket so transients stay visible. No external dependencies.
+ */
+export async function decodeAudioPeaks(file: File, buckets = 480): Promise<AudioPeaks> {
+  const Ctx: typeof AudioContext =
+    (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+  if (!Ctx) throw new Error('Web Audio API unavailable — cannot decode audio');
+  const arrayBuffer = await file.arrayBuffer();
+  const audioCtx = new Ctx();
+  let audioBuffer: AudioBuffer;
+  try {
+    audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+      audioCtx.decodeAudioData(
+        arrayBuffer.slice(0),
+        (buf) => resolve(buf),
+        (err) => reject(err instanceof Error ? err : new Error('Cannot decode audio — unsupported or corrupt file')),
+      );
+    });
+  } finally {
+    try { await audioCtx.close(); } catch { /* noop */ }
+  }
+
+  const len = audioBuffer.length;
+  const chans = audioBuffer.numberOfChannels;
+  const channelData: Float32Array[] = [];
+  for (let c = 0; c < chans; c++) channelData.push(audioBuffer.getChannelData(c));
+  const n = Math.max(1, Math.min(buckets, len));
+  const samplesPerBucket = Math.max(1, Math.floor(len / n));
+  const peaks: number[] = new Array(n).fill(0);
+  let globalMax = 0.0001;
+  for (let b = 0; b < n; b++) {
+    const start = b * samplesPerBucket;
+    const end = Math.min(len, start + samplesPerBucket);
+    let peak = 0;
+    for (let i = start; i < end; i++) {
+      let mixed = 0;
+      for (let c = 0; c < chans; c++) mixed += channelData[c][i];
+      const v = Math.abs(mixed / chans);
+      if (v > peak) peak = v;
+    }
+    peaks[b] = peak;
+    if (peak > globalMax) globalMax = peak;
+  }
+  // Normalize so the loudest bucket reaches 1.0 (quiet clips still read clearly).
+  for (let b = 0; b < n; b++) peaks[b] = peaks[b] / globalMax;
+  return { peaks, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numChannels: chans };
+}
+
+/** A minimal AudioBuffer-shaped view that encodeWav can consume directly. */
+interface BufferLike {
+  numberOfChannels: number;
+  sampleRate: number;
+  length: number;
+  getChannelData(channel: number): Float32Array;
+}
+
+/** Slice a decoded AudioBuffer to the [trimIn, trimOut] fraction of its length. */
+function sliceBuffer(buffer: AudioBuffer, trimIn: number, trimOut: number): BufferLike {
+  const total = buffer.length;
+  const startFrame = Math.max(0, Math.min(total - 1, Math.floor(trimIn * total)));
+  const endFrame = Math.max(startFrame + 1, Math.min(total, Math.ceil(trimOut * total)));
+  const sliceLen = endFrame - startFrame;
+  const chans = buffer.numberOfChannels;
+  const sliced: Float32Array[] = [];
+  for (let c = 0; c < chans; c++) sliced.push(buffer.getChannelData(c).slice(startFrame, endFrame));
+  return {
+    numberOfChannels: chans,
+    sampleRate: buffer.sampleRate,
+    length: sliceLen,
+    getChannelData: (c: number) => sliced[c],
+  };
 }
 
 /**
@@ -225,15 +314,18 @@ export async function transcodeAudioToWav(file: File, opts: WavEncodeOptions = {
   }
 
   const bitDepth: 16 | 24 = opts.bitDepth === 24 ? 24 : 16;
-  const blob = encodeWav(audioBuffer, bitDepth);
+  const trimIn = Math.max(0, Math.min(1, opts.trimIn ?? 0));
+  const trimOut = Math.max(trimIn, Math.min(1, opts.trimOut ?? 1));
+  const source: BufferLike = (trimIn > 0 || trimOut < 1) ? sliceBuffer(audioBuffer, trimIn, trimOut) : audioBuffer;
+  const blob = encodeWav(source, bitDepth);
   return { blob, ext: 'wav', mime: 'audio/wav', width: 0, height: 0 };
 }
 
 /**
- * Encode an AudioBuffer to a 16- or 24-bit interleaved PCM WAV blob.
- * Implements the canonical RIFF/WAVE header + PCM data chunk by hand.
+ * Encode an AudioBuffer (or BufferLike slice) to a 16- or 24-bit interleaved PCM
+ * WAV blob. Implements the canonical RIFF/WAVE header + PCM data chunk by hand.
  */
-export function encodeWav(buffer: AudioBuffer, bitDepth: 16 | 24): Blob {
+export function encodeWav(buffer: BufferLike, bitDepth: 16 | 24): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const numFrames = buffer.length;

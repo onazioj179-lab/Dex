@@ -13,6 +13,7 @@ import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { ResizablePanel } from '../../components/ResizablePanel';
 import { CreativeSlider } from '../../components/controls';
+import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
@@ -574,6 +575,13 @@ const Flux: React.FC = () => {
   const offCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const motionBlurCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const gizmoDragRef = useRef<{ startX: number; startY: number; origTransform: Transform } | null>(null);
+  // Timeline keyframe drag: records which keyframe is being dragged and the clip
+  // geometry so pointer movement maps cleanly to a frame delta.
+  const kfDragRef = useRef<{
+    layerId: string; property: string; origTime: number;
+    clipLeft: number; clipWidth: number; inPoint: number; outPoint: number; moved: boolean;
+  } | null>(null);
+  const [draggingKf, setDraggingKf] = useState<{ layerId: string; property: string; time: number } | null>(null);
 
   // Error states
   const [initError, setInitError] = React.useState<string | null>(null);
@@ -664,6 +672,7 @@ const Flux: React.FC = () => {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(100);
   const [trimOffset, setTrimOffset] = useState(0);
+  const [trimPathMode, setTrimPathMode] = useState<'Simultaneously' | 'Individually'>('Simultaneously');
   // 6. Auto-Wiggle
   const [showAutoWiggle, setShowAutoWiggle] = useState(false);
   const [wiggleFreq, setWiggleFreq] = useState(5);
@@ -1949,6 +1958,64 @@ const Flux: React.FC = () => {
     }));
   }, [selectedLayerId, currentTime]);
 
+  // Reposition a single keyframe in time. Identified by (property, original time)
+  // because keyframe times are unique within a property's track. Re-sorts so the
+  // interpolator (which assumes ascending order) stays valid.
+  const moveKeyframeTime = useCallback((layerId: string, property: string, origTime: number, newTime: number) => {
+    setLayers(prev => prev.map(l => {
+      if (l.id !== layerId) return l;
+      const clamped = Math.max(0, Math.min(duration, Math.round(newTime)));
+      const anims = (l.animations || []).map(a => {
+        if (a.property !== property) return a;
+        // Skip if another keyframe already sits on the target frame (avoid collision).
+        if (clamped !== origTime && a.keyframes.some(k => k.time === clamped)) return a;
+        const keyframes = a.keyframes.map(k => k.time === origTime ? { ...k, time: clamped } : k).sort((x, y) => x.time - y.time);
+        return { ...a, keyframes };
+      });
+      return { ...l, animations: anims };
+    }));
+    setIsDirty(true);
+  }, [duration]);
+
+  // Begin dragging a keyframe diamond on the main timeline. Captures the parent
+  // clip's screen geometry so pointer-move can convert pixels -> frames.
+  const startKeyframeDrag = useCallback((e: React.PointerEvent, layer: Layer, property: string, time: number) => {
+    e.stopPropagation();
+    const clipEl = (e.currentTarget as HTMLElement).parentElement;
+    if (!clipEl) return;
+    const rect = clipEl.getBoundingClientRect();
+    kfDragRef.current = {
+      layerId: layer.id, property, origTime: time,
+      clipLeft: rect.left, clipWidth: rect.width || 1,
+      inPoint: layer.inPoint, outPoint: layer.outPoint, moved: false,
+    };
+    setSelectedLayerId(layer.id);
+    setDraggingKf({ layerId: layer.id, property, time });
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  }, []);
+
+  const onKeyframeDragMove = useCallback((e: React.PointerEvent) => {
+    const d = kfDragRef.current;
+    if (!d) return;
+    const span = (d.outPoint - d.inPoint) || 1;
+    const frac = Math.max(0, Math.min(1, (e.clientX - d.clipLeft) / d.clipWidth));
+    const newTime = d.inPoint + frac * span;
+    d.moved = true;
+    moveKeyframeTime(d.layerId, d.property, d.origTime, newTime);
+    // Keep our reference time in sync so the next move targets the moved keyframe.
+    d.origTime = Math.max(0, Math.min(duration, Math.round(newTime)));
+    setDraggingKf({ layerId: d.layerId, property: d.property, time: d.origTime });
+  }, [moveKeyframeTime, duration]);
+
+  const onKeyframeDragEnd = useCallback((e: React.PointerEvent, fallbackTime: number) => {
+    const d = kfDragRef.current;
+    kfDragRef.current = null;
+    setDraggingKf(null);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    // A click with no drag should still seek the playhead to the keyframe.
+    if (d && !d.moved) setCurrentTime(fallbackTime);
+  }, []);
+
   // ROADMAP-600 #095/#269 — real local handlers for the NL command bar. Motion
   // preset writes actual keyframes (range-safe: ends at the layer's own values);
   // synthesis/sim ops (text→motion, auto-rig, physics, lip-sync) honestly skip.
@@ -2302,8 +2369,90 @@ const Flux: React.FC = () => {
     libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
   }), [showTimeline, timelineHeight, isTimelineResizing]);
 
+  // Standardized menu bar — organizes Flux's long feature span into File / Insert
+  // / Animation / Composition / Render / Effects / Layout / Export menus with
+  // submenus. Reuses the exact handlers behind the existing Features dropdown.
+  const fluxMenus: CreativeMenu[] = [
+    {
+      id: 'file', label: 'File', items: [
+        { label: 'Import Media…', shortcut: 'Ctrl+I', onSelect: () => importMedia() },
+        { label: 'Open Project…', shortcut: 'Ctrl+O', onSelect: () => openProject() },
+        { label: 'Save Project', shortcut: 'Ctrl+S', onSelect: () => saveProject() },
+        { separator: true },
+        { label: 'Export Video…', shortcut: 'Ctrl+E', onSelect: () => exportVideo() },
+      ],
+    },
+    {
+      id: 'insert', label: 'Insert', items: [
+        { label: 'Add Layer', submenu: ([
+          ['Shape', 'shape'], ['Text', 'text'], ['Image', 'image'], ['Video', 'video'],
+          ['Particle', 'particle'], ['Camera', 'camera'], ['Light', 'light'], ['Group', 'group'],
+        ] as const).map(([label, type]) => ({ label, onSelect: () => addLayer(type as Layer['type']) })) },
+      ],
+    },
+    {
+      id: 'animation', label: 'Animation', items: [
+        { label: 'Text Animator', checked: showTextAnimator, onSelect: () => setShowTextAnimator(v => !v) },
+        { label: 'Graph Editor', checked: showGraphEditor, onSelect: () => setShowGraphEditor(v => !v) },
+        { label: 'Expressions', checked: showExpressionEditor, onSelect: () => setShowExpressionEditor(v => !v) },
+        { label: 'Time Remap', checked: showTimeRemap, onSelect: () => setShowTimeRemap(v => !v) },
+        { label: 'Morph Shapes', checked: showMorphShapes, onSelect: () => setShowMorphShapes(v => !v) },
+        { label: 'Wiggle', checked: showAutoWiggle, onSelect: () => setShowAutoWiggle(v => !v) },
+        { label: 'Stagger', checked: showStagger, onSelect: () => setShowStagger(v => !v) },
+        { label: 'Motion Path', checked: showMotionPath, onSelect: () => setShowMotionPath(v => !v) },
+      ],
+    },
+    {
+      id: 'composition', label: 'Composition', items: [
+        { label: 'Null Objects', checked: showNullObjects, onSelect: () => setShowNullObjects(v => !v) },
+        { label: 'Precompose', checked: showPrecompose, onSelect: () => setShowPrecompose(v => !v) },
+        { label: 'Track Mattes', checked: showTrackMattes, onSelect: () => setShowTrackMattes(v => !v) },
+        { label: 'FX Stack', checked: showEffectsStack, onSelect: () => setShowEffectsStack(v => !v) },
+        { label: 'Masks', checked: showMaskSystem, onSelect: () => setShowMaskSystem(v => !v) },
+        { label: 'Trim Paths', checked: showTrimPaths, onSelect: () => setShowTrimPaths(v => !v) },
+      ],
+    },
+    {
+      id: 'render', label: 'Render', items: [
+        { label: 'Particles+', checked: showAdvancedParticles, onSelect: () => setShowAdvancedParticles(v => !v) },
+        { label: 'Camera Rig', checked: showCameraRig, onSelect: () => setShowCameraRig(v => !v) },
+        { label: 'Environment Map', checked: showEnvironment, onSelect: () => setShowEnvironment(v => !v) },
+        { label: '3D Text', checked: show3DText, onSelect: () => setShow3DText(v => !v) },
+        { label: 'Shaders', checked: showShaderEffects, onSelect: () => setShowShaderEffects(v => !v) },
+        { label: 'Frame Blending', checked: showFrameBlending, onSelect: () => setShowFrameBlending(v => !v) },
+        { label: 'Motion Blur', checked: showMotionBlur, onSelect: () => setShowMotionBlur(v => !v) },
+        { label: 'Color Correction', checked: showColorCorrection, onSelect: () => setShowColorCorrection(v => !v) },
+        { label: 'Stroke Effects', checked: showStrokeEffects, onSelect: () => setShowStrokeEffects(v => !v) },
+      ],
+    },
+    {
+      id: 'effects', label: 'Effects', items: [
+        { label: 'Audio Reactive', checked: showAudioReactive, onSelect: () => setShowAudioReactive(v => !v) },
+        { label: 'Repeater', checked: showRepeater, onSelect: () => setShowRepeater(v => !v) },
+      ],
+    },
+    {
+      id: 'layout', label: 'Layout', items: [
+        { label: 'Alignment', checked: showAlignment, onSelect: () => setShowAlignment(v => !v) },
+        { label: 'Guides', checked: showGuideLayer, onSelect: () => setShowGuideLayer(v => !v) },
+        { label: 'Markers', checked: showMarkers, onSelect: () => setShowMarkers(v => !v) },
+        { label: 'Snapshot', checked: showSnapshot, onSelect: () => setShowSnapshot(v => !v) },
+      ],
+    },
+    {
+      id: 'export', label: 'Export', items: [
+        { label: 'GIF Export', checked: showGifExport, onSelect: () => setShowGifExport(v => !v) },
+        { label: 'Lottie Export', checked: showLottieExport, onSelect: () => setShowLottieExport(v => !v) },
+        { label: 'Templates', checked: showCompTemplates, onSelect: () => setShowCompTemplates(v => !v) },
+        { label: 'Render Queue', checked: showRenderQueue, onSelect: () => setShowRenderQueue(v => !v) },
+        { label: 'Export Presets', checked: showExportPresets, onSelect: () => setShowExportPresets(v => !v) },
+      ],
+    },
+  ];
+
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
+      <CreativeMenuBar menus={fluxMenus} accent="#bf5af2" />
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
@@ -3110,18 +3259,29 @@ const Flux: React.FC = () => {
                         }}
                       >
                         {layer.name}
-                        {/* Keyframe diamonds */}
-                        {(layer.animations || []).flatMap(a => a.keyframes).map((kf, ki) => (
-                          <div key={ki} onClick={(e) => { e.stopPropagation(); setCurrentTime(kf.time); }} style={{
-                            position: 'absolute',
-                            left: `${((kf.time - layer.inPoint) / (layer.outPoint - layer.inPoint)) * 100}%`,
-                            top: '50%', transform: 'translate(-50%,-50%) rotate(45deg)',
-                            width: 7, height: 7,
-                            background: currentTime === kf.time ? 'var(--color-warning)' : 'var(--color-accent)',
-                            border: '1px solid var(--color-text-tertiary)',
-                            borderRadius: 2, cursor: 'pointer', zIndex: 2,
-                          }} title={`Keyframe at frame ${kf.time}`} />
-                        ))}
+                        {/* Keyframe diamonds — draggable to retime, click to seek */}
+                        {(layer.animations || []).flatMap(a => a.keyframes.map(kf => ({ kf, property: a.property }))).map(({ kf, property }) => {
+                          const isDragging = draggingKf?.layerId === layer.id && draggingKf.property === property && draggingKf.time === kf.time;
+                          return (
+                            <div
+                              key={`${property}-${kf.time}`}
+                              onPointerDown={(e) => startKeyframeDrag(e, layer, property, kf.time)}
+                              onPointerMove={onKeyframeDragMove}
+                              onPointerUp={(e) => onKeyframeDragEnd(e, kf.time)}
+                              style={{
+                                position: 'absolute',
+                                left: `${((kf.time - layer.inPoint) / (layer.outPoint - layer.inPoint)) * 100}%`,
+                                top: '50%', transform: `translate(-50%,-50%) rotate(45deg) scale(${isDragging ? 1.4 : 1})`,
+                                width: 7, height: 7,
+                                background: (currentTime === kf.time || isDragging) ? 'var(--color-warning)' : 'var(--color-accent)',
+                                border: '1px solid var(--color-text-tertiary)',
+                                borderRadius: 2, cursor: 'ew-resize', zIndex: isDragging ? 5 : 2,
+                                touchAction: 'none', transition: isDragging ? 'none' : 'transform 80ms ease',
+                              }}
+                              title={`${property} keyframe at frame ${kf.time} — drag to retime`}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -4038,8 +4198,8 @@ const Flux: React.FC = () => {
             ))}
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>Mode</div>
             <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-              {['Simultaneously', 'Individually'].map(m => (
-                <button key={m} aria-label={`${m} trim mode`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Simultaneously' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Simultaneously' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+              {(['Simultaneously', 'Individually'] as const).map(m => (
+                <button key={m} aria-label={`${m} trim mode`} aria-pressed={trimPathMode === m} onClick={() => { setTrimPathMode(m); setIsDirty(true); }} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: trimPathMode === m ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: trimPathMode === m ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
