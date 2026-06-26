@@ -61,9 +61,11 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
   dockAlign: 'center',
   dockPreset: 'regular',
-  glassOpacity: 0.85,
+  // Full Apple-style liquid glass out of the box (owner direction). The master
+  // toggle in Settings flips this to 'off' for fully-opaque true-black surfaces.
+  glassOpacity: 0.6,
   glassTint: '#0a0a0a',
-  glassMode: 'normal',
+  glassMode: 'liquid',
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -192,18 +194,50 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
 
-  // DEX Sharp full-flat (2026-06-13, owner direction "strip the glass and all,
-  // put them on place"): UI surfaces are SOLID regardless of the saved glass
-  // mode/opacity. Backdrop blur is already disabled platform-wide (see
-  // styles/glassMenu.ts `adaptiveBlur` + the --blur-* tokens), so these fills
-  // resolve opaque and theme-aware via --color-bg-surface-solid. The glass
-  // prefs + the data-glass-* attributes above are preserved untouched, so the
-  // frosted look can be restored by reverting this block to the per-mode
-  // branches kept in this file's git history.
-  root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, 1)`);
-  root.style.setProperty('--color-bg-glass', 'var(--color-bg-surface-solid)');
-  root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
-  root.style.setProperty('--dex-glass-blur', '0px');
+  // Liquid glass (master overhaul): the shell's frosted material is computed
+  // from the user's glass prefs and written here as inline CSS vars, so this is
+  // the single runtime control point for every `--color-bg-glass(-strong)`
+  // consumer (menus, dropdowns, sidebars, toolbars, panels, the floating
+  // chrome). Paired with the adaptive backdrop blur in styles/glassMenu.ts.
+  //   off      -> fully solid, theme-aware (no see-through, no blur)
+  //   reduced  -> near-opaque, no blur (accessibility / weak GPU)
+  //   normal   -> translucent fill + 24px frosted blur
+  //   liquid   -> lighter fill floor + 32px blur with extra saturation
+  const tint = `${r}, ${g}, ${b}`;
+  if (effectiveMode === 'off') {
+    // Glass FULLY OFF (owner direction): every glass surface -- menus, panels,
+    // sidebars, toolbars, and the floating chrome (top bar, dock, orbs,
+    // spotlight, app menu) -- goes opaque TRUE BLACK, no blur. Pure #000 AMOLED.
+    root.style.setProperty('--dex-glass-bg', '#000000');
+    root.style.setProperty('--color-bg-glass', '#000000');
+    root.style.setProperty('--color-bg-glass-strong', '#000000');
+    root.style.setProperty('--dex-glass-blur', '0px');
+    root.style.setProperty('--glass-bg', '#000000');
+    root.style.setProperty('--glass-blur', 'none');
+  } else if (effectiveMode === 'reduced') {
+    const op = Math.max(requestedOpacity, 0.92);
+    root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
+    root.style.setProperty('--color-bg-glass', `rgba(${tint}, ${op})`);
+    root.style.setProperty('--color-bg-glass-strong', `rgba(${tint}, ${Math.min(op + 0.05, 1)})`);
+    root.style.setProperty('--dex-glass-blur', '0px');
+    root.style.setProperty('--glass-bg', `rgba(${tint}, ${op})`);
+    root.style.setProperty('--glass-blur', 'none');
+  } else {
+    const liquid = effectiveMode === 'liquid';
+    // 'liquid' floats a touch more transparent so the wallpaper lensing reads.
+    const op = liquid ? Math.min(requestedOpacity, 0.78) : requestedOpacity;
+    const blur = liquid ? 32 : 24;
+    const sat = liquid ? 200 : 180;
+    const filter = `blur(${blur}px) saturate(${sat}%)`;
+    root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
+    root.style.setProperty('--color-bg-glass', `rgba(${tint}, ${op})`);
+    root.style.setProperty('--color-bg-glass-strong', `rgba(${tint}, ${Math.min(op + 0.12, 1)})`);
+    root.style.setProperty('--dex-glass-blur', filter);
+    // Floating chrome floats a touch more transparent than panels for the
+    // classic translucent top-bar / dock look.
+    root.style.setProperty('--glass-bg', `rgba(${tint}, ${Math.max(op - 0.08, 0.5)})`);
+    root.style.setProperty('--glass-blur', filter);
+  }
 }
 
 export function applyNightShift(prefs: Pick<ShellPreferences, 'nightShift' | 'nightShiftIntensity'>): void {
@@ -252,7 +286,11 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
   // Re-apply glass vars when the user's reduced-motion / reduced-transparency
   // preference changes at the OS level. This keeps the effective glass mode
   // honest without requiring a reload.
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  // Guarded so a store re-create (HMR / repeat import) can't stack duplicate
+  // matchMedia 'change' listeners that each re-run applyGlassVars.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && !(window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired) {
+    (window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired = true;
     try {
       const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
       const mqTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)');

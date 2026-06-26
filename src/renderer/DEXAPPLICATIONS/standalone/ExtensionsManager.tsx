@@ -164,7 +164,7 @@ const ExtensionsManager: React.FC = () => {
       </div>
 
       {showInstall && (
-        <div style={styles.installPanel}>
+        <div className="dex-liquid-glass-strong" style={styles.installPanel}>
           <span className="dex-label-caps" style={styles.sectionTitle}>
             Install from manifest
           </span>
@@ -210,7 +210,7 @@ const ExtensionsManager: React.FC = () => {
           const perms = permissionsFor(rec.manifest.id);
           const missing = perms.filter((p: PermissionId) => !permissions[p]?.enabled);
           return (
-            <div key={rec.manifest.id} className="ext-card" style={styles.card}>
+            <div key={rec.manifest.id} className="ext-card dex-liquid-glass-strong" style={styles.card}>
               <div style={styles.cardTop}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={styles.cardName}>
@@ -327,7 +327,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 14px',
     background: 'var(--color-accent, #0a84ff)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     color: '#fff',
     fontSize: '12px',
     fontWeight: 600,
@@ -338,7 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '7px 12px',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     fontWeight: 600,
@@ -349,7 +349,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '7px 12px',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     color: 'var(--color-text-secondary)',
     fontSize: '12px',
     fontWeight: 600,
@@ -357,9 +357,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   installPanel: {
+    margin: 'var(--space-3) var(--space-4) 0',
     padding: 'var(--space-4)',
-    borderBottom: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-secondary)',
     display: 'flex',
     flexDirection: 'column',
     gap: 'var(--space-3)',
@@ -377,7 +376,7 @@ const styles: Record<string, React.CSSProperties> = {
     resize: 'vertical',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     padding: 'var(--space-3)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-mono)',
@@ -401,9 +400,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-6)',
   },
   card: {
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-4)',
     display: 'flex',
     flexDirection: 'column',
@@ -423,7 +420,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     letterSpacing: '0.5px',
     padding: '2px 6px',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-tertiary)',
     border: '1px solid var(--color-border-subtle)',
@@ -438,7 +435,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardDesc: { fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5 },
   toggle: {
     padding: '6px 12px',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     border: '1px solid var(--color-border-subtle)',
     fontSize: '11px',
     fontWeight: 700,
@@ -451,7 +448,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 600,
     padding: '3px 8px',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',
     border: '1px solid var(--color-border-subtle)',
@@ -469,7 +466,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 600,
     padding: '3px 8px',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     border: '1px solid var(--color-border-subtle)',
   },
   cardActions: { display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)' },

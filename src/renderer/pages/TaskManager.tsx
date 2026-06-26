@@ -237,7 +237,7 @@ interface MetricCardProps {
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ label, value, detail, history, tone, max = 100 }) => (
-  <div style={styles.statCard}>
+  <div className="dex-liquid-glass" style={styles.statCard}>
     <div style={styles.statLabel}>{label}</div>
     <div style={{ ...styles.statValue, color: tone }}>{value}</div>
     <div style={styles.statDetail}>{detail}</div>
@@ -809,7 +809,7 @@ const TaskManager: React.FC = () => {
             the default Diagnostics view stays focused on CPU/Memory/Processes. */}
         {detailLevel >= 3 && (
           <>
-            <div style={styles.statCard}>
+            <div className="dex-liquid-glass" style={styles.statCard}>
               <div style={styles.statLabel}>Uptime</div>
               <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 20 }}>{formatUptime(uptimeSeconds)}</div>
               <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
@@ -832,7 +832,7 @@ const TaskManager: React.FC = () => {
               max={Math.max(1024, ...netTxHistory)}
             />
             {status.disk && (
-              <div style={styles.statCard}>
+              <div className="dex-liquid-glass" style={styles.statCard}>
                 <div style={styles.statLabel}>Disk</div>
                 <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 20 }}>{diskPercent}%</div>
                 <div style={styles.statDetail}>{diskDetail}</div>
@@ -846,7 +846,7 @@ const TaskManager: React.FC = () => {
       {detailLevel >= 2 && (
       <div style={styles.contentGrid}>
         {stages.length > 0 && (
-        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, gridColumn: '1 / -1' }}>
           <div style={styles.panelHeader}>
             <span>Workspaces</span>
             <span style={styles.countPill}>{stages.length}</span>
@@ -894,7 +894,7 @@ const TaskManager: React.FC = () => {
         </section>
         )}
 
-        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, gridColumn: '1 / -1' }}>
           <div style={styles.panelHeader}>
             <span>Workflows</span>
             <span style={styles.countPill}>{workflows.length}</span>
@@ -916,7 +916,7 @@ const TaskManager: React.FC = () => {
           </div>
         </section>
 
-        <section style={{ ...styles.panel, ...(detailLevel < 3 ? { gridColumn: '1 / -1' } : null) }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, ...(detailLevel < 3 ? { gridColumn: '1 / -1' } : null) }}>
           <div style={styles.panelHeader}>
             <span>Open Apps</span>
             <span style={styles.countPill}>{shellApps.length}</span>
@@ -954,7 +954,7 @@ const TaskManager: React.FC = () => {
         </section>
 
         {detailLevel >= 3 && (
-        <section style={styles.panel}>
+        <section className="dex-liquid-glass" style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1100,7 +1100,7 @@ const TaskManager: React.FC = () => {
             )}
           </div>
           {selectedProcess && (
-            <div style={styles.detailPanel} role="region" aria-label={`Details for ${selectedProcess.name}`}>
+            <div className="dex-liquid-glass-strong" style={styles.detailPanel} role="region" aria-label={`Details for ${selectedProcess.name}`}>
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle} title={selectedProcess.name}>{selectedProcess.name}</span>
                 <button
@@ -1162,13 +1162,13 @@ const styles: Record<string, React.CSSProperties> = {
   healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
   healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 8, border: '1px solid' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-2)' },
-  statCard: { padding: 11, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 3 },
+  statCard: { padding: 11, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 3 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { fontSize: 20, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   sparkWrap: { marginTop: 5, height: 36 },
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 'var(--space-3)' },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden' },
   panelHeader: { height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' },
@@ -1200,7 +1200,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggleButton: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   toggleButtonActive: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' },
   iconAction: { display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0 },
-  detailPanel: { flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', background: 'var(--color-bg-surface)', display: 'flex', flexDirection: 'column', gap: 8 },
+  detailPanel: { flexShrink: 0, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 },
   detailHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   detailTitle: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   detailClose: { width: 22, height: 22, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 },

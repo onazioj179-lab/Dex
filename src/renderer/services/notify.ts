@@ -166,6 +166,24 @@ export function readHubMeta(action: unknown): DexNotifyMeta | null {
   };
 }
 
+/**
+ * Decode the deep-link `target` a notification was persisted with, from the hub
+ * `action` envelope (string JSON or object). Returns null when absent/unparseable
+ * so the Notification Center can decide whether an item is activatable. The
+ * `_dexMeta` block is ignored here — only the caller's own action payload carries
+ * a target. Single source of truth for "where does clicking this notification go".
+ */
+export function readHubTarget(action: unknown): string | null {
+  let obj: any = action;
+  if (typeof action === 'string') {
+    if (!action) return null;
+    try { obj = JSON.parse(action); } catch { return null; }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const target = obj.target;
+  return typeof target === 'string' && target.trim() ? target.trim() : null;
+}
+
 /** Safe access to the IPC bridge; null in non-bridge contexts (SSR/tests). */
 function bridge(): { invoke: (channel: string, ...args: unknown[]) => Promise<any> } | null {
   const dex = (typeof window !== 'undefined' ? (window as any).dex : null) || null;

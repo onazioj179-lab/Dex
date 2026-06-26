@@ -20,6 +20,7 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
+import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
 import {
   type DeviceTier, ALL_TIERS, getTierLabel, getTierDescription,
@@ -207,36 +208,47 @@ const Icons = {
   ),
 };
 
-const SECTIONS: SettingSection[] = [
-  { id: 'general', name: 'General', icon: Icons.general },
-  { id: 'appearance', name: 'Appearance', icon: Icons.appearance },
-  { id: 'shell', name: 'Shell & Dock', icon: Icons.shell },
-  { id: 'sound', name: 'Sound', icon: Icons.sound },
-  { id: 'display', name: 'Display', icon: Icons.display },
-  { id: 'notifications', name: 'Notifications', icon: Icons.notifications },
-  { id: 'privacy', name: 'Privacy & Security', icon: Icons.privacy, keywords: 'security firewall encryption password pin biometric vpn malware lock' },
-  { id: 'network', name: 'Network', icon: Icons.network },
-  { id: 'performance', name: 'Performance', icon: Icons.performance },
-  { id: 'systemMonitor', name: 'System Monitor', icon: Icons.systemMonitor },
-  { id: 'accessibility', name: 'Accessibility', icon: Icons.accessibility },
-  { id: 'window', name: 'Window Management', icon: Icons.window },
-  { id: 'snap', name: 'Frame Snapping', icon: Icons.window },
-  { id: 'permissions', name: 'Permissions', icon: Icons.privacy },
-  { id: 'creator', name: 'Creator Access', icon: Icons.account },
-  { id: 'keyboard', name: 'Keyboard Shortcuts', icon: Icons.keyboard },
-  { id: 'files', name: 'Files', icon: Icons.files },
-  { id: 'storage', name: 'Storage & Data', icon: Icons.storage },
-  { id: 'browser', name: 'Browser', icon: Icons.browser },
-  { id: 'uki', name: 'UKI & Memory', icon: Icons.uki, keywords: 'ai assistant voice memory recall wake word intelligence' },
-  { id: 'aiproviders', name: 'AI Providers', icon: Icons.uki, keywords: 'ai artificial intelligence model api key openai anthropic claude gpt llm smart router' },
-  { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps, keywords: 'prism flux forge axl imosion video editor creative apps' },
-  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.plugins, keywords: 'plugin extension addon marketplace install developer' },
-  { id: 'developer', name: 'Developer', icon: Icons.developer, keywords: 'developer api sdk plugin debug diagnostics prompt console advanced build' },
-  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.nexus, keywords: 'biometric face fingerprint identity nexus' },
-  { id: 'updates', name: 'Updates', icon: Icons.updates },
-  { id: 'account', name: 'Account', icon: Icons.account },
-  { id: 'about', name: 'About', icon: Icons.about },
-];
+// Section icons live here -- Settings owns its visual presentation. The section
+// list + search keywords are the shared source of truth in settingsSections.ts,
+// so the command palette's "Settings: ..." deep-links can never drift from this
+// sidebar (same ids, same order).
+const SECTION_ICONS: Record<string, React.ReactNode> = {
+  general: Icons.general,
+  appearance: Icons.appearance,
+  shell: Icons.shell,
+  sound: Icons.sound,
+  display: Icons.display,
+  notifications: Icons.notifications,
+  privacy: Icons.privacy,
+  network: Icons.network,
+  performance: Icons.performance,
+  systemMonitor: Icons.systemMonitor,
+  accessibility: Icons.accessibility,
+  window: Icons.window,
+  snap: Icons.window,
+  permissions: Icons.privacy,
+  creator: Icons.account,
+  keyboard: Icons.keyboard,
+  files: Icons.files,
+  storage: Icons.storage,
+  browser: Icons.browser,
+  uki: Icons.uki,
+  aiproviders: Icons.uki,
+  creativeapps: Icons.creativeapps,
+  plugins: Icons.plugins,
+  developer: Icons.developer,
+  nexus: Icons.nexus,
+  updates: Icons.updates,
+  account: Icons.account,
+  about: Icons.about,
+};
+
+const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
+  id: s.id,
+  name: s.name,
+  icon: SECTION_ICONS[s.id] ?? Icons.general,
+  keywords: s.keywords,
+}));
 
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
@@ -2355,7 +2367,7 @@ export const Settings: React.FC = () => {
       // transparency toggles are flipped from anywhere in Settings.
       if (key === 'transparency') {
         try {
-          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'normal') : 'off');
+          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'liquid') : 'off');
         } catch { /* store not ready */ }
       }
       if (key === 'reduceTransparency') {
@@ -2364,7 +2376,7 @@ export const Settings: React.FC = () => {
             // transparency disabled -- glass stays off
             shellPrefs.setGlassMode('off');
           } else {
-            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'normal');
+            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'liquid');
           }
         } catch { /* store not ready */ }
       }
@@ -2520,12 +2532,28 @@ export const Settings: React.FC = () => {
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Mode</span>
-            <span style={styles.settingDesc}>Choose how transparent shell windows and overlays should be.</span>
+            <span style={styles.settingLabel}>Glass</span>
+            <span style={styles.settingDesc}>
+              {prefs.glassMode === 'off'
+                ? 'Off — every surface is opaque true black.'
+                : 'On — full Apple-style liquid glass across the whole shell.'}
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.glassMode !== 'off'}
+            onChange={(e) => prefs.setGlassMode(e.target.checked ? 'liquid' : 'off')}
+            aria-label="Liquid Glass on or off"
+          />
+        </div>
+        {prefs.glassMode !== 'off' && <>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Intensity</span>
+            <span style={styles.settingDesc}>How transparent the glass is. Liquid is the full Apple look.</span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { id: 'off', label: 'Off' },
               { id: 'reduced', label: 'Reduced' },
               { id: 'normal', label: 'Normal' },
               { id: 'liquid', label: 'Liquid' },
@@ -2570,6 +2598,7 @@ export const Settings: React.FC = () => {
             aria-label="Liquid Glass opacity"
           />
         </div>
+        </>}
 
         <h3 style={styles.sectionTitle}>Comfort & Power</h3>
         <div style={styles.settingRow}>
@@ -4961,12 +4990,15 @@ export const Settings: React.FC = () => {
 // ===========================================================================
 
 const styles: Record<string, React.CSSProperties> = {
+  // Outer shell. Transparent so the two glass panes (sidebar + content) read as
+  // real see-through frosted glass over the desktop rather than frosting a solid
+  // fill. The `.dex-liquid-glass` / `-strong` classes on the panes supply material.
   container: {
     width: '100%',
     height: '100%',
     display: 'flex',
     containerType: 'inline-size',
-    background: 'var(--pg-surface)',
+    background: 'transparent',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
     fontSize: '13px',
@@ -4974,16 +5006,16 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease',
   },
 
-  // Sidebar
+  // Sidebar — frosted glass via `.dex-liquid-glass` on the element; only the
+  // right divider + layout live here (background is supplied by the class).
   sidebar: {
     width: 'var(--pg-sidebar-width)',
     minWidth: 'var(--pg-sidebar-width)',
-    background: 'var(--pg-sidebar)',
     borderRight: '1px solid var(--pg-border)',
+    borderRadius: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: 'inset -1px 0 0 var(--color-border-subtle, rgba(255,255,255,0.02))',
   },
   sidebarHeader: {
     height: '36px',
@@ -5040,21 +5072,26 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
 
-  // Main
+  // Main content pane — `.dex-liquid-glass-strong` on the element gives the
+  // contrast-heavy frosted surface that long settings lists sit on. No radius
+  // (full-bleed pane); the class supplies the background.
   main: {
     flex: 1,
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    borderRadius: 0,
   },
+  // Toolbar header. Transparent so the content pane's glass reads through; the
+  // bottom hairline stays for structure.
   header: {
     height: '44px',
     display: 'flex',
     alignItems: 'center',
     padding: '0 18px',
     borderBottom: '1px solid var(--pg-border)',
-    background: 'var(--pg-toolbar)',
+    background: 'transparent',
   },
   headerTitle: {
     fontSize: '15px',

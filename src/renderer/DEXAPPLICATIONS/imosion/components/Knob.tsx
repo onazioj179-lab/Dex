@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useId } from 'react';
 
 // A real rotary knob: 270-degree sweep, drag up/down to turn, shift = fine,
 // double-click to reset, scroll wheel to nudge. Pure SVG, no deps. Built to look
@@ -86,7 +86,13 @@ export const Knob: React.FC<KnobProps> = ({ value, min, max, onChange, label, va
     apply(value + (e.deltaY < 0 ? step : -step));
   }, [apply, disabled, max, min, value]);
 
-  const ptr = polar(cx, cy, r - 3, angle);
+  const uid = useId().replace(/:/g, '');
+  const capR = r - 5;
+  const valueArcD = bipolar
+    ? (norm >= 0.5 ? arcPath(cx, cy, r, START + 0.5 * SWEEP, angle) : arcPath(cx, cy, r, angle, START + 0.5 * SWEEP))
+    : arcPath(cx, cy, r, START, angle);
+  const pIn = polar(cx, cy, capR * 0.30, angle);   // indicator base (on the cap)
+  const pOut = polar(cx, cy, capR - 1, angle);     // indicator tip
   const center = polar(cx, cy, r, START + 0.5 * SWEEP);
 
   return (
@@ -101,20 +107,36 @@ export const Knob: React.FC<KnobProps> = ({ value, min, max, onChange, label, va
         onDoubleClick={() => !disabled && apply(defaultValue ?? (min + max) / 2)}
         onWheel={onWheel}
       >
+        <defs>
+          {/* Domed metal cap: light catches the upper-left, falls to near-black. */}
+          <radialGradient id={`kb${uid}`} cx="50%" cy="36%" r="68%">
+            <stop offset="0%" stopColor="#43434e" />
+            <stop offset="52%" stopColor="#202026" />
+            <stop offset="100%" stopColor="#0e0e12" />
+          </radialGradient>
+          {/* Beveled rim ring. */}
+          <linearGradient id={`kr${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#5b5b66" />
+            <stop offset="100%" stopColor="#1b1b21" />
+          </linearGradient>
+          <filter id={`ks${uid}`} x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="1" stdDeviation="0.7" floodColor="#000" floodOpacity="0.5" />
+          </filter>
+        </defs>
         {/* track */}
         <path d={arcPath(cx, cy, r, START, START + SWEEP)} fill="none" stroke="#2a2a30" strokeWidth={3} strokeLinecap="round" />
-        {/* value arc */}
-        <path
-          d={bipolar
-            ? (norm >= 0.5 ? arcPath(cx, cy, r, START + 0.5 * SWEEP, angle) : arcPath(cx, cy, r, angle, START + 0.5 * SWEEP))
-            : arcPath(cx, cy, r, START, angle)}
-          fill="none" stroke={color} strokeWidth={3} strokeLinecap="round"
-        />
-        {/* knob body */}
-        <circle cx={cx} cy={cy} r={r - 5} fill="#16161a" stroke="#3a3a42" strokeWidth={1} />
-        {/* pointer */}
-        <line x1={cx} y1={cy} x2={ptr.x} y2={ptr.y} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
-        {bipolar && <circle cx={center.x} cy={center.y} r={1.2} fill="#5a5a64" />}
+        {/* value arc -- single crisp line, no bloom */}
+        <path d={valueArcD} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+        {/* beveled rim (sits on the panel with a drop shadow) */}
+        <circle cx={cx} cy={cy} r={r - 2.5} fill={`url(#kr${uid})`} filter={`url(#ks${uid})`} />
+        {/* domed metal cap */}
+        <circle cx={cx} cy={cy} r={capR} fill={`url(#kb${uid})`} stroke="#0b0b0f" strokeWidth={0.75} />
+        {/* top sheen */}
+        <ellipse cx={cx} cy={cy - capR * 0.34} rx={capR * 0.52} ry={capR * 0.26} fill="#ffffff" opacity={0.07} />
+        {/* indicator notch + glowing tip */}
+        <line x1={pIn.x} y1={pIn.y} x2={pOut.x} y2={pOut.y} stroke={color} strokeWidth={2.4} strokeLinecap="round" />
+        <circle cx={pOut.x} cy={pOut.y} r={1.5} fill={color} />
+        {bipolar && <circle cx={center.x} cy={center.y} r={1.2} fill="#6a6a74" />}
       </svg>
       {valueLabel !== undefined && (
         <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', minWidth: 28, textAlign: 'center' }}>{valueLabel}</span>

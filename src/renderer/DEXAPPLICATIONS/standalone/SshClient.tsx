@@ -114,7 +114,7 @@ const parseSshConfig = (text: string): Array<Partial<SshProfile> & { name: strin
 };
 
 const inputStyle: React.CSSProperties = {
-  padding: '6px 9px', borderRadius: 6, border: '1px solid var(--color-border)',
+  padding: '6px 9px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)',
   background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', outline: 'none', fontSize: 12, minWidth: 0,
 };
 const blank = { name: '', host: '', user: '', port: '22', keyPath: '', group: '', startupCommand: '' };
@@ -331,7 +331,7 @@ export default function SshClient(): React.ReactElement {
   const renderProfile = (p: SshProfile): React.ReactElement => {
     const m = meta[p.id];
     return (
-      <li key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
+      <li key={p.id} className="dex-liquid-glass" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 'var(--radius-lg)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="truncate" style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
           <div className="truncate text-xs" style={{ opacity: 0.7, fontFamily: 'var(--font-mono)' }}>
@@ -365,7 +365,7 @@ export default function SshClient(): React.ReactElement {
 
       {/* Import ~/.ssh/config block */}
       {showImport && (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
+        <section className="dex-liquid-glass-strong" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, borderRadius: 'var(--radius-xl)' }}>
           <div className="text-xs opacity-70">Paste an ~/.ssh/config block. Host / HostName / User / Port / IdentityFile are parsed into profiles.</div>
           <textarea
             aria-label="SSH config to import"
@@ -492,7 +492,7 @@ export default function SshClient(): React.ReactElement {
         ) : (
           <ul style={{ listStyle: 'none', margin: '0 0 10px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {keys.map(k => (
-              <li key={k.path} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
+              <li key={k.path} className="dex-liquid-glass" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 'var(--radius-lg)' }}>
                 <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 700, color: 'var(--color-accent)' }}>{k.type || '?'}</span>
                 <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }} title={k.path}>{k.fingerprint || k.path}</span>
                 <span className="truncate text-xs" style={{ opacity: 0.6, maxWidth: 160 }} title={k.comment}>{k.comment}</span>

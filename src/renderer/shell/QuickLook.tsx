@@ -281,6 +281,15 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
         </div>
       );
 
+    case 'pdf':
+      return (
+        <iframe
+          src={item.content}
+          title={item.title}
+          style={{ width: '100%', height: '65vh', border: 'none', borderRadius: 6, background: '#fff' }}
+        />
+      );
+
     default:
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-10)', color: 'var(--color-text-muted)', fontSize: 14 }}>

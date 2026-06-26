@@ -127,18 +127,61 @@ const ColorPicker: React.FC = () => {
     }
   }, []);
 
+  const previewOnDark = relLuminance(hex) > 0.35;
+
   return (
     <div style={s.container}>
+      <style>{`
+        .cp-slider { -webkit-appearance: none; appearance: none; outline: none; }
+        .cp-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: #fff;
+          border: 2px solid rgba(0,0,0,0.18);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.5) inset;
+          cursor: pointer;
+          transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        .cp-slider::-webkit-slider-thumb:hover { transform: scale(1.14); }
+        .cp-slider::-webkit-slider-thumb:active { transform: scale(0.96); }
+        .cp-slider::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: #fff; border: 2px solid rgba(0,0,0,0.18);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.35); cursor: pointer;
+        }
+        .cp-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(74,158,255,0.4); }
+        .cp-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(74,158,255,0.4); }
+        .cp-chip { transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+        .cp-chip:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .cp-chip:active { transform: scale(0.98); }
+        .cp-swatch { transition: transform 0.12s ease, box-shadow 0.15s ease; }
+        .cp-swatch:hover { transform: scale(1.12); z-index: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+        .cp-swatch:active { transform: scale(1.02); }
+        .cp-hex { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .cp-hex:focus-visible { box-shadow: 0 0 0 3px rgba(74,158,255,0.35); }
+        .cp-chip:focus-visible,
+        .cp-swatch:focus-visible {
+          outline: 2px solid var(--color-accent, #4A9EFF);
+          outline-offset: 2px;
+        }
+      `}</style>
       {/* Color preview */}
       <div style={{ ...s.previewBar, background: hex }}>
-        <div style={s.previewText}>{hex.toUpperCase()}</div>
+        <button
+          onClick={() => copy(hex.toUpperCase())}
+          style={{ ...s.previewText, color: previewOnDark ? '#000' : '#fff', textShadow: previewOnDark ? '0 1px 2px rgba(255,255,255,0.35)' : '0 1px 3px rgba(0,0,0,0.55)' }}
+          title="Copy HEX"
+          aria-label={`Current color ${hex.toUpperCase()}, click to copy`}
+        >
+          {hex.toUpperCase()}
+        </button>
       </div>
 
       {/* HSL Sliders */}
       <div style={s.sliders}>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>H</span>
-          <input type="range" min={0} max={360} value={hsl.h}
+          <input type="range" min={0} max={360} value={hsl.h} className="cp-slider"
             onChange={e => setHsl(p => ({ ...p, h: +e.target.value }))}
             aria-label="Hue" aria-valuetext={`${hsl.h} degrees`}
             style={{ ...s.slider, background: `linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)` }} />
@@ -146,7 +189,7 @@ const ColorPicker: React.FC = () => {
         </div>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>S</span>
-          <input type="range" min={0} max={100} value={hsl.s}
+          <input type="range" min={0} max={100} value={hsl.s} className="cp-slider"
             onChange={e => setHsl(p => ({ ...p, s: +e.target.value }))}
             aria-label="Saturation" aria-valuetext={`${hsl.s} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, ${hslToHex(hsl.h, 0, hsl.l)}, ${hslToHex(hsl.h, 100, hsl.l)})` }} />
@@ -154,7 +197,7 @@ const ColorPicker: React.FC = () => {
         </div>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>L</span>
-          <input type="range" min={0} max={100} value={hsl.l}
+          <input type="range" min={0} max={100} value={hsl.l} className="cp-slider"
             onChange={e => setHsl(p => ({ ...p, l: +e.target.value }))}
             aria-label="Lightness" aria-valuetext={`${hsl.l} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, #000, ${hslToHex(hsl.h, hsl.s, 50)}, #fff)` }} />
@@ -164,15 +207,15 @@ const ColorPicker: React.FC = () => {
 
       {/* Values */}
       <div style={s.values}>
-        <button onClick={() => copy(hex)} className="dex-liquid-glass" style={s.valueChip} title="Copy HEX">
+        <button onClick={() => copy(hex)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy HEX">
           <span style={s.valueLabel}>HEX</span>
           <span style={s.valueText}>{hex.toUpperCase()}</span>
         </button>
-        <button onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} className="dex-liquid-glass" style={s.valueChip} title="Copy RGB">
+        <button onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy RGB">
           <span style={s.valueLabel}>RGB</span>
           <span style={s.valueText}>{rgb.r}, {rgb.g}, {rgb.b}</span>
         </button>
-        <button onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} className="dex-liquid-glass" style={s.valueChip} title="Copy HSL">
+        <button onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy HSL">
           <span style={s.valueLabel}>HSL</span>
           <span style={s.valueText}>{hsl.h}, {hsl.s}%, {hsl.l}%</span>
         </button>
@@ -181,7 +224,7 @@ const ColorPicker: React.FC = () => {
             `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
             `Color ${hex.toUpperCase()}`,
           )}
-          className="dex-liquid-glass"
+          className="dex-liquid-glass cp-chip"
           style={s.valueChip}
           title="Send swatch to Notes"
         >

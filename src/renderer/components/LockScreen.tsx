@@ -71,8 +71,6 @@ export const LockScreen: React.FC = () => {
     authenticateWithPin,
     authenticateWithBiometric,
     authenticateWithRecovery,
-    idleWarning,
-    setIdleWarning,
     setError,
     config,
   } = useAuthStore();
@@ -87,7 +85,6 @@ export const LockScreen: React.FC = () => {
   const [unlocking, setUnlocking] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
-  const [idleSeconds, setIdleSeconds] = useState(0);
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -153,33 +150,9 @@ export const LockScreen: React.FC = () => {
     setRecoveryCode('');
   }, [isLocked, setError]);
 
-  // Listen for idle warning from main process
-  useEffect(() => {
-    const handler = (_event: any, data: { secondsUntilLock: number }) => {
-      setIdleWarning({ active: true, seconds: data.secondsUntilLock });
-      setIdleSeconds(data.secondsUntilLock);
-    };
-    window.electron?.ipcRenderer?.on?.('auth:idleWarning', handler);
-
-    let countdown: ReturnType<typeof setInterval>;
-    if (idleWarning?.active) {
-      countdown = setInterval(() => {
-        setIdleSeconds(prev => {
-          if (prev <= 1) {
-            setIdleWarning(null);
-            clearInterval(countdown);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      window.electron?.ipcRenderer?.off?.('auth:idleWarning', handler);
-      if (countdown) clearInterval(countdown);
-    };
-  }, [idleWarning?.active, setIdleWarning]);
+  // Idle-warning listener REMOVED (owner direction): DEX never warns about or
+  // acts on inactivity, so the "screen will lock in Ns" countdown is gone. The
+  // lock screen only ever appears for an explicit lock, never from idle.
 
   // Recovery code submission
   const handleRecoverySubmit = useCallback(async () => {
@@ -287,39 +260,12 @@ export const LockScreen: React.FC = () => {
     }
   }, [isLocked, isEnabled, method, handleBiometric]);
 
-  // Always show lock screen on startup (as welcome screen if auth not enabled)
-  // When auth is not enabled, user can click/press any key to dismiss
-  const isWelcomeMode = !isEnabled;
-  const [dismissed, setDismissed] = useState(() => {
-    try { return !!sessionStorage.getItem('dex-lock-dismissed'); } catch { return false; }
-  });
-
-  // Dismiss welcome screen on click or keypress
-  const handleWelcomeDismiss = useCallback(() => {
-    if (!isWelcomeMode || dismissed) return;
-    setUnlocking(true);
-    setTimeout(() => {
-      try { sessionStorage.setItem('dex-lock-dismissed', '1'); } catch (e) { console.warn('[DEX]', e); }
-      setDismissed(true);
-    }, 500);
-  }, [isWelcomeMode, dismissed]);
-
-  // Listen for keypress to dismiss welcome screen
-  useEffect(() => {
-    if (!isWelcomeMode || dismissed) return;
-    const handler = (e: KeyboardEvent) => {
-      if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
-      handleWelcomeDismiss();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isWelcomeMode, dismissed, handleWelcomeDismiss]);
-
-  // Don't render welcome/lock screen if auth is not enabled — go straight to desktop.
-  // Critical: also bail when auth is disabled so a stray `isLocked: true` (e.g. initial
-  // store default or a stale persisted flag) can never paint a blank full-screen overlay
-  // over the live workspace.
-  if (isWelcomeMode) return null;
+  // Startup welcome gate REMOVED (owner direction): DEX boots straight into Home.
+  // When no auth method is set up there is no "click anywhere to continue" screen
+  // -- the lock screen only ever appears for an explicit lock with auth enabled.
+  // Bailing when auth is disabled also stops a stray `isLocked: true` (initial
+  // store default or a stale persisted flag) from painting a blank full-screen
+  // overlay over the live workspace.
   if (!isEnabled) return null;
   if (!isLocked && !unlocking) return null;
 
@@ -349,7 +295,7 @@ export const LockScreen: React.FC = () => {
 
       <AnimatedBackground />
 
-      <div style={styles.content} onClick={isWelcomeMode ? handleWelcomeDismiss : undefined}>
+      <div style={styles.content}>
         {/* Clock */}
         <div style={styles.clockSection}>
           <div style={styles.time}>
@@ -359,17 +305,8 @@ export const LockScreen: React.FC = () => {
           <div style={styles.date}>{dateStr}</div>
         </div>
 
-        {/* Welcome mode: just show hint to continue */}
-        {isWelcomeMode && (
-          <div style={{ textAlign: 'center', animation: 'fadeInUp 1s ease-out 0.5s both' }}>
-            <div style={{ fontSize: 13, fontWeight: fontWeight.normal, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>
-              Click anywhere or press any key
-            </div>
-          </div>
-        )}
-
-        {/* Auth Section - only when auth is enabled */}
-        {!isWelcomeMode && <div
+        {/* Auth Section -- the lock screen only renders with auth enabled */}
+        <div
           style={styles.authSection}
           className={shake ? 'lock-shake' : ''}
         >
@@ -614,35 +551,8 @@ export const LockScreen: React.FC = () => {
               </div>
             </div>
           )}
-        </div>}
-      </div>
-
-      {/* Idle warning overlay — shown before screen locks */}
-      {!isLocked && idleWarning?.active && idleSeconds > 0 && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          zIndex: 'var(--z-max)', padding: '10px var(--space-5)',
-          background: 'linear-gradient(135deg, rgba(255,159,10,0.95), rgba(255,69,58,0.9))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: space[3],
-          fontSize: '13px', fontWeight: fontWeight.semibold, color: '#fff',
-          flexWrap: 'wrap', textAlign: 'center',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
-          </svg>
-          Screen will lock in {idleSeconds}s due to inactivity
-          <button
-            onClick={() => setIdleWarning(null)}
-            style={{
-              padding: '4px 14px', borderRadius: radius.md, border: '1px solid var(--color-text-tertiary)',
-              background: 'var(--color-border)', color: '#fff', fontSize: fontSize.sm,
-              cursor: 'pointer', fontWeight: fontWeight.semibold,
-            }}
-          >
-            Stay Active
-          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

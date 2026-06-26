@@ -1938,7 +1938,7 @@ export const Browser: React.FC = () => {
               />
             </div>
             {showSuggestions && suggestions.length > 0 && (
-              <div style={styles.suggestionsDropdown}>
+              <div className="dex-liquid-glass-strong" style={styles.suggestionsDropdown}>
                 {suggestions.map((s, i) => (
                   <button
                     key={`${s.url}-${i}`}
@@ -2011,7 +2011,7 @@ export const Browser: React.FC = () => {
 
       {/* Tab Menu - context menu */}
       {showTabMenu && (
-        <div style={styles.dropdown} onMouseLeave={() => setShowTabMenu(false)}>
+        <div className="dex-liquid-glass-strong" style={styles.dropdown} onMouseLeave={() => setShowTabMenu(false)}>
           <button style={styles.dropdownItem} onClick={() => { createTab(); setShowTabMenu(false); }}>New Tab</button>
           <button style={styles.dropdownItem} onClick={() => { duplicateTab(activeTab); setShowTabMenu(false); }}>Duplicate Tab</button>
           <div style={styles.dropdownDivider} />
@@ -2039,7 +2039,7 @@ export const Browser: React.FC = () => {
 
       {/* History Panel – grouped by day */}
       {showHistory && (
-        <div style={styles.sidePanel}>
+        <div className="dex-liquid-glass-strong" style={styles.sidePanel}>
           <div style={styles.sidePanelHeader}>
             <span>History</span>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -2077,7 +2077,7 @@ export const Browser: React.FC = () => {
 
       {/* Bookmarks Panel – with folders */}
       {showBookmarks && (
-        <div style={styles.sidePanel}>
+        <div className="dex-liquid-glass-strong" style={styles.sidePanel}>
           <div style={styles.sidePanelHeader}>
             <span>Bookmarks</span>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -2098,7 +2098,7 @@ export const Browser: React.FC = () => {
               aria-label="Search bookmarks"
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '5px var(--space-2)',
-                borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                borderRadius: 10, border: '1px solid var(--color-border-subtle)',
                 background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)',
                 fontSize: 12,
               }}
@@ -2163,7 +2163,7 @@ export const Browser: React.FC = () => {
 
       {/* Downloads Panel */}
       {showDownloads && (
-        <div style={styles.downloadsPanel}>
+        <div className="dex-liquid-glass-strong" style={styles.downloadsPanel}>
           <div style={styles.sidePanelHeader}>
             <span>Downloads</span>
             <button style={styles.panelClose} onClick={() => setShowDownloads(false)} aria-label="Close">{Icon.close}</button>
@@ -2279,7 +2279,7 @@ export const Browser: React.FC = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div style={styles.settingsPanel}>
+        <div className="dex-liquid-glass-strong" style={styles.settingsPanel}>
           <div style={styles.sidePanelHeader}>
             <span style={{ fontWeight: 600, fontSize: '13px' }}>Privacy & Security</span>
             <button style={styles.panelClose} onClick={() => setShowSettings(false)} aria-label="Close">{Icon.close}</button>
@@ -2349,7 +2349,7 @@ export const Browser: React.FC = () => {
 
       {/* Keychain Panel */}
       {showKeychain && (
-        <div style={styles.settingsPanel}>
+        <div className="dex-liquid-glass-strong" style={styles.settingsPanel}>
           <div style={styles.sidePanelHeader}>
             <span style={{ fontWeight: 600, fontSize: '13px' }}>Keychain</span>
             <button style={styles.panelClose} onClick={() => setShowKeychain(false)} aria-label="Close">{Icon.close}</button>
@@ -2474,10 +2474,9 @@ export const Browser: React.FC = () => {
 
       {/* Save Password Prompt */}
       {savePrompt && (
-        <div style={{
+        <div className="dex-liquid-glass-strong" style={{
           position: 'absolute', top: '80px', right: '12px', zIndex: 'var(--z-modal)',
-          background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
-          borderRadius: '8px', padding: '14px var(--space-4)', boxShadow: 'var(--pg-shadow-tooltip)',
+          borderRadius: 'var(--radius-lg)', padding: '14px var(--space-4)', boxShadow: 'var(--pg-shadow-tooltip)',
           width: '280px', fontSize: '12px',
         }}>
           <div style={{ fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-text-primary)' }}>Save password for {savePrompt.domain}?</div>
@@ -2611,7 +2610,7 @@ export const Browser: React.FC = () => {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                    borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
+                    borderRadius: 10, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
                     cursor: 'pointer', fontSize: 12,
                   }}
                 >
@@ -2622,7 +2621,7 @@ export const Browser: React.FC = () => {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                    borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
+                    borderRadius: 10, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
                     cursor: 'pointer', fontSize: 12,
                   }}
                   aria-label="Save article to Notes"
@@ -2684,7 +2683,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '4px',
-    borderRadius: '4px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2705,7 +2704,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '3px var(--space-2)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     cursor: 'pointer',
     maxWidth: '180px',
     minWidth: '0',
@@ -2760,7 +2759,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '2px',
     display: 'flex',
-    borderRadius: '4px',
+    borderRadius: '10px',
     opacity: 1,
     transition: 'opacity 0.15s',
     flexShrink: 0,
@@ -2771,7 +2770,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '3px 5px',
-    borderRadius: '4px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2811,7 +2810,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '3px',
-    borderRadius: '4px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2827,7 +2826,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     padding: '4px 10px',
     transition: 'box-shadow 0.15s, background 0.15s',
     border: '1px solid var(--color-bg-hover)',
@@ -2853,9 +2852,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: '42px',
     left: '10px',
-    background: 'var(--color-bg-elevated)',
     borderRadius: '10px',
-    border: '1px solid var(--color-border)',
     boxShadow: '0 8px 32px var(--color-shadow-strong)',
     zIndex: 9999,
     minWidth: '180px',
@@ -2885,9 +2882,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '320px',
     maxHeight: '420px',
-    background: 'var(--color-bg-elevated)',
     borderRadius: '12px',
-    border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 9999,
     overflow: 'hidden',
@@ -2911,7 +2906,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     display: 'flex',
     padding: '2px',
-    borderRadius: '4px',
+    borderRadius: '10px',
   },
   clearBtn: {
     background: 'transparent',
@@ -2976,9 +2971,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: '76px',
     right: '12px',
     width: '280px',
-    background: 'var(--color-bg-elevated)',
     borderRadius: '12px',
-    border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 100,
     overflow: 'hidden',
@@ -3051,7 +3044,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
-    borderRadius: '4px',
+    borderRadius: '10px',
   },
   findCloseBtn: {
     background: 'transparent',
@@ -3060,7 +3053,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
-    borderRadius: '4px',
+    borderRadius: '10px',
     marginLeft: '4px',
   },
 
@@ -3071,9 +3064,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '280px',
     maxHeight: '460px',
-    background: 'var(--color-bg-elevated)',
     borderRadius: '12px',
-    border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 200,
     overflow: 'hidden',
@@ -3116,7 +3107,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 10px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     outline: 'none',
@@ -3195,7 +3186,7 @@ const styles: Record<string, React.CSSProperties> = {
   favIcon: {
     width: '32px',
     height: '32px',
-    borderRadius: '6px',
+    borderRadius: '10px',
     background: 'var(--color-border-subtle)',
     display: 'flex',
     alignItems: 'center',
@@ -3255,7 +3246,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '9px 22px',
     background: 'var(--color-accent)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: 'var(--color-accent-text)',
     fontSize: '13px',
     fontWeight: 500,
@@ -3266,7 +3257,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-2) 18px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: 'var(--color-text-secondary)',
     fontSize: '13px',
     cursor: 'pointer',
@@ -3280,9 +3271,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     marginTop: '4px',
-    background: 'var(--color-bg-elevated)',
     borderRadius: '10px',
-    border: '1px solid var(--color-border)',
     boxShadow: '0 8px 32px var(--color-shadow-strong)',
     zIndex: 300,
     overflow: 'hidden',
