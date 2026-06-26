@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { glassPanel, glassButton } from '../styles/glassMenu';
+import { glassButton } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import DexIcon from '../components/DexIcon';
 import EmptyState from '../components/EmptyState';
@@ -17,11 +17,51 @@ import type { ScanResult } from '../../shared/games/scanner';
 
 type IpcBridge = { invoke: (c: string, ...a: any[]) => Promise<any> };
 
-const rowStyle: React.CSSProperties = {
-  background: 'var(--color-bg-surface)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 6,
+// Per-storefront identity: label + accent used for the badge and cover wash.
+const SOURCE_META: Record<string, { label: string; color: string }> = {
+  steam: { label: 'Steam', color: '#66C0F4' },
+  epic: { label: 'Epic', color: '#2F2D2E' },
+  gog: { label: 'GOG', color: '#A05BD4' },
+  itch: { label: 'itch.io', color: '#FA5C5C' },
+  ea: { label: 'EA', color: '#FF4747' },
+  native: { label: 'Installed', color: '#30D158' },
+  web: { label: 'Web', color: '#0A84FF' },
 };
+const sourceMeta = (s: string) => SOURCE_META[s] ?? { label: s, color: '#8E8E93' };
+
+// Deterministic cover art from the title -- a stable two-stop gradient so each
+// game keeps the same colours across launches (no art assets needed).
+function coverGradient(title: string): string {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) % 360;
+  const h2 = (h + 38) % 360;
+  return `linear-gradient(140deg, hsl(${h} 58% 32%), hsl(${h2} 62% 20%))`;
+}
+
+function formatPlaytime(totalSec: number): string {
+  if (!totalSec || totalSec < 60) return 'Never played';
+  const mins = Math.round(totalSec / 60);
+  if (mins < 60) return `${mins} min played`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h${m ? ` ${m}m` : ''} played`;
+}
+
+function relativeLastPlayed(iso?: string): string | null {
+  if (!iso) return null;
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return null;
+  const s = Math.max(0, (Date.now() - then) / 1000);
+  if (s < 3600) return 'Played recently';
+  const h = Math.round(s / 3600);
+  if (h < 24) return `Played ${h}h ago`;
+  const d = Math.round(h / 24);
+  return d <= 1 ? 'Played yesterday' : `Played ${d} days ago`;
+}
+
+const PlayGlyph = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+);
 
 /** glassButton lacks padding/disabled feedback on its own; apply the local convention. */
 const actionButton = (disabled: boolean): React.CSSProperties => ({
@@ -51,6 +91,7 @@ export default function Games(): React.ReactElement {
   const [scanning, setScanning] = useState(false);
   const [last, setLast] = useState('');
   const [query, setQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
 
   const refresh = useCallback(async () => {
     try {
@@ -65,12 +106,26 @@ export default function Games(): React.ReactElement {
     }
   }, []);
 
+  const availableSources = useMemo(() => {
+    const set = new Set(games.map(g => g.source));
+    return Array.from(set).sort();
+  }, [games]);
+
   const visibleGames = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...games]
       .sort((a, b) => a.title.localeCompare(b.title))
+      .filter(game => sourceFilter === 'all' || game.source === sourceFilter)
       .filter(game => !q || game.title.toLowerCase().includes(q) || game.id.toLowerCase().includes(q) || game.source.toLowerCase().includes(q));
-  }, [games, query]);
+  }, [games, query, sourceFilter]);
+
+  // "Continue playing" rail: games with real playtime, most-recent first.
+  const recentlyPlayed = useMemo(() => {
+    return games
+      .filter(g => (playtime[g.id]?.totalSec ?? 0) >= 60)
+      .sort((a, b) => Date.parse(playtime[b.id]?.lastPlayedIso ?? '0') - Date.parse(playtime[a.id]?.lastPlayedIso ?? '0'))
+      .slice(0, 8);
+  }, [games, playtime]);
 
   const onScan = useCallback(async () => {
     setScanning(true);
@@ -115,8 +170,45 @@ export default function Games(): React.ReactElement {
     }
   }, []);
 
+  // A single cover card. Click anywhere or the play button launches; right-click
+  // reveals the launch plan (the old "Plan" affordance, now out of the way).
+  const renderCard = (g: DiscoveredGame) => {
+    const pt = playtime[g.id];
+    const meta = sourceMeta(g.source);
+    const launching = busy === g.id;
+    const disabled = busy !== null || scanning;
+    const sub = relativeLastPlayed(pt?.lastPlayedIso) ?? formatPlaytime(pt?.totalSec ?? 0);
+    return (
+      <div
+        key={g.id}
+        className="dex-game-card"
+        role="button"
+        tabIndex={0}
+        aria-label={`Launch ${g.title}`}
+        title={`${g.title}\n${meta.label} - ${g.id}\nClick to launch, right-click for launch plan`}
+        onClick={() => { if (!disabled) onLaunch(g.id); }}
+        onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); onLaunch(g.id); } }}
+        onContextMenu={(e) => { e.preventDefault(); onPlan(g.id); }}
+      >
+        <div className="dex-game-cover" style={{ background: coverGradient(g.title) }}>
+          <span className="dex-game-badge" style={{ background: `${meta.color}E6` }}>{meta.label}</span>
+          <span className="dex-game-initial">{g.title.charAt(0).toUpperCase()}</span>
+          <span className="dex-game-play" aria-hidden="true">
+            {launching
+              ? <span className="dex-game-spinner" />
+              : <PlayGlyph size={22} />}
+          </span>
+        </div>
+        <div style={{ padding: '8px 4px 2px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="p-6 h-full overflow-auto" style={glassPanel}>
+    <div className="p-6 h-full overflow-auto dex-liquid-glass-strong" style={{ borderRadius: 0 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
         <div>
           <h1 className="text-2xl font-semibold">Games</h1>
@@ -148,40 +240,58 @@ export default function Games(): React.ReactElement {
           description="Scan your default storefront paths (Steam, Epic, GOG, Xbox...) to discover installed games."
           actions={[{ label: scanning ? 'Scanning...' : 'Scan for games', onClick: onScan }]}
         />
-      ) : visibleGames.length === 0 ? (
-        <EmptyState
-          icon={<DexIcon name="search" size={48} />}
-          title="No games match your search"
-          description={`Nothing matches "${query.trim()}". Try a different term or clear the search.`}
-          actions={[{ label: 'Clear search', onClick: () => setQuery(''), variant: 'secondary' }]}
-        />
       ) : (
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', margin: 0, padding: 0 }}>
-          {visibleGames.map(g => {
-            const pt = playtime[g.id];
-            return (
-              <li key={g.id} className="flex gap-3 p-3" style={{ ...rowStyle, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div className="min-w-0" style={{ flex: '1 1 220px' }}>
-                  <div className="font-medium truncate">{g.title}</div>
-                  <div className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                    {g.source} - {g.id}
-                    {pt ? ` - ${Math.round(pt.totalSec / 60)} min` : ''}
-                  </div>
-                </div>
-                <div className="flex gap-2" style={{ flexShrink: 0 }}>
-                  <button style={actionButton(busy !== null || scanning)} disabled={busy !== null || scanning} onClick={() => onPlan(g.id)}>Plan</button>
-                  <button
-                    style={actionButton(busy !== null || scanning)}
-                    disabled={busy !== null || scanning}
-                    onClick={() => onLaunch(g.id)}
-                  >
-                    {busy === g.id ? 'Launching...' : 'Launch'}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <style>{`
+            .dex-game-card { cursor: pointer; border-radius: var(--radius-lg); transition: transform 0.16s ease; outline: none; }
+            .dex-game-card:hover { transform: translateY(-4px); }
+            .dex-game-card:focus-visible { box-shadow: 0 0 0 2px var(--color-accent, #0A84FF); border-radius: var(--radius-lg); }
+            .dex-game-cover { position: relative; aspect-ratio: 16 / 10; border-radius: var(--radius-lg); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.10); }
+            .dex-game-initial { font-size: 46px; font-weight: 800; color: rgba(255,255,255,0.22); letter-spacing: -0.02em; }
+            .dex-game-badge { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 700; color: #fff; padding: 3px 7px; border-radius: 6px; letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+            .dex-game-play { position: absolute; right: 10px; bottom: 10px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,0.45); opacity: 0; transform: scale(0.85); transition: opacity 0.16s ease, transform 0.16s ease; }
+            .dex-game-card:hover .dex-game-play, .dex-game-card:focus-visible .dex-game-play { opacity: 1; transform: scale(1); }
+            .dex-game-spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: dexGameSpin 0.7s linear infinite; }
+            @keyframes dexGameSpin { to { transform: rotate(360deg); } }
+            .dex-game-chip { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--color-border, rgba(255,255,255,0.12)); background: transparent; color: var(--color-text-secondary); transition: all 0.12s ease; }
+            .dex-game-chip[aria-pressed="true"] { background: var(--color-accent, #0A84FF); border-color: var(--color-accent, #0A84FF); color: #fff; }
+          `}</style>
+
+          {availableSources.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+              <button className="dex-game-chip" aria-pressed={sourceFilter === 'all'} onClick={() => setSourceFilter('all')}>All ({games.length})</button>
+              {availableSources.map(s => (
+                <button key={s} className="dex-game-chip" aria-pressed={sourceFilter === s} onClick={() => setSourceFilter(s)}>
+                  {sourceMeta(s).label} ({games.filter(g => g.source === s).length})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {recentlyPlayed.length > 0 && sourceFilter === 'all' && !query.trim() && (
+            <section style={{ marginBottom: 'var(--space-5)' }}>
+              <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Continue playing</h2>
+              <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none' }}>
+                {recentlyPlayed.map(g => (
+                  <div key={g.id} style={{ width: 168, flexShrink: 0 }}>{renderCard(g)}</div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {visibleGames.length === 0 ? (
+            <EmptyState
+              icon={<DexIcon name="search" size={48} />}
+              title="No games match"
+              description={`Nothing matches your filters. Try a different term or clear the search.`}
+              actions={[{ label: 'Clear search', onClick: () => { setQuery(''); setSourceFilter('all'); }, variant: 'secondary' }]}
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
+              {visibleGames.map(renderCard)}
+            </div>
+          )}
+        </>
       )}
 
       {errors.length > 0 && (

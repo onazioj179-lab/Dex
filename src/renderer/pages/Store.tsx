@@ -22,7 +22,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
-import { premiumGlassPanel, premiumGlassToolbar } from '../styles/glassMenu';
 import { APP_DEFINITIONS } from '../store/runningApps';
 
 // ---------------------------------------------------------------------------
@@ -328,6 +327,7 @@ export default function Store(): React.ReactElement {
         tabIndex={0}
         onClick={() => setSelectedId(app.id)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(app.id); } }}
+        className="dex-liquid-glass"
         style={{ ...styles.card, ...(compact ? styles.cardCompact : null) }}
         title={`${app.name} — view details`}
       >
@@ -350,9 +350,17 @@ export default function Store(): React.ReactElement {
         {!compact && <div style={styles.cardDesc}>{app.description}</div>}
         <div style={styles.cardFoot}>
           <span style={styles.catChip}>{CATEGORY_LABELS[app.category]}</span>
-          <span style={styles.installedBadge}>
-            <DexIcon name="check-circle" size={12} /> Installed
-          </span>
+          {ratings[app.id] ? (
+            // Surface the user's own rating on the card -- it was stored but only
+            // ever visible inside the detail view before.
+            <span style={{ display: 'inline-flex', alignItems: 'center' }} title={`You rated this ${ratings[app.id]} of 5`}>
+              {renderStars(app.id, 11, false)}
+            </span>
+          ) : (
+            <span style={styles.installedBadge}>
+              <DexIcon name="check-circle" size={12} /> Installed
+            </span>
+          )}
         </div>
       </div>
     );
@@ -385,8 +393,8 @@ export default function Store(): React.ReactElement {
     const isFav = favorites.has(selected.id);
     const perms = derivePermissions(selected);
     return (
-      <div style={styles.container}>
-        <header style={styles.header}>
+      <div className="dex-liquid-glass-strong" style={styles.container}>
+        <header className="dex-liquid-glass" style={styles.header}>
           <div style={styles.titleBlock}>
             <button type="button" onClick={() => setSelectedId(null)} style={styles.backBtn} title="Back to store">
               <DexIcon name="arrow-left" size={16} />
@@ -471,8 +479,8 @@ export default function Store(): React.ReactElement {
   // -------------------------------------------------------------------------
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
+    <div className="dex-liquid-glass-strong" style={styles.container}>
+      <header className="dex-liquid-glass" style={styles.header}>
         <div style={styles.titleBlock}>
           <div style={styles.storeIcon} aria-hidden><DexIcon name="store" size={18} /></div>
           <div style={{ minWidth: 0 }}>
@@ -633,21 +641,29 @@ function tintBorder(color: string): string {
 // ---------------------------------------------------------------------------
 
 const styles: Record<string, React.CSSProperties> = {
+  // Root page surface. Glass comes from the `.dex-liquid-glass-strong` class on
+  // the JSX element (see-through frosted); only layout lives here. Full-bleed
+  // page, so no radius.
   container: {
-    ...premiumGlassPanel,
     height: '100%',
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
     color: 'var(--color-text-primary)',
     overflow: 'hidden',
+    borderRadius: 0,
   },
+  // Toolbar header. The `.dex-liquid-glass` class on the element supplies the
+  // frosted material; the bottom hairline + layout stay here.
   header: {
-    ...premiumGlassToolbar,
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 'var(--space-3)',
     padding: 'var(--space-3) var(--space-4)',
+    borderBottom: '1px solid var(--pg-border)',
+    borderRadius: 0,
+    display: 'flex',
+    alignItems: 'center',
   },
   titleBlock: { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
   backBtn: {
@@ -656,7 +672,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     minHeight: 32,
     padding: '0 var(--space-3)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     border: '1px solid var(--pg-border-strong)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)',
@@ -667,7 +683,7 @@ const styles: Record<string, React.CSSProperties> = {
   storeIcon: {
     width: 34,
     height: 34,
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -697,7 +713,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     padding: '0 10px',
     border: '1px solid var(--pg-border-strong)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
@@ -712,7 +728,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     padding: '0 8px 0 10px',
     border: '1px solid var(--pg-border-strong)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
@@ -788,14 +804,14 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     gap: 'var(--space-3)',
   },
+  // App tile. Frosted glass comes from `.dex-liquid-glass` on the element; only
+  // layout + radius live here (background/border are supplied by the class).
   card: {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     padding: 'var(--space-3)',
-    border: '1px solid var(--pg-border)',
-    borderRadius: 10,
-    background: 'var(--color-bg-surface)',
+    borderRadius: 'var(--radius-lg)',
     color: 'var(--color-text-primary)',
     textAlign: 'left',
     cursor: 'pointer',
@@ -819,7 +835,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
@@ -904,7 +920,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     minHeight: 36,
     padding: '0 16px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     border: 'none',
     background: 'var(--color-accent)',
     color: '#fff',
@@ -918,7 +934,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     minHeight: 36,
     padding: '0 14px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     border: '1px solid var(--pg-border-strong)',
     background: 'var(--color-bg-surface)',
     fontSize: 13,
@@ -935,7 +951,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     padding: '5px 10px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     border: '1px solid var(--pg-border)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',

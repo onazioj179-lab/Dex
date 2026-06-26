@@ -66,25 +66,30 @@ const PomodoroTimer: React.FC = () => {
   const totalSecs = (phase === 'work' ? config.workMin : phase === 'shortBreak' ? config.shortBreakMin : config.longBreakMin) * 60;
   const progress = totalSecs > 0 ? 1 - remainingSecs / totalSecs : 0;
   const accentColor = PHASE_COLORS[phase];
+  const idle = !running && remainingSecs === totalSecs;
+  const ringGradId = `pomo-ring-${phase}`;
 
-  const circleR = 100;
+  const circleR = 110;
   const circleC = 2 * Math.PI * circleR;
   const strokeDash = circleC * Math.min(1, Math.max(0, progress));
 
   return (
     <div style={s.container}>
+      <style>{POMO_CSS}</style>
       {/* Phase selector */}
       <div style={s.phaseTabs}>
         {(['work', 'shortBreak', 'longBreak'] as PomoPhase[]).map(p => (
           <button
             key={p}
+            className="pomo-tab"
             onClick={() => setPhase(p)}
-            style={{ ...s.phaseTab, ...(p === phase ? { background: PHASE_COLORS[p] + '22', color: PHASE_COLORS[p] } : {}) }}
+            aria-pressed={p === phase}
+            style={{ ...s.phaseTab, ...(p === phase ? { background: PHASE_COLORS[p] + '22', color: PHASE_COLORS[p], boxShadow: `inset 0 0 0 1px ${PHASE_COLORS[p]}44` } : {}) }}
           >
             {PHASE_LABELS[p]}
           </button>
         ))}
-        <button onClick={() => setShowSettings(v => !v)} style={{ ...s.phaseTab, marginLeft: 'auto' }} title="Settings" aria-label="Settings">
+        <button onClick={() => setShowSettings(v => !v)} className="pomo-tab" style={{ ...s.phaseTab, marginLeft: 'auto', ...(showSettings ? { background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)' } : {}) }} title="Settings" aria-label="Settings">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -93,7 +98,7 @@ const PomodoroTimer: React.FC = () => {
       </div>
 
       {showSettings ? (
-        <div style={s.settings}>
+        <div className="dex-liquid-glass-strong" style={s.settings}>
           <SettingRow label="Focus (min)" value={config.workMin} min={1} max={180} onChange={v => setConfig({ workMin: v })} />
           <SettingRow label="Short break (min)" value={config.shortBreakMin} min={1} max={60} onChange={v => setConfig({ shortBreakMin: v })} />
           <SettingRow label="Long break (min)" value={config.longBreakMin} min={1} max={120} onChange={v => setConfig({ longBreakMin: v })} />
@@ -108,20 +113,29 @@ const PomodoroTimer: React.FC = () => {
         <>
           {/* Timer circle */}
           <div style={s.timerArea}>
-            <div style={s.circleWrap}>
-              <svg width="240" height="240" viewBox="0 0 240 240">
-                <circle cx="120" cy="120" r={circleR} fill="none" stroke="var(--color-border-subtle)" strokeWidth="6" />
-                <circle cx="120" cy="120" r={circleR} fill="none" stroke={accentColor} strokeWidth="6"
+            <div style={{ ...s.circleWrap, ...(running ? { filter: `drop-shadow(0 0 28px ${accentColor}33)` } : {}) }}>
+              <svg width="264" height="264" viewBox="0 0 264 264">
+                <defs>
+                  <linearGradient id={ringGradId} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor={accentColor} stopOpacity="0.65" />
+                    <stop offset="100%" stopColor={accentColor} stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <circle cx="132" cy="132" r={circleR} fill="none" stroke="var(--color-border-subtle)" strokeWidth="10" />
+                <circle cx="132" cy="132" r={circleR} fill="none" stroke={`url(#${ringGradId})`} strokeWidth="10"
                   strokeDasharray={`${strokeDash} ${circleC}`} strokeLinecap="round"
-                  transform="rotate(-90 120 120)"
-                  style={{ transition: 'stroke-dasharray 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
+                  transform="rotate(-90 132 132)"
+                  style={{ transition: 'stroke-dasharray 0.4s cubic-bezier(0.4,0,0.2,1), stroke 0.3s ease' }} />
               </svg>
               <div style={s.timerText}>
-                <div style={{ fontSize: 48, fontWeight: 200, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 56, fontWeight: 200, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: 'var(--color-text-primary)' }}>
                   {fmtTime(remainingSecs)}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 500, marginTop: 4 }}>
-                  {PHASE_LABELS[phase]}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: accentColor, boxShadow: running ? `0 0 8px ${accentColor}` : 'none', transition: 'box-shadow 0.3s ease' }} />
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    {idle ? 'Ready' : running ? PHASE_LABELS[phase] : 'Paused'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -129,15 +143,20 @@ const PomodoroTimer: React.FC = () => {
 
           {/* Controls */}
           <div style={s.controls}>
-            <button onClick={resetPomodoro} style={s.secondaryBtn} title="Reset" aria-label="Reset">
+            <button onClick={resetPomodoro} className="pomo-icon-btn" style={s.secondaryBtn} title="Reset" aria-label="Reset">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
               </svg>
             </button>
-            <button onClick={() => (running ? pausePomodoro() : startPomodoro())} style={{ ...s.primaryBtn, background: accentColor }}>
-              {running ? 'Pause' : 'Start'}
+            <button onClick={() => (running ? pausePomodoro() : startPomodoro())} className="pomo-primary-btn" style={{ ...s.primaryBtn, background: accentColor, boxShadow: `0 8px 20px ${accentColor}40` }}>
+              {running ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4" /></svg>
+              )}
+              <span>{running ? 'Pause' : idle ? 'Start' : 'Resume'}</span>
             </button>
-            <button onClick={() => advance({ silent: true })} style={s.secondaryBtn} title={phase === 'work' ? 'Skip' : 'Skip break'} aria-label={phase === 'work' ? 'Skip' : 'Skip break'}>
+            <button onClick={() => advance({ silent: true })} className="pomo-icon-btn" style={s.secondaryBtn} title={phase === 'work' ? 'Skip' : 'Skip break'} aria-label={phase === 'work' ? 'Skip' : 'Skip break'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" />
               </svg>
@@ -147,13 +166,20 @@ const PomodoroTimer: React.FC = () => {
           {/* Session counter */}
           <div style={s.sessionInfo}>
             <div style={s.sessionDots}>
-              {Array.from({ length: Math.max(1, config.longBreakEvery) }).map((_, i) => (
-                <div key={i} style={{
-                  width: 10, height: 10, borderRadius: '50%',
-                  background: i < (completedSessions % Math.max(1, config.longBreakEvery)) ? accentColor : 'var(--color-border)',
-                  transition: 'background 0.18s cubic-bezier(0.4,0,0.2,1)',
-                }} />
-              ))}
+              {Array.from({ length: Math.max(1, config.longBreakEvery) }).map((_, i) => {
+                const doneInCycle = completedSessions % Math.max(1, config.longBreakEvery);
+                const filled = i < doneInCycle;
+                const isNext = i === doneInCycle && phase === 'work';
+                return (
+                  <div key={i} style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: filled ? accentColor : 'var(--color-border)',
+                    transform: filled ? 'scale(1.05)' : 'scale(1)',
+                    boxShadow: isNext ? `0 0 0 3px ${accentColor}33` : 'none',
+                    transition: 'background 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease, transform 0.3s ease',
+                  }} />
+                );
+              })}
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
               {log.sessions} session{log.sessions !== 1 ? 's' : ''} &middot; {log.focusMin} min focused today
@@ -208,7 +234,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   phaseTab: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '6px 14px', borderRadius: 6, border: 'none',
+    padding: '6px 14px', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -217,7 +243,7 @@ const s: Record<string, React.CSSProperties> = {
     flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 'var(--space-4) var(--space-5)',
   },
-  circleWrap: { position: 'relative', width: 240, height: 240 },
+  circleWrap: { position: 'relative', width: 264, height: 264, transition: 'filter 0.3s ease' },
   timerText: {
     position: 'absolute', inset: 0,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -227,9 +253,10 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 var(--space-5) var(--space-5)', flexShrink: 0,
   },
   primaryBtn: {
-    width: 120, height: 48, borderRadius: 24, border: 'none',
+    minWidth: 140, height: 52, borderRadius: 26, border: 'none',
     color: 'var(--color-text-inverse, #fff)', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-    transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
+    transition: 'transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease', fontFamily: 'var(--font-family)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 22px',
   },
   secondaryBtn: {
     width: 44, height: 44, borderRadius: '50%', border: 'none',
@@ -250,19 +277,19 @@ const s: Record<string, React.CSSProperties> = {
   logList: { display: 'flex', flexDirection: 'column', gap: 2 },
   logRow: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)',
+    padding: '6px var(--space-3)', borderRadius: 10, background: 'var(--color-bg-surface)',
   },
   logMeta: { fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' },
   settings: {
     width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column',
-    gap: 'var(--space-3)', padding: 'var(--space-5)',
+    gap: 'var(--space-3)', padding: 'var(--space-5)', margin: 'var(--space-3) 0',
   },
   settingRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' },
   settingLabel: { fontSize: 14, color: 'var(--color-text-primary)' },
   toggleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' },
   stepper: { display: 'flex', alignItems: 'center', gap: 4 },
   stepBtn: {
-    width: 32, height: 32, borderRadius: 6, border: '1px solid var(--color-border)',
+    width: 32, height: 32, borderRadius: 10, border: '1px solid var(--color-border)',
     background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
     fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'var(--font-family)',
@@ -270,14 +297,25 @@ const s: Record<string, React.CSSProperties> = {
   stepInput: {
     width: 52, height: 32, textAlign: 'center', fontSize: 15, fontWeight: 600,
     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-    borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none',
+    borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none',
   },
   doneBtn: {
     marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 8,
+    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
 };
+
+const POMO_CSS = `
+.pomo-tab:hover { background: var(--color-bg-surface); color: var(--color-text-primary); }
+.pomo-tab:focus-visible, .pomo-icon-btn:focus-visible, .pomo-primary-btn:focus-visible {
+  outline: 2px solid var(--color-accent); outline-offset: 2px;
+}
+.pomo-icon-btn:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); transform: translateY(-1px); }
+.pomo-icon-btn:active { transform: translateY(0) scale(0.95); }
+.pomo-primary-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.pomo-primary-btn:active { transform: translateY(0) scale(0.97); }
+`;
 
 PomodoroTimer.displayName = 'PomodoroTimer';
 export default memo(PomodoroTimer);

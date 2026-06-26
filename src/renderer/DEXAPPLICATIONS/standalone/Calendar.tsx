@@ -666,15 +666,47 @@ const Calendar: React.FC = () => {
 
   return (
     <div style={styles.container} role="region" aria-label="Calendar">
+      <style>{`
+        @keyframes cal-view-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes cal-modal-in { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes cal-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+        .cal-view-anim { animation: cal-view-fade 0.18s cubic-bezier(0.25,0.1,0.25,1); }
+        .cal-overlay-anim { animation: cal-overlay-in 0.16s ease; }
+        .cal-modal-anim { animation: cal-modal-in 0.2s cubic-bezier(0.16,1,0.3,1); }
+        .cal-icon-btn { outline: none; }
+        .cal-icon-btn:hover { background: var(--color-border-subtle) !important; color: var(--color-text-primary) !important; }
+        .cal-icon-btn:active { transform: scale(0.94); }
+        .cal-icon-btn:focus-visible { box-shadow: 0 0 0 2px var(--color-accent); }
+        .cal-pill:hover { background: var(--color-border-subtle) !important; color: var(--color-text-primary) !important; }
+        .cal-pill:active { transform: scale(0.97); }
+        .cal-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
+        .cal-add:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-success) 45%, transparent); }
+        .cal-add:active { transform: scale(0.95); }
+        .cal-add:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
+        .cal-daycell:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-default) !important; }
+        .cal-daycell:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
+        .cal-mini-day:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .cal-event-row:hover { border-color: var(--color-border-default) !important; box-shadow: var(--shadow-md) !important; transform: translateX(2px); }
+        .cal-event-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent) !important; }
+        .cal-agenda-row:hover { border-color: var(--color-border-default) !important; box-shadow: var(--shadow-sm) !important; transform: translateX(2px); }
+        .cal-agenda-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent) !important; }
+        .cal-cat-row:hover { background: var(--color-bg-hover) !important; }
+        .cal-mini-action:hover { background: var(--color-border-subtle) !important; color: var(--color-text-secondary) !important; }
+        .cal-week-event:hover { filter: brightness(1.08); transform: scale(1.02); z-index: 2; position: relative; }
+        .cal-save:hover { filter: brightness(1.1); }
+        .cal-save:active { transform: scale(0.97); }
+        .cal-cancel:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .cal-chip-input:focus-within, .cal-input:focus { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
+      `}</style>
       {/* Header */}
-      <div style={styles.header}>
+      <div className="dex-liquid-glass" style={styles.header}>
         <div style={styles.headerLeft}>
-          <button style={styles.todayBtn} onClick={goToToday} aria-label="Go to today">Today</button>
+          <button className="cal-pill" style={styles.todayBtn} onClick={goToToday} aria-label="Go to today">Today</button>
           <div style={styles.navBtns}>
-            <button style={styles.navBtn} onClick={() => navigate(-1)} aria-label={view === 'week' ? 'Previous week' : 'Previous month'} title={view === 'week' ? 'Previous week' : 'Previous month'}>
+            <button className="cal-icon-btn" style={styles.navBtn} onClick={() => navigate(-1)} aria-label={view === 'week' ? 'Previous week' : 'Previous month'} title={view === 'week' ? 'Previous week' : 'Previous month'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <button style={styles.navBtn} onClick={() => navigate(1)} aria-label={view === 'week' ? 'Next week' : 'Next month'} title={view === 'week' ? 'Next week' : 'Next month'}>
+            <button className="cal-icon-btn" style={styles.navBtn} onClick={() => navigate(1)} aria-label={view === 'week' ? 'Next week' : 'Next month'} title={view === 'week' ? 'Next week' : 'Next month'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
             </button>
           </div>
@@ -704,7 +736,7 @@ const Calendar: React.FC = () => {
           />
         </div>
         <div style={styles.headerRight}>
-          <div style={styles.searchWrap}>
+          <div className="cal-chip-input" style={styles.searchWrap}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
               style={styles.searchInput}
@@ -719,16 +751,17 @@ const Calendar: React.FC = () => {
             )}
           </div>
           <div style={styles.viewToggle}>
-            <button style={{ ...styles.viewBtn, ...(view === 'month' ? styles.viewBtnActive : {}) }} onClick={() => setView('month')} aria-label="Month view">Month</button>
-            <button style={{ ...styles.viewBtn, ...(view === 'week' ? styles.viewBtnActive : {}) }} onClick={() => setView('week')} aria-label="Week view">Week</button>
-            <button style={{ ...styles.viewBtn, ...(view === 'day' ? styles.viewBtnActive : {}) }} onClick={() => setView('day')} aria-label="Day view">Day</button>
-            <button style={{ ...styles.viewBtn, ...(view === 'agenda' ? styles.viewBtnActive : {}) }} onClick={() => setView('agenda')} aria-label="Agenda view">Agenda</button>
+            <button className="cal-pill" style={{ ...styles.viewBtn, ...(view === 'month' ? styles.viewBtnActive : {}) }} onClick={() => setView('month')} aria-label="Month view" aria-pressed={view === 'month'}>Month</button>
+            <button className="cal-pill" style={{ ...styles.viewBtn, ...(view === 'week' ? styles.viewBtnActive : {}) }} onClick={() => setView('week')} aria-label="Week view" aria-pressed={view === 'week'}>Week</button>
+            <button className="cal-pill" style={{ ...styles.viewBtn, ...(view === 'day' ? styles.viewBtnActive : {}) }} onClick={() => setView('day')} aria-label="Day view" aria-pressed={view === 'day'}>Day</button>
+            <button className="cal-pill" style={{ ...styles.viewBtn, ...(view === 'agenda' ? styles.viewBtnActive : {}) }} onClick={() => setView('agenda')} aria-label="Agenda view" aria-pressed={view === 'agenda'}>Agenda</button>
           </div>
-          <button style={styles.addBtn} onClick={() => openNewEvent(selectedDate || new Date())} aria-label="Add event" title="Add event">
+          <button className="cal-add" style={styles.addBtn} onClick={() => openNewEvent(selectedDate || new Date())} aria-label="Add event" title="Add event">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
           {(view === 'week' || view === 'day') && (
             <button
+              className="cal-pill"
               style={{ ...styles.todayBtn, marginLeft: 4, ...(showWorkingHours ? styles.viewBtnActive : {}) }}
               onClick={() => setShowWorkingHours(v => !v)}
               aria-pressed={showWorkingHours}
@@ -738,16 +771,16 @@ const Calendar: React.FC = () => {
               Hours
             </button>
           )}
-          <button style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportVisibleRange} aria-label="Export visible range to ICS" title="Export the events you're currently viewing">Export</button>
-          <button style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={exportICS} aria-label="Export all events to ICS" title="Export every event">Export All</button>
-          <button style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={importICS} aria-label="Import ICS">Import</button>
+          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportVisibleRange} aria-label="Export visible range to ICS" title="Export the events you're currently viewing">Export</button>
+          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={exportICS} aria-label="Export all events to ICS" title="Export every event">Export All</button>
+          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={importICS} aria-label="Import ICS">Import</button>
 
         </div>
       </div>
 
       <div style={styles.main}>
         {/* Sidebar */}
-        <div style={{ ...styles.sidebar, width: sidebarCollapsed ? '0' : 'min(260px, 30vw)', padding: sidebarCollapsed ? '0' : '20px' }}>
+        <div className={sidebarCollapsed ? undefined : 'dex-liquid-glass'} style={{ ...styles.sidebar, width: sidebarCollapsed ? '0' : 'min(260px, 30vw)', padding: sidebarCollapsed ? '0' : '20px' }}>
           {!sidebarCollapsed && (
             <>
               {/* Mini Calendar */}
@@ -762,8 +795,10 @@ const Calendar: React.FC = () => {
                   {getDaysInMonth(currentDate).map((day, idx) => (
                     <div
                       key={idx}
+                      className={day && !isToday(day) && !isSelected(day) ? 'cal-mini-day' : undefined}
                       style={{
                         ...styles.miniDay,
+                        ...(day && isWeekend(day) && !isToday(day) && !isSelected(day) ? { color: 'var(--color-text-muted)' } : {}),
                         ...(day && isToday(day) ? styles.miniDayToday : {}),
                         ...(day && isSelected(day) ? styles.miniDaySelected : {}),
                       }}
@@ -786,6 +821,7 @@ const Calendar: React.FC = () => {
                     return (
                       <button
                         key={cat.id}
+                        className="cal-cat-row"
                         style={{ ...styles.catRow, opacity: hidden ? 0.4 : 1 }}
                         onClick={() => toggleCategory(cat.id)}
                         aria-pressed={!hidden}
@@ -822,6 +858,10 @@ const Calendar: React.FC = () => {
                       getEventsForDate(selectedDate).map(event => (
                         <div
                           key={event.id}
+                          className="cal-event-row"
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event); } }}
                           style={{ ...styles.eventItem, borderLeftColor: event.color, cursor: 'pointer' }}
                           onClick={() => openEditEvent(event)}
                           title="Click to edit"
@@ -836,12 +876,12 @@ const Calendar: React.FC = () => {
                           </div>
                           <div style={styles.eventTitle}>{event.title}</div>
                           <div style={styles.eventActions} onClick={e => e.stopPropagation()}>
-                            <button style={styles.eventActionBtn} onClick={() => duplicateEvent(event)} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={11} /></button>
-                            <button style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 1)} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day">+1d</button>
-                            <button style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 7)} aria-label={`Move ${event.title} to next week`} title="Reschedule +1 week">+1w</button>
-                            <button style={styles.eventActionBtn} onClick={() => exportEventICS(event)} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={11} /></button>
+                            <button className="cal-mini-action" style={styles.eventActionBtn} onClick={() => duplicateEvent(event)} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={11} /></button>
+                            <button className="cal-mini-action" style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 1)} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day">+1d</button>
+                            <button className="cal-mini-action" style={styles.eventActionBtn} onClick={() => rescheduleEvent(event, 7)} aria-label={`Move ${event.title} to next week`} title="Reschedule +1 week">+1w</button>
+                            <button className="cal-mini-action" style={styles.eventActionBtn} onClick={() => exportEventICS(event)} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={11} /></button>
                           </div>
-                          <button style={styles.deleteEventBtn} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
+                          <button className="cal-mini-action" style={styles.deleteEventBtn} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
                         </div>
                       ))
                     )}
@@ -853,14 +893,14 @@ const Calendar: React.FC = () => {
         </div>
 
         {/* Toggle Sidebar */}
-        <button style={styles.sidebarToggle} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" title="Toggle sidebar">
+        <button className="cal-mini-action" style={styles.sidebarToggle} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" title="Toggle sidebar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
           </svg>
         </button>
 
         {/* Calendar Grid */}
-        <div style={styles.calendarArea}>
+        <div key={view} className="cal-view-anim" style={styles.calendarArea}>
           {view === 'month' ? (
             <>
               <div style={styles.weekHeader}>
@@ -879,33 +919,54 @@ const Calendar: React.FC = () => {
                   const dayEvents = getEventsForDate(day);
                   const iconEvent = dayEvents.find(e => e.icon);
                   const today = isToday(day);
+                  const weekend = isWeekend(day);
+                  const selected = !!isSelected(day);
                   return (
                     <div
                       key={idx}
+                      className="cal-daycell"
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${dayEvents.length ? `, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : ''}`}
+                      aria-pressed={selected}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); } }}
+                      onDoubleClick={() => openNewEvent(day)}
                       style={{
                         ...styles.dayCell,
+                        ...(weekend && !today && !selected ? styles.dayCellWeekend : {}),
                         ...(today ? styles.dayCellToday : {}),
-                        ...(isSelected(day) ? styles.dayCellSelected : {}),
+                        ...(selected ? styles.dayCellSelected : {}),
                       }}
                       onClick={() => setSelectedDate(day)}
-                      title={dayEvents.length ? dayEvents.map(e => `${e.time} ${e.title}`).join('\n') : undefined}
+                      title={dayEvents.length ? dayEvents.map(e => `${e.time} ${e.title}`).join('\n') : 'Double-click to add an event'}
                     >
-                      {dayEvents.length > 0 && (
-                        <div style={styles.cellDots}>
-                          {dayEvents.slice(0, 3).map(ev => (
-                            <span key={ev.id} style={{ ...styles.cellDot, background: ev.color }} />
-                          ))}
+                      <div style={styles.cellTopRow}>
+                        <div style={{ ...styles.dayNumber, ...(today ? styles.dayNumberToday : {}) }}>
+                          {day.getDate()}
                         </div>
-                      )}
-                      <div style={styles.cellIcon}>
                         {iconEvent && (
-                          <span style={{ color: iconEvent.color, display: 'inline-flex' }}>
-                            <DexIcon name={iconEvent.icon!} size={20} color="currentColor" />
+                          <span style={{ color: iconEvent.color, display: 'inline-flex', opacity: 0.85 }}>
+                            <DexIcon name={iconEvent.icon!} size={14} color="currentColor" />
                           </span>
                         )}
                       </div>
-                      <div style={{ ...styles.dayNumber, ...(today ? styles.dayNumberToday : {}) }}>
-                        {day.getDate()}
+                      <div style={styles.cellChips}>
+                        {dayEvents.slice(0, 3).map(ev => (
+                          <div
+                            key={ev.id}
+                            style={{
+                              ...styles.cellChip,
+                              background: `color-mix(in srgb, ${ev.color} 18%, transparent)`,
+                              ...(conflictIds.has(ev.id) ? { boxShadow: 'inset 0 0 0 1px var(--color-warning)' } : {}),
+                            }}
+                          >
+                            <span style={{ ...styles.cellChipDot, background: ev.color }} />
+                            <span style={styles.cellChipText}>{ev.title}</span>
+                          </div>
+                        ))}
+                        {dayEvents.length > 3 && (
+                          <div style={styles.cellMore}>+{dayEvents.length - 3} more</div>
+                        )}
                       </div>
                     </div>
                   );
@@ -917,10 +978,14 @@ const Calendar: React.FC = () => {
             <div style={styles.agendaContainer}>
               {agendaItems.length === 0 ? (
                 <div style={styles.noEvents}>
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.35, marginBottom: 'var(--space-2)' }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.35, marginBottom: 'var(--space-2)' }}>
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  <div>No upcoming events{search ? ' match your search' : ''}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No upcoming events{search ? ' match your search' : ''}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>{search ? 'Try a different search term' : `The next ${AGENDA_DAYS} days are clear`}</div>
+                  {!search && (
+                    <button className="cal-pill" style={{ ...styles.todayBtn, marginTop: 'var(--space-3)' }} onClick={() => openNewEvent(selectedDate || new Date())} aria-label="Add an event">Add event</button>
+                  )}
                 </div>
               ) : (
                 (() => {
@@ -941,6 +1006,10 @@ const Calendar: React.FC = () => {
                       {group.items.map(({ event }) => (
                         <div
                           key={event.id + group.key}
+                          className="cal-agenda-row"
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event); } }}
                           style={{ ...styles.agendaItem, borderLeftColor: event.color }}
                           onClick={() => openEditEvent(event)}
                           title="Click to edit"
@@ -957,10 +1026,10 @@ const Calendar: React.FC = () => {
                               <DexIcon name="alert-triangle" size={10} /> Conflict
                             </span>
                           )}
-                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); duplicateEvent(event); }} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={12} /></button>
-                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); rescheduleEvent(event, 1); }} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day"><DexIcon name="chevron-right" size={12} /></button>
-                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); exportEventICS(event); }} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={12} /></button>
-                          <button style={styles.agendaDelete} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
+                          <button className="cal-mini-action" style={styles.agendaDelete} onClick={e => { e.stopPropagation(); duplicateEvent(event); }} aria-label={`Duplicate ${event.title}`} title="Duplicate"><DexIcon name="copy" size={12} /></button>
+                          <button className="cal-mini-action" style={styles.agendaDelete} onClick={e => { e.stopPropagation(); rescheduleEvent(event, 1); }} aria-label={`Move ${event.title} to tomorrow`} title="Reschedule +1 day"><DexIcon name="chevron-right" size={12} /></button>
+                          <button className="cal-mini-action" style={styles.agendaDelete} onClick={e => { e.stopPropagation(); exportEventICS(event); }} aria-label={`Export ${event.title}`} title="Export this event (.ics)"><DexIcon name="download" size={12} /></button>
+                          <button className="cal-mini-action" style={styles.agendaDelete} onClick={e => { e.stopPropagation(); deleteEvent(event.id); }} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -1008,6 +1077,7 @@ const Calendar: React.FC = () => {
                         {slotEvents.map(event => (
                           <div
                             key={event.id}
+                            className="cal-week-event"
                             style={{
                               ...styles.dayViewEvent,
                               background: event.color,
@@ -1081,6 +1151,7 @@ const Calendar: React.FC = () => {
                           {slotEvents.map(event => (
                             <div
                               key={event.id}
+                              className="cal-week-event"
                               style={{
                                 ...styles.weekViewEvent,
                                 background: event.color,
@@ -1106,19 +1177,21 @@ const Calendar: React.FC = () => {
 
       {/* Event Modal */}
       {showEventModal && (
-        <div style={styles.modalOverlay} onMouseDown={closeModal}>
-          <div style={styles.modal} role="dialog" aria-label={editingId ? 'Edit Event' : 'New Event'} aria-modal="true" onMouseDown={e => e.stopPropagation()}>
+        <div className="cal-overlay-anim" style={styles.modalOverlay} onMouseDown={closeModal}>
+          <div className="dex-liquid-glass-strong cal-modal-anim" style={styles.modal} role="dialog" aria-label={editingId ? 'Edit Event' : 'New Event'} aria-modal="true" onMouseDown={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <h2 style={styles.modalTitle}>{editingId ? 'Edit Event' : 'New Event'}</h2>
               <button style={styles.modalClose} onClick={closeModal} aria-label="Close modal"><DexIcon name="close" size={14} /></button>
             </div>
             <div style={styles.modalBody}>
               <input
+                className="cal-input"
                 style={styles.input}
                 type="text"
                 placeholder="Event title"
                 value={newEvent.title}
                 onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveEvent(); } }}
                 autoFocus
               />
               <input
@@ -1268,8 +1341,8 @@ const Calendar: React.FC = () => {
                   </div>
                 );
               })()}
-              <button style={styles.cancelBtn} onClick={closeModal} aria-label="Cancel">Cancel</button>
-              <button style={styles.saveBtn} onClick={handleSaveEvent} aria-label="Save event">{editingId ? 'Save Changes' : 'Save Event'}</button>
+              <button className="cal-cancel" style={styles.cancelBtn} onClick={closeModal} aria-label="Cancel">Cancel</button>
+              <button className="cal-save" style={styles.saveBtn} onClick={handleSaveEvent} aria-label="Save event">{editingId ? 'Save Changes' : 'Save Event'}</button>
             </div>
           </div>
         </div>
@@ -1294,8 +1367,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     padding: 'var(--space-3) var(--space-4)',
     height: '44px',
+    borderRadius: 0,
     borderBottom: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface-solid, #1C1C1E)',
   },
   headerLeft: {
     display: 'flex',
@@ -1311,7 +1384,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 14px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-secondary)',
     fontSize: '11px',
     fontWeight: 600,
@@ -1329,7 +1402,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-subtle)',
     color: 'var(--color-text-tertiary)',
     padding: '6px var(--space-2)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1344,7 +1417,7 @@ const styles: Record<string, React.CSSProperties> = {
   jumpDate: {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     padding: '5px 8px',
     color: 'var(--color-text-secondary)',
     fontSize: '11px',
@@ -1359,7 +1432,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     padding: '0 8px',
     height: '28px',
     color: 'var(--color-text-tertiary)',
@@ -1386,7 +1459,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewToggle: {
     display: 'flex',
     background: 'var(--color-bg-hover)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     padding: '2px',
     border: '1px solid var(--color-border-subtle)',
     gap: '2px',
@@ -1394,7 +1467,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewBtn: {
     padding: '6px var(--space-3)',
     border: 'none',
-    borderRadius: '3px',
+    borderRadius: '8px',
     background: 'transparent',
     color: 'var(--color-text-muted)',
     fontSize: '11px',
@@ -1413,7 +1486,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '32px',
     background: 'var(--color-success)',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-inverse)',
     cursor: 'pointer',
     display: 'flex',
@@ -1428,8 +1501,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
   },
   sidebar: {
-    background: 'var(--color-bg-surface)',
-    borderRight: '1px solid var(--color-border-subtle)',
+    borderRadius: 0,
     overflow: 'hidden',
     transition: 'all 0.18s ease',
   },
@@ -1451,7 +1523,7 @@ const styles: Record<string, React.CSSProperties> = {
   miniCal: {
     marginBottom: 'var(--space-4)',
     background: 'var(--color-bg-surface)',
-    borderRadius: '6px',
+    borderRadius: '12px',
     padding: 'var(--space-3)',
     border: '1px solid var(--color-border-subtle)',
   },
@@ -1564,7 +1636,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   eventItem: {
     background: 'var(--color-bg-surface)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     padding: '10px var(--space-3)',
     borderLeft: '3px solid',
     position: 'relative',
@@ -1681,41 +1753,78 @@ const styles: Record<string, React.CSSProperties> = {
   dayCellEmpty: {
     background: 'transparent',
   },
+  dayCellWeekend: {
+    background: 'color-mix(in srgb, var(--color-text-muted) 5%, var(--color-bg-surface))',
+  },
   dayCellToday: {
-    borderColor: 'var(--color-border-default)',
+    borderColor: 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border-default))',
+    background: 'color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-surface))',
   },
   dayCellSelected: {
     boxShadow: 'inset 0 0 0 1.5px var(--color-accent)',
     borderColor: 'transparent',
   },
-  cellDots: {
-    position: 'absolute',
-    top: '8px',
-    right: '8px',
-    display: 'flex',
-    gap: '3px',
-  },
-  cellDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-  },
-  cellIcon: {
-    flex: 1,
+  cellTopRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '20px',
+    justifyContent: 'space-between',
+    marginBottom: '4px',
+  },
+  cellChips: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    overflow: 'hidden',
+    flex: 1,
+  },
+  cellChip: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    borderRadius: '5px',
+    padding: '1px 5px',
+    overflow: 'hidden',
+  },
+  cellChipDot: {
+    width: '5px',
+    height: '5px',
+    borderRadius: '50%',
+    flexShrink: 0,
+  },
+  cellChipText: {
+    fontSize: '10px',
+    fontWeight: 600,
+    color: 'var(--color-text-secondary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    lineHeight: 1.4,
+  },
+  cellMore: {
+    fontSize: '9px',
+    fontWeight: 600,
+    color: 'var(--color-text-muted)',
+    padding: '0 5px',
+    letterSpacing: '0.2px',
   },
   dayNumber: {
     fontSize: '13px',
-    fontWeight: 500,
-    color: 'var(--color-text-tertiary)',
+    fontWeight: 600,
+    color: 'var(--color-text-secondary)',
     alignSelf: 'flex-start',
   },
   dayNumberToday: {
-    color: 'var(--color-text-primary)',
+    color: 'var(--color-text-inverse)',
     fontWeight: 700,
+    background: 'var(--color-accent)',
+    borderRadius: '50%',
+    width: '22px',
+    height: '22px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    boxShadow: '0 1px 4px color-mix(in srgb, var(--color-accent) 50%, transparent)',
   },
   // -- Week View Styles --------------------------------------
   weekViewContainer: {
@@ -1723,7 +1832,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     flex: 1,
     overflow: 'hidden',
-    borderRadius: '6px',
+    borderRadius: '12px',
     border: '1px solid var(--color-border-subtle)',
     boxShadow: 'var(--shadow-md)',
   },
@@ -1900,7 +2009,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
     borderLeft: '3px solid',
-    borderRadius: '6px',
+    borderRadius: '10px',
     padding: '10px var(--space-3)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -1943,11 +2052,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   },
   modal: {
-    background: 'var(--color-bg-surface)',
-    borderRadius: '10px',
+    borderRadius: '14px',
     width: 'min(380px, 92vw)',
-    boxShadow: 'var(--shadow-float)',
-    border: '1px solid var(--color-border-default)',
 
   },
   modalHeader: {
@@ -1956,7 +2062,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: 'var(--space-4) var(--space-5)',
     borderBottom: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface)',
   },
   modalTitle: {
     fontSize: '14px',
@@ -1983,7 +2088,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '8px',
     padding: 'var(--space-3) 14px',
     color: 'var(--color-text-primary)',
     fontSize: '13px',
@@ -2001,7 +2106,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '8px',
     padding: '10px var(--space-3)',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
@@ -2027,7 +2132,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     cursor: 'pointer',
     color: 'var(--color-text-tertiary)',
     transition: 'all 0.15s ease',
@@ -2058,7 +2163,7 @@ const styles: Record<string, React.CSSProperties> = {
   textarea: {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '8px',
     padding: 'var(--space-3) 14px',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
@@ -2079,7 +2184,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-2) var(--space-4)',
     background: 'transparent',
     border: '1px solid var(--color-border-default)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-secondary)',
     fontSize: '12px',
     fontWeight: 600,
@@ -2091,7 +2196,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-2) var(--space-4)',
     background: 'var(--color-success)',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-inverse)',
     fontSize: '12px',
     fontWeight: 600,
