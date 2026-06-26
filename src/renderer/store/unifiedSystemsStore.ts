@@ -14,10 +14,8 @@
 import { create } from 'zustand';
 import {
   type NotificationRecord as PolicyRecord,
-  type NotificationGroup as PolicyGroup,
   type NotificationPriority,
   sortByPriority,
-  groupBySource,
 } from '../../shared/notifications/group';
 import { readHubMeta } from '../services/notify';
 
@@ -50,15 +48,6 @@ export interface NotificationRecord {
   icon: 'info' | 'success' | 'warning' | 'error';
   /** Grouping key — the _dexMeta.source, falling back to `app`. */
   source: string;
-}
-
-/** A source group for the Notification Center (grouping = finding 2). */
-export interface NotificationCenterGroup {
-  source: string;
-  items: NotificationRecord[];
-  topPriority: NotificationPriority;
-  latestTs: number;
-  unreadCount: number;
 }
 
 /**
@@ -107,8 +96,6 @@ interface NotificationCenterState {
   sendNotification: (app: string, title: string, body: string, action?: any) => Promise<void>;
   /** Priority-ordered flat list (urgent first, then most recent). */
   getOrdered: () => NotificationRecord[];
-  /** Source-grouped, priority-ordered view for the center (finding 2). */
-  getGroups: () => NotificationCenterGroup[];
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   clearAll: () => Promise<void>;
@@ -147,22 +134,6 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
     const order = sortByPriority(notifications.map(toPolicyRecord));
     const byId = new Map(notifications.map((n) => [String(n.id), n]));
     return order.map((r) => byId.get(r.id)).filter(Boolean) as NotificationRecord[];
-  },
-
-  getGroups: () => {
-    const { notifications } = get();
-    const byId = new Map(notifications.map((n) => [String(n.id), n]));
-    const policyGroups: PolicyGroup[] = groupBySource(notifications.map(toPolicyRecord));
-    return policyGroups.map((g) => {
-      const items = g.items.map((r) => byId.get(r.id)).filter(Boolean) as NotificationRecord[];
-      return {
-        source: g.source,
-        items,
-        topPriority: g.topPriority,
-        latestTs: g.latestTs,
-        unreadCount: items.reduce((n, it) => (it.read === 0 ? n + 1 : n), 0),
-      };
-    });
   },
 
   markRead: async (id) => {
