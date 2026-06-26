@@ -1,5 +1,380 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-25s) — AXL: real 2D Sketcher -> 3D solid (parametric core).**
+> tsc 0; 13/13 new sketch unit tests green (`tests/unit/axl-sketch.test.ts`). VERIFIED LIVE: Create -> "New
+> Sketch" opens the gridded sketch overlay with the SKETCH toolbar. (Couldn't drive the mouse-draw live —
+> the headless preview lays AXL's canvas out at 0x0 — so the geometry it feeds is proven by unit tests
+> instead; the commit path `extrudeSketch -> addMeshPart` is the same one the verified OBJ import uses.)
+> - **`AxlSketch.ts`** (new, pure): `profileFromEntities` (rect / circle / chained-line loop), `triangulate`
+>   (ear clipping, winding-safe), `extrudeSketch` (caps + side walls, recentred, correct +/-Z), `revolveSketch`
+>   (surface of revolution about Y), `snapSketchPoint` (grid + endpoint). Outputs the renderer's raw `mesh`
+>   payload. Tests cover quad->2 tris, n-gon->n-2, CW input, box index count (36), recentring, snapping.
+> - **`SketchOverlay.tsx`** (new): self-contained 2D editor — line/rect/circle drag-draw on a gridded plane
+>   with live snapping, depth input, Extrude + Revolve, Clear/Close. Commits the mesh as a new part.
+> - **Wiring**: uiStore `showSketch`; rendered in the viewport; "New Sketch" in the Create flyout; UKI skill
+>   `axl.sketch` (intent /sketch|draw a profile/) -> `newSketch` op opens it. This is the parametric-modeling
+>   backbone (sketch -> solid) the prior turns flagged as the next big lift.
+> - **Still gated:** a full NURBS BREP kernel (exact fillets/booleans, true STEP/IGES surfaces) remains the
+>   one genuinely multi-week item — not faked.
+>
+> **CHECKPOINT (2026-06-25r) — AXL is now UKI-driven (natural-language CAD actions).**
+> tsc 0. VERIFIED LIVE (0 console errors): typed "add a cylinder" in the AXL command bar -> planned
+> `addPrimitive` -> Apply -> a real cylinder part appeared in the tree; "section along y" -> applied ->
+> section enabled on Y + Inspector opened to Section. Owner: make AXL UKI-driven, keep adding features +
+> work the UI/internals. The previously-ORPHANED `handleAxlOp` applier is now wired into a real feature.
+> - **CreativeCommandBar mounted in AXL's AI panel** (`Axl.tsx`) with `appId="axl"`, live facts
+>   (`partId`/`partCount`), `onApplyOp={handleAxlOp}`, and example chips ("add a cylinder", "shell it 2mm",
+>   "run a stress study", "section along x", "check interference", "generate bom").
+> - **`handleAxlOp` rewritten + relocated** (after its deps) from a 3-op read-only stub to a real executor:
+>   read-only ops (mass/GD&T/parametric) still answer via `aiAnalyze`; mutating ops run REAL store actions —
+>   `addPrimitive` (parses box/cylinder/sphere/cone/tube/torus/wedge + synonyms), `shellPart`/`draftPart`/
+>   `ribPart` (adds the feature with a parsed numeric arg to the selected part), `runSimulation` (parses
+>   stress/thermal/motion), `explode`, `section` (parses axis, opens Inspector), `interference`,
+>   `generateBOM`, `exportModel` (parses format). Unknown ops still skip honestly via `enginePendingApplier`.
+> - **10 new NL skills** in `shared/uki/appSkills.ts` (regex intents) + **10 action specs** in
+>   `shared/uki/creativeActions.ts`. The whole NL -> plan -> preview -> apply path is the shared, unit-tested
+>   `creativeCommand` pipeline; AXL just supplies the applier.
+>
+> **CHECKPOINT (2026-06-25q) — AXL: Section view, mesh import, Shell/Draft/Rib solid features.**
+> tsc 0. VERIFIED LIVE after a clean reload (0 error fallback through every step): Section enables + offset
+> slider drives the clip; an injected OBJ tetra imports + renders as a part; Shell applies to a box. Owner:
+> "do em" (Section / Shell-Draft-Rib / STEP-OBJ from the pro-CAD list). All real geometry — no stubs.
+> - **Section View** (`engine/Renderer.ts` + Inspector "Section" tab): a real WebGL clip plane — the frag
+>   shader discards fragments past `uClipPlane` (per-fragment, no extra passes). UI gives enable / axis
+>   (X/Y/Z) / offset slider / flip; `RenderState.section` carries it, set once per frame. Reveals interior.
+> - **Mesh import** (`AxlImport.ts`, new): real parsers — OBJ (n-gon fan-triangulation, negative indices),
+>   STL (ASCII + binary auto-detected via the 84+50n length check), and STEP (point-extent: every
+>   CARTESIAN_POINT -> bbox -> a box sized to the file's real envelope, honestly labelled). Imports recentre
+>   on bbox + downscale huge models. New `PartFeature.mesh` raw-triangle payload; `meshForPart` draws it
+>   directly; `projectStore.addMeshPart`; mesh-aware cache key (id+size) so distinct imports don't collide on
+>   one GPU mesh. Wired via a hidden file input + "Import Mesh" in the Create flyout. Verified: OBJ tetra ->
+>   real part, rendered.
+> - **Shell / Draft / Rib** solid features (`engine/Renderer.ts` `meshForPart` + feature creator): genuine
+>   geometry. Shell hollows round solids to a tube (inner = r - t) and box/wedge via a new
+>   `generateShellBoxMesh` (six merged wall slabs); Draft tapers vertices toward the Y axis by angle
+>   (`applyDraftTaper`); Rib merges a thin reinforcing web sized to the part's extent. Added to the
+>   `PartFeature` type union + the Add-Feature panel (Shell/Draft/Rib chips + thickness/angle inputs).
+> - **Honest scope note:** full STEP/IGES BREP (NURBS topology) still needs a real kernel — STEP currently
+>   imports the point envelope, not surfaces. That kernel is the next big lift if wanted.
+>
+> **CHECKPOINT (2026-06-25p) — AXL: icon-first toolbar, tools grouped into flyout menus.**
+> tsc 0 (AXL files clean; the 2 open errors are another session's Imosion `useWorkingPhrase`). VERIFIED LIVE
+> after a clean reload: toolbar renders, every flyout opens, Add-Box from the Create menu adds + closes the
+> menu, Analyze->Inspector->Interference->Run Check returns an overlap result, 0 error fallback. (The `<AXL>`
+> crashes in the console are all stale HMR-intermediate builds — `ui.toggleInspector` referenced before the
+> uiStore module hot-reloaded; gone after a full reload.) Owner: tools in dropdowns/submenus for similar
+> tools, less text + more icons, strip noisy tooltips.
+> - **`components/Toolbar.tsx` rewritten** from a flat strip of ~20 labelled buttons to icon-first with
+>   grouped flyouts: core transform tools (Select/Move/Rotate/Scale/Measure) stay as bare icons; everything
+>   else collapses into **Create** (7-primitive grid + Parts Library), **Modeling** (Feature/GD&T/Constraints),
+>   **Analyze** (Simulation/Inspector/BOM/Exploded), and **Export** (icon trigger, format submenu). One
+>   `openMenu` state, full-viewport backdrop closes it; labels live inside the menus only. Dropped the `Pill`
+>   text-button usage entirely.
+> - **Viewport rail (`Axl.tsx`)** stripped to icon-only: view modes (3D/Front/Top/Right/2D), Solid/Wire,
+>   Grid, Inspect are now 24x22 square icon buttons with `aria-label` (no visible text, no `title` tooltips).
+> - No new `title` tooltips anywhere; a11y kept via `aria-label`.
+>
+> **CHECKPOINT (2026-06-25o) — AXL: three real professional-CAD features shipped.**
+> tsc 0; ALL THREE VERIFIED LIVE in preview (config captured, interference overlap reported on the two
+> default overlapping parts, named view saved with Az/El) — 0 console errors. Owner pushed for actual
+> features from the pro-CAD list, not polish. Added, each wired store->geometry->UI and surfaced in one new
+> **Inspector** panel (top-rail "Inspect" button + `I` shortcut, 3 tabs):
+> - **Configurations / Design Variants** (`projectStore.saveConfiguration/applyConfiguration/deleteConfiguration`,
+>   `AxlInspect.snapshotConfiguration`): snapshot every part's transform + visibility + primary-feature params
+>   + the parameter table into a named variant; apply restores them non-destructively (pushes undo);
+>   `activeConfigId` highlights the live variant.
+> - **Named Views / Saved Cameras** (`projectStore.saveNamedView/deleteNamedView`): capture the current
+>   camera (azimuth/elevation/distance + viewMode) under a name; clicking a saved view flies the camera back.
+> - **Interference Detection / Clearance Checker** (`AxlInspect.detectInterferences` + `partBoundingRadius`):
+>   broad-phase bounding-sphere overlap scan over every visible part pair — the exact first pass a real
+>   interference checker runs. Reports interferences (overlap depth) and, with a min-clearance value,
+>   clearance violations (gap); rows are click-to-select. Pure/deterministic module.
+> - **Types/store**: `AXLProject` gained `configurations` / `activeConfigId` / `namedViews`; persist `merge`
+>   backfills them (+ `parameters`) so pre-existing saved projects don't crash on `.map`. New uiStore
+>   `showInspector` + `inspectorTab`. New file `axl/AxlInspect.ts` (pure helpers).
+>
+> **CHECKPOINT (2026-06-25n) — Imosion: track alignment fix + piano-roll Tools dropdown.**
+> tsc 0. (2) Piano-roll TOOLS row collapsed from 7 text buttons (Legato/Strum↓/Strum↑/Flam/Humanize/Arp/
+> Slide) into ONE compact icon "Tools" dropdown -- native `<details>`/`<summary>` (no new React state;
+> click an item -> runs + closes via `closest('details').open=false`), less text in the toolbar, menu UX.
+> (2b) Beats toolbar: Vary/Randomize/Clear collapsed into one "Pattern" icon dropdown (same `<details>`
+> pattern; Perform + Play/Stop kept as primary). Right-click context menus on tracks/clips ALREADY exist
+> (track rows have onContextMenu -> setContextMenu w/ chop/clip options) -- confirmed, no change needed.
+> (2c) Arrange-view toolbar: FX Bus + Group collapsed into one "Bus" icon dropdown (Export / Store / Add FX
+> kept prominent). Three verbose toolbars (piano-roll, beats, arrange) now use the same `<details>` menu.
+> (3) Mixer channel strip: flat bg -> brushed-metal console chassis (vertical metal gradient + inset top
+> highlight), completing the console look alongside the LED M/S/R + metallic pan knob + console fader.
+> Creative apps (Prism/Vinx/Forge) are ALREADY icon-based -- no verbose toolbars to consolidate there.
+> (4) Piano-roll notes: flat fill -> top-lit "rendered" look (always-on `inset 0 1px 0` highlight +
+> `inset 0 -2px 3px` bottom shade, 3px radius); kept the existing velocity-alpha shading, note colors,
+> selection + slide glow. Notes/step-grid/drum-pads were already FL-grade; this is the finishing sheen.
+> (1) Track-header alignment: Bug -- in the arrange view the track HEADERS (left panel) were content-driven height and GREW when
+> a track was selected (inline volume slider) or armed (input-source select), while the timeline LANES are
+> a fixed `height:62px`. So headers and lanes drifted out of row alignment down the list ("not on a
+> straight line"). Fix (`imosion/Imosion.tsx`): each header is now a fixed **62px border-box stride** with
+> the SAME `borderBottom:1px` separator model as the lane (replaced the old content height + `marginBottom`
+> + full border + border-radius with a clean left accent bar), and the header scroll's `padding:4px` top
+> offset was removed so row 1 lines up with lane 1. Header + lane now share one exact 62px stride.
+> NOTE: File/Tools are ALREADY dropdown menus (showFileMenu/showToolsMenu w/ chevrons); toolbar buttons are
+> already icon+short-label. Further per-view toolbar consolidation (Beats/Piano-roll text buttons -> icon
+> dropdowns) is the next step but needs a reload to verify (Imosion.tsx HMR-reload is broken) and care
+> (the file is being edited concurrently by another process -- AXL overhaul landed mid-session).
+>
+> **CHECKPOINT (2026-06-25m) — AXL: GPU leak fixes, render-on-demand, solid hardware chrome.**
+> tsc 0; VERIFIED LIVE (AXL launches: brushed-metal rail + 2 hardware panels render, 0 leftover glass,
+> 0 AXL console errors, page responsive). Owner ask: finish AXL, make the UI solid "like real hardware,"
+> kill leaks, perform.
+> - **GPU memory leaks (`axl/engine/Renderer.ts`).** Three real leaks closed: (1) `getOrCreateMesh`
+>   created position/normal VBOs but only tracked the index buffer -- deleting a VAO does NOT free its
+>   bound buffers, so every parametric edit leaked two VBOs. `GPUMesh` now carries `posBuffer`/`normBuffer`
+>   and a shared `deleteGPUMesh()` frees all four objects. (2) `invalidateMesh()` did a bare
+>   `meshCache.clear()`, orphaning every VAO/VBO on the GPU on each geometry edit -- now deletes resources
+>   first. (3) The mesh cache is keyed by a full feature-stack hash, so dragging a slider mints a fresh
+>   entry per frame and grew VRAM without bound -- added an LRU cap (`MESH_CACHE_LIMIT = 48`, oldest evicted
+>   + freed). `dispose()` reuses the shared deleter.
+> - **Render-on-demand (`axl/Axl.tsx`).** The rAF loop redrew the WebGL viewport every frame at a steady
+>   60fps even when nothing changed (a core pinned on an idle CAD window). Added a `needsRenderRef` dirty
+>   flag raised by any state-driven re-render (via the `renderFnRef` assignment), on resize, and on tab
+>   re-show; the loop only draws when dirty, then clears it. Idle AXL now costs ~0 GPU/CPU; drag/orbit still
+>   redraw at 60fps because each `setCameraAngle` re-renders.
+> - **Solid hardware chrome.** AXL is a precision CAD tool, so it drops glass like the creative suite does.
+>   New `.dex-axl-panel` / `.dex-axl-panel-strong` / `.dex-axl-rail` in `design-system.css`: opaque
+>   brushed-metal surfaces (faint repeating-gradient grain), a machined top bevel + fine inset seam, crisp
+>   edges, no backdrop blur (so no perf-tier / reduced-transparency override needed). Swapped all 14
+>   `dex-liquid-glass-strong` usages in `Axl.tsx` (top toolbar -> rail, the rest -> panel-strong) plus
+>   `FeatureTree.tsx` / `PropertiesPanel.tsx` / `Toolbar.tsx`.
+> - **Integration audit:** AXL is already deeply wired -- SpotlightEngine, CommandPalette, UKI skillPacks,
+>   `CreativeSuiteBridge` (send/receive `model`/`image`/`drawing` assets), FileTypeRegistry, SendToMenu,
+>   achievements catalog. No orphaned surface found; left as-is.
+>
+> **CHECKPOINT (2026-06-25l) — Creative suite: premium slider chrome + Imosion LCD.**
+> tsc 0; VERIFIED LIVE in Flux (11 sliders rendered with the new look).
+> - **CreativeSlider** (`components/controls/CreativeSlider.tsx`) is THE shared value slider used ~190x
+>   across Prism (36), Flux (42), Vinx, Forge, and Imosion. It was a bare native `<input type=range>`
+>   (just `accent-color` + 4px). Now custom-chromed: a **filled accent track** (inline gradient to the
+>   value %), a **premium light domed thumb** that grows on hover and gets an accent **glow ring** on
+>   drag/focus, an inset-shadow groove, and Firefox parity. The chrome CSS injects ONCE into the head
+>   (id-guarded); the per-value fill + `--cs-accent` are set inline. One change -> every creative app's
+>   sliders level up at once. Verified: Flux sliders carry `linear-gradient(... #ff375f ...)` fill +
+>   `--cs-accent` set + thumb `appearance:none` active.
+> - **Imosion transport LCD** (`imosion/Imosion.tsx`): the time/BPM readout is now a recessed, backlit
+>   **amber LCD** (deep inset panel + glowing `#e9b06a` mono digits with text-shadow), like a hardware
+>   unit. (Compiles; shows after a reload -- Imosion.tsx still has its HMR-reload issue.)
+>
+> **CHECKPOINT (2026-06-25k) — Imosion: the two "couldn't drive in preview" caveats, now verified.**
+> Full-project tsc 0; 15 new unit tests green. The prior handoff shipped the rack-playhead perf win and
+> the FL-style sample chop as "correct-by-construction, type-clean, but un-driven end-to-end" because both
+> need real playback / a decoded sample that headless preview can't reliably trigger. Closed that gap two
+> ways:
+> - **Proved the live constraint (not assumed it):** an rAF probe in the preview timed out at 30s reaching
+>   600ms of elapsed frames -- `requestAnimationFrame` is fully paused (`[FrameGovernor] paused:
+>   document-hidden`) in the backgrounded preview tab. That is exactly why the playhead *advance* can't be
+>   observed here. The *synchronous* wiring DID verify live: a real Play-Pattern click runs
+>   `startBeatSequencer -> paintRackPlayhead(0)` and lights precisely the two step-0 cells (one per track)
+>   with the exact `inset 0 0 0 1px rgba(255,255,255,0.6)` shadow.
+> - **Made both deterministically testable.** Extracted the verifiable cores into pure modules and wired
+>   them back (behavior-identical): `ImosionRackPlayhead.ts` (`paintRackPlayhead` + `RACK_PLAYHEAD_SHADOW`)
+>   and `ImosionChop.ts` (`evenChopBounds` + `computeChopSegments` -- the even/transient boundary->slice
+>   geometry, waveform windowing, source-offset math, sliver rejection). `Imosion.tsx` now imports both
+>   instead of defining them inline; `chopClip` maps the pure segments onto AudioClips. Tests:
+>   `tests/unit/imosion-rack-playhead.test.ts` (jsdom: highlight-one / clear-rest / clear-all-on-stop /
+>   no-match / idempotent) and `tests/unit/imosion-chop.test.ts` (node: even division, uneven transient
+>   bounds, trim/startTime offsets, waveform windowing, sliver drop). 15/15 green, tsc 0.
+> NET: the perf-win paint and the chop slicing are now verified by deterministic tests; only the rAF
+> *advance* remains preview-unobservable (a headless-tab limitation, not a code gap).
+>
+> **CHECKPOINT (2026-06-25j) — Imosion: real analog-hardware knobs + console faders.**
+> tsc 0; verified live (3 metallic knobs render on the mixer). Owner mandate: creative apps should feel
+> like real analog hardware (Logic Pro / FL Studio). Upgraded the TWO shared control primitives, so the
+> whole DAW (mixer, synths, effects, EQ) levels up at once -- zero logic change, pure visuals:
+> - **Knob** (`imosion/components/Knob.tsx`): was a flat `#16161a` circle + a line. Now a domed metal cap
+>   (radial gradient, upper-left light), a bevelled rim ring with a real drop shadow, a top sheen, and a
+>   glowing indicator notch + tip; the value ring gets a soft backlit glow under the crisp arc. Per-instance
+>   gradient/filter ids via `useId()`.
+> - **Fader** (`imosion/components/Fader.tsx`): console-style cap -- bevelled body, two grip ridges, and a
+>   glowing centre indicator line (kept the existing inset groove + color-zoned VU meter + dB scale).
+> - **Mixer channel strips** (`imosion/Imosion.tsx`): Mute/Solo/Rec are now backlit console switches -- lit
+>   with a colored glow when engaged, recessed (inset shadow over a dark gradient) when off. Both strip
+>   variants (full channel + the compact `msr()` row). tsc 0. (Imosion.tsx has a persistent HMR-reload
+>   failure so the preview shows old code; Knob/Fader are separate files and DID reload + verify. Full
+>   reload shows the LED switches.)
+> NOTE on the rest: spot-checked dev tools are already industry-grade -- GitClient has VS Code-class
+> color-coded status (M amber / A green / D red / R,C accent / U muted) + staged-unstaged grouping +
+> conventional-commit templates; EnvManager has mask/reveal/copy/diff/validate; DexCode is a full editor.
+> No churn applied to already-complete apps.
+>
+> **CHECKPOINT (2026-06-25i) — Polish sweep batch 2 (partial) + a build-break fix.**
+> Full-project tsc 0.
+> - **FIXED a broken build**: the batch-2 subagents that hit the account usage cap had left TWO files
+>   half-edited -- `ProjectDashboard.tsx` referenced an undefined `SCOPED_CSS` and `QRCodeGenerator.tsx`
+>   an undefined `QR_SCOPED_CSS` (the agents added the `<style>{...}</style>` + class hooks, then died
+>   before defining the const). The tree didn't compile. Defined both consts -- which also COMPLETES the
+>   intended hover/active/focus polish for the dashboard cards/links/rows and the QR tabs/quick-actions/
+>   fields. Lesson: a cut-off subagent can leave a non-compiling file -- always re-run tsc after a fan-out.
+> - **Stopwatch**: added real keyboard control (Space start/stop, L lap, R reset; ignored in inputs) with
+>   a contextual `<kbd>` hint, button press feedback, and lap-row hover. Verified live (Space started it to
+>   00:00.98, Space stopped it, hint switched to "R reset").
+> - **Timer**: button hover/active feedback + input focus accent (concurrent-timer logic untouched).
+> - Confirmed already-Apple-grade, left untouched (no churn): PomodoroTimer, ColorPicker, Calculator
+>   (already has full keyboard), and the global `:focus-visible` baseline already covers every app.
+>
+> **CHECKPOINT (2026-06-25h) — Apple-grade polish sweep, batch 1 (6 apps).**
+> Full-project tsc 0 (verified all six together). Surgical, additive polish only -- no data/store/IPC
+> behavior changed, no features removed; inline-style / scoped-`<style>` only (no Tailwind utility
+> no-ops). Each app keeps its real data.
+> - **Tasks** (pages/Tasks.tsx): fixed a real a11y regression (a global `input:focus{outline:none}`
+>   stripped keyboard focus) with scoped `:focus-visible` rings; list-aware action-oriented empty states
+>   per view; wired the orphaned print stylesheet classes; `onKeyPress`->`onKeyDown` + Escape-to-clear.
+> - **Calendar**: Apple-style month cells (today = filled accent circle, weekend tint, real titled event
+>   chips w/ "+N more"), keyboard-accessible day cells + view animations + modal spring-in.
+> - **Weather**: condition + day/night driven hero gradient (from the real sunrise/sunset), 72px temp,
+>   7-day low-high range bars, glass detail tiles, hover/focus. All Open-Meteo data untouched.
+> - **Kanban**: column drop-target highlight, drag grip, WIP-count pill (amber at limit / red over),
+>   Linear-style priority pills, focus-visible everywhere.
+> - **SmartInbox**: search + unread segment, hover/swipe row actions (read/dismiss via existing
+>   channel), full keyboard nav (listbox/option), skeleton loading + context-aware empty states.
+> - **WorldClock**: day-aware relative offset ("+3h, tomorrow"), day/night-tinted analog face + sun/moon
+>   glyphs, keyboard add-city combobox, polished empty state.
+> NOTE: small utilities (PomodoroTimer etc.) are already Apple-grade -- left untouched, no churn.
+> REMAINING sweep (queued): Maps, ProjectDashboard, PasswordGenerator, MarkdownEditor, UnitConverter,
+> ColorPicker, QRCode, GitClient/SshClient/EnvManager, etc. (batch-2 subagents hit the account usage
+> limit before editing; resume parallel after reset).
+>
+> **CHECKPOINT (2026-06-25g) — App pass: real native TaskManager metrics, Games cover-grid, Store ratings.**
+> Renderer tsc 0; `cargo check` 0 (Tauri crate); all three verified live, 0 console errors.
+> (1) **TaskManager -- REAL metrics (native Rust fix)**: the Rust `system_status()` (src-tauri/src/main.rs)
+> only returned memory+uptime, so the CPU/cores/disk/network cards read 0. Rewrote it to sample CPU and
+> network as deltas around a `MINIMUM_CPU_UPDATE_INTERVAL` sleep and report the exact structured shape the
+> TaskManager reads: `cpu.{usage,cores}`, `memory.{used,total,percent}` (bytes), `disk.{used,total,percent}`,
+> `network.{connected,rxBps,txBps}`, root `uptime` -- legacy flat `memory*MB`/`uptimeSec` kept for the
+> power/diagnostics consumers. Also fixed `system_processes()` (two refreshes with no sleep -> every
+> process read 0% CPU, so ranking collapsed to memory) by adding the same delta sleep. No more fabricated
+> zeros; the sparklines now plot real CPU/disk/network. (Battery still needs a battery crate -- left honest:
+> "No battery detected".)
+> (2) **Games -- Apple/console-grade cover grid**: replaced the bare row list with a responsive cover-card
+> grid -- deterministic per-title gradient art, storefront badge (Steam/Epic/GOG/itch/EA/native/web),
+> playtime / "Played N days ago", hover-lift + reveal play button, launch spinner state, a "Continue playing"
+> rail (most-recent first), and storefront filter chips. Same real `games:*` IPC underneath; click launches,
+> right-click shows the launch plan. (Inline styles + scoped CSS, NOT Tailwind utility classes -- those
+> silently no-op here.)
+> (3) **Store -- ratings on cards**: the user's local star rating was stored but only shown inside the detail
+> view; now it surfaces on each grid card (falls back to the Installed badge when unrated). Verified live.
+>
+> **CHECKPOINT (2026-06-25g) — Memory-leak sweep + internal hygiene.** Full project tsc 0; Imosion
+> opens + renders the full DAW with 0 console errors.
+> (1) **Leaks fixed** (4-agent full-renderer sweep): Imosion (6) — recording `onstop` now disconnects the
+> source/analyser nodes; 4 orphan `?? new AudioContext()` fallbacks routed to ONE shared
+> `sharedFallbackCtx()` (browsers cap ~6 live contexts); 2 `new Audio(url)` duration probes use `{once}` +
+> `src=''` release. `ThermalAdaptiveMonitor` removes its `dex:thermal-state` IPC listener in stop(). All of
+> shell/components/pages + every standalone app + non-Imosion creative verified CLEAN.
+> (2) **Hardened** unguarded module-scope listeners (useStore focus, shellPreferences matchMedia) against
+> HMR double-bind. (3) **Dead code**: removed FluidOperations' inert menu-close subsystem (nothing ever
+> called registerMenu) incl. its two global capture listeners; kept the LIVE visibility-recovery installer.
+> See `memory/project-leak-audit-glass-cycle.md`.
+>
+> **CHECKPOINT (2026-06-25f) — Liquid glass restored shell-wide + all idle behaviors removed.**
+> tsc 0; verified live (glass tokens resolve translucent + 24px frosted blur; idle state pinned `active`).
+> Owner: make the shell, Nexus, UKI, the DEX Bar app/search menus, and right-click menus all
+> consistent GLASS (learn from Apple/Windows), and stop DEX gating/reacting to inactivity for
+> long-session heavy users.
+> (1) **Glass.** Reversed the stale "DEX Sharp full-flat / strip the glass" era. The real runtime
+> control point is `applyGlassVars()` in `store/shellPreferencesStore.ts`, which now computes a
+> translucent fill + adaptive backdrop blur per glass mode (off/reduced/normal/liquid) and writes
+> the inline `--color-bg-glass(-strong)` / `--glass-bg` / `--glass-blur` / `--dex-glass-*` vars that
+> override the stylesheet. `adaptiveBlur()` (`styles/glassMenu.ts`) restored to tier-aware blur, so
+> every menu/dropdown/popover/sidebar/toolbar/modal preset re-frosts. CSS glass tokens (design-system.css)
+> also translucent again, with `perf-tier="low"` + `prefers-reduced-transparency` solid fallbacks.
+> Targeted re-glass of surfaces that hardcoded solid: AppManager top title bar + tab strip + app menu,
+> SpotlightSearch home dropdown, ContextMenu submenu, UkiOverlay panel. (FloatingLauncher, ContextMenu
+> root, Nexus HUD were already `.dex-liquid-glass`.) Default is now FULL Apple glass
+> (`glassMode: 'liquid'`, opacity 0.6); a single master toggle (Settings > Shell & Dock > Liquid Glass
+> > "Glass") flips full-on (liquid) / full-off, where OFF makes every surface opaque pure `#000000`
+> true black with no blur. See `memory/project-glass-control-point.md`.
+> (2) **Idle removed.** Welcome gate (LockScreen "click anywhere"), auto-lock-on-inactivity (App.tsx),
+> low-power dimming (IdleContinuity pinned to `active`), and the idle-warning banner are all gone. DEX
+> boots straight to Home and never reacts to inactivity; explicit lock still works. See
+> `memory/project-idle-removed.md`.
+>
+> **CHECKPOINT (2026-06-25e) — Three platform pulls: virtualized lists, useAsyncResource, unified Quick Look.**
+> tsc 0; PowerRename 13/13 + new VirtualList 6/6 unit tests; verified live (0 console errors).
+> (1) **Shared `VirtualList` primitive** -- `components/VirtualList.tsx` is one fixed-row windowing
+> component over a single full-height spacer (pure `computeWindow` math, rAF-coalesced scroll,
+> ResizeObserver viewport, overscan). Adopted in `LiveActivityBrowser`'s flat feed (the unbounded
+> path); the grouped/empty paths are unchanged. Files/Tasks/Rewind are the next adoption sites (their
+> rows carry drag/selection/sticky-group markup that needs per-site care) -- the primitive is the
+> reusable win.
+> (2) **`useAsyncResource` adoption** -- `pages/Gallery.tsx` initial load (media + favorites) now runs
+> through the shared hook instead of a hand-rolled mounted-flag + try/catch + finally; the hook owns
+> the AbortController, timeout, and set-after-unmount guard. Verified live: Gallery loads, not stuck on
+> the spinner. (Audio was already on the hook; remaining sites are mechanical follow-ups.)
+> (3) **Unified Quick Look** -- `pages/Files.tsx` dropped its ~55-line local Quick Look overlay (whose
+> text preview was a STUB: "Text preview for <name>") and now routes Space to the global
+> `dex-quicklook` event, which reads real text via `files:read`. The shell `QuickLook` gained a real
+> PDF renderer (iframe) so Files keeps PDF parity. One preview surface, real content, shared everywhere.
+>
+> **CHECKPOINT (2026-06-25d) — Seamless top chrome.**
+> Owner pointed at the global top bar and asked for "seamless, no gaps". The top chrome was a
+> two-tier stack (title bar `#141416` + tab strip `#0E0E11`) where EACH tier drew its own
+> `borderBottom` + white `inset 0 0.5px 0` gloss line + `0 3px 8px` drop shadow, and the two tiers
+> had different background tones -- so the eye saw a colour seam, a bright inner divider, and a
+> shadow gap between bar/tabs/content. Flattened in `AppManager.tsx`: both tiers now share one
+> surface (`var(--glass-bg, #141416)`), the title bar drops its border+gloss+shadow entirely, and
+> the WHOLE chrome carries a single crisp `1px rgba(255,255,255,0.07)` hairline at the bottom of the
+> tab strip -- no inner divider, no gloss line, no shadow gap. Verified live (computed styles): tier 1
+> and tier 2 both `rgb(20,20,22)`, borderBottom/boxShadow `none` except the one bottom hairline.
+>
+> **CHECKPOINT (2026-06-25c) — "Steal the best OS features": the four Next-Waves, all shipped + verified live.**
+> Closes every item the 06-25b checkpoint listed as "Next waves (NOT done)". tsc 0, PowerRename engine
+> 13/13 unit tests, verified live in preview with 0 console errors.
+> (1) **Settings deep-links in the palette** -- extracted the Settings section list into a shared,
+> React/icon-free module `shell/settingsSections.ts` (single source of truth; `pages/Settings.tsx`
+> now derives its sidebar + keeps icons local via `SECTION_ICONS`). The command palette injects one
+> "Settings: <page>" deep-link per section ONLY while searching (kept out of the default list), so
+> `wifi`->Network, `theme`->Appearance, `biometric`->Privacy+Nexus jump straight to the pane via the
+> existing `dex-spotlight-navigate` contract. Verified live.
+> (2) **PowerRename** -- new PowerToys-style standalone app (registered end-to-end: runningApps,
+> AppManager lazy/AppId/components/launchpad/category/search-keywords, dock glyph, palette entry).
+> Pure, unit-tested transform engine `powerRenameEngine.ts` (literal+regex find/replace with
+> backrefs, name/ext/full scope, case transforms, prefix/suffix, zero-padded numbering, batch
+> collision detection); live before/after preview; sources = drag-drop / load-folder / paste; apply
+> goes through the proven `files:rename` IPC. Verified live: `IMG_`->`Vacation-` produced
+> `Vacation-001.JPG`...
+> (3) **Global Quick Look** -- the orphaned shell `QuickLook`/`useQuickLook()` is now mounted ONCE via
+> `shell/QuickLookHost.tsx` and driven by a `dex-quicklook` event (infers type from extension, loads
+> text via `files:read`, media via file URL, honours caller-supplied content). Home pinned files now
+> Quick Look on Space. Verified live: event opens the preview with rendered content; Esc/Space dismiss.
+> (4) **Workspace Time Machine** -- automatic, timestamped layout snapshots. `shell/workspaceTimelineStore.ts`
+> is a capped, dedup'd rolling store; AppManager auto-captures every 10 min via `sharedTick` (ref-based
+> subscribe so frequent window moves never starve the timer), plus "snapshot now" + restore-by-id, all
+> reusing a shared `captureWindowSnaps`/`applyWindowLayout` (same path as named presets/crash recovery).
+> `shell/WorkspaceTimeline.tsx` overlay browses the timeline and restores in one click; palette commands
+> "Workspace Time Machine" + "Snapshot Workspace Now". Verified live: snapshot captured "2 windows ·
+> PowerRename, Calculator", restore reopened them, 0 errors. (NOTE: a case-only filename collision
+> `WorkspaceTimeline.tsx` vs `workspaceTimeline.ts` broke HMR on Windows; fixed by renaming the store
+> to `workspaceTimelineStore.ts` -- avoid case-only-differing filenames in one dir.)
+>
+> **CHECKPOINT (2026-06-25b) — Shell/Home cleanup + Spotlight "never a dead end".**
+> Focused, verified slice against the "improve shell + home, clear dead code, improve speed" ask
+> (tsc 0, 63/63 targeted tests pass, verified live in preview: 0 console errors).
+> (1) **Dead-code purge** -- removed the orphaned `QuickAccessApps` component + its `ALL_AVAILABLE_APPS`
+> table from `pages/Home.tsx` (defined, never rendered since the Home redesign) and deleted its only
+> backing store `store/homeAppsStore.ts` (-172 lines Home, -1 file). `RegistryCommandPalette` was
+> KEPT (it has a live test suite; it is the cleaner registry-driven design and a candidate to
+> eventually replace the hardcoded palette, not dead).
+> (2) **Command palette speed** -- math/unit evaluation (`tryEvalMath`/`tryUnitConvert`) now runs only
+> when the query contains a digit; the common alpha-query keystroke path ("notes", "settings") no
+> longer spins up the safe-math parser + conversion regex on every character.
+> (3) **Spotlight is never a dead end** -- a non-empty query now always offers a "Search the web for
+> \"<q>\"" action under Quick Actions, reusing the proven `dex-spotlight-navigate` ->
+> AppManager -> Browser contract (same path Quick Actions/Flow use). Suppressed for pure math/unit
+> queries (which already show an inline result) and excluded from the recent-commands memory.
+> Verified live: `12*9 = 108`, `5 km to mi = 3.106856 mi`, `notes` -> real matches + web fallback,
+> `asdfqwer` -> web fallback only.
+> **Next waves (need their own verified passes, NOT done):** Settings deep-links in the palette
+> (requires extracting `SECTIONS` metadata into a shared module so the palette doesn't pull the whole
+> Settings bundle, then mapping query->sectionId via `dex-settings-navigate`); Quick Look real
+> file-system preview; Time Machine-style scheduled snapshots; PowerRename bulk-rename surface.
+>
 > **CHECKPOINT (2026-06-25) — Ultra-premium overhaul, wave 1: launcher motion + Glass 2.0 depth + Control Center.**
 > Against the ULTRA PREMIUM OVERHAUL brief. Shipped this wave (all tsc 0, watermark 0, verified live):
 > (1) **DEX Bar elevated** -- premium one-time entrance fade (opacity-only so it never fights the
@@ -2495,6 +2870,218 @@ REMAINING (lower leverage / deferred):
 > text in ANY surface shows a floating "Ask UKI" chip (or Ctrl/Cmd+Shift+U) that routes the selection to the
 > agent loop via `dex-uki-ask` — no per-app wiring. Builds on the provider-agnostic ReAct agent (web search +
 > app control) shipped earlier. tsc 0, watermark lint 0 (2162).
+
+## Imosion: pro-DAW overhaul (Logic Pro + FL Studio standard)
+
+Goal: bring Imosion to professional standard and beyond, learning from Logic Pro and FL Studio.
+Priority order: Imosion UI/UX + missing creative features FIRST, then Games, Task Manager,
+Achievements (Apple-inspired). Only add what is genuinely missing; do not rebuild what exists.
+
+> **DONE — Imosion fast open/close + pro UI pass.** (1) Speed: removed the on-mount
+> `getUserMedia({audio:true})` mic activation (it prompted + blocked first paint on every launch);
+> device enumeration and `requestMIDIAccess` now run on `requestIdleCallback` so opening/closing is
+> instant. Mic permission is requested lazily by `startRecording`. (2) Piano roll: realistic
+> white/black keyboard column (52px -> 90px) with octave labels, scale/root ticks and live note
+> highlight; configurable row height (14px -> 22px default) with a vertical key-zoom control (12-40).
+> (3) Mixer: channel strips 108px -> 132px, real fader cap + 0 dB line + dB scale, larger pan knob,
+> bigger M/S/R; bus/master strips 94px -> 116px; sidechain overlay geometry updated. (4) Panels:
+> plugin panel 260 -> 340 (min 280, max 540), track panel 200 -> 224 (min 180, max 420). tsc 0.
+
+> **DONE — Imosion piano-roll creative tools (FL/Logic-inspired, net-new).** Added Note Color
+> (per-note color tag + palette + colored rendering), Quick Legato, Strum up/down, Flam, Humanize,
+> Arpeggiate (chord -> run), and Typing-Keyboard-to-Piano (A-K play the preview synth, Z/X octave).
+> All operate on the selection or the whole part. New "TOOLS" row in the piano roll. tsc 0, verified
+> in preview (tools render, color applies, no console errors).
+
+> **DONE — Imosion workflow batch 2 (FL/Logic gap fill).** Shipped: Stamp tool (drops a diatonic
+> triad in the current key/scale on click — new 'stamp' piano-roll tool); Smart Controls / Macros
+> (one knob drives many plugin params via 0..1 -> min..max mapping, with a Track->Plugin->Param
+> assign form); searchable Plugin Picker (live filter in the FX browser); Freeze / Bounce-in-Place
+> (wires `frozenTracks` — bypasses the FX chain in the live graph, FROZEN badge + context toggle);
+> Channel-Strip Presets (save/recall a track's volume+pan+full chain, localStorage-persisted);
+> Track / Project Alternatives (named whole-session snapshots: tracks/buses/MIDI/tempo/master,
+> capture+restore); Event List editor (table of all MIDI notes, edit start/length/velocity, delete);
+> Tap Tempo (manual Smart Tempo next to BPM); Clone/Duplicate Track (context menu). New WORKFLOW
+> section in the Tools menu. Step sequencer already existed (beatmaker view). tsc 0; verified in
+> preview (menu items, stamp tool, Event List modal, Note Color all render; no console errors).
+
+> **DONE — Tooltip purge + Beats actually plays.** (1) Removed ALL HTML `title=` tooltips from the
+> creative apps (179 across imosion/prism/forge/vinx/flux/axl) via a careful attribute-stripper that
+> leaves `aria-label` for a11y and skips SVG `<title>` + object keys; fixed the one over-removal
+> (vinx EmptyState `title` is visible text). Pro controls speak for themselves now. (2) Fixed a real
+> Beats bug: the sequencer was SILENT (it only moved the playhead). Extracted a shared
+> `triggerDrumPad(pad, velocity, index)` and wired it into the rAF tick via a live `beatSeqRef`
+> snapshot (no stale closures / no playback restarts) so active cells now sound. (3) Per-lane
+> Mute/Solo (FL channel-rack style) in the Beats lane column, honored by the trigger; clicking a lane
+> name previews its sound. tsc 0; verified in preview (16 M/S lanes render, Play/Stop runs, no errors).
+
+> **DONE — Playback power cut (30fps state throttle).** The "Smooth Playback" rAF called
+> `setCurrentTime` EVERY frame (~60fps), re-rendering the whole 9.7k-line component 60x/sec during
+> playback — the main power drain. `currentTimeRef` still updates every frame (audio stays
+> sample-accurate); the React state update is throttled to ~30fps (`STATE_UPDATE_INTERVAL` 16->33),
+> halving playback re-renders with no visible scrubber change. Verified: Imosion mounts + playback
+> advances. The full per-view split was NOT attempted — the repo is mid-edit elsewhere (unrelated tsc
+> errors: ProjectDashboard `SCOPED_CSS`, QRCodeGenerator `QR_SCOPED_CSS`; and a parallel pass is
+> retheming the Imosion Knob/EQ to muted analog colors), so a 140-line structural move would collide.
+> Next when the tree is stable: DOM-driven playhead (decouple playhead motion from React) + per-view memo.
+
+> **DONE — DOM-driven playhead (15fps state, 60fps playhead).** Both playheads (arrange + piano
+> roll) now carry refs (`arrangePlayheadRef`/`pianoPlayheadRef`); the playback rAF writes their
+> `left` straight to the DOM every frame using value mirrors (`phZoomRef`/`phBpmRef`/`phPrZoomRef`,
+> since the rAF effect deps can't include them). With the playhead decoupled from React, the time
+> state now updates at ~15fps (`STATE_UPDATE_INTERVAL` 33->66) — quarters full-component re-renders
+> vs the original 60fps, big power win, playhead stays buttery. tsc 0 (Imosion clean). IMPORTANT
+> VERIFICATION FINDING: the offscreen preview PAUSES requestAnimationFrame (a 500ms rAF probe never
+> completed -> 30s timeout), so playback clock / playhead / meters / beat animation CANNOT be observed
+> there — they only run in a focused real app window. Verify rAF features by tsc + code review, not
+> the preview.
+
+> **DONE — Piano-roll note dragging (move + resize + marquee).** Core DAW interaction that was
+> entirely DEAD: `pianoRollDrag` was set by the resize handle but NEVER consumed, so notes couldn't be
+> moved OR resized. Wired three mouse-event handlers (no rAF, so verifiable): `startNoteMove` (drag the
+> selection by snapped beats + semitones, group-aware, 3px threshold, alt=toggle slide, shift=add to
+> selection), `startNoteResize` (drag the right edge to set duration, snapped), `startMarquee`
+> (rubber-band box-select from empty grid space, shift=additive) with a live marquee rectangle. The
+> dead `pianoRollDrag` state was removed. tsc 0; VERIFIED in preview with synthetic mouse events — a
+> note dragged exactly +2 beats (0->128px) and +2 semitones (506->462px), correctly snapped.
+
+> **DONE — Piano-roll editing keys + double-click delete.** Added a piano-roll keydown handler
+> (active only when the roll is visible, ignores text fields): Copy (Ctrl/Cmd+C), Cut (X), Paste (V,
+> at the snapped playhead, clipboard normalized to t=0 in `prClipboardRef`), Duplicate (D, +1 bar),
+> Select-All (A), and Delete/Backspace to remove the selection. Notes also double-click-to-delete.
+> The velocity-lane drag already existed (kept). tsc 0; VERIFIED in preview: copy/paste 11->22 notes,
+> double-click 22->21, select-all + Delete -> 0, no console errors. (Preview note: this server had to
+> be restarted via preview_start `npm run dev:renderer` on :5180 — the harness server kept dropping.)
+
+> **DONE — Piano-roll zoom (Ctrl+wheel) + right-click context menu.** (1) Ctrl/Cmd+wheel zooms the
+> roll horizontally (`pianoRollZoom` 24..220), Ctrl+Shift+wheel zooms key height — zoom-toward-cursor
+> behavior FL/Logic users expect, on top of the existing toolbar +/- buttons. (2) Right-click anywhere
+> in the roll opens a context menu (Copy/Paste/Duplicate/Delete/Select-All/Quantize/Humanize/Legato +
+> note-colour swatches); right-clicking a note selects it first so the action targets it. Extracted
+> the edit ops into reusable callbacks (`prCopy`/`prPaste`/`prDuplicate`/`prDeleteSelected`/
+> `prSelectAll`) now shared by BOTH the keyboard shortcuts and the menu (no duplicated logic). tsc 0;
+> VERIFIED in preview: Ctrl+wheel grew a note 32->39px, menu renders with all actions, menu Duplicate
+> 14->15 notes.
+
+> **DONE — Piano-roll nudge + glue + chop.** Arrow keys nudge the selection (Left/Right = +/- snap in
+> time, Up/Down = +/- semitone, Shift+Up/Down = octave). `prGlue` merges selected same-pitch notes
+> into one spanning note; `prChop` splits each selected note into snap-grid pieces (FL Glue/Chop). Both
+> added to the right-click menu; all three are reusable callbacks. tsc 0; VERIFIED in preview: arrow
+> nudge moved a note +32px and -1 semitone, menu Chop split 11->24 notes, menu shows Glue+Chop. Page
+> churn during verification traced to a concurrent UkiOverlay.tsx HMR failure (not Imosion, not mine).
+
+> **DONE — Piano-roll Reverse + Invert (FL Flip H/V).** `prReverse` mirrors note timing within the
+> target span; `prInvert` mirrors pitches around the selection's lo/hi center. Both operate on the
+> selection (or the whole part if nothing selected) and are in the right-click menu. tsc 0. Live
+> click-verification was blocked by the dev server dying (concurrent UkiOverlay/LockScreen HMR
+> failures keep crashing it), but they're trivial pure transforms wired into the SAME menu mechanism
+> already verified this session (Chop 11->24, Duplicate 14->15 clicked through it).
+
+> **DONE — Piano-roll per-note Mute (FL).** `MidiNote.muted` + `prMuteToggle` (right-click "Mute /
+> Unmute" and the `M` key) toggle mute on the selection. Muted notes render dashed + 35% opacity and
+> are skipped in all 3 playback/export scheduling loops. tsc 0. (Couldn't live-verify: both dev-server
+> ports were held by a concurrent chat's servers; same menu/keyboard patterns verified earlier.)
+
+> **STATUS — Imosion piano roll is now FL/Logic-complete.** Editing toolkit shipped across this
+> session: draw/select/erase/stamp tools, marquee box-select, drag-move, edge-resize, copy/cut/paste/
+> duplicate, delete + double-click-delete, arrow-nudge (time+pitch+octave), glue, chop, reverse,
+> invert, quantize, humanize, legato, strum up/down, flam, arpeggiate, slide/glide, note colors,
+> scale highlight, typing-keyboard input, Ctrl+wheel zoom (H + key height), right-click context menu,
+> velocity lane. Arrange + piano-roll right-click menus both complete. Remaining FL/Logic items are
+> the big Channel-Rack rebuild and ML/DSP-blocked features (Drummer/Session Players, Flex Time,
+> Audio-to-MIDI, Stem Separation, Dolby Atmos) — NOT started (correctly deferred, not faked).
+
+> **DONE — Solid menus + Piano Roll horizontal zoom/slide.** (1) Imosion dropdowns (File/Tools/
+> Panels) were translucent (`--color-bg-elevated` glass token) — made SOLID `#16161b` so menus aren't
+> see-through. (2) The piano roll was reusing the arrange `zoom` (=40 -> 2400px/beat, the "washed-up"
+> feel); gave it its OWN `pianoRollZoom` (px/beat, default 64, 24..220) with horizontal Zoom in/out
+> buttons next to the existing vertical key-zoom; bar grid-lines + playhead boldened for clarity.
+> (3) `Slide` tool added to the piano-roll TOOLS row (`toggleSlideSelected` toggles portamento on the
+> selection). Velocity lane + Note Color already present. tsc 0; verified in preview (solid menu bg
+> rgb(22,22,27); H-zoom, V-zoom, Slide, velocity all render). Unrelated: a LockScreen.tsx HMR error
+> exists in the shell (caught by AppErrorBoundary) — not from Imosion, left for its owner.
+
+> **DONE — Toned-down TOOLS colors + hardware Beat Maker.** (1) The piano-roll TOOLS color
+> swatches were full-saturation 16px squares ("too loud") — now muted 11px dots at 0.6 opacity that
+> brighten on hover. (2) Beat Maker restyled into a real hardware step sequencer: recessed slot cells
+> that light like LEDs when active (lane colour + glow, brighter on the playhead), steps grouped in
+> 4s with gaps, downbeats tinted, whole row dims when muted/soloed-out (`BEAT_PAD_COLORS` hoisted to
+> module scope). Live pads are now MPC-style rubber pads (raised gradient + bevel, press = inset +
+> glow + scale). tsc 0; verified in preview (16 lanes + pads render, no runtime errors). Lag: the
+> remaining felt cost is the playhead tick re-rendering the whole component — fixed properly only by
+> the per-view split (still the honest next task; not rushed mid-rebuild).
+> **DONE — Imosion pro rebuild (audio-engineer pass, against the Acon Remix reference).**
+> Built 3 reusable pro components under `imosion/components/`: `Knob` (270deg rotary, drag/shift-fine/
+> dbl-reset/wheel, bipolar arc), `Fader` (real grab-the-cap vertical fader, dB ticks, unity line,
+> optional meter — replaces the deprecated `WebkitAppearance: slider-vertical`), and `ParametricEQ`
+> (interactive frequency-response curve with draggable low-shelf/mid-bell/high-shelf nodes wired to
+> the eq plugin's real params). Rebuilt the mixer: the inline per-track strip is now a **memoized
+> `MixerChannel`** (this kills the lag — editing one channel no longer re-renders all of them), with
+> the new Fader + Pan Knob, cleaner layout, and **drag-to-reorder FX chain**. The right-panel plugin
+> editor now shows **real rotary knobs** for every param + the **Pro EQ curve** for eq plugins.
+> Sidechain router actually wires now: the Sidechain panel's "Apply Routing" finds/creates the
+> target's compressor and sets its `sidechainSource` + params (was previously orphaned state). Tools
+> menu is now **multi-column** (`.frosted-dropdown.cols`) so the long list isn't an endless scroll.
+> tsc 0; mixer + components verified in preview (faders, knobs, no Imosion console errors).
+
+> **DONE — Imosion lag + live meters pass.** (1) Lag: `Knob` and `Fader` coalesce drag updates to
+> one per animation frame (a fast drag was firing 120+ state updates/sec, each re-running the
+> 9000-line render). (2) Live meters: one shared rAF taps each track's post-fader gain node with a
+> non-destructive `AnalyserNode` and writes the level straight into the meter DOM via
+> `data-imosion-meter` (no React state -> zero re-render), only while the mixer is on screen — the
+> reference's signature green meters, done performantly. (3) Taller faders (168px) + boxed dB
+> readouts. NOTE: Imosion is too big for Vite fast-refresh, so edits need a window refresh to show;
+> the deeper lag fix (split Imosion into per-view components so only the active view re-renders) is
+> the next item. tsc 0; verified in preview (channels render faders/knobs/meters, no runtime errors).
+
+### Imosion remaining backlog (gap analysis vs FL/Logic)
+
+Renderer-feasible but larger (future batches):
+- Ghost notes (faint notes from other parts) — needs a multi-part note model first
+- Live Loops grid (cell launcher) + Performance Mode
+- Take comping / Quick-Swipe over the existing Comp Lanes
+- Detached/floating plugin windows; Visual Mixer (node view); Frequency Splitter (multiband routing)
+- Full automation graph point editing; MIDI Transform sets; multi-output instrument routing
+- Per-track latency compensation (reporting/PDC)
+
+Out of renderer scope (ML / native): Audio-to-MIDI, Stem Separation, true Smart Tempo audio onset
+detect, AI Drummer & Session Players, Dolby Atmos / spatial, true Flex Time engine, hardware MIDI
+scripting, native plugin sandboxing. These need DSP/ML or native hosting we don't fake.
+
+### Creative apps — pro-controls pass (applying Imosion's bar to the rest, one by one)
+> **DONE — Prism + global creative sliders.** (1) Prism `AdjustmentControls` native `<input
+> type=range>` replaced with a Lightroom-style draggable slider: recessed track, accent fill from the
+> natural origin (centre for bipolar params like Brightness/Contrast/Hue, left otherwise), metal
+> thumb, scroll-to-nudge, double-click reset (sensible `def` per param). (2) Global CSS in
+> design-system.css upgrades EVERY native slider under `.dex-creative-panel`/`-strong` (Vinx/Prism/
+> Forge) to a console look (recessed track + bevelled metal cap), webkit + moz. tsc 0; CSS-only for
+> the global rule. Couldn't live-verify (concurrent chat holds both dev ports).
+> **DONE — Pro sliders now cover ALL creative apps.** Forge + Vinx native sliders already sit under
+> `.dex-creative-panel(-strong)` so the global console-slider rule covers them. Flux didn't use that
+> class, so added `className="flux-root"` to its root + extended the CSS selector — every Flux slider
+> (20+ across its floating panels) now renders as a console control too. tsc 0. Imosion, Prism, Vinx,
+> Forge, Flux all share the hardware-slider look.
+> **DONE — Vinx clip menu Split/Duplicate + Flux keyframe right-click delete.** Vinx clip context
+> menu gained "Split at Playhead" (reuses the proven Ctrl+K split: clone L/R with adjusted media
+> in/out) and "Duplicate" (clone placed right after, via `getClipById` + `_addClip`). Flux timeline
+> keyframes restructured to keep their animation index so right-click deletes that exact keyframe
+> (`setLayers` filter). tsc 0. (Not live-verified — concurrent chat holds the dev ports; both follow
+> patterns already verified this session.)
+> **VERIFIED LIVE (port 5199).** Fixed the preview block: project Vite is pinned to 5173/strict, so
+> added a `dex-auto` launch config on an explicit free port (5199). On that server, all creative apps
+> mount clean with NO console errors and NO error boundary: Prism (console slider computed 5px +
+> gradient), Vinx, Forge, Flux (`.flux-root` present + slider console-style applied). Imosion note-mute
+> verified (Ctrl+A + M -> 10/10 notes dashed + 0.35 opacity). The server crashes every ~6 evals from
+> the concurrent chat's shared `.vite` cache, so the few remaining deep click-paths (Imosion
+> Reverse/Invert post-state, Vinx Split/Duplicate click, Flux keyframe-delete click) are tsc-clean +
+> wired into menus already clicked-verified this session — high confidence, not yet click-captured.
+- Still queued (genuinely new work): Flux draggable keyframes + wiring its dead controls (camera DOF /
+  distribute / A-B snapshot); Forge real waveform + trim scrubber; Vinx color-wheel RGB readouts.
+
+### After Imosion (queued)
+- Games app — UI/UX pass, Apple-inspired internals
+- Task Manager — UI/UX pass, Apple-inspired internals
+- Achievements — UI/UX pass, Apple-inspired internals
 
 ## Build / run
 

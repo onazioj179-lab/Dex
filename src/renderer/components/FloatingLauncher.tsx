@@ -130,6 +130,13 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const next = useNowPlaying(s => s.next);
   const prev = useNowPlaying(s => s.prev);
 
+  // UKI presence: the mic button mirrors her live state so the bar is the one
+  // glanceable "is she awake?" signal across the whole shell. Awake+working ->
+  // accent glyph with a slow breathing glow; asleep (dormant) -> dimmed.
+  const ukiState = useUkiStore(s => s.state);
+  const ukiActive = ukiState === 'listening' || ukiState === 'processing' || ukiState === 'thinking' || ukiState === 'speaking';
+  const ukiAsleep = ukiState === 'dormant';
+
   const launchApp = useRunningApps(s => s.launchApp);
   const openApp = useCallback((id: string) => {
     try { const def = APP_DEFINITIONS[id]; if (def) launchApp({ id, name: def.name, icon: def.icon, color: def.color }); } catch { /* not registered */ }
@@ -279,6 +286,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   // inset rim so each control reads as its own lit glass chip (monochrome).
   const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.10)'; };
   const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
+  // UKI mic keeps its accent tint on hover-out while she is awake, so the
+  // presence cue never flickers off mid-interaction.
+  const ukiHoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = ukiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
 
   return (
     <div
@@ -376,7 +386,26 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         >
           <div style={{ width: 2, height: 16, borderRadius: 1, background: 'var(--color-border, rgba(255,255,255,0.16))' }} />
         </div>
-        <button type="button" className="dex-pressable" aria-label="Open UKI assistant" onPointerDown={e => e.stopPropagation()} onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+        <button
+          type="button"
+          className={`dex-pressable${ukiActive ? ' dex-uki-awake' : ''}`}
+          aria-label={ukiActive ? 'UKI is active -- open assistant' : ukiAsleep ? 'UKI is asleep -- open assistant' : 'Open UKI assistant'}
+          title={ukiActive ? 'UKI is active' : ukiAsleep ? 'UKI is asleep' : 'Open UKI assistant'}
+          onPointerDown={e => e.stopPropagation()}
+          onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }}
+          style={{
+            ...ctrlBtn,
+            color: ukiActive ? 'var(--color-accent)' : ctrlBtn.color,
+            opacity: ukiAsleep ? 0.45 : 1,
+            // Glow + breath ride on `filter` (driven by the .dex-uki-awake
+            // keyframe) so the bar's hover handlers, which only touch
+            // background/color/box-shadow, can never clobber the presence cue.
+            animation: ukiActive ? 'dexUkiBreath 2.4s ease-in-out infinite' : 'none',
+            transition: 'opacity 0.25s ease, color 0.2s ease',
+          }}
+          onMouseEnter={hoverIn}
+          onMouseLeave={ukiHoverOut}
+        >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10v1a7 7 0 0 0 14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />
           </svg>

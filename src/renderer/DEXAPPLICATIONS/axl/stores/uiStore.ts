@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 
 export type PanelTab = 'properties' | 'material' | 'constraints' | 'features' | 'history';
+export type InspectorTab = 'configs' | 'views' | 'interference' | 'section';
 
 export interface AIMessage {
   role: 'user' | 'assistant';
@@ -38,6 +39,12 @@ interface UIStore {
   toggleSettings: () => void;
   showDrawing: boolean;
   toggleDrawing: () => void;
+  showInspector: boolean;
+  toggleInspector: () => void;
+  showSketch: boolean;
+  toggleSketch: () => void;
+  inspectorTab: InspectorTab;
+  setInspectorTab: (tab: InspectorTab) => void;
 
   // AI assistant
   showAI: boolean;
@@ -95,6 +102,12 @@ export const useUIStore = create<UIStore>()((set) => ({
   toggleSettings: () => set(s => ({ showSettings: !s.showSettings })),
   showDrawing: false,
   toggleDrawing: () => set(s => ({ showDrawing: !s.showDrawing })),
+  showInspector: false,
+  toggleInspector: () => set(s => ({ showInspector: !s.showInspector })),
+  showSketch: false,
+  toggleSketch: () => set(s => ({ showSketch: !s.showSketch })),
+  inspectorTab: 'configs',
+  setInspectorTab: (tab) => set({ inspectorTab: tab }),
 
   showAI: false,
   toggleAI: () => set(s => ({ showAI: !s.showAI })),
@@ -139,6 +152,8 @@ export const useUIStore = create<UIStore>()((set) => ({
     showExport: false,
     showSettings: false,
     showDrawing: false,
+    showInspector: false,
+    showSketch: false,
     showAI: false,
   }),
 }));

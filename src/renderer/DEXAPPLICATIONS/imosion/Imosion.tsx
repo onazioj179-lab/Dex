@@ -13,7 +13,13 @@ import { detectTempo, detectOnsets } from '../../../shared/media/beatDetect';
 import { decodeAudioToMono } from '../../services/media/decodeAudio';
 import { useRunningApps } from '../../store/runningApps';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import DexIcon from '../../components/DexIcon';
+import Knob from './components/Knob';
+import Fader from './components/Fader';
+import ParametricEQ from './components/ParametricEQ';
+import { paintRackPlayhead } from './ImosionRackPlayhead';
+import { evenChopBounds, computeChopSegments } from './ImosionChop';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
@@ -65,6 +71,19 @@ import { DexSearchInput } from '../../styles/components';
 // ==================== APP IDENTITY ====================
 export const IMOSION_VERSION = '1.0.0';
 export const IMOSION_BUILD_DATE = '2026-04-11';
+
+// Shared fallback AudioContext. Used ONLY when the AudioEngine has no context
+// yet (e.g. a drum pad / piano / chord preview fires before init() resolves).
+// Reused across every fallback call site so these paths can't each spawn a fresh
+// AudioContext -- browsers cap the number of live contexts (~6), so leaking one
+// per pad hit would eventually kill all audio in a long session.
+let _imosionFallbackCtx: AudioContext | null = null;
+function sharedFallbackCtx(sampleRate?: number): AudioContext {
+  if (!_imosionFallbackCtx || _imosionFallbackCtx.state === 'closed') {
+    _imosionFallbackCtx = sampleRate ? new AudioContext({ sampleRate }) : new AudioContext();
+  }
+  return _imosionFallbackCtx;
+}
 
 // ==================== TYPES ====================
 type RoutingDestination = 'master' | string; // master or bus ID
@@ -345,6 +364,8 @@ interface MidiNote {
   velocity: number; // 0-127
   selected?: boolean;
   slide?: boolean; // Glide Notes: portamento — glide pitch from the previous note
+  color?: string; // Note Color (FL-style): per-note color tag for organising parts
+  muted?: boolean; // Per-note mute (FL): kept in the part but skipped on playback/export
 }
 
 interface MidiClip {
@@ -465,7 +486,7 @@ const INSTRUMENT_PRESETS: Record<InstrumentType, { name: string; params: Record<
 };
 
 const INSTRUMENT_COLORS: Record<InstrumentType, string> = {
-  subsynth: '#bf5af2',
+  subsynth: '#8a6a9c',
   fmsynth: 'var(--color-warning)',
   wavetable: 'var(--color-success)',
   sampler: 'var(--color-accent)',
@@ -532,7 +553,7 @@ const PLUGIN_LIBRARY: Record<PluginType, { name: string; abbr: string; color: st
     { key: 'lowFreq', label: 'LF', min: 20, max: 500, default: 100, unit: 'Hz' },
     { key: 'highFreq', label: 'HF', min: 2000, max: 20000, default: 8000, unit: 'Hz' },
   ]},
-  compressor: { name: 'Compressor', abbr: 'CMP', color: '#bf5af2', params: [
+  compressor: { name: 'Compressor', abbr: 'CMP', color: '#8a6a9c', params: [
     { key: 'threshold', label: 'Thresh', min: -60, max: 0, default: -20, unit: 'dB' },
     { key: 'ratio', label: 'Ratio', min: 1, max: 20, default: 4, unit: ':1' },
     { key: 'attack', label: 'Atk', min: 0.1, max: 100, default: 10, unit: 'ms' },
@@ -540,7 +561,7 @@ const PLUGIN_LIBRARY: Record<PluginType, { name: string; abbr: string; color: st
     { key: 'makeupGain', label: 'Gain', min: 0, max: 24, default: 0, unit: 'dB' },
     { key: 'sidechainSource', label: 'SC Src', min: -1, max: 125, default: -1, unit: '' },
   ]},
-  reverb: { name: 'Reverb', abbr: 'REV', color: '#64d2ff', params: [
+  reverb: { name: 'Reverb', abbr: 'REV', color: '#4a7896', params: [
     { key: 'roomSize', label: 'Room', min: 0, max: 100, default: 50, unit: '%' },
     { key: 'damping', label: 'Damp', min: 0, max: 100, default: 50, unit: '%' },
     { key: 'wetDry', label: 'Mix', min: 0, max: 100, default: 30, unit: '%' },
@@ -551,7 +572,7 @@ const PLUGIN_LIBRARY: Record<PluginType, { name: string; abbr: string; color: st
     { key: 'feedback', label: 'FB', min: 0, max: 95, default: 40, unit: '%' },
     { key: 'wetDry', label: 'Mix', min: 0, max: 100, default: 30, unit: '%' },
   ]},
-  chorus: { name: 'Chorus', abbr: 'CHR', color: '#ff375f', params: [
+  chorus: { name: 'Chorus', abbr: 'CHR', color: '#a05a68', params: [
     { key: 'rate', label: 'Rate', min: 0.1, max: 10, default: 1, unit: 'Hz' },
     { key: 'depth', label: 'Depth', min: 0, max: 100, default: 50, unit: '%' },
     { key: 'wetDry', label: 'Mix', min: 0, max: 100, default: 50, unit: '%' },
@@ -572,12 +593,12 @@ const PLUGIN_LIBRARY: Record<PluginType, { name: string; abbr: string; color: st
     { key: 'threshold', label: 'Thresh', min: -40, max: 0, default: -20, unit: 'dB' },
     { key: 'ratio', label: 'Ratio', min: 1, max: 10, default: 4, unit: ':1' },
   ]},
-  saturation: { name: 'Saturation', abbr: 'SAT', color: '#bf5af2', params: [
+  saturation: { name: 'Saturation', abbr: 'SAT', color: '#8a6a9c', params: [
     { key: 'drive', label: 'Drive', min: 0, max: 100, default: 30, unit: '%' },
     { key: 'warmth', label: 'Warm', min: 0, max: 100, default: 50, unit: '%' },
     { key: 'mix', label: 'Mix', min: 0, max: 100, default: 50, unit: '%' },
   ]},
-  autotune: { name: 'Pitch Correct', abbr: 'TUNE', color: '#64d2ff', params: [
+  autotune: { name: 'Pitch Correct', abbr: 'TUNE', color: '#4a7896', params: [
     { key: 'speed', label: 'Speed', min: 0, max: 100, default: 50, unit: '%' },
     { key: 'scale', label: 'Key', min: 0, max: 11, default: 0, unit: '' },
     { key: 'humanize', label: 'Human', min: 0, max: 100, default: 30, unit: '%' },
@@ -850,52 +871,56 @@ const PITCH_PRESETS = [
 
 const DEFAULT_TEMPLATES: RecordingTemplate[] = [
   { id: 'vocal', name: 'Vocal Session', bpm: 120, sampleRate: 96000, bitDepth: 32, createdAt: 0, buses: [
-    { id: 'bus-verb', name: 'Reverb', type: 'fx', color: '#64d2ff', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
-    { id: 'bus-delay', name: 'Delay', type: 'fx', color: 'var(--color-success)', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
+    { id: 'bus-verb', name: 'Reverb', type: 'fx', color: '#4a7896', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
+    { id: 'bus-delay', name: 'Delay', type: 'fx', color: '#4f8a60', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
   ], tracks: [
-    { id: 't1', name: 'Lead Vocal', type: 'audio', volume: 0.85, pan: 0, muted: false, solo: false, armed: true, color: 'var(--color-accent)', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.3, preFader: false }], phase: false, trim: 0, inputSource: '' },
-    { id: 't2', name: 'Harmonies', type: 'audio', volume: 0.7, pan: -0.15, muted: false, solo: false, armed: false, color: '#bf5af2', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't1', name: 'Lead Vocal', type: 'audio', volume: 0.85, pan: 0, muted: false, solo: false, armed: true, color: '#5a78a0', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.3, preFader: false }], phase: false, trim: 0, inputSource: '' },
+    { id: 't2', name: 'Harmonies', type: 'audio', volume: 0.7, pan: -0.15, muted: false, solo: false, armed: false, color: '#8a6a9c', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
   ]},
   { id: 'podcast', name: 'Podcast', bpm: 120, sampleRate: 48000, bitDepth: 24, createdAt: 0, buses: [], tracks: [
-    { id: 't1', name: 'Host', type: 'audio', volume: 0.9, pan: -0.25, muted: false, solo: false, armed: true, color: 'var(--color-accent)', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
-    { id: 't2', name: 'Guest', type: 'audio', volume: 0.9, pan: 0.25, muted: false, solo: false, armed: false, color: 'var(--color-warning)', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't1', name: 'Host', type: 'audio', volume: 0.9, pan: -0.25, muted: false, solo: false, armed: true, color: '#5a78a0', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't2', name: 'Guest', type: 'audio', volume: 0.9, pan: 0.25, muted: false, solo: false, armed: false, color: '#a8744a', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
   ]},
   { id: 'band', name: 'Full Band', bpm: 120, sampleRate: 96000, bitDepth: 32, createdAt: 0, buses: [
-    { id: 'bus-drums', name: 'Drum Bus', type: 'group', color: 'var(--color-error)', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
-    { id: 'bus-verb', name: 'Plate Reverb', type: 'fx', color: '#64d2ff', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
+    { id: 'bus-drums', name: 'Drum Bus', type: 'group', color: '#9e5a55', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
+    { id: 'bus-verb', name: 'Plate Reverb', type: 'fx', color: '#4a7896', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' },
   ], tracks: [
-    { id: 't1', name: 'Kick', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: false, color: 'var(--color-error)', plugins: [], output: 'bus-drums', sends: [], phase: false, trim: 0, inputSource: '' },
-    { id: 't2', name: 'Snare', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: false, color: 'var(--color-error)', plugins: [], output: 'bus-drums', sends: [{ id: 's1', busId: 'bus-verb', level: 0.2, preFader: false }], phase: false, trim: 0, inputSource: '' },
-    { id: 't3', name: 'Bass', type: 'audio', volume: 0.75, pan: 0, muted: false, solo: false, armed: false, color: 'var(--color-warning)', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
-    { id: 't4', name: 'Guitar', type: 'audio', volume: 0.7, pan: -0.4, muted: false, solo: false, armed: false, color: 'var(--color-success)', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.35, preFader: false }], phase: false, trim: 0, inputSource: '' },
-    { id: 't5', name: 'Vocal', type: 'audio', volume: 0.85, pan: 0, muted: false, solo: false, armed: true, color: 'var(--color-accent)', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.25, preFader: false }], phase: false, trim: 0, inputSource: '' },
+    { id: 't1', name: 'Kick', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: false, color: '#9e5a55', plugins: [], output: 'bus-drums', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't2', name: 'Snare', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: false, color: '#9e5a55', plugins: [], output: 'bus-drums', sends: [{ id: 's1', busId: 'bus-verb', level: 0.2, preFader: false }], phase: false, trim: 0, inputSource: '' },
+    { id: 't3', name: 'Bass', type: 'audio', volume: 0.75, pan: 0, muted: false, solo: false, armed: false, color: '#a8744a', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't4', name: 'Guitar', type: 'audio', volume: 0.7, pan: -0.4, muted: false, solo: false, armed: false, color: '#4f8a60', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.35, preFader: false }], phase: false, trim: 0, inputSource: '' },
+    { id: 't5', name: 'Vocal', type: 'audio', volume: 0.85, pan: 0, muted: false, solo: false, armed: true, color: '#5a78a0', plugins: [], output: 'master', sends: [{ id: 's1', busId: 'bus-verb', level: 0.25, preFader: false }], phase: false, trim: 0, inputSource: '' },
   ]},
   { id: 'empty', name: 'Empty', bpm: 120, sampleRate: 96000, bitDepth: 32, createdAt: 0, buses: [], tracks: [
-    { id: 't1', name: 'Track 1', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: true, color: 'var(--color-accent)', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
+    { id: 't1', name: 'Track 1', type: 'audio', volume: 0.8, pan: 0, muted: false, solo: false, armed: true, color: '#5a78a0', plugins: [], output: 'master', sends: [], phase: false, trim: 0, inputSource: '' },
   ]},
 ];
 
 const COLORS = CLIP_COLORS.map(c => c.color);
 
+// Per-lane colours for the Beat Maker step grid + drum pads (one per pad row).
+// Muted, distinct drum-lane colors (Logic/FL colour-code lanes, but restrained).
+const BEAT_PAD_COLORS = ['#9e5a55', '#a8744a', '#a08644', '#8f8748', '#4f8a60', '#4a7896', '#5a78a0', '#6b6c9c', '#8a6a9c', '#a05a68', '#ac8e68', '#6a6a72', '#7a7a82', '#8a8a92', '#aeaeb2', '#d1d1d6'];
+
 // Icons
 // External plugin catalog — populated by scanning installed VST/AU plugins
 const EXTERNAL_PLUGIN_CATALOG: ExternalPlugin[] = [
-  { id: 'ext-ozone', name: 'Ozone 11', vendor: 'iZotope', version: '11.0.1', type: 'vst3', category: 'Mastering', installed: false, color: '#6366f1' },
-  { id: 'ext-serum', name: 'Serum', vendor: 'Xfer Records', version: '1.36b5', type: 'vst3', category: 'Synthesizer', installed: false, color: '#ec4899' },
-  { id: 'ext-fabfilter-q', name: 'Pro-Q 3', vendor: 'FabFilter', version: '3.24', type: 'vst3', category: 'EQ', installed: false, color: '#f59e0b' },
-  { id: 'ext-fabfilter-c', name: 'Pro-C 2', vendor: 'FabFilter', version: '2.15', type: 'vst3', category: 'Dynamics', installed: false, color: '#f59e0b' },
-  { id: 'ext-fabfilter-l', name: 'Pro-L 2', vendor: 'FabFilter', version: '2.10', type: 'vst3', category: 'Limiter', installed: false, color: '#f59e0b' },
-  { id: 'ext-valhalla-room', name: 'ValhallaDSP Room', vendor: 'Valhalla DSP', version: '2.0.1', type: 'vst3', category: 'Reverb', installed: false, color: '#22d3ee' },
-  { id: 'ext-valhalla-delay', name: 'ValhallaDSP Delay', vendor: 'Valhalla DSP', version: '1.5.3', type: 'vst3', category: 'Delay', installed: false, color: '#22d3ee' },
-  { id: 'ext-soundtoys-decap', name: 'Decapitator', vendor: 'Soundtoys', version: '5.4.1', type: 'vst3', category: 'Saturation', installed: false, color: '#ef4444' },
-  { id: 'ext-waves-ssl', name: 'SSL G-Channel', vendor: 'Waves', version: '14.0', type: 'vst3', category: 'Channel Strip', installed: false, color: '#a855f7' },
-  { id: 'ext-waves-cla', name: 'CLA-76', vendor: 'Waves', version: '14.0', type: 'vst3', category: 'Compressor', installed: false, color: '#a855f7' },
-  { id: 'ext-spitfire-labs', name: 'LABS', vendor: 'Spitfire Audio', version: '2.4.0', type: 'vst3', category: 'Instrument', installed: false, color: '#84cc16' },
-  { id: 'ext-rc20', name: 'RC-20 Retro Color', vendor: 'XLN Audio', version: '1.3.5', type: 'vst3', category: 'Lo-Fi / FX', installed: false, color: '#fb923c' },
-  { id: 'ext-massive-x', name: 'Massive X', vendor: 'Native Instruments', version: '1.8.0', type: 'vst3', category: 'Synthesizer', installed: false, color: '#0ea5e9' },
-  { id: 'ext-kontakt', name: 'Kontakt 7', vendor: 'Native Instruments', version: '7.10', type: 'vst3', category: 'Sampler', installed: false, color: '#0ea5e9' },
-  { id: 'ext-izotope-rx', name: 'RX 10 Elements', vendor: 'iZotope', version: '10.4', type: 'vst3', category: 'Restoration', installed: false, color: '#6366f1' },
-  { id: 'ext-goodhertz-tilt', name: 'Tilt EQ', vendor: 'Goodhertz', version: '3.7', type: 'vst3', category: 'EQ', installed: false, color: '#14b8a6' },
+  { id: 'ext-ozone', name: 'Ozone 11', vendor: 'iZotope', version: '11.0.1', type: 'vst3', category: 'Mastering', installed: false, color: '#6b6c9c' },
+  { id: 'ext-serum', name: 'Serum', vendor: 'Xfer Records', version: '1.36b5', type: 'vst3', category: 'Synthesizer', installed: false, color: '#a06282' },
+  { id: 'ext-fabfilter-q', name: 'Pro-Q 3', vendor: 'FabFilter', version: '3.24', type: 'vst3', category: 'EQ', installed: false, color: '#a08644' },
+  { id: 'ext-fabfilter-c', name: 'Pro-C 2', vendor: 'FabFilter', version: '2.15', type: 'vst3', category: 'Dynamics', installed: false, color: '#a08644' },
+  { id: 'ext-fabfilter-l', name: 'Pro-L 2', vendor: 'FabFilter', version: '2.10', type: 'vst3', category: 'Limiter', installed: false, color: '#a08644' },
+  { id: 'ext-valhalla-room', name: 'ValhallaDSP Room', vendor: 'Valhalla DSP', version: '2.0.1', type: 'vst3', category: 'Reverb', installed: false, color: '#43808f' },
+  { id: 'ext-valhalla-delay', name: 'ValhallaDSP Delay', vendor: 'Valhalla DSP', version: '1.5.3', type: 'vst3', category: 'Delay', installed: false, color: '#43808f' },
+  { id: 'ext-soundtoys-decap', name: 'Decapitator', vendor: 'Soundtoys', version: '5.4.1', type: 'vst3', category: 'Saturation', installed: false, color: '#9e5a55' },
+  { id: 'ext-waves-ssl', name: 'SSL G-Channel', vendor: 'Waves', version: '14.0', type: 'vst3', category: 'Channel Strip', installed: false, color: '#8a6a9c' },
+  { id: 'ext-waves-cla', name: 'CLA-76', vendor: 'Waves', version: '14.0', type: 'vst3', category: 'Compressor', installed: false, color: '#8a6a9c' },
+  { id: 'ext-spitfire-labs', name: 'LABS', vendor: 'Spitfire Audio', version: '2.4.0', type: 'vst3', category: 'Instrument', installed: false, color: '#6f8a4e' },
+  { id: 'ext-rc20', name: 'RC-20 Retro Color', vendor: 'XLN Audio', version: '1.3.5', type: 'vst3', category: 'Lo-Fi / FX', installed: false, color: '#a8744a' },
+  { id: 'ext-massive-x', name: 'Massive X', vendor: 'Native Instruments', version: '1.8.0', type: 'vst3', category: 'Synthesizer', installed: false, color: '#4a7896' },
+  { id: 'ext-kontakt', name: 'Kontakt 7', vendor: 'Native Instruments', version: '7.10', type: 'vst3', category: 'Sampler', installed: false, color: '#4a7896' },
+  { id: 'ext-izotope-rx', name: 'RX 10 Elements', vendor: 'iZotope', version: '10.4', type: 'vst3', category: 'Restoration', installed: false, color: '#6b6c9c' },
+  { id: 'ext-goodhertz-tilt', name: 'Tilt EQ', vendor: 'Goodhertz', version: '3.7', type: 'vst3', category: 'EQ', installed: false, color: '#438a80' },
   { id: 'ext-baby-audio-super', name: 'Super VHS', vendor: 'Baby Audio', version: '1.2', type: 'vst3', category: 'Lo-Fi / FX', installed: false, color: '#e879f9' },
   { id: 'ext-ssl-native-bus', name: 'Native Bus Compressor 2', vendor: 'SSL', version: '2.0.3', type: 'vst3', category: 'Dynamics', installed: false, color: '#38bdf8' },
   { id: 'ext-vital', name: 'Vital', vendor: 'Matt Tytel', version: '1.5.5', type: 'vst3', category: 'Synthesizer', installed: false, color: '#34d399' },
@@ -1808,71 +1833,241 @@ function writeString(view: DataView, offset: number, str: string) {
 }
 
 // ==================== MEMOIZED SUB-COMPONENTS ====================
-// Track Channel Strip - Memoized for performance
-const TrackChannelStrip = memo<{
+// Pro mixer channel strip — memoized so editing one track never re-renders the
+// whole mixer (the old inline strips re-rendered all channels on every change,
+// which is what made the mixer feel laggy). Built on the real Fader + Knob.
+const MixerChannel = memo<{
   track: AudioTrack;
-  isSelected: boolean;
-  onSelect: () => void;
-  onUpdate: (updates: Partial<AudioTrack>) => void;
+  index: number;
+  selected: boolean;
   buses: AudioBus[];
-}>(({ track, isSelected, onSelect, onUpdate, buses }) => (
-  <div role="button" tabIndex={0} aria-label={`Select track ${track.name}`} aria-pressed={isSelected} onClick={onSelect} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }} style={{ width: '94px', minWidth: '94px', background: isSelected ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)', borderRadius: '8px', marginRight: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: `1px solid ${isSelected ? track.color + '40' : 'var(--color-border-subtle)'}`, overflow: 'hidden', boxShadow: isSelected ? `0 0 20px ${track.color}15` : '0 2px 8px rgba(0,0,0,0.2)' }}>
-    <div style={{ padding: 'var(--space-2) 10px', borderBottom: '1px solid var(--color-border-subtle)', background: `linear-gradient(180deg, ${track.color}25, ${track.color}10)` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <div onClick={(e) => { e.stopPropagation(); const idx = COLORS.indexOf(track.color); onUpdate({ color: COLORS[(idx + 1) % COLORS.length] }); }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.4)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }} style={{ width: 8, height: 8, borderRadius: '50%', background: track.color, cursor: 'pointer', flexShrink: 0, border: '1px solid var(--color-text-tertiary)', transition: 'transform 0.12s ease' }} title="Click to change color" />
-        <div style={{ fontSize: '10px', fontWeight: 600, color: track.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{track.name}</div>
+  frozen: boolean;
+  onSelect: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<AudioTrack>) => void;
+  onTogglePlugin: (trackId: string, pluginId: string) => void;
+  onOpenBrowser: (trackId: string) => void;
+  onReorderPlugins: (trackId: string, from: number, to: number) => void;
+}>(({ track, index, selected, buses, frozen, onSelect, onUpdate, onTogglePlugin, onOpenBrowser, onReorderPlugins }) => {
+  const dB = (track.volume - 1) * 60;
+  return (
+    <div onClick={() => onSelect(track.id)} style={{ width: '128px', minWidth: '128px', background: selected ? 'linear-gradient(180deg,#2a2a32,#1f1f26 55%,#191920)' : 'linear-gradient(180deg,#212127,#191920 55%,#141418)', borderRadius: '10px', marginRight: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, overflow: 'hidden', boxShadow: selected ? `0 0 0 1px ${track.color}44, 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)` : '0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+      {/* Header */}
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-subtle)', background: `linear-gradient(180deg, ${track.color}2e, ${track.color}10)`, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span onClick={(e) => { e.stopPropagation(); const i = COLORS.indexOf(track.color); onUpdate(track.id, { color: COLORS[(i + 1) % COLORS.length] }); }} style={{ width: 9, height: 9, borderRadius: '50%', background: track.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }} />
+        <span style={{ fontSize: '9px', fontWeight: 700, color: track.color, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>{(index + 1).toString().padStart(2, '0')}</span>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{track.name}</div>
+      </div>
+
+      {/* FX chain — drag chips to reorder, signal flows top to bottom */}
+      <div
+        onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-imosion-plugin')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }}
+        style={{ padding: '4px', borderBottom: '1px solid var(--color-border-subtle)', maxHeight: '74px', overflowY: 'auto' }}
+      >
+        {track.plugins.length === 0 ? (
+          <div style={{ fontSize: '8px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '2px 0' }}>No FX</div>
+        ) : track.plugins.map((p, pi) => (
+          <div key={p.id} draggable
+            onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-fx-idx', String(pi)); e.dataTransfer.effectAllowed = 'move'; }}
+            onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-imosion-fx-idx')) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}
+            onDrop={(e) => { const raw = e.dataTransfer.getData('application/x-imosion-fx-idx'); if (raw !== '') { e.preventDefault(); e.stopPropagation(); onReorderPlugins(track.id, parseInt(raw), pi); } }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 5px', borderRadius: 4, marginBottom: 2, background: p.enabled ? `${PLUGIN_LIBRARY[p.type].color}1f` : '#141417', opacity: p.enabled ? 1 : 0.45, cursor: 'grab' }}>
+            <span style={{ color: 'var(--color-text-disabled)', fontSize: 8, lineHeight: 1 }}>⠿</span>
+            <span style={{ fontSize: 8, color: PLUGIN_LIBRARY[p.type].color, fontWeight: 700, flex: 1 }}>{PLUGIN_LIBRARY[p.type].abbr}</span>
+            <button onClick={(e) => { e.stopPropagation(); onTogglePlugin(track.id, p.id); }} aria-label={p.enabled ? 'Bypass' : 'Enable'} style={{ width: 12, height: 12, borderRadius: 3, border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+          </div>
+        ))}
+        <div onClick={(e) => { e.stopPropagation(); onOpenBrowser(track.id); }} style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center', cursor: 'pointer', padding: 1, borderRadius: 3, border: '1px dashed #2a2a30', marginTop: 2 }}>+ FX</div>
+      </div>
+
+      {/* Fader + live meter */}
+      <div style={{ flexShrink: 0, padding: '10px var(--space-2) 8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+        <Fader value={track.volume} min={0} max={1.5} defaultValue={1} unity={1} color={track.color} height={168} meterId={track.id}
+          ticks={[{ at: 1.5, label: '+9' }, { at: 1, label: '0' }, { at: 0.5, label: '-12' }, { at: 0, label: '∞' }]}
+          onChange={(v) => onUpdate(track.id, { volume: v })} />
+        <span style={{ fontSize: '10px', color: track.volume > 1.01 ? 'var(--color-warning)' : 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)', marginTop: 8, fontWeight: 600, padding: '2px 8px', background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid #27272a', minWidth: 52, textAlign: 'center' }}>{dB > 0 ? '+' : ''}{dB.toFixed(1)} dB</span>
+      </div>
+
+      {/* Pan knob */}
+      <div style={{ padding: '4px var(--space-2) 8px', display: 'flex', justifyContent: 'center', borderBottom: '1px solid var(--color-border-subtle)' }} onClick={e => e.stopPropagation()}>
+        <Knob value={track.pan} min={-1} max={1} defaultValue={0} bipolar color={track.color} size={42} label="Pan"
+          valueLabel={track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}
+          onChange={(v) => onUpdate(track.id, { pan: v })} />
+      </div>
+
+      {/* M / S / R -- backlit console switches: lit + glowing when engaged,
+          recessed (inset shadow) when off */}
+      <div style={{ padding: '7px 6px', display: 'flex', justifyContent: 'center', gap: 5 }}>
+        <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); onUpdate(track.id, { muted: !track.muted }); }} style={{ width: 32, height: 24, borderRadius: 6, border: '1px solid', borderColor: track.muted ? 'var(--color-accent)' : '#3a3a44', background: track.muted ? 'var(--color-accent)' : 'linear-gradient(180deg,#2c2c34,#1d1d23)', color: track.muted ? '#fff' : '#b6b6c0', cursor: 'pointer', fontSize: 10, fontWeight: 800, transition: 'all 0.12s ease', boxShadow: track.muted ? '0 0 8px var(--color-accent), inset 0 1px 0 rgba(255,255,255,0.35)' : 'inset 0 1px 2px rgba(0,0,0,0.45)' }}>M</button>
+        <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); onUpdate(track.id, { solo: !track.solo }); }} style={{ width: 32, height: 24, borderRadius: 6, border: '1px solid', borderColor: track.solo ? 'var(--color-warning)' : '#3a3a44', background: track.solo ? 'var(--color-warning)' : 'linear-gradient(180deg,#2c2c34,#1d1d23)', color: track.solo ? '#000' : '#b6b6c0', cursor: 'pointer', fontSize: 10, fontWeight: 800, transition: 'all 0.12s ease', boxShadow: track.solo ? '0 0 8px var(--color-warning), inset 0 1px 0 rgba(255,255,255,0.4)' : 'inset 0 1px 2px rgba(0,0,0,0.45)' }}>S</button>
+        <button aria-label="Record arm" onClick={(e) => { e.stopPropagation(); onUpdate(track.id, { armed: !track.armed }); }} style={{ width: 32, height: 24, borderRadius: 6, border: '1px solid', borderColor: track.armed ? 'var(--color-error)' : '#3a3a44', background: track.armed ? 'var(--color-error)' : 'linear-gradient(180deg,#2c2c34,#1d1d23)', color: track.armed ? '#fff' : '#b6b6c0', cursor: 'pointer', fontSize: 10, fontWeight: 800, transition: 'all 0.12s ease', boxShadow: track.armed ? '0 0 9px var(--color-error), inset 0 1px 0 rgba(255,255,255,0.3)' : 'inset 0 1px 2px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="record" size={12} /></button>
+      </div>
+
+      {/* Output routing */}
+      <div style={{ padding: '5px 6px', borderTop: '1px solid #1a1a1e', background: 'var(--color-bg-base)', display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+        {frozen && <span style={{ fontSize: 7, color: '#4a7896', fontWeight: 700 }}>❄</span>}
+        <select value={track.output} onChange={(e) => onUpdate(track.id, { output: e.target.value as RoutingDestination })} style={{ flex: 1, padding: '4px 5px', background: 'var(--color-bg-base)', border: '1px solid #27272a', borderRadius: 4, color: 'var(--color-text-secondary)', fontSize: 9 }}>
+          <option value="master">Master</option>
+          {buses.filter(b => b.type === 'group').map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
       </div>
     </div>
-    <div style={{ padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid var(--color-border-subtle)' }}>
-      <span style={{ fontSize: '7px', color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Pan</span>
-      <div style={{ position: 'relative', width: '40px', height: '40px' }}>
-        <svg width="40" height="40" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="16" fill="var(--color-bg-tertiary)" stroke="var(--color-border-default)" strokeWidth="2" />
-          <line x1="20" y1="20" x2={20 + Math.sin(track.pan * Math.PI / 2) * 12} y2={20 - Math.cos(track.pan * Math.PI / 2) * 12} stroke={track.color} strokeWidth="2" strokeLinecap="round" />
-          <circle cx="20" cy="20" r="4" fill={track.color} />
-        </svg>
+  );
+});
+MixerChannel.displayName = 'MixerChannel';
+
+// Clip waveform renderer. Memoized + redraws ONLY when the peaks/color change or
+// the clip is actually resized (ResizeObserver) — NOT on every parent re-render.
+// The old inline `<canvas ref={el => {...draw...}}>` re-ran a full canvas redraw
+// for every clip on every render (playhead tick, zoom step, selection…), which is
+// what made audio-track zoom feel laggy. This isolates the redraw to real resizes.
+const ClipWaveformCanvas = memo<{ peaks: number[]; color: string }>(({ peaks, color }) => {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || peaks.length === 0) return;
+    const draw = () => {
+      const ctx = el.getContext('2d');
+      const parent = el.parentElement;
+      if (!ctx || !parent) return;
+      const w = parent.clientWidth || 100;
+      const h = parent.clientHeight || 30;
+      if (w < 1 || h < 1) return;
+      el.width = w * 2; el.height = h * 2;
+      ctx.setTransform(2, 0, 0, 2, 0, 0);
+      const mid = h / 2;
+      ctx.clearRect(0, 0, w, h);
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, color + '60');
+      grad.addColorStop(0.5, color + '30');
+      grad.addColorStop(1, color + '60');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      for (let i = 0; i < peaks.length; i++) ctx.lineTo((i / peaks.length) * w, mid - peaks[i] * mid * 0.9);
+      for (let i = peaks.length - 1; i >= 0; i--) ctx.lineTo((i / peaks.length) * w, mid + peaks[i] * mid * 0.9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      for (let i = 0; i < peaks.length; i++) ctx.lineTo((i / peaks.length) * w, mid - peaks[i] * mid * 0.9);
+      ctx.stroke();
+      ctx.strokeStyle = `${color}20`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    };
+    draw();
+    // Redraw on actual clip resize (zoom changes the clip width) — coalesced by
+    // the browser, so a fast zoom-drag triggers far fewer redraws than a
+    // render-driven callback would.
+    const parent = el.parentElement;
+    if (typeof ResizeObserver === 'undefined' || !parent) return;
+    const ro = new ResizeObserver(draw);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [peaks, color]);
+  return <canvas ref={ref} style={{ width: '100%', height: '100%', display: 'block' }} />;
+});
+ClipWaveformCanvas.displayName = 'ClipWaveformCanvas';
+
+// Channel Rack row — one consolidated FL-style channel line: name, mute/solo/arm,
+// pan knob, volume knob + live meter, the full inline FX chain (add/bypass/remove/
+// drag-reorder), and output routing — all on one row. Memoized so a change to one
+// channel doesn't re-render the whole rack. Selecting a row opens its plugin
+// controls in the shared plugin panel, so the Rack is the one place a user can
+// work on channels + mixer + plugin chain + plugin control together.
+const ChannelRackRow = memo<{
+  track: AudioTrack;
+  index: number;
+  selected: boolean;
+  buses: AudioBus[];
+  onSelect: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<AudioTrack>) => void;
+  onTogglePlugin: (trackId: string, pluginId: string) => void;
+  onRemovePlugin: (trackId: string, pluginId: string) => void;
+  onOpenBrowser: (trackId: string) => void;
+  onReorderPlugins: (trackId: string, from: number, to: number) => void;
+  steps: boolean[] | undefined;
+  onToggleStep: (trackId: string, step: number) => void;
+}>(({ track, index, selected, buses, onSelect, onUpdate, onTogglePlugin, onRemovePlugin, onOpenBrowser, onReorderPlugins, steps, onToggleStep }) => {
+  const dB = (track.volume - 1) * 60;
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const msr = (active: boolean, onColor: string, onText: string): React.CSSProperties => ({ width: 22, height: 20, borderRadius: 4, border: '1px solid', borderColor: active ? onColor : '#3a3a44', background: active ? onColor : 'linear-gradient(180deg,#2c2c34,#1d1d23)', color: active ? onText : '#b6b6c0', cursor: 'pointer', fontSize: 9, fontWeight: 800, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.12s ease', boxShadow: active ? `0 0 7px ${onColor}, inset 0 1px 0 rgba(255,255,255,0.32)` : 'inset 0 1px 2px rgba(0,0,0,0.45)' });
+  return (
+    <div onClick={() => onSelect(track.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, boxShadow: selected ? `0 0 0 1px ${track.color}33` : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span onClick={(e) => { stop(e); const i = COLORS.indexOf(track.color); onUpdate(track.id, { color: COLORS[(i + 1) % COLORS.length] }); }} style={{ width: 10, height: 10, borderRadius: '50%', background: track.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }} />
+      <span style={{ fontSize: 9, fontWeight: 700, color: track.color, opacity: 0.6, fontFamily: 'var(--font-mono)', width: 16, flexShrink: 0 }}>{(index + 1).toString().padStart(2, '0')}</span>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: 116, flexShrink: 0 }}>{track.name}</div>
+      <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={stop}>
+        <button aria-label="Mute" onClick={() => onUpdate(track.id, { muted: !track.muted })} style={msr(track.muted, 'var(--color-accent)', '#fff')}>M</button>
+        <button aria-label="Solo" onClick={() => onUpdate(track.id, { solo: !track.solo })} style={msr(track.solo, 'var(--color-warning)', '#000')}>S</button>
+        <button aria-label="Record arm" onClick={() => onUpdate(track.id, { armed: !track.armed })} style={msr(track.armed, 'var(--color-error)', '#fff')}><DexIcon name="record" size={10} /></button>
       </div>
-      <input type="range" min="-1" max="1" step="0.01" value={track.pan} onChange={(e) => onUpdate({ pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-      <span style={{ fontSize: '8px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
-    </div>
-    <div style={{ flex: 1, padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <span style={{ fontSize: '7px', color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Vol</span>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', gap: '3px' }}>
-        {/* Stereo peak meter (L/R) */}
-        <div style={{ display: 'flex', gap: '1px', height: '100%', maxHeight: '120px' }}>
-          {[0, 1].map((ch) => {
-            const level = track.muted ? 0 : Math.min(track.volume * (0.7 + ch * 0.1), 1.5);
-            const pct = Math.min(level / 1.5, 1) * 100;
-            const isClip = level > 1.0;
-            return (
-              <div key={ch} style={{ width: '3px', height: '100%', background: 'var(--color-bg-tertiary)', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${pct}%`, background: isClip ? 'linear-gradient(to top, var(--color-success), var(--color-warning) 60%, var(--color-error))' : `linear-gradient(to top, var(--color-success), ${track.color})`, borderRadius: '2px', transition: 'height 0.08s ease-out' }} />
-              </div>
-            );
-          })}
+      <div onClick={stop} style={{ flexShrink: 0 }}>
+        <Knob value={track.pan} min={-1} max={1} defaultValue={0} bipolar size={30} color={track.color} label="Pan"
+          valueLabel={track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}
+          onChange={(v) => onUpdate(track.id, { pan: v })} />
+      </div>
+      <div onClick={stop} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Knob value={track.volume} min={0} max={1.5} defaultValue={1} size={34} color={track.color} label="Vol"
+          valueLabel={`${dB > 0 ? '+' : ''}${dB.toFixed(0)}`}
+          onChange={(v) => onUpdate(track.id, { volume: v })} />
+        <div style={{ width: 5, height: 34, background: '#0a0a0c', borderRadius: 3, overflow: 'hidden', border: '1px solid #050507', position: 'relative' }}>
+          <div data-imosion-meter={track.id} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '0%', background: '#4f8a60', transition: 'height 0.05s linear', willChange: 'height' }} />
         </div>
-        {/* Volume fader */}
-        <div style={{ width: '8px', height: '100%', maxHeight: '120px', background: 'var(--color-bg-tertiary)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${track.volume * 100}%`, background: `linear-gradient(to top, ${track.color}, ${track.color}80)`, borderRadius: '3px' }} />
-        </div>
-        <input type="range" min="0" max="1.5" step="0.01" value={track.volume} onChange={(e) => onUpdate({ volume: parseFloat(e.target.value) })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
       </div>
-      <span style={{ fontSize: '9px', color: track.color, fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
-    </div>
-    <div style={{ padding: '6px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'center', gap: '4px' }}>
-      <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); onUpdate({ muted: !track.muted }); }} style={{ width: '22px', height: '18px', borderRadius: '2px', border: '1px solid', borderColor: track.muted ? 'rgba(10,132,255,0.4)' : 'var(--color-border-default)', background: track.muted ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: track.muted ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="volume-x" size={10} /></button>
-      <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); onUpdate({ solo: !track.solo }); }} style={{ width: '22px', height: '18px', borderRadius: '2px', border: '1px solid', borderColor: track.solo ? 'rgba(255,159,10,0.4)' : 'var(--color-border-default)', background: track.solo ? 'var(--color-warning)' : 'var(--color-bg-tertiary)', color: track.solo ? '#000' : 'var(--color-text-muted)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="headphones" size={10} /></button>
-      <button aria-label="Record arm" onClick={(e) => { e.stopPropagation(); onUpdate({ armed: !track.armed }); }} style={{ width: '22px', height: '18px', borderRadius: '2px', border: '1px solid', borderColor: track.armed ? 'rgba(255,69,58,0.4)' : 'var(--color-border-default)', background: track.armed ? 'var(--color-error)' : 'var(--color-bg-tertiary)', color: track.armed ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="record" size={10} /></button>
-    </div>
-    <div style={{ padding: '4px 6px', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)' }}>
-      <select value={track.output} onChange={(e) => onUpdate({ output: e.target.value as RoutingDestination })} style={{ width: '100%', padding: '3px 4px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-default)', borderRadius: '2px', color: 'var(--color-text-muted)', fontSize: '8px' }}>
+      <div onClick={stop} onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-imosion-plugin')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto' }}>
+        {track.plugins.map((p, pi) => (
+          <div key={p.id} draggable
+            onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-fx-idx', String(pi)); e.dataTransfer.effectAllowed = 'move'; }}
+            onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-imosion-fx-idx')) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}
+            onDrop={(e) => { const raw = e.dataTransfer.getData('application/x-imosion-fx-idx'); if (raw !== '') { e.preventDefault(); onReorderPlugins(track.id, parseInt(raw), pi); } }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 4, background: p.enabled ? `${PLUGIN_LIBRARY[p.type].color}1f` : '#141417', opacity: p.enabled ? 1 : 0.5, cursor: 'grab', flexShrink: 0 }}>
+            <button onClick={() => onTogglePlugin(track.id, p.id)} aria-label={p.enabled ? 'Bypass' : 'Enable'} style={{ width: 9, height: 9, borderRadius: 2, border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+            <span style={{ fontSize: 8, color: PLUGIN_LIBRARY[p.type].color, fontWeight: 700 }}>{PLUGIN_LIBRARY[p.type].abbr}</span>
+            <button onClick={() => onRemovePlugin(track.id, p.id)} aria-label="Remove FX" style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 11 }}>×</button>
+          </div>
+        ))}
+        <button onClick={() => onOpenBrowser(track.id)} aria-label="Add FX" style={{ fontSize: 9, color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '3px 7px', borderRadius: 4, border: '1px dashed #2a2a30', background: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}>+ FX</button>
+      </div>
+      <select value={track.output} onClick={stop} onChange={(e) => onUpdate(track.id, { output: e.target.value as RoutingDestination })} style={{ flexShrink: 0, width: 74, padding: '3px 5px', background: 'var(--color-bg-base)', border: '1px solid #27272a', borderRadius: 4, color: 'var(--color-text-secondary)', fontSize: 9 }}>
         <option value="master">Master</option>
         {buses.filter(b => b.type === 'group').map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
+      </div>
+      {/* 16-step pattern — triggers this channel's synth on play (shared beat clock) */}
+      {/* The live playhead highlight is written straight to the DOM by the step
+          clock (data-rack-step) — NOT via a prop — so advancing the step does not
+          re-render every channel row each 16th note (power/lag fix). */}
+      <div onClick={stop} style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        {Array.from({ length: 16 }).map((_, i) => {
+          const on = steps?.[i] ?? false;
+          return (
+            <button
+              key={i}
+              data-rack-step={i}
+              aria-label={`Channel ${track.name} step ${i + 1}`}
+              aria-pressed={on}
+              onClick={() => onToggleStep(track.id, i)}
+              style={{
+                flex: 1, height: 16, minHeight: 0, padding: 0,
+                marginLeft: i % 4 === 0 && i !== 0 ? 4 : 0,
+                borderRadius: 3,
+                border: `1px solid ${on ? track.color : '#2a2a30'}`,
+                background: on ? track.color : (i % 4 === 0 ? '#1a1a1f' : '#121216'),
+                cursor: 'pointer',
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
-  </div>
-));
-TrackChannelStrip.displayName = 'TrackChannelStrip';
+  );
+});
+ChannelRackRow.displayName = 'ChannelRackRow';
 
 // ==================== COMPONENT ====================
 const Imosion: React.FC = () => {
@@ -2013,10 +2208,14 @@ const Imosion: React.FC = () => {
   const blobUrlsRef = useRef<Set<string>>(new Set());
 
   // Layout - responsive
-  const [trackPanelWidth, setTrackPanelWidth] = useState(200);
-  const [pluginPanelWidth, setPluginPanelWidth] = useState(260);
+  const [trackPanelWidth, setTrackPanelWidth] = useState(224);
+  const [pluginPanelWidth, setPluginPanelWidth] = useState(340);
   const [isResizingTrack, setIsResizingTrack] = useState(false);
   const [isResizingPlugin, setIsResizingPlugin] = useState(false);
+  // Collapsible side panels — collapse the track list (left) and/or the plugin
+  // chain (right) to a thin rail so the arrange/track lane gets the full width.
+  const [trackPanelCollapsed, setTrackPanelCollapsed] = useState(false);
+  const [pluginPanelCollapsed, setPluginPanelCollapsed] = useState(false);
 
   // Transport
   const [isPlaying, setIsPlaying] = useState(false);
@@ -2037,6 +2236,15 @@ const Imosion: React.FC = () => {
   const playbackSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const decodedBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const currentTimeRef = useRef(0);
+  // DOM-driven playheads: the playback RAF writes their position straight to the
+  // DOM every frame (60fps, buttery) so the React time-state can update slowly
+  // (~15fps, for the LCD) without the playhead ever looking choppy. Big power win.
+  const arrangePlayheadRef = useRef<HTMLDivElement | null>(null);
+  const pianoPlayheadRef = useRef<HTMLDivElement | null>(null);
+  // Live mirrors of zoom/bpm/zoom values the RAF needs (its effect deps exclude them).
+  const phZoomRef = useRef(40);
+  const phBpmRef = useRef(120);
+  const phPrZoomRef = useRef(64);
   // Mirror of trackAutomations read inside the playback RAF loop. The loop's
   // effect deps intentionally exclude trackAutomations (so editing automation
   // does not restart playback), so we read live values through this ref instead.
@@ -2150,7 +2358,12 @@ const Imosion: React.FC = () => {
   useEffect(() => {
     if (!navigator.requestMIDIAccess) return;
     let access: any = null;
-    navigator.requestMIDIAccess({ sysex: false }).then((ma: any) => {
+    let cancelled = false;
+    // Defer MIDI access to idle: requesting it on mount can show a permission
+    // prompt and stalls first paint. Imosion stays interactive immediately;
+    // MIDI devices wire up a beat later once the UI is on screen.
+    const requestMidi = () => navigator.requestMIDIAccess!({ sysex: false }).then((ma: any) => {
+      if (cancelled) return;
       access = ma;
       setMidiAccess(ma);
       const inputs: Array<{ id: string; name: string; connected: boolean }> = [];
@@ -2169,7 +2382,13 @@ const Imosion: React.FC = () => {
       };
     }).catch(() => { /* MIDI not available */ });
 
+    const ric: typeof requestIdleCallback | undefined = (window as any).requestIdleCallback;
+    const idleId = ric ? ric(() => requestMidi(), { timeout: 2500 }) : window.setTimeout(requestMidi, 400);
+
     return () => {
+      cancelled = true;
+      const cic: ((id: number) => void) | undefined = (window as any).cancelIdleCallback;
+      if (ric && cic) cic(idleId as number); else clearTimeout(idleId as number);
       if (access) {
         access.inputs.forEach((input: any) => { input.onmidimessage = null; });
       }
@@ -2278,18 +2497,23 @@ const Imosion: React.FC = () => {
   // Degrade safely when the media stack is unavailable (insecure context, headless
   // preview, or a build without navigator.mediaDevices): the app stays usable with
   // recording controls disabled rather than crashing on mount.
+  // Enumerate audio devices WITHOUT forcing a mic-permission prompt on open.
+  // Opening Imosion must be instant: we no longer call getUserMedia() here (that
+  // activated the microphone and blocked first paint on every launch). We only
+  // enumerate (labels stay generic until permission is granted by recording),
+  // and we defer even that to idle time so it never competes with first paint.
+  // The real mic-permission request happens lazily in startRecording().
   useEffect(() => {
     const md = navigator.mediaDevices;
-    if (!md) {
-      console.warn('[Imosion] Media devices unavailable in this environment; recording/input disabled.');
+    if (!md || typeof md.enumerateDevices !== 'function') {
+      if (!md) console.warn('[Imosion] Media devices unavailable in this environment; recording/input disabled.');
       return;
     }
+    let cancelled = false;
     const getDevices = async () => {
       try {
-        if (typeof md.getUserMedia === 'function') {
-          await md.getUserMedia({ audio: true });
-        }
-        const devices = typeof md.enumerateDevices === 'function' ? await md.enumerateDevices() : [];
+        const devices = await md.enumerateDevices();
+        if (cancelled) return;
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
         setAudioDevices([...audioInputs, ...audioOutputs]);
@@ -2299,10 +2523,15 @@ const Imosion: React.FC = () => {
         console.warn('[Imosion] Audio device enumeration failed:', e);
       }
     };
-    getDevices();
-    if (typeof md.addEventListener !== 'function') return;
-    md.addEventListener('devicechange', getDevices);
-    return () => md.removeEventListener('devicechange', getDevices);
+    const ric: typeof requestIdleCallback | undefined = (window as any).requestIdleCallback;
+    const idleId = ric ? ric(() => getDevices(), { timeout: 2000 }) : window.setTimeout(getDevices, 300);
+    if (typeof md.addEventListener === 'function') md.addEventListener('devicechange', getDevices);
+    return () => {
+      cancelled = true;
+      const cic: ((id: number) => void) | undefined = (window as any).cancelIdleCallback;
+      if (ric && cic) cic(idleId as number); else clearTimeout(idleId as number);
+      if (typeof md.removeEventListener === 'function') md.removeEventListener('devicechange', getDevices);
+    };
   }, []);
 
   // Master settings with full mastering chain
@@ -2512,6 +2741,11 @@ const Imosion: React.FC = () => {
   const [templates, setTemplates] = useState<RecordingTemplate[]>(DEFAULT_TEMPLATES);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [zoom, setZoom] = useState(40);
+  // Coalesce ctrl+wheel zoom into one setZoom per frame (a trackpad pinch fires
+  // dozens of wheel events/sec; applying each one re-rendered the whole arrange
+  // lane and was a big part of the audio-zoom lag).
+  const zoomRafRef = useRef<number | null>(null);
+  const zoomFactorRef = useRef(1);
   const [timeDisplayMode, setTimeDisplayMode] = useState<'time' | 'bars'>('time');
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, trackId: null, clipId: null, busId: null });
   const [showFileMenu, setShowFileMenu] = useState(false);
@@ -2519,19 +2753,31 @@ const Imosion: React.FC = () => {
   const [showPanelsMenu, setShowPanelsMenu] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
   const [meterStats, setMeterStats] = useState<{ peakDb: number; crestDb: number } | null>(null);
-  const [viewMode, setViewMode] = useState<'arrange' | 'mixer' | 'beatmaker' | 'pianoroll'>('arrange');
+  const [viewMode, setViewMode] = useState<'arrange' | 'mixer' | 'beatmaker' | 'pianoroll' | 'rack'>('arrange');
 
   // ===== PIANO ROLL =====
   const [pianoRollNotes, setPianoRollNotes] = useState<MidiNote[]>([]);
   const [pianoRollScroll, setPianoRollScroll] = useState({ x: 0, y: 60 * 6 }); // scroll to middle C area
-  const [pianoRollTool, setPianoRollTool] = useState<'select' | 'draw' | 'erase'>('draw');
+  const [pianoRollTool, setPianoRollTool] = useState<'select' | 'draw' | 'erase' | 'stamp'>('draw');
   const [pianoRollSnap, setPianoRollSnap] = useState<number>(0.25); // 1/4 = quarter note, 0.25 = 16th
   const [riffScale, setRiffScale] = useState<RiffScale>('minor'); // Idea Forge (Riff Machine)
   const [pianoRollSelectedNotes, setPianoRollSelectedNotes] = useState<Set<string>>(new Set());
-  const [pianoRollDrag, setPianoRollDrag] = useState<{ type: 'none' | 'move' | 'resize' | 'marquee'; noteId?: string; startX: number; startY: number; startPitch?: number; startTime?: number } | null>(null);
+  // Rubber-band marquee rectangle (content coords) while box-selecting notes.
+  const [prMarquee, setPrMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Clipboard for piano-roll copy/cut/paste (notes normalized to start at t=0).
+  const prClipboardRef = useRef<MidiNote[]>([]);
+  // Right-click context menu in the piano roll.
+  const [prMenu, setPrMenu] = useState<{ x: number; y: number } | null>(null);
   const [showVelocityLane, setShowVelocityLane] = useState(true);
   const [showCCLane, setShowCCLane] = useState(false);
   const [pianoRollOctaveRange] = useState({ low: 0, high: 8 }); // C0 to C8 = 96 notes
+  // Vertical zoom for the piano roll: row height in px. Pro DAWs let you scale key
+  // rows; 22px is a comfortable default (vs the old cramped 14px). 12..40 range.
+  const [pianoKeyHeight, setPianoKeyHeight] = useState(22);
+  // Horizontal zoom for the piano roll: pixels per beat. The arrange-view `zoom`
+  // is tuned for seconds and made the roll absurdly wide; this is its own sane
+  // scale (default 64 px/beat, 24..220).
+  const [pianoRollZoom, setPianoRollZoom] = useState(64);
   const [showChordTrigger, setShowChordTrigger] = useState(false);
   const [chordIncludeSeventh, setChordIncludeSeventh] = useState(false);
   const [chordTriggerMode, setChordTriggerMode] = useState<'major' | 'minor'>('major');
@@ -2709,6 +2955,28 @@ const Imosion: React.FC = () => {
   const [activePad, setActivePad] = useState(-1);
   const [beatPattern, setBeatPattern] = useState(0);
   const [beatPatterns, setBeatPatterns] = useState<{ grid: boolean[][]; velocities: number[][] }[]>([]);
+  // Per-lane mute/solo (FL channel-rack style).
+  const [beatMutes, setBeatMutes] = useState<Set<number>>(new Set());
+  const [beatSolos, setBeatSolos] = useState<Set<number>>(new Set());
+  // Live snapshot read by the sequencer rAF so it triggers the CURRENT pattern
+  // without re-creating the loop (no stale closures, no playback restarts).
+  const beatSeqRef = useRef({ grid: beatGrid, vel: beatVelocities, kit: beatKit, mutes: beatMutes, solos: beatSolos });
+  beatSeqRef.current = { grid: beatGrid, vel: beatVelocities, kit: beatKit, mutes: beatMutes, solos: beatSolos };
+
+  // Channel Rack step sequencer: per-track 16-step on/off pattern (FL Channel
+  // Rack). Shares the beat step-clock; on each active step the channel's built-in
+  // synth is triggered (real audio, see startBeatSequencer). Live ref so the loop
+  // reads the current pattern without re-creating itself.
+  const [rackSteps, setRackSteps] = useState<Record<string, boolean[]>>({});
+  const rackStepsRef = useRef<Record<string, boolean[]>>({});
+  rackStepsRef.current = rackSteps;
+  const toggleRackStep = useCallback((trackId: string, step: number) => {
+    setRackSteps(prev => {
+      const cur = prev[trackId] ? prev[trackId].slice() : Array(16).fill(false);
+      cur[step] = !cur[step];
+      return { ...prev, [trackId]: cur };
+    });
+  }, []);
 
   // Cleanup beat sequencer interval on unmount
   useEffect(() => {
@@ -2759,6 +3027,56 @@ const Imosion: React.FC = () => {
     return () => window.removeEventListener('mouseup', end);
   }, []);
 
+  // Synthesize one drum hit. Shared by the live pads AND the sequencer so the grid
+  // actually makes sound on playback (it previously only moved the playhead).
+  const triggerDrumPad = useCallback((pad: string, velocity = 1, index = 0) => {
+    try {
+      const engine = getAudioEngine();
+      let ctx = engine.getContext();
+      if (!ctx) { engine.init(sampleRate).catch(() => {/* */}); ctx = engine.getContext() ?? sharedFallbackCtx(sampleRate); }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {/* */});
+      const t = ctx.currentTime;
+      const v = Math.max(0, Math.min(1.2, velocity));
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const p = pad.toLowerCase();
+      const noiseBuf = (dur: number) => { const buf = ctx!.createBuffer(1, Math.floor(ctx!.sampleRate * dur), ctx!.sampleRate); const d = buf.getChannelData(0); for (let s = 0; s < d.length; s++) d[s] = Math.random() * 2 - 1; return buf; };
+      if (p.includes('kick') || p.includes('808') || p.includes('sub') || p.includes('bass')) {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+        gain.gain.setValueAtTime(0.8 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.3);
+      } else if (p.includes('snare') || p.includes('clap') || p.includes('rim') || p.includes('snap')) {
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+        gain.gain.setValueAtTime(0.6 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        const noise = ctx.createBufferSource(); noise.buffer = noiseBuf(0.08); const ng = ctx.createGain(); ng.gain.setValueAtTime(0.4 * v, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        noise.connect(ng); ng.connect(ctx.destination); noise.start(t);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.15);
+      } else if (p.includes('hihat') || p.includes('hh') || p.includes('shaker')) {
+        const noise = ctx.createBufferSource(); noise.buffer = noiseBuf(0.05); const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 8000;
+        gain.gain.setValueAtTime(0.3 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        noise.connect(hpf); hpf.connect(gain); gain.connect(ctx.destination); noise.start(t);
+        osc.connect(gain); osc.frequency.value = 0; osc.start(t); osc.stop(t + 0.01);
+      } else if (p.includes('crash') || p.includes('cymbal') || p.includes('ride') || p.includes('open')) {
+        const noise = ctx.createBufferSource(); noise.buffer = noiseBuf(0.4); const bpf = ctx.createBiquadFilter(); bpf.type = 'bandpass'; bpf.frequency.value = 5000; bpf.Q.value = 0.5;
+        gain.gain.setValueAtTime(0.25 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        noise.connect(bpf); bpf.connect(gain); gain.connect(ctx.destination); noise.start(t);
+        osc.connect(gain); osc.frequency.value = 0; osc.start(t); osc.stop(t + 0.01);
+      } else if (p.includes('tom') || p.includes('conga') || p.includes('bongo')) {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(200 + index * 20, t); osc.frequency.exponentialRampToValueAtTime(60, t + 0.2);
+        gain.gain.setValueAtTime(0.6 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.2);
+      } else if (p.includes('bell') || p.includes('cow')) {
+        osc.type = 'square'; osc.frequency.setValueAtTime(800, t);
+        gain.gain.setValueAtTime(0.2 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.15);
+      } else {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(440 + index * 40, t);
+        gain.gain.setValueAtTime(0.3 * v, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.1);
+      }
+    } catch (err) { console.warn('[Imosion] Drum trigger error:', err); }
+  }, [getAudioEngine, sampleRate]);
+
   const startBeatSequencer = useCallback(() => {
     if (beatIntervalRef.current) clearInterval(beatIntervalRef.current);
     setBeatPlaying(true);
@@ -2767,10 +3085,32 @@ const Imosion: React.FC = () => {
     let step = 0;
     let lastStepTime = performance.now();
     let rafId: number;
+    const fire = (s: number) => {
+      const { grid, vel, kit, mutes, solos } = beatSeqRef.current;
+      const hasSolo = solos.size > 0;
+      for (let ri = 0; ri < kit.pads.length; ri++) {
+        if (!grid[ri]?.[s]) continue;
+        if (mutes.has(ri)) continue;
+        if (hasSolo && !solos.has(ri)) continue;
+        triggerDrumPad(kit.pads[ri], vel[ri]?.[s] ?? 0.8, ri);
+      }
+      // Channel Rack steps: trigger each channel's built-in synth on its active
+      // step (default middle-C, ~16th-note gate). Real synthesis, same clock.
+      const rs = rackStepsRef.current;
+      for (const tid in rs) {
+        if (!rs[tid]?.[s]) continue;
+        const syn = getTrackSynth(tid);
+        if (syn) { try { syn.playNoteFor(60, 110, 0.18); } catch { /* synth not ready */ } }
+      }
+    };
+    fire(0); // hit the downbeat immediately
+    paintRackPlayhead(0);
     const tick = (now: number) => {
       if (now - lastStepTime >= stepTime) {
         step = (step + 1) % beatSteps;
         setBeatPlayStep(step);
+        paintRackPlayhead(step);
+        fire(step);
         lastStepTime += stepTime;
         // Catch up if we fell behind
         if (now - lastStepTime >= stepTime) lastStepTime = now;
@@ -2780,7 +3120,7 @@ const Imosion: React.FC = () => {
     rafId = requestAnimationFrame(tick);
     // Store cleanup handle — reuse beatIntervalRef for cancellation
     (beatIntervalRef as any).current = { cancel: () => cancelAnimationFrame(rafId) } as any;
-  }, [bpm, beatSteps]);
+  }, [bpm, beatSteps, triggerDrumPad, getTrackSynth]);
 
   const stopBeatSequencer = useCallback(() => {
     if (beatIntervalRef.current) {
@@ -2793,6 +3133,7 @@ const Imosion: React.FC = () => {
     beatIntervalRef.current = null;
     setBeatPlaying(false);
     setBeatPlayStep(-1);
+    paintRackPlayhead(-1);
   }, []);
 
   const clearBeatPattern = useCallback(() => {
@@ -2828,6 +3169,388 @@ const Imosion: React.FC = () => {
     })));
   }, [riffScale]);
 
+  // ===== Piano Roll creative tools (FL Studio / Logic-inspired) =====
+  // All operate on the current selection, or the whole part when nothing is selected.
+  // Muted note-label colors (matches the restrained channel palette — no neon).
+  const PR_NOTE_COLORS = ['#8a6a9c', '#4a7896', '#4f8a60', '#a08644', '#a8744a', '#9e5a55', '#a06282', '#6b6c9c'];
+  const [typingKeyboard, setTypingKeyboard] = useState(false); // QWERTY -> piano
+  const [typingOctave, setTypingOctave] = useState(4);
+
+  const prHitTest = useCallback(() => (
+    pianoRollSelectedNotes.size > 0 ? (n: MidiNote) => pianoRollSelectedNotes.has(n.id) : () => true
+  ), [pianoRollSelectedNotes]);
+
+  const prGroupByStart = useCallback((notes: MidiNote[]) => {
+    const groups = new Map<string, MidiNote[]>();
+    notes.forEach(n => { const k = n.startTime.toFixed(4); const g = groups.get(k); if (g) g.push(n); else groups.set(k, [n]); });
+    return groups;
+  }, []);
+
+  const applyNoteColor = useCallback((color: string) => {
+    const hit = prHitTest();
+    setPianoRollNotes(prev => prev.map(n => hit(n) ? { ...n, color } : n));
+  }, [prHitTest]);
+
+  // Quick Legato: stretch each note to the start of the next note in time.
+  const applyLegato = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      const sorted = [...prev].sort((a, b) => a.startTime - b.startTime);
+      return prev.map(n => {
+        if (!hit(n)) return n;
+        const next = sorted.find(o => o.startTime > n.startTime + 1e-6);
+        if (!next) return n;
+        return { ...n, duration: Math.max(0.0625, next.startTime - n.startTime) };
+      });
+    });
+  }, [prHitTest]);
+
+  // Strum: offset stacked (chord) notes in time, low-to-high (up) or high-to-low (down).
+  const applyStrum = useCallback((dir: 'up' | 'down') => {
+    const step = pianoRollSnap / 4;
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      const offsets = new Map<string, number>();
+      prGroupByStart(prev.filter(hit)).forEach(notes => {
+        [...notes].sort((a, b) => dir === 'up' ? a.pitch - b.pitch : b.pitch - a.pitch)
+          .forEach((n, i) => offsets.set(n.id, i * step));
+      });
+      return prev.map(n => offsets.has(n.id) ? { ...n, startTime: Math.max(0, n.startTime + offsets.get(n.id)!) } : n);
+    });
+  }, [prHitTest, prGroupByStart, pianoRollSnap]);
+
+  // Flam: add a softer grace note just before each target note.
+  const applyFlam = useCallback(() => {
+    const grace = Math.min(0.08, pianoRollSnap / 3);
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      const adds: MidiNote[] = [];
+      prev.forEach(n => { if (hit(n)) adds.push({ ...n, id: `flam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, startTime: Math.max(0, n.startTime - grace), duration: grace, velocity: Math.max(1, Math.round(n.velocity * 0.6)), selected: false }); });
+      return [...prev, ...adds];
+    });
+  }, [prHitTest, pianoRollSnap]);
+
+  // Humanize: jitter timing and velocity for a natural feel.
+  const applyHumanize = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      return prev.map(n => {
+        if (!hit(n)) return n;
+        const tJit = (Math.random() - 0.5) * (pianoRollSnap * 0.25);
+        const vJit = Math.round((Math.random() - 0.5) * 24);
+        return { ...n, startTime: Math.max(0, n.startTime + tJit), velocity: Math.max(1, Math.min(127, n.velocity + vJit)) };
+      });
+    });
+  }, [prHitTest, pianoRollSnap]);
+
+  // Arpeggiate: spread each chord into a sequential run (one snap-step apart).
+  const applyArpeggiate = useCallback(() => {
+    const step = pianoRollSnap;
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      const updates = new Map<string, { startTime: number; duration: number }>();
+      prGroupByStart(prev.filter(hit)).forEach(notes => {
+        if (notes.length < 2) return;
+        const base = notes[0].startTime;
+        [...notes].sort((a, b) => a.pitch - b.pitch).forEach((n, i) => updates.set(n.id, { startTime: base + i * step, duration: step }));
+      });
+      return prev.map(n => { const u = updates.get(n.id); return u ? { ...n, ...u } : n; });
+    });
+  }, [prHitTest, prGroupByStart, pianoRollSnap]);
+
+  // Slide/Glide: toggle portamento on the selected notes (or all if none selected).
+  const toggleSlideSelected = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const hit = prHitTest();
+      const anyOff = prev.some(n => hit(n) && !n.slide);
+      return prev.map(n => hit(n) ? { ...n, slide: anyOff } : n);
+    });
+  }, [prHitTest]);
+
+  // ===== Reusable piano-roll edit ops (shared by keyboard + right-click menu) =====
+  const prSelectAll = useCallback(() => setPianoRollSelectedNotes(new Set(pianoRollNotes.map(n => n.id))), [pianoRollNotes]);
+  const prDeleteSelected = useCallback(() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }, [pianoRollSelectedNotes]);
+  const prCopy = useCallback(() => {
+    const sel = pianoRollNotes.filter(n => pianoRollSelectedNotes.has(n.id));
+    if (!sel.length) return;
+    const minT = Math.min(...sel.map(n => n.startTime));
+    prClipboardRef.current = sel.map(n => ({ ...n, startTime: n.startTime - minT }));
+  }, [pianoRollNotes, pianoRollSelectedNotes]);
+  const prPaste = useCallback(() => {
+    if (!prClipboardRef.current.length) return;
+    const beat = Math.max(0, Math.round((currentTimeRef.current * (bpm / 60)) / pianoRollSnap) * pianoRollSnap);
+    const add = prClipboardRef.current.map((n, i) => ({ ...n, id: `paste-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`, startTime: n.startTime + beat, selected: false }));
+    setPianoRollNotes(prev => [...prev, ...add]);
+    setPianoRollSelectedNotes(new Set(add.map(n => n.id)));
+  }, [bpm, pianoRollSnap]);
+  const prDuplicate = useCallback(() => {
+    const sel = pianoRollNotes.filter(n => pianoRollSelectedNotes.has(n.id));
+    if (!sel.length) return;
+    const add = sel.map((n, i) => ({ ...n, id: `dup-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`, startTime: n.startTime + 1, selected: false }));
+    setPianoRollNotes(prev => [...prev, ...add]);
+    setPianoRollSelectedNotes(new Set(add.map(n => n.id)));
+  }, [pianoRollNotes, pianoRollSelectedNotes]);
+  // Nudge the selection by beats (time) and/or semitones (pitch) — arrow keys.
+  const prNudge = useCallback((dBeats: number, dSemis: number) => {
+    setPianoRollNotes(prev => prev.map(n => pianoRollSelectedNotes.has(n.id) ? { ...n, startTime: Math.max(0, n.startTime + dBeats), pitch: Math.max(0, Math.min(127, n.pitch + dSemis)) } : n));
+  }, [pianoRollSelectedNotes]);
+  // Glue: merge selected notes on the same pitch into one spanning note (FL Glue).
+  const prGlue = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const sel = prev.filter(n => pianoRollSelectedNotes.has(n.id));
+      if (sel.length < 2) return prev;
+      const byPitch = new Map<number, MidiNote[]>();
+      sel.forEach(n => { const g = byPitch.get(n.pitch); if (g) g.push(n); else byPitch.set(n.pitch, [n]); });
+      const removed = new Set<string>(); const merged: MidiNote[] = [];
+      byPitch.forEach((notes, pitch) => {
+        if (notes.length < 2) return;
+        const start = Math.min(...notes.map(n => n.startTime));
+        const end = Math.max(...notes.map(n => n.startTime + n.duration));
+        const vel = Math.round(notes.reduce((a, n) => a + n.velocity, 0) / notes.length);
+        notes.forEach(n => removed.add(n.id));
+        merged.push({ ...notes[0], id: `glue-${Date.now()}-${pitch}`, startTime: start, duration: end - start, velocity: vel });
+      });
+      if (!merged.length) return prev;
+      const next = [...prev.filter(n => !removed.has(n.id)), ...merged];
+      setPianoRollSelectedNotes(new Set(merged.map(n => n.id)));
+      return next;
+    });
+  }, [pianoRollSelectedNotes]);
+  // Chop: split each selected note into snap-grid-sized pieces (FL Chop).
+  const prChop = useCallback(() => {
+    setPianoRollNotes(prev => {
+      let changed = false; const out: MidiNote[] = [];
+      prev.forEach(n => {
+        if (!pianoRollSelectedNotes.has(n.id) || n.duration <= pianoRollSnap * 1.0001) { out.push(n); return; }
+        changed = true;
+        const pieces = Math.max(2, Math.round(n.duration / pianoRollSnap));
+        const dur = n.duration / pieces;
+        for (let i = 0; i < pieces; i++) out.push({ ...n, id: `chop-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`, startTime: n.startTime + i * dur, duration: dur });
+      });
+      return changed ? out : prev;
+    });
+  }, [pianoRollSelectedNotes, pianoRollSnap]);
+  // Helper: notes to operate on (selection, or the whole part when nothing selected).
+  const prTargetSet = useCallback((all: MidiNote[]) => pianoRollSelectedNotes.size ? all.filter(n => pianoRollSelectedNotes.has(n.id)) : all, [pianoRollSelectedNotes]);
+  // Reverse: mirror note timing within the target span (FL Flip horizontally).
+  const prReverse = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const tgt = prTargetSet(prev);
+      if (tgt.length < 2) return prev;
+      const s = Math.min(...tgt.map(n => n.startTime));
+      const e = Math.max(...tgt.map(n => n.startTime + n.duration));
+      const ids = new Set(tgt.map(n => n.id));
+      return prev.map(n => ids.has(n.id) ? { ...n, startTime: s + (e - (n.startTime + n.duration)) } : n);
+    });
+  }, [prTargetSet]);
+  // Invert: mirror pitches around the target's center pitch (FL Flip vertically).
+  const prInvert = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const tgt = prTargetSet(prev);
+      if (tgt.length < 2) return prev;
+      const lo = Math.min(...tgt.map(n => n.pitch)), hi = Math.max(...tgt.map(n => n.pitch));
+      const ids = new Set(tgt.map(n => n.id));
+      return prev.map(n => ids.has(n.id) ? { ...n, pitch: Math.max(0, Math.min(127, lo + hi - n.pitch)) } : n);
+    });
+  }, [prTargetSet]);
+  // Mute/Unmute: per-note mute toggle on the selection (FL note mute).
+  const prMuteToggle = useCallback(() => {
+    setPianoRollNotes(prev => {
+      const tgt = prTargetSet(prev);
+      const anyOn = tgt.some(n => !n.muted);
+      const ids = new Set(tgt.map(n => n.id));
+      return prev.map(n => ids.has(n.id) ? { ...n, muted: anyOn } : n);
+    });
+  }, [prTargetSet]);
+
+  // ===== Piano-roll note dragging (Logic/FL essential) =====
+  // Plain functions (recreated each render) so they always close over the latest
+  // notes/zoom/snap; each sets up its own window listeners and tears them down on
+  // mouseup. Mouse-event based (no rAF), so it works everywhere.
+  const startNoteMove = (e: React.MouseEvent, note: MidiNote) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    if (e.altKey) { setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, slide: !n.slide } : n)); return; }
+    // Selection: shift toggles; clicking an unselected note selects just it (so a
+    // drag moves the whole current selection if the note was already selected).
+    let sel = new Set(pianoRollSelectedNotes);
+    if (e.shiftKey) { if (sel.has(note.id)) sel.delete(note.id); else sel.add(note.id); }
+    else if (!sel.has(note.id)) sel = new Set([note.id]);
+    setPianoRollSelectedNotes(sel);
+    previewSynthNote(note.pitch, note.velocity, 0.3);
+    const ids = sel.size ? sel : new Set([note.id]);
+    const snap = pianoRollNotes.filter(n => ids.has(n.id)).map(n => ({ id: n.id, startTime: n.startTime, pitch: n.pitch }));
+    const startX = e.clientX, startY = e.clientY;
+    const beatW = pianoRollZoom, keyH = pianoKeyHeight, gridSnap = pianoRollSnap;
+    let moved = false;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      moved = true;
+      const dBeat = Math.round(dx / beatW / gridSnap) * gridSnap;
+      const dPitch = -Math.round(dy / keyH);
+      setPianoRollNotes(prev => prev.map(n => { const o = snap.find(s => s.id === n.id); return o ? { ...n, startTime: Math.max(0, o.startTime + dBeat), pitch: Math.max(0, Math.min(127, o.pitch + dPitch)) } : n; }));
+    };
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const startNoteResize = (e: React.MouseEvent, note: MidiNote) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const startX = e.clientX, startDur = note.duration, beatW = pianoRollZoom, gridSnap = pianoRollSnap;
+    const onMove = (ev: MouseEvent) => {
+      const dBeat = (ev.clientX - startX) / beatW;
+      const dur = Math.max(gridSnap, Math.round((startDur + dBeat) / gridSnap) * gridSnap);
+      setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, duration: dur } : n));
+    };
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Rubber-band marquee select started from empty grid space (scroll container = el).
+  const startMarquee = (e: React.MouseEvent, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    const ox = e.clientX - rect.left + el.scrollLeft, oy = e.clientY - rect.top + el.scrollTop;
+    const beatW = pianoRollZoom, keyH = pianoKeyHeight, topPitch = pianoRollOctaveRange.high * 12 - 1;
+    const notesAtStart = pianoRollNotes;
+    const additive = e.shiftKey;
+    if (!additive) setPianoRollSelectedNotes(new Set());
+    const onMove = (ev: MouseEvent) => {
+      const cx = ev.clientX - rect.left + el.scrollLeft, cy = ev.clientY - rect.top + el.scrollTop;
+      setPrMarquee({ x: Math.min(ox, cx), y: Math.min(oy, cy), w: Math.abs(cx - ox), h: Math.abs(cy - oy) });
+    };
+    const onUp = (ev: MouseEvent) => {
+      const cx = ev.clientX - rect.left + el.scrollLeft, cy = ev.clientY - rect.top + el.scrollTop;
+      const x0 = Math.min(ox, cx), x1 = Math.max(ox, cx), y0 = Math.min(oy, cy), y1 = Math.max(oy, cy);
+      const sel = new Set<string>();
+      notesAtStart.forEach(n => {
+        const nx = n.startTime * beatW, nw = n.duration * beatW, ny = (topPitch - n.pitch) * keyH;
+        if (nx < x1 && nx + nw > x0 && ny < y1 && ny + keyH > y0) sel.add(n.id);
+      });
+      setPianoRollSelectedNotes(prev => additive ? new Set([...prev, ...sel]) : sel);
+      setPrMarquee(null);
+      window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Typing Keyboard to Piano (FL/Logic): QWERTY rows play the preview synth.
+  // Active only when the toggle is on and the piano roll is showing, and never
+  // while focus is in a text field so it can't hijack typing.
+  useEffect(() => {
+    if (!typingKeyboard || viewMode !== 'pianoroll') return;
+    const MAP: Record<string, number> = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14 };
+    const held = new Set<string>();
+    const inField = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+    const pitchFor = (k: string) => typingOctave * 12 + MAP[k];
+    const onDown = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || inField(document.activeElement)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z') { setTypingOctave(o => Math.max(0, o - 1)); return; }
+      if (k === 'x') { setTypingOctave(o => Math.min(9, o + 1)); return; }
+      if (!(k in MAP) || held.has(k)) return;
+      const pitch = pitchFor(k);
+      if (pitch < 0 || pitch > 127) return;
+      e.preventDefault();
+      held.add(k);
+      const s = getPreviewSynth();
+      if (s) { try { s.noteOn(pitch, 100); } catch { /* */ } }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (!held.has(k)) return;
+      held.delete(k);
+      const s = previewSynthRef.current;
+      if (s) { try { s.noteOff(pitchFor(k)); } catch { /* */ } }
+    };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      const s = previewSynthRef.current;
+      held.forEach(k => { if (s) { try { s.noteOff(pitchFor(k)); } catch { /* */ } } });
+    };
+  }, [typingKeyboard, viewMode, typingOctave, getPreviewSynth]);
+
+  // Piano-roll editing keys: copy / cut / paste / duplicate / select-all / delete.
+  // Only while the piano roll is visible and focus isn't in a field.
+  useEffect(() => {
+    if (viewMode !== 'pianoroll') return;
+    const inField = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+    const onKey = (e: KeyboardEvent) => {
+      if (inField(document.activeElement)) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (mod && k === 'c') { e.preventDefault(); e.stopPropagation(); prCopy(); }
+      else if (mod && k === 'x') { e.preventDefault(); e.stopPropagation(); prCopy(); prDeleteSelected(); }
+      else if (mod && k === 'v') { e.preventDefault(); e.stopPropagation(); prPaste(); }
+      else if (mod && k === 'd') { e.preventDefault(); e.stopPropagation(); prDuplicate(); }
+      else if (mod && k === 'a') { e.preventDefault(); e.stopPropagation(); prSelectAll(); }
+      else if (k === 'delete' || k === 'backspace') { if (!pianoRollSelectedNotes.size) return; e.preventDefault(); e.stopPropagation(); prDeleteSelected(); }
+      else if (k === 'arrowleft' || k === 'arrowright') { if (!pianoRollSelectedNotes.size) return; e.preventDefault(); e.stopPropagation(); prNudge((k === 'arrowright' ? 1 : -1) * pianoRollSnap, 0); }
+      else if (k === 'arrowup' || k === 'arrowdown') { if (!pianoRollSelectedNotes.size) return; e.preventDefault(); e.stopPropagation(); prNudge(0, (k === 'arrowup' ? 1 : -1) * (e.shiftKey ? 12 : 1)); }
+      else if (!mod && k === 'm') { if (!pianoRollSelectedNotes.size) return; e.preventDefault(); e.stopPropagation(); prMuteToggle(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewMode, pianoRollSelectedNotes.size, pianoRollSnap, prCopy, prPaste, prDuplicate, prSelectAll, prDeleteSelected, prNudge, prMuteToggle]);
+
+  // Live mixer metering: one shared rAF taps each track's post-fader gain node with
+  // an AnalyserNode and writes the level straight into the meter DOM (no React state,
+  // so it never causes a re-render). Only runs while the mixer view is on screen.
+  // The analyser is a non-destructive branch — the audio path is untouched.
+  // Entering the Channel Rack with nothing selected? Auto-select the first
+  // channel so its plugin controls show immediately (no blank right panel).
+  useEffect(() => {
+    if (viewMode === 'rack' && !selectedTrack && tracks.length > 0) {
+      setSelectedTrack(tracks[0].id);
+    }
+  }, [viewMode, selectedTrack, tracks]);
+
+  useEffect(() => {
+    if (viewMode !== 'mixer' && viewMode !== 'rack') return;
+    const analysers = new Map<string, AnalyserNode>();
+    let raf = 0;
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      try {
+        const engine = audioEngineRef.current as any;
+        const ctx: AudioContext | null = engine?.getContext?.() ?? null;
+        const tn: Map<string, { gain: GainNode }> | undefined = engine?.trackNodes;
+        const bn: Map<string, { gain: GainNode }> | undefined = engine?.busNodes;
+        const masterGain: GainNode | undefined = engine?.masterGain;
+        if (!ctx) return;
+        document.querySelectorAll<HTMLElement>('[data-imosion-meter]').forEach(el => {
+          const id = el.getAttribute('data-imosion-meter');
+          if (!id) return;
+          // Resolve the post-fader gain node to tap. Bus meters use a
+          // "busmeter-<busId>" id, the master uses "mastermeter", everything
+          // else is a track id — so buses and the master read REAL levels, not
+          // the old fader-position-as-fake-level gradients.
+          const gain: GainNode | null = id.startsWith('busmeter-')
+            ? (bn?.get(id.slice(9))?.gain ?? null)
+            : id === 'mastermeter'
+              ? (masterGain ?? null)
+              : (tn?.get(id)?.gain ?? null);
+          if (!gain) { el.style.height = '0%'; return; }
+          let an = analysers.get(id);
+          if (!an) { an = ctx.createAnalyser(); an.fftSize = 256; try { gain.connect(an); } catch { /* */ } analysers.set(id, an); }
+          const { peak } = computeMeterLevel(an);
+          const lvl = Math.min(100, peak * 100);
+          el.style.height = `${lvl}%`;
+          el.style.background = lvl > 90 ? 'var(--color-error)' : lvl > 72 ? 'var(--color-warning)' : '#4f8a60';
+        });
+      } catch { /* metering is best-effort */ }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); analysers.forEach(a => { try { a.disconnect(); } catch { /* */ } }); };
+  }, [viewMode]);
+
   // ===== NEW PRO FEATURES =====
   // Built-in effects visual UI
   const [showEffectsRack, setShowEffectsRack] = useState(false);
@@ -2860,6 +3583,35 @@ const Imosion: React.FC = () => {
   const [showStemExport, setShowStemExport] = useState(false);
   // Freeze/flatten tracks
   const [frozenTracks, setFrozenTracks] = useState<Set<string>>(new Set());
+
+  // ===== Pro workflow additions (FL/Logic-inspired) =====
+  // Channel-strip presets: save a whole track chain (volume/pan/plugins) and recall it.
+  interface ChannelStripPreset { id: string; name: string; volume: number; pan: number; plugins: TrackPlugin[] }
+  const [stripPresets, setStripPresets] = useState<ChannelStripPreset[]>(() => {
+    try { return JSON.parse(localStorage.getItem('imosion.stripPresets') || '[]'); } catch { return []; }
+  });
+  const [showStripPresets, setShowStripPresets] = useState(false);
+  const [newStripPresetName, setNewStripPresetName] = useState('');
+
+  // Track / Project Alternatives: named snapshots of the whole session.
+  interface ProjectSnapshot { id: string; name: string; createdAt: number; data: { tracks: AudioTrack[]; buses: AudioBus[]; pianoRollNotes: MidiNote[]; bpm: number; masterSettings: MasterSettings } }
+  const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([]);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [newSnapshotName, setNewSnapshotName] = useState('');
+
+  // Smart Controls / Macros: one knob drives many plugin params.
+  interface MacroTarget { trackId: string; pluginId: string; paramKey: string; min: number; max: number }
+  interface Macro { id: string; name: string; value: number; targets: MacroTarget[] }
+  const [macros, setMacros] = useState<Macro[]>([]);
+  const [showMacros, setShowMacros] = useState(false);
+  const [macroAssign, setMacroAssign] = useState<{ trackId: string; pluginId: string; paramKey: string }>({ trackId: '', pluginId: '', paramKey: '' });
+
+  // Searchable plugin picker
+  const [pluginPickerQuery, setPluginPickerQuery] = useState('');
+  // Event List editor (MIDI notes as a table)
+  const [showEventList, setShowEventList] = useState(false);
+  // Tap tempo (Smart Tempo, manual)
+  const tapTimesRef = useRef<number[]>([]);
   // Punch-in/punch-out recording
   const [punchInPoint, setPunchInPoint] = useState<number | null>(null);
   const [punchOutPoint, setPunchOutPoint] = useState<number | null>(null);
@@ -2907,6 +3659,9 @@ const Imosion: React.FC = () => {
   });
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  // Live render verbs for the export dialog ("Rendering / Mixing it down /
+  // Bouncing") instead of a frozen "Exporting...".
+  const exportPhrase = useWorkingPhrase(isExporting, 'render');
 
   // Collaboration
   const [collaborationSession, setCollaborationSession] = useState<CollaborationSession | null>(null);
@@ -3508,6 +4263,7 @@ const Imosion: React.FC = () => {
         const midiToFreq = (note: number) => 440 * Math.pow(2, (note - 69) / 12);
         const beatsToSec = (beats: number) => beats * 60 / bpm;
         for (const note of pianoRollNotes) {
+          if (note.muted) continue;
           try {
             const noteStart = beatsToSec(note.startTime);
             const noteDur = beatsToSec(note.duration);
@@ -3779,11 +4535,11 @@ const Imosion: React.FC = () => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         if (isResizingTrack) {
-          setTrackPanelWidth(Math.max(150, Math.min(350, e.clientX)));
+          setTrackPanelWidth(Math.max(180, Math.min(420, e.clientX)));
         }
         if (isResizingPlugin && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
-          setPluginPanelWidth(Math.max(180, Math.min(400, rect.right - e.clientX)));
+          setPluginPanelWidth(Math.max(280, Math.min(540, rect.right - e.clientX)));
         }
       });
     };
@@ -3969,13 +4725,22 @@ const Imosion: React.FC = () => {
     });
   }, [tracks, buses]);
 
+  // Keep the RAF's value mirrors current (it can't depend on these without restarting).
+  phZoomRef.current = zoom;
+  phBpmRef.current = bpm;
+  phPrZoomRef.current = pianoRollZoom;
+
   // Smooth Playback with requestAnimationFrame (sub-millisecond timing)
   useEffect(() => {
     if (isPlaying) {
       lastFrameTimeRef.current = performance.now();
-      
+
       let lastStateUpdate = 0;
-      const STATE_UPDATE_INTERVAL = 16; // ~60fps for smooth scrubber movement
+      // The visible playhead is written straight to the DOM every frame (60fps,
+      // buttery), so the React time-state only needs to update ~15fps for the LCD
+      // readout — quartering full-component re-renders vs the old 60fps. Audio
+      // scheduling reads currentTimeRef, which is updated every frame below.
+      const STATE_UPDATE_INTERVAL = 66; // ~15fps state; playhead stays 60fps via DOM
       
       const animate = (timestamp: number) => {
         const deltaMs = timestamp - lastFrameTimeRef.current;
@@ -3989,6 +4754,12 @@ const Imosion: React.FC = () => {
         if (isLooping && next >= duration) { next = 0; }
         else if (next >= duration) { next = duration; }
         currentTimeRef.current = next;
+
+        // Drive the visible playheads directly (60fps), bypassing React entirely.
+        const ah = arrangePlayheadRef.current;
+        if (ah) ah.style.left = `${next * phZoomRef.current}px`;
+        const ph = pianoPlayheadRef.current;
+        if (ph) ph.style.left = `${next * (phBpmRef.current / 60) * phPrZoomRef.current}px`;
 
         // Apply automation values at current time (throttled to ~30Hz to reduce main-thread load)
         if (timestamp - lastStateUpdate >= 33 || lastStateUpdate === 0) {
@@ -4305,6 +5076,7 @@ const Imosion: React.FC = () => {
         const beatsToSec = (beats: number) => beats * 60 / bpm;
         const pianoRollSynthTimers: number[] = [];
         for (const note of pianoRollNotes) {
+          if (note.muted) continue;
           const noteStartSec = beatsToSec(note.startTime);
           const noteDurSec = beatsToSec(note.duration);
           const noteEndSec = noteStartSec + noteDurSec;
@@ -4320,6 +5092,7 @@ const Imosion: React.FC = () => {
         const beatsToSec = (beats: number) => beats * 60 / bpm;
 
         for (const note of pianoRollNotes) {
+          if (note.muted) continue;
           const noteStartSec = beatsToSec(note.startTime);
           const noteDurSec = beatsToSec(note.duration);
           const noteEndSec = noteStartSec + noteDurSec;
@@ -4456,6 +5229,11 @@ const Imosion: React.FC = () => {
       recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        // Disconnect the metering graph so the source/analyser nodes (and the
+        // stopped MediaStream they reference) don't linger in the AudioContext.
+        try { source.disconnect(); } catch { /* already gone */ }
+        try { analyser.disconnect(); } catch { /* already gone */ }
+        if (analyserRef.current === analyser) analyserRef.current = null;
         setInputLevel(0);
         setMeterStats(null);
         if (chunksRef.current.length > 0) {
@@ -4751,20 +5529,24 @@ const Imosion: React.FC = () => {
       const trackId = selectedTrack || tracks[0]?.id;
       if (!trackId) continue;
 
-      // Create audio element to get duration
+      // Probe duration with a throwaway audio element ({ once } so the listeners
+      // self-remove), then release it so it doesn't keep the media buffered.
       const audio = new Audio(url);
-      await new Promise<void>((resolve, reject) => { 
-        audio.addEventListener('loadedmetadata', () => resolve()); 
-        audio.addEventListener('error', () => resolve()); // Still add clip on error
-        audio.load(); 
+      await new Promise<void>((resolve) => {
+        audio.addEventListener('loadedmetadata', () => resolve(), { once: true });
+        audio.addEventListener('error', () => resolve(), { once: true }); // Still add clip on error
+        audio.load();
         setTimeout(resolve, 3000); // Timeout fallback
       });
-      
+      const probedDuration = audio.duration || 10;
+      audio.src = '';
+      try { audio.load(); } catch { /* release buffered media */ }
+
       const newClip: AudioClip = {
         id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: file.name.replace(/\.[^/.]+$/, ''),
         startTime: currentTime,
-        duration: audio.duration || 10,
+        duration: probedDuration,
         waveform: Array(50).fill(0.3),
         gain: 1,
         url,
@@ -4827,20 +5609,24 @@ const Imosion: React.FC = () => {
       const trackId = targetTrackId || selectedTrack || tracks[0]?.id;
       if (!trackId) continue;
 
-      // Create audio element to get duration
+      // Probe duration with a throwaway audio element ({ once } so the listeners
+      // self-remove), then release it so it doesn't keep the media buffered.
       const audio = new Audio(url);
-      await new Promise<void>((resolve) => { 
-        audio.addEventListener('loadedmetadata', () => resolve()); 
-        audio.addEventListener('error', () => resolve());
-        audio.load(); 
+      await new Promise<void>((resolve) => {
+        audio.addEventListener('loadedmetadata', () => resolve(), { once: true });
+        audio.addEventListener('error', () => resolve(), { once: true });
+        audio.load();
         setTimeout(resolve, 3000);
       });
-      
+      const probedDuration = audio.duration || 10;
+      audio.src = '';
+      try { audio.load(); } catch { /* release buffered media */ }
+
       const newClip: AudioClip = {
         id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: file.name.replace(/\.[^/.]+$/, ''),
         startTime: currentTime,
-        duration: audio.duration || 10,
+        duration: probedDuration,
         waveform: Array(50).fill(0.3),
         gain: 1,
         url,
@@ -4924,6 +5710,62 @@ const Imosion: React.FC = () => {
   const updateClip = useCallback((trackId: string, clipId: string, updates: Partial<AudioClip>) => {
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, clips: t.clips.map(c => c.id === clipId ? { ...c, ...updates } : c) } : t));
   }, []);
+
+  // FL-style sample chop: slice a clip into independent, rearrangeable slices.
+  // mode 'even' = N equal pieces; mode 'transient' = cut at detected onsets
+  // (Edison/Slicex style). Each slice references the SAME source with the right
+  // trimStart offset + duration, so playback plays the correct portion (the live
+  // scheduler does source.start(when, trimStart, duration)). Replaces the source
+  // clip with the slices on the track.
+  const chopClip = useCallback(async (trackId: string, clipId: string, slices: number, mode: 'even' | 'transient') => {
+    const track = tracks.find(t => t.id === trackId);
+    const clip = track?.clips.find(c => c.id === clipId);
+    if (!clip || clip.duration <= 0.02) return;
+    // Boundaries are clip-relative seconds: [0, ..., duration].
+    let bounds: number[] = [];
+    if (mode === 'transient' && clip.url) {
+      try {
+        const ctx = getAudioEngine().getContext() || sharedFallbackCtx();
+        const arrayBuf = await (await fetch(clip.url)).arrayBuffer();
+        const buf = await ctx.decodeAudioData(arrayBuf.slice(0));
+        const onsets = detectOnsets(buf.getChannelData(0), buf.sampleRate, { sensitivity: 1.1 });
+        // onsets are seconds from buffer start — window to this clip, make relative.
+        const rel = onsets
+          .filter(t => t > clip.trimStart + 0.04 && t < clip.trimStart + clip.duration - 0.04)
+          .map(t => t - clip.trimStart);
+        if (rel.length) bounds = [0, ...rel, clip.duration];
+      } catch (e) { console.warn('[Imosion] transient chop failed, falling back to even', e); }
+    }
+    if (bounds.length < 2) bounds = evenChopBounds(clip.duration, slices);
+    // Pure slicing geometry (see ImosionChop) — kept testable apart from the UI.
+    const segments = computeChopSegments(
+      { duration: clip.duration, trimStart: clip.trimStart, startTime: clip.startTime, waveformLength: clip.waveform.length },
+      bounds,
+    );
+    const newClips: AudioClip[] = segments.map(seg => ({
+      ...DEFAULT_CLIP_PROPS,
+      id: `slice-${Date.now()}-${seg.index}`,
+      name: `${clip.name} ${seg.index + 1}`,
+      startTime: seg.startTime,
+      duration: seg.duration,
+      trimStart: seg.trimStart,
+      trimEnd: seg.trimEnd,
+      waveform: clip.waveform.slice(seg.wfStart, seg.wfEnd),
+      gain: clip.gain,
+      url: clip.url,
+      pitch: clip.pitch,
+      originalBPM: clip.originalBPM,
+      detectedKey: clip.detectedKey,
+      detectedScale: clip.detectedScale,
+    }));
+    if (newClips.length < 2) return;
+    setTracks(prev => prev.map(t => t.id === trackId
+      ? { ...t, clips: [...t.clips.filter(c => c.id !== clipId), ...newClips] }
+      : t));
+    setEditingClip(null);
+    setShowClipEditor(false);
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Chopped "${clip.name}" into ${newClips.length} slices` } }));
+  }, [tracks, getAudioEngine]);
 
   const splitClip = useCallback((trackId: string, clipId: string, splitTime: number) => {
     const track = tracks.find(t => t.id === trackId);
@@ -5158,6 +6000,125 @@ const Imosion: React.FC = () => {
     });
   }, [getAudioEngine]);
 
+  // Open the FX browser targeting a specific track (stable for memoized strips).
+  const openBrowserForTrack = useCallback((trackId: string) => { setSelectedTrack(trackId); setShowPluginBrowser(true); }, []);
+
+  // Drag-to-reorder a track's plugin chain (signal flows top -> bottom).
+  const reorderPlugins = useCallback((trackId: string, from: number, to: number) => {
+    setTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+      const pls = [...t.plugins];
+      if (from < 0 || to < 0 || from >= pls.length || to >= pls.length || from === to) return t;
+      const [moved] = pls.splice(from, 1);
+      pls.splice(to, 0, moved);
+      return { ...t, plugins: pls };
+    }));
+    try { const t = tracks.find(x => x.id === trackId); t?.plugins.forEach(p => getAudioEngine().processPlugin(trackId, p)); } catch { /* */ }
+  }, [tracks, getAudioEngine]);
+
+  // ===== Freeze / Bounce-in-Place =====
+  // Freezing flags a track as committed: its FX chain is bypassed in the live graph
+  // (CPU saved, like Logic/Cubase freeze) until unfrozen. Visual badge in track list.
+  const toggleFreeze = useCallback((trackId: string) => {
+    setFrozenTracks(prev => {
+      const next = new Set(prev);
+      const freezing = !next.has(trackId);
+      if (freezing) next.add(trackId); else next.delete(trackId);
+      const track = tracks.find(t => t.id === trackId);
+      if (track) {
+        // Re-apply the chain: when frozen, push disabled copies so the engine bypasses them.
+        track.plugins.forEach(p => { try { getAudioEngine().processPlugin(trackId, { ...p, enabled: freezing ? false : p.enabled }); } catch { /* */ } });
+      }
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: freezing ? `Froze ${track?.name ?? 'track'} (FX bypassed)` : `Unfroze ${track?.name ?? 'track'}` } }));
+      return next;
+    });
+  }, [tracks, getAudioEngine]);
+
+  // Clone a track (Channel) with a fresh id + independent plugin instances.
+  const duplicateTrack = useCallback((trackId: string) => {
+    setTracks(prev => {
+      const idx = prev.findIndex(t => t.id === trackId);
+      if (idx < 0 || prev.length >= 1000) return prev;
+      const src = prev[idx];
+      const clone: AudioTrack = {
+        ...src,
+        id: `t${Date.now()}`,
+        name: `${src.name} copy`,
+        clips: src.clips.map(c => ({ ...c, id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` })),
+        plugins: src.plugins.map(p => ({ ...p, id: `p${Date.now()}-${Math.random().toString(36).slice(2, 6)}` })),
+      };
+      const next = [...prev]; next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  }, []);
+
+  // ===== Channel-strip presets =====
+  const persistStripPresets = useCallback((next: ChannelStripPreset[]) => {
+    setStripPresets(next);
+    try { localStorage.setItem('imosion.stripPresets', JSON.stringify(next)); } catch { /* */ }
+  }, []);
+  const saveStripPreset = useCallback((name: string) => {
+    const track = tracks.find(t => t.id === selectedTrack);
+    if (!track || !name.trim()) return;
+    const preset: ChannelStripPreset = { id: `sp${Date.now()}`, name: name.trim(), volume: track.volume, pan: track.pan, plugins: track.plugins.map(p => ({ ...p })) };
+    persistStripPresets([...stripPresets, preset]);
+    setNewStripPresetName('');
+  }, [tracks, selectedTrack, stripPresets, persistStripPresets]);
+  const applyStripPreset = useCallback((preset: ChannelStripPreset) => {
+    if (!selectedTrack) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Select a track first' } })); return; }
+    const plugins = preset.plugins.map(p => ({ ...p, id: `p${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }));
+    updateTrack(selectedTrack, { volume: preset.volume, pan: preset.pan, plugins });
+    plugins.forEach(p => { try { getAudioEngine().processPlugin(selectedTrack, p); } catch { /* */ } });
+  }, [selectedTrack, updateTrack, getAudioEngine]);
+  const deleteStripPreset = useCallback((id: string) => { persistStripPresets(stripPresets.filter(p => p.id !== id)); }, [stripPresets, persistStripPresets]);
+
+  // ===== Track / Project Alternatives (snapshots) =====
+  const captureSnapshot = useCallback((name: string) => {
+    if (!name.trim()) return;
+    const snap: ProjectSnapshot = { id: `snap${Date.now()}`, name: name.trim(), createdAt: Date.now(), data: { tracks: JSON.parse(JSON.stringify(tracks)), buses: JSON.parse(JSON.stringify(buses)), pianoRollNotes: JSON.parse(JSON.stringify(pianoRollNotes)), bpm, masterSettings: JSON.parse(JSON.stringify(masterSettings)) } };
+    setSnapshots(prev => [...prev, snap]);
+    setNewSnapshotName('');
+  }, [tracks, buses, pianoRollNotes, bpm, masterSettings]);
+  const restoreSnapshot = useCallback((id: string) => {
+    const snap = snapshots.find(s => s.id === id);
+    if (!snap) return;
+    setTracks(JSON.parse(JSON.stringify(snap.data.tracks)));
+    setBuses(JSON.parse(JSON.stringify(snap.data.buses)));
+    setPianoRollNotes(JSON.parse(JSON.stringify(snap.data.pianoRollNotes)));
+    setBpm(snap.data.bpm);
+    setMasterSettings(JSON.parse(JSON.stringify(snap.data.masterSettings)));
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Restored "${snap.name}"` } }));
+  }, [snapshots]);
+  const deleteSnapshot = useCallback((id: string) => setSnapshots(prev => prev.filter(s => s.id !== id)), []);
+
+  // ===== Smart Controls / Macros =====
+  const addMacro = useCallback(() => setMacros(prev => [...prev, { id: `m${Date.now()}`, name: `Macro ${prev.length + 1}`, value: 0, targets: [] }]), []);
+  const deleteMacro = useCallback((id: string) => setMacros(prev => prev.filter(m => m.id !== id)), []);
+  const addMacroTarget = useCallback((macroId: string, target: MacroTarget) => setMacros(prev => prev.map(m => m.id === macroId ? { ...m, targets: [...m.targets, target] } : m)), []);
+  const removeMacroTarget = useCallback((macroId: string, idx: number) => setMacros(prev => prev.map(m => m.id === macroId ? { ...m, targets: m.targets.filter((_, i) => i !== idx) } : m)), []);
+  const setMacroValue = useCallback((macroId: string, value: number) => {
+    setMacros(prev => prev.map(m => {
+      if (m.id !== macroId) return m;
+      // Drive every mapped param: 0..1 -> target.min..target.max
+      m.targets.forEach(t => { const v = t.min + (t.max - t.min) * value; updatePluginParam(t.trackId, t.pluginId, t.paramKey, v); });
+      return { ...m, value };
+    }));
+  }, [updatePluginParam]);
+
+  // ===== Tap Tempo (Smart Tempo, manual) =====
+  const tapTempo = useCallback(() => {
+    const now = performance.now();
+    const taps = tapTimesRef.current.filter(t => now - t < 2500);
+    taps.push(now);
+    tapTimesRef.current = taps.slice(-6);
+    if (tapTimesRef.current.length >= 2) {
+      const intervals = tapTimesRef.current.slice(1).map((t, i) => t - tapTimesRef.current[i]);
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const detected = Math.round(60000 / avg);
+      if (detected >= 40 && detected <= 300) setBpm(detected);
+    }
+  }, []);
+
   // Template actions
   const applyTemplate = useCallback((template: RecordingTemplate) => {
     setTracks(template.tracks.map(t => ({ ...t, type: 'audio' as const, clips: [] })));
@@ -5227,26 +6188,53 @@ const Imosion: React.FC = () => {
         }
         button:active { transform: scale(0.97); }
         button:disabled { opacity: 0.35; cursor: not-allowed; }
-        input[type="range"] { 
-          -webkit-appearance: none; 
-          background: transparent; 
-          cursor: pointer; 
-          height: 4px;
+        /* Analog hardware sliders: a recessed dark groove + brushed-metal cap,
+           matching the Fader/Knob components so every raw slider in the DAW reads
+           as a real physical control (the Logic/FL look) instead of a flat web
+           input. The cap carries a center indent line and a lit top bevel. */
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+          cursor: pointer;
+          height: 16px;
         }
-        input[type="range"]::-webkit-slider-thumb { 
-          -webkit-appearance: none; 
-          height: 12px; 
-          width: 12px; 
-          border-radius: 50%; 
-          background: #30d158;
-          margin-top: -4px;
-          border: none;
+        input[type="range"]::-webkit-slider-runnable-track {
+          height: 5px;
+          background: linear-gradient(180deg, #060608, #15151a);
+          border-radius: 3px;
+          border: 1px solid #050507;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
         }
-        input[type="range"]::-webkit-slider-runnable-track { 
-          height: 4px; 
-          background: var(--color-border);
-          border-radius: 2px; 
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 11px;
+          border-radius: 3px;
+          background: linear-gradient(180deg, #50505a 0%, #2a2a30 55%, #1a1a1e 100%);
+          margin-top: -6px;
+          border: 1px solid #050507;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.22);
         }
+        input[type="range"]::-webkit-slider-thumb:hover { background: linear-gradient(180deg, #5a5a66 0%, #303038 55%, #1e1e24 100%); }
+        input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 1px 2px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.28), 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent); }
+        input[type="range"]::-moz-range-track {
+          height: 5px;
+          background: linear-gradient(180deg, #060608, #15151a);
+          border-radius: 3px;
+          border: 1px solid #050507;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+        }
+        input[type="range"]::-moz-range-thumb {
+          height: 15px;
+          width: 10px;
+          border-radius: 3px;
+          background: linear-gradient(180deg, #50505a 0%, #2a2a30 55%, #1a1a1e 100%);
+          border: 1px solid #050507;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.22);
+        }
+        /* Vertical faders (mixer buses/master use writing-mode + slider-vertical). */
+        input[type="range"][style*="vertical"]::-webkit-slider-thumb { width: 16px; height: 11px; margin-top: 0; margin-left: -6px; }
         * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -5254,33 +6242,38 @@ const Imosion: React.FC = () => {
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
         .imosion-root { container-type: size; }
         .imosion-root button, .imosion-root select, .imosion-root input { font-family: inherit; }
-        .imosion-root button { min-height: 24px; }
+        /* Consistent sizing: box-sizing so a 1px border never changes the footprint,
+           and a uniform min-height so same-role buttons line up across the app. */
+        .imosion-root button { min-height: 24px; box-sizing: border-box; }
+        .imosion-root select, .imosion-root input { box-sizing: border-box; }
         .imosion-root [role="menu"], .imosion-root .frosted-dropdown, .imosion-root .dropdown {
           backdrop-filter: none !important;
           -webkit-backdrop-filter: none !important;
-          background: var(--color-bg-elevated, #1c1c1e) !important;
+          background: #16161b !important; /* SOLID — no see-through glass on menus */
         }
         @container (max-width: 920px) {
           .imosion-root .divider { display: none; }
         }
         .resize-handle { cursor: col-resize; background: var(--color-border-subtle); }
-        .resize-handle:hover { background: rgba(48,209,88,0.2); }
-        .dropdown-item:hover { background: rgba(48,209,88,0.08); }
-        .track-row:hover { background: rgba(48,209,88,0.04) !important; }
+        .resize-handle:hover { background: rgba(79, 138, 96,0.2); }
+        .dropdown-item:hover { background: rgba(79, 138, 96,0.08); }
+        .track-row:hover { background: rgba(79, 138, 96,0.04) !important; }
         .clip-item { cursor: grab; }
-        .clip-item:hover { background: rgba(48,209,88,0.12) !important; }
+        .clip-item:hover { background: rgba(79, 138, 96,0.12) !important; }
         .clip-item:active { cursor: grabbing; }
         .clip-dragging { opacity: 0.6; }
-        .drop-target { background: rgba(48,209,88,0.1) !important; }
+        .drop-target { background: rgba(79, 138, 96,0.1) !important; }
         .modal-overlay { animation: fadeIn 0.15s ease; background: rgba(0,0,0,0.5); }
         select { outline: none; font-family: inherit; }
         select:focus, input:focus { outline: none; }
-        .btn { 
-          display: flex; 
-          align-items: center; 
+        .btn {
+          display: flex;
+          align-items: center;
           justify-content: center;
           gap: 4px;
-          padding: 4px 8px;
+          height: 26px;
+          padding: 0 10px;
+          box-sizing: border-box;
           background: var(--color-border-subtle);
           border: 1px solid var(--color-bg-hover);
           border-radius: 9999px;
@@ -5288,19 +6281,25 @@ const Imosion: React.FC = () => {
           cursor: pointer;
           font-size: 10px;
           font-weight: 500;
+          white-space: nowrap;
         }
-        .btn:hover { background: #1e3a28; color: #30d158; border-color: #2a5e3a; }
-        .btn-active { background: #1e3a28; color: #30d158; border-color: #30d158; }
-        .btn-icon { padding: 4px 6px; }
-        .btn-primary { background: #30d158; border-color: #30d158; color: #000; font-weight: 700; border-radius: 9999px; }
-        .btn-primary:hover { background: #34d85c; }
+        .btn:hover { background: #232329; color: var(--color-text-primary); border-color: #3a3a42; }
+        .btn-active { background: #283128; color: #7aa888; border-color: #4f8a60; }
+        /* Square icon buttons: a single, uniform footprint everywhere they are not
+           given an explicit inline size. */
+        .btn-icon { width: 26px; height: 26px; padding: 0; flex-shrink: 0; }
+        .btn-primary { background: #4f8a60; border-color: #4f8a60; color: #0a0a0c; font-weight: 700; border-radius: 9999px; }
+        .btn-primary:hover { background: #58986a; }
         .btn-danger { background: var(--color-error); border-color: var(--color-error); color: #fff; border-radius: 9999px; }
         .divider { width: 1px; height: 18px; background: var(--color-border-subtle); margin: 0 4px; }
-        .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #30d158; }
-        .frosted-dropdown { background: var(--color-bg-elevated, #1C1C1E); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 14px 36px rgba(0,0,0,0.42); }
+        .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #4f8a60; }
+        .frosted-dropdown { background: #16161b; border: 1px solid #2c2c34; border-radius: 8px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); }
         .collapsible-header { cursor: pointer; user-select: none; transition: background 0.15s ease; }
         .collapsible-header:hover { background: var(--color-border-subtle); }
         .dropdown-item { transition: background 0.12s ease; }
+        /* Multi-column menus keep long lists short (no endless vertical scroll). */
+        .frosted-dropdown.cols { column-width: 188px; column-gap: 8px; }
+        .frosted-dropdown.cols > * { break-inside: avoid; }
         .dropdown-item:hover { background: #1e3a28 !important; }
         .dropdown-item:active { background: #244830 !important; }
         .plugin-drag { cursor: grab; user-select: none; }
@@ -5347,7 +6346,7 @@ const Imosion: React.FC = () => {
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowToolsMenu(false)}>
             <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(!showToolsMenu); setShowFileMenu(false); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools {Icon.chevron}</button>
             {showToolsMenu && (
-              <div className="frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '200px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="frosted-dropdown cols" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', width: 'min(396px, calc(100vw - 24px))', maxHeight: 'min(460px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showEffectsRack ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEffectsRack(!showEffectsRack); setShowToolsMenu(false); }}>FX Rack {showEffectsRack && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showSidechainPanel ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowSidechainPanel(!showSidechainPanel); setShowToolsMenu(false); }}>Sidechain {showSidechainPanel && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
@@ -5389,6 +6388,12 @@ const Imosion: React.FC = () => {
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowMidiPanel(!showMidiPanel); setShowToolsMenu(false); }}>MIDI Controller</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackNotes(!showTrackNotes); setShowToolsMenu(false); }}>Track Notes</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>WORKFLOW</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showMacros ? '#8a6a9c' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowMacros(true); setShowToolsMenu(false); }}>Smart Controls (Macros){macros.length > 0 && <span style={{ fontSize: '9px', color: '#8a6a9c' }}>{macros.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowAlternatives(true); setShowToolsMenu(false); }}>Track Alternatives{snapshots.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{snapshots.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowStripPresets(true); setShowToolsMenu(false); }}>Channel Strip Presets{stripPresets.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{stripPresets.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEventList(true); setShowToolsMenu(false); }}>Event List Editor{pianoRollNotes.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{pianoRollNotes.length}</span>}</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowStemExport(!showStemExport); setShowToolsMenu(false); }}>Stem Export</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowSRConvert(!showSRConvert); setShowToolsMenu(false); }}>Sample Rate Convert</div>
@@ -5400,38 +6405,46 @@ const Imosion: React.FC = () => {
           </div>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* Undo/Redo */}
-          <IconButton aria-label="Undo" onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" icon={Icon.undo}
+          <IconButton aria-label="Undo" onClick={undo} disabled={historyIndex <= 0} icon={Icon.undo}
             style={{ color: historyIndex <= 0 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', opacity: historyIndex <= 0 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }} />
-          <IconButton aria-label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" icon={Icon.redo}
+          <IconButton aria-label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} icon={Icon.redo}
             style={{ color: historyIndex >= history.length - 1 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', opacity: historyIndex >= history.length - 1 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }} />
         </div>
 
         {/* Center: Transport + LCD */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {/* Transport Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-border-subtle)', borderRadius: '8px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
-            <button aria-label="Rewind" onClick={() => setCurrentTime(0)} title="Rewind" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.rewind}</button>
-            <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} title={isPlaying ? 'Pause (Space)' : 'Play (Space)'} style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isPlaying ? 'var(--color-success)' : 'transparent', color: isPlaying ? '#000' : 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{isPlaying ? Icon.pause : Icon.play}</button>
-            <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} title="Stop" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.stop}</button>
-            <button aria-label={isRecording ? 'Stop Recording' : 'Record (R)'} onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Stop Recording' : 'Record (R)'} style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isRecording ? 'var(--color-error)' : 'transparent', color: isRecording ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.record}</button>
-            <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
-            <button aria-label="Loop" onClick={() => setIsLooping(!isLooping)} title="Loop (L)" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isLooping ? '#0d2847' : 'transparent', color: isLooping ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.loop}</button>
-            <button aria-label="Metronome" onClick={() => setMetronomeSettings(s => ({ ...s, enabled: !s.enabled }))} title="Metronome" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: metronomeSettings.enabled ? '#2a1840' : 'transparent', color: metronomeSettings.enabled ? '#bf5af2' : 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2L6 22h12L12 2z"/><line x1="8" y1="14" x2="16" y2="14"/><circle cx="12" cy="10" r="1.5"/></svg></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#141417', borderRadius: '9px', padding: '3px', border: '1px solid #2c2c34' }}>
+            <button aria-label="Rewind" onClick={() => setCurrentTime(0)} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.rewind}</button>
+            <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} style={{ width: '42px', height: '28px', borderRadius: '6px', border: 'none', background: isPlaying ? 'var(--color-success)' : '#36363f', color: isPlaying ? '#04130a' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isPlaying ? '0 0 14px rgba(79, 138, 96,0.55)' : 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{isPlaying ? Icon.pause : Icon.play}</button>
+            <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.stop}</button>
+            <button aria-label={isRecording ? 'Stop Recording' : 'Record (R)'} onClick={isRecording ? stopRecording : startRecording} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: isRecording ? 'var(--color-error)' : 'transparent', color: isRecording ? '#fff' : '#ff6b63', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isRecording ? '0 0 14px rgba(158, 90, 85,0.55)' : 'none' }}>{Icon.record}</button>
+            <div style={{ width: '1px', height: '18px', background: '#2c2c34', margin: '0 2px' }} />
+            <button aria-label="Loop" onClick={() => setIsLooping(!isLooping)} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: isLooping ? 'var(--color-accent)' : 'transparent', color: isLooping ? '#fff' : '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { if (!isLooping) e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { if (!isLooping) e.currentTarget.style.background = 'transparent'; }}>{Icon.loop}</button>
+            <button aria-label="Metronome" onClick={() => setMetronomeSettings(s => ({ ...s, enabled: !s.enabled }))} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: metronomeSettings.enabled ? 'var(--color-accent)' : 'transparent', color: metronomeSettings.enabled ? '#fff' : '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { if (!metronomeSettings.enabled) e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { if (!metronomeSettings.enabled) e.currentTarget.style.background = 'transparent'; }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2L6 22h12L12 2z"/><line x1="8" y1="14" x2="16" y2="14"/><circle cx="12" cy="10" r="1.5"/></svg></button>
+            {metronomeSettings.enabled && (
+              <Knob
+                value={metronomeSettings.volume} min={0} max={1} defaultValue={0.7} size={26}
+                color="var(--color-accent)"
+                onChange={(v) => setMetronomeSettings(s => ({ ...s, volume: v }))}
+                valueLabel={`${Math.round(metronomeSettings.volume * 100)}`}
+              />
+            )}
           </div>
 
           {/* Recording Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {/* Count-in toggle */}
-            <button aria-label="Count-in" onClick={() => setCountInEnabled(c => !c)} title={`Count-in: ${countInEnabled ? countInBars + ' bars' : 'Off'}`} style={{ padding: '4px var(--space-2)', borderRadius: '6px', border: '1px solid', borderColor: countInEnabled ? '#3d2060' : 'var(--color-bg-hover)', background: countInEnabled ? '#2a1840' : 'var(--color-bg-elevated)', color: countInEnabled ? '#bf5af2' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button aria-label="Count-in" onClick={() => setCountInEnabled(c => !c)} style={{ padding: '4px var(--space-2)', borderRadius: '6px', border: '1px solid', borderColor: countInEnabled ? '#3d2060' : 'var(--color-bg-hover)', background: countInEnabled ? '#2a1840' : 'var(--color-bg-elevated)', color: countInEnabled ? '#8a6a9c' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
               {countInBars}
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </button>
             {/* Punch set buttons */}
             {punchMode && (
               <>
-                <button aria-label="Set punch in" onClick={() => setPunchInPoint(currentTime)} title="Set Punch In at playhead" style={{ padding: '4px 7px', borderRadius: '6px', border: '1px solid #4a2020', background: punchInPoint !== null ? '#3a1818' : 'var(--color-bg-elevated)', color: 'var(--color-error)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.punchIn} IN</button>
-                <button aria-label="Set punch out" onClick={() => setPunchOutPoint(currentTime)} title="Set Punch Out at playhead" style={{ padding: '4px 7px', borderRadius: '6px', border: '1px solid #4a2020', background: punchOutPoint !== null ? '#3a1818' : 'var(--color-bg-elevated)', color: 'var(--color-error)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.punchOut} OUT</button>
-                <button aria-label="Clear punch" onClick={() => { setPunchInPoint(null); setPunchOutPoint(null); }} title="Clear punch region" style={{ padding: '4px 6px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.eraser} CLR</button>
+                <button aria-label="Set punch in" onClick={() => setPunchInPoint(currentTime)} style={{ padding: '4px 7px', borderRadius: '6px', border: '1px solid #4a2020', background: punchInPoint !== null ? '#3a1818' : 'var(--color-bg-elevated)', color: 'var(--color-error)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.punchIn} IN</button>
+                <button aria-label="Set punch out" onClick={() => setPunchOutPoint(currentTime)} style={{ padding: '4px 7px', borderRadius: '6px', border: '1px solid #4a2020', background: punchOutPoint !== null ? '#3a1818' : 'var(--color-bg-elevated)', color: 'var(--color-error)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.punchOut} OUT</button>
+                <button aria-label="Clear punch" onClick={() => { setPunchInPoint(null); setPunchOutPoint(null); }} style={{ padding: '4px 6px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>{Icon.eraser} CLR</button>
               </>
             )}
             {/* Armed tracks count */}
@@ -5443,7 +6456,7 @@ const Imosion: React.FC = () => {
             )}
             {/* Count-in countdown */}
             {isCountingIn && (
-              <span style={{ padding: '2px var(--space-2)', borderRadius: '3px', background: '#2a1840', color: '#bf5af2', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono)', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
+              <span style={{ padding: '2px var(--space-2)', borderRadius: '3px', background: '#2a1840', color: '#8a6a9c', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono)', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
             )}
             {/* Recording elapsed timer */}
             {isRecording && (
@@ -5454,15 +6467,18 @@ const Imosion: React.FC = () => {
             )}
           </div>
 
-          {/* LCD Display */}
-          <div data-testid="imosion-transport" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-            <div onClick={() => setTimeDisplayMode(m => m === 'time' ? 'bars' : 'time')} title="Click to toggle" style={{ padding: '4px 14px', cursor: 'pointer', borderRight: '1px solid var(--color-bg-hover)', minWidth: '110px', textAlign: 'center' }}>
+          {/* LCD Display -- recessed, backlit amber readout like a hardware unit */}
+          <div data-testid="imosion-transport" style={{ display: 'flex', alignItems: 'center', background: 'linear-gradient(180deg,#0a0c0b,#070807)', borderRadius: '8px', border: '1px solid #000', boxShadow: 'inset 0 1px 5px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+            <div onClick={() => setTimeDisplayMode(m => m === 'time' ? 'bars' : 'time')} style={{ padding: '4px 14px', cursor: 'pointer', borderRight: '1px solid var(--color-bg-hover)', minWidth: '110px', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>{timeDisplayMode === 'time' ? 'TIME' : 'BARS'}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '0.5px' }}>{formatTime(currentTime)}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: '#e9b06a', letterSpacing: '1px', textShadow: '0 0 7px rgba(233,176,106,0.55)' }}>{formatTime(currentTime)}</div>
             </div>
             <div style={{ padding: '4px 10px', borderRight: '1px solid var(--color-bg-hover)', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>BPM</div>
-              <input data-testid="bpm-display" type="number" value={bpm} onChange={(e) => setBpm(Math.max(40, Math.min(300, parseInt(e.target.value) || 120)))} style={{ width: '42px', background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 600, textAlign: 'center', fontFamily: 'var(--font-mono)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input data-testid="bpm-display" type="number" value={bpm} onChange={(e) => setBpm(Math.max(40, Math.min(300, parseInt(e.target.value) || 120)))} style={{ width: '42px', background: 'transparent', border: 'none', color: '#e9b06a', fontSize: '14px', fontWeight: 700, textAlign: 'center', fontFamily: 'var(--font-mono)', textShadow: '0 0 6px rgba(233,176,106,0.5)' }} />
+                <button aria-label="Tap tempo" onClick={tapTempo} style={{ fontSize: '8px', fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', lineHeight: 1 }}>TAP</button>
+              </div>
             </div>
             <div style={{ padding: '4px var(--space-2)', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>KEY</div>
@@ -5482,10 +6498,35 @@ const Imosion: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           {/* View Mode Toggle - GarageBand segmented control */}
           <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: '8px', padding: '2px', border: '1px solid var(--color-border-subtle)' }}>
-            <button aria-label="Arrange" onClick={() => setViewMode('arrange')} style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: viewMode === 'arrange' ? '#1e3a28' : 'transparent', color: viewMode === 'arrange' ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: viewMode === 'arrange' ? 'inset 0 1px 0 #2a5e3a' : 'none' }}>{Icon.arrange} Arrange</button>
-            <button data-testid="imosion-mixer" aria-label="Mixer" onClick={() => setViewMode('mixer')} style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: viewMode === 'mixer' ? '#1e3a28' : 'transparent', color: viewMode === 'mixer' ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: viewMode === 'mixer' ? 'inset 0 1px 0 #2a5e3a' : 'none' }}>{Icon.mixerView} Mixer</button>
-            <button aria-label="Beat Maker" onClick={() => setViewMode('beatmaker')} style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: viewMode === 'beatmaker' ? '#1e3a28' : 'transparent', color: viewMode === 'beatmaker' ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: viewMode === 'beatmaker' ? 'inset 0 1px 0 #2a5e3a' : 'none' }}>{Icon.beats} Beats</button>
-            <button aria-label="Piano Roll" onClick={() => setViewMode('pianoroll')} style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: viewMode === 'pianoroll' ? '#2a1840' : 'transparent', color: viewMode === 'pianoroll' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: viewMode === 'pianoroll' ? 'inset 0 1px 0 #3d2060' : 'none' }}>{Icon.pianoRoll} Piano Roll</button>
+            {([
+              { mode: 'arrange', icon: Icon.arrange, label: 'Arrange', testid: undefined },
+              { mode: 'rack', icon: (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>), label: 'Channels', testid: 'imosion-rack' },
+              { mode: 'mixer', icon: Icon.mixerView, label: 'Mixer', testid: 'imosion-mixer' },
+              { mode: 'beatmaker', icon: Icon.beats, label: 'Beats', testid: undefined },
+              { mode: 'pianoroll', icon: Icon.pianoRoll, label: 'Piano Roll', testid: undefined },
+            ] as const).map((v) => {
+              const on = viewMode === v.mode;
+              return (
+                <button
+                  key={v.mode}
+                  data-testid={v.testid}
+                  aria-label={v.label}
+                  aria-pressed={on}
+                  onClick={() => setViewMode(v.mode)}
+                  onMouseEnter={(e) => { if (!on) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--color-text-primary)'; } }}
+                  onMouseLeave={(e) => { if (!on) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; } }}
+                  style={{
+                    padding: '5px 11px', borderRadius: '6px', border: 'none',
+                    background: on ? 'rgba(74,158,255,0.22)' : 'transparent',
+                    color: on ? '#fff' : 'var(--color-text-secondary)',
+                    fontSize: '10px', fontWeight: 600, cursor: 'pointer',
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    boxShadow: on ? 'inset 0 0 0 1px rgba(74,158,255,0.45), 0 1px 4px rgba(74,158,255,0.25)' : 'none',
+                  }}
+                >{v.icon} {v.label}</button>
+              );
+            })}
           </div>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* Master Volume */}
@@ -5507,9 +6548,9 @@ const Imosion: React.FC = () => {
               <div className="frosted-dropdown" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '180px', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '6px var(--space-3) 4px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIEW</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showAutomation ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowAutomation(a => !a); setShowPanelsMenu(false); }}>Automation{showAutomation && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentBrowser ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentBrowser(b => !b); setShowPanelsMenu(false); }}>Instruments{showInstrumentBrowser && <span style={{ fontSize: '9px', color: '#bf5af2' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentBrowser ? '#8a6a9c' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentBrowser(b => !b); setShowPanelsMenu(false); }}>Instruments{showInstrumentBrowser && <span style={{ fontSize: '9px', color: '#8a6a9c' }}>ON</span>}</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showChordsScales ? '#FF6B35' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowChordsScales(s => !s); setShowPanelsMenu(false); }}>Chords &amp; Scales{showChordsScales && <span style={{ fontSize: '9px', color: '#FF6B35' }}>ON</span>}</div>
-                {selectedInstrument && <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentEditor ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentEditor(b => !b); setShowPanelsMenu(false); }}>Edit Instrument{showInstrumentEditor && <span style={{ fontSize: '9px', color: '#bf5af2' }}>ON</span>}</div>}
+                {selectedInstrument && <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentEditor ? '#8a6a9c' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentEditor(b => !b); setShowPanelsMenu(false); }}>Edit Instrument{showInstrumentEditor && <span style={{ fontSize: '9px', color: '#8a6a9c' }}>ON</span>}</div>}
               </div>
             )}
           </div>
@@ -5531,7 +6572,7 @@ const Imosion: React.FC = () => {
             {meterStats && meterStats.peakDb > -120 ? `${meterStats.peakDb.toFixed(1)}dB` : '-dB'}
           </span>
           {meterStats && meterStats.crestDb > 0 && (
-            <span title="Crest factor (peak - RMS): dynamics indicator" style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '52px' }}>
+            <span style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '52px' }}>
               CF {meterStats.crestDb.toFixed(1)}
             </span>
           )}
@@ -5541,19 +6582,30 @@ const Imosion: React.FC = () => {
       {/* Main Area */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         {/* Track Panel - GarageBand Style */}
-        <div data-testid="imosion-tracks" style={{ width: trackPanelWidth, minWidth: 150, flexShrink: 0, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column' }}>
+        {/* Collapsed rail — click to bring the track list back */}
+        {trackPanelCollapsed && (
+          <button aria-label="Expand tracks panel" onClick={() => setTrackPanelCollapsed(false)}
+            style={{ width: 26, flexShrink: 0, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 8, paddingTop: 8, cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>Tracks</span>
+          </button>
+        )}
+        <div data-testid="imosion-tracks" style={{ width: trackPanelWidth, minWidth: 180, flexShrink: 0, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', display: trackPanelCollapsed ? 'none' : 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
             <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '1px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 4 }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               Tracks
             </span>
-            <button aria-label="Add new track" onClick={addTrack} className="btn btn-icon" title="Add new track" style={{ width: '20px', height: '20px', padding: '0' }}>{Icon.plus}</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button aria-label="Add new track" onClick={addTrack} className="btn btn-icon" style={{ width: '20px', height: '20px', padding: '0' }}>{Icon.plus}</button>
+              <button aria-label="Collapse tracks panel" onClick={() => setTrackPanelCollapsed(true)} className="btn btn-icon" style={{ width: '20px', height: '20px', padding: '0' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+            </div>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0' }}>
             {tracks.map((track, trackIdx) => {
               const isSelected = selectedTrack === track.id;
               return (
-              <div key={track.id} onClick={() => setSelectedTrack(track.id)} style={{ padding: '0', marginBottom: '1px', background: isSelected ? `linear-gradient(90deg, ${track.color}15, ${track.color}08)` : trackIdx % 2 === 0 ? 'var(--color-border-subtle)' : 'transparent', borderRadius: '6px', cursor: 'pointer', border: `1px solid ${isSelected ? track.color + '25' : 'transparent'}`, overflow: 'hidden', transition: 'all 0.15s ease' }}>
+              <div key={track.id} onClick={() => setSelectedTrack(track.id)} style={{ padding: '0', height: '62px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: isSelected ? `linear-gradient(90deg, ${track.color}15, ${track.color}08)` : trackIdx % 2 === 0 ? 'var(--color-border-subtle)' : 'transparent', borderBottom: '1px solid var(--color-border-subtle)', borderLeft: `2px solid ${isSelected ? track.color : 'transparent'}`, cursor: 'pointer', overflow: 'hidden', transition: 'background 0.15s ease, border-color 0.15s ease' }}>
                 {/* Track header row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px var(--space-2)' }}>
                   {/* GarageBand-style instrument icon circle */}
@@ -5561,7 +6613,6 @@ const Imosion: React.FC = () => {
                     role="button" tabIndex={0} aria-label={`Change color for ${track.name}`}
                     onClick={(e) => { e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); }} 
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); } }}
-                    title="Click to change color"
                     style={{ width: '28px', height: '28px', borderRadius: '50%', background: `linear-gradient(135deg, ${track.color}40, ${track.color}20)`, cursor: 'pointer', border: `1.5px solid ${track.color}60`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isSelected ? `0 0 8px ${track.color}30` : 'none' }} 
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={track.color} strokeWidth="2" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -5576,15 +6627,16 @@ const Imosion: React.FC = () => {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '10px', fontWeight: 600, color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.name}</div>
                     <div style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      {frozenTracks.has(track.id) && <span style={{ background: 'rgba(74, 120, 150,0.15)', color: '#4a7896', padding: '0 3px', borderRadius: 2, fontWeight: 700 }}>FROZEN</span>}
                       {track.plugins.length > 0 && <span style={{ background: 'var(--color-bg-hover)', padding: '0 3px', borderRadius: 2 }}>{track.plugins.length} FX</span>}
                       {track.output !== 'master' && <span style={{ color: track.color + '80' }}>→ {buses.find(b => b.id === track.output)?.name || 'Bus'}</span>}
                       <span style={{ fontFamily: 'var(--font-mono)' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(0)}dB</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '2px' }}>
-                    <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { muted: !track.muted }); }} title="Mute" style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.muted ? 'var(--color-accent)' : 'var(--color-bg-hover)', color: track.muted ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>M</button>
-                    <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { solo: !track.solo }); }} title="Solo" style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.solo ? 'var(--color-warning)' : 'var(--color-bg-hover)', color: track.solo ? '#000' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>S</button>
-                    <button aria-label="Record Arm" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { armed: !track.armed }); }} title="Record Arm" style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.armed ? 'var(--color-error)' : 'var(--color-bg-hover)', color: track.armed ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>●</button>
+                    <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { muted: !track.muted }); }} style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.muted ? 'var(--color-accent)' : 'var(--color-bg-hover)', color: track.muted ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>M</button>
+                    <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { solo: !track.solo }); }} style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.solo ? 'var(--color-warning)' : 'var(--color-bg-hover)', color: track.solo ? '#000' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>S</button>
+                    <button aria-label="Record Arm" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { armed: !track.armed }); }} style={{ width: '18px', height: '18px', borderRadius: '50%', border: 'none', background: track.armed ? 'var(--color-error)' : 'var(--color-bg-hover)', color: track.armed ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>●</button>
                   </div>
                 </div>
                 {/* Volume slider - GarageBand inline style */}
@@ -5626,9 +6678,9 @@ const Imosion: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 14px', background: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--color-bg-tertiary)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)' }}>
-                <button aria-label="Zoom In" onClick={() => setZoom(z => Math.min(200, z * 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }} title="Zoom In (Ctrl+Plus)">{Icon.zoomIn}</button>
-                <button aria-label="Zoom Out" onClick={() => setZoom(z => Math.max(10, z / 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }} title="Zoom Out (Ctrl+Minus)">{Icon.zoomOut}</button>
-                <button aria-label="Reset Zoom" onClick={() => setZoom(40)} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px', fontSize: '9px', color: 'var(--color-text-muted)' }} title="Reset Zoom">1:1</button>
+                <button aria-label="Zoom In" onClick={() => setZoom(z => Math.min(200, z * 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }}>{Icon.zoomIn}</button>
+                <button aria-label="Zoom Out" onClick={() => setZoom(z => Math.max(10, z / 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }}>{Icon.zoomOut}</button>
+                <button aria-label="Reset Zoom" onClick={() => setZoom(40)} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px', fontSize: '9px', color: 'var(--color-text-muted)' }}>1:1</button>
               </div>
               <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: '36px', background: 'var(--color-bg-tertiary)', padding: '4px var(--space-2)', borderRadius: '3px', textAlign: 'center' }}>{Math.round(zoom)}px</span>
               <div className="divider" />
@@ -5639,13 +6691,19 @@ const Imosion: React.FC = () => {
                   File > Import Audio or drag-and-drop, both of which still work. */}
               <button aria-label="Export" onClick={() => setShowExportModal(true)} className="btn" style={{ color: 'var(--color-accent)' }}>{Icon.download} Export</button>
               <div className="divider" />
-              <button aria-label="FX Bus" onClick={() => addBus('fx')} className="btn">{Icon.bus} FX Bus</button>
-              <button aria-label="Group" onClick={() => addBus('group')} className="btn">{Icon.route} Group</button>
+              {/* Bus-creation actions collapsed into one dropdown. */}
+              <details className="bus-add-dd" style={{ position: 'relative' }}>
+                <summary className="btn" style={{ listStyle: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{Icon.bus} Bus <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <button aria-label="Add FX Bus" onClick={(e) => { addBus('fx'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.bus} FX Bus</button>
+                  <button aria-label="Add Group Bus" onClick={(e) => { addBus('group'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.route} Group Bus</button>
+                </div>
+              </details>
               <div className="divider" />
               <button aria-label="Store" onClick={() => setShowPluginStore(true)} className="btn">{Icon.store} Store</button>
               <button aria-label="Add FX" onClick={() => setShowPluginBrowser(true)} className="btn btn-primary">{Icon.plugin} Add FX</button>
               <div className="divider" />
-              <button aria-label="Spectrum Analyzer" onClick={() => setShowSpectrum(s => !s)} className={`btn ${showSpectrum ? 'btn-active' : ''}`} title="Spectrum Analyzer">Spectrum</button>
+              <button aria-label="Spectrum Analyzer" onClick={() => setShowSpectrum(s => !s)} className={`btn ${showSpectrum ? 'btn-active' : ''}`}>Spectrum</button>
             </div>
           </div>
 
@@ -5677,14 +6735,14 @@ const Imosion: React.FC = () => {
               })}
             </div>
             {keyChanges.map((kc, i) => (
-              <div key={`key-${i}`} onClick={() => removeKeyChange(kc.time)} title={`${kc.key.root} ${kc.key.scale}`} style={{ position: 'absolute', left: `${kc.time * zoom}px`, top: '2px', padding: '1px 6px', background: 'rgba(255,149,0,0.15)', borderRadius: '2px', fontSize: '8px', color: '#ff9500', cursor: 'pointer', fontWeight: 600 }}>{kc.key.root}{kc.key.scale === 'minor' ? 'm' : ''}</div>
+              <div key={`key-${i}`} onClick={() => removeKeyChange(kc.time)} style={{ position: 'absolute', left: `${kc.time * zoom}px`, top: '2px', padding: '1px 6px', background: 'rgba(255,149,0,0.15)', borderRadius: '2px', fontSize: '8px', color: '#ff9500', cursor: 'pointer', fontWeight: 600 }}>{kc.key.root}{kc.key.scale === 'minor' ? 'm' : ''}</div>
             ))}
             {bpmChanges.map((bc, i) => (
-              <div key={`bpm-${i}`} onClick={() => removeBpmChange(bc.time)} title={`${bc.bpm} BPM`} style={{ position: 'absolute', left: `${bc.time * zoom}px`, top: '2px', marginLeft: 'var(--space-10)', padding: '1px 6px', background: 'rgba(10,132,255,0.12)', borderRadius: '2px', fontSize: '8px', color: 'var(--color-accent)', cursor: 'pointer', fontWeight: 600 }}>{bc.bpm}</div>
+              <div key={`bpm-${i}`} onClick={() => removeBpmChange(bc.time)} style={{ position: 'absolute', left: `${bc.time * zoom}px`, top: '2px', marginLeft: 'var(--space-10)', padding: '1px 6px', background: 'rgba(10,132,255,0.12)', borderRadius: '2px', fontSize: '8px', color: 'var(--color-accent)', cursor: 'pointer', fontWeight: 600 }}>{bc.bpm}</div>
             ))}
             {/* Punch-in/out region overlay */}
             {punchMode && punchInPoint !== null && punchOutPoint !== null && (
-              <div style={{ position: 'absolute', left: `${punchInPoint * zoom}px`, width: `${(punchOutPoint - punchInPoint) * zoom}px`, top: 0, bottom: 0, background: 'rgba(255,69,58,0.08)', borderLeft: '2px solid rgba(255,69,58,0.6)', borderRight: '2px solid rgba(255,69,58,0.6)', pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', left: `${punchInPoint * zoom}px`, width: `${(punchOutPoint - punchInPoint) * zoom}px`, top: 0, bottom: 0, background: 'rgba(158, 90, 85,0.08)', borderLeft: '2px solid rgba(158, 90, 85,0.6)', borderRight: '2px solid rgba(158, 90, 85,0.6)', pointerEvents: 'none' }}>
                 <span style={{ position: 'absolute', top: '2px', left: '4px', fontSize: '7px', color: 'var(--color-error)', fontWeight: 700, letterSpacing: '0.5px' }}>PUNCH</span>
               </div>
             )}
@@ -5705,7 +6763,6 @@ const Imosion: React.FC = () => {
                 }
               }}
               style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}
-              title="Double-click to add key change, Shift+double-click for BPM change"
             />
           </div>
             );
@@ -5730,11 +6787,18 @@ const Imosion: React.FC = () => {
           <div
             style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'auto', position: 'relative', background: '#08080a' }}
             onWheel={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                const delta = Math.abs(e.deltaY) > 50 ? Math.sign(e.deltaY) * 50 : e.deltaY;
-                const factor = 1 + Math.abs(delta) * 0.002;
-                setZoom(z => delta < 0 ? Math.min(200, z * factor) : Math.max(10, z / factor));
+              if (!(e.ctrlKey || e.metaKey)) return;
+              e.preventDefault();
+              const delta = Math.abs(e.deltaY) > 50 ? Math.sign(e.deltaY) * 50 : e.deltaY;
+              const factor = 1 + Math.abs(delta) * 0.002;
+              zoomFactorRef.current *= delta < 0 ? factor : 1 / factor;
+              if (zoomRafRef.current == null) {
+                zoomRafRef.current = requestAnimationFrame(() => {
+                  zoomRafRef.current = null;
+                  const mult = zoomFactorRef.current;
+                  zoomFactorRef.current = 1;
+                  setZoom(z => Math.max(10, Math.min(200, z * mult)));
+                });
               }
             }}
             onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }}
@@ -5818,56 +6882,14 @@ const Imosion: React.FC = () => {
                     {/* Fade Out indicator */}
                     {clip.fadeOut > 0 && <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${Math.min(clip.fadeOut / clip.duration * 100, 50)}%`, background: `linear-gradient(to left, ${track.color}70, transparent)`, pointerEvents: 'none' }} />}
                     <div style={{ padding: '3px 6px', fontSize: '9px', fontWeight: 600, background: 'linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2))', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      {clip.tempoLocked && <span style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center' }} title="Tempo Locked">{Icon.link}</span>}
+                      {clip.tempoLocked && <span style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center' }}>{Icon.link}</span>}
                       {clip.reverse && <span style={{ color: 'var(--color-error)', fontWeight: 700 }}>R</span>}
                       {clip.pitch !== 0 && <span style={{ color: 'var(--color-warning)' }}>{clip.pitch > 0 ? '+' : ''}{clip.pitch}</span>}
                       {clip.stretch !== 1 && <span style={{ color: 'var(--color-success)' }}>{clip.stretch.toFixed(1)}x</span>}
                       <span style={{ color: 'var(--color-text-primary)' }}>{clip.name}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1px 2px', flex: 1, overflow: 'hidden' }}>
-                      <canvas
-                        ref={(el) => {
-                          if (el && clip.waveform.length > 0) {
-                            const ctx = el.getContext('2d');
-                            if (!ctx) return;
-                            const w = el.parentElement?.clientWidth || 100;
-                            const h = el.parentElement?.clientHeight || 30;
-                            el.width = w * 2; el.height = h * 2;
-                            ctx.scale(2, 2);
-                            const mid = h / 2;
-                            ctx.clearRect(0, 0, w, h);
-                            const grad = ctx.createLinearGradient(0, 0, 0, h);
-                            grad.addColorStop(0, track.color + '60');
-                            grad.addColorStop(0.5, track.color + '30');
-                            grad.addColorStop(1, track.color + '60');
-                            ctx.fillStyle = grad;
-                            ctx.beginPath();
-                            ctx.moveTo(0, mid);
-                            const peaks = clip.waveform;
-                            for (let i = 0; i < peaks.length; i++) {
-                              ctx.lineTo((i / peaks.length) * w, mid - peaks[i] * mid * 0.9);
-                            }
-                            for (let i = peaks.length - 1; i >= 0; i--) {
-                              ctx.lineTo((i / peaks.length) * w, mid + peaks[i] * mid * 0.9);
-                            }
-                            ctx.closePath();
-                            ctx.fill();
-                            ctx.strokeStyle = track.color;
-                            ctx.lineWidth = 1;
-                            ctx.lineJoin = 'round';
-                            ctx.beginPath();
-                            ctx.moveTo(0, mid);
-                            for (let i = 0; i < peaks.length; i++) {
-                              ctx.lineTo((i / peaks.length) * w, mid - peaks[i] * mid * 0.9);
-                            }
-                            ctx.stroke();
-                            ctx.strokeStyle = `${track.color}20`;
-                            ctx.lineWidth = 0.5;
-                            ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
-                          }
-                        }}
-                        style={{ width: '100%', height: '100%', display: 'block' }}
-                      />
+                      <ClipWaveformCanvas peaks={clip.waveform} color={track.color} />
                     </div>
                   </div>
                 ))}
@@ -5883,11 +6905,55 @@ const Imosion: React.FC = () => {
                 <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-text-tertiary)', opacity: 0.7, letterSpacing: '0.04em' }}>Drag audio here</div>
               </div>
             )}
-            <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${currentTime * zoom}px`, width: '2px', background: 'var(--color-error)', zIndex: 100, pointerEvents: 'none' }} />
+            <div ref={arrangePlayheadRef} style={{ position: 'absolute', top: 0, bottom: 0, left: `${currentTime * zoom}px`, width: '2px', background: 'var(--color-error)', zIndex: 100, pointerEvents: 'none' }} />
           </div>
           );
           })()}
         </div>
+
+        {/* Channel Rack View — channels + mixer controls + FX chain on one row each;
+            the selected channel's plugin controls open in the shared plugin panel. */}
+        {viewMode === 'rack' && (
+          <div className="view-content" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-secondary)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="section-title">Channel Rack</span>
+                <span style={{ fontSize: 9, padding: '2px 6px', background: '#0d2847', borderRadius: 2, color: 'var(--color-accent)' }}>{tracks.length} Channels</span>
+                <span style={{ fontSize: 9, color: 'var(--color-text-disabled)' }}>Select a channel to edit its plugins →</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button aria-label={beatPlaying ? 'Stop pattern' : 'Play pattern'} onClick={() => beatPlaying ? stopBeatSequencer() : startBeatSequencer()} className={`btn ${beatPlaying ? 'btn-active' : ''}`}>
+                  <span style={{ display: 'flex' }}>{beatPlaying ? Icon.stop : Icon.play}</span> {beatPlaying ? 'Stop' : 'Play Pattern'}
+                </button>
+                <button aria-label="Add channel" onClick={addTrack} className="btn"><span style={{ display: 'flex' }}>{Icon.plus}</span> Channel</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
+              {tracks.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--color-text-disabled)' }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>No channels yet — add one to start</div>
+                </div>
+              ) : tracks.map((track, idx) => (
+                <ChannelRackRow
+                  key={track.id}
+                  track={track}
+                  index={idx}
+                  selected={selectedTrack === track.id}
+                  buses={buses}
+                  onSelect={setSelectedTrack}
+                  onUpdate={updateTrack}
+                  onTogglePlugin={togglePlugin}
+                  onRemovePlugin={removePlugin}
+                  onOpenBrowser={openBrowserForTrack}
+                  onReorderPlugins={reorderPlugins}
+                  steps={rackSteps[track.id]}
+                  onToggleStep={toggleRackStep}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Full Mixer View */}
         {viewMode === 'mixer' && (
@@ -5917,16 +6983,16 @@ const Imosion: React.FC = () => {
                     track.plugins.filter(p => p.type === 'compressor' && (p.params.sidechainSource ?? -1) >= 0).map(p => {
                       const srcIdx = p.params.sidechainSource as number;
                       if (srcIdx < 0 || srcIdx >= tracks.length) return null;
-                      const srcX = 12 + srcIdx * 102 + 47;
-                      const destX = 12 + destIdx * 102 + 47;
+                      const srcX = 12 + srcIdx * 140 + 66;
+                      const destX = 12 + destIdx * 140 + 66;
                       const y1 = 20;
                       const y2 = 40;
                       const midY = (y1 + y2) / 2 - 10;
                       return (
                         <g key={`sc-${track.id}-${p.id}`}>
-                          <path d={`M ${srcX} ${y1} C ${srcX} ${midY}, ${destX} ${midY}, ${destX} ${y2}`} fill="none" stroke="#bf5af2" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
-                          <circle cx={srcX} cy={y1} r="3" fill="#bf5af2" opacity="0.8" />
-                          <circle cx={destX} cy={y2} r="3" fill="#bf5af2" opacity="0.8" />
+                          <path d={`M ${srcX} ${y1} C ${srcX} ${midY}, ${destX} ${midY}, ${destX} ${y2}`} fill="none" stroke="#8a6a9c" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
+                          <circle cx={srcX} cy={y1} r="3" fill="#8a6a9c" opacity="0.8" />
+                          <circle cx={destX} cy={y2} r="3" fill="#8a6a9c" opacity="0.8" />
                         </g>
                       );
                     })
@@ -5936,99 +7002,19 @@ const Imosion: React.FC = () => {
 
               {/* Track Channel Strips */}
               {tracks.map((track, idx) => (
-                <div key={track.id} onClick={() => setSelectedTrack(track.id)} style={{ width: '108px', minWidth: '108px', background: selectedTrack === track.id ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)', borderRadius: '8px', marginRight: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: `1px solid ${selectedTrack === track.id ? track.color + '40' : 'var(--color-border-subtle)'}`, overflow: 'hidden', boxShadow: selectedTrack === track.id ? `0 0 20px ${track.color}15` : '0 2px 8px rgba(0,0,0,0.2)' }}>
-                  {/* Insert Number + Track Name */}
-                  <div style={{ padding: '4px 6px', borderBottom: '1px solid var(--color-border-subtle)', background: `linear-gradient(180deg, ${track.color}25, ${track.color}10)` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '8px', fontWeight: 700, color: track.color, opacity: 0.6, minWidth: '16px' }}>#{idx + 1}</span>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: track.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{track.name}</div>
-                    </div>
-                  </div>
-
-                  {/* Effects Chain Slots (up to 10) */}
-                  <div
-                    onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-imosion-plugin')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; e.currentTarget.style.background = 'rgba(48,209,88,0.1)'; } }}
-                    onDragLeave={(e) => { e.currentTarget.style.background = ''; }}
-                    onDrop={(e) => { e.preventDefault(); e.currentTarget.style.background = ''; const pluginType = e.dataTransfer.getData('application/x-imosion-plugin') as PluginType; if (pluginType && PLUGIN_LIBRARY[pluginType]) { addPluginToTrack(track.id, pluginType); } }}
-                    style={{ padding: '3px 4px', borderBottom: '1px solid var(--color-border-subtle)', maxHeight: '60px', overflowY: 'auto', transition: 'background 0.15s' }}
-                  >
-                    {track.plugins.length > 0 ? track.plugins.slice(0, 10).map((p) => (
-                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 5px', borderRadius: '3px', marginBottom: '2px', background: p.enabled ? `${PLUGIN_LIBRARY[p.type].color}15` : '#111113', opacity: p.enabled ? 1 : 0.4 }}>
-                        <span style={{ color: PLUGIN_LIBRARY[p.type].color, display: 'flex', flexShrink: 0 }}>{PLUGIN_ICON[p.type]}</span>
-                        <span style={{ fontSize: '8px', color: PLUGIN_LIBRARY[p.type].color, fontWeight: 600, flex: 1 }}>{PLUGIN_LIBRARY[p.type].abbr}</span>
-                        <button onClick={(e) => { e.stopPropagation(); togglePlugin(track.id, p.id); }} aria-label={p.enabled ? `Disable ${PLUGIN_LIBRARY[p.type].abbr} plugin on ${track.name}` : `Enable ${PLUGIN_LIBRARY[p.type].abbr} plugin on ${track.name}`} aria-pressed={p.enabled} style={{ width: '14px', height: '14px', borderRadius: '2px', border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="2.5" fill={p.enabled ? '#000' : 'var(--color-text-tertiary)'}/></svg></button>
-                      </div>
-                    )) : (
-                      <div style={{ fontSize: '7px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '2px 0' }}>No FX</div>
-                    )}
-                    <div 
-                      onClick={(e) => { e.stopPropagation(); setSelectedTrack(track.id); setShowPluginBrowser(true); }}
-                      style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', textAlign: 'center', cursor: 'pointer', padding: '1px', borderRadius: '2px', border: '1px dashed #27272a', marginTop: '2px' }}
-                    >+ FX</div>
-                  </div>
-
-                  {/* Sidechain indicator */}
-                  {track.plugins.some(p => p.type === 'compressor' && (p.params.sidechainSource ?? -1) >= 0) && (
-                    <div style={{ padding: '2px 4px', background: '#2a1840', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#bf5af2' }} />
-                      <span style={{ fontSize: '7px', color: '#bf5af2', fontWeight: 600 }}>SC</span>
-                    </div>
-                  )}
-
-                  {/* Pan Knob */}
-                  <div style={{ padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid var(--color-border-subtle)' }}>
-                    <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Pan</span>
-                    <div style={{ position: 'relative', width: '40px', height: '40px' }}>
-                      <svg width="40" height="40" viewBox="0 0 40 40">
-                        <circle cx="20" cy="20" r="16" fill="#1a1a1e" stroke="#27272a" strokeWidth="2" />
-                        <line x1="20" y1="20" x2={20 + Math.sin(track.pan * Math.PI / 2) * 12} y2={20 - Math.cos(track.pan * Math.PI / 2) * 12} stroke={track.color} strokeWidth="2" strokeLinecap="round" />
-                        <circle cx="20" cy="20" r="4" fill={track.color} />
-                      </svg>
-                    </div>
-                    <input type="range" min="-1" max="1" step="0.01" value={track.pan} onChange={(e) => updateTrack(track.id, { pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
-                  </div>
-
-                  {/* Volume Fader */}
-                  <div style={{ flex: 1, padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Vol</span>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <div style={{ width: '8px', height: '100%', maxHeight: '120px', background: 'var(--color-bg-elevated)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${Math.min(100, track.volume / 1.5 * 100)}%`, background: `linear-gradient(to top, ${track.color}, ${track.color}80)`, borderRadius: '3px', transition: 'height 0.05s ease-out' }} />
-                        {/* Level marks */}
-                        {[0, 0.25, 0.5, 0.75, 1].map(v => (
-                          <div key={v} style={{ position: 'absolute', bottom: `${(v / 1.5) * 100}%`, left: '100%', marginLeft: '3px', width: '3px', height: '1px', background: v === 1 ? 'var(--color-error)' : '#3f3f46' }} />
-                        ))}
-                      </div>
-                      <input type="range" min="0" max="1.5" step="0.01" value={track.volume} onChange={(e) => {
-                        const raw = parseFloat(e.target.value);
-                        // Shift key = fine control (±0.002 steps)
-                        if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey) {
-                          const diff = raw - track.volume;
-                          updateTrack(track.id, { volume: Math.max(0, Math.min(1.5, track.volume + diff * 0.1)) });
-                        } else {
-                          updateTrack(track.id, { volume: raw });
-                        }
-                      }} onDoubleClick={() => updateTrack(track.id, { volume: 1 })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} title="Hold Shift for fine control. Double-click to reset." />
-                    </div>
-                    <span style={{ fontSize: '9px', color: track.volume > 1.01 ? 'var(--color-warning)' : track.color, fontFamily: 'var(--font-mono)', marginTop: '4px', fontWeight: track.volume > 1.01 ? 700 : 400 }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
-                  </div>
-
-                  {/* Controls */}
-                  <div style={{ padding: '6px', borderTop: '1px solid #1a1a1e', display: 'flex', justifyContent: 'center', gap: '4px' }}>
-                    <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { muted: !track.muted }); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid', borderColor: track.muted ? 'var(--color-accent)' : 'var(--color-bg-hover)', background: track.muted ? 'var(--color-accent)' : 'var(--color-bg-elevated)', color: track.muted ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="volume-x" size={12} /></button>
-                    <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { solo: !track.solo }); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid', borderColor: track.solo ? 'var(--color-warning)' : 'var(--color-bg-hover)', background: track.solo ? 'var(--color-warning)' : 'var(--color-bg-elevated)', color: track.solo ? '#000' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="headphones" size={12} /></button>
-                    <button aria-label="Record arm" onClick={(e) => { e.stopPropagation(); updateTrack(track.id, { armed: !track.armed }); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid', borderColor: track.armed ? 'var(--color-error)' : 'var(--color-bg-hover)', background: track.armed ? 'var(--color-error)' : 'var(--color-bg-elevated)', color: track.armed ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="record" size={12} /></button>
-                  </div>
-
-                  {/* Output Routing */}
-                  <div style={{ padding: '4px 6px', borderTop: '1px solid #1a1a1e', background: 'var(--color-bg-base)' }}>
-                    <select value={track.output} onChange={(e) => updateTrack(track.id, { output: e.target.value as RoutingDestination })} style={{ width: '100%', padding: '3px 4px', background: 'var(--color-bg-base)', border: '1px solid #27272a', borderRadius: '2px', color: 'var(--color-text-tertiary)', fontSize: '8px' }}>
-                      <option value="master">Master</option>
-                      {buses.filter(b => b.type === 'group').map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  </div>
-                </div>
+                <MixerChannel
+                  key={track.id}
+                  track={track}
+                  index={idx}
+                  selected={selectedTrack === track.id}
+                  buses={buses}
+                  frozen={frozenTracks.has(track.id)}
+                  onSelect={setSelectedTrack}
+                  onUpdate={updateTrack}
+                  onTogglePlugin={togglePlugin}
+                  onOpenBrowser={openBrowserForTrack}
+                  onReorderPlugins={reorderPlugins}
+                />
               ))}
 
               {/* Separator */}
@@ -6036,7 +7022,7 @@ const Imosion: React.FC = () => {
 
               {/* Bus Channel Strips */}
               {buses.map(bus => (
-                <div key={bus.id} onClick={() => setSelectedBus(bus.id)} style={{ width: '94px', minWidth: '94px', background: selectedBus === bus.id ? '#18181b' : '#111113', borderRadius: '6px', marginRight: '6px', display: 'flex', flexDirection: 'column', border: `1px solid ${selectedBus === bus.id ? bus.color + '40' : 'var(--color-bg-elevated)'}`, overflow: 'hidden' }}>
+                <div key={bus.id} onClick={() => setSelectedBus(bus.id)} style={{ width: '116px', minWidth: '116px', background: selectedBus === bus.id ? '#18181b' : '#111113', borderRadius: '10px', marginRight: '6px', display: 'flex', flexDirection: 'column', border: `1px solid ${selectedBus === bus.id ? bus.color + '55' : 'var(--color-bg-elevated)'}`, overflow: 'hidden' }}>
                   {/* Bus Name */}
                   <div style={{ padding: '6px var(--space-2)', borderBottom: '1px solid #1a1a1e', background: bus.color + '20' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -6047,36 +7033,23 @@ const Imosion: React.FC = () => {
 
                   {/* Pan Knob */}
                   <div style={{ padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid #1a1a1e' }}>
-                    <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Pan</span>
-                    <div style={{ position: 'relative', width: '40px', height: '40px' }}>
-                      <svg width="40" height="40" viewBox="0 0 40 40">
-                        <circle cx="20" cy="20" r="16" fill="#1a1a1e" stroke="#27272a" strokeWidth="2" />
-                        <line x1="20" y1="20" x2={20 + Math.sin(bus.pan * Math.PI / 2) * 12} y2={20 - Math.cos(bus.pan * Math.PI / 2) * 12} stroke={bus.color} strokeWidth="2" strokeLinecap="round" />
-                        <circle cx="20" cy="20" r="4" fill={bus.color} />
-                      </svg>
-                    </div>
-                    <input type="range" min="-1" max="1" step="0.01" value={bus.pan} onChange={(e) => updateBus(bus.id, { pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{bus.pan === 0 ? 'C' : bus.pan < 0 ? `L${Math.abs(Math.round(bus.pan * 100))}` : `R${Math.round(bus.pan * 100)}`}</span>
+                    <Knob
+                      value={bus.pan} min={-1} max={1} bipolar defaultValue={0} size={40}
+                      color={bus.color} label="Pan"
+                      onChange={(v) => updateBus(bus.id, { pan: v })}
+                      valueLabel={bus.pan === 0 ? 'C' : bus.pan < 0 ? `L${Math.abs(Math.round(bus.pan * 100))}` : `R${Math.round(bus.pan * 100)}`}
+                    />
                   </div>
 
-                  {/* Volume Fader + VU Meter */}
-                  <div style={{ flex: 1, padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  {/* Volume Fader + live VU meter (meter driven by the mixer rAF loop via data-imosion-meter) */}
+                  <div style={{ flex: 1, padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Vol</span>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', gap: 3 }}>
-                      {/* Left VU */}
-                      <div style={{ width: 3, height: '100%', maxHeight: 120, background: 'var(--color-bg-elevated)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${Math.min(100, bus.volume * 72)}%`, background: `linear-gradient(to top, ${bus.color}90, ${bus.volume > 0.9 ? 'var(--color-error)' : bus.color})`, borderRadius: 2, transition: 'height 0.1s ease' }} />
-                      </div>
-                      {/* Fader */}
-                      <div style={{ width: '8px', height: '100%', maxHeight: '120px', background: 'var(--color-bg-elevated)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${bus.volume * 100}%`, background: `linear-gradient(to top, ${bus.color}, ${bus.color}80)`, borderRadius: '3px' }} />
-                      </div>
-                      {/* Right VU */}
-                      <div style={{ width: 3, height: '100%', maxHeight: 120, background: 'var(--color-bg-elevated)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${Math.min(100, bus.volume * 68)}%`, background: `linear-gradient(to top, ${bus.color}90, ${bus.volume > 0.9 ? 'var(--color-error)' : bus.color})`, borderRadius: 2, transition: 'height 0.1s ease' }} />
-                      </div>
-                      <input type="range" min="0" max="1.5" step="0.01" value={bus.volume} onChange={(e) => updateBus(bus.id, { volume: parseFloat(e.target.value) })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
-                    </div>
+                    <Fader
+                      value={bus.volume} min={0} max={1.5} unity={1} defaultValue={1} height={120}
+                      color={bus.color} meterId={`busmeter-${bus.id}`} meter={0}
+                      onChange={(v) => updateBus(bus.id, { volume: v })}
+                      ticks={[{ at: 1.5, label: '+9' }, { at: 1, label: '0' }, { at: 0.5, label: '-12' }, { at: 0, label: '-∞' }]}
+                    />
                     <span style={{ fontSize: '9px', color: bus.color, fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{bus.volume > 1 ? '+' : ''}{((bus.volume - 1) * 60).toFixed(1)} dB</span>
                   </div>
 
@@ -6090,32 +7063,35 @@ const Imosion: React.FC = () => {
               ))}
 
               {/* Master Channel */}
-              <div style={{ width: '94px', minWidth: '94px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginLeft: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: '1px solid rgba(48,209,88,0.3)', overflow: 'hidden' }}>
-                <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid #1a1a1e', background: 'rgba(48,209,88,0.1)' }}>
+              <div style={{ width: '116px', minWidth: '116px', background: 'var(--color-bg-surface)', borderRadius: '10px', marginLeft: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: '1px solid rgba(79, 138, 96,0.35)', overflow: 'hidden' }}>
+                <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid #1a1a1e', background: 'rgba(79, 138, 96,0.1)' }}>
                   <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-success)', textAlign: 'center' }}>MASTER</div>
                 </div>
 
                 {/* Master Volume */}
-                <div style={{ flex: 1, padding: 'var(--space-3) var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ flex: 1, padding: 'var(--space-3) var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)', textTransform: 'uppercase' }}>Output</span>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                    <div style={{ width: '12px', height: '100%', maxHeight: '140px', background: 'var(--color-bg-elevated)', borderRadius: '3px', position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${masterSettings.volume * 100}%`, background: 'linear-gradient(to top, #30d158, #28a745)', borderRadius: '3px' }} />
-                    </div>
-                    <input type="range" min="0" max="1" step="0.01" value={masterSettings.volume} onChange={(e) => setMasterSettings(s => ({ ...s, volume: parseFloat(e.target.value) }))} style={{ position: 'absolute', width: '100%', maxHeight: '140px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
-                  </div>
+                  <Fader
+                    value={masterSettings.volume} min={0} max={1} unity={1} defaultValue={1} height={140}
+                    color="#4f8a60" meterId="mastermeter" meter={0}
+                    onChange={(v) => setMasterSettings(s => ({ ...s, volume: v }))}
+                    ticks={[{ at: 1, label: '0' }, { at: 0.75, label: '-9' }, { at: 0.5, label: '-18' }, { at: 0, label: '-∞' }]}
+                  />
                   <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'var(--font-mono)', marginTop: 'var(--space-2)', fontWeight: 600 }}>{((masterSettings.volume - 1) * 60).toFixed(1)} dB</span>
                 </div>
 
                 {/* Master Controls */}
                 <div style={{ padding: 'var(--space-2)', borderTop: '1px solid #1a1a1e', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <button aria-label="Toggle Master Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ width: '100%', padding: '4px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? '#4a2020' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? '#3a1818' : 'var(--color-bg-elevated)', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 600 }}>LIMITER {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)' }}>Ceil:</span>
-                    <input type="range" min="-6" max="0" step="0.1" value={masterSettings.limiterCeiling} onChange={(e) => setMasterSettings(s => ({ ...s, limiterCeiling: parseFloat(e.target.value) }))} style={{ flex: 1 }} />
-                    <span style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', width: '28px', textAlign: 'right' }}>{masterSettings.limiterCeiling.toFixed(1)}dB</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <Knob
+                      value={masterSettings.limiterCeiling} min={-6} max={0} defaultValue={0} size={32}
+                      color="var(--color-error)" label="Ceil"
+                      onChange={(v) => setMasterSettings(s => ({ ...s, limiterCeiling: v }))}
+                      valueLabel={`${masterSettings.limiterCeiling.toFixed(1)}dB`}
+                    />
                   </div>
-                  <button aria-label="MASTERING" onClick={() => setShowMasteringPanel(true)} style={{ width: '100%', padding: '4px 6px', borderRadius: '3px', border: '1px solid #3d2060', background: '#2a1840', color: '#bf5af2', cursor: 'pointer', fontSize: '8px', fontWeight: 600, marginTop: '4px' }}>MASTERING</button>
+                  <button aria-label="MASTERING" onClick={() => setShowMasteringPanel(true)} style={{ width: '100%', padding: '4px 6px', borderRadius: '3px', border: '1px solid #3d2060', background: '#2a1840', color: '#8a6a9c', cursor: 'pointer', fontSize: '8px', fontWeight: 600, marginTop: '4px' }}>MASTERING</button>
                 </div>
               </div>
             </div>
@@ -6148,72 +7124,93 @@ const Imosion: React.FC = () => {
                 <select aria-label="Drum genre" value={drumGenre} onChange={e => setDrumGenre(e.target.value as DrumGenre)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '9px', padding: '3px var(--space-2)', cursor: 'pointer' }}>
                   {DRUM_GENRES.map(gn => <option key={gn} value={gn}>{gn.charAt(0).toUpperCase() + gn.slice(1)}</option>)}
                 </select>
-                <button aria-label="Session Performer — generate a drum pattern" title="Session Performer: generate a pattern in this genre" onClick={performBeat} style={{ padding: '3px var(--space-2)', background: 'rgba(48,209,88,0.12)', border: '1px solid rgba(48,209,88,0.25)', borderRadius: '3px', color: 'var(--color-success)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Perform</button>
-                <button aria-label="Vary — make a variation of the current pattern" title="Variant System: create a variation of the current pattern" onClick={() => setBeatGrid(g => varyPattern(g, 0.5, Math.floor(Math.random() * 1e9)))} style={{ padding: '3px var(--space-2)', background: 'rgba(94,92,230,0.12)', border: '1px solid rgba(94,92,230,0.25)', borderRadius: '3px', color: '#9b99ff', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Vary</button>
-                <button aria-label="Randomize" onClick={randomizeBeatPattern} style={{ padding: '3px var(--space-2)', background: 'rgba(255,159,10,0.1)', border: '1px solid rgba(255,159,10,0.2)', borderRadius: '3px', color: 'var(--color-warning)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Random</button>
-                <button aria-label="Clear" onClick={clearBeatPattern} style={{ padding: '3px var(--space-2)', background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Clear</button>
-                <button aria-label={beatPlaying ? 'Stop' : 'Play'} onClick={beatPlaying ? stopBeatSequencer : startBeatSequencer} style={{ padding: '3px 10px', background: beatPlaying ? 'rgba(255,69,58,0.2)' : 'rgba(48,209,88,0.15)', border: `1px solid ${beatPlaying ? 'rgba(255,69,58,0.3)' : 'rgba(48,209,88,0.3)'}`, borderRadius: '3px', color: beatPlaying ? 'var(--color-error)' : 'var(--color-success)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>{beatPlaying ? 'Stop' : 'Play'}</button>
+                <button aria-label="Session Performer — generate a drum pattern" onClick={performBeat} style={{ padding: '4px 10px', background: 'rgba(79, 138, 96,0.22)', border: '1px solid rgba(79, 138, 96,0.55)', borderRadius: '6px', color: '#8fb89a', fontSize: '9px', fontWeight: 700, cursor: 'pointer' }}>Perform</button>
+                {/* Pattern actions (Vary/Random/Clear) collapsed into one dropdown. */}
+                <details className="beat-pattern-dd" style={{ position: 'relative' }}>
+                  <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #2a2a30', background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)', fontSize: '9px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    Pattern
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </summary>
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    {([
+                      { label: 'Vary', title: 'Make a variation of the current pattern', fn: () => setBeatGrid(g => varyPattern(g, 0.5, Math.floor(Math.random() * 1e9))) },
+                      { label: 'Randomize', title: 'Randomize the pattern', fn: randomizeBeatPattern },
+                      { label: 'Clear', title: 'Clear the pattern', fn: clearBeatPattern },
+                    ] as const).map(t => (
+                      <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
+                    ))}
+                  </div>
+                </details>
+                <button aria-label={beatPlaying ? 'Stop' : 'Play'} onClick={beatPlaying ? stopBeatSequencer : startBeatSequencer} style={{ padding: '4px 14px', background: beatPlaying ? 'rgba(158, 90, 85,0.9)' : 'rgba(79, 138, 96,0.9)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '9px', fontWeight: 800, letterSpacing: '0.03em', cursor: 'pointer', boxShadow: beatPlaying ? '0 2px 8px rgba(158, 90, 85,0.4)' : '0 2px 8px rgba(79, 138, 96,0.4)' }}>{beatPlaying ? 'STOP' : 'PLAY'}</button>
               </div>
             </div>
 
             {/* Grid: Pad labels on left, step grid on right */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'auto' }}>
-              {/* Pad Labels */}
-              <div style={{ width: 80, flexShrink: 0, borderRight: '1px solid var(--color-border-subtle)' }}>
+              {/* Pad Labels + per-lane mute/solo + preview */}
+              <div style={{ width: 124, flexShrink: 0, borderRight: '1px solid var(--color-border-subtle)' }}>
                 <div style={{ height: 24 }} /> {/* Spacer for step numbers */}
-                {beatKit.pads.map((pad, ri) => (
-                  <div key={ri} onClick={() => setActivePad(ri === activePad ? -1 : ri)} style={{ height: 28, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '9px', fontWeight: 600, color: activePad === ri ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', background: activePad === ri ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', borderBottom: '1px solid var(--color-border-subtle)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    {pad}
-                  </div>
-                ))}
+                {beatKit.pads.map((pad, ri) => {
+                  const muted = beatMutes.has(ri);
+                  const soloed = beatSolos.has(ri);
+                  const dimmed = muted || (beatSolos.size > 0 && !soloed);
+                  return (
+                    <div key={ri} style={{ height: 28, display: 'flex', alignItems: 'center', gap: 3, padding: '0 6px', borderBottom: '1px solid var(--color-border-subtle)', background: activePad === ri ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', opacity: dimmed ? 0.4 : 1 }}>
+                      <span onClick={() => { setActivePad(ri === activePad ? -1 : ri); triggerDrumPad(pad, 1, ri); }} style={{ flex: 1, fontSize: '9px', fontWeight: 600, color: activePad === ri ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{pad}</span>
+                      <button aria-label={`Mute ${pad}`} onClick={() => setBeatMutes(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid', borderColor: muted ? 'var(--color-accent)' : '#3a3a44', background: muted ? 'var(--color-accent)' : '#222228', color: muted ? '#fff' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>M</button>
+                      <button aria-label={`Solo ${pad}`} onClick={() => setBeatSolos(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid', borderColor: soloed ? 'var(--color-warning)' : '#3a3a44', background: soloed ? 'var(--color-warning)' : '#222228', color: soloed ? '#000' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>S</button>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Step Grid */}
-              <div style={{ flex: 1, overflow: 'auto' }}>
+              {/* Step Grid — hardware step sequencer: recessed slots that light like LEDs */}
+              <div style={{ flex: 1, overflow: 'auto', background: '#0a0a0d' }}>
                 {/* Step Numbers */}
-                <div style={{ display: 'flex', height: 24, position: 'sticky', top: 0, background: 'var(--color-bg-base)', zIndex: 2, borderBottom: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ display: 'flex', height: 26, position: 'sticky', top: 0, background: '#0c0c10', zIndex: 2, borderBottom: '1px solid #1a1a1e', paddingLeft: 4 }}>
                   {Array.from({ length: beatSteps }, (_, i) => (
-                    <div key={i} style={{ width: 28, minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: i % 4 === 0 ? 'var(--color-text-tertiary)' : '#3f3f46', fontWeight: i % 4 === 0 ? 600 : 400, background: beatPlayStep === i ? 'rgba(48,209,88,0.08)' : 'transparent' }}>
+                    <div key={i} style={{ width: 28, minWidth: 28, marginLeft: i % 4 === 0 && i !== 0 ? 6 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontFamily: 'var(--font-mono)', color: (beatPlaying && beatPlayStep === i) ? 'var(--color-success)' : i % 4 === 0 ? 'var(--color-text-secondary)' : '#3a3a40', fontWeight: i % 4 === 0 ? 700 : 400 }}>
                       {i + 1}
                     </div>
                   ))}
                 </div>
 
                 {/* Rows */}
-                {beatKit.pads.map((_, ri) => (
-                  <div key={ri} style={{ display: 'flex', height: 28, borderBottom: '1px solid var(--color-border-subtle)' }}>
-                    {Array.from({ length: beatSteps }, (__, ci) => {
-                      const active = beatGrid[ri]?.[ci] ?? false;
-                      const isPlayhead = beatPlayStep === ci;
-                      const isBeat = ci % 4 === 0;
-                      const vel = beatVelocities[ri]?.[ci] ?? 0.8;
-                      const padColors = ['var(--color-error)', '#ff6b3a', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64d2ff', 'var(--color-accent)', '#5e5ce6', '#bf5af2', '#ff375f', '#ac8e68', '#48484a', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)', '#aeaeb2', '#d1d1d6'];
-                      const color = padColors[ri % padColors.length];
-                      return (
-                        <div
-                          key={ci}
-                          onMouseDown={() => beatCellDown(ri, ci)}
-                          onMouseEnter={() => beatCellEnter(ri, ci)}
-                          onContextMenu={e => { e.preventDefault(); if (active) setBeatVelocities(v => { const nv = v.map(r => [...r]); nv[ri][ci] = nv[ri][ci] > 0.5 ? 0.3 : nv[ri][ci] > 0.2 ? 1 : 0.8; return nv; }); }}
-                          style={{
-                            width: 28, minWidth: 28, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none',
-                            background: isPlayhead ? 'rgba(48,209,88,0.06)' : isBeat ? 'rgba(255,255,255,0.015)' : 'transparent',
-                            borderRight: ci % 4 === 3 ? '1px solid var(--color-bg-hover)' : '1px solid var(--color-border-subtle)',
-                          }}
-                        >
-                          <div style={{
-                            width: 20, height: 20, borderRadius: 3,
-                            background: active ? color : 'var(--color-border-subtle)',
-                            border: active ? `1px solid ${color}` : '1px solid var(--color-bg-hover)',
-                            opacity: active ? vel : 0.5,
-                            transition: 'all 0.08s ease',
-                            boxShadow: active && isPlayhead ? `0 0 8px ${color}60` : 'none',
-                          }} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                {beatKit.pads.map((_, ri) => {
+                  const color = BEAT_PAD_COLORS[ri % BEAT_PAD_COLORS.length];
+                  const dimmed = beatMutes.has(ri) || (beatSolos.size > 0 && !beatSolos.has(ri));
+                  return (
+                    <div key={ri} style={{ display: 'flex', height: 28, alignItems: 'center', paddingLeft: 4, opacity: dimmed ? 0.4 : 1, transition: 'opacity 0.12s' }}>
+                      {Array.from({ length: beatSteps }, (__, ci) => {
+                        const active = beatGrid[ri]?.[ci] ?? false;
+                        const isPlayhead = beatPlaying && beatPlayStep === ci;
+                        const isBeat = ci % 4 === 0;
+                        const vel = beatVelocities[ri]?.[ci] ?? 0.8;
+                        return (
+                          <div
+                            key={ci}
+                            onMouseDown={() => beatCellDown(ri, ci)}
+                            onMouseEnter={() => beatCellEnter(ri, ci)}
+                            onContextMenu={e => { e.preventDefault(); if (active) setBeatVelocities(v => { const nv = v.map(r => [...r]); nv[ri][ci] = nv[ri][ci] > 0.5 ? 0.3 : nv[ri][ci] > 0.2 ? 1 : 0.8; return nv; }); }}
+                            style={{ width: 28, minWidth: 28, marginLeft: isBeat && ci !== 0 ? 6 : 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none', background: isPlayhead ? 'rgba(255,255,255,0.045)' : 'transparent' }}
+                          >
+                            <div style={{
+                              width: 22, height: 22, borderRadius: 4,
+                              background: active ? `linear-gradient(180deg, ${color}, ${color}bb)` : `linear-gradient(180deg, ${isBeat ? '#1c1c22' : '#16161b'}, #0d0d11)`,
+                              border: active ? `1px solid ${color}` : `1px solid ${isBeat ? '#2a2a31' : '#15151a'}`,
+                              opacity: active ? (0.55 + vel * 0.45) : 1,
+                              boxShadow: active
+                                ? `inset 0 1px 0 rgba(255,255,255,0.28), 0 0 ${isPlayhead ? 11 : 5}px ${color}${isPlayhead ? 'cc' : '55'}`
+                                : 'inset 0 1px 2px rgba(0,0,0,0.75)',
+                              transition: 'box-shadow 0.06s ease, background 0.06s ease',
+                            }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -6221,7 +7218,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: 'var(--space-3)', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', flexShrink: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px', maxWidth: 500 }}>
                 {beatKit.pads.slice(0, 16).map((pad, i) => {
-                  const padColors = ['var(--color-error)', '#ff6b3a', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64d2ff', 'var(--color-accent)', '#5e5ce6', '#bf5af2', '#ff375f', '#ac8e68', '#48484a', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)', '#aeaeb2', '#d1d1d6'];
+                  const padColors = ['var(--color-error)', '#a8744a', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#4a7896', 'var(--color-accent)', '#6b6c9c', '#8a6a9c', '#a05a68', '#ac8e68', '#48484a', 'var(--color-text-tertiary)', 'var(--color-text-tertiary)', '#aeaeb2', '#d1d1d6'];
                   const color = padColors[i % padColors.length];
                   return (
                     <button
@@ -6235,7 +7232,7 @@ const Imosion: React.FC = () => {
                           let ctx = engine.getContext();
                           if (!ctx) {
                             engine.init(sampleRate).catch(() => {/* ignore */});
-                            ctx = engine.getContext() ?? new AudioContext({ sampleRate });
+                            ctx = engine.getContext() ?? sharedFallbackCtx(sampleRate);
                           }
                           if (ctx.state === 'suspended') { ctx.resume().catch(() => {/* ignore */}); }
                           if (ctx) {
@@ -6285,14 +7282,19 @@ const Imosion: React.FC = () => {
                       }}
                       onMouseUp={() => setActivePad(-1)}
                       style={{
-                        aspectRatio: '1', borderRadius: 6,
-                        background: activePad === i ? color : `${color}20`,
-                        border: `1px solid ${color}40`,
-                        color: activePad === i ? '#000' : color,
+                        aspectRatio: '1', borderRadius: 8,
+                        background: activePad === i
+                          ? `radial-gradient(circle at 50% 35%, ${color}, ${color}aa)`
+                          : `linear-gradient(180deg, #24242b, #141418)`,
+                        border: activePad === i ? `1px solid ${color}` : '1px solid #0b0b0e',
+                        color: activePad === i ? '#000' : `${color}`,
                         fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.06s ease',
-                        boxShadow: activePad === i ? `0 0 12px ${color}50` : 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1, padding: 2,
+                        transition: 'transform 0.04s ease, box-shadow 0.06s ease',
+                        transform: activePad === i ? 'translateY(1px) scale(0.97)' : 'none',
+                        boxShadow: activePad === i
+                          ? `inset 0 2px 6px rgba(0,0,0,0.5), 0 0 16px ${color}77`
+                          : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.5)',
                       }}
                     >
                       {pad}
@@ -6310,10 +7312,10 @@ const Imosion: React.FC = () => {
             {/* Piano Roll Toolbar */}
             <div style={{ padding: 'var(--space-2) 14px', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#bf5af2' }}>Piano Roll</span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#8a6a9c' }}>Piano Roll</span>
                 <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
-                  {(['select', 'draw', 'erase'] as const).map(tool => (
-                    <button key={tool} aria-label={tool} onClick={() => setPianoRollTool(tool)} style={{ padding: '4px 10px', borderRadius: '3px', border: 'none', background: pianoRollTool === tool ? 'rgba(191,90,242,0.25)' : 'transparent', color: pianoRollTool === tool ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{tool}</button>
+                  {(['select', 'draw', 'erase', 'stamp'] as const).map(tool => (
+                    <button key={tool} aria-label={tool} onClick={() => setPianoRollTool(tool)} style={{ padding: '4px 10px', borderRadius: '3px', border: 'none', background: pianoRollTool === tool ? 'rgba(138, 106, 156,0.25)' : 'transparent', color: pianoRollTool === tool ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{tool}</button>
                   ))}
                 </div>
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
@@ -6321,8 +7323,21 @@ const Imosion: React.FC = () => {
                   <option value={1}>1/1</option><option value={0.5}>1/2</option><option value={0.25}>1/4</option><option value={0.125}>1/8</option><option value={0.0625}>1/16</option><option value={1/3}>1/3</option><option value={1/6}>1/6T</option>
                 </select>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showVelocityLane} onChange={e => setShowVelocityLane(e.target.checked)} style={{ accentColor: '#bf5af2' }} />Velocity
+                  <input type="checkbox" checked={showVelocityLane} onChange={e => setShowVelocityLane(e.target.checked)} style={{ accentColor: '#8a6a9c' }} />Velocity
                 </label>
+                <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
+                {/* Horizontal zoom (time) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
+                  <button aria-label="Zoom out" onClick={() => setPianoRollZoom(z => Math.max(24, z - 16))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
+                  <button aria-label="Zoom in" onClick={() => setPianoRollZoom(z => Math.min(220, z + 16))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
+                </div>
+                {/* Vertical key zoom */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
+                  <button aria-label="Smaller keys" onClick={() => setPianoKeyHeight(h => Math.max(12, h - 2))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="6 8 12 3 18 8"/><polyline points="6 16 12 21 18 16"/></svg>
+                  <button aria-label="Taller keys" onClick={() => setPianoKeyHeight(h => Math.min(40, h + 2))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
+                </div>
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
                 <select value={musicalKey} onChange={e => setMusicalKey(e.target.value)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', padding: '4px var(--space-2)', cursor: 'pointer' }}>
                   {NOTE_NAMES.map((n, i) => <option key={i} value={n}>{n}</option>)}
@@ -6336,28 +7351,74 @@ const Imosion: React.FC = () => {
                 <select aria-label="Riff scale" value={riffScale} onChange={e => setRiffScale(e.target.value as RiffScale)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', padding: '4px var(--space-2)', cursor: 'pointer' }}>
                   {RIFF_SCALES.map(sc => <option key={sc} value={sc}>{sc}</option>)}
                 </select>
-                <button aria-label="Idea Forge — generate a riff" title="Idea Forge: generate a melodic riff in this scale" onClick={forgeRiff} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(48,209,88,0.25)', background: 'rgba(48,209,88,0.12)', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Idea Forge</button>
+                <button aria-label="Idea Forge — generate a riff" onClick={forgeRiff} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(79, 138, 96,0.25)', background: 'rgba(79, 138, 96,0.12)', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Idea Forge</button>
                 <button aria-label="Delete Selected" onClick={() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>Delete</button>
-                <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.1)', color: '#bf5af2', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
-                <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(100,210,255,0.3)', background: showChordTrigger ? 'rgba(100,210,255,0.2)' : 'transparent', color: showChordTrigger ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
+                <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.1)', color: '#8a6a9c', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
+                <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(74, 120, 150,0.3)', background: showChordTrigger ? 'rgba(74, 120, 150,0.2)' : 'transparent', color: showChordTrigger ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
               </div>
+            </div>
+            {/* Creative Tools row (FL/Logic-inspired): legato, strum, flam, humanize, arp, note colors, typing keyboard */}
+            <div style={{ padding: '6px 14px', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', gap: '8px', background: '#0b0b0d', flexShrink: 0, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '0.6px' }}>TOOLS</span>
+              {/* Note tools collapsed into one icon dropdown (was 7 text buttons). */}
+              <details className="pr-tools-dd" style={{ position: 'relative' }}>
+                <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: '5px', border: '1px solid #2a2a30', background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                  Tools
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '172px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  {([
+                    { label: 'Legato', title: 'Quick Legato — stretch notes to the next note', fn: applyLegato },
+                    { label: 'Strum down', title: 'Strum down (high to low)', fn: () => applyStrum('down') },
+                    { label: 'Strum up', title: 'Strum up (low to high)', fn: () => applyStrum('up') },
+                    { label: 'Flam', title: 'Flam — add a soft grace note before each note', fn: applyFlam },
+                    { label: 'Humanize', title: 'Humanize — jitter timing and velocity', fn: applyHumanize },
+                    { label: 'Arpeggiate', title: 'Arpeggiate — spread chords into a run', fn: applyArpeggiate },
+                    { label: 'Slide / glide', title: 'Toggle glide/slide (portamento) on selected notes', fn: toggleSlideSelected },
+                  ] as const).map(t => (
+                    <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
+                  ))}
+                </div>
+              </details>
+              <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
+              <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Color</span>
+              {PR_NOTE_COLORS.map(c => (
+                <button key={c} aria-label={`Color notes ${c}`} onClick={() => applyNoteColor(c)} onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; }} style={{ width: '11px', height: '11px', borderRadius: '50%', border: 'none', background: c, opacity: 0.6, cursor: 'pointer', padding: 0, transition: 'opacity 0.12s' }} />
+              ))}
+              <button aria-label="Clear note color" onClick={() => applyNoteColor('')} style={{ width: '11px', height: '11px', borderRadius: '50%', border: '1px solid #2a2a30', background: 'transparent', cursor: 'pointer', padding: 0 }} />
+              <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
+              <button aria-label="Toggle typing keyboard" aria-pressed={typingKeyboard} onClick={() => setTypingKeyboard(v => !v)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid', borderColor: typingKeyboard ? 'rgba(79, 138, 96,0.4)' : '#2a2a30', background: typingKeyboard ? 'rgba(79, 138, 96,0.15)' : 'var(--color-bg-elevated)', color: typingKeyboard ? 'var(--color-success)' : 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="10"/><line x1="10" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="14" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+                Typing KB{typingKeyboard ? ` · C${typingOctave}` : ''}
+              </button>
             </div>
             {/* Piano Roll Body */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-              {/* Piano Keys Column */}
-              <div style={{ width: '52px', flexShrink: 0, background: '#0c0c0e', borderRight: '1px solid #1f1f23', overflow: 'hidden' }}>
-                <div style={{ position: 'relative', height: `${(pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 * 14}px`, transform: `translateY(-${pianoRollScroll.y}px)` }}>
+              {/* Piano Keys Column — realistic keyboard (white/black keys), scale + live highlight */}
+              <div style={{ width: '90px', flexShrink: 0, background: '#050506', borderRight: '1px solid #1f1f23', overflow: 'hidden', boxShadow: 'inset -6px 0 10px -8px rgba(0,0,0,0.9)' }}>
+                <div style={{ position: 'relative', height: `${(pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 * pianoKeyHeight}px`, transform: `translateY(-${pianoRollScroll.y}px)` }}>
                   {Array.from({ length: (pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 }, (_, i) => {
                     const noteNum = (pianoRollOctaveRange.high * 12 - 1) - i;
                     const black = isBlackKey(noteNum);
                     const inScale = isNoteInScale(noteNum, musicalKey, musicalScale);
+                    const isRoot = noteNum % 12 === NOTE_NAMES.indexOf(musicalKey);
+                    const isC = noteNum % 12 === 0;
+                    const active = midiNotes.has(noteNum) || pianoRollNotes.some(n => n.pitch === noteNum);
+                    const showLabel = pianoKeyHeight >= 16 ? !black : isC;
                     return (
-                      <div key={noteNum} title={`Click to preview ${midiNoteName(noteNum)}`}
+                      <div key={noteNum}
                         onMouseDown={() => { const s = getPreviewSynth(); if (s) { try { s.noteOn(noteNum, 110); } catch { /* */ } } }}
                         onMouseUp={() => { const s = getPreviewSynth(); if (s) { try { s.noteOff(noteNum); } catch { /* */ } } }}
                         onMouseLeave={() => { const s = previewSynthRef.current; if (s) { try { s.noteOff(noteNum); } catch { /* */ } } }}
-                        style={{ height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px', background: black ? '#080809' : (noteNum % 12 === 0 ? 'var(--color-border-subtle)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #27272a' : '1px solid #141417', cursor: 'pointer' }}>
-                        <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: inScale ? (black ? 'var(--color-text-secondary)' : '#d4d4d8') : '#3f3f46', fontWeight: noteNum % 12 === 0 ? 600 : 400 }}>{midiNoteName(noteNum)}</span>
+                        style={{ position: 'relative', height: `${pianoKeyHeight}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '7px', cursor: 'pointer',
+                          background: active ? 'linear-gradient(90deg, #8a6a9c, #d07bff)' : black ? 'linear-gradient(180deg, #141417, #0a0a0c)' : (isC ? 'linear-gradient(180deg, #f2f2f6, #d9d9e2)' : 'linear-gradient(180deg, #d6d6de, #c2c2cc)'),
+                          color: active ? '#fff' : black ? '#9a9aa3' : '#26262c',
+                          borderBottom: isC ? '1px solid rgba(0,0,0,0.55)' : '1px solid rgba(0,0,0,0.22)',
+                          boxShadow: black ? 'inset 0 -1px 0 rgba(0,0,0,0.6)' : 'inset 0 -2px 2px -1px rgba(0,0,0,0.18)' }}>
+                        {/* in-scale tick */}
+                        {inScale && !active && <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: isRoot ? '#8a6a9c' : 'rgba(138, 106, 156,0.45)' }} />}
+                        {showLabel && <span style={{ fontSize: pianoKeyHeight >= 18 ? '9px' : '8px', fontFamily: 'var(--font-mono)', fontWeight: isC ? 700 : 500, letterSpacing: '-0.2px', userSelect: 'none' }}>{midiNoteName(noteNum)}</span>}
                       </div>
                     );
                   })}
@@ -6366,13 +7427,15 @@ const Imosion: React.FC = () => {
               {/* Note Grid */}
               <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'auto', background: 'var(--color-bg-base)' }}
                 onScroll={e => { const t = e.currentTarget; setPianoRollScroll({ x: t.scrollLeft, y: t.scrollTop }); }}
+                onWheel={e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); if (e.shiftKey) setPianoKeyHeight(h => Math.max(12, Math.min(40, h + (e.deltaY < 0 ? 2 : -2)))); else setPianoRollZoom(z => Math.max(24, Math.min(220, z + (e.deltaY < 0 ? 14 : -14)))); } }}
+                onContextMenu={e => { e.preventDefault(); setPrMenu({ x: e.clientX, y: e.clientY }); }}
                 onMouseDown={e => {
                   if (pianoRollTool === 'draw' && e.button === 0) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
                     const y = e.clientY - rect.top + e.currentTarget.scrollTop;
-                    const beatWidth = 60 * zoom;
-                    const noteHeight = 14;
+                    const beatWidth = pianoRollZoom;
+                    const noteHeight = pianoKeyHeight;
                     const totalNotes = (pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12;
                     const startBeat = Math.floor(x / beatWidth / pianoRollSnap) * pianoRollSnap;
                     const pitch = (pianoRollOctaveRange.high * 12 - 1) - Math.floor(y / noteHeight);
@@ -6386,68 +7449,129 @@ const Imosion: React.FC = () => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
                     const y = e.clientY - rect.top + e.currentTarget.scrollTop;
-                    const beatWidth = 60 * zoom;
-                    const noteHeight = 14;
+                    const beatWidth = pianoRollZoom;
+                    const noteHeight = pianoKeyHeight;
                     const clickBeat = x / beatWidth;
                     const clickPitch = (pianoRollOctaveRange.high * 12 - 1) - Math.floor(y / noteHeight);
                     setPianoRollNotes(prev => prev.filter(n => !(n.pitch === clickPitch && clickBeat >= n.startTime && clickBeat <= n.startTime + n.duration)));
+                  } else if (pianoRollTool === 'stamp' && e.button === 0) {
+                    // Stamp Tool: drop a diatonic triad in the current key/scale at the click.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+                    const y = e.clientY - rect.top + e.currentTarget.scrollTop;
+                    const beatWidth = pianoRollZoom;
+                    const noteHeight = pianoKeyHeight;
+                    const startBeat = Math.floor(x / beatWidth / pianoRollSnap) * pianoRollSnap;
+                    const root = (pianoRollOctaveRange.high * 12 - 1) - Math.floor(y / noteHeight);
+                    if (root >= 0 && root < 124) {
+                      const nextTone = (p: number) => { let q = p + 1; while (q < 127 && !isNoteInScale(q, musicalKey, musicalScale)) q++; return q; };
+                      const second = nextTone(root); const third = nextTone(second); const fourth = nextTone(third); const fifth = nextTone(fourth);
+                      const chord = [root, third, fifth];
+                      const dur = Math.max(pianoRollSnap, 1);
+                      const stamp: MidiNote[] = chord.map((p, i) => ({ id: `stamp-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`, pitch: p, startTime: startBeat, duration: dur, velocity: 100, selected: false }));
+                      setPianoRollNotes(prev => [...prev, ...stamp]);
+                      chord.forEach(p => previewSynthNote(p, 95, 0.5));
+                    }
                   } else if (pianoRollTool === 'select' && e.button === 0) {
-                    if (!e.shiftKey) setPianoRollSelectedNotes(new Set());
+                    startMarquee(e, e.currentTarget as HTMLElement);
                   }
                 }}
               >
-                <div style={{ position: 'relative', width: `${200 * 60 * zoom}px`, height: `${(pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 * 14}px` }}>
+                <div style={{ position: 'relative', width: `${200 * pianoRollZoom}px`, height: `${(pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 * pianoKeyHeight}px` }}>
                   {/* Grid lines */}
                   {Array.from({ length: (pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12 }, (_, i) => {
                     const noteNum = (pianoRollOctaveRange.high * 12 - 1) - i;
                     const black = isBlackKey(noteNum);
                     const inScale = isNoteInScale(noteNum, musicalKey, musicalScale);
                     return (
-                      <div key={`row-${noteNum}`} style={{ position: 'absolute', left: 0, right: 0, top: i * 14, height: '14px', background: black ? 'rgba(0,0,0,0.3)' : (inScale ? 'rgba(191,90,242,0.02)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #27272a' : '1px solid var(--color-border-subtle)' }} />
+                      <div key={`row-${noteNum}`} style={{ position: 'absolute', left: 0, right: 0, top: i * pianoKeyHeight, height: `${pianoKeyHeight}px`, background: black ? 'rgba(0,0,0,0.32)' : (inScale ? 'rgba(138, 106, 156,0.05)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #2f2f36' : '1px solid var(--color-border-subtle)' }} />
                     );
                   })}
-                  {/* Beat grid lines */}
+                  {/* Beat grid lines — bar lines bolder so the grid reads clearly */}
                   {Array.from({ length: 200 }, (_, i) => (
-                    <div key={`beat-${i}`} style={{ position: 'absolute', left: i * 60 * zoom, top: 0, bottom: 0, width: '1px', background: i % 4 === 0 ? 'var(--color-border-subtle)' : 'rgba(255,255,255,0.025)', zIndex: 1 }} />
+                    <div key={`beat-${i}`} style={{ position: 'absolute', left: i * pianoRollZoom, top: 0, bottom: 0, width: i % 4 === 0 ? '1.5px' : '1px', background: i % 4 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.05)', zIndex: 1 }} />
                   ))}
                   {/* Playhead */}
-                  <div style={{ position: 'absolute', left: playbackPosition * 60 * zoom * (bpm / 60), top: 0, bottom: 0, width: '1px', background: '#bf5af2', zIndex: 5, boxShadow: '0 0 6px rgba(191,90,242,0.4)' }} />
+                  <div ref={pianoPlayheadRef} style={{ position: 'absolute', left: playbackPosition * (bpm / 60) * pianoRollZoom, top: 0, bottom: 0, width: '2px', background: '#8a6a9c', zIndex: 5, boxShadow: '0 0 8px rgba(138, 106, 156,0.6)' }} />
                   {/* Notes */}
                   {pianoRollNotes.map(note => {
-                    const beatWidth = 60 * zoom;
-                    const noteHeight = 14;
+                    const beatWidth = pianoRollZoom;
+                    const noteHeight = pianoKeyHeight;
                     const totalNotes = (pianoRollOctaveRange.high - pianoRollOctaveRange.low) * 12;
                     const x = note.startTime * beatWidth;
                     const y = ((pianoRollOctaveRange.high * 12 - 1) - note.pitch) * noteHeight;
                     const w = note.duration * beatWidth;
                     const isSelected = pianoRollSelectedNotes.has(note.id);
                     const velocityAlpha = 0.4 + (note.velocity / 127) * 0.6;
+                    const aHex = Math.round(velocityAlpha * 255).toString(16).padStart(2, '0');
+                    const noteBg = isSelected ? 'rgba(255,149,0,0.85)' : note.color ? `${note.color}${aHex}` : note.slide ? `rgba(74, 120, 150,${velocityAlpha})` : `rgba(138, 106, 156,${velocityAlpha})`;
+                    const noteBorder = isSelected ? '1px solid #a8744a' : note.color ? `1px solid ${note.color}` : note.slide ? '1px solid #4a7896' : '1px solid var(--color-border)';
                     return (
-                      <div key={note.id} title={note.slide ? 'Glide note (Alt+click to toggle)' : 'Alt+click to make a glide note'} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: isSelected ? 'rgba(255,149,0,0.85)' : note.slide ? `rgba(100,210,255,${velocityAlpha})` : `rgba(191,90,242,${velocityAlpha})`, borderRadius: '2px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: isSelected ? '1px solid #ff9f0a' : note.slide ? '1px solid #64d2ff' : '1px solid var(--color-border)', boxShadow: note.slide ? '0 0 6px rgba(100,210,255,0.4)' : isSelected ? '0 0 6px rgba(255,149,0,0.3)' : 'none', transition: 'box-shadow 0.1s' }}
-                        onClick={e => { e.stopPropagation(); if (e.altKey) { setPianoRollNotes(prev => prev.map(n => n.id === note.id ? { ...n, slide: !n.slide } : n)); return; } if (pianoRollTool === 'select') { previewSynthNote(note.pitch, note.velocity, 0.35); const newSel = new Set(e.shiftKey ? pianoRollSelectedNotes : []); if (newSel.has(note.id)) newSel.delete(note.id); else newSel.add(note.id); setPianoRollSelectedNotes(newSel); } else if (pianoRollTool === 'erase') { setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); } }}
+                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: noteBg, borderRadius: '3px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: note.muted ? '1px dashed var(--color-text-tertiary)' : noteBorder, opacity: note.muted ? 0.35 : 1, boxShadow: `${note.slide ? '0 0 6px rgba(74, 120, 150,0.4), ' : isSelected ? '0 0 6px rgba(255,149,0,0.3), ' : ''}inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.22)`, transition: 'box-shadow 0.1s, opacity 0.1s' }}
+                        onMouseDown={e => { if (pianoRollTool === 'erase') { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); return; } if (pianoRollTool === 'select') startNoteMove(e, note); }}
+                        onDoubleClick={e => { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); setPianoRollSelectedNotes(prev => { const s = new Set(prev); s.delete(note.id); return s; }); }}
+                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!pianoRollSelectedNotes.has(note.id)) setPianoRollSelectedNotes(new Set([note.id])); setPrMenu({ x: e.clientX, y: e.clientY }); }}
                       >
-                        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '4px', cursor: 'ew-resize', borderRadius: '0 2px 2px 0' }} onMouseDown={e => { e.stopPropagation(); setPianoRollDrag({ type: 'resize', noteId: note.id, startX: e.clientX, startY: e.clientY, startTime: note.startTime }); }} />
-                        <span style={{ fontSize: '6px', color: 'var(--color-text-secondary)', padding: '0 2px', lineHeight: `${noteHeight - 1}px`, overflow: 'hidden', whiteSpace: 'nowrap', userSelect: 'none' }}>{midiNoteName(note.pitch)}</span>
+                        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '5px', cursor: 'ew-resize', borderRadius: '0 2px 2px 0' }} onMouseDown={e => startNoteResize(e, note)} />
+                        <span style={{ fontSize: pianoKeyHeight >= 16 ? '9px' : '7px', color: '#fff', fontWeight: 600, padding: '0 3px', lineHeight: `${noteHeight - 1}px`, overflow: 'hidden', whiteSpace: 'nowrap', userSelect: 'none', textShadow: '0 1px 1px rgba(0,0,0,0.4)' }}>{midiNoteName(note.pitch)}</span>
                       </div>
                     );
                   })}
+                  {/* Rubber-band marquee */}
+                  {prMarquee && (
+                    <div style={{ position: 'absolute', left: prMarquee.x, top: prMarquee.y, width: prMarquee.w, height: prMarquee.h, background: 'rgba(138,106,156,0.15)', border: '1px solid #8a6a9c', zIndex: 6, pointerEvents: 'none' }} />
+                  )}
                 </div>
               </div>
             </div>
+            {/* Right-click context menu */}
+            {prMenu && (
+              <>
+                <div onClick={() => setPrMenu(null)} onContextMenu={e => { e.preventDefault(); setPrMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 6999 }} />
+                <div style={{ position: 'fixed', left: Math.min(prMenu.x, window.innerWidth - 184), top: Math.min(prMenu.y, window.innerHeight - 320), width: 172, background: '#16161b', border: '1px solid #2c2c34', borderRadius: 8, boxShadow: '0 16px 40px rgba(0,0,0,0.6)', zIndex: 7000, padding: 4, fontSize: 11 }}>
+                  {([
+                    { label: 'Copy', fn: prCopy, k: 'Ctrl C' },
+                    { label: 'Paste', fn: prPaste, k: 'Ctrl V' },
+                    { label: 'Duplicate', fn: prDuplicate, k: 'Ctrl D' },
+                    { label: 'Delete', fn: prDeleteSelected, k: 'Del' },
+                    { label: 'Select All', fn: prSelectAll, k: 'Ctrl A' },
+                    { label: 'Glue', fn: prGlue, k: '' },
+                    { label: 'Chop', fn: prChop, k: '' },
+                    { label: 'Reverse', fn: prReverse, k: '' },
+                    { label: 'Invert', fn: prInvert, k: '' },
+                    { label: 'Mute / Unmute', fn: prMuteToggle, k: 'M' },
+                    { label: 'Quantize', fn: () => setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))), k: '' },
+                    { label: 'Humanize', fn: applyHumanize, k: '' },
+                    { label: 'Legato', fn: applyLegato, k: '' },
+                  ] as const).map(it => (
+                    <div key={it.label} onClick={() => { it.fn(); setPrMenu(null); }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 5, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
+                      <span>{it.label}</span>{it.k && <span style={{ color: 'var(--color-text-tertiary)', fontSize: 9, fontFamily: 'var(--font-mono)' }}>{it.k}</span>}
+                    </div>
+                  ))}
+                  <div style={{ height: 1, background: '#2c2c34', margin: '4px 6px' }} />
+                  <div style={{ display: 'flex', gap: 5, padding: '4px 10px', alignItems: 'center' }}>
+                    <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Color</span>
+                    {PR_NOTE_COLORS.map(c => (
+                      <button key={c} aria-label={`Color ${c}`} onClick={() => { applyNoteColor(c); setPrMenu(null); }} style={{ width: 13, height: 13, borderRadius: '50%', border: 'none', background: c, cursor: 'pointer', padding: 0 }} />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             {/* Velocity Lane */}
             {showVelocityLane && (
               <div style={{ height: '60px', flexShrink: 0, borderTop: '1px solid #1f1f23', background: '#0c0c0e', display: 'flex', overflow: 'hidden' }}>
-                <div style={{ width: '52px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid #1f1f23' }}>
-                  <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontWeight: 600 }}>VEL</span>
+                <div style={{ width: '90px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid #1f1f23' }}>
+                  <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.5px' }}>VELOCITY</span>
                 </div>
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                   {pianoRollNotes.map(note => {
-                    const beatWidth = 60 * zoom;
+                    const beatWidth = pianoRollZoom;
                     const x = note.startTime * beatWidth - pianoRollScroll.x;
                     const h = (note.velocity / 127) * 54;
                     const isSelected = pianoRollSelectedNotes.has(note.id);
                     return (
-                      <div key={`vel-${note.id}`} style={{ position: 'absolute', left: x, bottom: 3, width: Math.max(note.duration * beatWidth - 1, 3), height: h, background: isSelected ? 'var(--color-warning)' : '#bf5af2', borderRadius: '2px 2px 0 0', opacity: 0.7, cursor: 'ns-resize' }}
+                      <div key={`vel-${note.id}`} style={{ position: 'absolute', left: x, bottom: 3, width: Math.max(note.duration * beatWidth - 1, 3), height: h, background: isSelected ? 'var(--color-warning)' : '#8a6a9c', borderRadius: '2px 2px 0 0', opacity: 0.7, cursor: 'ns-resize' }}
                         onMouseDown={e => {
                           e.preventDefault();
                           const startY = e.clientY;
@@ -6475,7 +7599,7 @@ const Imosion: React.FC = () => {
                   let ctx = engine.getContext();
                   if (!ctx) {
                     engine.init(sampleRate).catch(() => { /* ignore */ });
-                    ctx = engine.getContext() ?? new AudioContext({ sampleRate });
+                    ctx = engine.getContext() ?? sharedFallbackCtx(sampleRate);
                   }
                   if (ctx.state === 'suspended') { ctx.resume().catch(() => { /* ignore */ }); }
                   const t0 = ctx.currentTime;
@@ -6505,7 +7629,7 @@ const Imosion: React.FC = () => {
               return (
                 <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: 6, padding: 10, zIndex: 20, boxShadow: 'var(--pg-shadow-context)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64d2ff' }}>Chord Trigger</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#4a7896' }}>Chord Trigger</span>
                     <button aria-label="Close Chord Trigger" onClick={() => setShowChordTrigger(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}><DexIcon name="close" size={14} /></button>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
@@ -6513,12 +7637,12 @@ const Imosion: React.FC = () => {
                       {NOTE_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
                     </select>
                     <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: 3, padding: 1 }}>
-                      <button aria-label="Major" onClick={() => setChordTriggerMode('major')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'major' ? 'rgba(100,210,255,0.25)' : 'transparent', color: chordTriggerMode === 'major' ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Maj</button>
-                      <button aria-label="Minor" onClick={() => setChordTriggerMode('minor')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'minor' ? 'rgba(100,210,255,0.25)' : 'transparent', color: chordTriggerMode === 'minor' ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Min</button>
+                      <button aria-label="Major" onClick={() => setChordTriggerMode('major')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'major' ? 'rgba(74, 120, 150,0.25)' : 'transparent', color: chordTriggerMode === 'major' ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Maj</button>
+                      <button aria-label="Minor" onClick={() => setChordTriggerMode('minor')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'minor' ? 'rgba(74, 120, 150,0.25)' : 'transparent', color: chordTriggerMode === 'minor' ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Min</button>
                     </div>
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', cursor: 'pointer', marginBottom: 'var(--space-2)' }}>
-                    <input type="checkbox" checked={chordIncludeSeventh} onChange={e => setChordIncludeSeventh(e.target.checked)} style={{ accentColor: '#64d2ff' }} />
+                    <input type="checkbox" checked={chordIncludeSeventh} onChange={e => setChordIncludeSeventh(e.target.checked)} style={{ accentColor: '#4a7896' }} />
                     +seventh
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
@@ -6528,10 +7652,9 @@ const Imosion: React.FC = () => {
                         aria-label={`Chord ${c.numeral} ${c.name}`}
                         onClick={() => playChord(c.pitches)}
                         onDoubleClick={() => { playChord(c.pitches); insertChord(c.pitches); }}
-                        title={`${c.numeral}  ${c.name} - click to play, double-click to insert`}
                         style={{
                           padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)',
-                          color: c.quality === 'major' ? '#64d2ff' : c.quality === 'minor' ? '#bf5af2' : c.quality === 'diminished' ? 'var(--color-error)' : 'var(--color-warning)',
+                          color: c.quality === 'major' ? '#4a7896' : c.quality === 'minor' ? '#8a6a9c' : c.quality === 'diminished' ? 'var(--color-error)' : 'var(--color-warning)',
                           fontSize: 9, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                         }}
                       >
@@ -6553,7 +7676,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-warning)' }}>Automation</span>
                 <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '1px', border: '1px solid var(--color-bg-hover)' }}>
                   {(['read', 'write', 'latch', 'touch'] as const).map(mode => (
-                    <button key={mode} aria-label={`Automation ${mode}`} onClick={() => setAutomationMode(mode)} style={{ padding: '2px 7px', borderRadius: '2px', border: 'none', background: automationMode === mode ? 'rgba(255,159,10,0.25)' : 'transparent', color: automationMode === mode ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: '8px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{mode}</button>
+                    <button key={mode} aria-label={`Automation ${mode}`} onClick={() => setAutomationMode(mode)} style={{ padding: '2px 7px', borderRadius: '2px', border: 'none', background: automationMode === mode ? 'rgba(168, 116, 74,0.25)' : 'transparent', color: automationMode === mode ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: '8px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{mode}</button>
                   ))}
                 </div>
               </div>
@@ -6604,7 +7727,7 @@ const Imosion: React.FC = () => {
           };
           const qualityColor = (q: string) =>
             q === 'major' ? '#FF6B35'
-              : q === 'minor' ? '#bf5af2'
+              : q === 'minor' ? '#8a6a9c'
               : q === 'diminished' ? 'var(--color-error)'
               : 'var(--color-warning)';
           return (
@@ -6624,7 +7747,7 @@ const Imosion: React.FC = () => {
               {/* Scale notes */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', color: 'var(--color-text-tertiary)' }}>SCALE NOTES</span>
-                <button aria-label="Copy scale notes" onClick={copyNotes} title="Copy notes to clipboard" style={{ padding: '2px 6px', borderRadius: 2, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>Copy</button>
+                <button aria-label="Copy scale notes" onClick={copyNotes} style={{ padding: '2px 6px', borderRadius: 2, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>Copy</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 'var(--space-2)' }}>
                 {notes.map((n, i) => (
@@ -6635,7 +7758,7 @@ const Imosion: React.FC = () => {
               <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>DIATONIC CHORDS</div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(chords.length, 7)}, 1fr)`, gap: 4 }}>
                 {chords.map((c, i) => (
-                  <div key={i} title={`${c.numeral}  ${c.name} — ${c.notes.join(' ')}`} style={{ padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: qualityColor(c.quality), fontSize: 9, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div key={i} style={{ padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: qualityColor(c.quality), fontSize: 9, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                     <span>{c.numeral}</span>
                     <span style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{c.name}</span>
                   </div>
@@ -6653,7 +7776,7 @@ const Imosion: React.FC = () => {
               {/* Header */}
               <div style={{ padding: '14px var(--space-5)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <div style={{ width: '6px', height: '20px', background: 'linear-gradient(180deg, #bf5af2, #bf5af2)', borderRadius: '3px' }} />
+                  <div style={{ width: '6px', height: '20px', background: 'linear-gradient(180deg, #8a6a9c, #8a6a9c)', borderRadius: '3px' }} />
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Mastering Suite</span>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '3px' }}>Pro</span>
                 </div>
@@ -6668,11 +7791,11 @@ const Imosion: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                   {MASTERING_PRESETS.map(preset => (
-                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} title={preset.description} style={{ padding: '5px 10px', borderRadius: '3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : '#141417', color: selectedMasteringPreset === preset.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
+                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : '#141417', color: selectedMasteringPreset === preset.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
                   ))}
                   {customMasteringPresets.map(preset => (
                     <div key={preset.id} style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                      <button aria-label={`Apply preset ${preset.name}`} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '3px 0 0 3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--color-success)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'rgba(48,209,88,0.15)' : '#141417', color: selectedMasteringPreset === preset.id ? '#4ade80' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>{preset.name}</button>
+                      <button aria-label={`Apply preset ${preset.name}`} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '3px 0 0 3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--color-success)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'rgba(79, 138, 96,0.15)' : '#141417', color: selectedMasteringPreset === preset.id ? '#4ade80' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>{preset.name}</button>
                       <button aria-label={`Delete preset ${preset.name}`} onClick={() => deleteCustomMasteringPreset(preset.id)} style={{ padding: '5px 6px', borderRadius: '0 3px 3px 0', border: '1px solid #27272a', borderLeft: 'none', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px' }}><DexIcon name="close" size={10} /></button>
                     </div>
                   ))}
@@ -6712,9 +7835,9 @@ const Imosion: React.FC = () => {
                 
                 {/* Character */}
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#ff375f', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Character</div>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#a05a68', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Character</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Analog Warmth" min={0} max={100} step={1} value={masterSettings.analogWarmth} onChange={v => setMasterSettings(s => ({ ...s, analogWarmth: v }))} accentColor="#ff375f" unit="%" />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Analog Warmth" min={0} max={100} step={1} value={masterSettings.analogWarmth} onChange={v => setMasterSettings(s => ({ ...s, analogWarmth: v }))} accentColor="#a05a68" unit="%" />
                   </div>
                 </div>
                 
@@ -6724,13 +7847,13 @@ const Imosion: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Target" min={-24} max={0} step={1} value={masterSettings.loudnessTarget} onChange={v => setMasterSettings(s => ({ ...s, loudnessTarget: v }))} accentColor="var(--color-error)" unit=" LUFS" />
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Ceiling" min={-6} max={0} step={0.1} value={masterSettings.limiterCeiling} onChange={v => setMasterSettings(s => ({ ...s, limiterCeiling: v }))} accentColor="var(--color-error)" format={v => `${v.toFixed(1)} dB`} />
-                    <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(255,69,58,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
+                    <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(158, 90, 85,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
                   </div>
                 </div>
                 
                 {/* Output */}
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#bf5af2', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output</div>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#8a6a9c', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Dithering</label><select value={masterSettings.dithering} onChange={e => setMasterSettings(s => ({ ...s, dithering: e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '3px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="none">None</option><option value="triangular">Triangular</option><option value="noise-shaped">Noise Shaped</option></select></div>
                     <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Oversampling</label><select value={masterSettings.oversampling} onChange={e => setMasterSettings(s => ({ ...s, oversampling: +e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '3px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="1">1x (Off)</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option></select></div>
@@ -6743,7 +7866,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: '10px', color: 'var(--color-text-disabled)' }}>Adjust settings to taste, then save as custom preset</span>
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button aria-label="Reset" onClick={() => { setMasterSettings({ volume: 0.85, limiterEnabled: true, limiterCeiling: -0.3, dithering: 'triangular', oversampling: 1, stereoWidth: 100, bassEnhance: 0, highShelf: 0, lowShelf: 0, midSideBalance: 0, multiband: { lowGain: 0, midGain: 0, highGain: 0, lowFreq: 200, highFreq: 4000 }, analogWarmth: 10, loudnessTarget: -14 }); setSelectedMasteringPreset(null); }} style={{ padding: '7px 14px', borderRadius: '4px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Reset</button>
-                  <button aria-label="Done" onClick={() => setShowMasteringPanel(false)} style={{ padding: '7px var(--space-4)', borderRadius: '4px', border: 'none', background: 'linear-gradient(180deg, #bf5af2, #9333ea)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Done</button>
+                  <button aria-label="Done" onClick={() => setShowMasteringPanel(false)} style={{ padding: '7px var(--space-4)', borderRadius: '4px', border: 'none', background: 'linear-gradient(180deg, #8a6a9c, #9333ea)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Done</button>
                 </div>
               </div>
             </div>
@@ -6763,7 +7886,7 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ padding: 'var(--space-3) 18px', borderTop: '1px solid #1f1f23', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
                 <button aria-label="Cancel" onClick={() => setShowSavePresetModal(null)} style={{ padding: '7px 14px', borderRadius: '4px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 4 }}><DexIcon name="close" size={12} />Cancel</button>
-                <button aria-label="Save" onClick={() => { if (newPresetName.trim()) { if (showSavePresetModal.type === 'mastering') saveCustomMasteringPreset(newPresetName.trim()); else if (showSavePresetModal.pluginType && showSavePresetModal.trackId && showSavePresetModal.pluginId) saveCustomPluginPreset(showSavePresetModal.pluginType, showSavePresetModal.trackId, showSavePresetModal.pluginId, newPresetName.trim()); }}} disabled={!newPresetName.trim()} style={{ padding: '7px 14px', borderRadius: '4px', border: 'none', background: newPresetName.trim() ? '#bf5af2' : 'var(--color-bg-hover)', color: newPresetName.trim() ? 'white' : 'var(--color-text-tertiary)', cursor: newPresetName.trim() ? 'pointer' : 'not-allowed', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><DexIcon name="save" size={12} />Save</button>
+                <button aria-label="Save" onClick={() => { if (newPresetName.trim()) { if (showSavePresetModal.type === 'mastering') saveCustomMasteringPreset(newPresetName.trim()); else if (showSavePresetModal.pluginType && showSavePresetModal.trackId && showSavePresetModal.pluginId) saveCustomPluginPreset(showSavePresetModal.pluginType, showSavePresetModal.trackId, showSavePresetModal.pluginId, newPresetName.trim()); }}} disabled={!newPresetName.trim()} style={{ padding: '7px 14px', borderRadius: '4px', border: 'none', background: newPresetName.trim() ? '#8a6a9c' : 'var(--color-bg-hover)', color: newPresetName.trim() ? 'white' : 'var(--color-text-tertiary)', cursor: newPresetName.trim() ? 'pointer' : 'not-allowed', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><DexIcon name="save" size={12} />Save</button>
               </div>
             </div>
           </div>
@@ -6774,7 +7897,7 @@ const Imosion: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
             <div style={{ width: 'min(680px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'linear-gradient(180deg, #111114, #0a0a0c)', borderRadius: '10px', border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               <div style={{ padding: '14px var(--space-5)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#bf5af2' }}>Software Instruments</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#8a6a9c' }}>Software Instruments</span>
                 <button aria-label="Close" onClick={() => setShowInstrumentBrowser(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
@@ -6820,7 +7943,7 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ padding: 'var(--space-3) var(--space-5)', borderTop: '1px solid #1f1f23', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{instrumentTracks.length} instrument track{instrumentTracks.length !== 1 ? 's' : ''} loaded</span>
-                <button aria-label="Done" onClick={() => setShowInstrumentBrowser(false)} style={{ padding: '7px var(--space-4)', borderRadius: '4px', border: 'none', background: 'linear-gradient(180deg, #bf5af2, #9333ea)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Done</button>
+                <button aria-label="Done" onClick={() => setShowInstrumentBrowser(false)} style={{ padding: '7px var(--space-4)', borderRadius: '4px', border: 'none', background: 'linear-gradient(180deg, #8a6a9c, #9333ea)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Done</button>
               </div>
             </div>
           </div>
@@ -6930,13 +8053,13 @@ const Imosion: React.FC = () => {
                     const enabled = !!builtinSynthEnabled[inst.id];
                     const accent = INSTRUMENT_COLORS[inst.instrument.type];
                     return (
-                      <div style={{ border: `1px solid ${enabled ? 'rgba(191,90,242,0.35)' : '#1a1a1e'}`, borderRadius: 6, padding: 'var(--space-3)', background: enabled ? 'rgba(191,90,242,0.04)' : 'transparent' }}>
+                      <div style={{ border: `1px solid ${enabled ? 'rgba(138, 106, 156,0.35)' : '#1a1a1e'}`, borderRadius: 6, padding: 'var(--space-3)', background: enabled ? 'rgba(138, 106, 156,0.04)' : 'transparent' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                           <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: enabled ? '#bf5af2' : 'var(--color-text-secondary)' }}>Built-in Synth</div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: enabled ? '#8a6a9c' : 'var(--color-text-secondary)' }}>Built-in Synth</div>
                             <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Real internal instrument - no external VST/AU plugin needed</div>
                           </div>
-                          <button aria-label="Toggle Built-in Synth" onClick={() => toggleBuiltinSynth(inst.id)} style={{ padding: '4px 12px', borderRadius: 4, border: `1px solid ${enabled ? '#bf5af2' : '#27272a'}`, background: enabled ? 'rgba(191,90,242,0.2)' : '#18181b', color: enabled ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{enabled ? 'ON' : 'OFF'}</button>
+                          <button aria-label="Toggle Built-in Synth" onClick={() => toggleBuiltinSynth(inst.id)} style={{ padding: '4px 12px', borderRadius: 4, border: `1px solid ${enabled ? '#8a6a9c' : '#27272a'}`, background: enabled ? 'rgba(138, 106, 156,0.2)' : '#18181b', color: enabled ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{enabled ? 'ON' : 'OFF'}</button>
                         </div>
                         {enabled && (
                           <>
@@ -6945,7 +8068,7 @@ const Imosion: React.FC = () => {
                               <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>WAVEFORM</div>
                               <div style={{ display: 'flex', gap: 4 }}>
                                 {(['sawtooth', 'square', 'sine', 'triangle'] as SynthWaveform[]).map(w => (
-                                  <button key={w} aria-label={`Waveform ${w}`} onClick={() => updateBuiltinSynthParam(inst.id, { waveform: w })} style={{ flex: 1, padding: '5px 0', borderRadius: 3, border: '1px solid #27272a', background: sp.waveform === w ? 'rgba(191,90,242,0.2)' : '#18181b', color: sp.waveform === w ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{w === 'sawtooth' ? 'Saw' : w}</button>
+                                  <button key={w} aria-label={`Waveform ${w}`} onClick={() => updateBuiltinSynthParam(inst.id, { waveform: w })} style={{ flex: 1, padding: '5px 0', borderRadius: 3, border: '1px solid #27272a', background: sp.waveform === w ? 'rgba(138, 106, 156,0.2)' : '#18181b', color: sp.waveform === w ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{w === 'sawtooth' ? 'Saw' : w}</button>
                                 ))}
                               </div>
                             </div>
@@ -7043,7 +8166,7 @@ const Imosion: React.FC = () => {
                     <button aria-label="Mute instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, muted: !t.muted } : t))} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid #27272a', background: inst.muted ? 'rgba(10,132,255,0.2)' : '#18181b', color: inst.muted ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>M</button>
                     <button aria-label="Solo instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, solo: !t.solo } : t))} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid #27272a', background: inst.solo ? 'rgba(255,149,0,0.2)' : '#18181b', color: inst.solo ? '#ff9500' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>S</button>
                   </div>
-                  <button aria-label="Remove instrument track" onClick={() => { setInstrumentTracks(prev => prev.filter(t => t.id !== inst.id)); setShowInstrumentEditor(false); }} style={{ padding: '6px', borderRadius: 4, border: '1px solid rgba(255,55,95,0.2)', background: 'rgba(255,55,95,0.08)', color: '#ff375f', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Remove Track</button>
+                  <button aria-label="Remove instrument track" onClick={() => { setInstrumentTracks(prev => prev.filter(t => t.id !== inst.id)); setShowInstrumentEditor(false); }} style={{ padding: '6px', borderRadius: 4, border: '1px solid rgba(160, 90, 104,0.2)', background: 'rgba(160, 90, 104,0.08)', color: '#a05a68', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Remove Track</button>
                 </div>
               </div>
             </div>
@@ -7052,14 +8175,25 @@ const Imosion: React.FC = () => {
         })()}
 
         {/* Resize Handle */}
-        <div className="resize-handle" onMouseDown={() => setIsResizingPlugin(true)} style={{ width: '4px', display: viewMode === 'arrange' ? 'block' : 'none' }} />
+        <div className="resize-handle" onMouseDown={() => setIsResizingPlugin(true)} style={{ width: '4px', display: (viewMode === 'arrange' || viewMode === 'rack') ? 'block' : 'none' }} />
 
+        {/* Plugin Panel — collapsed rail */}
+        {selectedTrackData && (viewMode === 'arrange' || viewMode === 'rack') && pluginPanelCollapsed && (
+          <button aria-label="Expand plugin chain panel" onClick={() => setPluginPanelCollapsed(false)}
+            style={{ width: 26, flexShrink: 0, background: 'linear-gradient(180deg, #0c0c0f, #09090b)', borderLeft: '1px solid #1a1a1e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 8, paddingTop: 8, cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <span style={{ writingMode: 'vertical-rl', fontSize: 9, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>FX Chain</span>
+          </button>
+        )}
         {/* Plugin Panel */}
-        {selectedTrackData && viewMode === 'arrange' && (
-          <div style={{ width: pluginPanelWidth, minWidth: 180, flexShrink: 0, background: 'linear-gradient(180deg, #0c0c0f, #09090b)', borderLeft: '1px solid #1a1a1e', display: 'flex', flexDirection: 'column' }}>
+        {selectedTrackData && (viewMode === 'arrange' || viewMode === 'rack') && !pluginPanelCollapsed && (
+          <div style={{ width: pluginPanelWidth, minWidth: 280, flexShrink: 0, background: 'linear-gradient(180deg, #0c0c0f, #09090b)', borderLeft: '1px solid #1a1a1e', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '10px var(--space-3)', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, #111114, #0d0d10)' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)' }}>{selectedTrackData.name}</span>
-              <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', padding: '2px 6px', background: '#0f0f12', borderRadius: '3px' }}>{selectedTrackData.plugins.length}/{MAX_PLUGINS_PER_TRACK}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', padding: '2px 6px', background: '#0f0f12', borderRadius: '3px' }}>{selectedTrackData.plugins.length}/{MAX_PLUGINS_PER_TRACK}</span>
+                <button aria-label="Collapse plugin chain panel" onClick={() => setPluginPanelCollapsed(true)} className="btn btn-icon" style={{ width: '20px', height: '20px', padding: '0' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+              </div>
             </div>
             
             {/* Routing Section */}
@@ -7073,7 +8207,7 @@ const Imosion: React.FC = () => {
                 </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                <button aria-label="Phase" onClick={() => updateTrack(selectedTrackData.id, { phase: !selectedTrackData.phase })} style={{ padding: '4px var(--space-2)', background: selectedTrackData.phase ? 'rgba(255,69,58,0.2)' : '#111114', border: '1px solid', borderColor: selectedTrackData.phase ? 'rgba(255,69,58,0.3)' : '#1f1f23', borderRadius: '4px', color: selectedTrackData.phase ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.phase} Phase</button>
+                <button aria-label="Phase" onClick={() => updateTrack(selectedTrackData.id, { phase: !selectedTrackData.phase })} style={{ padding: '4px var(--space-2)', background: selectedTrackData.phase ? 'rgba(158, 90, 85,0.2)' : '#111114', border: '1px solid', borderColor: selectedTrackData.phase ? 'rgba(158, 90, 85,0.3)' : '#1f1f23', borderRadius: '4px', color: selectedTrackData.phase ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.phase} Phase</button>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Trim:</span>
                 <input type="range" min="-24" max="24" step="0.5" value={selectedTrackData.trim} onChange={(e) => updateTrack(selectedTrackData.id, { trim: parseFloat(e.target.value) })} style={{ flex: 1 }} />
                 <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{selectedTrackData.trim.toFixed(1)}</span>
@@ -7087,8 +8221,8 @@ const Imosion: React.FC = () => {
                   <div key={send.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                     <span style={{ fontSize: '8px', color: bus?.color || 'var(--color-text-tertiary)', width: '40px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bus?.name || 'Bus'}</span>
                     <input type="range" min="0" max="1" step="0.01" value={send.level} onChange={(e) => updateSend(selectedTrackData.id, send.id, { level: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                    <button aria-label={send.preFader ? 'Switch to post-fader' : 'Switch to pre-fader'} onClick={() => updateSend(selectedTrackData.id, send.id, { preFader: !send.preFader })} style={{ padding: '1px 3px', background: send.preFader ? 'rgba(48,209,88,0.2)' : '#111113', border: '1px solid #27272a', borderRadius: '2px', color: send.preFader ? 'var(--color-success)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px' }}>{send.preFader ? 'PRE' : 'POST'}</button>
-                    <button aria-label="Remove send" onClick={() => removeSend(selectedTrackData.id, send.id)} style={{ width: '14px', height: '14px', background: 'rgba(255,69,58,0.1)', border: 'none', borderRadius: '2px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={9} /></button>
+                    <button aria-label={send.preFader ? 'Switch to post-fader' : 'Switch to pre-fader'} onClick={() => updateSend(selectedTrackData.id, send.id, { preFader: !send.preFader })} style={{ padding: '1px 3px', background: send.preFader ? 'rgba(79, 138, 96,0.2)' : '#111113', border: '1px solid #27272a', borderRadius: '2px', color: send.preFader ? 'var(--color-success)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '7px' }}>{send.preFader ? 'PRE' : 'POST'}</button>
+                    <button aria-label="Remove send" onClick={() => removeSend(selectedTrackData.id, send.id)} style={{ width: '14px', height: '14px', background: 'rgba(158, 90, 85,0.1)', border: 'none', borderRadius: '2px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={9} /></button>
                   </div>
                 );
               })}
@@ -7116,7 +8250,7 @@ const Imosion: React.FC = () => {
                           <span style={{ fontSize: '9px', fontWeight: 600, color: lib.color }}>{lib.abbr}</span>
                           <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{lib.name}</span>
                         </div>
-                        <button aria-label="Delete" onClick={() => removePlugin(selectedTrackData.id, plugin.id)} style={{ width: '16px', height: '16px', borderRadius: '2px', border: 'none', background: 'rgba(255,69,58,0.1)', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.trash}</button>
+                        <button aria-label="Delete" onClick={() => removePlugin(selectedTrackData.id, plugin.id)} style={{ width: '16px', height: '16px', borderRadius: '2px', border: 'none', background: 'rgba(158, 90, 85,0.1)', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.trash}</button>
                       </div>
                       {/* Preset Selector with Custom Presets */}
                       <div style={{ marginBottom: '6px' }}>
@@ -7132,27 +8266,38 @@ const Imosion: React.FC = () => {
                               </optgroup>
                             )}
                           </select>
-                          <button aria-label="Save preset" onClick={() => { setShowSavePresetModal({ type: 'plugin', pluginType: plugin.type, trackId: selectedTrackData.id, pluginId: plugin.id }); setNewPresetName(''); }} style={{ padding: '4px 6px', borderRadius: '3px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px' }} title="Save preset">+</button>
+                          <button aria-label="Save preset" onClick={() => { setShowSavePresetModal({ type: 'plugin', pluginType: plugin.type, trackId: selectedTrackData.id, pluginId: plugin.id }); setNewPresetName(''); }} style={{ padding: '4px 6px', borderRadius: '3px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px' }}>+</button>
                         </div>
                       </div>
-                      {lib.params.map(param => (
-                        <div key={param.key} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-                          <span style={{ width: '36px', fontSize: '8px', color: 'var(--color-text-tertiary)' }}>{param.label}</span>
-                          {param.key === 'sidechainSource' ? (
-                            <select value={plugin.params[param.key] ?? -1} onChange={(e) => updatePluginParam(selectedTrackData.id, plugin.id, param.key, parseInt(e.target.value))} style={{ flex: 1, padding: '2px 4px', background: 'var(--color-bg-base)', border: '1px solid #bf5af240', borderRadius: '2px', color: '#bf5af2', fontSize: '8px', cursor: 'pointer' }}>
+                      {/* Pro Parametric EQ: drag the band nodes on the response curve */}
+                      {plugin.type === 'eq' && (
+                        <div style={{ marginBottom: '6px' }}>
+                          <ParametricEQ
+                            width={Math.max(230, pluginPanelWidth - 44)} height={118} color={lib.color}
+                            lowGain={plugin.params.lowGain ?? 0} midGain={plugin.params.midGain ?? 0} highGain={plugin.params.highGain ?? 0}
+                            lowFreq={plugin.params.lowFreq ?? 100} highFreq={plugin.params.highFreq ?? 8000}
+                            onChange={(k, v) => updatePluginParam(selectedTrackData.id, plugin.id, k, v)}
+                          />
+                        </div>
+                      )}
+                      {/* Real rotary controls for every parameter */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', padding: '4px 0 2px' }}>
+                        {lib.params.map(param => param.key === 'sidechainSource' ? (
+                          <div key={param.key} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '44px', fontSize: '8px', color: 'var(--color-text-tertiary)' }}>SC Source</span>
+                            <select value={plugin.params[param.key] ?? -1} onChange={(e) => updatePluginParam(selectedTrackData.id, plugin.id, param.key, parseInt(e.target.value))} style={{ flex: 1, padding: '3px 5px', background: 'var(--color-bg-base)', border: '1px solid #8a6a9c40', borderRadius: '4px', color: '#8a6a9c', fontSize: '9px', cursor: 'pointer' }}>
                               <option value={-1}>None (No SC)</option>
                               {tracks.filter(t => t.id !== selectedTrackData.id).map((t, i) => (
                                 <option key={t.id} value={i}>{t.name}</option>
                               ))}
                             </select>
-                          ) : (
-                            <>
-                              <input type="range" min={param.min} max={param.max} step={(param.max - param.min) / 100} value={plugin.params[param.key] ?? param.default} onChange={(e) => updatePluginParam(selectedTrackData.id, plugin.id, param.key, parseFloat(e.target.value))} style={{ flex: 1 }} />
-                              <span style={{ width: '32px', fontSize: '8px', color: lib.color, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{(plugin.params[param.key] ?? param.default).toFixed(param.max > 100 ? 0 : 1)}</span>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                          </div>
+                        ) : (
+                          <Knob key={param.key} label={param.label} value={plugin.params[param.key] ?? param.default} min={param.min} max={param.max} defaultValue={param.default} color={lib.color} size={44}
+                            valueLabel={`${(plugin.params[param.key] ?? param.default).toFixed(param.max > 100 ? 0 : 1)}${param.unit && param.unit.length <= 2 ? param.unit : ''}`}
+                            onChange={(v) => updatePluginParam(selectedTrackData.id, plugin.id, param.key, v)} />
+                        ))}
+                      </div>
 
                     </div>
                   );
@@ -7291,7 +8436,7 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Marker Regions panel" onClick={() => setShowMarkerRegions(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add region" onClick={() => setMarkerRegions(prev => [...prev, { id: `r-${Date.now()}`, name: `Section ${prev.length + 1}`, start: currentTime, end: currentTime + 16, color: ['var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F', '#64D2FF'][prev.length % 6] }])} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Region</button>
+            <button aria-label="Add region" onClick={() => setMarkerRegions(prev => [...prev, { id: `r-${Date.now()}`, name: `Section ${prev.length + 1}`, start: currentTime, end: currentTime + 16, color: ['var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#8a6a9c', '#FF375F', '#64D2FF'][prev.length % 6] }])} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Region</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {markerRegions.map(r => (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -7314,7 +8459,7 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Tempo Map panel" onClick={() => setShowTempoMap(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add tempo change" onClick={() => setTempoChanges(prev => [...prev, { id: `tc-${Date.now()}`, bar: prev.length > 0 ? prev[prev.length - 1].bar + 16 : 1, bpm: 120, curve: 'instant' }])} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid rgba(255,159,10,0.2)', background: 'rgba(255,159,10,0.08)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Tempo Change</button>
+            <button aria-label="Add tempo change" onClick={() => setTempoChanges(prev => [...prev, { id: `tc-${Date.now()}`, bar: prev.length > 0 ? prev[prev.length - 1].bar + 16 : 1, bpm: 120, curve: 'instant' }])} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid rgba(168, 116, 74,0.2)', background: 'rgba(168, 116, 74,0.08)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Tempo Change</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {tempoChanges.map(tc => (
                 <div key={tc.id} style={{ padding: '6px', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
@@ -7373,7 +8518,7 @@ const Imosion: React.FC = () => {
               <>
                 <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Track: {tracks.find(t => t.id === selectedTrack)?.name || 'Unknown'}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, marginBottom: 10 }}>
-                  {['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64D2FF', 'var(--color-accent)', '#bf5af2', '#FF375F', '#AC8E68', 'var(--color-text-tertiary)', '#FF6482', '#32ADE6', '#66D4CF', '#FF9500', '#A2845E', 'var(--color-text-primary)'].map(c => (
+                  {['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64D2FF', 'var(--color-accent)', '#8a6a9c', '#FF375F', '#AC8E68', 'var(--color-text-tertiary)', '#FF6482', '#32ADE6', '#66D4CF', '#FF9500', '#A2845E', 'var(--color-text-primary)'].map(c => (
                     <button key={c} aria-label={`Set track color to ${c}`} onClick={() => { setTracks(prev => prev.map(t => t.id === selectedTrack ? { ...t, color: c } : t)); }} style={{ width: '100%', aspectRatio: '1', borderRadius: 3, background: c, border: '1px solid var(--color-border)', cursor: 'pointer' }} />
                   ))}
                 </div>
@@ -7428,12 +8573,12 @@ const Imosion: React.FC = () => {
           <div style={{ padding: 10 }}>
             {referenceUrl ? (
               <>
-                <div style={{ padding: '6px var(--space-2)', borderRadius: 4, background: 'rgba(48,209,88,0.08)', border: '1px solid rgba(48,209,88,0.2)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ padding: '6px var(--space-2)', borderRadius: 4, background: 'rgba(79, 138, 96,0.08)', border: '1px solid rgba(79, 138, 96,0.2)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 10, color: 'var(--color-success)', flex: 1 }}>Reference loaded</span>
                   <button aria-label="Remove reference" onClick={() => { setReferenceUrl(''); setReferencePlaying(false); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11 }}><DexIcon name="close" size={11} /></button>
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-                  <button aria-label={referencePlaying ? 'Pause reference' : 'Play reference'} onClick={() => setReferencePlaying(!referencePlaying)} style={{ flex: 1, padding: '6px', borderRadius: 4, border: 'none', background: referencePlaying ? 'var(--color-success)' : 'rgba(48,209,88,0.1)', color: referencePlaying ? '#000' : 'var(--color-success)', fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{referencePlaying ? <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1" /><rect x="9" y="2" width="4" height="12" rx="1" /></svg> Pause</> : <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6z" /></svg> Play</>}</button>
+                  <button aria-label={referencePlaying ? 'Pause reference' : 'Play reference'} onClick={() => setReferencePlaying(!referencePlaying)} style={{ flex: 1, padding: '6px', borderRadius: 4, border: 'none', background: referencePlaying ? 'var(--color-success)' : 'rgba(79, 138, 96,0.1)', color: referencePlaying ? '#000' : 'var(--color-success)', fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{referencePlaying ? <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1" /><rect x="9" y="2" width="4" height="12" rx="1" /></svg> Pause</> : <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6z" /></svg> Play</>}</button>
                   <button aria-label="A/B switch" onClick={() => { setReferencePlaying(p => !p); setMasterSettings(s => ({ ...s, volume: s.volume > 0 ? 0 : 0.8 })); }} style={{ padding: '6px var(--space-3)', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', background: 'var(--color-accent-light, rgba(10,132,255,0.06))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>A/B</button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -7513,7 +8658,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 50 }}>Side Gain</span>
-              <input type="range" min="-12" max="12" value={sideGain} onChange={e => { const v = Number(e.target.value); setSideGain(v); setMasterSettings(s => ({ ...s, midSideBalance: midGain - v })); }} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="-12" max="12" value={sideGain} onChange={e => { const v = Number(e.target.value); setSideGain(v); setMasterSettings(s => ({ ...s, midSideBalance: midGain - v })); }} style={{ flex: 1, accentColor: '#8a6a9c' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{sideGain > 0 ? '+' : ''}{sideGain}dB</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
@@ -7651,12 +8796,12 @@ const Imosion: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Place warp markers to stretch specific sections of audio clips to align with the grid.</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['Beats', 'Tones', 'Texture', 'Re-Pitch', 'Complex'] as const).map(m => (
-                <button key={m} aria-label={`${m} warp mode`} onClick={() => setWarpMode(m)} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (warpMode === m ? 'rgba(255,159,10,0.3)' : 'var(--color-bg-hover)'), background: warpMode === m ? 'rgba(255,159,10,0.1)' : 'var(--color-border-subtle)', color: warpMode === m ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} warp mode`} onClick={() => setWarpMode(m)} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (warpMode === m ? 'rgba(168, 116, 74,0.3)' : 'var(--color-bg-hover)'), background: warpMode === m ? 'rgba(168, 116, 74,0.1)' : 'var(--color-border-subtle)', color: warpMode === m ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
             <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>{warpMarkers.length} marker{warpMarkers.length === 1 ? '' : 's'}</div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button aria-label="Auto-detect transients" onClick={() => { const wf = forgeClip?.clip.waveform || []; if (wf.length === 0) { setWarpMarkers([{ id: `w-${Date.now()}-1`, position: 0.25 }, { id: `w-${Date.now()}-2`, position: 0.5 }, { id: `w-${Date.now()}-3`, position: 0.75 }]); return; } const detected: Array<{ id: string; position: number }> = []; const window = 32; for (let i = window; i < wf.length - window; i += window) { const before = wf.slice(i - window, i).reduce((a, b) => a + Math.abs(b), 0) / window; const after = wf.slice(i, i + window).reduce((a, b) => a + Math.abs(b), 0) / window; if (after > before * 1.8 && after > 0.1) { detected.push({ id: `w-${Date.now()}-${i}`, position: i / wf.length }); } } setWarpMarkers(detected.slice(0, 64)); }} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid rgba(255,159,10,0.2)', background: 'rgba(255,159,10,0.08)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Auto-Detect</button>
+              <button aria-label="Auto-detect transients" onClick={() => { const wf = forgeClip?.clip.waveform || []; if (wf.length === 0) { setWarpMarkers([{ id: `w-${Date.now()}-1`, position: 0.25 }, { id: `w-${Date.now()}-2`, position: 0.5 }, { id: `w-${Date.now()}-3`, position: 0.75 }]); return; } const detected: Array<{ id: string; position: number }> = []; const window = 32; for (let i = window; i < wf.length - window; i += window) { const before = wf.slice(i - window, i).reduce((a, b) => a + Math.abs(b), 0) / window; const after = wf.slice(i, i + window).reduce((a, b) => a + Math.abs(b), 0) / window; if (after > before * 1.8 && after > 0.1) { detected.push({ id: `w-${Date.now()}-${i}`, position: i / wf.length }); } } setWarpMarkers(detected.slice(0, 64)); }} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid rgba(168, 116, 74,0.2)', background: 'rgba(168, 116, 74,0.08)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Auto-Detect</button>
               <button aria-label="Clear warp markers" onClick={() => setWarpMarkers([])} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Clear All</button>
             </div>
           </div>
@@ -7704,19 +8849,19 @@ const Imosion: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Format</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[{ id: 'wav', name: 'WAV' }, { id: 'flac', name: 'FLAC' }, { id: 'aiff', name: 'AIFF' }, { id: 'mp3', name: 'MP3' }, { id: 'ogg', name: 'OGG' }, { id: 'aac', name: 'AAC' }].map(f => (
-                <button key={f.id} onClick={() => setExportFormatAdv(f.id)} aria-label={`Export as ${f.name}`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (exportFormatAdv === f.id ? 'rgba(48,209,88,0.3)' : 'var(--color-bg-hover)'), background: exportFormatAdv === f.id ? 'rgba(48,209,88,0.1)' : 'var(--color-border-subtle)', color: exportFormatAdv === f.id ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{f.name}</button>
+                <button key={f.id} onClick={() => setExportFormatAdv(f.id)} aria-label={`Export as ${f.name}`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportFormatAdv === f.id ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{f.name}</button>
               ))}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Bit Depth</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[16, 24, 32].map(b => (
-                <button key={b} onClick={() => setExportBitDepth(b)} aria-label={`${b}-bit export`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (exportBitDepth === b ? 'rgba(48,209,88,0.3)' : 'var(--color-bg-hover)'), background: exportBitDepth === b ? 'rgba(48,209,88,0.1)' : 'var(--color-border-subtle)', color: exportBitDepth === b ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{b}-bit</button>
+                <button key={b} onClick={() => setExportBitDepth(b)} aria-label={`${b}-bit export`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (exportBitDepth === b ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportBitDepth === b ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportBitDepth === b ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{b}-bit</button>
               ))}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Sample Rate</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[44100, 48000, 88200, 96000, 176400, 192000].map(sr => (
-                <button key={sr} onClick={() => setExportSR(sr)} aria-label={`Export at ${sr}Hz`} style={{ padding: '4px', borderRadius: 3, border: '1px solid ' + (exportSR === sr ? 'rgba(48,209,88,0.3)' : 'var(--color-bg-hover)'), background: exportSR === sr ? 'rgba(48,209,88,0.1)' : 'var(--color-border-subtle)', color: exportSR === sr ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
+                <button key={sr} onClick={() => setExportSR(sr)} aria-label={`Export at ${sr}Hz`} style={{ padding: '4px', borderRadius: 3, border: '1px solid ' + (exportSR === sr ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportSR === sr ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportSR === sr ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
@@ -7735,16 +8880,20 @@ const Imosion: React.FC = () => {
       {/* Plugin Browser Modal */}
       {showPluginBrowser && selectedTrackData && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowPluginBrowser(false)}>
-          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: '#1c1c20', borderRadius: '8px', border: '1px solid rgba(48,209,88,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(48,209,88,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(48,209,88,0.08) 0%, transparent 100%)' }}>
+          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: '#1c1c20', borderRadius: '8px', border: '1px solid rgba(79, 138, 96,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(79, 138, 96,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(79, 138, 96,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(79, 138, 96,0.08) 0%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4f8a60" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>Audio FX</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>— {selectedTrackData.name}</span>
               </div>
               <button aria-label="Close" onClick={() => setShowPluginBrowser(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '2px' }}>{Icon.close}</button>
             </div>
-            
+            {/* Searchable plugin picker */}
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid #232327' }}>
+              <input autoFocus value={pluginPickerQuery} onChange={e => setPluginPickerQuery(e.target.value)} placeholder="Search FX..." aria-label="Search plugins" style={{ width: '100%', padding: '6px 10px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '11px', outline: 'none' }} />
+            </div>
+
             <div style={{ padding: '6px', maxHeight: '420px', overflowY: 'auto' }}>
               {selectedTrackData.plugins.length >= MAX_PLUGINS_PER_TRACK ? (
                 <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-error)', fontSize: '11px' }}>Maximum {MAX_PLUGINS_PER_TRACK} inserts reached</div>
@@ -7752,7 +8901,7 @@ const Imosion: React.FC = () => {
                 <>
                   {/* EQ & Dynamics */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EQ & Dynamics</div>
-                  {(['eq', 'compressor', 'limiter', 'gate', 'deesser'] as PluginType[]).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
+                  {(['eq', 'compressor', 'limiter', 'gate', 'deesser'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
                     <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
@@ -7762,7 +8911,7 @@ const Imosion: React.FC = () => {
 
                   {/* Modulation & Time */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>Modulation & Time</div>
-                  {(['reverb', 'delay', 'chorus'] as PluginType[]).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
+                  {(['reverb', 'delay', 'chorus'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
                     <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
@@ -7772,7 +8921,7 @@ const Imosion: React.FC = () => {
 
                   {/* Utility */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>Utility</div>
-                  {(['saturation', 'autotune'] as PluginType[]).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
+                  {(['saturation', 'autotune'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
                     <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
@@ -7800,11 +8949,158 @@ const Imosion: React.FC = () => {
         </div>
       )}
 
+      {/* Channel Strip Presets Modal */}
+      {showStripPresets && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowStripPresets(false)}>
+          <div className="modal-content" style={{ width: 'min(420px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>Channel Strip Presets</span>
+              <button aria-label="Close" onClick={() => setShowStripPresets(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
+            </div>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23' }}>
+              <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Save the selected track's volume, pan and full FX chain.</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={newStripPresetName} onChange={e => setNewStripPresetName(e.target.value)} placeholder={selectedTrackData ? `${selectedTrackData.name} chain` : 'Select a track'} style={{ flex: 1, padding: '6px 10px', background: 'var(--color-bg-elevated)', border: '1px solid #2a2a30', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '11px' }} />
+                <button onClick={() => saveStripPreset(newStripPresetName || (selectedTrackData ? `${selectedTrackData.name} chain` : ''))} disabled={!selectedTrackData} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(79, 138, 96,0.3)', background: 'rgba(79, 138, 96,0.12)', color: 'var(--color-success)', fontSize: '11px', fontWeight: 600, cursor: selectedTrackData ? 'pointer' : 'not-allowed', opacity: selectedTrackData ? 1 : 0.5 }}>Save</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              {stripPresets.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>No presets yet.</div> :
+                stripPresets.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '6px', marginBottom: '4px', background: 'var(--color-bg-elevated)' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.name}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{p.plugins.length} FX · vol {((p.volume - 1) * 60).toFixed(0)}dB</div>
+                    </div>
+                    <button onClick={() => applyStripPreset(p)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+                    <button aria-label="Delete preset" onClick={() => deleteStripPreset(p.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Track Alternatives (Snapshots) Modal */}
+      {showAlternatives && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowAlternatives(false)}>
+          <div className="modal-content" style={{ width: 'min(440px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>Track Alternatives</span>
+              <button aria-label="Close" onClick={() => setShowAlternatives(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
+            </div>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23' }}>
+              <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Snapshot the whole session (tracks, buses, MIDI, tempo, master) and branch freely.</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={newSnapshotName} onChange={e => setNewSnapshotName(e.target.value)} placeholder={`Version ${snapshots.length + 1}`} style={{ flex: 1, padding: '6px 10px', background: 'var(--color-bg-elevated)', border: '1px solid #2a2a30', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '11px' }} />
+                <button onClick={() => captureSnapshot(newSnapshotName || `Version ${snapshots.length + 1}`)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(74,158,255,0.3)', background: 'rgba(74,158,255,0.12)', color: 'var(--color-accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Capture</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              {snapshots.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>No alternatives captured.</div> :
+                snapshots.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '6px', marginBottom: '4px', background: 'var(--color-bg-elevated)' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{s.name}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{s.data.tracks.length} tracks · {s.data.pianoRollNotes.length} notes · {s.data.bpm} BPM</div>
+                    </div>
+                    <button onClick={() => restoreSnapshot(s.id)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Restore</button>
+                    <button aria-label="Delete snapshot" onClick={() => deleteSnapshot(s.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Controls (Macros) Modal */}
+      {showMacros && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowMacros(false)}>
+          <div className="modal-content" style={{ width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>Smart Controls — Macros</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={addMacro} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.12)', color: '#8a6a9c', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>+ Macro</button>
+                <button aria-label="Close" onClick={() => setShowMacros(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+              {macros.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>Add a macro, then map one knob to many plugin parameters.</div> :
+                macros.map(m => {
+                  const formTrack = tracks.find(t => t.id === macroAssign.trackId);
+                  return (
+                  <div key={m.id} style={{ padding: '10px', borderRadius: '8px', marginBottom: '8px', background: 'var(--color-bg-elevated)', border: '1px solid #232327' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <input value={m.name} onChange={e => setMacros(prev => prev.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))} style={{ flex: 1, padding: '4px 8px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '5px', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600 }} />
+                      <input type="range" min={0} max={1} step={0.01} value={m.value} onChange={e => setMacroValue(m.id, parseFloat(e.target.value))} style={{ width: '140px', accentColor: '#8a6a9c' }} />
+                      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', minWidth: '34px', textAlign: 'right' }}>{Math.round(m.value * 100)}%</span>
+                      <button aria-label="Delete macro" onClick={() => deleteMacro(m.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                    </div>
+                    {m.targets.map((t, i) => {
+                      const trk = tracks.find(x => x.id === t.trackId); const pl = trk?.plugins.find(p => p.id === t.pluginId);
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-secondary)', padding: '3px 6px' }}>
+                          <span style={{ flex: 1 }}>{trk?.name ?? '?'} · {pl ? PLUGIN_LIBRARY[pl.type].abbr : '?'} · {t.paramKey}</span>
+                          <button aria-label="Remove target" onClick={() => removeMacroTarget(m.id, i)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                        </div>
+                      );
+                    })}
+                    {/* Assign new target */}
+                    <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <select value={macroAssign.trackId} onChange={e => setMacroAssign({ trackId: e.target.value, pluginId: '', paramKey: '' })} style={{ flex: 1, minWidth: '90px', padding: '4px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                        <option value="">Track…</option>
+                        {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <select value={macroAssign.pluginId} onChange={e => setMacroAssign(a => ({ ...a, pluginId: e.target.value, paramKey: '' }))} disabled={!formTrack} style={{ flex: 1, minWidth: '90px', padding: '4px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                        <option value="">Plugin…</option>
+                        {formTrack?.plugins.map(p => <option key={p.id} value={p.id}>{PLUGIN_LIBRARY[p.type].name}</option>)}
+                      </select>
+                      <select value={macroAssign.paramKey} onChange={e => setMacroAssign(a => ({ ...a, paramKey: e.target.value }))} disabled={!macroAssign.pluginId} style={{ flex: 1, minWidth: '90px', padding: '4px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                        <option value="">Param…</option>
+                        {(() => { const pl = formTrack?.plugins.find(p => p.id === macroAssign.pluginId); return pl ? PLUGIN_LIBRARY[pl.type].params.map(pa => <option key={pa.key} value={pa.key}>{pa.label}</option>) : null; })()}
+                      </select>
+                      <button disabled={!macroAssign.trackId || !macroAssign.pluginId || !macroAssign.paramKey} onClick={() => { const pl = formTrack?.plugins.find(p => p.id === macroAssign.pluginId); const pa = pl && PLUGIN_LIBRARY[pl.type].params.find(x => x.key === macroAssign.paramKey); if (pa) { addMacroTarget(m.id, { trackId: macroAssign.trackId, pluginId: macroAssign.pluginId, paramKey: macroAssign.paramKey, min: pa.min, max: pa.max }); setMacroAssign({ trackId: '', pluginId: '', paramKey: '' }); } }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', opacity: (!macroAssign.trackId || !macroAssign.pluginId || !macroAssign.paramKey) ? 0.5 : 1 }}>Map</button>
+                    </div>
+                  </div>
+                ); })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event List Editor Modal */}
+      {showEventList && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowEventList(false)}>
+          <div className="modal-content" style={{ width: 'min(560px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>Event List — {pianoRollNotes.length} notes</span>
+              <button aria-label="Close" onClick={() => setShowEventList(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
+            </div>
+            <div style={{ display: 'flex', padding: '6px 16px', borderBottom: '1px solid #1f1f23', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '0.5px' }}>
+              <span style={{ width: '60px' }}>NOTE</span><span style={{ width: '90px' }}>START (beat)</span><span style={{ width: '90px' }}>LENGTH</span><span style={{ flex: 1 }}>VELOCITY</span><span style={{ width: '40px' }}></span>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {pianoRollNotes.length === 0 ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--color-text-tertiary)' }}>No MIDI notes. Draw some in the Piano Roll.</div> :
+                [...pianoRollNotes].sort((a, b) => a.startTime - b.startTime).map(n => (
+                  <div key={n.id} style={{ display: 'flex', alignItems: 'center', padding: '4px 16px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ width: '60px', color: 'var(--color-text-primary)', fontWeight: 600 }}>{midiNoteName(n.pitch)}</span>
+                    <input type="number" step={0.25} value={Number(n.startTime.toFixed(3))} onChange={e => { const v = Math.max(0, parseFloat(e.target.value) || 0); setPianoRollNotes(prev => prev.map(x => x.id === n.id ? { ...x, startTime: v } : x)); }} style={{ width: '80px', marginRight: '10px', padding: '2px 4px', background: 'var(--color-bg-elevated)', border: '1px solid #2a2a30', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px' }} />
+                    <input type="number" step={0.25} value={Number(n.duration.toFixed(3))} onChange={e => { const v = Math.max(0.0625, parseFloat(e.target.value) || 0.25); setPianoRollNotes(prev => prev.map(x => x.id === n.id ? { ...x, duration: v } : x)); }} style={{ width: '80px', marginRight: '10px', padding: '2px 4px', background: 'var(--color-bg-elevated)', border: '1px solid #2a2a30', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px' }} />
+                    <input type="range" min={1} max={127} value={n.velocity} onChange={e => { const v = parseInt(e.target.value); setPianoRollNotes(prev => prev.map(x => x.id === n.id ? { ...x, velocity: v } : x)); }} style={{ flex: 1, accentColor: '#8a6a9c' }} />
+                    <span style={{ width: '28px', textAlign: 'right', color: 'var(--color-text-tertiary)' }}>{n.velocity}</span>
+                    <button aria-label="Delete note" onClick={() => setPianoRollNotes(prev => prev.filter(x => x.id !== n.id))} style={{ width: '34px', background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '12px' }}>×</button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Plugin Store Modal */}
       {showPluginStore && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowPluginStore(false)}>
           <div className="modal-content" style={{ width: 'min(600px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
-            <div style={{ padding: '14px var(--space-4)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(48,209,88,0.1), transparent)' }}>
+            <div style={{ padding: '14px var(--space-4)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(79, 138, 96,0.1), transparent)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ color: 'var(--color-success)' }}>{Icon.store}</span>
                 <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '-0.01em' }}>Plugin Store</span>
@@ -7826,8 +9122,8 @@ const Imosion: React.FC = () => {
 
             {/* Tabs */}
             <div style={{ display: 'flex', padding: '0 14px', borderBottom: '1px solid #1f1f23', gap: '4px' }}>
-              <button aria-label="Browse plugins tab" onClick={() => setStoreActiveTab('browse')} style={{ padding: '10px var(--space-3)', background: 'transparent', border: 'none', borderBottom: storeActiveTab === 'browse' ? '2px solid #30d158' : '2px solid transparent', color: storeActiveTab === 'browse' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Browse ({filteredStorePlugins.length})</button>
-              <button aria-label="Installed plugins tab" onClick={() => setStoreActiveTab('installed')} style={{ padding: '10px var(--space-3)', background: 'transparent', border: 'none', borderBottom: storeActiveTab === 'installed' ? '2px solid #30d158' : '2px solid transparent', color: storeActiveTab === 'installed' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Installed ({installedPlugins.length})</button>
+              <button aria-label="Browse plugins tab" onClick={() => setStoreActiveTab('browse')} style={{ padding: '10px var(--space-3)', background: 'transparent', border: 'none', borderBottom: storeActiveTab === 'browse' ? '2px solid #4f8a60' : '2px solid transparent', color: storeActiveTab === 'browse' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Browse ({filteredStorePlugins.length})</button>
+              <button aria-label="Installed plugins tab" onClick={() => setStoreActiveTab('installed')} style={{ padding: '10px var(--space-3)', background: 'transparent', border: 'none', borderBottom: storeActiveTab === 'installed' ? '2px solid #4f8a60' : '2px solid transparent', color: storeActiveTab === 'installed' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Installed ({installedPlugins.length})</button>
             </div>
 
             <div style={{ padding: 'var(--space-3)', maxHeight: '450px', overflowY: 'auto' }}>
@@ -7848,7 +9144,7 @@ const Imosion: React.FC = () => {
                         <button
                           aria-label={`Install ${plugin.name}`}
                           onClick={() => installPlugin(plugin)}
-                          style={{ width: '100%', padding: '6px', background: 'rgba(48,209,88,0.15)', border: '1px solid rgba(48,209,88,0.3)', borderRadius: '3px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                          style={{ width: '100%', padding: '6px', background: 'rgba(79, 138, 96,0.15)', border: '1px solid rgba(79, 138, 96,0.3)', borderRadius: '3px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                         >
                           {Icon.download} Install
                         </button>
@@ -7866,7 +9162,7 @@ const Imosion: React.FC = () => {
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                       {installedPlugins.map(plugin => (
-                        <div key={plugin.id} style={{ padding: 'var(--space-3)', background: '#0c0c0e', borderRadius: '6px', border: '1px solid rgba(48,209,88,0.2)' }}>
+                        <div key={plugin.id} style={{ padding: 'var(--space-3)', background: '#0c0c0e', borderRadius: '6px', border: '1px solid rgba(79, 138, 96,0.2)' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -7880,7 +9176,7 @@ const Imosion: React.FC = () => {
                           <button
                             aria-label={`Uninstall ${plugin.name}`}
                             onClick={() => uninstallPlugin(plugin.id)}
-                            style={{ width: '100%', padding: '6px', background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '10px' }}
+                            style={{ width: '100%', padding: '6px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '10px' }}
                           >
                             Uninstall
                           </button>
@@ -7915,7 +9211,7 @@ const Imosion: React.FC = () => {
                     <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{tpl.tracks.length} tracks / {tpl.bpm} BPM / {tpl.sampleRate/1000}k</div>
                   </div>
                   {!DEFAULT_TEMPLATES.find(d => d.id === tpl.id) && (
-                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} style={{ padding: '3px 6px', background: 'rgba(255,69,58,0.1)', border: 'none', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{Icon.trash}</button>
+                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} style={{ padding: '3px 6px', background: 'rgba(158, 90, 85,0.1)', border: 'none', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{Icon.trash}</button>
                   )}
                 </div>
               ))}
@@ -7930,8 +9226,14 @@ const Imosion: React.FC = () => {
           {contextMenu.clipId ? (
             <>
               <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { duplicateClip(contextMenu.trackId, contextMenu.clipId); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.copy} Duplicate</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) openForge(contextMenu.trackId, clip); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: '#ff375f', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Open in Forge</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) openForge(contextMenu.trackId, clip); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: '#a05a68', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Open in Forge</div>
               <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) { setEditingClip({ trackId: contextMenu.trackId!, clip }); setShowClipEditor(true); } } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.mixer} Edit Clip</div>
+              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
+              {/* FL-style sample chop — slice into independent, rearrangeable clips */}
+              <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--color-text-disabled)', padding: '3px 10px 1px', letterSpacing: 1 }}>CHOP SAMPLE</div>
+              {([{ label: '4 slices', n: 4, m: 'even' }, { label: '8 slices', n: 8, m: 'even' }, { label: '16 slices', n: 16, m: 'even' }, { label: 'At transients', n: 0, m: 'transient' }] as const).map(o => (
+                <div key={o.label} className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) chopClip(contextMenu.trackId, contextMenu.clipId, o.n, o.m); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Chop — {o.label}</div>
+              ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
               {/* Tempo Lock Toggle */}
               <div className="ctx-item" onClick={() => { 
@@ -7974,6 +9276,12 @@ const Imosion: React.FC = () => {
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
               <div className="ctx-item" onClick={() => { setShowPluginBrowser(true); setSelectedTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plugin} Add Plugin</div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) duplicateTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plus} Duplicate Track</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) toggleFreeze(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: contextMenu.trackId && frozenTracks.has(contextMenu.trackId) ? '#4a7896' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+                {contextMenu.trackId && frozenTracks.has(contextMenu.trackId) ? 'Unfreeze Track' : 'Freeze Track'}
+              </div>
+              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
               <div className="ctx-item" onClick={() => { if (contextMenu.trackId) deleteTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-error)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.trash} Delete Track</div>
             </>
           ) : null}
@@ -7997,14 +9305,14 @@ const Imosion: React.FC = () => {
               <div style={{ marginBottom: '14px', padding: '10px var(--space-3)', background: 'var(--color-bg-base)', borderRadius: '6px', border: '1px solid #1f1f23' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ color: '#bf5af2' }}>{Icon.music}</span>
+                    <span style={{ color: '#8a6a9c' }}>{Icon.music}</span>
                     <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Key Detection</span>
                   </div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button 
                       aria-label="Detect clip key"
                       onClick={() => detectClipKey(editingClip.trackId, editingClip.clip.id)}
-                      style={{ padding: '4px var(--space-2)', background: 'rgba(191,90,242,0.2)', border: '1px solid rgba(191,90,242,0.3)', borderRadius: '3px', color: '#bf5af2', cursor: 'pointer', fontSize: '9px', fontWeight: 600 }}
+                      style={{ padding: '4px var(--space-2)', background: 'rgba(138, 106, 156,0.2)', border: '1px solid rgba(138, 106, 156,0.3)', borderRadius: '3px', color: '#8a6a9c', cursor: 'pointer', fontSize: '9px', fontWeight: 600 }}
                     >
                       Detect Key
                     </button>
@@ -8014,9 +9322,9 @@ const Imosion: React.FC = () => {
                       disabled={!editingClip.clip.detectedKey}
                       style={{ 
                         padding: '4px 10px', 
-                        background: editingClip.clip.keyLocked ? 'rgba(48,209,88,0.2)' : 'rgba(113,113,122,0.2)', 
+                        background: editingClip.clip.keyLocked ? 'rgba(79, 138, 96,0.2)' : 'rgba(113,113,122,0.2)', 
                         border: '1px solid', 
-                        borderColor: editingClip.clip.keyLocked ? 'rgba(48,209,88,0.3)' : '#3f3f46',
+                        borderColor: editingClip.clip.keyLocked ? 'rgba(79, 138, 96,0.3)' : '#3f3f46',
                         borderRadius: '3px', 
                         color: editingClip.clip.keyLocked ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                         cursor: editingClip.clip.detectedKey ? 'pointer' : 'not-allowed', 
@@ -8036,7 +9344,7 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Detected:</span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: editingClip.clip.detectedKey ? '#bf5af2' : 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-elevated)', borderRadius: '3px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: editingClip.clip.detectedKey ? '#8a6a9c' : 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-elevated)', borderRadius: '3px' }}>
                       {editingClip.clip.detectedKey ? `${editingClip.clip.detectedKey} ${editingClip.clip.detectedScale}` : 'Not analyzed'}
                     </span>
                   </div>
@@ -8062,9 +9370,9 @@ const Imosion: React.FC = () => {
                     onClick={() => editingClip.clip.tempoLocked ? unmatchClipFromTempo(editingClip.trackId, editingClip.clip.id) : matchClipToTempo(editingClip.trackId, editingClip.clip.id)}
                     style={{ 
                       padding: '4px 10px', 
-                      background: editingClip.clip.tempoLocked ? 'rgba(48,209,88,0.2)' : 'rgba(113,113,122,0.2)', 
+                      background: editingClip.clip.tempoLocked ? 'rgba(79, 138, 96,0.2)' : 'rgba(113,113,122,0.2)', 
                       border: '1px solid', 
-                      borderColor: editingClip.clip.tempoLocked ? 'rgba(48,209,88,0.3)' : '#3f3f46',
+                      borderColor: editingClip.clip.tempoLocked ? 'rgba(79, 138, 96,0.3)' : '#3f3f46',
                       borderRadius: '3px', 
                       color: editingClip.clip.tempoLocked ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                       cursor: 'pointer', 
@@ -8095,7 +9403,7 @@ const Imosion: React.FC = () => {
               {/* Warp Mode Section */}
               <div style={{ marginBottom: '14px', padding: '10px var(--space-3)', background: 'var(--color-bg-base)', borderRadius: '6px', border: '1px solid #1f1f23' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                  <span style={{ color: '#64d2ff' }}>{Icon.stretch}</span>
+                  <span style={{ color: '#4a7896' }}>{Icon.stretch}</span>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Warp Mode</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
@@ -8104,14 +9412,13 @@ const Imosion: React.FC = () => {
                       key={mode.value}
                       aria-label={`Warp mode: ${mode.label}`}
                       onClick={() => setClipWarpMode(editingClip.trackId, editingClip.clip.id, mode.value)}
-                      title={mode.desc}
                       style={{ 
                         padding: '6px 4px', 
                         background: editingClip.clip.warpMode === mode.value ? 'rgba(6,182,212,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
                         borderColor: editingClip.clip.warpMode === mode.value ? 'rgba(6,182,212,0.4)' : 'var(--color-bg-hover)', 
                         borderRadius: '3px', 
-                        color: editingClip.clip.warpMode === mode.value ? '#64d2ff' : 'var(--color-text-tertiary)', 
+                        color: editingClip.clip.warpMode === mode.value ? '#4a7896' : 'var(--color-text-tertiary)', 
                         cursor: 'pointer', 
                         fontSize: '8px', 
                         fontWeight: 600 
@@ -8148,7 +9455,7 @@ const Imosion: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Stretch:</span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#64d2ff', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{((1 / (editingClip.clip.speedMultiplier || 1)) * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#4a7896', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{((1 / (editingClip.clip.speedMultiplier || 1)) * 100).toFixed(1)}%</span>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Duration:</span>
                     <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{(editingClip.clip.duration / (editingClip.clip.speedMultiplier || 1)).toFixed(2)}s</span>
                   </div>
@@ -8174,9 +9481,9 @@ const Imosion: React.FC = () => {
                       disabled={editingClip.clip.tempoLocked}
                       style={{ 
                         padding: '4px var(--space-2)', 
-                        background: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(48,209,88,0.2)' : 'var(--color-bg-elevated)', 
+                        background: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(79, 138, 96,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
-                        borderColor: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(48,209,88,0.4)' : 'var(--color-bg-hover)', 
+                        borderColor: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(79, 138, 96,0.4)' : 'var(--color-bg-hover)', 
                         borderRadius: '3px', 
                         color: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                         cursor: editingClip.clip.tempoLocked ? 'not-allowed' : 'pointer', 
@@ -8215,7 +9522,7 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '40px' }}>Fine</span>
                   <input type="range" min="-100" max="100" step="1" value={Math.round(((editingClip.clip.pitch % 1) || 0) * 100)} onChange={(e) => setClipPitch(editingClip.trackId, editingClip.clip.id, Math.trunc(editingClip.clip.pitch) + parseInt(e.target.value) / 100)} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '9px', color: '#bf5af2', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{Math.round(((editingClip.clip.pitch % 1) || 0) * 100)}ct</span>
+                  <span style={{ fontSize: '9px', color: '#8a6a9c', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{Math.round(((editingClip.clip.pitch % 1) || 0) * 100)}ct</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                   {PITCH_PRESETS.map(preset => (
@@ -8225,9 +9532,9 @@ const Imosion: React.FC = () => {
                       onClick={() => setClipPitch(editingClip.trackId, editingClip.clip.id, preset.value)}
                       style={{ 
                         padding: '4px 6px', 
-                        background: editingClip.clip.pitch === preset.value ? 'rgba(255,159,10,0.2)' : 'var(--color-bg-elevated)', 
+                        background: editingClip.clip.pitch === preset.value ? 'rgba(168, 116, 74,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
-                        borderColor: editingClip.clip.pitch === preset.value ? 'rgba(255,159,10,0.4)' : 'var(--color-bg-hover)', 
+                        borderColor: editingClip.clip.pitch === preset.value ? 'rgba(168, 116, 74,0.4)' : 'var(--color-bg-hover)', 
                         borderRadius: '3px', 
                         color: editingClip.clip.pitch === preset.value ? 'var(--color-warning)' : 'var(--color-text-tertiary)', 
                         cursor: 'pointer', 
@@ -8252,20 +9559,20 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '10px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', width: '65px' }}>Fade In</span>
                   <input type="range" min="0" max="5" step="0.01" value={editingClip.clip.fadeIn} onChange={(e) => updateClip(editingClip.trackId, editingClip.clip.id, { fadeIn: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeIn.toFixed(2)}s</span>
+                  <span style={{ fontSize: '10px', color: '#4a7896', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeIn.toFixed(2)}s</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', width: '65px' }}>Fade Out</span>
                   <input type="range" min="0" max="5" step="0.01" value={editingClip.clip.fadeOut} onChange={(e) => updateClip(editingClip.trackId, editingClip.clip.id, { fadeOut: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeOut.toFixed(2)}s</span>
+                  <span style={{ fontSize: '10px', color: '#4a7896', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeOut.toFixed(2)}s</span>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #1f1f23' }}>
-                <button aria-label="Toggle Reverse" onClick={() => updateClip(editingClip.trackId, editingClip.clip.id, { reverse: !editingClip.clip.reverse })} style={{ padding: 'var(--space-2) 14px', background: editingClip.clip.reverse ? 'rgba(255,69,58,0.2)' : 'var(--color-bg-elevated)', border: '1px solid', borderColor: editingClip.clip.reverse ? 'rgba(255,69,58,0.3)' : 'var(--color-bg-hover)', borderRadius: '4px', color: editingClip.clip.reverse ? 'var(--color-error)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>{Icon.reverse} {editingClip.clip.reverse ? 'Reversed' : 'Reverse'}</button>
+                <button aria-label="Toggle Reverse" onClick={() => updateClip(editingClip.trackId, editingClip.clip.id, { reverse: !editingClip.clip.reverse })} style={{ padding: 'var(--space-2) 14px', background: editingClip.clip.reverse ? 'rgba(158, 90, 85,0.2)' : 'var(--color-bg-elevated)', border: '1px solid', borderColor: editingClip.clip.reverse ? 'rgba(158, 90, 85,0.3)' : 'var(--color-bg-hover)', borderRadius: '4px', color: editingClip.clip.reverse ? 'var(--color-error)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>{Icon.reverse} {editingClip.clip.reverse ? 'Reversed' : 'Reverse'}</button>
                 <button aria-label="Reset All" onClick={() => updateClip(editingClip.trackId, editingClip.clip.id, { ...DEFAULT_CLIP_PROPS, gain: 1 })} style={{ padding: 'var(--space-2) 14px', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Reset All</button>
-                <button aria-label="Open clip in Forge editor" onClick={() => { openForge(editingClip.trackId, editingClip.clip); setShowClipEditor(false); }} style={{ padding: 'var(--space-2) 14px', background: 'rgba(255,55,95,0.1)', border: '1px solid rgba(255,55,95,0.2)', borderRadius: '4px', color: '#ff375f', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>{Icon.audio} Open in Forge</button>
+                <button aria-label="Open clip in Forge editor" onClick={() => { openForge(editingClip.trackId, editingClip.clip); setShowClipEditor(false); }} style={{ padding: 'var(--space-2) 14px', background: 'rgba(160, 90, 104,0.1)', border: '1px solid rgba(160, 90, 104,0.2)', borderRadius: '4px', color: '#a05a68', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>{Icon.audio} Open in Forge</button>
                 <div style={{ flex: 1 }} />
                 <button aria-label="Done" onClick={() => setShowClipEditor(false)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'linear-gradient(135deg, #0a84ff, #0a84ff)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Done</button>
               </div>
@@ -8277,12 +9584,12 @@ const Imosion: React.FC = () => {
       {/* Forge Audio Editor - Edison-style sample editor */}
       {showForge && forgeClip && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }} onMouseDown={() => setShowForge(false)}>
-          <div style={{ width: 'min(900px, calc(100vw - 32px))', height: 'min(600px, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #ff375f40', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div style={{ width: 'min(900px, calc(100vw - 32px))', height: 'min(600px, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #a05a6840', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }} onMouseDown={(e) => e.stopPropagation()}>
             {/* Forge Header */}
             <div style={{ padding: '10px var(--space-4)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
-                <div style={{ width: '6px', height: '20px', background: '#ff375f', borderRadius: '3px' }} />
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#ff375f', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
+                <div style={{ width: '6px', height: '20px', background: '#a05a68', borderRadius: '3px' }} />
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#a05a68', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Audio Editor</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '3px' }}>{forgeClip.clip.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)' }}>{forgeClip.clip.duration.toFixed(2)}s | {forgeClip.clip.waveform.length} samples</span>
@@ -8292,13 +9599,13 @@ const Imosion: React.FC = () => {
 
             {/* Forge Toolbar */}
             <div style={{ padding: '6px var(--space-3)', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-bg-base)', flexWrap: 'wrap' }}>
-              <button aria-label="Normalize audio" onClick={forgeNormalize} style={{ padding: '5px 10px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '3px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Normalize</button>
-              <button aria-label={forgeClip.clip.reverse ? 'Un-reverse audio' : 'Reverse audio'} onClick={forgeReverse} style={{ padding: '5px 10px', background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>{forgeClip.clip.reverse ? 'Un-Reverse' : 'Reverse'}</button>
-              <button aria-label="Apply Fade In" onClick={forgeFadeIn} style={{ padding: '5px 10px', background: 'rgba(100,210,255,0.1)', border: '1px solid rgba(100,210,255,0.2)', borderRadius: '3px', color: '#64d2ff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade In</button>
-              <button aria-label="Apply Fade Out" onClick={forgeFadeOut} style={{ padding: '5px 10px', background: 'rgba(100,210,255,0.1)', border: '1px solid rgba(100,210,255,0.2)', borderRadius: '3px', color: '#64d2ff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade Out</button>
+              <button aria-label="Normalize audio" onClick={forgeNormalize} style={{ padding: '5px 10px', background: 'rgba(79, 138, 96,0.1)', border: '1px solid rgba(79, 138, 96,0.2)', borderRadius: '3px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Normalize</button>
+              <button aria-label={forgeClip.clip.reverse ? 'Un-reverse audio' : 'Reverse audio'} onClick={forgeReverse} style={{ padding: '5px 10px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>{forgeClip.clip.reverse ? 'Un-Reverse' : 'Reverse'}</button>
+              <button aria-label="Apply Fade In" onClick={forgeFadeIn} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '3px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade In</button>
+              <button aria-label="Apply Fade Out" onClick={forgeFadeOut} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '3px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade Out</button>
               <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-              <button aria-label="Silence selection" onClick={forgeSilence} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(255,159,10,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(255,159,10,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? 'var(--color-warning)' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Silence</button>
-              <button aria-label="Trim to selection" onClick={forgeTrim} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(191,90,242,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(191,90,242,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? '#bf5af2' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Trim to Selection</button>
+              <button aria-label="Silence selection" onClick={forgeSilence} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(168, 116, 74,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(168, 116, 74,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? 'var(--color-warning)' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Silence</button>
+              <button aria-label="Trim to selection" onClick={forgeTrim} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(138, 106, 156,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(138, 106, 156,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? '#8a6a9c' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Trim to Selection</button>
               <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
               <button aria-label="Increase gain by 6dB" onClick={() => forgeGain(1.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain +6dB</button>
               <button aria-label="Decrease gain by 6dB" onClick={() => forgeGain(0.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain -6dB</button>
@@ -8311,7 +9618,7 @@ const Imosion: React.FC = () => {
             <div style={{ flex: 1, position: 'relative', background: '#080810', overflow: 'hidden' }}>
               {/* Selection overlay */}
               {forgeSelection && (
-                <div style={{ position: 'absolute', left: `${forgeSelection.start * 100}%`, width: `${(forgeSelection.end - forgeSelection.start) * 100}%`, top: 0, bottom: 0, background: 'rgba(255,55,95,0.12)', borderLeft: '1px solid #ff375f', borderRight: '1px solid #ff375f', zIndex: 5, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', left: `${forgeSelection.start * 100}%`, width: `${(forgeSelection.end - forgeSelection.start) * 100}%`, top: 0, bottom: 0, background: 'rgba(160, 90, 104,0.12)', borderLeft: '1px solid #a05a68', borderRight: '1px solid #a05a68', zIndex: 5, pointerEvents: 'none' }} />
               )}
               <canvas
                 ref={(el) => {
@@ -8340,13 +9647,13 @@ const Imosion: React.FC = () => {
                   ctx.beginPath(); ctx.moveTo(0, mid * 0.5); ctx.lineTo(w, mid * 0.5); ctx.stroke();
                   ctx.beginPath(); ctx.moveTo(0, mid * 1.5); ctx.lineTo(w, mid * 1.5); ctx.stroke();
                   // Waveform fill
-                  ctx.fillStyle = 'rgba(255,55,95,0.25)';
+                  ctx.fillStyle = 'rgba(160, 90, 104,0.25)';
                   ctx.beginPath(); ctx.moveTo(0, mid);
                   for (let i = 0; i < wf.length; i++) { ctx.lineTo((i / wf.length) * w, mid - wf[i] * mid * 0.9); }
                   for (let i = wf.length - 1; i >= 0; i--) { ctx.lineTo((i / wf.length) * w, mid + wf[i] * mid * 0.9); }
                   ctx.closePath(); ctx.fill();
                   // Waveform line
-                  ctx.strokeStyle = '#ff375f';
+                  ctx.strokeStyle = '#a05a68';
                   ctx.lineWidth = 1;
                   ctx.beginPath(); ctx.moveTo(0, mid);
                   for (let i = 0; i < wf.length; i++) { ctx.lineTo((i / wf.length) * w, mid - wf[i] * mid * 0.9); }
@@ -8388,12 +9695,12 @@ const Imosion: React.FC = () => {
                 <span>Duration: <span style={{ color: 'var(--color-text-primary)' }}>{forgeClip.clip.duration.toFixed(3)}s</span></span>
                 <span>Gain: <span style={{ color: 'var(--color-success)' }}>{forgeClip.clip.gain.toFixed(2)}</span></span>
                 <span>Pitch: <span style={{ color: 'var(--color-warning)' }}>{forgeClip.clip.pitch > 0 ? '+' : ''}{forgeClip.clip.pitch}st</span></span>
-                <span>Speed: <span style={{ color: '#64d2ff' }}>{(forgeClip.clip.speedMultiplier || 1).toFixed(2)}x</span></span>
-                <span>Warp: <span style={{ color: '#bf5af2' }}>{forgeClip.clip.warpMode}</span></span>
+                <span>Speed: <span style={{ color: '#4a7896' }}>{(forgeClip.clip.speedMultiplier || 1).toFixed(2)}x</span></span>
+                <span>Warp: <span style={{ color: '#8a6a9c' }}>{forgeClip.clip.warpMode}</span></span>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button aria-label="Back to Clip Editor" onClick={() => { setEditingClip(forgeClip); setShowClipEditor(true); setShowForge(false); }} style={{ padding: '5px var(--space-3)', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '10px', cursor: 'pointer' }}>Clip Editor</button>
-                <button aria-label="Done editing in Forge" onClick={() => setShowForge(false)} style={{ padding: '5px 14px', background: '#ff375f', border: 'none', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Done</button>
+                <button aria-label="Done editing in Forge" onClick={() => setShowForge(false)} style={{ padding: '5px 14px', background: '#a05a68', border: 'none', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Done</button>
               </div>
             </div>
           </div>
@@ -8434,7 +9741,7 @@ const Imosion: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-tertiary)', marginBottom: '6px', textTransform: 'uppercase' }}>Sample Rate</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {[44100, 48000, 96000].map(rate => (
-                    <button key={rate} aria-label={`Sample rate: ${(rate / 1000).toFixed(1)} kHz`} onClick={() => setExportSettings(s => ({ ...s, sampleRate: rate as 44100 | 48000 | 96000 | 192000 }))} style={{ flex: 1, padding: 'var(--space-2)', background: exportSettings.sampleRate === rate ? '#2a1840' : 'var(--color-bg-elevated)', border: '1px solid', borderColor: exportSettings.sampleRate === rate ? '#bf5af2' : 'var(--color-bg-hover)', borderRadius: '4px', color: exportSettings.sampleRate === rate ? '#bf5af2' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>{(rate / 1000).toFixed(1)} kHz</button>
+                    <button key={rate} aria-label={`Sample rate: ${(rate / 1000).toFixed(1)} kHz`} onClick={() => setExportSettings(s => ({ ...s, sampleRate: rate as 44100 | 48000 | 96000 | 192000 }))} style={{ flex: 1, padding: 'var(--space-2)', background: exportSettings.sampleRate === rate ? '#2a1840' : 'var(--color-bg-elevated)', border: '1px solid', borderColor: exportSettings.sampleRate === rate ? '#8a6a9c' : 'var(--color-bg-hover)', borderRadius: '4px', color: exportSettings.sampleRate === rate ? '#8a6a9c' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>{(rate / 1000).toFixed(1)} kHz</button>
                   ))}
                 </div>
               </div>
@@ -8464,18 +9771,18 @@ const Imosion: React.FC = () => {
               {isExporting && (
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Exporting...</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>{exportPhrase}...</span>
                     <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>{Math.round(exportProgress)}%</span>
                   </div>
                   <div style={{ height: '6px', background: 'var(--color-bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${exportProgress}%`, background: 'linear-gradient(90deg, #30d158, #30d158)', transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', width: `${exportProgress}%`, background: 'linear-gradient(90deg, #4f8a60, #4f8a60)', transition: 'width 0.3s' }} />
                   </div>
                 </div>
               )}
 
               {/* Export button */}
-              <button aria-label="Export project" onClick={exportProject} disabled={isExporting} style={{ width: '100%', padding: 'var(--space-3)', background: isExporting ? 'var(--color-bg-elevated)' : 'linear-gradient(135deg, #30d158, #28a745)', border: 'none', borderRadius: '6px', color: '#fff', cursor: isExporting ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-                {isExporting ? 'Exporting...' : <>{Icon.download} Export Now</>}
+              <button aria-label="Export project" onClick={exportProject} disabled={isExporting} style={{ width: '100%', padding: 'var(--space-3)', background: isExporting ? 'var(--color-bg-elevated)' : 'linear-gradient(135deg, #4f8a60, #28a745)', border: 'none', borderRadius: '6px', color: '#fff', cursor: isExporting ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+                {isExporting ? `${exportPhrase}...` : <>{Icon.download} Export Now</>}
               </button>
             </div>
           </div>
@@ -8521,7 +9828,7 @@ const Imosion: React.FC = () => {
                       <button aria-label="Join collaboration session" onClick={() => {
                         const input = document.getElementById('collab-session-id') as HTMLInputElement;
                         if (input?.value) joinCollabSession(input.value);
-                      }} style={{ padding: '10px var(--space-4)', background: 'rgba(48,209,88,0.2)', border: '1px solid rgba(48,209,88,0.3)', borderRadius: '4px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Join</button>
+                      }} style={{ padding: '10px var(--space-4)', background: 'rgba(79, 138, 96,0.2)', border: '1px solid rgba(79, 138, 96,0.3)', borderRadius: '4px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Join</button>
                     </div>
                   </div>
 
@@ -8589,7 +9896,7 @@ const Imosion: React.FC = () => {
                   </div>
 
                   {/* Leave session */}
-                  <button aria-label="Leave Session" onClick={leaveCollabSession} style={{ width: '100%', padding: '10px', background: 'rgba(255,69,58,0.15)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: '4px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Leave Session</button>
+                  <button aria-label="Leave Session" onClick={leaveCollabSession} style={{ width: '100%', padding: '10px', background: 'rgba(158, 90, 85,0.15)', border: '1px solid rgba(158, 90, 85,0.3)', borderRadius: '4px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Leave Session</button>
                 </div>
               )}
             </div>
@@ -8609,10 +9916,10 @@ const Imosion: React.FC = () => {
           <div style={{ padding: 10, overflowY: 'auto', flex: 1 }}>
             {[
               { name: 'Parametric EQ', type: 'eq', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 8c2-4 4 4 6 0s4 4 6 0" strokeLinecap="round"/></svg>, color: 'var(--color-accent)', params: ['Low Cut', 'Low Shelf', 'Mid', 'High Shelf', 'High Cut'] },
-              { name: 'Compressor', type: 'comp', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14L7 7l2 3 5-10" strokeLinecap="round" strokeLinejoin="round"/></svg>, color: '#bf5af2', params: ['Threshold', 'Ratio', 'Attack', 'Release', 'Makeup'] },
+              { name: 'Compressor', type: 'comp', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 14L7 7l2 3 5-10" strokeLinecap="round" strokeLinejoin="round"/></svg>, color: '#8a6a9c', params: ['Threshold', 'Ratio', 'Attack', 'Release', 'Makeup'] },
               { name: 'Reverb', type: 'reverb', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="3"/><circle cx="8" cy="8" r="6" strokeDasharray="2 2"/></svg>, color: 'var(--color-success)', params: ['Size', 'Decay', 'Pre-delay', 'Damping', 'Mix'] },
               { name: 'Delay', type: 'delay', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 8h2m3 0h2m3 0h2" strokeLinecap="round"/><path d="M4 5v6m7-6v6" strokeLinecap="round" opacity="0.5"/></svg>, color: 'var(--color-warning)', params: ['Time', 'Feedback', 'HP Filter', 'LP Filter', 'Mix'] },
-              { name: 'Chorus', type: 'chorus', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1 6c3-3 5 3 7 0s4 3 7 0" strokeLinecap="round"/><path d="M1 10c3-3 5 3 7 0s4 3 7 0" strokeLinecap="round" opacity="0.5"/></svg>, color: '#64d2ff', params: ['Rate', 'Depth', 'Mix'] },
+              { name: 'Chorus', type: 'chorus', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1 6c3-3 5 3 7 0s4 3 7 0" strokeLinecap="round"/><path d="M1 10c3-3 5 3 7 0s4 3 7 0" strokeLinecap="round" opacity="0.5"/></svg>, color: '#4a7896', params: ['Rate', 'Depth', 'Mix'] },
               { name: 'Saturation', type: 'sat', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2.5 5 2.5 5H3l2.5-5z"/></svg>, color: 'var(--color-error)', params: ['Drive', 'Tone', 'Mix'] },
             ].map(fx => (
               <div key={fx.type} style={{ marginBottom: 6, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: activeEffectPlugin === fx.type ? 'var(--color-border-subtle)' : 'var(--color-border-subtle)', overflow: 'hidden' }}>
@@ -8711,7 +10018,7 @@ const Imosion: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ height: 60, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 10px 4px' }}>
-              <svg width="260" height="50" viewBox="0 0 260 50"><rect x="0" y="20" width="80" height="30" fill="#30d158" opacity="0.15" rx="2"/><rect x="80" y="0" width="10" height="50" fill="#ff453a" opacity="0.1" rx="2"/><rect x="90" y="40" width="80" height="10" fill="#505050" opacity="0.2" rx="2"/><rect x="170" y="0" width="10" height="50" fill="#30d158" opacity="0.1" rx="2"/><rect x="180" y="20" width="80" height="30" fill="#30d158" opacity="0.15" rx="2"/><text x="30" y="14" fill="#30d158" fontSize="7" textAnchor="middle">Open</text><text x="130" y="35" fill="#ff453a" fontSize="7" textAnchor="middle">Closed</text><text x="220" y="14" fill="#30d158" fontSize="7" textAnchor="middle">Open</text></svg>
+              <svg width="260" height="50" viewBox="0 0 260 50"><rect x="0" y="20" width="80" height="30" fill="#4f8a60" opacity="0.15" rx="2"/><rect x="80" y="0" width="10" height="50" fill="#9e5a55" opacity="0.1" rx="2"/><rect x="90" y="40" width="80" height="10" fill="#505050" opacity="0.2" rx="2"/><rect x="170" y="0" width="10" height="50" fill="#4f8a60" opacity="0.1" rx="2"/><rect x="180" y="20" width="80" height="30" fill="#4f8a60" opacity="0.15" rx="2"/><text x="30" y="14" fill="#4f8a60" fontSize="7" textAnchor="middle">Open</text><text x="130" y="35" fill="#9e5a55" fontSize="7" textAnchor="middle">Closed</text><text x="220" y="14" fill="#4f8a60" fontSize="7" textAnchor="middle">Open</text></svg>
             </div>
             {[{ label: 'Threshold', min: -80, max: 0, def: -40, unit: 'dB', desc: 'Signal level to open gate' }, { label: 'Hold', min: 0, max: 500, def: 50, unit: 'ms', desc: 'Time gate stays open' }, { label: 'Range', min: -96, max: 0, def: -80, unit: 'dB', desc: 'Attenuation when closed' }, { label: 'Hysteresis', min: 0, max: 20, def: 4, unit: 'dB', desc: 'Close threshold offset' }].map(p => (
               <div key={p.label} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -8735,7 +10042,7 @@ const Imosion: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ height: 50, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="240" height="40" viewBox="0 0 240 40"><path d="M0 35 L60 33 L100 30 L130 15 Q140 5 150 15 L170 30 L200 33 L240 35" fill="none" stroke="#ff9f0a" strokeWidth="1.5" opacity="0.6"/><rect x="120" y="8" width="40" height="25" fill="#ff9f0a" opacity="0.1" rx="3"/><text x="140" y="38" fill="#505050" fontSize="7" textAnchor="middle">4-8 kHz</text></svg>
+              <svg width="240" height="40" viewBox="0 0 240 40"><path d="M0 35 L60 33 L100 30 L130 15 Q140 5 150 15 L170 30 L200 33 L240 35" fill="none" stroke="#a8744a" strokeWidth="1.5" opacity="0.6"/><rect x="120" y="8" width="40" height="25" fill="#a8744a" opacity="0.1" rx="3"/><text x="140" y="38" fill="#505050" fontSize="7" textAnchor="middle">4-8 kHz</text></svg>
             </div>
             {[{ label: 'Frequency', min: 2000, max: 12000, def: 6500, unit: 'Hz' }, { label: 'Threshold', min: -40, max: 0, def: -15, unit: 'dB' }, { label: 'Ratio', min: 1, max: 10, def: 3, unit: ':1' }, { label: 'Bandwidth', min: 0.5, max: 4, def: 2, unit: 'Oct', step: 0.1 }].map((p: any) => (
               <div key={p.label} style={{ padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -8779,10 +10086,37 @@ const Imosion: React.FC = () => {
                     <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{p.label}</span>
                     <span style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>{sidechainParams[p.label as keyof typeof sidechainParams]} {p.unit}</span>
                   </div>
-                  <input type="range" min={p.min} max={p.max} value={sidechainParams[p.label as keyof typeof sidechainParams]} step={p.unit === 'ms' ? 1 : 0.1} onChange={e => setSidechainParams(prev => ({ ...prev, [p.label]: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#bf5af2' }} />
+                  <input type="range" min={p.min} max={p.max} value={sidechainParams[p.label as keyof typeof sidechainParams]} step={p.unit === 'ms' ? 1 : 0.1} onChange={e => setSidechainParams(prev => ({ ...prev, [p.label]: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#8a6a9c' }} />
                 </div>
               ))}
             </div>
+            <button
+              disabled={!sidechainSource || !sidechainTarget || sidechainSource === sidechainTarget}
+              onClick={() => {
+                const targetId = sidechainTarget!;
+                // Source index is relative to the target's "other tracks" list (matches the compressor param + ducking engine).
+                const others = tracks.filter(t => t.id !== targetId);
+                const srcIndex = others.findIndex(t => t.id === sidechainSource);
+                if (srcIndex < 0) return;
+                setTracks(prev => prev.map(t => {
+                  if (t.id !== targetId) return t;
+                  let plugins = t.plugins;
+                  let comp = plugins.find(p => p.type === 'compressor');
+                  if (!comp) {
+                    comp = { id: `p${Date.now()}`, type: 'compressor', enabled: true, params: Object.fromEntries(PLUGIN_LIBRARY.compressor.params.map(pp => [pp.key, pp.default])) };
+                    plugins = [...plugins, comp];
+                  }
+                  plugins = plugins.map(p => p.id === comp!.id ? { ...p, enabled: true, params: { ...p.params, sidechainSource: srcIndex, threshold: sidechainParams.Threshold, ratio: sidechainParams.Ratio, attack: sidechainParams.Attack, release: sidechainParams.Release } } : p);
+                  const updated = { ...t, plugins };
+                  const wired = plugins.find(p => p.id === comp!.id);
+                  if (wired) { try { getAudioEngine().processPlugin(targetId, wired); } catch { /* */ } }
+                  return updated;
+                }));
+                window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Sidechain: ${others[srcIndex]?.name} ducks ${tracks.find(t => t.id === targetId)?.name}` } }));
+                setShowSidechainPanel(false);
+              }}
+              style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid rgba(138, 106, 156,0.4)', background: (!sidechainSource || !sidechainTarget || sidechainSource === sidechainTarget) ? 'var(--color-bg-hover)' : 'rgba(138, 106, 156,0.18)', color: (!sidechainSource || !sidechainTarget || sidechainSource === sidechainTarget) ? 'var(--color-text-disabled)' : '#8a6a9c', fontSize: 11, fontWeight: 700, cursor: (!sidechainSource || !sidechainTarget || sidechainSource === sidechainTarget) ? 'not-allowed' : 'pointer' }}
+            >Apply Routing</button>
           </div>
         </div>
       )}
@@ -8812,7 +10146,7 @@ const Imosion: React.FC = () => {
                     <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${lane.active ? 'rgba(10,132,255,0.2)' : 'var(--color-border-subtle)'} 0%, transparent 100%)` }} />
                     {[...Array(20)].map((_, k) => <div key={k} style={{ position: 'absolute', left: `${k * 5}%`, bottom: 0, width: 2, height: `${20 + Math.sin(k * lane.id.charCodeAt(5) * 0.3) * 40 + 50}%`, background: lane.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', opacity: 0.4, borderRadius: 2 }} />)}
                   </div>
-                  <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)', width: 24 }}>{lane.active ? <DexIcon name="check" size={10} color="#30d158" /> : ''}</span>
+                  <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)', width: 24 }}>{lane.active ? <DexIcon name="check" size={10} color="#4f8a60" /> : ''}</span>
                 </div>
               ))}
               <button aria-label="Add New Take" onClick={() => setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: false }])} style={{ marginTop: 6, padding: '3px 10px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>+ New Take</button>
@@ -8856,7 +10190,7 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Track Groups" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrackFolderDialog(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            <button aria-label="New Group" onClick={() => setTrackFolders(prev => [...prev, { id: `folder-${Date.now()}`, name: `Group ${prev.length + 1}`, trackIds: [], collapsed: false, color: ['var(--color-accent)', 'var(--color-success)', '#bf5af2', 'var(--color-warning)', 'var(--color-error)'][prev.length % 5] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 10, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Group</button>
+            <button aria-label="New Group" onClick={() => setTrackFolders(prev => [...prev, { id: `folder-${Date.now()}`, name: `Group ${prev.length + 1}`, trackIds: [], collapsed: false, color: ['var(--color-accent)', 'var(--color-success)', '#8a6a9c', 'var(--color-warning)', 'var(--color-error)'][prev.length % 5] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 10, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Group</button>
             {trackFolders.length === 0 ? (
               <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 10 }}>Create groups to organize tracks</div>
             ) : (
@@ -8886,12 +10220,12 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Session Notes" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCollabMarkers(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10, overflowY: 'auto', maxHeight: 300 }}>
-            <button onClick={() => setCollabMarkers(prev => [...prev, { id: `note-${Date.now()}`, time: currentTime, author: userName, text: '', color: '#bf5af2', resolved: false }])} aria-label="Add session note at current time" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed rgba(191,90,242,0.3)', background: 'transparent', color: '#bf5af2', fontSize: 10, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Note at {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')}</button>
+            <button onClick={() => setCollabMarkers(prev => [...prev, { id: `note-${Date.now()}`, time: currentTime, author: userName, text: '', color: '#8a6a9c', resolved: false }])} aria-label="Add session note at current time" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed rgba(138, 106, 156,0.3)', background: 'transparent', color: '#8a6a9c', fontSize: 10, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Note at {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')}</button>
             {collabMarkers.length === 0 ? (
               <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 10 }}>No session notes yet</div>
             ) : (
               collabMarkers.map(m => (
-                <div key={m.id} style={{ padding: 'var(--space-2)', borderRadius: 4, background: m.resolved ? 'rgba(48,209,88,0.05)' : 'var(--color-border-subtle)', marginBottom: 4, borderLeft: `3px solid ${m.resolved ? 'var(--color-success)' : m.color}` }}>
+                <div key={m.id} style={{ padding: 'var(--space-2)', borderRadius: 4, background: m.resolved ? 'rgba(79, 138, 96,0.05)' : 'var(--color-border-subtle)', marginBottom: 4, borderLeft: `3px solid ${m.resolved ? 'var(--color-success)' : m.color}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                     <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{m.author} @ {Math.floor(m.time / 60)}:{String(Math.floor(m.time % 60)).padStart(2, '0')}</span>
                     <button aria-label={m.resolved ? 'Mark as unresolved' : 'Mark as resolved'} onClick={() => setCollabMarkers(prev => prev.map(cm => cm.id === m.id ? { ...cm, resolved: !cm.resolved } : cm))} style={{ background: 'none', border: 'none', color: m.resolved ? 'var(--color-success)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 9 }}>{m.resolved ? <DexIcon name="check" size={10} /> : <DexIcon name="circle" size={10} />}</button>
@@ -8943,7 +10277,7 @@ const Imosion: React.FC = () => {
                 </div>
               ))}
             </div>
-            <button aria-label={midiLearnMode ? 'Stop MIDI Learn' : 'Start MIDI Learn'} onClick={() => setMidiLearnMode(!midiLearnMode)} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px', borderRadius: 4, border: `1px solid ${midiLearnMode ? 'rgba(255,69,58,0.4)' : 'rgba(10,132,255,0.3)'}`, background: midiLearnMode ? 'rgba(255,69,58,0.12)' : 'rgba(10,132,255,0.08)', color: midiLearnMode ? 'var(--color-error)' : 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{midiLearnMode ? 'Stop MIDI Learn' : 'MIDI Learn'}</button>
+            <button aria-label={midiLearnMode ? 'Stop MIDI Learn' : 'Start MIDI Learn'} onClick={() => setMidiLearnMode(!midiLearnMode)} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px', borderRadius: 4, border: `1px solid ${midiLearnMode ? 'rgba(158, 90, 85,0.4)' : 'rgba(10,132,255,0.3)'}`, background: midiLearnMode ? 'rgba(158, 90, 85,0.12)' : 'rgba(10,132,255,0.08)', color: midiLearnMode ? 'var(--color-error)' : 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{midiLearnMode ? 'Stop MIDI Learn' : 'MIDI Learn'}</button>
           </div>
         </div>
       )}
@@ -8956,7 +10290,7 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Track Folders" onClick={() => setShowTrackFolderDialog(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="New Folder" onClick={() => setTrackFolders(prev => [...prev, { id: crypto.randomUUID(), name: `Folder ${prev.length + 1}`, trackIds: [], collapsed: false, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2'][prev.length % 5] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'rgba(10,132,255,0.06)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Folder</button>
+            <button aria-label="New Folder" onClick={() => setTrackFolders(prev => [...prev, { id: crypto.randomUUID(), name: `Folder ${prev.length + 1}`, trackIds: [], collapsed: false, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#8a6a9c'][prev.length % 5] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'rgba(10,132,255,0.06)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Folder</button>
             {trackFolders.length === 0 ? (
               <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 10 }}>No folders — group tracks by creating a folder</div>
             ) : (
@@ -8997,19 +10331,19 @@ const Imosion: React.FC = () => {
               </svg>
               {/* Gain envelope line */}
               <svg width="100%" height="100%" viewBox="0 0 480 120" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-                <line x1="0" y1="40" x2="480" y2="40" stroke="#ffd60a" strokeWidth="1.5" strokeDasharray="2,2" />
+                <line x1="0" y1="40" x2="480" y2="40" stroke="#8f8748" strokeWidth="1.5" strokeDasharray="2,2" />
                 {/* Envelope nodes */}
-                <circle cx="0" cy="40" r="4" fill="#ffd60a" style={{ cursor: 'grab' }} />
-                <circle cx="160" cy="40" r="4" fill="#ffd60a" style={{ cursor: 'grab' }} />
-                <circle cx="320" cy="40" r="4" fill="#ffd60a" style={{ cursor: 'grab' }} />
-                <circle cx="480" cy="40" r="4" fill="#ffd60a" style={{ cursor: 'grab' }} />
+                <circle cx="0" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
+                <circle cx="160" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
+                <circle cx="320" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
+                <circle cx="480" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
               </svg>
               {/* 0dB reference line */}
               <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed var(--color-border)' }} />
               <span style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: 8, color: 'var(--color-text-tertiary)' }}>0 dB</span>
             </div>
             <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
-              <button aria-label="Add gain envelope node" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'rgba(255,214,10,0.08)', color: 'var(--color-warning)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Add Node</button>
+              <button aria-label="Add gain envelope node" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'rgba(143, 135, 72,0.08)', color: 'var(--color-warning)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Add Node</button>
               <button aria-label="Reset gain envelope" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Reset Envelope</button>
               <button aria-label="Normalize gain envelope" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Normalize</button>
             </div>
@@ -9034,7 +10368,7 @@ const Imosion: React.FC = () => {
                   <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>{bus}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <div style={{ width: 30, height: 4, borderRadius: 2, background: 'rgba(48,209,88,0.3)' }}>
+                  <div style={{ width: 30, height: 4, borderRadius: 2, background: 'rgba(79, 138, 96,0.3)' }}>
                     <div style={{ width: `${60 + i * 10}%`, height: '100%', borderRadius: 2, background: 'var(--color-success)' }} />
                   </div>
                   <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{-12 + i * 3}dB</span>
