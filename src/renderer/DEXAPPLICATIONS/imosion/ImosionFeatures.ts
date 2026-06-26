@@ -31,14 +31,14 @@ export interface Region {
 
 // Region type presets
 export const REGION_TYPES = [
-  { value: 'intro', label: 'Intro', color: '#22c55e' },
-  { value: 'verse', label: 'Verse', color: '#3b82f6' },
-  { value: 'chorus', label: 'Chorus', color: '#f59e0b' },
-  { value: 'bridge', label: 'Bridge', color: '#8b5cf6' },
-  { value: 'hook', label: 'Hook', color: '#ec4899' },
-  { value: 'breakdown', label: 'Breakdown', color: '#06b6d4' },
-  { value: 'drop', label: 'Drop', color: '#ef4444' },
-  { value: 'outro', label: 'Outro', color: '#6366f1' },
+  { value: 'intro', label: 'Intro', color: '#4f8a60' },
+  { value: 'verse', label: 'Verse', color: '#5a78a0' },
+  { value: 'chorus', label: 'Chorus', color: '#a08644' },
+  { value: 'bridge', label: 'Bridge', color: '#7c6a9c' },
+  { value: 'hook', label: 'Hook', color: '#a06282' },
+  { value: 'breakdown', label: 'Breakdown', color: '#43808f' },
+  { value: 'drop', label: 'Drop', color: '#9e5a55' },
+  { value: 'outro', label: 'Outro', color: '#6b6c9c' },
   { value: 'custom', label: 'Custom', color: 'var(--color-text-tertiary)' },
 ];
 
@@ -93,18 +93,18 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Lead Vocal', color: '#f59e0b', volume: 0.8, pan: 0, plugins: [
+      { name: 'Lead Vocal', color: '#a08644', volume: 0.8, pan: 0, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -4, midGain: 2, highGain: 1, lowFreq: 100, highFreq: 8000 } },
         { type: 'compressor', enabled: true, params: { threshold: -18, ratio: 4, attack: 8, release: 100, makeupGain: 3 } },
         { type: 'deesser', enabled: true, params: { frequency: 6500, threshold: -20, ratio: 4 } },
       ], output: 'master', sends: [{ busName: 'Vocal Reverb', level: 0.25, preFader: false }] },
-      { name: 'Vocal Double', color: '#f97316', volume: 0.5, pan: -0.3, plugins: [
+      { name: 'Vocal Double', color: '#a8744a', volume: 0.5, pan: -0.3, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -6, midGain: 1, highGain: 2, lowFreq: 150, highFreq: 6000 } },
       ], output: 'master', sends: [{ busName: 'Vocal Reverb', level: 0.35, preFader: false }] },
-      { name: 'Harmonies', color: '#eab308', volume: 0.4, pan: 0.3, plugins: [], output: 'master', sends: [{ busName: 'Vocal Reverb', level: 0.4, preFader: false }] },
+      { name: 'Harmonies', color: '#8f8748', volume: 0.4, pan: 0.3, plugins: [], output: 'master', sends: [{ busName: 'Vocal Reverb', level: 0.4, preFader: false }] },
     ],
     buses: [
-      { name: 'Vocal Reverb', type: 'fx', color: '#06b6d4', plugins: [
+      { name: 'Vocal Reverb', type: 'fx', color: '#43808f', plugins: [
         { type: 'reverb', enabled: true, params: { roomSize: 35, damping: 50, wetDry: 100, predelay: 15 } },
       ]},
     ],
@@ -117,34 +117,34 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Kick', color: '#ef4444', volume: 0.85, pan: 0, plugins: [
+      { name: 'Kick', color: '#9e5a55', volume: 0.85, pan: 0, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: 4, midGain: -2, highGain: 2, lowFreq: 60, highFreq: 5000 } },
         { type: 'compressor', enabled: true, params: { threshold: -12, ratio: 4, attack: 5, release: 50, makeupGain: 2 } },
       ], output: 'Drum Bus', sends: [] },
-      { name: 'Snare Top', color: '#f97316', volume: 0.8, pan: 0.05, plugins: [
+      { name: 'Snare Top', color: '#a8744a', volume: 0.8, pan: 0.05, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -2, midGain: 2, highGain: 3, lowFreq: 150, highFreq: 6000 } },
         { type: 'gate', enabled: true, params: { threshold: -35, attack: 0.5, hold: 30, release: 50 } },
       ], output: 'Drum Bus', sends: [{ busName: 'Drum Room', level: 0.3, preFader: false }] },
-      { name: 'Snare Bottom', color: '#f59e0b', volume: 0.5, pan: 0.05, plugins: [
+      { name: 'Snare Bottom', color: '#a08644', volume: 0.5, pan: 0.05, plugins: [
         { type: 'gate', enabled: true, params: { threshold: -30, attack: 0.3, hold: 20, release: 40 } },
       ], output: 'Drum Bus', sends: [] },
-      { name: 'Hi-Hat', color: '#eab308', volume: 0.65, pan: 0.4, plugins: [
+      { name: 'Hi-Hat', color: '#8f8748', volume: 0.65, pan: 0.4, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -8, midGain: 0, highGain: 2, lowFreq: 400, highFreq: 10000 } },
       ], output: 'Drum Bus', sends: [] },
-      { name: 'Rack Tom', color: '#22c55e', volume: 0.7, pan: -0.25, plugins: [
+      { name: 'Rack Tom', color: '#4f8a60', volume: 0.7, pan: -0.25, plugins: [
         { type: 'gate', enabled: true, params: { threshold: -32, attack: 0.5, hold: 40, release: 60 } },
       ], output: 'Drum Bus', sends: [{ busName: 'Drum Room', level: 0.35, preFader: false }] },
-      { name: 'Floor Tom', color: '#10b981', volume: 0.75, pan: 0.3, plugins: [
+      { name: 'Floor Tom', color: '#468a74', volume: 0.75, pan: 0.3, plugins: [
         { type: 'gate', enabled: true, params: { threshold: -30, attack: 0.8, hold: 50, release: 80 } },
       ], output: 'Drum Bus', sends: [{ busName: 'Drum Room', level: 0.35, preFader: false }] },
-      { name: 'Overheads L', color: '#3b82f6', volume: 0.6, pan: -0.8, plugins: [], output: 'Drum Bus', sends: [] },
-      { name: 'Overheads R', color: '#6366f1', volume: 0.6, pan: 0.8, plugins: [], output: 'Drum Bus', sends: [] },
+      { name: 'Overheads L', color: '#5a78a0', volume: 0.6, pan: -0.8, plugins: [], output: 'Drum Bus', sends: [] },
+      { name: 'Overheads R', color: '#6b6c9c', volume: 0.6, pan: 0.8, plugins: [], output: 'Drum Bus', sends: [] },
     ],
     buses: [
-      { name: 'Drum Bus', type: 'group', color: '#ef4444', plugins: [
+      { name: 'Drum Bus', type: 'group', color: '#9e5a55', plugins: [
         { type: 'compressor', enabled: true, params: { threshold: -15, ratio: 3, attack: 15, release: 80, makeupGain: 2 } },
       ]},
-      { name: 'Drum Room', type: 'fx', color: '#06b6d4', plugins: [
+      { name: 'Drum Room', type: 'fx', color: '#43808f', plugins: [
         { type: 'reverb', enabled: true, params: { roomSize: 30, damping: 55, wetDry: 100, predelay: 8 } },
       ]},
     ],
@@ -157,11 +157,11 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Bass DI', color: '#8b5cf6', volume: 0.85, pan: 0, plugins: [
+      { name: 'Bass DI', color: '#7c6a9c', volume: 0.85, pan: 0, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: 3, midGain: 1, highGain: -1, lowFreq: 80, highFreq: 4000 } },
         { type: 'compressor', enabled: true, params: { threshold: -16, ratio: 5, attack: 15, release: 200, makeupGain: 3 } },
       ], output: 'master', sends: [] },
-      { name: 'Bass Dirty', color: '#a855f7', volume: 0.4, pan: 0, plugins: [
+      { name: 'Bass Dirty', color: '#8a6a9c', volume: 0.4, pan: 0, plugins: [
         { type: 'saturation', enabled: true, params: { drive: 45, warmth: 60, mix: 100 } },
         { type: 'eq', enabled: true, params: { lowGain: -6, midGain: 4, highGain: 2, lowFreq: 200, highFreq: 3000 } },
       ], output: 'master', sends: [] },
@@ -176,21 +176,21 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Guitar L', color: '#22c55e', volume: 0.75, pan: -0.7, plugins: [
+      { name: 'Guitar L', color: '#4f8a60', volume: 0.75, pan: -0.7, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -4, midGain: 2, highGain: 1, lowFreq: 120, highFreq: 6000 } },
       ], output: 'Guitar Bus', sends: [{ busName: 'Guitar Verb', level: 0.2, preFader: false }] },
-      { name: 'Guitar R', color: '#10b981', volume: 0.75, pan: 0.7, plugins: [
+      { name: 'Guitar R', color: '#468a74', volume: 0.75, pan: 0.7, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -4, midGain: 2, highGain: 1, lowFreq: 120, highFreq: 6000 } },
       ], output: 'Guitar Bus', sends: [{ busName: 'Guitar Verb', level: 0.2, preFader: false }] },
-      { name: 'Guitar Clean', color: '#14b8a6', volume: 0.6, pan: 0, plugins: [
+      { name: 'Guitar Clean', color: '#438a80', volume: 0.6, pan: 0, plugins: [
         { type: 'chorus', enabled: true, params: { rate: 0.8, depth: 40, wetDry: 30 } },
       ], output: 'Guitar Bus', sends: [{ busName: 'Guitar Verb', level: 0.35, preFader: false }] },
     ],
     buses: [
-      { name: 'Guitar Bus', type: 'group', color: '#22c55e', plugins: [
+      { name: 'Guitar Bus', type: 'group', color: '#4f8a60', plugins: [
         { type: 'compressor', enabled: true, params: { threshold: -18, ratio: 3, attack: 20, release: 150, makeupGain: 2 } },
       ]},
-      { name: 'Guitar Verb', type: 'fx', color: '#06b6d4', plugins: [
+      { name: 'Guitar Verb', type: 'fx', color: '#43808f', plugins: [
         { type: 'reverb', enabled: true, params: { roomSize: 40, damping: 45, wetDry: 100, predelay: 20 } },
       ]},
     ],
@@ -203,10 +203,10 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Piano', color: '#ec4899', volume: 0.7, pan: -0.1, plugins: [
+      { name: 'Piano', color: '#a06282', volume: 0.7, pan: -0.1, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -2, midGain: 1, highGain: 2, lowFreq: 100, highFreq: 8000 } },
       ], output: 'Keys Bus', sends: [{ busName: 'Keys Reverb', level: 0.3, preFader: false }] },
-      { name: 'Pad', color: '#f43f5e', volume: 0.5, pan: 0, plugins: [
+      { name: 'Pad', color: '#a05a68', volume: 0.5, pan: 0, plugins: [
         { type: 'chorus', enabled: true, params: { rate: 0.3, depth: 60, wetDry: 40 } },
       ], output: 'Keys Bus', sends: [{ busName: 'Keys Reverb', level: 0.5, preFader: false }] },
       { name: 'Lead Synth', color: '#e11d48', volume: 0.65, pan: 0.15, plugins: [
@@ -217,8 +217,8 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
       ], output: 'master', sends: [] },
     ],
     buses: [
-      { name: 'Keys Bus', type: 'group', color: '#ec4899', plugins: [] },
-      { name: 'Keys Reverb', type: 'fx', color: '#06b6d4', plugins: [
+      { name: 'Keys Bus', type: 'group', color: '#a06282', plugins: [] },
+      { name: 'Keys Reverb', type: 'fx', color: '#43808f', plugins: [
         { type: 'reverb', enabled: true, params: { roomSize: 60, damping: 35, wetDry: 100, predelay: 25 } },
       ]},
     ],
@@ -231,17 +231,17 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Violins I', color: '#f59e0b', volume: 0.7, pan: -0.5, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
-      { name: 'Violins II', color: '#f97316', volume: 0.65, pan: -0.25, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
-      { name: 'Violas', color: '#eab308', volume: 0.65, pan: 0.15, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
+      { name: 'Violins I', color: '#a08644', volume: 0.7, pan: -0.5, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
+      { name: 'Violins II', color: '#a8744a', volume: 0.65, pan: -0.25, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
+      { name: 'Violas', color: '#8f8748', volume: 0.65, pan: 0.15, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.4, preFader: false }] },
       { name: 'Cellos', color: '#d97706', volume: 0.7, pan: 0.4, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.35, preFader: false }] },
       { name: 'Basses', color: '#b45309', volume: 0.75, pan: 0.6, plugins: [], output: 'Strings Bus', sends: [{ busName: 'String Hall', level: 0.3, preFader: false }] },
     ],
     buses: [
-      { name: 'Strings Bus', type: 'group', color: '#f59e0b', plugins: [
+      { name: 'Strings Bus', type: 'group', color: '#a08644', plugins: [
         { type: 'eq', enabled: true, params: { lowGain: 1, midGain: 0, highGain: 2, lowFreq: 100, highFreq: 10000 } },
       ]},
-      { name: 'String Hall', type: 'fx', color: '#06b6d4', plugins: [
+      { name: 'String Hall', type: 'fx', color: '#43808f', plugins: [
         { type: 'reverb', enabled: true, params: { roomSize: 85, damping: 25, wetDry: 100, predelay: 35 } },
       ]},
     ],
@@ -254,20 +254,20 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Kick', color: '#ef4444', volume: 0.85, pan: 0, plugins: [], output: 'Drum Bus', sends: [] },
-      { name: 'Snare', color: '#f97316', volume: 0.8, pan: 0.05, plugins: [], output: 'Drum Bus', sends: [] },
-      { name: 'Overheads', color: '#eab308', volume: 0.6, pan: 0, plugins: [], output: 'Drum Bus', sends: [] },
-      { name: 'Bass', color: '#8b5cf6', volume: 0.85, pan: 0, plugins: [], output: 'master', sends: [] },
-      { name: 'Guitar L', color: '#22c55e', volume: 0.7, pan: -0.6, plugins: [], output: 'Guitar Bus', sends: [] },
-      { name: 'Guitar R', color: '#10b981', volume: 0.7, pan: 0.6, plugins: [], output: 'Guitar Bus', sends: [] },
-      { name: 'Keys', color: '#ec4899', volume: 0.55, pan: -0.2, plugins: [], output: 'master', sends: [] },
-      { name: 'Lead Vocal', color: '#f59e0b', volume: 0.8, pan: 0, plugins: [], output: 'Vocal Bus', sends: [] },
+      { name: 'Kick', color: '#9e5a55', volume: 0.85, pan: 0, plugins: [], output: 'Drum Bus', sends: [] },
+      { name: 'Snare', color: '#a8744a', volume: 0.8, pan: 0.05, plugins: [], output: 'Drum Bus', sends: [] },
+      { name: 'Overheads', color: '#8f8748', volume: 0.6, pan: 0, plugins: [], output: 'Drum Bus', sends: [] },
+      { name: 'Bass', color: '#7c6a9c', volume: 0.85, pan: 0, plugins: [], output: 'master', sends: [] },
+      { name: 'Guitar L', color: '#4f8a60', volume: 0.7, pan: -0.6, plugins: [], output: 'Guitar Bus', sends: [] },
+      { name: 'Guitar R', color: '#468a74', volume: 0.7, pan: 0.6, plugins: [], output: 'Guitar Bus', sends: [] },
+      { name: 'Keys', color: '#a06282', volume: 0.55, pan: -0.2, plugins: [], output: 'master', sends: [] },
+      { name: 'Lead Vocal', color: '#a08644', volume: 0.8, pan: 0, plugins: [], output: 'Vocal Bus', sends: [] },
       { name: 'Backing Vox', color: '#d97706', volume: 0.45, pan: 0.25, plugins: [], output: 'Vocal Bus', sends: [] },
     ],
     buses: [
-      { name: 'Drum Bus', type: 'group', color: '#ef4444', plugins: [] },
-      { name: 'Guitar Bus', type: 'group', color: '#22c55e', plugins: [] },
-      { name: 'Vocal Bus', type: 'group', color: '#f59e0b', plugins: [] },
+      { name: 'Drum Bus', type: 'group', color: '#9e5a55', plugins: [] },
+      { name: 'Guitar Bus', type: 'group', color: '#4f8a60', plugins: [] },
+      { name: 'Vocal Bus', type: 'group', color: '#a08644', plugins: [] },
     ],
   },
   {
@@ -278,21 +278,21 @@ export const TRACK_TEMPLATES: TrackTemplate[] = [
     isBuiltIn: true,
     createdAt: Date.now(),
     tracks: [
-      { name: 'Host 1', color: '#3b82f6', volume: 0.85, pan: -0.3, plugins: [
+      { name: 'Host 1', color: '#5a78a0', volume: 0.85, pan: -0.3, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -4, midGain: 2, highGain: 2, lowFreq: 120, highFreq: 8000 } },
         { type: 'compressor', enabled: true, params: { threshold: -20, ratio: 3, attack: 10, release: 150, makeupGain: 4 } },
         { type: 'gate', enabled: true, params: { threshold: -45, attack: 2, hold: 100, release: 150 } },
       ], output: 'master', sends: [] },
-      { name: 'Host 2', color: '#6366f1', volume: 0.85, pan: 0.3, plugins: [
+      { name: 'Host 2', color: '#6b6c9c', volume: 0.85, pan: 0.3, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -4, midGain: 2, highGain: 2, lowFreq: 120, highFreq: 8000 } },
         { type: 'compressor', enabled: true, params: { threshold: -20, ratio: 3, attack: 10, release: 150, makeupGain: 4 } },
         { type: 'gate', enabled: true, params: { threshold: -45, attack: 2, hold: 100, release: 150 } },
       ], output: 'master', sends: [] },
-      { name: 'Remote Guest', color: '#8b5cf6', volume: 0.8, pan: 0, plugins: [
+      { name: 'Remote Guest', color: '#7c6a9c', volume: 0.8, pan: 0, plugins: [
         { type: 'eq', enabled: true, params: { lowGain: -6, midGain: 3, highGain: 3, lowFreq: 150, highFreq: 7000 } },
         { type: 'compressor', enabled: true, params: { threshold: -18, ratio: 4, attack: 8, release: 120, makeupGain: 5 } },
       ], output: 'master', sends: [] },
-      { name: 'Music/SFX', color: '#22c55e', volume: 0.4, pan: 0, plugins: [], output: 'master', sends: [] },
+      { name: 'Music/SFX', color: '#4f8a60', volume: 0.4, pan: 0, plugins: [], output: 'master', sends: [] },
     ],
     buses: [],
   },
@@ -405,24 +405,28 @@ export interface TrackNote {
 }
 
 // ==================== CLIP COLORS ====================
+// Muted "studio hardware" channel palette — same hue spread so channels stay
+// distinguishable, but desaturated to a restrained, professional level (no candy
+// rainbow). Pro DAWs (Logic, FL, hardware mixers) use low-saturation channel tints
+// so the meters/waveforms read clearly and the chrome reads as a real machine.
 export const CLIP_COLORS = [
-  { id: 'red', color: '#ef4444', name: 'Red' },
-  { id: 'orange', color: '#f97316', name: 'Orange' },
-  { id: 'amber', color: '#f59e0b', name: 'Amber' },
-  { id: 'yellow', color: '#eab308', name: 'Yellow' },
-  { id: 'lime', color: '#84cc16', name: 'Lime' },
-  { id: 'green', color: '#22c55e', name: 'Green' },
-  { id: 'emerald', color: '#10b981', name: 'Emerald' },
-  { id: 'teal', color: '#14b8a6', name: 'Teal' },
-  { id: 'cyan', color: '#06b6d4', name: 'Cyan' },
-  { id: 'sky', color: '#0ea5e9', name: 'Sky' },
-  { id: 'blue', color: '#3b82f6', name: 'Blue' },
-  { id: 'indigo', color: '#6366f1', name: 'Indigo' },
-  { id: 'violet', color: '#8b5cf6', name: 'Violet' },
-  { id: 'purple', color: '#a855f7', name: 'Purple' },
-  { id: 'fuchsia', color: '#d946ef', name: 'Fuchsia' },
-  { id: 'pink', color: '#ec4899', name: 'Pink' },
-  { id: 'rose', color: '#f43f5e', name: 'Rose' },
+  { id: 'red', color: '#9e5a55', name: 'Red' },
+  { id: 'orange', color: '#a8744a', name: 'Orange' },
+  { id: 'amber', color: '#a08644', name: 'Amber' },
+  { id: 'yellow', color: '#8f8748', name: 'Yellow' },
+  { id: 'lime', color: '#6f8a4e', name: 'Lime' },
+  { id: 'green', color: '#4f8a60', name: 'Green' },
+  { id: 'emerald', color: '#468a74', name: 'Emerald' },
+  { id: 'teal', color: '#438a80', name: 'Teal' },
+  { id: 'cyan', color: '#43808f', name: 'Cyan' },
+  { id: 'sky', color: '#4a7896', name: 'Sky' },
+  { id: 'blue', color: '#5a78a0', name: 'Blue' },
+  { id: 'indigo', color: '#6b6c9c', name: 'Indigo' },
+  { id: 'violet', color: '#7c6a9c', name: 'Violet' },
+  { id: 'purple', color: '#8a6a9c', name: 'Purple' },
+  { id: 'fuchsia', color: '#976595', name: 'Fuchsia' },
+  { id: 'pink', color: '#a06282', name: 'Pink' },
+  { id: 'rose', color: '#a05a68', name: 'Rose' },
   { id: 'gray', color: 'var(--color-text-tertiary)', name: 'Gray' },
 ];
 
@@ -909,23 +913,23 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     tempo: 120,
     timeSignature: { numerator: 4, denominator: 4 },
     tracks: [
-      { name: 'Lead Vocal', type: 'audio', color: '#f59e0b', volume: 0.8, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Backing Vocals', type: 'audio', color: '#f97316', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Drums', type: 'midi', color: '#ef4444', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Bass', type: 'midi', color: '#22c55e', volume: 0.75, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Piano', type: 'midi', color: '#3b82f6', volume: 0.6, pan: -0.1, armed: false, solo: false, mute: false },
-      { name: 'Synth Pad', type: 'midi', color: '#8b5cf6', volume: 0.4, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Strings', type: 'midi', color: '#ec4899', volume: 0.45, pan: 0.1, armed: false, solo: false, mute: false },
+      { name: 'Lead Vocal', type: 'audio', color: '#a08644', volume: 0.8, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Backing Vocals', type: 'audio', color: '#a8744a', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Drums', type: 'midi', color: '#9e5a55', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Bass', type: 'midi', color: '#4f8a60', volume: 0.75, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Piano', type: 'midi', color: '#5a78a0', volume: 0.6, pan: -0.1, armed: false, solo: false, mute: false },
+      { name: 'Synth Pad', type: 'midi', color: '#7c6a9c', volume: 0.4, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Strings', type: 'midi', color: '#a06282', volume: 0.45, pan: 0.1, armed: false, solo: false, mute: false },
     ],
     markers: [
-      { id: 'm1', time: 0, name: 'Intro', color: '#22c55e', type: 'marker' },
-      { id: 'm2', time: 16, name: 'Verse 1', color: '#3b82f6', type: 'marker' },
-      { id: 'm3', time: 48, name: 'Chorus', color: '#f59e0b', type: 'marker' },
+      { id: 'm1', time: 0, name: 'Intro', color: '#4f8a60', type: 'marker' },
+      { id: 'm2', time: 16, name: 'Verse 1', color: '#5a78a0', type: 'marker' },
+      { id: 'm3', time: 48, name: 'Chorus', color: '#a08644', type: 'marker' },
     ],
     regions: [
-      { id: 'r1', name: 'Intro', startTime: 0, endTime: 16, color: '#22c55e', type: 'intro' },
-      { id: 'r2', name: 'Verse 1', startTime: 16, endTime: 48, color: '#3b82f6', type: 'verse' },
-      { id: 'r3', name: 'Chorus 1', startTime: 48, endTime: 80, color: '#f59e0b', type: 'chorus' },
+      { id: 'r1', name: 'Intro', startTime: 0, endTime: 16, color: '#4f8a60', type: 'intro' },
+      { id: 'r2', name: 'Verse 1', startTime: 16, endTime: 48, color: '#5a78a0', type: 'verse' },
+      { id: 'r3', name: 'Chorus 1', startTime: 48, endTime: 80, color: '#a08644', type: 'chorus' },
     ],
   },
   {
@@ -936,24 +940,24 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     tempo: 128,
     timeSignature: { numerator: 4, denominator: 4 },
     tracks: [
-      { name: 'Kick', type: 'midi', color: '#ef4444', volume: 0.9, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Snare/Clap', type: 'midi', color: '#f97316', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Hi-Hats', type: 'midi', color: '#f59e0b', volume: 0.7, pan: 0.2, armed: false, solo: false, mute: false },
-      { name: 'Bass', type: 'midi', color: '#22c55e', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Lead Synth', type: 'midi', color: '#3b82f6', volume: 0.7, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Pad', type: 'midi', color: '#8b5cf6', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'FX/Risers', type: 'audio', color: '#ec4899', volume: 0.6, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Vocal Chops', type: 'audio', color: '#06b6d4', volume: 0.55, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Kick', type: 'midi', color: '#9e5a55', volume: 0.9, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Snare/Clap', type: 'midi', color: '#a8744a', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Hi-Hats', type: 'midi', color: '#a08644', volume: 0.7, pan: 0.2, armed: false, solo: false, mute: false },
+      { name: 'Bass', type: 'midi', color: '#4f8a60', volume: 0.85, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Lead Synth', type: 'midi', color: '#5a78a0', volume: 0.7, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Pad', type: 'midi', color: '#7c6a9c', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'FX/Risers', type: 'audio', color: '#a06282', volume: 0.6, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Vocal Chops', type: 'audio', color: '#43808f', volume: 0.55, pan: 0, armed: false, solo: false, mute: false },
     ],
     markers: [
-      { id: 'm1', time: 0, name: 'Intro', color: '#22c55e', type: 'marker' },
-      { id: 'm2', time: 32, name: 'Build', color: '#f59e0b', type: 'marker' },
-      { id: 'm3', time: 64, name: 'Drop', color: '#ef4444', type: 'marker' },
+      { id: 'm1', time: 0, name: 'Intro', color: '#4f8a60', type: 'marker' },
+      { id: 'm2', time: 32, name: 'Build', color: '#a08644', type: 'marker' },
+      { id: 'm3', time: 64, name: 'Drop', color: '#9e5a55', type: 'marker' },
     ],
     regions: [
-      { id: 'r1', name: 'Intro', startTime: 0, endTime: 32, color: '#22c55e', type: 'intro' },
-      { id: 'r2', name: 'Build', startTime: 32, endTime: 64, color: '#f59e0b', type: 'breakdown' },
-      { id: 'r3', name: 'Drop', startTime: 64, endTime: 128, color: '#ef4444', type: 'drop' },
+      { id: 'r1', name: 'Intro', startTime: 0, endTime: 32, color: '#4f8a60', type: 'intro' },
+      { id: 'r2', name: 'Build', startTime: 32, endTime: 64, color: '#a08644', type: 'breakdown' },
+      { id: 'r3', name: 'Drop', startTime: 64, endTime: 128, color: '#9e5a55', type: 'drop' },
     ],
   },
   {
@@ -964,12 +968,12 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
     tempo: 120,
     timeSignature: { numerator: 4, denominator: 4 },
     tracks: [
-      { name: 'Host', type: 'audio', color: '#3b82f6', volume: 0.85, pan: -0.3, armed: true, solo: false, mute: false },
-      { name: 'Guest 1', type: 'audio', color: '#22c55e', volume: 0.85, pan: 0.3, armed: false, solo: false, mute: false },
-      { name: 'Guest 2', type: 'audio', color: '#f59e0b', volume: 0.85, pan: 0.5, armed: false, solo: false, mute: true },
-      { name: 'Intro Music', type: 'audio', color: '#8b5cf6', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Outro Music', type: 'audio', color: '#ec4899', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
-      { name: 'Sound Effects', type: 'audio', color: '#ef4444', volume: 0.6, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Host', type: 'audio', color: '#5a78a0', volume: 0.85, pan: -0.3, armed: true, solo: false, mute: false },
+      { name: 'Guest 1', type: 'audio', color: '#4f8a60', volume: 0.85, pan: 0.3, armed: false, solo: false, mute: false },
+      { name: 'Guest 2', type: 'audio', color: '#a08644', volume: 0.85, pan: 0.5, armed: false, solo: false, mute: true },
+      { name: 'Intro Music', type: 'audio', color: '#7c6a9c', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Outro Music', type: 'audio', color: '#a06282', volume: 0.5, pan: 0, armed: false, solo: false, mute: false },
+      { name: 'Sound Effects', type: 'audio', color: '#9e5a55', volume: 0.6, pan: 0, armed: false, solo: false, mute: false },
     ],
     markers: [],
     regions: [],

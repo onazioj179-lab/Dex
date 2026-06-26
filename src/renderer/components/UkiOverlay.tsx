@@ -24,6 +24,8 @@ import { runUkiAgent, webSearch } from '../uki/agentRunner';
 import { formatUkiContexts } from '../uki/appContextRegistry';
 import { getActiveWorkspace } from '../uki/context';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../uki/answerEngine';
+import { useSpinnerVerb } from '../uki/spinnerVerbs';
+import { computeLingerMs } from '../uki/sleepTiming';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -1215,6 +1217,7 @@ function useTypewriter(target: string, speed = 18): string {
 }
 
 const STATE_LABELS: Record<string, { label: string; color: string }> = {
+  dormant: { label: 'Asleep', color: 'var(--color-text-tertiary)' },
   idle: { label: 'Idle', color: 'var(--color-text-tertiary)' },
   listening: { label: 'Listening...', color: 'var(--color-accent)' },
   processing: { label: 'Processing...', color: '#BF5AF2' },
@@ -1410,6 +1413,9 @@ const UkiOverlay: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [thoughtSteps, setThoughtSteps] = useState<string[]>([]);
   const thoughtStepsRef = useRef<string[]>([]);
+  // Live, context-aware verb for the thinking indicator (rotates while busy).
+  const spinnerActive = isThinking && !streamingResponse;
+  const verb = useSpinnerVerb(spinnerActive, thoughtSteps[thoughtSteps.length - 1]);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [speakResponses, setSpeakResponses] = useState(() => {
     try { return localStorage.getItem('dex-uki-speak-responses') !== 'false'; } catch { return true; }
@@ -1422,6 +1428,30 @@ const UkiOverlay: React.FC = () => {
       window.speechSynthesis.cancel();
     }
   }, [speakResponses]);
+
+  // --- Sleep lifecycle -----------------------------------------------------
+  // One source of truth for "how long before UKI drifts to sleep", replacing
+  // the two hard-coded 8s timers that used to live in the effect AND the mouse
+  // handlers (they could silently drift apart). armSleep re-reads live store
+  // state and bails whenever the user is still engaged (hovering, mid-type, or
+  // she's mid-speech), so she never disappears out from under an active user.
+  // `sleepMs` (>0 while armed) drives the countdown hairline.
+  const [sleepMs, setSleepMs] = useState(0);
+  const cancelSleep = useCallback(() => {
+    if (autoHideRef.current) { clearTimeout(autoHideRef.current); autoHideRef.current = null; }
+    setSleepMs(0);
+  }, []);
+  const armSleep = useCallback(() => {
+    cancelSleep();
+    const st = useUkiStore.getState();
+    // Only a finished, displayed answer lingers; anything in flight stays up.
+    if (st.state !== 'idle' || !st.showTranscript || !st.response) return;
+    if (hoveredRef.current || inputText.trim()) return;
+    if (document.activeElement === inputRef.current) return;
+    const ms = computeLingerMs(st.response);
+    setSleepMs(ms);
+    autoHideRef.current = setTimeout(() => useUkiStore.getState().sleep(), ms);
+  }, [cancelSleep, inputText]);
 
   // Per-mount voiceschanged listener (replaces previous module-level leak)
   // and unmount cleanup for in-flight streaming timer.
@@ -1776,19 +1806,17 @@ const UkiOverlay: React.FC = () => {
     }
   }, [transcript, partialTranscript, response, conversationHistory, streamingResponse, isThinking, thoughtSteps]);
 
-  // Auto-hide after response shown for 8s (pauses on hover)
+  // Arm the content-aware sleep timer once an answer is settled and idle. Any
+  // re-engagement (typing, thinking, streaming) cancels it; it re-arms when the
+  // dependencies settle again. Pause-while-hovered is handled by the panel's
+  // mouse handlers calling cancelSleep / armSleep directly.
   useEffect(() => {
-    if (state === 'idle' && showTranscript && response) {
-      const startTimer = () => {
-        if (hoveredRef.current) return;
-        autoHideRef.current = setTimeout(() => {
-          useUkiStore.getState().reset();
-        }, 8000);
-      };
-      startTimer();
-      return () => { if (autoHideRef.current) clearTimeout(autoHideRef.current); };
+    if (state === 'idle' && showTranscript && response && !isThinking && !streamingResponse) {
+      armSleep();
+      return cancelSleep;
     }
-  }, [state, showTranscript, response]);
+    cancelSleep();
+  }, [state, showTranscript, response, isThinking, streamingResponse, inputText, armSleep, cancelSleep]);
 
   if (!isVisible) return null;
 
@@ -1809,8 +1837,8 @@ const UkiOverlay: React.FC = () => {
   return (
     <div
       ref={panelRef}
-      onMouseEnter={() => { hoveredRef.current = true; if (autoHideRef.current) { clearTimeout(autoHideRef.current); autoHideRef.current = null; } }}
-      onMouseLeave={() => { hoveredRef.current = false; if (state === 'idle' && showTranscript && response) { if (autoHideRef.current) clearTimeout(autoHideRef.current); autoHideRef.current = setTimeout(() => { useUkiStore.getState().reset(); }, 8000); } }}
+      onMouseEnter={() => { hoveredRef.current = true; cancelSleep(); }}
+      onMouseLeave={() => { hoveredRef.current = false; armSleep(); }}
       style={{
       position: 'fixed',
       top: panelPos?.y ?? 80,
@@ -1834,17 +1862,42 @@ const UkiOverlay: React.FC = () => {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.5; transform: scale(1.4); }
         }
+        @keyframes ukiLinger {
+          from { transform: scaleX(1); }
+          to { transform: scaleX(0); }
+        }
       `}</style>
 
       <div style={{
-        // Solid surface matching the app-menu panel -- no washed-out translucent
-        // glass (was bg-hover + blur-xl saturate) and no gloss sheen highlight.
-        background: 'var(--color-bg-elevated, #1c1c1e)',
+        // Liquid glass (master overhaul), matching the app-menu / dock / menus:
+        // a translucent strong fill over the shared adaptive blur. Degrades to
+        // solid on weak GPUs / reduced-transparency via the shared token.
+        background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',
+        backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+        WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover)',
         overflow: 'hidden',
+        position: 'relative',
       }}>
+        {/* Sleep countdown hairline — a calm, non-alarming cue that UKI is about
+            to rest. It only renders while the sleep timer is armed; hovering or
+            typing cancels the timer, which unmounts the bar. Keyed on sleepMs so
+            re-arming restarts the depletion from full. */}
+        {sleepMs > 0 && (
+          <div
+            key={sleepMs}
+            aria-hidden
+            style={{
+              position: 'absolute', left: 0, bottom: 0, height: 2, width: '100%',
+              transformOrigin: 'left center',
+              background: 'var(--color-accent)', opacity: 0.5,
+              animation: `ukiLinger ${sleepMs}ms linear forwards`,
+              pointerEvents: 'none', zIndex: 1,
+            }}
+          />
+        )}
         {/* State bar — the drag handle (only the header moves the panel, so
             clicking the content/response area never starts a drag) */}
         <div onPointerDown={handleDragStart} style={{
@@ -1864,8 +1917,11 @@ const UkiOverlay: React.FC = () => {
             fontSize: 11, fontWeight: 600, color: stateInfo.color,
             letterSpacing: '0.02em',
             fontFamily: 'var(--dex-font-ui)',
+            transition: 'opacity 0.2s ease',
           }}>
-            {stateInfo.label}
+            {/* While reasoning, the header echoes the live spinner verb so the
+                whole panel speaks with one voice; otherwise the static label. */}
+            {spinnerActive ? `${verb}…` : stateInfo.label}
           </span>
 
           {/* Audio waveform visualization when listening */}
@@ -2068,7 +2124,9 @@ const UkiOverlay: React.FC = () => {
                   background: 'var(--color-accent)',
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
-                <span>Thinking{thoughtSteps.length > 0 ? ` -- step ${thoughtSteps.length}` : ''}</span>
+                <span style={{ transition: 'opacity 0.2s ease' }}>
+                  {verb}&hellip;{thoughtSteps.length > 0 ? ` · step ${thoughtSteps.length}` : ''}
+                </span>
               </div>
               {thoughtSteps.length > 0 && (
                 <ol style={{

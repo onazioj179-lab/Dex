@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
@@ -176,6 +177,8 @@ const PresentationBuilder: React.FC = () => {
   // if the component unmounts mid-drag (the mouseup handler would otherwise never fire).
   const dragCleanup = useRef<(() => void) | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  // Live export verbs for the Export Images button.
+  const exportPhrase = useWorkingPhrase(isExporting, 'export');
 
   const theme = getTheme(themeId);
 
@@ -603,10 +606,10 @@ const PresentationBuilder: React.FC = () => {
 
         {/* Speaker notes strip */}
         {notes && (
-          <div style={{
+          <div className="dex-liquid-glass" style={{
             position: 'absolute', bottom: 26, left: 24, right: 24, maxHeight: '18vh',
-            overflow: 'auto', padding: '10px 14px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.06)', color: '#ddd', fontSize: 15,
+            overflow: 'auto', padding: '10px 14px', borderRadius: 14,
+            color: '#ddd', fontSize: 15,
             fontFamily: 'var(--font-family)', whiteSpace: 'pre-wrap', lineHeight: 1.4,
           }}>{notes}</div>
         )}
@@ -672,7 +675,7 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
-          <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? 'Exporting…' : 'Export Images'}</button>
+          <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
           <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Present</button>
         </div>
@@ -717,7 +720,7 @@ const PresentationBuilder: React.FC = () => {
               }}
               onClick={() => { setCurrentIdx(idx); setSelectedBlockId(null); }}
               style={{
-                position: 'relative', cursor: 'pointer', borderRadius: 4,
+                position: 'relative', cursor: 'pointer', borderRadius: 10,
                 padding: 4, border: idx === currentIdx ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                 background: dragOverIdx === idx ? 'var(--color-bg-hover)' : 'transparent',
               }}
@@ -769,10 +772,9 @@ const PresentationBuilder: React.FC = () => {
         </div>
 
         {/* Right panel — properties */}
-        <div style={{
+        <div className="dex-liquid-glass-strong" style={{
           width: 240, padding: 14, gap: 'var(--space-3)', display: 'flex', flexDirection: 'column',
-          borderLeft: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)',
-          overflowY: 'auto',
+          borderRadius: 0, overflowY: 'auto',
         }}>
           <div className="dex-label-caps">
             Slide Settings
@@ -801,7 +803,7 @@ const PresentationBuilder: React.FC = () => {
               type="color"
               value={currentSlide?.background ?? '#000000'}
               onChange={e => updateCurrentSlide(s => ({ ...s, background: e.target.value }))}
-              style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
+              style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
             />
           </label>
           <label style={fieldLabel}>
@@ -859,7 +861,7 @@ const PresentationBuilder: React.FC = () => {
                       type="color"
                       value={selectedBlock.style.color ?? '#ffffff'}
                       onChange={e => updateBlock(selectedBlock.id, { style: { color: e.target.value } })}
-                      style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
+                      style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
                     />
                   </label>
                 </>
@@ -871,7 +873,7 @@ const PresentationBuilder: React.FC = () => {
                     type="color"
                     value={selectedBlock.style.background ?? '#5E5CE6'}
                     onChange={e => updateBlock(selectedBlock.id, { style: { background: e.target.value } })}
-                    style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
+                    style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
                   />
                 </label>
               )}
@@ -927,10 +929,10 @@ const PresentationBuilder: React.FC = () => {
         >
           <div
             onClick={e => e.stopPropagation()}
+            className="dex-liquid-glass-strong"
             style={{
-              width: 520, maxWidth: '90%', background: 'var(--color-bg-elevated)',
-              border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 18,
-              display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--pg-shadow-popover)',
+              width: 520, maxWidth: '90%', borderRadius: 14, padding: 18,
+              display: 'flex', flexDirection: 'column', gap: 12,
             }}
           >
             <div style={{ fontSize: 14, fontWeight: 600 }}>Import Outline</div>
@@ -999,7 +1001,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 
 const toolbarBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '6px var(--space-3)', borderRadius: 6, fontSize: 12,
+  padding: '6px var(--space-3)', borderRadius: 10, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
@@ -1014,7 +1016,7 @@ const fieldLabel: React.CSSProperties = {
 };
 
 const fieldInput: React.CSSProperties = {
-  padding: '6px var(--space-2)', borderRadius: 4, fontSize: 12,
+  padding: '6px var(--space-2)', borderRadius: 10, fontSize: 12,
   background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

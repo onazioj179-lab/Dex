@@ -294,7 +294,11 @@ const ClipVisual: React.FC<{
   onSplit: (clipId: string, frame: number) => void;
   onClipContextMenu?: (clipId: string, trackId: string, x: number, y: number) => void;
 }> = memo(({ clip, track, zoom, scrollX, viewportWidth, selected, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onClipContextMenu }) => {
-  const color = getClipColor(track.type);
+  // When clip color labels are enabled (View menu) and this clip has a label
+  // color set (Inspector), tint the whole clip with that color — Premiere/DaVinci
+  // style. Otherwise fall back to the per-track-type color.
+  const showColorLabels = useVinxStore(s => s.showClipColorLabels);
+  const color = (showColorLabels && clip.color) ? clip.color : getClipColor(track.type);
   const x = frameToPixels(clip.startFrame, zoom) - scrollX;
   const width = frameToPixels(clip.endFrame - clip.startFrame, zoom);
 

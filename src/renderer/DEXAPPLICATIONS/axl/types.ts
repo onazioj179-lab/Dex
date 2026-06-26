@@ -32,13 +32,16 @@ export interface Material {
 
 export interface PartFeature {
   id: string;
-  type: 'primitive' | 'boolean' | 'extrude' | 'revolve' | 'chamfer' | 'fillet' | 'pattern' | 'mirror' | 'sketch';
+  type: 'primitive' | 'boolean' | 'extrude' | 'revolve' | 'chamfer' | 'fillet' | 'pattern' | 'mirror' | 'sketch' | 'shell' | 'draft' | 'rib' | 'mesh';
   name: string;
   params: Record<string, number | string | boolean>;
   visible: boolean;
   locked: boolean;
   suppressed?: boolean;
   parentId?: string;
+  // Raw triangle mesh for imported geometry (OBJ/STL/STEP). When present the
+  // renderer draws this directly instead of generating from a primitive.
+  mesh?: { positions: number[]; normals: number[]; indices: number[] };
 }
 
 export interface Part {
@@ -186,6 +189,54 @@ export interface SimulationResult {
   elementCount?: number;      // number of FE members solved
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Configurations / Design Variants — snapshot of part placement + driving
+// geometry so one model can carry several configured states (e.g. "Closed",
+// "Open", "Long Shaft") and switch between them non-destructively.
+// ═══════════════════════════════════════════════════════════════════════════
+export interface ConfigurationPart {
+  partId: string;
+  transform: Transform;
+  params: Record<string, number | string | boolean>; // primary feature params
+  visible: boolean;
+}
+
+export interface Configuration {
+  id: string;
+  name: string;
+  parts: ConfigurationPart[];
+  parameters: Parameter[];
+  createdAt: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Named Views / Saved Cameras — store a camera orientation under a name so the
+// user can jump back to a curated viewpoint.
+// ═══════════════════════════════════════════════════════════════════════════
+export interface NamedView {
+  id: string;
+  name: string;
+  azimuth: number;
+  elevation: number;
+  distance: number;
+  viewMode: ViewMode;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Interference / Clearance — broad-phase bounding-volume collision between
+// parts in the assembly (the first pass any real interference checker runs).
+// ═══════════════════════════════════════════════════════════════════════════
+export interface InterferencePair {
+  partAId: string;
+  partBId: string;
+  partAName: string;
+  partBName: string;
+  centerDistance: number; // distance between part centroids (units)
+  sumRadii: number;       // sum of bounding radii (units)
+  overlap: number;        // sumRadii - centerDistance; >0 => interfering
+  status: 'interference' | 'clearance';
+}
+
 export interface AXLProject {
   name: string;
   units: 'mm' | 'in' | 'm';
@@ -198,6 +249,9 @@ export interface AXLProject {
   dimensionLines: DimensionLine[];
   sketches: Sketch[];
   parameters: Parameter[];
+  configurations: Configuration[];
+  activeConfigId?: string;
+  namedViews: NamedView[];
   createdAt: number;
   modifiedAt: number;
   version: number;

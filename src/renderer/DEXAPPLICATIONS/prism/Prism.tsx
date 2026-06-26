@@ -4,7 +4,6 @@
  * Professional image editing with layers and smart tools
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import { useRunningApps } from '../../store/runningApps';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import DexIcon from '../../components/DexIcon';
 import { ResizablePanel } from '../../components/ResizablePanel';
@@ -12,7 +11,7 @@ import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
-import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { loadEngagement, saveEngagement, recordAppUsage, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
@@ -26,12 +25,7 @@ import { applyLensCorrection } from '../../../shared/creative/lensCorrect';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
-  ROTATION_PRESETS,
-  BATCH_RESIZE_PRESETS,
   hexToRgb,
-  rgbToHex,
-  rgbToHsl,
-  generateId as prismGenerateId,
 } from './PrismFeatures';
 import type { AdjustmentType as PrismAdjustmentType, BlendMode as PrismBlendMode } from './PrismFeatures';
 import {
@@ -69,15 +63,12 @@ const PRISM_HISTORY_LIMIT = 60;
 import {
   type SelectionState,
   type GradientType,
-  type GradientStop,
   type PenPath,
-  type PenPoint,
   type CloneState,
   type FilterName,
   type TransformState,
   createEmptySelection,
   createRectSelection,
-  createEllipseSelection,
   createLassoSelection,
   createWandSelection,
   selectAll,
@@ -97,22 +88,18 @@ import {
   applyTransformHandle,
   computeHistogram,
   drawHistogram,
-  drawColorWheel,
   canvasToTIFF,
   canvasToBMP,
   applyAdjustmentToImageData,
   defaultAdjustment,
-  curveLUTFromPoints,
-  identityLUT,
-  patchMatchFill,
-  buildSelectionMaskFromAlpha,
   type AdjustmentParams,
   type AdjustmentKind,
 } from './PrismEngine';
-import { getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
+import { getPerfTier } from '../../utils/adaptiveCanvas';
 import { buildBandMask } from '../../../shared/creative/luminanceMask';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 import { AdjustmentControls } from './AdjustmentControls';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
 import { clampEventToViewport } from '../../utils/menuPosition';
 
@@ -185,17 +172,6 @@ interface HistoryState {
   name: string;
   layers: Layer[];
   timestamp: number;
-}
-
-interface Brush {
-  id: string;
-  name: string;
-  size: number;
-  hardness: number;
-  opacity: number;
-  flow: number;
-  spacing: number;
-  shape: 'round' | 'square' | 'custom';
 }
 
 // ==================== SVG ICONS ====================
@@ -339,7 +315,7 @@ const Prism: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
-  const appSettings = useCreativeAppSettings('prism');
+  useCreativeAppSettings('prism');
   // Track app usage
   useAppTracking('prism');
   const collab = useCollaborationFeatures({ appId: 'prism', projectName: 'PRISM Project', autoCheckpointInterval: 300000 });
@@ -476,7 +452,6 @@ const Prism: React.FC = () => {
   // Panels
   const [showLayers, setShowLayers] = useState(true);
   const [showAdjustments, setShowAdjustments] = useState(true);
-  const [showBrushSettings, setShowBrushSettings] = useState(false);
   const [activePanel, setActivePanel] = useState<'adjustments' | 'filters' | 'presets'>('adjustments');
   const [presetType, setPresetType] = useState<'filters' | 'brushes' | 'styles'>('filters');
 
@@ -502,7 +477,6 @@ const Prism: React.FC = () => {
   // ===== ADVANCED TOOL STATE =====
   // Selection
   const [selection, setSelection] = useState<SelectionState>(createEmptySelection);
-  const selectionAnimRef = useRef<number>(0);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Gradient
@@ -619,6 +593,9 @@ const Prism: React.FC = () => {
 
   // ===== PRO FEATURES STATE =====
   const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
+  // UKI natural-language assistant bar ("remove background", "auto enhance").
+  // Drives the previously-orphaned applyCreativeOp handler below.
+  const [showAiBar, setShowAiBar] = useState(false);
   // Content-Aware Fill
   const [showContentAwareFill, setShowContentAwareFill] = useState(false);
   const [contentAwareSampling, setContentAwareSampling] = useState<'auto' | 'rectangular' | 'custom'>('auto');
@@ -798,7 +775,6 @@ const Prism: React.FC = () => {
     { id: 'action-2', name: 'B&W Dramatic', steps: ['Desaturate', 'Contrast +40', 'Vignette'] },
     { id: 'action-3', name: 'Social Media Crop', steps: ['Crop 1:1', 'Resize 1080x1080', 'Sharpen 30%'] },
   ]);
-  const [actionsRecording, setActionsRecording] = useState(false);
   // 19. Quick Mask Mode
   const [quickMaskMode, setQuickMaskMode] = useState(false);
   // 20. Refine Edge
@@ -1449,7 +1425,6 @@ const Prism: React.FC = () => {
     const canvas = drawCanvasRef.current || canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const z = zoom / 100;
     // Account for CSS transform: translate(panOffset) scale(zoom)
     // The bounding rect already reflects the scaled size, but we need
     // to map from screen coords → canvas pixel coords properly
@@ -2889,10 +2864,28 @@ const Prism: React.FC = () => {
   const selectedLayer = layers.find(l => l.id === selectedLayerId);
 
   // Running apps integration
-  const { setCurrentApp } = useRunningApps();
 
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
+      {showAiBar && (
+        <div
+          className="dex-creative-panel-strong"
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', width: 'min(560px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 7000, padding: 'var(--space-2)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.4px' }}>PRISM ASSISTANT</span>
+            <button aria-label="Close assistant" onClick={() => setShowAiBar(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>x</button>
+          </div>
+          <CreativeCommandBar
+            appId="prism"
+            facts={{ layerId: selectedLayerId, selectionId: selection.mask ? 'active' : undefined }}
+            onApplyOp={applyCreativeOp}
+            examples={['auto enhance', 'remove background', 'upscale 2x', 'denoise']}
+            placeholder="Describe an edit..."
+          />
+        </div>
+      )}
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop images to import</div>}
       <style>{`
         /* === PRISM - PROFESSIONAL UI === */
@@ -2988,10 +2981,22 @@ const Prism: React.FC = () => {
           <button className="prism-btn" style={styles.btn} onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" aria-label="Undo">{Icons.undo}</button>
           <button className="prism-btn" style={styles.btn} onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" aria-label="Redo">{Icons.redo}</button>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
+          <button
+            className="prism-btn"
+            style={{ ...styles.btn, color: showAiBar ? '#ff375f' : undefined, background: showAiBar ? '#2e1520' : undefined }}
+            onClick={() => setShowAiBar(v => !v)}
+            title="AI assistant — describe an edit in plain language"
+            aria-label="Toggle AI assistant"
+            aria-pressed={showAiBar}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>
+            Assistant
+          </button>
+          <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
             <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} onMouseEnter={e => { if (!showFeaturesMenu) e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { if (!showFeaturesMenu) e.currentTarget.style.background = 'transparent'; }} style={{ background: showFeaturesMenu ? '#2e1520' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#ff375f' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showFeaturesMenu && (
-              <div className="dex-liquid-glass-strong" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', zIndex: 6000, padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="dex-creative-panel-strong" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', zIndex: 6000, padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>ADJUSTMENTS</div>
                 {[
                   { label: 'Curves', active: showCurves, fn: () => setShowCurves(v => !v) },
@@ -3146,7 +3151,7 @@ const Prism: React.FC = () => {
                 {/* Flyout menu */}
                 {isOpen && hasMultiple && (
                   <div
-                    className="dex-liquid-glass"
+                    className="dex-creative-panel"
                     style={{
                       position: 'absolute',
                       left: '100%',
@@ -3233,7 +3238,7 @@ const Prism: React.FC = () => {
 
         {/* Tool Options Bar */}
         <div style={styles.mainArea}>
-          {(activeTool === 'pointer' || activeTool === 'wand' || activeTool === 'lasso' || activeTool === 'gradient' || activeTool === 'clone' || activeTool === 'heal' || activeTool === 'dodge' || activeTool === 'burn' || activeTool === 'text') && (
+          {(activeTool === 'pointer' || activeTool === 'wand' || activeTool === 'lasso' || activeTool === 'gradient' || activeTool === 'clone' || activeTool === 'heal' || activeTool === 'dodge' || activeTool === 'burn' || activeTool === 'text' || activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'shape') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', fontSize: '11px', minHeight: '28px' }}>
               {(activeTool === 'pointer' || activeTool === 'wand' || activeTool === 'lasso') && (
                 <>
@@ -3330,6 +3335,45 @@ const Prism: React.FC = () => {
                   ))}
                 </>
               )}
+              {(activeTool === 'brush' || activeTool === 'eraser') && (
+                <>
+                  <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>{activeTool === 'brush' ? 'Brush' : 'Eraser'}:</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>Size:</span>
+                  <input aria-label="Brush size" type="range" min="1" max="500" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} style={{ width: '70px', accentColor: '#ff375f' }} />
+                  <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '32px' }}>{brushSize}px</span>
+                  <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>Hardness:</span>
+                  <input aria-label="Brush hardness" type="range" min="0" max="100" value={brushHardness} onChange={e => setBrushHardness(Number(e.target.value))} style={{ width: '60px', accentColor: '#ff375f' }} />
+                  <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '28px' }}>{brushHardness}%</span>
+                  <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>Opacity:</span>
+                  <input aria-label="Brush opacity" type="range" min="1" max="100" value={brushOpacity} onChange={e => setBrushOpacity(Number(e.target.value))} style={{ width: '60px', accentColor: '#ff375f' }} />
+                  <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '28px' }}>{brushOpacity}%</span>
+                  <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>Smoothing:</span>
+                  <input aria-label="Brush stabilization" type="range" min="0" max="20" value={brushStabilization} onChange={e => setBrushStabilization(Number(e.target.value))} style={{ width: '60px', accentColor: '#ff375f' }} />
+                  <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '20px' }}>{brushStabilization}</span>
+                </>
+              )}
+              {activeTool === 'shape' && (
+                <>
+                  <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Shape:</span>
+                  <SegmentedControl
+                    options={['rectangle', 'ellipse', 'line'] as const}
+                    value={shapeType}
+                    onChange={setShapeType}
+                    accentColor="#ff375f"
+                    variant="subtle"
+                    aria-label="Shape type"
+                  />
+                  <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={shapeFill} onChange={e => setShapeFill(e.target.checked)} />
+                    Fill
+                  </label>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: 9 }}>(outline width follows brush size)</span>
+                </>
+              )}
             </div>
           )}
           <div
@@ -3403,10 +3447,10 @@ const Prism: React.FC = () => {
               for (let px = 0; px <= canvasSize.height; px += step) vTicks.push(<span key={`v${px}`} style={{ position: 'absolute', top: px * sx, left: 0, fontSize: 8, color: 'var(--color-text-tertiary)', borderTop: '1px solid var(--color-border)', width: RULER, textAlign: 'center', writingMode: 'vertical-rl' }}>{px}</span>);
               return (
                 <>
-                  <div className="dex-liquid-glass" style={{ position: 'absolute', top: 0, left: RULER, right: 0, height: RULER, borderRadius: 0, overflow: 'hidden', zIndex: 45, pointerEvents: 'none' }}>
+                  <div className="dex-creative-panel" style={{ position: 'absolute', top: 0, left: RULER, right: 0, height: RULER, borderRadius: 0, overflow: 'hidden', zIndex: 45, pointerEvents: 'none' }}>
                     <div style={{ position: 'absolute', left: panOffset.x, top: 0, height: RULER }}>{hTicks}</div>
                   </div>
-                  <div className="dex-liquid-glass" style={{ position: 'absolute', top: RULER, left: 0, bottom: 0, width: RULER, borderRadius: 0, overflow: 'hidden', zIndex: 45, pointerEvents: 'none' }}>
+                  <div className="dex-creative-panel" style={{ position: 'absolute', top: RULER, left: 0, bottom: 0, width: RULER, borderRadius: 0, overflow: 'hidden', zIndex: 45, pointerEvents: 'none' }}>
                     <div style={{ position: 'absolute', top: panOffset.y, left: 0, width: RULER }}>{vTicks}</div>
                   </div>
                   <div style={{ position: 'absolute', top: 0, left: 0, width: RULER, height: RULER, background: 'var(--color-bg-surface)', borderRight: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)', zIndex: 46, pointerEvents: 'none' }} />
@@ -3420,7 +3464,7 @@ const Prism: React.FC = () => {
               <div key={g.id} style={{ position: 'absolute', top: 0, bottom: 0, left: panOffset.x + g.position * (zoom / 100), width: 1, background: 'var(--color-success)', opacity: 0.7, zIndex: 44, pointerEvents: 'none' }} />
             ))}
             {/* Zoom Controls Overlay */}
-            <div className="dex-liquid-glass" style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-lg)', padding: '6px var(--space-3)', zIndex: 40 }}>
+            <div className="dex-creative-panel" style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-lg)', padding: '6px var(--space-3)', zIndex: 40 }}>
               <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.max(10, z - 10))} title="Zoom Out" aria-label="Zoom out">-</button>
               <input 
                 type="range" 
@@ -3662,7 +3706,7 @@ const Prism: React.FC = () => {
                     aria-expanded={showAddAdjustmentMenu}
                   >fx</button>
                   {showAddAdjustmentMenu && (
-                    <div role="menu" className="dex-liquid-glass" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, borderRadius: 'var(--radius-lg)', padding: 4, minWidth: 160, zIndex: 50 }}>
+                    <div role="menu" className="dex-creative-panel" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, borderRadius: 'var(--radius-lg)', padding: 4, minWidth: 160, zIndex: 50 }}>
                       {([
                         { kind: 'brightness-contrast' as const, label: 'Brightness/Contrast' },
                         { kind: 'hue-saturation' as const, label: 'Hue/Saturation' },
@@ -3692,7 +3736,7 @@ const Prism: React.FC = () => {
                     aria-expanded={showLayerBoolean}
                   >&cap;</button>
                   {showLayerBoolean && (
-                    <div role="menu" className="dex-liquid-glass" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, borderRadius: 'var(--radius-lg)', padding: 4, minWidth: 180, zIndex: 50 }}>
+                    <div role="menu" className="dex-creative-panel" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, borderRadius: 'var(--radius-lg)', padding: 4, minWidth: 180, zIndex: 50 }}>
                       <div style={{ padding: '4px 8px', fontSize: 9, color: 'var(--color-text-tertiary)' }}>Selected layer &amp; the one below</div>
                       {(['union', 'intersect', 'subtract', 'difference'] as BooleanOp[]).map(op => (
                         <div
@@ -3778,7 +3822,7 @@ const Prism: React.FC = () => {
 
       {/* Content-Aware Fill Panel */}
       {showContentAwareFill && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(360px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(360px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Content-Aware Fill</span>
             <button aria-label="Close Content-Aware Fill panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowContentAwareFill(false)}><DexIcon name="close" size={14} /></button>
@@ -3928,7 +3972,7 @@ const Prism: React.FC = () => {
 
       {/* Liquify Panel */}
       {showLiquify && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 240, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 80, width: 240, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Liquify</span>
             <button aria-label="Close Liquify panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLiquify(false)}><DexIcon name="close" size={14} /></button>
@@ -4012,7 +4056,7 @@ const Prism: React.FC = () => {
 
       {/* Frequency Separation Panel */}
       {showFreqSeparation && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Frequency Separation</span>
             <button aria-label="Close Frequency Separation panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowFreqSeparation(false)}><DexIcon name="close" size={14} /></button>
@@ -4113,7 +4157,7 @@ const Prism: React.FC = () => {
 
       {/* Color Range Selection Panel */}
       {showColorRange && (
-        <div style={{ position: 'fixed', right: 20, top: 120, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 120, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Color Range</span>
             <button aria-label="Close Color Range panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowColorRange(false)}><DexIcon name="close" size={14} /></button>
@@ -4175,7 +4219,7 @@ const Prism: React.FC = () => {
 
       {/* Layer Styles Panel */}
       {showLayerStyles && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 300, maxHeight: 500, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 80, width: 300, maxHeight: 500, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Layer Styles</span>
             <button aria-label="Close Layer Styles panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLayerStyles(false)}><DexIcon name="close" size={14} /></button>
@@ -4202,7 +4246,7 @@ const Prism: React.FC = () => {
 
       {/* Filter Gallery */}
       {showFilterGallery && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 48px))', height: 420, borderRadius: 'var(--radius-xl)', zIndex: 6000, display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 48px))', height: 420, borderRadius: 'var(--radius-xl)', zIndex: 6000, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Filter Gallery</span>
             <button aria-label="Close Filter Gallery" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowFilterGallery(false)}><DexIcon name="close" size={14} /></button>
@@ -4235,7 +4279,7 @@ const Prism: React.FC = () => {
 
       {/* Lens Correction Panel */}
       {showLensCorrection && (
-        <div style={{ position: 'fixed', right: 20, top: 100, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 100, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Lens Correction</span>
             <button aria-label="Close Lens Correction panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLensCorrection(false)}><DexIcon name="close" size={14} /></button>
@@ -4272,7 +4316,7 @@ const Prism: React.FC = () => {
 
       {/* HDR Merge Panel */}
       {showHDRMerge && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>HDR Merge</span>
             <button aria-label="Close HDR Merge panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowHDRMerge(false)}><DexIcon name="close" size={14} /></button>
@@ -4300,7 +4344,7 @@ const Prism: React.FC = () => {
 
       {/* Batch Processing Panel */}
       {showBatchProcess && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Processing</span>
             <button aria-label="Close Batch Processing panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowBatchProcess(false)}><DexIcon name="close" size={14} /></button>
@@ -4375,7 +4419,7 @@ const Prism: React.FC = () => {
 
       {/* RAW Development Panel */}
       {showRAWDevelop && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, maxHeight: 500, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, maxHeight: 500, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>RAW Develop</span>
             <button aria-label="Close RAW Develop panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowRAWDevelop(false)}><DexIcon name="close" size={14} /></button>
@@ -4402,7 +4446,7 @@ const Prism: React.FC = () => {
 
       {/* Artboard System Panel */}
       {showArtboards && (
-        <div style={{ position: 'fixed', left: 60, top: 60, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', left: 60, top: 60, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Artboards</span>
             <button aria-label="Close Artboards panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowArtboards(false)}><DexIcon name="close" size={14} /></button>
@@ -4427,7 +4471,7 @@ const Prism: React.FC = () => {
 
       {/* Asset Library Panel */}
       {showAssetLibrary && (
-        <div className="dex-liquid-glass" style={{ position: 'fixed', right: 20, bottom: 60, width: 300, height: 360, borderRadius: 'var(--radius-xl)', zIndex: 6000, display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-creative-panel" style={{ position: 'fixed', right: 20, bottom: 60, width: 300, height: 360, borderRadius: 'var(--radius-xl)', zIndex: 6000, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Asset Library</span>
             <button aria-label="Close Asset Library panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowAssetLibrary(false)}><DexIcon name="close" size={14} /></button>
@@ -4454,7 +4498,7 @@ const Prism: React.FC = () => {
 
       {/* Slice Export Panel */}
       {showSliceExport && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Slice Export for Web</span>
             <button aria-label="Close Slice Export panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSliceExport(false)}><DexIcon name="close" size={14} /></button>
@@ -4476,7 +4520,7 @@ const Prism: React.FC = () => {
               ))
             )}
             {slices.length > 0 && (
-              <button aria-label="Export all slices" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; slices.forEach((sl, idx) => { const sliceCanvas = document.createElement('canvas'); sliceCanvas.width = sl.width; sliceCanvas.height = sl.height; const ctx = sliceCanvas.getContext('2d'); if (!ctx) return; ctx.drawImage(canvas, sl.x, sl.y, sl.width, sl.height, 0, 0, sl.width, sl.height); const mimeType = sl.format === 'jpg' ? 'image/jpeg' : sl.format === 'webp' ? 'image/webp' : 'image/png'; sliceCanvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sl.name}.${sl.format}`; a.click(); URL.revokeObjectURL(url); }, mimeType, sl.quality / 100); }); setShowSliceExport(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Export All Slices</button>
+              <button aria-label="Export all slices" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; slices.forEach((sl) => { const sliceCanvas = document.createElement('canvas'); sliceCanvas.width = sl.width; sliceCanvas.height = sl.height; const ctx = sliceCanvas.getContext('2d'); if (!ctx) return; ctx.drawImage(canvas, sl.x, sl.y, sl.width, sl.height, 0, 0, sl.width, sl.height); const mimeType = sl.format === 'jpg' ? 'image/jpeg' : sl.format === 'webp' ? 'image/webp' : 'image/png'; sliceCanvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sl.name}.${sl.format}`; a.click(); URL.revokeObjectURL(url); }, mimeType, sl.quality / 100); }); setShowSliceExport(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Export All Slices</button>
             )}
           </div>
         </div>
@@ -4484,7 +4528,7 @@ const Prism: React.FC = () => {
 
       {/* Spot Healing Panel */}
       {showSpotHealing && (
-        <div style={{ position: 'fixed', right: 20, top: 120, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 120, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Spot Healing</span>
             <button aria-label="Close Spot Healing panel" onClick={() => setShowSpotHealing(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -4515,7 +4559,7 @@ const Prism: React.FC = () => {
 
       {/* Select Subject Panel */}
       {showSelectSubject && (
-        <div style={{ position: 'fixed', right: 20, top: 340, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', right: 20, top: 340, width: 260, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Select Subject</span>
             <button aria-label="Close Select Subject panel" onClick={() => setShowSelectSubject(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -4572,7 +4616,7 @@ const Prism: React.FC = () => {
 
       {/* Smart Objects Panel */}
       {showSmartObjects && (
-        <div style={{ position: 'fixed', left: 80, top: 120, width: 280, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass">
+        <div style={{ position: 'fixed', left: 80, top: 120, width: 280, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Smart Objects</span>
             <button aria-label="Close Smart Objects panel" onClick={() => setShowSmartObjects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -4629,7 +4673,7 @@ const Prism: React.FC = () => {
 
       {/* Panorama Stitch Panel */}
       {showPanorama && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(440px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(440px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Panorama Stitch</span>
             <button aria-label="Close Panorama Stitch panel" onClick={() => setShowPanorama(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -4726,7 +4770,7 @@ const Prism: React.FC = () => {
 
       {/* Focus Stacking Panel */}
       {showFocusStack && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Focus Stacking</span>
             <button aria-label="Close Focus Stacking panel" onClick={() => setShowFocusStack(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -4821,7 +4865,7 @@ const Prism: React.FC = () => {
 
       {/* 1. Curves Editor */}
       {showCurves && (
-        <div style={{ position: 'fixed', right: 290, top: 120, width: 320, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 120, width: 320, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Curves</span>
             <button aria-label="Close Curves panel" onClick={() => setShowCurves(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4913,7 +4957,7 @@ const Prism: React.FC = () => {
 
       {/* 2. Levels */}
       {showLevels && (
-        <div style={{ position: 'fixed', right: 290, top: 160, width: 340, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 160, width: 340, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Levels</span>
             <button aria-label="Close Levels panel" onClick={() => setShowLevels(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4984,7 +5028,7 @@ const Prism: React.FC = () => {
 
       {/* 3. Channel Mixer */}
       {showChannelMixer && (
-        <div style={{ position: 'fixed', right: 290, top: 200, width: 300, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 200, width: 300, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Channel Mixer</span>
             <button aria-label="Close Channel Mixer panel" onClick={() => setShowChannelMixer(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5039,7 +5083,7 @@ const Prism: React.FC = () => {
 
       {/* 5. Selective Color */}
       {showSelectiveColor && (
-        <div style={{ position: 'fixed', right: 290, top: 240, width: 310, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 240, width: 310, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Selective Color</span>
             <button aria-label="Close Selective Color panel" onClick={() => setShowSelectiveColor(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5106,7 +5150,7 @@ const Prism: React.FC = () => {
 
       {/* 6. Photo Filter */}
       {showPhotoFilter && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Photo Filter</span>
             <button aria-label="Close Photo Filter panel" onClick={() => setShowPhotoFilter(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5150,7 +5194,7 @@ const Prism: React.FC = () => {
 
       {/* 7. Color Lookup / LUT */}
       {showColorLookup && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Color Lookup (LUT)</span>
             <button aria-label="Close Color Lookup panel" onClick={() => setShowColorLookup(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5220,7 +5264,7 @@ const Prism: React.FC = () => {
 
       {/* 8. Replace Color */}
       {showReplaceColor && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Replace Color</span>
             <button aria-label="Close Replace Color panel" onClick={() => setShowReplaceColor(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5273,7 +5317,7 @@ const Prism: React.FC = () => {
 
       {/* 9. Posterize */}
       {showPosterize && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Posterize</span>
             <button aria-label="Close Posterize panel" onClick={() => setShowPosterize(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5294,7 +5338,7 @@ const Prism: React.FC = () => {
 
       {/* 10. Threshold */}
       {showThreshold && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Threshold</span>
             <button aria-label="Close Threshold panel" onClick={() => setShowThreshold(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5315,7 +5359,7 @@ const Prism: React.FC = () => {
 
       {/* 11. Canvas Size */}
       {showCanvasSize && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Canvas Size</span>
             <button aria-label="Close Canvas Size panel" onClick={() => setShowCanvasSize(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5349,7 +5393,7 @@ const Prism: React.FC = () => {
 
       {/* 12. Image Rotation */}
       {showImageRotation && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Image Rotation</span>
             <button aria-label="Close Image Rotation panel" onClick={() => setShowImageRotation(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5401,7 +5445,7 @@ const Prism: React.FC = () => {
 
       {/* 13. Color Balance */}
       {showColorBalance && (
-        <div style={{ position: 'fixed', right: 290, top: 140, width: 310, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 140, width: 310, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Color Balance</span>
             <button aria-label="Close Color Balance panel" onClick={() => setShowColorBalance(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5439,7 +5483,7 @@ const Prism: React.FC = () => {
 
       {/* 14. Gradient Map */}
       {showGradientMap && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Gradient Map</span>
             <button aria-label="Close Gradient Map panel" onClick={() => setShowGradientMap(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5467,7 +5511,7 @@ const Prism: React.FC = () => {
 
       {/* 15. Unsharp Mask */}
       {showUnsharpMask && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Unsharp Mask</span>
             <button aria-label="Close Unsharp Mask panel" onClick={() => setShowUnsharpMask(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5487,7 +5531,7 @@ const Prism: React.FC = () => {
 
       {/* 16. Add Noise */}
       {showAddNoise && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Add Noise</span>
             <button aria-label="Close Add Noise panel" onClick={() => setShowAddNoise(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5517,7 +5561,7 @@ const Prism: React.FC = () => {
 
       {/* 18. Guides Panel */}
       {showGuidesPanel && (
-        <div style={{ position: 'fixed', right: 290, top: 180, width: 280, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 180, width: 280, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Guides</span>
             <button aria-label="Close Guides panel" onClick={() => setShowGuidesPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5548,17 +5592,13 @@ const Prism: React.FC = () => {
 
       {/* 19. Actions / Macros */}
       {showActions && (
-        <div style={{ position: 'fixed', right: 290, top: 100, width: 300, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', right: 290, top: 100, width: 300, borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Actions</span>
             <button aria-label="Close Actions panel" onClick={() => setShowActions(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              <button aria-label="New action" onClick={() => setActions(prev => [...prev, { id: `a-${Date.now()}`, name: `Action ${prev.length + 1}`, steps: [] }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ New Action</button>
-              <button aria-label={actionsRecording ? 'Stop recording' : 'Record action'} onClick={() => setActionsRecording(v => !v)} style={{ padding: '5px 10px', borderRadius: 9999, border: '1px solid ' + (actionsRecording ? 'rgba(255,59,48,0.3)' : 'var(--color-bg-hover)'), background: actionsRecording ? 'rgba(255,59,48,0.12)' : 'var(--color-border-subtle)', color: actionsRecording ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{actionsRecording ? <><svg width="8" height="8" viewBox="0 0 16 16" fill="#FF453A" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Stop</> : <><svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Record</>}</button>
-            </div>
-            {actionsRecording && <div style={{ padding: '6px var(--space-2)', borderRadius: 4, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.15)', marginBottom: 'var(--space-2)', fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>Recording</div>}
+            <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 8, lineHeight: 1.4 }}>One-click image actions. The built-in actions run real pixel operations on the active layer.</div>
             <div style={{ maxHeight: 250, overflowY: 'auto' }}>
               {actions.map(a => (
                 <div key={a.id} style={{ padding: 'var(--space-2)', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
@@ -5579,7 +5619,7 @@ const Prism: React.FC = () => {
 
       {/* 20. Refine Edge */}
       {showRefineEdge && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-liquid-glass-strong">
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 6000 }} className="dex-creative-panel-strong">
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Refine Edge</span>
             <button aria-label="Close Refine Edge panel" onClick={() => setShowRefineEdge(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -5659,7 +5699,7 @@ const Prism: React.FC = () => {
         const left = Math.max(4, Math.min(ctxMenu.x, window.innerWidth - MENU_W - 4));
         const top = Math.max(4, Math.min(ctxMenu.y, window.innerHeight - menuH - 4));
         return (
-          <div className="dex-liquid-glass" style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', minWidth: MENU_W, borderRadius: 'var(--radius-lg)', padding: '4px 0', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-creative-panel" style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', minWidth: MENU_W, borderRadius: 'var(--radius-lg)', padding: '4px 0', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
               : <div key={i} className="prism-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>

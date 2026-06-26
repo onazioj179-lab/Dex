@@ -98,11 +98,11 @@ const statusMeta = (f: GitStatusFile): { ch: string; color: string; title: strin
   }
 };
 
+// File-status rows are floating glass cards; the .dex-liquid-glass class carries
+// the background + border + rim, so only geometry lives here.
 const rowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
-  padding: '6px 10px', borderRadius: 6,
-  border: '1px solid var(--color-border-subtle)',
-  background: 'var(--color-bg-surface)',
+  padding: '6px 10px', borderRadius: 'var(--radius-lg)',
 };
 
 // glassButton has no :disabled CSS, so a disabled button otherwise stays fully
@@ -122,6 +122,12 @@ export default function GitClient(): React.ReactElement {
   const [branches, setBranches] = useState<{ current: string | null; branches: string[] }>({ current: null, branches: [] });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  // The git operation currently running, as a present-participle label
+  // ("Pulling", "Pushing", "Committing"…). Before this, `busy` showed nothing
+  // about WHAT was happening — flash messages only fired on completion. Naming
+  // the live op (Siri-style honesty) beats a generic rotating verb here because
+  // git ops are short and specific.
+  const [currentOp, setCurrentOp] = useState('');
   const [note, setNote] = useState('');
   const [selectedCommit, setSelectedCommit] = useState<GitCommit | null>(null);
   const [userTemplates, setUserTemplates] = useState<{ label: string; body: string }[]>(() => loadTemplates());
@@ -157,6 +163,7 @@ export default function GitClient(): React.ReactElement {
   const refresh = useCallback(async (path = repoPath) => {
     if (!bridge || !path) return;
     setBusy(true);
+    setCurrentOp('Refreshing');
     try {
       const [st, lg, br] = await Promise.all([
         bridge.status(path),
@@ -170,6 +177,7 @@ export default function GitClient(): React.ReactElement {
       flash(`Refresh failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
+      setCurrentOp('');
     }
   }, [bridge, repoPath, flash]);
 
@@ -183,9 +191,10 @@ export default function GitClient(): React.ReactElement {
     void refresh(p);
   }, [pending, refresh]);
 
-  const run = useCallback(async (fn: () => Promise<{ success: boolean; message: string }>, okMsg: string) => {
+  const run = useCallback(async (fn: () => Promise<{ success: boolean; message: string }>, okMsg: string, op = 'Working') => {
     if (!bridge || !repoPath) return;
     setBusy(true);
+    setCurrentOp(op);
     try {
       const r = await fn();
       flash(r?.success ? okMsg : (r?.message || 'Command failed'), r?.success ? 'success' : 'error');
@@ -194,6 +203,7 @@ export default function GitClient(): React.ReactElement {
       flash(e instanceof Error ? e.message : String(e), 'error');
     } finally {
       setBusy(false);
+      setCurrentOp('');
     }
   }, [bridge, repoPath, flash, refresh]);
 
@@ -227,8 +237,8 @@ export default function GitClient(): React.ReactElement {
   }, []);
 
   const toggleStage = useCallback((f: GitStatusFile) => {
-    if (f.staged) void run(() => bridge!.unstage(repoPath, [f.path]), 'Unstaged');
-    else void run(() => bridge!.stage(repoPath, [f.path]), 'Staged');
+    if (f.staged) void run(() => bridge!.unstage(repoPath, [f.path]), 'Unstaged', 'Unstaging');
+    else void run(() => bridge!.stage(repoPath, [f.path]), 'Staged', 'Staging');
   }, [bridge, repoPath, run]);
 
   const commit = useCallback(() => {
@@ -237,7 +247,7 @@ export default function GitClient(): React.ReactElement {
     if (staged.length === 0) { flash('Stage at least one file first', 'error'); return; }
     try { localStorage.setItem(LS_LAST_MSG, msg); } catch { /* ignore */ }
     setLastMessage(msg);
-    void run(() => bridge!.commit(repoPath, msg), 'Committed').then(() => setMessage(''));
+    void run(() => bridge!.commit(repoPath, msg), 'Committed', 'Committing').then(() => setMessage(''));
   }, [bridge, repoPath, message, staged.length, run, flash]);
 
   // Insert a template body at the start of the message (renderer-side only).
@@ -287,7 +297,7 @@ export default function GitClient(): React.ReactElement {
   const renderFile = (f: GitStatusFile) => {
     const m = statusMeta(f);
     return (
-      <li key={(f.staged ? 's:' : 'u:') + f.path} style={rowStyle}>
+      <li key={(f.staged ? 's:' : 'u:') + f.path} className="dex-liquid-glass" style={rowStyle}>
         <span title={m.title} style={{ width: 18, textAlign: 'center', fontWeight: 700, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.ch}</span>
         <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{f.path}</span>
         <button
@@ -333,7 +343,7 @@ export default function GitClient(): React.ReactElement {
               aria-label="Switch branch"
               value={branches.current ?? ''}
               disabled={busy}
-              onChange={(e) => { const b = e.target.value; if (b && b !== branches.current) void run(() => bridge!.checkout(repoPath, b), `Switched to ${b}`); }}
+              onChange={(e) => { const b = e.target.value; if (b && b !== branches.current) void run(() => bridge!.checkout(repoPath, b), `Switched to ${b}`, 'Switching branch'); }}
               style={{ ...glassButton, padding: '4px 8px', fontSize: 12, ...disabledVisual(busy) }}
             >
               {branches.branches.map(b => <option key={b} value={b}>{b}</option>)}
@@ -344,7 +354,7 @@ export default function GitClient(): React.ReactElement {
               title={status.behind > 0 ? `Pull ${status.behind} commit(s)` : 'Pull from upstream'}
               style={{ ...glassButton, ...(status.behind > 0 ? { borderColor: 'var(--color-warning)', color: 'var(--color-warning)' } : {}), ...disabledVisual(busy) }}
               disabled={busy}
-              onClick={() => run(() => bridge!.pull(repoPath), 'Pulled')}
+              onClick={() => run(() => bridge!.pull(repoPath), 'Pulled', 'Pulling')}
             >
               Pull{status.behind > 0 ? ` (${status.behind})` : ''}
             </button>
@@ -354,7 +364,7 @@ export default function GitClient(): React.ReactElement {
               title={status.ahead > 0 ? `Push ${status.ahead} commit(s)` : 'Push to upstream'}
               style={{ ...glassButton, ...(status.ahead > 0 ? { borderColor: 'var(--color-success)', color: 'var(--color-success)' } : {}), ...disabledVisual(busy) }}
               disabled={busy}
-              onClick={() => run(() => bridge!.push(repoPath), 'Pushed')}
+              onClick={() => run(() => bridge!.push(repoPath), 'Pushed', 'Pushing')}
             >
               Push{status.ahead > 0 ? ` (${status.ahead})` : ''}
             </button>
@@ -372,7 +382,7 @@ export default function GitClient(): React.ReactElement {
           onKeyDown={(e) => { if (e.key === 'Enter') openRepo(); }}
           placeholder="Path to a git repository (e.g. C:\\Users\\you\\project)"
           style={{
-            flex: 1, minWidth: 0, padding: 'var(--space-2) 10px', borderRadius: 6,
+            flex: 1, minWidth: 0, padding: 'var(--space-2) 10px', borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
             color: 'var(--color-text-primary)', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12,
           }}
@@ -380,7 +390,15 @@ export default function GitClient(): React.ReactElement {
         <button style={{ ...glassButton, ...disabledVisual(busy || !pending.trim()) }} disabled={busy || !pending.trim()} onClick={openRepo}>Open</button>
       </div>
 
-      {note && <div role="status" aria-live="polite" className="text-sm break-words" style={{ color: 'var(--color-text-secondary)' }}>{note}</div>}
+      {/* Live operation indicator: while a git command runs, say WHICH one. The
+          pulsing dot + accent text reads as active; clears the moment it ends. */}
+      {busy && currentOp && (
+        <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)', animation: 'ukiPulse 0.9s ease-in-out infinite', flexShrink: 0 }} />
+          {currentOp}…
+        </div>
+      )}
+      {!busy && note && <div role="status" aria-live="polite" className="text-sm break-words" style={{ color: 'var(--color-text-secondary)' }}>{note}</div>}
 
       {/* Body */}
       {!repoPath ? (
@@ -405,9 +423,9 @@ export default function GitClient(): React.ReactElement {
               </h2>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12, ...disabledVisual(busy || unstaged.length === 0) }} disabled={busy || unstaged.length === 0}
-                  onClick={() => run(() => bridge!.stage(repoPath, unstaged.map(f => f.path)), 'Staged all')}>Stage all</button>
+                  onClick={() => run(() => bridge!.stage(repoPath, unstaged.map(f => f.path)), 'Staged all', 'Staging')}>Stage all</button>
                 <button style={{ ...glassButton, padding: '2px 10px', fontSize: 12, ...disabledVisual(busy || staged.length === 0) }} disabled={busy || staged.length === 0}
-                  onClick={() => run(() => bridge!.unstage(repoPath, staged.map(f => f.path)), 'Unstaged all')}>Unstage all</button>
+                  onClick={() => run(() => bridge!.unstage(repoPath, staged.map(f => f.path)), 'Unstaged all', 'Unstaging')}>Unstage all</button>
               </div>
             </div>
             {status && status.files.length === 0 ? (
@@ -486,7 +504,7 @@ export default function GitClient(): React.ReactElement {
               placeholder="Commit message"
               rows={2}
               style={{
-                resize: 'vertical', padding: 'var(--space-2) 10px', borderRadius: 6,
+                resize: 'vertical', padding: 'var(--space-2) 10px', borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
                 color: 'var(--color-text-primary)', outline: 'none', fontSize: 13, fontFamily: 'var(--font-family)',
               }}
@@ -515,7 +533,7 @@ export default function GitClient(): React.ReactElement {
                         key={c.hash}
                         onClick={() => setSelectedCommit(active ? null : c)}
                         style={{
-                          display: 'flex', gap: 10, padding: '5px 8px', borderRadius: 6, alignItems: 'baseline', cursor: 'pointer',
+                          display: 'flex', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-lg)', alignItems: 'baseline', cursor: 'pointer',
                           background: active ? 'var(--color-bg-surface)' : 'transparent',
                           border: active ? '1px solid var(--color-accent)' : '1px solid transparent',
                         }}
@@ -533,9 +551,9 @@ export default function GitClient(): React.ReactElement {
             {/* Details panel */}
             {selectedCommit && (
               <aside
+                className="dex-liquid-glass-strong"
                 style={{
-                  width: 280, flexShrink: 0, overflow: 'auto', padding: 'var(--space-3)', borderRadius: 8,
-                  border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)',
+                  width: 280, flexShrink: 0, overflow: 'auto', padding: 'var(--space-3)', borderRadius: 'var(--radius-xl)',
                   display: 'flex', flexDirection: 'column', gap: 8,
                 }}
               >
