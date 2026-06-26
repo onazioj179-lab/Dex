@@ -1,5 +1,24 @@
 # DEX — Roadmap (single source of truth)
 
+> **DONE (2026-06-26) — Creative suite standardization + multi-window "use all at once".**
+> Cleared the queued creative-app work (all tsc 0, watermark 0 (2187), verified live in preview):
+> (1) **Flux draggable keyframes** — timeline keyframe diamonds are now drag-to-retime (pointer
+> capture, collision-safe, re-sorts the track; click with no drag still seeks). Wired the dead
+> Trim-Paths "Simultaneously/Individually" mode toggle. (`flux/Flux.tsx`)
+> (2) **Forge real waveform + trim scrubber** — new `decodeAudioPeaks()` + `sliceBuffer()` in
+> `forge/transcode.ts`; the Trim & Split panel decodes the selected audio job into a real peak
+> waveform with draggable in/out handles, a seconds/selection readout, and an honest empty state
+> for video. Trim is now actually applied on WAV encode (was previously a dead setting).
+> (3) **Vinx editable color-wheel readouts** — the R/G/B/M readouts under each Lift/Gamma/Gain wheel
+> are now editable numeric fields (commit on Enter/blur, Arrow nudges, ±1 clamp). (`vinx/ColorWheel.tsx`)
+> (4) **Standardized creative menu bar** — new reusable `components/CreativeMenuBar.tsx` (desktop-style
+> menu bar with dropdowns + nested submenu flyouts, edge-aware, portal-rendered, no-glass) and
+> `components/CollapsibleSidePanel.tsx` (collapses to a labelled rail, persisted). Folded the long
+> Features dropdowns of Forge / Flux / Vinx into File/Edit/View/… menus with grouped submenus.
+> (5) **"Use All Apps at Once"** — `AppManager.autoTileAll` reads its window set from the latest state,
+> and new `tileAllRunningApps` detaches every running app then tiles them together; reachable via the
+> Command Palette ("Use All Apps at Once") and the `dex-arrange-windows` event with `{ includeAll: true }`.
+
 > **CHECKPOINT (2026-06-25) — Ultra-premium overhaul, wave 1: launcher motion + Glass 2.0 depth + Control Center.**
 > Against the ULTRA PREMIUM OVERHAUL brief. Shipped this wave (all tsc 0, watermark 0, verified live):
 > (1) **DEX Bar elevated** -- premium one-time entrance fade (opacity-only so it never fights the

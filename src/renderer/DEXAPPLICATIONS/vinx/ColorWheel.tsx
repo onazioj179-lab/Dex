@@ -52,9 +52,47 @@ const labelStyle: React.CSSProperties = {
 };
 
 const readoutStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(4, auto)', gap: '2px 6px',
+  display: 'grid', gridTemplateColumns: 'auto 1fr auto 1fr', gap: '2px 4px',
   fontSize: 9, fontFamily: 'var(--font-mono)',
   fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-tertiary)',
+  alignItems: 'center', width: '100%',
+};
+
+const readoutInputStyle: React.CSSProperties = {
+  width: '100%', minWidth: 0, boxSizing: 'border-box',
+  background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)',
+  borderRadius: 3, color: 'var(--color-text-secondary)',
+  fontSize: 9, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+  padding: '1px 3px', textAlign: 'right', outline: 'none',
+};
+
+const clamp1 = (n: number) => Math.max(-1, Math.min(1, n));
+
+// Editable numeric field for a single color-wheel channel. Commits on blur and
+// on Enter; reverts non-numeric input to the current value. Up/Down nudge by 0.01.
+const ChannelInput: React.FC<{ value: number; onCommit: (v: number) => void }> = ({ value, onCommit }) => {
+  const [text, setText] = React.useState(value.toFixed(3));
+  const editing = React.useRef(false);
+  React.useEffect(() => { if (!editing.current) setText(value.toFixed(3)); }, [value]);
+  const commit = (raw: string) => {
+    const n = parseFloat(raw);
+    onCommit(Number.isFinite(n) ? clamp1(n) : value);
+    editing.current = false;
+  };
+  return (
+    <input
+      type="text" inputMode="decimal" value={text}
+      onFocus={(e) => { editing.current = true; e.currentTarget.select(); }}
+      onChange={(e) => { editing.current = true; setText(e.target.value); }}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { commit((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); onCommit(clamp1(value + (e.shiftKey ? 0.1 : 0.01))); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); onCommit(clamp1(value - (e.shiftKey ? 0.1 : 0.01))); }
+      }}
+      style={readoutInputStyle}
+    />
+  );
 };
 
 export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120 }) => {
@@ -249,10 +287,10 @@ export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120
       </div>
       <span style={labelStyle}>{label}</span>
       <div style={readoutStyle}>
-        <span>R</span><span>{value.r.toFixed(3)}</span>
-        <span>G</span><span>{value.g.toFixed(3)}</span>
-        <span>B</span><span>{value.b.toFixed(3)}</span>
-        <span>M</span><span>{value.master.toFixed(3)}</span>
+        <span>R</span><ChannelInput value={value.r} onCommit={(v) => onChange({ ...value, r: v })} />
+        <span>G</span><ChannelInput value={value.g} onCommit={(v) => onChange({ ...value, g: v })} />
+        <span>B</span><ChannelInput value={value.b} onCommit={(v) => onChange({ ...value, b: v })} />
+        <span>M</span><ChannelInput value={value.master} onCommit={(v) => onChange({ ...value, master: v })} />
       </div>
     </div>
   );

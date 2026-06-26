@@ -33,6 +33,7 @@ import { MulticamPanel } from './MulticamPanel';
 import { formatTimecode, generateId } from './VinxTypes';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
+import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { dispatchActivity, updateActivity, completeActivity } from '../../utils/liveActivity';
@@ -971,6 +972,102 @@ const VinxEditor: React.FC = () => {
 
   const speeds = [0.25, 0.5, 1, 2, 4];
 
+  // Standardized menu bar — folds Vinx's long Features list into File / Edit /
+  // View / Color / Audio / Video / Timeline / Export menus with submenus. Reuses
+  // the same handlers as the existing Features dropdown.
+  const vinxMenus: CreativeMenu[] = [
+    {
+      id: 'file', label: 'File', items: [
+        { label: 'Save', shortcut: 'Ctrl+S', onSelect: () => markSaved() },
+        { separator: true },
+        { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setShowExportDialog(true) },
+        { label: quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM)', onSelect: () => (quickExport.active ? handleCancelQuickExport() : handleQuickExport()) },
+        { separator: true },
+        { label: 'Export', submenu: [
+          { label: 'Render Queue', checked: showBackgroundRender, onSelect: () => toggleBackgroundRender() },
+          { label: 'EDL / XML Export', checked: showEDLExport, onSelect: () => toggleEDLExport() },
+          { label: 'Batch Export', checked: showBatchExport, onSelect: () => toggleBatchExport() },
+          { label: 'Templates', onSelect: () => toggleTemplateDialog() },
+        ] },
+      ],
+    },
+    {
+      id: 'edit', label: 'Edit', items: [
+        { label: 'Undo', shortcut: 'Ctrl+Z', disabled: undoStack.length === 0, onSelect: () => undo() },
+        { label: 'Redo', shortcut: 'Ctrl+Shift+Z', disabled: redoStack.length === 0, onSelect: () => redo() },
+        { separator: true },
+        { label: 'Adjustment Layer', onSelect: () => addAdjustmentLayer() },
+        { label: 'Reverse Clip', disabled: selectedClipIds.length === 0, onSelect: () => { if (selectedClipIds.length > 0) reverseClip(selectedClipIds[0]); } },
+        { separator: true },
+        { label: 'Copy Attributes', disabled: selectedClipIds.length === 0, onSelect: () => { if (selectedClipIds.length > 0) copyClipAttributes(selectedClipIds[0]); } },
+        { label: 'Paste Attributes', disabled: !copiedClipAttributes || selectedClipIds.length === 0, onSelect: () => { if (copiedClipAttributes && selectedClipIds.length > 0) pasteClipAttributes(selectedClipIds[0]); } },
+      ],
+    },
+    {
+      id: 'view', label: 'View', items: [
+        { label: 'Layout', submenu: [
+          { label: 'Edit', onSelect: () => resetPanelToPreset('edit') },
+          { label: 'Color', onSelect: () => resetPanelToPreset('color') },
+          { label: 'Audio', onSelect: () => resetPanelToPreset('audio') },
+        ] },
+        { separator: true },
+        { label: 'Clip Inspector', checked: showClipInspector, onSelect: () => toggleClipInspector() },
+        { label: 'Reference Frame', checked: showReferenceFrame, onSelect: () => toggleReferenceFrame() },
+        { label: 'Timecode Overlay', checked: timecodeOverlayEnabled, onSelect: () => toggleTimecodeOverlay() },
+        { label: renderPreviewStatus === 'rendering' ? 'Cancel Render Preview' : 'Render Preview', onSelect: () => (renderPreviewStatus === 'rendering' ? cancelRenderPreview() : startRenderPreview()) },
+      ],
+    },
+    {
+      id: 'color', label: 'Color', items: [
+        { label: 'LUT Browser', checked: showLUTBrowser, onSelect: () => toggleLUTBrowser() },
+        { label: 'Speed Ramp', checked: showSpeedRampEditor, onSelect: () => toggleSpeedRampEditor() },
+        { label: 'Freeze Frame', disabled: selectedClipIds.length === 0, onSelect: () => { if (selectedClipIds.length > 0) createFreezeFrame(selectedClipIds[0], currentFrame, project.frameRate * 2); } },
+      ],
+    },
+    {
+      id: 'audio', label: 'Audio', items: [
+        { label: 'Loudness (LUFS)', checked: showLoudnessPanel, onSelect: () => toggleLoudnessPanel() },
+        { label: 'Audio Ducking', checked: showAudioDuckingPanel, onSelect: () => toggleAudioDuckingPanel() },
+        { label: 'Voiceover', checked: isRecordingVoiceover, onSelect: () => toggleVoiceoverRecording() },
+        { label: 'Voice Isolation', checked: voiceIsolationEnabled, onSelect: () => toggleVoiceIsolation() },
+        { label: 'Crossfade Presets', checked: showCrossfadePresets, onSelect: () => toggleCrossfadePresets() },
+        { label: 'Audio EQ', checked: showAudioEQ, onSelect: () => toggleAudioEQ() },
+      ],
+    },
+    {
+      id: 'video', label: 'Video', items: [
+        { label: 'Motion Tracker', checked: showMotionTracker, onSelect: () => toggleMotionTracker() },
+        { label: 'Mask Editor', checked: showMaskEditor, onSelect: () => toggleMaskEditor() },
+        { label: 'Stabilization', checked: showStabilizationPanel, onSelect: () => toggleStabilizationPanel() },
+        { label: 'Noise Reduction', checked: showNoiseReductionPanel, onSelect: () => toggleNoiseReductionPanel() },
+        { label: 'Ken Burns Zoom', checked: showKenBurns, onSelect: () => toggleKenBurns() },
+      ],
+    },
+    {
+      id: 'timeline', label: 'Timeline', items: [
+        { label: 'Editing', submenu: [
+          { label: 'Clip Roles', checked: showClipRolesPanel, onSelect: () => toggleClipRolesPanel() },
+          { label: 'Picture-in-Picture', checked: showPipPresets, onSelect: () => togglePipPresets() },
+          { label: 'Auto-Reframe', checked: showAutoReframe, onSelect: () => toggleAutoReframe() },
+          { label: 'J/L Cut Presets', checked: showJLCutPanel, onSelect: () => toggleJLCutPanel() },
+        ] },
+        { label: 'Subtitles & Multicam', submenu: [
+          { label: 'Subtitles (SRT)', checked: showSubtitleEditor, onSelect: () => toggleSubtitleEditor() },
+          { label: 'Multicam Mode', checked: multicamMode, onSelect: () => toggleMulticamMode() },
+          { label: 'Multicam Angles Panel', checked: showMulticamPanel, onSelect: () => setShowMulticamPanel(!showMulticamPanel) },
+        ] },
+        { label: 'Markers', submenu: [
+          { label: 'Marker Manager', checked: showMarkerManager, onSelect: () => toggleMarkerManager() },
+          { label: 'Snap Settings', checked: showSnapSettings, onSelect: () => toggleSnapSettings() },
+        ] },
+        { separator: true },
+        { label: 'Set In Point', shortcut: 'I', onSelect: () => setInPoint() },
+        { label: 'Set Out Point', shortcut: 'O', onSelect: () => setOutPoint() },
+        { label: 'Clear In/Out', onSelect: () => clearInOutPoints() },
+      ],
+    },
+  ];
+
   return (
     <div style={appContainerStyle} className="vinx-app" {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop videos to import</div>}
@@ -1025,6 +1122,8 @@ const VinxEditor: React.FC = () => {
         </div>
       )}
 
+      {/* Standardized menu bar (File / Edit / View / Color / Audio / Video / Timeline) */}
+      <CreativeMenuBar menus={vinxMenus} accent="var(--color-accent)" />
       {/* Toolbar */}
       <div style={toolbarStyle} className="vinx-tb">
         {/* App Icon + Project name */}
