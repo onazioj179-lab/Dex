@@ -118,6 +118,13 @@ interface UkiStoreState {
   startListening: () => void;
   stopListening: () => void;
   reset: () => void;
+  /**
+   * Drift to sleep: hide the transient panel and enter `dormant` (Nexus shows
+   * this as STANDBY). Distinct from `reset()` — reset is an explicit dismissal
+   * (she's awake but closed), sleep is UKI standing down on her own after a
+   * response has lingered. Conversation history is untouched either way.
+   */
+  sleep: () => void;
   addConversationTurn: (turn: UkiConversationTurn) => void;
   setKnowledgeNodes: (nodes: UkiKnowledgeNode[]) => void;
   /** Append a reasoning step to the rewindable thought trail. */
@@ -214,6 +221,7 @@ export const useUkiStore = create<UkiStoreState>((set, get) => ({
   startListening: () => set({ state: 'listening', isListening: true, transcript: '', partialTranscript: '', response: '', error: null, showTranscript: false, showPanel: true }),
   stopListening: () => set({ state: 'idle', isListening: false, audioLevel: 0 }),
   reset: () => set({ state: 'idle', transcript: '', partialTranscript: '', response: '', audioLevel: 0, isListening: false, showTranscript: false, showPanel: false, error: null }),
+  sleep: () => set({ state: 'dormant', transcript: '', partialTranscript: '', response: '', audioLevel: 0, isListening: false, showTranscript: false, showPanel: false, error: null }),
 
   addConversationTurn: (turn) => set((prev) => {
     const next = [...prev.conversationHistory.slice(-29), turn];
@@ -243,5 +251,7 @@ export const useUkiStore = create<UkiStoreState>((set, get) => ({
   setIsSearchingMemory: (v) => set({ isSearchingMemory: v }),
   clearMemorySearch: () => set({ memorySearchResults: [], memorySearchQuery: '', isSearchingMemory: false }),
   togglePanel: () => set(s => ({ showPanel: !s.showPanel })),
-  openPanel: () => set({ showPanel: true }),
+  // Reopening always wakes her: a dormant UKI returns to idle so the header
+  // reads "Idle", not a stale "Asleep", and the sleep timer can re-arm cleanly.
+  openPanel: () => set(s => ({ showPanel: true, state: s.state === 'dormant' ? 'idle' : s.state })),
 }));

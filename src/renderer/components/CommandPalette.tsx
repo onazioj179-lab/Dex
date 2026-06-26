@@ -253,6 +253,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
     { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { useClipboardStore.getState().clearAll(); }, keywords: ['clean', 'privacy'] },
+    { id: 'toggle-dex-bar', title: 'Show / Hide DEX Bar', subtitle: 'Toggle the floating launcher bar', icon: Icons.home, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-toggle-bar')); }, keywords: ['bar', 'launcher', 'dock', 'floating', 'show', 'hide', 'restore'], shortcut: `${_M}+Shift+B` },
     { id: 'save-diagnostics', title: 'Save Diagnostics Report', subtitle: 'Download crash + environment info', icon: Icons.files, category: 'action', action: () => { exportDiagnostics(); }, keywords: ['diagnostics', 'crash', 'report', 'debug', 'support', 'recovery', 'logs'] },
     { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
     { id: 'arrange-windows', title: 'Arrange Windows', subtitle: 'Tile open windows into a grid', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), keywords: ['tile', 'grid', 'arrange', 'organize', 'windows', 'layout', 'cascade'] },
@@ -322,9 +323,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     const { text: scopeText, allowedCategories } = scopedQuery(query);
     const q = scopeText.toLowerCase();
 
-    // Math evaluation (on the residual text after any scope prefix)
-    const mathResult = tryEvalMath(scopeText);
-    const unitResult = tryUnitConvert(scopeText);
+    // Math/unit evaluation only makes sense when the query carries a number, so
+    // skip the parse machinery on plain-text queries -- this memo runs on every
+    // keystroke and the common case ("notes", "set...") has no digits.
+    const hasDigit = /\d/.test(scopeText);
+    const mathResult = hasDigit ? tryEvalMath(scopeText) : null;
+    const unitResult = hasDigit ? tryUnitConvert(scopeText) : null;
     const inlineResults: Command[] = [];
     if (mathResult) inlineResults.push({
       id: 'math-result',
@@ -354,7 +358,28 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       return { cmd, score: Math.max(titleScore, keywordScore, subtitleScore) };
     }).filter(x => x.score > 0);
     scored.sort((a, b) => b.score - a.score);
-    return [...inlineResults, ...scored.map(x => x.cmd)];
+
+    // Spotlight-style fallback: a non-empty query is never a dead end. Append a
+    // "Search the web" action under the scored matches, reusing the same browser
+    // navigation contract as Quick Actions and Flow (dex-spotlight-navigate ->
+    // AppManager opens Browser and navigates). Suppressed for math/unit queries,
+    // which already produced an inline result above.
+    const fallbacks: Command[] = [];
+    const trimmed = scopeText.trim();
+    if (trimmed && !mathResult && !unitResult) {
+      fallbacks.push({
+        id: 'web-search',
+        title: `Search the web for "${trimmed}"`,
+        subtitle: 'Open in Browser',
+        icon: Icons.browser,
+        category: 'action',
+        action: () => window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
+          detail: { appId: 'browser', contextId: `https://www.google.com/search?q=${encodeURIComponent(trimmed)}` },
+        })),
+        keywords: [],
+      });
+    }
+    return [...inlineResults, ...scored.map(x => x.cmd), ...fallbacks];
   }, [commands, query, recentIds]);
 
   // Flatten into the SAME order the list renders (grouped by category). The list
@@ -385,7 +410,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   // Execute a command: record it as recent (except transient math/unit results),
   // run its action, and close.
   const runCommand = useCallback((cmd: Command) => {
-    if (cmd.id !== 'math-result' && cmd.id !== 'unit-result') recordRecentCommand(cmd.id);
+    if (cmd.id !== 'math-result' && cmd.id !== 'unit-result' && cmd.id !== 'web-search') recordRecentCommand(cmd.id);
     cmd.action();
     onClose();
   }, [onClose]);

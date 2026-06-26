@@ -31,6 +31,7 @@ import {
   type BackupPayload,
   type FolderBackupEntry,
 } from '../../services/backupSync';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 
 function toast(type: 'success' | 'error' | 'warning' | 'info', message: string): void {
   try {
@@ -67,6 +68,11 @@ const BackupSync: React.FC = () => {
   const [passphrase, setPassphrase] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState<null | string>(null);
+  // Live crypto verbs per operation, replacing frozen one-word labels.
+  const encryptPhrase = useWorkingPhrase(busy === 'export', 'encrypt');
+  const decryptPhrase = useWorkingPhrase(busy === 'import', 'decrypt');
+  const restorePhrase = useWorkingPhrase(busy === 'restore', 'restore');
+  const syncPhrase = useWorkingPhrase(busy === 'sync-out', 'sync');
   const [recent, setRecent] = useState<RecentBackup[]>([]);
 
   // Pending import (decrypted but not yet applied).
@@ -205,7 +211,7 @@ const BackupSync: React.FC = () => {
         .bks-btn:hover:not(:disabled) { filter: brightness(1.12); }
         .bks-btn:active:not(:disabled) { transform: scale(0.985); }
         .bks-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .bks-row:hover { background: var(--color-bg-hover) !important; }
+        .bks-row:hover { border-color: var(--color-border, rgba(255,255,255,0.15)) !important; }
         .bks-seg:hover { background: var(--color-bg-hover) !important; }
       `}</style>
 
@@ -216,7 +222,7 @@ const BackupSync: React.FC = () => {
 
       <div style={styles.main}>
         {/* Passphrase */}
-        <section style={styles.card}>
+        <section className="dex-liquid-glass-strong" style={styles.card}>
           <div style={styles.cardLabel}>Passphrase</div>
           <p style={styles.help}>
             Your backup is encrypted with AES-256. There is no recovery — if you lose this
@@ -255,7 +261,7 @@ const BackupSync: React.FC = () => {
         </section>
 
         {/* Export */}
-        <section style={styles.card}>
+        <section className="dex-liquid-glass-strong" style={styles.card}>
           <div style={styles.cardLabel}>Export</div>
           <p style={styles.help}>
             Encrypt every DEX setting, note, board, and app state into a single
@@ -267,12 +273,12 @@ const BackupSync: React.FC = () => {
             disabled={busy !== null || !passphrase}
             onClick={onExport}
           >
-            {busy === 'export' ? 'Encrypting…' : 'Export encrypted backup'}
+            {busy === 'export' ? `${encryptPhrase}…` : 'Export encrypted backup'}
           </button>
         </section>
 
         {/* Import & restore */}
-        <section style={styles.card}>
+        <section className="dex-liquid-glass-strong" style={styles.card}>
           <div style={styles.cardLabel}>Import &amp; restore</div>
           <p style={styles.help}>
             Open a <code style={styles.code}>.dexbackup</code> file, then choose how to apply it.
@@ -283,11 +289,11 @@ const BackupSync: React.FC = () => {
             disabled={busy !== null || !passphrase}
             onClick={onPickImport}
           >
-            {busy === 'import' ? 'Decrypting…' : 'Choose backup file…'}
+            {busy === 'import' ? `${decryptPhrase}…` : 'Choose backup file…'}
           </button>
 
           {pending && (
-            <div style={styles.pendingBox}>
+            <div className="dex-liquid-glass-strong" style={styles.pendingBox}>
               <div style={styles.pendingTitle}>
                 Ready to restore: <strong>{pending.location}</strong>
               </div>
@@ -326,7 +332,7 @@ const BackupSync: React.FC = () => {
                   disabled={busy !== null}
                   onClick={onConfirmRestore}
                 >
-                  {busy === 'restore' ? 'Restoring…' : `Restore (${restoreMode})`}
+                  {busy === 'restore' ? `${restorePhrase}…` : `Restore (${restoreMode})`}
                 </button>
                 <button
                   className="bks-btn"
@@ -341,7 +347,7 @@ const BackupSync: React.FC = () => {
           )}
 
           {lastSummary && (
-            <div style={styles.summaryBox}>
+            <div className="dex-liquid-glass-strong" style={styles.summaryBox}>
               <div style={styles.summaryTitle}>Last restore ({lastSummary.mode})</div>
               <div style={styles.summaryGrid}>
                 <Stat label="Added" value={lastSummary.added} />
@@ -364,7 +370,7 @@ const BackupSync: React.FC = () => {
 
         {/* Offline folder sync */}
         {native && (
-          <section style={styles.card}>
+          <section className="dex-liquid-glass-strong" style={styles.card}>
             <div style={styles.cardLabel}>Offline folder sync</div>
             <p style={styles.help}>
               Point at a folder (e.g. a synced cloud-drive folder) to write and read
@@ -386,7 +392,7 @@ const BackupSync: React.FC = () => {
                   disabled={busy !== null || !passphrase}
                   onClick={onSyncOut}
                 >
-                  {busy === 'sync-out' ? 'Writing…' : 'Sync out now'}
+                  {busy === 'sync-out' ? `${syncPhrase}…` : 'Sync out now'}
                 </button>
               )}
             </div>
@@ -399,7 +405,7 @@ const BackupSync: React.FC = () => {
               ) : (
                 <div style={styles.list}>
                   {folderFiles.map((f) => (
-                    <div key={f.path} className="bks-row" style={styles.row}>
+                    <div key={f.path} className="bks-row dex-liquid-glass" style={styles.row}>
                       <span style={styles.rowName} title={f.path}>{f.name}</span>
                       <button
                         className="bks-btn"
@@ -418,7 +424,7 @@ const BackupSync: React.FC = () => {
         )}
 
         {/* Recent backups */}
-        <section style={styles.card}>
+        <section className="dex-liquid-glass-strong" style={styles.card}>
           <div style={styles.cardHeaderRow}>
             <div style={styles.cardLabel}>Recent activity</div>
             {recent.length > 0 && (
@@ -432,7 +438,7 @@ const BackupSync: React.FC = () => {
           ) : (
             <div style={styles.list}>
               {recent.map((r) => (
-                <div key={r.id} className="bks-row" style={styles.row}>
+                <div key={r.id} className="bks-row dex-liquid-glass" style={styles.row}>
                   <div style={{ minWidth: 0 }}>
                     <div style={styles.rowName}>
                       {KIND_LABEL[r.kind]} · {r.keyCount} keys
@@ -485,7 +491,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     color: 'var(--color-text-tertiary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     padding: '2px 8px',
   },
   main: {
@@ -500,10 +506,8 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 auto',
   },
   card: {
-    background: 'var(--color-bg-secondary)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-4)',
-    border: '1px solid var(--color-border-subtle)',
     boxShadow: 'var(--shadow-sm)',
   },
   cardHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
@@ -521,7 +525,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11.5px',
     background: 'var(--color-bg-surface)',
     padding: '1px 5px',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     margin: '0 3px',
   },
   passRow: { display: 'flex', gap: 'var(--space-2)', alignItems: 'center' },
@@ -530,7 +534,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '34px',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     color: 'var(--color-text-primary)',
     padding: '0 var(--space-3)',
     fontSize: '13px',
@@ -544,7 +548,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent)',
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -556,7 +560,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -568,7 +572,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     color: 'var(--color-text-secondary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     fontSize: '12.5px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -579,7 +583,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '5px',
+    borderRadius: 'var(--radius-sm)',
     fontSize: '12px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -596,9 +600,7 @@ const styles: Record<string, React.CSSProperties> = {
   pendingBox: {
     marginTop: 'var(--space-3)',
     padding: 'var(--space-3)',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-md)',
   },
   pendingTitle: { fontSize: '13px', marginBottom: '4px' },
   pendingMeta: { fontSize: '11.5px', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' },
@@ -609,7 +611,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-secondary)',
     color: 'var(--color-text-secondary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-sm)',
     fontSize: '12.5px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -625,9 +627,7 @@ const styles: Record<string, React.CSSProperties> = {
   summaryBox: {
     marginTop: 'var(--space-3)',
     padding: 'var(--space-3)',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-md)',
   },
   summaryTitle: { fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' },
   summaryGrid: { display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' },
@@ -651,9 +651,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     gap: 'var(--space-3)',
     padding: 'var(--space-2) var(--space-3)',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-md)',
     transition: 'all 0.15s ease',
   },
   rowName: { fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },

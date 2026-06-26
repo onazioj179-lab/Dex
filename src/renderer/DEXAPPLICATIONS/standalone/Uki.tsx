@@ -24,6 +24,7 @@ import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPa
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../../uki/answerEngine';
 import { classifyOperatorIntent, diagnose } from '../../uki/operator';
+import { useSpinnerVerb } from '../../uki/spinnerVerbs';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import type { ChatMessage } from '../../uki/providers/types';
 
@@ -257,6 +258,8 @@ export default function Uki(): React.ReactElement {
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [busy, setBusy] = useState(false);
+  // Lively thinking verb shown after send, before the first token streams in.
+  const verb = useSpinnerVerb(busy && !streamingText);
   const [search, setSearch] = useState('');
   const [contentMatchIds, setContentMatchIds] = useState<Set<string>>(() => new Set());
   // Provider config is re-checked (not memoized once) so adding a key in
@@ -683,6 +686,18 @@ export default function Uki(): React.ReactElement {
                 <button style={S.cancelBtn} onClick={cancelAction} disabled={busy}>
                   Cancel
                 </button>
+              </div>
+            </div>
+          )}
+          {busy && !streamingText && (
+            <div style={{ ...S.row, justifyContent: 'flex-start' }}>
+              <div style={{ ...S.bubble, ...S.bubbleAi, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-secondary)' }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--color-accent)',
+                  animation: 'ukiPulse 0.9s ease-in-out infinite',
+                }} />
+                <span style={{ transition: 'opacity 0.2s ease' }}>{verb}&hellip;</span>
               </div>
             </div>
           )}

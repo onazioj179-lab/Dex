@@ -62,6 +62,10 @@ function flushUnlocks(): void {
   pending = [];
   if (!unlocks.length) return;
 
+  // Achievements are low-value, non-interrupting: route them SILENTLY to the
+  // notification center (no popup banner). The owner explicitly does not want
+  // achievement banners popping over their work; they remain in the center +
+  // Trophies app for anyone who wants to look.
   const viewAction = { label: 'View', onClick: openTrophies };
   if (unlocks.length === 1) {
     const a = unlocks[0];
@@ -69,6 +73,7 @@ function flushUnlocks(): void {
       source: 'Achievements',
       action: { target: TROPHIES_DEEPLINK, label: 'View' },
       actions: [viewAction],
+      silent: true,
     });
   } else {
     const points = unlocks.reduce((sum, a) => sum + a.points, 0);
@@ -76,6 +81,7 @@ function flushUnlocks(): void {
       source: 'Achievements',
       action: { target: TROPHIES_DEEPLINK, label: 'View' },
       actions: [viewAction],
+      silent: true,
     });
   }
 

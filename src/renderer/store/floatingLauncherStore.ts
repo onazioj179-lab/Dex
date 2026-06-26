@@ -52,3 +52,26 @@ export const useFloatingLauncher = create<FloatingLauncherState>((set, get) => (
   setPosition: (x, y) => { set({ x, y }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
   setEnabled: (enabled) => { set({ enabled }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
 }));
+
+// Always-available recovery: a global shortcut toggles the DEX Bar even when it
+// is hidden (the bar renders null when disabled, so it can't host its own
+// re-show control). Lives in the store module -- which is always imported -- so
+// the listener survives with the bar hidden. Ctrl/Cmd + Shift + B. Also exposed
+// on window for the command palette / Settings to call. Guarded against the
+// HMR / double-import re-register.
+if (typeof window !== 'undefined' && !(window as { __dexBarToggleWired?: boolean }).__dexBarToggleWired) {
+  (window as { __dexBarToggleWired?: boolean }).__dexBarToggleWired = true;
+  const toggleBar = () => {
+    const s = useFloatingLauncher.getState();
+    s.setEnabled(!s.enabled);
+  };
+  (window as unknown as { dexToggleBar?: () => void }).dexToggleBar = toggleBar;
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
+      e.preventDefault();
+      toggleBar();
+    }
+  });
+  // Let any UI dispatch a re-show without importing the store.
+  window.addEventListener('dex-toggle-bar', toggleBar);
+}

@@ -41,12 +41,14 @@
   --color-bg-hover: #1E1E22;
   --color-bg-active: #252528;
   --color-bg-overlay: #0E0E10;
-  /* "Glass" fills — DEX Sharp full-flat (2026-06-13): now fully OPAQUE solid
-     surfaces (owner direction: strip the glass, place surfaces solidly). Kept
-     under the same token names so the ~hundreds of existing consumers go solid
-     with no per-site edits. Was rgba(22,22,24,0.86)/rgba(26,26,30,0.93). */
-  --color-bg-glass: #161618;
-  --color-bg-glass-strong: #1A1A1E;
+  /* "Glass" fills (master overhaul: real liquid glass again). Translucent
+     surfaces paired with the adaptive backdrop blur in glassMenu.ts, so every
+     menu / dropdown / popover / sidebar / toolbar / panel that consumes these
+     reads as one consistent frosted material. ~hundreds of consumers re-glass
+     with no per-site edits. Conservative alphas keep text readable; weak GPUs
+     (perf-tier "low") and reduced-transparency fall back to solid below. */
+  --color-bg-glass: rgba(22, 22, 26, 0.74);
+  --color-bg-glass-strong: rgba(16, 16, 20, 0.86);
   --color-bg-blur: #121214;
   --color-bg-secondary: #121214;
   --color-bg-elevated: #1A1A1E;
@@ -155,13 +157,16 @@
   --color-surface: #111111;   /* cards, panels, elevated areas */
   --color-overlay: #1a1a1a;   /* modals, dropdowns, popovers */
   --color-raised:  #222222;   /* hover / selected rows */
-  /* Floating chrome (dock, top bar, orbs, spotlight, control center). DEX Sharp
-     full-flat: SOLID and OPAQUE -- never see-through to wallpaper/windows behind.
-     One token, so every `var(--glass-bg)` consumer goes solid in one place. Blur
-     is also off (it's globally killed); kept as `none` for honesty. */
-  --glass-bg:     #141416;
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-blur:   none;
+  /* Floating chrome (dock, top bar, orbs, spotlight, control center). Liquid
+     glass (master overhaul): genuinely translucent over a real backdrop blur so
+     the wallpaper/content blooms behind it -- the macOS/Windows vibrancy the
+     whole shell is built around. One token, so every `var(--glass-bg)` consumer
+     re-glasses in one place. Degrades to solid on weak GPUs (perf-tier "low",
+     which strips backdrop-filter platform-wide) and prefers-reduced-transparency
+     via the overrides just below the .dex-liquid-glass block. */
+  --glass-bg:     rgba(20, 20, 24, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur:   blur(28px) saturate(180%);
   --glass-tint:   rgba(80, 80, 120, 0.04);
   /* Border tiers (spec aliases) */
   --border-subtle:  rgba(255, 255, 255, 0.06);
@@ -806,10 +811,12 @@
      boost (the "lensing" that makes wallpaper bloom behind it), finished with a
      fresnel-style bright top rim and edge highlights. Far more transparent than a
      frosted panel so the wallpaper/content reads through. */
-  background: linear-gradient(180deg, rgba(40, 40, 50, 0.40), rgba(14, 14, 20, 0.54));
-  backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
-  -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
-  border: 1px solid var(--color-border-glass, rgba(255, 255, 255, 0.16));
+  background: linear-gradient(180deg, rgba(44, 44, 54, 0.28), rgba(14, 14, 20, 0.42));
+  backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
+  -webkit-backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
+  /* Borderless: no hard outline. The lit fresnel rim (inset highlight below)
+     defines the edge, so the panel reads as one continuous piece of glass. */
+  border: 1px solid transparent;
   border-radius: var(--radius-xl);
   /* Spatial depth: a tight contact shadow + a wide soft ambient shadow so the
      panel reads as a physical object floating above the desktop, not a flat
@@ -826,10 +833,10 @@
 /* Stronger variant: more opaque for content-heavy surfaces that need text
    contrast (panels over busy app content rather than the wallpaper). */
 .dex-liquid-glass-strong {
-  background: linear-gradient(180deg, rgba(26, 26, 32, 0.78), rgba(12, 12, 16, 0.86));
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid var(--color-border-glass, rgba(255, 255, 255, 0.14));
+  background: linear-gradient(180deg, rgba(24, 24, 30, 0.66), rgba(11, 11, 15, 0.76));
+  backdrop-filter: blur(30px) saturate(185%);
+  -webkit-backdrop-filter: blur(30px) saturate(185%);
+  border: 1px solid transparent;
   border-radius: var(--radius-xl);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.22),
@@ -839,12 +846,16 @@
     inset 1px 0 0 rgba(255, 255, 255, 0.05),
     inset -1px 0 0 rgba(255, 255, 255, 0.05);
 }
-/* Lite mode (weak GPUs, data-perf-tier="low") strips the backdrop blur via the
-   universal rule, so give the panels a solid bg there to avoid an ugly
-   see-through. Same for the accessibility reduced-transparency preference. */
-html[data-perf-tier="low"] .dex-liquid-glass,
+/* Lite mode (weak GPUs, data-perf-tier="low") strips the EXPENSIVE backdrop blur
+   via the universal rule -- but the glass STAYS translucent so it never goes
+   solid black. We just bump the opacity a touch (it has no frost to lean on) so
+   text stays readable. Result: real see-through glass on every tier; only the
+   blur is dropped on weak GPUs. */
+html[data-perf-tier="low"] .dex-liquid-glass {
+  background: linear-gradient(180deg, rgba(26, 26, 34, 0.58), rgba(12, 12, 16, 0.70));
+}
 html[data-perf-tier="low"] .dex-liquid-glass-strong {
-  background: #141416;
+  background: linear-gradient(180deg, rgba(20, 20, 26, 0.80), rgba(10, 10, 14, 0.88));
 }
 @media (prefers-reduced-transparency: reduce) {
   .dex-liquid-glass,
@@ -853,6 +864,90 @@ html[data-perf-tier="low"] .dex-liquid-glass-strong {
     -webkit-backdrop-filter: none;
     background: var(--color-bg-surface, #161618);
   }
+}
+/* Glass-token fallbacks: when the backdrop blur is unavailable -- weak GPUs
+   (perf-tier "low" strips backdrop-filter platform-wide) or the user prefers
+   reduced transparency -- bump the floating-chrome and glass-fill tokens to
+   solid so text never sits on muddy, un-blurred translucency. Every menu,
+   dropdown, panel, and chrome surface that reads these tokens degrades together
+   in one place, matching the .dex-liquid-glass fallbacks above. */
+html[data-perf-tier="low"] {
+  --glass-bg: #141416;
+  --glass-blur: none;
+  --color-bg-glass: #161618;
+  --color-bg-glass-strong: #1a1a1e;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg: #141416;
+    --glass-blur: none;
+    --color-bg-glass: #161618;
+    --color-bg-glass-strong: #1a1a1e;
+  }
+}
+
+/* ── Creative pro-app panels (Vinx / Prism / Forge) ───────────────────────────
+   The creative suite deliberately uses NO glass. Pro editors (Premiere, DaVinci
+   Resolve, Photoshop) ship solid dark chrome: see-through panels hurt legibility
+   over dense timelines/canvases and the backdrop blur is the single most
+   expensive thing the compositor does each frame. These two classes are a 1:1
+   opaque, blur-free replacement for .dex-liquid-glass / -strong and are used
+   ONLY by the creative apps, so the whole suite reads as one solid, fast tool.
+   Fully opaque -> no perf-tier or reduced-transparency override needed. */
+.dex-creative-panel {
+  background: #161619;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 10px 30px rgba(0, 0, 0, 0.34),
+    0 24px 56px -16px rgba(0, 0, 0, 0.42);
+}
+.dex-creative-panel-strong {
+  background: #0f0f12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.40),
+    0 14px 38px rgba(0, 0, 0, 0.44),
+    0 30px 64px -16px rgba(0, 0, 0, 0.54);
+}
+
+/* ── AXL engineering hardware chrome ──────────────────────────────────────────
+   AXL is a precision CAD tool, so its chrome reads as real instrument hardware
+   rather than glass: solid brushed-metal surfaces, a machined top bevel, a fine
+   inset seam, and crisp edges. No backdrop blur -> fully opaque, so (like the
+   creative panels) it needs no perf-tier or reduced-transparency override. The
+   faint repeating-gradient is a brushed-metal grain at very low alpha. */
+.dex-axl-panel,
+.dex-axl-panel-strong {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #1c1d22 0%, #161619 48%, #131316 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.42),
+    0 18px 44px -18px rgba(0, 0, 0, 0.60);
+}
+.dex-axl-panel-strong {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #161619 0%, #111114 52%, #0d0d10 100%);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+/* Brushed-metal rail for the top toolbar / header strip: horizontal grain, a
+   harder machined bevel top-and-bottom so it reads as a milled faceplate. */
+.dex-axl-rail {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #212227 0%, #191a1e 44%, #141417 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
 
 /* ── Premium motion: spring entrances for floating glass surfaces ──────────────
@@ -871,6 +966,69 @@ html[data-perf-tier="low"] .dex-liquid-glass-strong {
 .dex-drawer-in { animation: dexDrawerIn 0.26s cubic-bezier(0.34, 1.4, 0.5, 1) both; }
 @media (prefers-reduced-motion: reduce) {
   .dex-drawer-in { animation: none; }
+}
+
+/* UKI presence on the DEX Bar mic button: a slow accent breath while she is
+   awake and working (listening/processing/thinking/speaking). The glow itself
+   is an inline drop-shadow filter so the bar's hover handlers never fight it;
+   this keyframe only animates the breath. Disabled in lite/reduced-motion. */
+@keyframes dexUkiBreath {
+  0%, 100% { filter: drop-shadow(0 0 3px var(--color-accent)); }
+  50%      { filter: drop-shadow(0 0 9px var(--color-accent)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dex-uki-awake { animation: none !important; }
+}
+
+/* Live-activity progress card: spinner, indeterminate bar sweep, and a springy
+   drop-in entrance. Used by components/LiveActivityHost. */
+@keyframes dexSpin { to { transform: rotate(360deg); } }
+@keyframes dexIndeterminate {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+@keyframes dexLiveActivityIn {
+  0%   { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  60%  { opacity: 1; transform: translateY(2px) scale(1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dex-live-activity-in { animation: dexLiveActivityIn 0.3s cubic-bezier(0.34, 1.4, 0.5, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .dex-live-activity-in { animation: none; }
+  .dex-live-activity-in [style*="dexSpin"],
+  .dex-live-activity-in [style*="dexIndeterminate"] { animation: none !important; }
+}
+
+/* Consistent glass button -- a borderless frosted chip that matches the shell's
+   liquid glass. Opt-in: add to buttons that should read as premium glass (not
+   every button -- use the existing solid/ghost styles for dense in-app controls). */
+.dex-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 7px 14px;
+  color: var(--color-text-primary, #fff);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: background 0.14s ease, box-shadow 0.14s ease, transform 0.06s ease;
+}
+.dex-glass-btn:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07));
+}
+.dex-glass-btn:active { transform: translateY(0.5px); }
+.dex-glass-btn:disabled { opacity: 0.5; cursor: default; }
+/* Accent (primary) variant -- DEX blue. */
+.dex-glass-btn-accent {
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 92%, white 8%), var(--color-accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 2px 10px rgba(74, 158, 255, 0.30);
+}
+.dex-glass-btn-accent:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 80%, white 20%), var(--color-accent));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

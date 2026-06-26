@@ -473,16 +473,67 @@ fn files_organize_by_type(dir: &str) -> Value {
     Value::Array(operations)
 }
 
-/// `system:getStatus` / `power:getStats` — memory + uptime snapshot.
+/// `system:getStatus` / `power:getStats` — full live snapshot: CPU%, cores,
+/// memory, disk, and network throughput.
+///
+/// CPU usage and network rate are deltas, so this takes two samples around a
+/// short sleep (`MINIMUM_CPU_UPDATE_INTERVAL`) -- a single refresh always reports
+/// 0% CPU. The structured `cpu`/`memory`/`disk`/`network`/`uptime` fields are
+/// what the Task Manager reads; the flat `memory*MB`/`uptimeSec` fields are kept
+/// for the older power/diagnostics consumers that still read them.
 fn system_status() -> Value {
+    use std::time::Instant;
+
     let mut sys = sysinfo::System::new_all();
-    sys.refresh_memory();
+    // Baseline network counters; received()/transmitted() then report the bytes
+    // moved since this point, which we divide by the elapsed time for a rate.
+    let mut networks = sysinfo::Networks::new_with_refreshed_list();
+    let t0 = Instant::now();
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    sys.refresh_all();
+    networks.refresh();
+    let elapsed = t0.elapsed().as_secs_f64().max(0.001);
+
+    let cpu_usage = sys.global_cpu_info().cpu_usage();
+    let cores = sys.cpus().len() as u64;
+
+    let mem_used = sys.used_memory(); // bytes (sysinfo 0.30)
+    let mem_total = sys.total_memory();
+    let mem_percent = if mem_total > 0 { (mem_used as f64 / mem_total as f64) * 100.0 } else { 0.0 };
+
+    let (mut rx, mut tx, mut iface_count) = (0u64, 0u64, 0u64);
+    for (_iface, data) in &networks {
+        rx += data.received();
+        tx += data.transmitted();
+        iface_count += 1;
+    }
+    let rx_bps = (rx as f64 / elapsed) as u64;
+    let tx_bps = (tx as f64 / elapsed) as u64;
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let (mut disk_total, mut disk_avail) = (0u64, 0u64);
+    for d in &disks {
+        disk_total += d.total_space();
+        disk_avail += d.available_space();
+    }
+    let disk_used = disk_total.saturating_sub(disk_avail);
+    let disk_percent = if disk_total > 0 { (disk_used as f64 / disk_total as f64) * 100.0 } else { 0.0 };
+
+    let uptime = sysinfo::System::uptime();
+
     json!({
         "success": true,
         "shell": "tauri",
-        "memoryUsedMB": sys.used_memory() / (1024 * 1024),
-        "memoryTotalMB": sys.total_memory() / (1024 * 1024),
-        "uptimeSec": sysinfo::System::uptime(),
+        // Legacy flat fields (power:getStats / diagnostics back-compat).
+        "memoryUsedMB": mem_used / (1024 * 1024),
+        "memoryTotalMB": mem_total / (1024 * 1024),
+        "uptimeSec": uptime,
+        // Structured fields read by the Task Manager.
+        "cpu": { "usage": cpu_usage, "cores": cores },
+        "memory": { "used": mem_used, "total": mem_total, "percent": mem_percent },
+        "disk": { "used": disk_used, "total": disk_total, "percent": disk_percent },
+        "network": { "connected": iface_count > 0, "rxBps": rx_bps, "txBps": tx_bps },
+        "uptime": uptime,
     })
 }
 
@@ -517,6 +568,9 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
 /// cpu%, memMB). Ranked + capped so the UI gets the hogs, not raw noise.
 fn system_processes() -> Value {
     let mut sys = sysinfo::System::new_all();
+    // Per-process CPU% is a delta between two samples; without the sleep every
+    // process reads 0% and the ranking collapses to memory only.
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
     sys.refresh_all();
     let all: Vec<ProcInfo> = sys
         .processes()
@@ -1700,7 +1754,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("games:list" | "games:playtime") => games::dispatch(&app, ch, &args),
         ch @ ("governance:getPolicies" | "governance:getPolicy") => governance_ctl::dispatch(&app, ch, &args),
         ch @ ("intelligence:getState" | "intelligence:getConfig") => intelligence_ctl::dispatch(&app, ch, &args),
-        ch @ ("learning:getModels") => learning_ctl::dispatch(&app, ch, &args),
+        ch @ "learning:getModels" => learning_ctl::dispatch(&app, ch, &args),
         ch @ ("monitor:getBaseline" | "monitor:getDigests") => monitor_ctl::dispatch(&app, ch, &args),
         // Full network:* surface (summary/getStatus + config/setConfig/setMode/
         // setOffline/connections/history/usage/policies). Was a 2-channel arm, so
@@ -1708,12 +1762,12 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // silently degraded; prefix-route the tier. networkHygiene:/connection:
         // are separate prefixes and unaffected.
         ch if ch.starts_with("network:") => network_ctl::dispatch(&app, ch, &args),
-        ch @ ("security:getPolicy") => security_ctl::dispatch(&app, ch, &args),
+        ch @ "security:getPolicy" => security_ctl::dispatch(&app, ch, &args),
         ch @ ("store:list" | "store:installed") => store_ctl::dispatch(&app, ch, &args),
         ch @ ("tags:list" | "tags:get") => tagging_ctl::dispatch(&app, ch, &args),
         ch @ ("tasks:list" | "tasks:get") => tasks_ctl::dispatch(&app, ch, &args),
         ch @ ("timeline:getEvents" | "timeline:getEvent") => timeline_ctl::dispatch(&app, ch, &args),
-        ch @ ("trust:list") => trust_ctl::dispatch(&app, ch, &args),
+        ch @ "trust:list" => trust_ctl::dispatch(&app, ch, &args),
         ch @ "update:getStatus" => update_ctl::dispatch(&app, ch, &args),
         // Full updates:* surface (getInfo/getPreferences + canDowngrade, install
         // history, changelog, skip/remindLater, pruneCache, ...). Was an explicit
