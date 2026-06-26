@@ -2303,7 +2303,7 @@ const Flux: React.FC = () => {
   }), [showTimeline, timelineHeight, isTimelineResizing]);
 
   return (
-    <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
+    <div className="flux-root" style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
@@ -2369,7 +2369,6 @@ const Flux: React.FC = () => {
             <button
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
-              title="Share & Collaborate"
             >
               {collab.activeCollaboratorCount > 0 ? `${collab.activeCollaboratorCount} collaborators` : 'Share'}
             </button>
@@ -2378,7 +2377,7 @@ const Flux: React.FC = () => {
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
             <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? 'rgba(191,90,242,0.1)' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#bf5af2' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showFeaturesMenu && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="dex-liquid-glass-strong" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dex-label-caps" style={{ padding: '6px var(--space-3) 4px' }}>ANIMATION</div>
                 {[
                   { label: 'Text Animator', active: showTextAnimator, fn: () => setShowTextAnimator(v => !v) },
@@ -2485,7 +2484,6 @@ const Flux: React.FC = () => {
                     event.preventDefault();
                     if (hasMultiple) setOpenToolGroup(isOpen ? null : group.id);
                   }}
-                  title={currentTool ? (currentTool.key ? `${currentTool.name} (${currentTool.key})` : currentTool.name) : group.label}
                   aria-label={currentTool?.name || group.label}
                   aria-haspopup={hasMultiple ? 'true' : undefined}
                   aria-expanded={isOpen ? 'true' : undefined}
@@ -2507,14 +2505,13 @@ const Flux: React.FC = () => {
                 </button>
                 {isOpen && hasMultiple && (
                   <div
+                    className="dex-liquid-glass-strong"
                     style={{
                       position: 'absolute',
                       left: '100%',
                       top: 0,
                       marginLeft: 4,
-                      background: 'var(--color-bg-elevated)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 6,
+                      borderRadius: 12,
                       padding: 4,
                       boxShadow: 'var(--pg-shadow-context)',
                       zIndex: 'var(--z-modal)',
@@ -2617,19 +2614,18 @@ const Flux: React.FC = () => {
               )}
               {/* Overlay UI - Canvas Zoom Controls */}
               <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '8px', padding: '6px var(--space-3)' }}>
-                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} title="Zoom Out" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <input 
                   type="range" 
                   min="10" 
                   max="200" 
                   value={viewScale} 
                   onChange={(e) => setViewScale(Number(e.target.value))} 
-                  style={{ width: '100px', accentColor: '#bf5af2', cursor: 'pointer' }} 
-                  title={`Canvas scale: ${Math.round(viewScale)}%`}
+                  style={{ width: '100px', accentColor: '#bf5af2', cursor: 'pointer' }}
                 />
-                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} title="Zoom In" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
-                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(50)} title="Reset to 50%" aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(50)} aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
               </div>
             </div>
 
@@ -2784,7 +2780,6 @@ const Flux: React.FC = () => {
                                     tabIndex={selectedLayerId ? 0 : -1}
                                     aria-label={`Apply ${preset.name} easing to selected layer`}
                                     aria-disabled={!selectedLayerId}
-                                    title={preset.description}
                                     onClick={() => {
                                       if (!selectedLayerId) return;
                                       const [p1x, p1y, p2x, p2y] = preset.bezier;
@@ -3022,7 +3017,6 @@ const Flux: React.FC = () => {
               <div
                 onPointerDown={startTimelineResize}
                 onDoubleClick={resetTimelineHeight}
-                title="Drag to resize timeline (double-click to reset)"
                 style={{ position: 'absolute', top: -3, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 20 }}
               />
             )}
@@ -3039,13 +3033,13 @@ const Flux: React.FC = () => {
               </div>
               <div style={styles.timeDisplay}>{formatTime(currentTime)}</div>
               <span style={{ color: 'var(--color-border-subtle)' }}>|</span>
-              <button style={{ ...styles.iconBtn, color: loopEnabled ? '#bf5af2' : undefined, background: loopEnabled ? 'rgba(191,90,242,0.12)' : undefined }} title={loopEnabled ? 'Loop: On' : 'Loop: Off'} onClick={() => setLoopEnabled(v => !v)} aria-label="Toggle loop">{Icons.loop}</button>
-              <button style={styles.iconBtn} title="Add Keyframe" onClick={() => { ['x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'opacity'].forEach(p => addKeyframeAtTime(p)); }} aria-label="Add keyframe">{Icons.keyframe}</button>
+              <button style={{ ...styles.iconBtn, color: loopEnabled ? '#bf5af2' : undefined, background: loopEnabled ? 'rgba(191,90,242,0.12)' : undefined }} onClick={() => setLoopEnabled(v => !v)} aria-label="Toggle loop">{Icons.loop}</button>
+              <button style={styles.iconBtn} onClick={() => { ['x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'opacity'].forEach(p => addKeyframeAtTime(p)); }} aria-label="Add keyframe">{Icons.keyframe}</button>
               <div style={{ flex: 1 }} />
               {/* Timeline Zoom */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <button style={{ ...styles.iconBtn, fontSize: '11px' }} onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} aria-label="Zoom out timeline">-</button>
-                <input type="range" min="25" max="400" value={zoom * 100} onChange={(e) => setZoom(Number(e.target.value) / 100)} style={{ width: '80px', accentColor: '#bf5af2' }} title={`Timeline zoom: ${Math.round(zoom * 100)}%`} />
+                <input type="range" min="25" max="400" value={zoom * 100} onChange={(e) => setZoom(Number(e.target.value) / 100)} style={{ width: '80px', accentColor: '#bf5af2' }} />
                 <button style={{ ...styles.iconBtn, fontSize: '11px' }} onClick={() => setZoom(z => Math.min(4, z + 0.25))} aria-label="Zoom in timeline">+</button>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '32px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
               </div>
@@ -3110,9 +3104,12 @@ const Flux: React.FC = () => {
                         }}
                       >
                         {layer.name}
-                        {/* Keyframe diamonds */}
-                        {(layer.animations || []).flatMap(a => a.keyframes).map((kf, ki) => (
-                          <div key={ki} onClick={(e) => { e.stopPropagation(); setCurrentTime(kf.time); }} style={{
+                        {/* Keyframe diamonds — click to scrub, right-click to delete */}
+                        {(layer.animations || []).map((a, ai) => a.keyframes.map((kf, ki) => (
+                          <div key={`${ai}-${ki}`}
+                            onClick={(e) => { e.stopPropagation(); setCurrentTime(kf.time); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setLayers(prev => prev.map(l => l.id !== layer.id ? l : { ...l, animations: (l.animations || []).map((aa, aai) => aai !== ai ? aa : { ...aa, keyframes: aa.keyframes.filter((_, kki) => kki !== ki) }) })); }}
+                            style={{
                             position: 'absolute',
                             left: `${((kf.time - layer.inPoint) / (layer.outPoint - layer.inPoint)) * 100}%`,
                             top: '50%', transform: 'translate(-50%,-50%) rotate(45deg)',
@@ -3120,8 +3117,8 @@ const Flux: React.FC = () => {
                             background: currentTime === kf.time ? 'var(--color-warning)' : 'var(--color-accent)',
                             border: '1px solid var(--color-text-tertiary)',
                             borderRadius: 2, cursor: 'pointer', zIndex: 2,
-                          }} title={`Keyframe at frame ${kf.time}`} />
-                        ))}
+                          }} />
+                        )))}
                       </div>
                     </div>
                   ))}
@@ -3141,10 +3138,10 @@ const Flux: React.FC = () => {
 
       {/* Text Animator Panel */}
       {showTextAnimator && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Text Animator</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTextAnimator(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTextAnimator(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Animate By</div>
@@ -3237,7 +3234,7 @@ const Flux: React.FC = () => {
           window.addEventListener('pointerup', onUp);
         };
         return (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 60, bottom: 0, right: 0, height: 200, background: 'var(--color-bg-elevated)', borderTop: '1px solid var(--color-border-subtle)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 60, bottom: 0, right: 0, height: 200, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Graph Editor</span>
@@ -3270,7 +3267,7 @@ const Flux: React.FC = () => {
                 </select>
               )}
             </div>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGraphEditor(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGraphEditor(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ height: 'calc(100% - 32px)', position: 'relative', padding: 'var(--space-2) var(--space-10)' }}>
             {/* Y-axis labels */}
@@ -3300,10 +3297,10 @@ const Flux: React.FC = () => {
 
       {/* Expression Editor Panel */}
       {showExpressionEditor && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 340, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Expression Engine</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => { setShowExpressionEditor(false); setExpressionError(null); }} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => { setShowExpressionEditor(false); setExpressionError(null); }} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-2)', alignItems: 'center' }}>
@@ -3317,7 +3314,7 @@ const Flux: React.FC = () => {
             {!expressionError && selectedLayer?.expressions?.[expressionTarget] && (
               <div style={{ fontSize: 11, color: '#bf5af2', marginTop: 4, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <span>Live on {expressionTarget}: {selectedLayer.expressions[expressionTarget]}</span>
-                <button aria-label="Remove live expression" title="Remove live expression" onClick={() => {
+                <button aria-label="Remove live expression" onClick={() => {
                   if (!selectedLayerId) return;
                   setLayers(prev => prev.map(l => {
                     if (l.id !== selectedLayerId || !l.expressions) return l;
@@ -3386,7 +3383,7 @@ const Flux: React.FC = () => {
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
-              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
+              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: '#bf5af2', fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
               </button>
             ))}
@@ -3396,10 +3393,10 @@ const Flux: React.FC = () => {
 
       {/* Repeater Panel */}
       {showRepeater && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Repeater / Replicator</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowRepeater(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowRepeater(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
@@ -3418,10 +3415,10 @@ const Flux: React.FC = () => {
 
       {/* 3D Text Panel */}
       {show3DText && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 100, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 100, width: 260, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>3D Text</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShow3DText(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShow3DText(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3445,10 +3442,10 @@ const Flux: React.FC = () => {
 
       {/* GIF/APNG Export Panel */}
       {showGifExport && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Animated Export (WebM)</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGifExport(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGifExport(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
@@ -3521,10 +3518,10 @@ const Flux: React.FC = () => {
 
       {/* Lottie Export Panel */}
       {showLottieExport && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Lottie / JSON Export</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLottieExport(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLottieExport(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ padding: 'var(--space-4)', borderRadius: 6, background: 'rgba(255,149,10,0.08)', border: '1px solid rgba(255,149,10,0.2)', textAlign: 'center', marginBottom: 'var(--space-3)' }}>
@@ -3604,10 +3601,10 @@ const Flux: React.FC = () => {
 
       {/* Composition Templates */}
       {showCompTemplates && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Composition Templates</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowCompTemplates(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowCompTemplates(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             <div style={{ width: 130, borderRight: '1px solid var(--color-bg-hover)', padding: 'var(--space-2)' }}>
@@ -3636,7 +3633,7 @@ const Flux: React.FC = () => {
 
       {/* Null Objects Panel */}
       {showNullObjects && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 120, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 120, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Null Objects</span>
             <button aria-label="Close Null Objects panel" onClick={() => setShowNullObjects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3670,7 +3667,7 @@ const Flux: React.FC = () => {
 
       {/* Motion Path Panel */}
       {showMotionPath && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 120, width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 120, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Motion Path</span>
             <button aria-label="Close Motion Path panel" onClick={() => setShowMotionPath(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3717,7 +3714,7 @@ const Flux: React.FC = () => {
 
       {/* Mask System Panel */}
       {showMaskSystem && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 350, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 350, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Mask System</span>
             <button aria-label="Close Mask System panel" onClick={() => setShowMaskSystem(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3764,7 +3761,7 @@ const Flux: React.FC = () => {
 
       {/* Advanced Particles Panel */}
       {showAdvancedParticles && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(400px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(400px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Advanced Particles</span>
             <button aria-label="Close Advanced Particles panel" onClick={() => setShowAdvancedParticles(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3816,7 +3813,7 @@ const Flux: React.FC = () => {
 
       {/* Audio Reactive Panel */}
       {showAudioReactive && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 350, width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 350, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Reactive</span>
             <button aria-label="Close Audio Reactive panel" onClick={() => setShowAudioReactive(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3860,7 +3857,7 @@ const Flux: React.FC = () => {
 
       {/* Shader Effects Panel */}
       {showShaderEffects && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shader Effects</span>
             <button aria-label="Close Shader Effects panel" onClick={() => setShowShaderEffects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3900,7 +3897,7 @@ const Flux: React.FC = () => {
 
       {/* 1. Track Mattes */}
       {showTrackMattes && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 80, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Track Mattes</span>
             <button aria-label="Close Track Mattes panel" onClick={() => setShowTrackMattes(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -3924,7 +3921,7 @@ const Flux: React.FC = () => {
 
       {/* 2. Precompose */}
       {showPrecompose && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Pre-compose</span>
             <button aria-label="Close Precompose panel" onClick={() => setShowPrecompose(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -3966,7 +3963,7 @@ const Flux: React.FC = () => {
 
       {/* 3. Time Remap */}
       {showTimeRemap && (
-        <div style={{ position: 'fixed', right: 20, top: 120, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 120, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Time Remap</span>
             <button aria-label="Close Time Remap panel" onClick={() => setShowTimeRemap(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -3994,7 +3991,7 @@ const Flux: React.FC = () => {
 
       {/* 4. Morph Shapes */}
       {showMorphShapes && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shape Morph</span>
             <button aria-label="Close Shape Morph panel" onClick={() => setShowMorphShapes(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4023,7 +4020,7 @@ const Flux: React.FC = () => {
 
       {/* 5. Trim Paths */}
       {showTrimPaths && (
-        <div style={{ position: 'fixed', right: 20, top: 160, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 160, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Trim Paths</span>
             <button aria-label="Close Trim Paths panel" onClick={() => setShowTrimPaths(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4048,7 +4045,7 @@ const Flux: React.FC = () => {
 
       {/* 6. Auto-Wiggle */}
       {showAutoWiggle && (
-        <div style={{ position: 'fixed', right: 20, top: 200, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 200, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Wiggle</span>
             <button aria-label="Close Wiggle panel" onClick={() => setShowAutoWiggle(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4087,7 +4084,7 @@ const Flux: React.FC = () => {
 
       {/* 7. Layer Effects Stack */}
       {showEffectsStack && (
-        <div style={{ position: 'fixed', right: 20, top: 100, width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 100, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Effects Stack</span>
             <button aria-label="Close Effects Stack panel" onClick={() => setShowEffectsStack(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4158,7 +4155,7 @@ const Flux: React.FC = () => {
 
       {/* 8. Camera Rig */}
       {showCameraRig && (
-        <div style={{ position: 'fixed', right: 20, top: 140, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 140, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Camera Rig</span>
             <button aria-label="Close Camera Rig panel" onClick={() => setShowCameraRig(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4206,7 +4203,7 @@ const Flux: React.FC = () => {
 
       {/* 9. Environment Map */}
       {showEnvironment && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Environment</span>
             <button aria-label="Close Environment panel" onClick={() => setShowEnvironment(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4229,7 +4226,7 @@ const Flux: React.FC = () => {
 
       {/* 10. Render Queue */}
       {showRenderQueue && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Render Queue</span>
             <button aria-label="Close Render Queue panel" onClick={() => setShowRenderQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4280,7 +4277,7 @@ const Flux: React.FC = () => {
 
       {/* 11. Timeline Markers */}
       {showMarkers && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 80, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Markers</span>
             <button aria-label="Close Markers panel" onClick={() => setShowMarkers(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4305,7 +4302,7 @@ const Flux: React.FC = () => {
 
       {/* 12. Layer Alignment */}
       {showAlignment && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(260px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(260px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Align & Distribute</span>
             <button aria-label="Close Alignment panel" onClick={() => setShowAlignment(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4314,7 +4311,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 6 }}>Align</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 3, marginBottom: 10 }}>
               {[{ l: 'align-left', t: 'Left' }, { l: 'align-center', t: 'H Center' }, { l: 'align-right', t: 'Right' }, { l: 'align-left', t: 'Top' }, { l: 'align-center', t: 'V Center' }, { l: 'align-right', t: 'Bottom' }].map(a => (
-                <button key={a.t} aria-label={`Align ${a.t}`} title={a.t} onClick={() => {
+                <button key={a.t} aria-label={`Align ${a.t}`} onClick={() => {
                   if (!selectedLayerId) return;
                   setLayers(prev => prev.map(l => {
                     if (l.id !== selectedLayerId) return l;
@@ -4342,7 +4339,7 @@ const Flux: React.FC = () => {
 
       {/* 13. Guide Layers */}
       {showGuideLayer && (
-        <div style={{ position: 'fixed', right: 20, top: 240, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 240, width: 260, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Guide Layers</span>
             <button aria-label="Close Guide Layers panel" onClick={() => setShowGuideLayer(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4363,7 +4360,7 @@ const Flux: React.FC = () => {
 
       {/* 14. Snapshot / A/B */}
       {showSnapshot && (
-        <div style={{ position: 'fixed', right: 20, top: 100, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 100, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Snapshots</span>
             <button aria-label="Close Snapshots panel" onClick={() => setShowSnapshot(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4387,7 +4384,7 @@ const Flux: React.FC = () => {
 
       {/* 15. Frame Blending */}
       {showFrameBlending && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Frame Blending</span>
             <button aria-label="Close Frame Blending panel" onClick={() => setShowFrameBlending(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4414,7 +4411,7 @@ const Flux: React.FC = () => {
 
       {/* 16. Color Correction */}
       {showColorCorrection && (
-        <div style={{ position: 'fixed', right: 20, top: 120, width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 120, width: 320, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Color Correction</span>
             <button aria-label="Close Color Correction panel" onClick={() => setShowColorCorrection(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4448,7 +4445,7 @@ const Flux: React.FC = () => {
 
       {/* 17. Stagger / Sequence */}
       {showStagger && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(290px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(290px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stagger / Sequence</span>
             <button aria-label="Close Stagger panel" onClick={() => setShowStagger(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4483,7 +4480,7 @@ const Flux: React.FC = () => {
 
       {/* 18. Shape Stroke Effects */}
       {showStrokeEffects && (
-        <div style={{ position: 'fixed', right: 20, top: 180, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 180, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stroke Effects</span>
             <button aria-label="Close Stroke Effects panel" onClick={() => setShowStrokeEffects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4513,7 +4510,7 @@ const Flux: React.FC = () => {
 
       {/* 19. Motion Blur */}
       {showMotionBlur && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Motion Blur</span>
             <button aria-label="Close Motion Blur panel" onClick={() => setShowMotionBlur(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4536,7 +4533,7 @@ const Flux: React.FC = () => {
 
       {/* 20. Export Presets */}
       {showExportPresets && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(350px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(350px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Export Presets</span>
             <button aria-label="Close Export Presets panel" onClick={() => setShowExportPresets(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -4583,9 +4580,9 @@ const Flux: React.FC = () => {
           { label: 'Delete Layer', fn: () => deleteLayer(ctxLayer.id), disabled: layers.length <= 1, danger: true },
         ];
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, borderRadius: 12, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
+              ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               : <div key={i} className="flux-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
@@ -4603,7 +4600,8 @@ const Flux: React.FC = () => {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: 420, padding: 'var(--space-4)', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
+            className="dex-liquid-glass-strong"
+            style={{ width: 420, padding: 'var(--space-4)', borderRadius: 12, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <strong style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>Morph to target SVG path</strong>

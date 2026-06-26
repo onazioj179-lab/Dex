@@ -586,17 +586,17 @@ const ViewerPanel: React.FC<{
       <div style={controlsBarStyle}>
         <div style={timecodeStyle}>{formatTimecode(currentFrame, frameRate)}</div>
         <div style={{ flex: '1 1 8px', minWidth: 8 }} />
-        <button aria-label="Skip to start" style={transportBtnStyle} onClick={onSkipBack} title="Go to start"><SkipBackIcon /></button>
-        <button aria-label="Previous frame" style={transportBtnStyle} onClick={onStepBack} title="Previous frame"><StepBackIcon /></button>
+        <button aria-label="Skip to start" style={transportBtnStyle} onClick={onSkipBack}><SkipBackIcon /></button>
+        <button aria-label="Previous frame" style={transportBtnStyle} onClick={onStepBack}><StepBackIcon /></button>
         {isPlaying ? (
-          <button aria-label="Pause" style={{ ...transportBtnStyle, color: 'var(--color-accent)' }} onClick={onPause} title="Pause"><PauseIcon /></button>
+          <button aria-label="Pause" style={{ ...transportBtnStyle, color: 'var(--color-accent)' }} onClick={onPause}><PauseIcon /></button>
         ) : (
-          <button aria-label="Play" style={{ ...transportBtnStyle, color: 'var(--color-text-primary)' }} onClick={onPlay} title="Play"><PlayIcon /></button>
+          <button aria-label="Play" style={{ ...transportBtnStyle, color: 'var(--color-text-primary)' }} onClick={onPlay}><PlayIcon /></button>
         )}
-        <button aria-label="Stop" style={transportBtnStyle} onClick={onStop} title="Stop"><StopIcon /></button>
-        <button aria-label="Next frame" style={transportBtnStyle} onClick={onStepForward} title="Next frame"><StepForwardIcon /></button>
-        <button aria-label="Skip to end" style={transportBtnStyle} onClick={onSkipForward} title="Go to end"><SkipForwardIcon /></button>
-        <button aria-label="Toggle loop" aria-pressed={loopEnabled} style={{ ...transportBtnStyle, color: loopEnabled ? 'var(--color-accent)' : 'var(--color-text-secondary)' }} onClick={onToggleLoop} title="Loop"><LoopIcon active={loopEnabled} /></button>
+        <button aria-label="Stop" style={transportBtnStyle} onClick={onStop}><StopIcon /></button>
+        <button aria-label="Next frame" style={transportBtnStyle} onClick={onStepForward}><StepForwardIcon /></button>
+        <button aria-label="Skip to end" style={transportBtnStyle} onClick={onSkipForward}><SkipForwardIcon /></button>
+        <button aria-label="Toggle loop" aria-pressed={loopEnabled} style={{ ...transportBtnStyle, color: loopEnabled ? 'var(--color-accent)' : 'var(--color-text-secondary)' }} onClick={onToggleLoop}><LoopIcon active={loopEnabled} /></button>
         <div style={{ flex: '1 1 8px', minWidth: 8 }} />
         <div style={{ ...timecodeStyle, color: 'var(--color-text-tertiary)' }}>{formatTimecode(duration, frameRate)}</div>
       </div>

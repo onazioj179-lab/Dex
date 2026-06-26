@@ -332,10 +332,10 @@ const MediaTab: React.FC = memo(() => {
         display: 'flex', height: 28, alignItems: 'center', gap: 4, padding: '0 6px',
         borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
       }}>
-        <button aria-label="Import media" onClick={handleImport} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }} title="Import Media">
+        <button aria-label="Import media" onClick={handleImport} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }}>
           <ImportIcon />
         </button>
-        <button aria-label="Create new bin" onClick={() => addBin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }} title="New Bin">
+        <button aria-label="Create new bin" onClick={() => addBin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }}>
           <BinIcon />
         </button>
         <div style={{ flex: 1 }} />
@@ -465,7 +465,6 @@ const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () 
       onContextMenu={onContextMenu}
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('vinx/media', item.id); e.dataTransfer.effectAllowed = 'copy'; }}
-      title="Drag to timeline or double-click to insert"
     >
       <div style={thumbnailStyle}>
         {item.thumbnailUrl ? (
@@ -501,7 +500,6 @@ const MediaGridItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () 
       onContextMenu={onContextMenu}
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('vinx/media', item.id); e.dataTransfer.effectAllowed = 'copy'; }}
-      title="Drag to timeline or double-click to insert"
     >
       <div style={{ ...thumbnailStyle, width: 72, height: 40 }}>
         {item.thumbnailUrl ? (

@@ -23,20 +23,45 @@ interface Props {
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' };
 const labelStyle: React.CSSProperties = { width: 64, fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 };
 const valStyle: React.CSSProperties = { width: 38, fontSize: 11, textAlign: 'right', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' };
-const sliderStyle: React.CSSProperties = { flex: 1, accentColor: 'var(--color-accent, #4a9eff)', height: 4 };
 
-function Slider({ label, value, min, max, step = 1, fmt, onInput }: {
+// Lightroom-style pro slider: recessed track, accent fill from the natural origin
+// (centre for bipolar params, left otherwise), a metal thumb you grab and drag,
+// scroll to nudge, and double-click to reset. Replaces the lame native range input.
+function Slider({ label, value, min, max, step = 1, def, fmt, onInput }: {
   label: string; value: number; min: number; max: number; step?: number;
-  fmt?: (v: number) => string; onInput: (v: number) => void;
+  def?: number; fmt?: (v: number) => string; onInput: (v: number) => void;
 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef(false);
+  const span = max - min || 1;
+  const norm = Math.max(0, Math.min(1, (value - min) / span));
+  const bipolar = min < 0 && max > 0;
+  const zeroNorm = bipolar ? (0 - min) / span : 0;
+  const resetVal = def !== undefined ? def : (bipolar ? 0 : min);
+  const setFromX = (clientX: number) => {
+    const el = trackRef.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    let v = min + t * span;
+    if (step) v = Math.round(v / step) * step;
+    onInput(Math.max(min, Math.min(max, v)));
+  };
   return (
     <div style={rowStyle}>
       <span style={labelStyle}>{label}</span>
-      <input
-        type="range" min={min} max={max} step={step} value={value} style={sliderStyle}
-        onChange={(e) => onInput(Number(e.target.value))}
-        aria-label={label}
-      />
+      <div
+        ref={trackRef} role="slider" aria-label={label} aria-valuenow={value} aria-valuemin={min} aria-valuemax={max}
+        onPointerDown={(e) => { dragRef.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); setFromX(e.clientX); }}
+        onPointerMove={(e) => { if (dragRef.current) setFromX(e.clientX); }}
+        onPointerUp={(e) => { dragRef.current = false; (e.target as Element).releasePointerCapture?.(e.pointerId); }}
+        onDoubleClick={() => onInput(resetVal)}
+        onWheel={(e) => { e.preventDefault(); const d = (e.deltaY < 0 ? 1 : -1) * step * (e.shiftKey ? 5 : 1); onInput(Math.max(min, Math.min(max, value + d))); }}
+        style={{ flex: 1, position: 'relative', height: 18, cursor: 'ew-resize', touchAction: 'none', display: 'flex', alignItems: 'center' }}
+      >
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: 'linear-gradient(180deg,#0a0a0c,#1a1a1e)', border: '1px solid #050507' }} />
+        <div style={{ position: 'absolute', height: 4, borderRadius: 2, background: 'var(--color-accent, #4a9eff)', left: `${Math.min(norm, zeroNorm) * 100}%`, width: `${Math.abs(norm - zeroNorm) * 100}%` }} />
+        <div style={{ position: 'absolute', left: `${norm * 100}%`, transform: 'translateX(-50%)', width: 13, height: 13, borderRadius: '50%', background: 'linear-gradient(180deg,#52525c,#1a1a20)', border: '1px solid #050507', boxShadow: '0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.25)', pointerEvents: 'none' }} />
+      </div>
       <span style={valStyle}>{fmt ? fmt(value) : value}</span>
     </div>
   );
@@ -179,7 +204,7 @@ export const AdjustmentControls: React.FC<Props> = ({ adjustment, onChange }) =>
       return (
         <div>
           <Slider label="Hue" min={-180} max={180} value={adjustment.hue} onInput={(v) => onChange({ hue: v } as Partial<AdjustmentParams>)} fmt={(v) => `${v}°`} />
-          <Slider label="Saturation" min={0} max={2} step={0.01} value={adjustment.saturation} fmt={(v) => `${Math.round(v * 100)}%`} onInput={(v) => onChange({ saturation: v } as Partial<AdjustmentParams>)} />
+          <Slider label="Saturation" min={0} max={2} step={0.01} def={1} value={adjustment.saturation} fmt={(v) => `${Math.round(v * 100)}%`} onInput={(v) => onChange({ saturation: v } as Partial<AdjustmentParams>)} />
           <Slider label="Lightness" min={-1} max={1} step={0.01} value={adjustment.lightness} fmt={(v) => `${Math.round(v * 100)}`} onInput={(v) => onChange({ lightness: v } as Partial<AdjustmentParams>)} />
         </div>
       );
@@ -187,10 +212,10 @@ export const AdjustmentControls: React.FC<Props> = ({ adjustment, onChange }) =>
       return (
         <div>
           <Slider label="In Black" min={0} max={254} value={adjustment.inputBlack} onInput={(v) => onChange({ inputBlack: Math.min(v, adjustment.inputWhite - 1) } as Partial<AdjustmentParams>)} />
-          <Slider label="In White" min={1} max={255} value={adjustment.inputWhite} onInput={(v) => onChange({ inputWhite: Math.max(v, adjustment.inputBlack + 1) } as Partial<AdjustmentParams>)} />
-          <Slider label="Gamma" min={0.1} max={3} step={0.01} value={adjustment.gamma} fmt={(v) => v.toFixed(2)} onInput={(v) => onChange({ gamma: v } as Partial<AdjustmentParams>)} />
+          <Slider label="In White" min={1} max={255} def={255} value={adjustment.inputWhite} onInput={(v) => onChange({ inputWhite: Math.max(v, adjustment.inputBlack + 1) } as Partial<AdjustmentParams>)} />
+          <Slider label="Gamma" min={0.1} max={3} step={0.01} def={1} value={adjustment.gamma} fmt={(v) => v.toFixed(2)} onInput={(v) => onChange({ gamma: v } as Partial<AdjustmentParams>)} />
           <Slider label="Out Black" min={0} max={255} value={adjustment.outputBlack} onInput={(v) => onChange({ outputBlack: v } as Partial<AdjustmentParams>)} />
-          <Slider label="Out White" min={0} max={255} value={adjustment.outputWhite} onInput={(v) => onChange({ outputWhite: v } as Partial<AdjustmentParams>)} />
+          <Slider label="Out White" min={0} max={255} def={255} value={adjustment.outputWhite} onInput={(v) => onChange({ outputWhite: v } as Partial<AdjustmentParams>)} />
         </div>
       );
     case 'curves':

@@ -378,9 +378,10 @@ const MarkdownEditor: React.FC = () => {
   const tableSnippet = '\n| Column A | Column B |\n| --- | --- |\n| Cell 1 | Cell 2 |\n';
 
   return (
-    <div style={s.container}>
+    <div style={s.container} data-dex-md-root>
+      <style>{MD_SCOPED_CSS}</style>
       {/* Toolbar */}
-      <div style={s.toolbar}>
+      <div className="dex-liquid-glass" style={s.toolbar}>
         <div style={s.toolbarLeft}>
           <input
             value={fileName}
@@ -429,7 +430,7 @@ const MarkdownEditor: React.FC = () => {
 
       {/* Find / replace bar */}
       {showFind && (
-        <div style={s.findBar}>
+        <div className="dex-liquid-glass-strong" style={s.findBar}>
           <input
             value={findQuery}
             onChange={e => setFindQuery(e.target.value)}
@@ -468,7 +469,7 @@ const MarkdownEditor: React.FC = () => {
       {/* Editor / Preview Panes */}
       <div style={s.panes}>
         {showToc && (
-          <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--color-border, rgba(255,255,255,0.08))', overflow: 'auto', padding: 'var(--space-2)' }}>
+          <div className="dex-liquid-glass" style={{ width: 200, flexShrink: 0, borderRadius: 0, borderRight: '1px solid var(--color-border, rgba(255,255,255,0.08))', overflow: 'auto', padding: 'var(--space-2)' }}>
             <div className="dex-label-caps" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '4px 6px' }}>Outline</div>
             {headings.length === 0 ? (
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px 6px' }}>No headings yet</div>
@@ -499,24 +500,36 @@ const MarkdownEditor: React.FC = () => {
         )}
         {viewMode !== 'editor' && (
           <div ref={previewRef} style={s.pane} onScroll={handlePreviewScroll}>
-            <div
-              style={s.preview}
-              onClick={handlePreviewClick}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown }}
-            />
+            {content.trim() === '' ? (
+              <div style={s.emptyState} aria-hidden="true">
+                <div style={s.emptyMark}>{ '# ' }</div>
+                <div style={s.emptyTitle}>Nothing to preview yet</div>
+                <div style={s.emptyHint}>Start typing in the editor. Rendered Markdown appears here live.</div>
+              </div>
+            ) : (
+              <div
+                className="dex-md-preview"
+                style={s.preview}
+                onClick={handlePreviewClick}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown }}
+              />
+            )}
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <div style={s.statusBar}>
-        <span>{stats.words} words</span>
-        <span>{stats.chars} chars</span>
-        <span>{stats.lines} lines</span>
-        <span>{stats.readTime} read</span>
+      <div className="dex-liquid-glass" style={s.statusBar}>
+        <span style={s.statItem}><strong style={s.statValue}>{stats.words.toLocaleString()}</strong> words</span>
+        <span style={s.statSep} aria-hidden="true" />
+        <span style={s.statItem}><strong style={s.statValue}>{stats.chars.toLocaleString()}</strong> chars</span>
+        <span style={s.statSep} aria-hidden="true" />
+        <span style={s.statItem}><strong style={s.statValue}>{stats.lines.toLocaleString()}</strong> lines</span>
+        <span style={s.statSep} aria-hidden="true" />
+        <span style={s.statItem}>{stats.readTime} read</span>
         {lintIssues.length > 0 && (
           <span
-            style={{ color: 'var(--color-warning)', cursor: 'default' }}
+            style={{ ...s.statItem, color: 'var(--color-warning)', cursor: 'default', marginLeft: 'auto' }}
             title={lintIssues.map(i => `Line ${i.line}: ${i.message}`).join('\n')}
           >
             {lintIssues.length} issue{lintIssues.length === 1 ? '' : 's'}
@@ -533,9 +546,12 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
   },
+  // Flush glass strip: the .dex-liquid-glass class supplies the translucent
+  // material; borderRadius:0 keeps it edge-to-edge as window chrome.
   toolbar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px var(--space-3)', borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
+    padding: '6px var(--space-3)', borderRadius: 0,
+    borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
     flexShrink: 0, gap: 'var(--space-2)',
   },
   toolbarLeft: { display: 'flex', alignItems: 'center', gap: 4 },
@@ -549,33 +565,33 @@ const s: Record<string, React.CSSProperties> = {
     width: 1, height: 18, background: 'var(--color-border, rgba(255,255,255,0.1))', margin: '0 4px',
   },
   fmtBtn: {
-    minWidth: 28, height: 28, padding: '0 4px', borderRadius: 4, border: 'none',
+    minWidth: 28, height: 28, padding: '0 4px', borderRadius: 'var(--radius-md)', border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'var(--font-family)',
   },
   viewToggle: {
     display: 'flex', background: 'var(--color-bg-elevated)',
-    borderRadius: 4, padding: 2,
+    borderRadius: 'var(--radius-md)', padding: 2,
   },
   viewBtn: {
-    padding: '4px var(--space-2)', borderRadius: 3, border: 'none',
+    padding: '4px var(--space-2)', borderRadius: 'var(--radius-md)', border: 'none',
     fontSize: 12, cursor: 'pointer',
   },
+  // Flush glass strip (pops in above the panes); borderRadius:0 keeps it edge-to-edge.
   findBar: {
     display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-    padding: '6px var(--space-3)',
+    padding: '6px var(--space-3)', borderRadius: 0,
     borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
-    background: 'var(--color-bg-elevated)',
   },
   findInput: {
     background: 'var(--color-bg-base)', border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-    borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 13,
+    borderRadius: 'var(--radius-md)', color: 'var(--color-text-primary)', fontSize: 13,
     padding: '4px 8px', outline: 'none', width: 160, fontFamily: 'var(--font-family)',
   },
   matchCount: { fontSize: 11, color: 'var(--color-text-secondary)', minWidth: 64 },
   findToggle: {
-    width: 26, height: 26, borderRadius: 4, border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    width: 26, height: 26, borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
     background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)',
   },
@@ -584,37 +600,92 @@ const s: Record<string, React.CSSProperties> = {
     borderColor: 'var(--color-accent, #4a9eff)',
   },
   findAction: {
-    padding: '4px 10px', borderRadius: 4, border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    padding: '4px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
     background: 'transparent', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
     fontFamily: 'var(--font-family)',
   },
   findClose: {
-    marginLeft: 'auto', width: 26, height: 26, borderRadius: 4, border: 'none',
+    marginLeft: 'auto', width: 26, height: 26, borderRadius: 'var(--radius-md)', border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 13, cursor: 'pointer',
   },
   panes: {
-    display: 'flex', flex: 1, overflow: 'hidden',
+    display: 'flex', flex: 1, overflow: 'hidden', position: 'relative',
   },
   pane: {
-    flex: 1, overflow: 'auto', minWidth: 0,
+    flex: 1, overflow: 'auto', minWidth: 0, scrollBehavior: 'smooth',
   },
   editor: {
     width: '100%', height: '100%', resize: 'none',
     background: 'transparent', border: 'none',
     color: 'var(--color-text-primary)',
-    fontSize: 14, lineHeight: 1.6, padding: 'var(--space-4) var(--space-5)',
-    fontFamily: 'var(--font-mono)',
-    outline: 'none', tabSize: 2, overflow: 'auto',
+    fontSize: 14, lineHeight: 1.7, padding: 'var(--space-4) var(--space-5)',
+    fontFamily: 'var(--font-mono)', letterSpacing: 0,
+    outline: 'none', tabSize: 2, overflow: 'auto', caretColor: 'var(--color-accent, #4a9eff)',
   },
   preview: {
-    padding: 'var(--space-4) var(--space-6)', fontSize: 14, lineHeight: 1.7,
-    color: 'var(--color-text-primary)',
+    padding: 'var(--space-4) var(--space-6)', fontSize: 15, lineHeight: 1.75,
+    color: 'var(--color-text-primary)', maxWidth: 760, letterSpacing: '0.002em',
+    wordBreak: 'break-word', overflowWrap: 'anywhere',
   },
+  emptyState: {
+    height: '100%', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+    gap: 6, padding: 'var(--space-6)', userSelect: 'none',
+  },
+  emptyMark: {
+    fontFamily: 'var(--font-mono)', fontSize: 30, lineHeight: 1,
+    color: 'var(--color-text-tertiary)', opacity: 0.55, marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)',
+  },
+  emptyHint: {
+    fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 280, lineHeight: 1.5,
+  },
+  // Flush glass strip along the bottom; borderRadius:0 keeps it edge-to-edge.
   statusBar: {
-    display: 'flex', gap: 'var(--space-4)', padding: '4px var(--space-4)',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+    padding: '5px var(--space-4)', borderRadius: 0,
     borderTop: '1px solid var(--color-border, rgba(255,255,255,0.08))',
     fontSize: 11, color: 'var(--color-text-secondary)', flexShrink: 0,
+    fontVariantNumeric: 'tabular-nums',
   },
+  statItem: { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
+  statValue: { fontWeight: 600, color: 'var(--color-text-primary)', fontSize: 11 },
+  statSep: { width: 1, height: 10, background: 'var(--color-border, rgba(255,255,255,0.12))' },
 };
+
+// Scoped polish that inline styles can't express: focus-visible rings, button
+// hover states, native scrollbars, and rendered-preview typography. Selectors
+// are namespaced under [data-dex-md-root] so nothing leaks to other apps.
+const MD_SCOPED_CSS = `
+[data-dex-md-root] button { transition: background 120ms ease, color 120ms ease; }
+[data-dex-md-root] button:hover:not(:disabled) {
+  background: var(--color-bg-hover, rgba(255,255,255,0.07));
+  color: var(--color-text-primary);
+}
+[data-dex-md-root] button:disabled { opacity: 0.4; cursor: default; }
+[data-dex-md-root] :focus-visible {
+  outline: 2px solid var(--color-accent, #4a9eff);
+  outline-offset: 1px;
+  border-radius: var(--radius-md);
+}
+[data-dex-md-root] input:focus-visible, [data-dex-md-root] textarea:focus-visible { outline-offset: -1px; }
+[data-dex-md-root] textarea::selection { background: var(--color-accent-soft, rgba(74,158,255,0.3)); }
+[data-dex-md-root] ::-webkit-scrollbar { width: 10px; height: 10px; }
+[data-dex-md-root] ::-webkit-scrollbar-thumb {
+  background: var(--color-border, rgba(255,255,255,0.14));
+  border-radius: 6px; border: 2px solid transparent; background-clip: padding-box;
+}
+[data-dex-md-root] ::-webkit-scrollbar-thumb:hover { background: var(--color-text-tertiary); background-clip: padding-box; }
+[data-dex-md-root] ::-webkit-scrollbar-corner { background: transparent; }
+[data-dex-md-root] .dex-md-preview > :first-child { margin-top: 0; }
+[data-dex-md-root] .dex-md-preview a:hover { text-decoration: underline; }
+[data-dex-md-root] .dex-md-preview h1, [data-dex-md-root] .dex-md-preview h2,
+[data-dex-md-root] .dex-md-preview h3 { letter-spacing: -0.01em; }
+@media (prefers-reduced-motion: reduce) {
+  [data-dex-md-root] button { transition: none; }
+}
+`;
 
 export default memo(MarkdownEditor);

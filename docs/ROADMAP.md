@@ -1,5 +1,32 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-26) — Notification redesign: the center is finally REACHABLE + live deep-links + group digest.**
+> tsc 0 (full project); 13/13 new digest unit tests; VERIFIED LIVE in preview (0 console errors). Closes the
+> "Notification redesign (live actions / quick-reply / grouping / AI summary)" overhaul theme as far as it can
+> be built honestly in a renderer-only pass. Root finding: the hub-backed `NotificationCenter` (shell/
+> NotificationBanners.tsx) had NO opener anywhere -- `setShowNotifCenter(true)` did not exist, and the
+> alternate `NotificationBell`/`NotificationPanel` (UnifiedSystems.tsx) is never mounted. So NO persistent
+> notification center was reachable at all; notifications only flashed as transient banners. Shipped:
+> - **Reachability (the real fix).** Added a "Notifications" item (with the live `hubUnreadCount` badge) to the
+>   top-bar control-center dropdown menu in `AppManager.tsx`, opening the hub-backed center. This honours the
+>   owner's earlier "keep the top bar bell-free; open from the control-center menu" directive -- whose stale
+>   comment claimed it was already reachable (it wasn't). VERIFIED LIVE: menu -> Notifications -> center opens.
+> - **Live deep-link actions.** The persisted hub `action` envelope (a deep-link `target`) was being DROPPED in
+>   the `centerNotifications` mapping, so persisted notifications were dead ends once their banner faded. Now
+>   carried through; each center card with a target renders an "Open" affordance that routes via the proven
+>   `dex-spotlight-navigate` contract (URL -> browser, `appId`, or `appId:context` e.g. `settings:network`),
+>   marks read, and closes. New single-source `readHubTarget()` in services/notify.ts. VERIFIED LIVE: injected
+>   3 records (2 with targets) -> exactly 2 "Open" buttons -> click dispatched `{appId:'files'}` + closed.
+> - **Group digest ("summary" leg, done honestly).** New pure `shared/notifications/digest.ts`
+>   (`summarizeGroup`/`relativeShort`/`topPriority`) renders an on-device per-source digest in the grouped view
+>   ("2 notifications, 1 urgent"). Deterministic counts, NOT a fabricated model gloss -- a provider summary can
+>   layer on `headline` later. VERIFIED LIVE: NETWORK group showed "2 notifications, 1 urgent". 13 unit tests.
+> - **DRY.** Collapsed the duplicated grouped/timeline card markup into one `CenterCard` (deep-link + in-session
+>   action closures + reduced-motion + read styling).
+> - **Honest scope:** quick-reply (inline text input) needs a messaging/relay backend to be real, so it was
+>   FLAGGED not faked. Dead `NotificationBell`/`NotificationPanel` pair left for a separate cleanup pass (chip
+>   spawned) -- removing ~150 lines from the concurrently-edited UnifiedSystems.tsx mid-session was too risky.
+>
 > **CHECKPOINT (2026-06-25s) — AXL: real 2D Sketcher -> 3D solid (parametric core).**
 > tsc 0; 13/13 new sketch unit tests green (`tests/unit/axl-sketch.test.ts`). VERIFIED LIVE: Create -> "New
 > Sketch" opens the gridded sketch overlay with the SKETCH toolbar. (Couldn't drive the mouse-draw live —

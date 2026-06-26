@@ -411,61 +411,13 @@ export function createFluidResize(options: {
 }
 
 // ---------------------------------------------------------------------------
-// IMMEDIATE CLOSE SYSTEM FOR MENUS/DROPDOWNS
+// (Removed) IMMEDIATE CLOSE SYSTEM FOR MENUS/DROPDOWNS
+// Nothing ever called registerMenu(), so the registry stayed permanently empty
+// and installGlobalMenuCloseHandler()'s global pointerdown/keydown CAPTURE
+// listeners only iterated an empty map on every click/keypress -- pure dead
+// weight. Menus/dropdowns own their outside-click/Escape close (ContextMenu.tsx,
+// UnifiedDropdown.tsx), so the whole subsystem + its two global listeners are gone.
 // ---------------------------------------------------------------------------
-
-const activeMenus = new Set<string>();
-const menuCloseCallbacks = new Map<string, () => void>();
-
-export function registerMenu(id: string, closeCallback: () => void): void {
-  activeMenus.add(id);
-  menuCloseCallbacks.set(id, closeCallback);
-}
-
-export function unregisterMenu(id: string): void {
-  activeMenus.delete(id);
-  menuCloseCallbacks.delete(id);
-}
-
-export function closeAllMenusImmediately(except?: string): void {
-  menuCloseCallbacks.forEach((callback, id) => {
-    if (id !== except) {
-      callback();
-    }
-  });
-}
-
-export function closeMenuImmediately(id: string): void {
-  const callback = menuCloseCallbacks.get(id);
-  if (callback) {
-    callback();
-    unregisterMenu(id);
-  }
-}
-
-// Global click handler for immediate menu close
-let globalClickHandlerInstalled = false;
-
-export function installGlobalMenuCloseHandler(): void {
-  if (globalClickHandlerInstalled) return;
-  globalClickHandlerInstalled = true;
-
-  document.addEventListener('pointerdown', (e) => {
-    // Close all menus unless clicking within a menu
-    const target = e.target as HTMLElement;
-    const isMenuClick = target.closest('[data-menu]') !== null;
-    if (!isMenuClick) {
-      closeAllMenusImmediately();
-    }
-  }, { capture: true, passive: true });
-
-  // Close on Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeAllMenusImmediately();
-    }
-  }, { capture: true });
-}
 
 // ---------------------------------------------------------------------------
 // OPERATION GUARDS - Pause heavy operations during drag/resize
@@ -689,7 +641,6 @@ export function makeButtonResponsive(element: HTMLElement): () => void {
 // ---------------------------------------------------------------------------
 
 export function initFluidOperations(): void {
-  installGlobalMenuCloseHandler();
   installVisibilityRecovery();
 }
 
@@ -702,10 +653,6 @@ export default {
   createFluidDrag,
   createFluidResize,
   createFluidPanel,
-  closeAllMenusImmediately,
-  closeMenuImmediately,
-  registerMenu,
-  unregisterMenu,
   isOperationActive,
   deferDuringOperation,
   forceRepaint,

@@ -39,6 +39,10 @@ let longTasksInWindow = 0;
 // torn down in stop() so a start/stop/start cycle doesn't leak duplicates.
 let longTaskObserver: PerformanceObserver | null = null;
 let longTaskDecayInterval: ReturnType<typeof setInterval> | null = null;
+// Main-process thermal IPC listener: kept with its emitter so stop() can remove
+// it -- otherwise a start/stop/start cycle stacks duplicate listeners (leak).
+let thermalIpc: { off?: Function; removeListener?: Function } | null = null;
+let thermalIpcHandler: ((...args: any[]) => void) | null = null;
 
 function setLevel(next: ThermalLevel, reason: string): void {
   if (next === currentLevel) return;
@@ -116,9 +120,12 @@ export function startThermalAdaptiveMonitor(): void {
     const w = window as any;
     const ipc = w.electron || w.api;
     if (ipc && typeof ipc.on === 'function') {
-      ipc.on('dex:thermal-state', (_: any, state: { state: ThermalLevel }) => {
+      const handler = (_: any, state: { state: ThermalLevel }) => {
         if (state && state.state) setLevel(state.state, 'main-process');
-      });
+      };
+      ipc.on('dex:thermal-state', handler);
+      thermalIpc = ipc;
+      thermalIpcHandler = handler;
     }
   } catch { /* */ }
 
@@ -132,6 +139,11 @@ export function stopThermalAdaptiveMonitor(): void {
   rafHandle = 0;
   if (longTaskObserver) { longTaskObserver.disconnect(); longTaskObserver = null; }
   if (longTaskDecayInterval) { clearInterval(longTaskDecayInterval); longTaskDecayInterval = null; }
+  if (thermalIpc && thermalIpcHandler) {
+    try { (thermalIpc.off ?? thermalIpc.removeListener)?.call(thermalIpc, 'dex:thermal-state', thermalIpcHandler); } catch { /* */ }
+  }
+  thermalIpc = null;
+  thermalIpcHandler = null;
   frameTimes = [];
   lastFrameTs = 0;
 }
