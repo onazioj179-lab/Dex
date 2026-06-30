@@ -52,8 +52,8 @@ describe('appSkills bundles - id presence', () => {
   it('imosion exposes 12 skills', () => {
     expect(imosionSkills().skills).toHaveLength(12);
   });
-  it('axl exposes 6 skills', () => {
-    expect(axlSkills().skills).toHaveLength(6);
+  it('axl exposes 17 skills', () => {
+    expect(axlSkills().skills).toHaveLength(17);
   });
   it('rewind exposes 3 skills', () => {
     expect(rewindSkills().skills).toHaveLength(3);
