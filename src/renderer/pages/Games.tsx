@@ -8,7 +8,6 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { glassButton } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import DexIcon from '../components/DexIcon';
 import EmptyState from '../components/EmptyState';
@@ -47,6 +46,18 @@ function formatPlaytime(totalSec: number): string {
   return `${h}h${m ? ` ${m}m` : ''} played`;
 }
 
+// True-black SOLID theme (no glass) — matches the Trophies dashboard direction.
+const G_PANEL = '#101012';
+const G_PANEL2 = '#16161a';
+const G_BORDER = '#26262b';
+const G_DIM = '#8a8a90';
+
+function formatHours(totalSec: number): string {
+  if (totalSec < 3600) return `${Math.round(totalSec / 60)}m`;
+  const h = totalSec / 3600;
+  return h >= 10 ? `${Math.round(h)}h` : `${h.toFixed(1)}h`;
+}
+
 function relativeLastPlayed(iso?: string): string | null {
   if (!iso) return null;
   const then = Date.parse(iso);
@@ -63,11 +74,15 @@ const PlayGlyph = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
 );
 
-/** glassButton lacks padding/disabled feedback on its own; apply the local convention. */
+/** Solid (non-glass) action button matching the true-black theme. */
 const actionButton = (disabled: boolean): React.CSSProperties => ({
-  ...glassButton,
   padding: '6px 14px',
   fontSize: 12,
+  fontWeight: 600,
+  borderRadius: 9,
+  background: G_PANEL2,
+  border: `1px solid ${G_BORDER}`,
+  color: '#f1ece5',
   opacity: disabled ? 0.5 : 1,
   cursor: disabled ? 'not-allowed' : 'pointer',
 });
@@ -126,6 +141,24 @@ export default function Games(): React.ReactElement {
       .sort((a, b) => Date.parse(playtime[b.id]?.lastPlayedIso ?? '0') - Date.parse(playtime[a.id]?.lastPlayedIso ?? '0'))
       .slice(0, 8);
   }, [games, playtime]);
+
+  // Real playtime overview (the reference's "Your Statistic" band).
+  const totalPlaySec = useMemo(
+    () => Object.values(playtime).reduce((n, p) => n + (p?.totalSec ?? 0), 0),
+    [playtime],
+  );
+  const playedCount = useMemo(
+    () => games.filter(g => (playtime[g.id]?.totalSec ?? 0) >= 60).length,
+    [games, playtime],
+  );
+  const topGames = useMemo(
+    () => games
+      .map(g => ({ g, sec: playtime[g.id]?.totalSec ?? 0 }))
+      .filter(x => x.sec >= 60)
+      .sort((a, b) => b.sec - a.sec)
+      .slice(0, 3),
+    [games, playtime],
+  );
 
   const onScan = useCallback(async () => {
     setScanning(true);
@@ -208,7 +241,7 @@ export default function Games(): React.ReactElement {
   };
 
   return (
-    <div className="p-6 h-full overflow-auto dex-liquid-glass-strong" style={{ borderRadius: 0 }}>
+    <div className="p-6 h-full overflow-auto" style={{ borderRadius: 0, background: 'transparent', color: '#f1ece5' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
         <div>
           <h1 className="text-2xl font-semibold">Games</h1>
@@ -256,6 +289,39 @@ export default function Games(): React.ReactElement {
             .dex-game-chip { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--color-border, rgba(255,255,255,0.12)); background: transparent; color: var(--color-text-secondary); transition: all 0.12s ease; }
             .dex-game-chip[aria-pressed="true"] { background: var(--color-accent, #0A84FF); border-color: var(--color-accent, #0A84FF); color: #fff; }
           `}</style>
+
+          {/* Playtime overview — total hours + top games (real games:playtime data). */}
+          {totalPlaySec >= 60 && (
+            <section style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
+              padding: 18, marginBottom: 'var(--space-4)', borderRadius: 16,
+              background: G_PANEL, border: `1px solid ${G_BORDER}`,
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: G_DIM, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Total playtime</div>
+                <div style={{ fontSize: 30, fontWeight: 800, marginTop: 4, letterSpacing: '-0.02em' }}>{formatHours(totalPlaySec)}</div>
+                <div style={{ fontSize: 12, color: G_DIM, marginTop: 2 }}>{games.length} games · {playedCount} played</div>
+              </div>
+              {topGames.length > 0 && (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {topGames.map(({ g, sec }) => (
+                    <div key={g.id} title={`${g.title} — ${formatHours(sec)}`} style={{
+                      textAlign: 'center', minWidth: 84, padding: '11px 9px', borderRadius: 13,
+                      background: G_PANEL2, border: `1px solid ${G_BORDER}`,
+                    }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10, margin: '0 auto 8px',
+                        background: coverGradient(g.title), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontSize: 15,
+                      }}>{g.title.charAt(0).toUpperCase()}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800 }}>{formatHours(sec)}</div>
+                      <div style={{ fontSize: 10, color: G_DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 76 }}>{g.title}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {availableSources.length > 1 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
