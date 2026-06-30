@@ -18,6 +18,8 @@ import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { useScheduledInterval } from '../../hooks/useScheduledWork';
 import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { resolveRecallDate } from '../../../shared/rewind/recall';
 import { spaceAt } from '../../store/stageActivityLog';
 import { STAGE_KIND_META, type StageKind } from '../../store/stageStore';
 
@@ -297,7 +299,33 @@ const Rewind: React.FC = () => {
         custom: { view: c.view, recording: c.isRecording, journalEntries: c.journalCount },
       };
     });
-    return () => unregisterUkiAppContext('rewind');
+    // Cross-session recall: UKI reads the persisted Rewind history for a day so it
+    // can answer "what did I work on last Thursday" / "continue last week".
+    registerUkiAppAction('rewind', {
+      id: 'rewind.recall',
+      description: 'recall what the user worked on around a day ("last thursday", "yesterday", "2026-06-25") by reading the Rewind activity history — for cross-session continuity.',
+      args: [{ name: 'when', type: 'string' }],
+      example: '{"when":"last thursday"}',
+      mutates: false,
+    }, async (args) => {
+      const when = String(args.when ?? '').trim();
+      const date = resolveRecallDate(when, new Date());
+      if (!date) return `I couldn't read the date "${when}". Try "yesterday", "last thursday", or a date like 2026-06-25.`;
+      const rw = (window as unknown as { dex?: { rewind?: { getSmartSummary?: (d: string) => Promise<unknown> } } }).dex?.rewind;
+      if (!rw?.getSmartSummary) return "Rewind activity history isn't available in this build.";
+      try {
+        const ss = (await rw.getSmartSummary(date)) as { aiSummary?: string; summary?: string; totalEntries?: number } | null;
+        if (!ss) return `No recorded activity for ${date}.`;
+        const summary = ss.aiSummary || ss.summary || (ss.totalEntries != null ? `${ss.totalEntries} recorded events` : '');
+        return summary ? `${date}: ${summary}` : `There is recorded activity on ${date}, but no summary is available.`;
+      } catch {
+        return `Could not load Rewind activity for ${date}.`;
+      }
+    });
+    return () => {
+      unregisterUkiAppContext('rewind');
+      unregisterUkiAppAction('rewind.recall');
+    };
   }, []);
 
   // Persist journal entries on change (debounced flush)
