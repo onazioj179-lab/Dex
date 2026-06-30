@@ -305,9 +305,12 @@ const ROOT: React.CSSProperties = {
   color: 'var(--color-text-primary, #e5e5ea)',
   overflow: 'hidden',
 };
+// Sticky chrome header — `.dex-liquid-glass-strong` (applied via className on the
+// element) supplies the translucent material + blur; we flatten the forced radius
+// to 0 (full-bleed bar) and keep the hairline divider beneath it.
 const HEADER: React.CSSProperties = {
   padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0,
-  background: 'var(--color-bg-surface-solid, #1C1C1E)',
+  borderRadius: 0,
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const CONTENT: React.CSSProperties = {
@@ -341,7 +344,7 @@ const BAR_BG: React.CSSProperties = {
 };
 const TAB_STYLE = (active: boolean): React.CSSProperties => ({
   padding: '6px 14px', fontSize: 12, fontWeight: active ? 600 : 400,
-  borderRadius: 6, cursor: 'pointer', border: 'none',
+  borderRadius: 10, cursor: 'pointer', border: 'none',
   background: active ? 'var(--color-bg-hover, rgba(255,255,255,.1))' : 'transparent',
   color: active ? 'var(--color-text-primary, #fff)' : 'var(--color-text-tertiary, rgba(255,255,255,.5))',
   transition: 'all .15s ease',
@@ -657,7 +660,7 @@ const Learn: React.FC = () => {
       <div
         key={lesson.id}
         style={{
-          borderRadius: 8,
+          borderRadius: 'var(--radius-lg)',
           border: `1px solid ${isOpen ? accent + '66' : 'var(--color-border-subtle, rgba(255,255,255,.06))'}`,
           background: isOpen ? accent + '0d' : 'var(--color-bg-hover, rgba(255,255,255,.02))',
           overflow: 'hidden',
@@ -708,7 +711,7 @@ const Learn: React.FC = () => {
                 width: '100%', minHeight: 56, resize: 'vertical', boxSizing: 'border-box',
                 background: 'var(--color-bg-inset, rgba(0,0,0,.25))', color: 'inherit',
                 border: '1px solid var(--color-border-subtle, rgba(255,255,255,.08))',
-                borderRadius: 6, padding: '8px 10px', fontSize: 12, fontFamily: 'inherit',
+                borderRadius: 10, padding: '8px 10px', fontSize: 12, fontFamily: 'inherit',
                 outline: 'none', marginBottom: 10,
               }}
             />
@@ -717,7 +720,7 @@ const Learn: React.FC = () => {
                 onClick={() => completeLesson(lesson.id)}
                 disabled={done}
                 style={{
-                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none',
+                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 10, border: 'none',
                   cursor: done ? 'default' : 'pointer',
                   background: done ? 'var(--color-bg-hover, rgba(255,255,255,.06))' : 'rgba(48,209,88,.16)',
                   color: done ? 'var(--color-text-tertiary, rgba(255,255,255,.4))' : 'var(--color-success)',
@@ -728,7 +731,7 @@ const Learn: React.FC = () => {
               <button
                 onClick={() => saveNotesFor(lesson)}
                 style={{
-                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+                  padding: '7px 14px', fontSize: 12, fontWeight: 600, borderRadius: 10,
                   border: '1px solid var(--color-border-subtle, rgba(255,255,255,.1))',
                   background: 'var(--color-bg-hover, rgba(255,255,255,.04))', color: 'inherit', cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -747,7 +750,7 @@ const Learn: React.FC = () => {
   return (
     <div style={ROOT}>
       {/* Header */}
-      <div style={HEADER}>
+      <div className="dex-liquid-glass-strong" style={HEADER}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
@@ -767,7 +770,7 @@ const Learn: React.FC = () => {
           <button
             onClick={() => setEnabled(!enabled)}
             style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 500, borderRadius: 6,
+              padding: '6px 14px', fontSize: 12, fontWeight: 500, borderRadius: 10,
               border: 'none', cursor: 'pointer',
               background: enabled ? 'rgba(48,209,88,.15)' : 'rgba(255,69,58,.15)',
               color: enabled ? 'var(--color-success)' : 'var(--color-error)',
@@ -932,7 +935,7 @@ const Learn: React.FC = () => {
                   width: '100%', boxSizing: 'border-box', padding: '9px 12px 9px 34px',
                   background: 'var(--color-bg-elevated, rgba(255,255,255,.04))', color: 'inherit',
                   border: '1px solid var(--color-border-subtle, rgba(255,255,255,.08))',
-                  borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                  borderRadius: 10, fontSize: 13, outline: 'none', fontFamily: 'inherit',
                 }}
               />
             </div>
@@ -964,7 +967,7 @@ const Learn: React.FC = () => {
                           style={{
                             width: '100%', textAlign: 'left' as const, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                            borderRadius: 8, border: `1px solid ${mod.color}55`, background: `${mod.color}12`, color: 'inherit',
+                            borderRadius: 'var(--radius-lg)', border: `1px solid ${mod.color}55`, background: `${mod.color}12`, color: 'inherit',
                           }}
                         >
                           <div style={{ width: 34, height: 34, borderRadius: 8, background: `${mod.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1274,7 +1277,7 @@ const Learn: React.FC = () => {
               <button
                 onClick={handleReset}
                 style={{
-                  padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 500, borderRadius: 6,
+                  padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 500, borderRadius: 10,
                   border: '1px solid var(--color-error-muted, rgba(255,69,58,.3))', background: 'var(--color-error-muted, rgba(255,69,58,.08))',
                   color: 'var(--color-error)', cursor: 'pointer',
                 }}
@@ -1336,7 +1339,7 @@ const Learn: React.FC = () => {
                     onClick={() => changePowerProfile(profile.id)}
                     style={{
                       padding: '14px var(--space-4)',
-                      borderRadius: 8,
+                      borderRadius: 'var(--radius-lg)',
                       border: powerProfile === profile.id ? `2px solid ${profile.color}` : '2px solid transparent',
                       background: powerProfile === profile.id ? `${profile.color}15` : 'var(--color-bg-hover, rgba(255,255,255,.03))',
                       cursor: 'pointer',
@@ -1379,7 +1382,7 @@ const Learn: React.FC = () => {
                 <button
                   onClick={toggleRestrictions}
                   style={{
-                    padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 600, borderRadius: 6,
+                    padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 600, borderRadius: 10,
                     border: 'none', cursor: 'pointer',
                     background: restrictedMode ? 'rgba(255,69,58,.15)' : 'rgba(48,209,88,.15)',
                     color: restrictedMode ? '#FF453A' : '#30D158',
@@ -1401,7 +1404,7 @@ const Learn: React.FC = () => {
                     key={item.label}
                     onClick={() => (window as any).electron?.invoke?.(item.action)}
                     style={{
-                      padding: '10px var(--space-3)', borderRadius: 6, border: 'none',
+                      padding: '10px var(--space-3)', borderRadius: 10, border: 'none',
                       background: 'var(--color-bg-hover, rgba(255,255,255,.05))', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       fontSize: 11, color: 'inherit', transition: 'background 0.15s ease',

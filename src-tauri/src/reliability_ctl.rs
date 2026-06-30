@@ -303,7 +303,7 @@ fn stability_metrics(app: &tauri::AppHandle) -> Value {
 /// eventLoop, ipc, windows). Computed live like runHealthChecks(); the
 /// BrowserWindow responsiveness check has no analog in the Rust shell (no live
 /// windows accessible from here), so `windows` reports healthy with a note.
-fn health_checks(app: &tauri::AppHandle) -> Vec<Value> {
+fn health_checks(_app: &tauri::AppHandle) -> Vec<Value> {
     let (rss, vsz) = process_memory();
     let heap_percent = if vsz > 0 {
         (rss as f64 / vsz as f64) * 100.0

@@ -48,7 +48,7 @@ const FeatureTree: React.FC = () => {
   }, 0), [parts]);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
+    <div className="dex-axl-panel-strong" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 0, boxShadow: 'none', borderRight: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
       <div style={{ padding: 'var(--space-2) 10px', fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '1px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         OUTLINER
@@ -70,7 +70,6 @@ const FeatureTree: React.FC = () => {
             >
               <span
                 onClick={(e) => { e.stopPropagation(); togglePartVisibility(part.id); }}
-                title={part.visible ? 'Hide part' : 'Show part'}
                 style={{ cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}
               >
                 {part.visible ? (
@@ -102,7 +101,7 @@ const FeatureTree: React.FC = () => {
                 )}
                 {f.name}
                 </span>
-                <button aria-label={f.suppressed ? 'Unsuppress feature' : 'Suppress feature'} title={f.suppressed ? 'Unsuppress' : 'Suppress'} onClick={(e) => { e.stopPropagation(); useProjectStore.getState().toggleFeatureSuppression(part.id, f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: f.suppressed ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontSize: 10, lineHeight: 1 }}>
+                <button aria-label={f.suppressed ? 'Unsuppress feature' : 'Suppress feature'} onClick={(e) => { e.stopPropagation(); useProjectStore.getState().toggleFeatureSuppression(part.id, f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: f.suppressed ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontSize: 10, lineHeight: 1 }}>
                   {f.suppressed ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}
                 </button>
               </div>

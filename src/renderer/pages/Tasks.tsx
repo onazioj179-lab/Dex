@@ -1172,22 +1172,43 @@ export const Tasks: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="dex-tasks-root" style={styles.container}>
       <style>{`
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
+        .dex-tasks-root button { font-family: inherit; transition: all 0.12s ease; }
+        .dex-tasks-root button:active { transform: scale(0.97); }
         * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        input:focus { outline: none; }
+        /* Pointer focus stays clean; keyboard focus gets a clear ring (a11y, WCAG 2.4.7). */
+        .dex-tasks-root :focus-visible {
+          outline: 2px solid var(--color-accent, #0a84ff);
+          outline-offset: 2px;
+          border-radius: var(--radius-sm, 4px);
+        }
+        .dex-tasks-root input:focus:not(:focus-visible),
+        .dex-tasks-root select:focus:not(:focus-visible),
+        .dex-tasks-root textarea:focus:not(:focus-visible) { outline: none; }
+        /* Sidebar list rows: subtle hover lift for inactive rows. */
+        .dex-tasks-list-row:hover { background: var(--color-border-subtle) !important; }
+        /* Task rows: faint hover wash + reveal the trailing action buttons. */
+        .dex-tasks-task-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.03)); }
+        .dex-tasks-row-action { transition: opacity 0.12s ease, background 0.12s ease; }
+        .dex-tasks-task-row:hover .dex-tasks-row-action { opacity: 0.85; }
+        .dex-tasks-row-action:hover { background: var(--color-border-subtle) !important; opacity: 1 !important; }
+        .dex-tasks-row-action:focus-visible { opacity: 1 !important; }
+        .dex-tasks-delete:hover { background: var(--color-error-muted, rgba(255,69,58,0.14)) !important; color: var(--color-error) !important; }
         @keyframes dexTaskComplete {
           0% { transform: scale(1); }
           40% { transform: scale(1.015); background: var(--color-success-muted, rgba(48,209,88,0.1)); }
           100% { transform: scale(1); }
         }
         .dex-task-complete { animation: dexTaskComplete 0.4s ease; }
+        @media (prefers-reduced-motion: reduce) {
+          .dex-tasks-root button:active { transform: none; }
+          .dex-task-complete { animation: none; }
+        }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
@@ -1210,6 +1231,8 @@ export const Tasks: React.FC = () => {
                 {showMyListsLabel && <div style={{ ...styles.sectionLabel, marginTop: 'var(--space-2)' }}>My Lists</div>}
                 <button
                   aria-label={`Select ${list.name} list`}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={isActive ? undefined : 'dex-tasks-list-row'}
                   style={{
                     ...styles.listItem,
                     background: isActive ? 'var(--color-border-subtle)' : 'transparent',
@@ -1234,7 +1257,7 @@ export const Tasks: React.FC = () => {
 
       {/* Main Content */}
       <div style={styles.main}>
-        <div style={styles.header}>
+        <div className="dex-liquid-glass" style={styles.header}>
           <div style={styles.headerTitle}>
             <span style={{...styles.titleText, color: selectedListData.color}}>
               {selectedListData.name}
@@ -1248,10 +1271,12 @@ export const Tasks: React.FC = () => {
               )}
             </span>
           </div>
+          <div className="dex-tasks-controls" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <button
             style={styles.toggleCompleted}
             onClick={() => setShowCompleted(!showCompleted)}
             aria-label={showCompleted ? 'Hide completed tasks' : 'Show completed tasks'}
+            aria-pressed={showCompleted}
           >
             {showCompleted ? 'Hide' : 'Show'} Completed
           </button>
@@ -1259,6 +1284,7 @@ export const Tasks: React.FC = () => {
             style={{...styles.toggleCompleted, color: showCalendarView ? 'var(--color-accent, #0a84ff)' : undefined}}
             onClick={() => setShowCalendarView(!showCalendarView)}
             aria-label={showCalendarView ? 'Hide calendar view' : 'Show calendar view'}
+            aria-pressed={showCalendarView}
           >
             {showCalendarView ? 'List' : 'Calendar'}
           </button>
@@ -1268,7 +1294,7 @@ export const Tasks: React.FC = () => {
             onChange={(e) => setSortBy(e.target.value as 'priority' | 'date' | 'name' | 'manual')}
             aria-label="Sort tasks by"
             style={{
-              padding: '4px var(--space-2)', borderRadius: 4, fontSize: 11, fontWeight: 500,
+              padding: '4px var(--space-2)', borderRadius: 10, fontSize: 11, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)', cursor: 'pointer', outline: 'none',
               fontFamily: 'inherit',
@@ -1289,6 +1315,7 @@ export const Tasks: React.FC = () => {
               Clear Done
             </button>
           )}
+          </div>
         </div>
         {/* Search Bar */}
         <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
@@ -1315,7 +1342,7 @@ export const Tasks: React.FC = () => {
               onClick={() => setStatusFilter(opt.id)}
               aria-label={`Filter by status: ${opt.label}`}
               style={{
-                padding: '3px 10px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 11, cursor: 'pointer',
+                padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                 border: '1px solid var(--color-border-subtle)',
                 background: statusFilter === opt.id ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
                 color: statusFilter === opt.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -1341,7 +1368,7 @@ export const Tasks: React.FC = () => {
                 onClick={() => setPriorityFilter(opt.id)}
                 aria-label={`Filter by priority: ${opt.label}`}
                 style={{
-                  padding: '3px 10px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 11, cursor: 'pointer',
+                  padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                   border: `1px solid ${active ? accent : 'var(--color-border-subtle)'}`,
                   background: 'var(--color-bg-hover)',
                   color: active ? accent : 'var(--color-text-secondary)',
@@ -1461,7 +1488,7 @@ export const Tasks: React.FC = () => {
         })()}
 
         {/* Add Task */}
-        <div style={styles.addTask}>
+        <div className="dex-tasks-add-button" style={styles.addTask}>
           <div style={{ ...styles.checkbox, cursor: 'default' }} aria-hidden="true" />
           <input
             type="text"
@@ -1469,7 +1496,10 @@ export const Tasks: React.FC = () => {
             ref={newTaskInputRef}
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyPress={(e) => { if (e.key === 'Enter' && !isAdding) addTask(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isAdding) { e.preventDefault(); addTask(); }
+              else if (e.key === 'Escape' && newTaskTitle) { e.preventDefault(); setNewTaskTitle(''); setNewTaskDue(''); }
+            }}
             aria-label="Add a task"
             style={styles.addInput}
           />
@@ -1547,7 +1577,7 @@ export const Tasks: React.FC = () => {
               onClick={() => applyTemplate(i)}
               className="dex-hover-bg"
               style={{
-                padding: '3px var(--space-2)', borderRadius: 4,
+                padding: '3px var(--space-2)', borderRadius: 10,
                 background: 'var(--color-border-subtle)',
                 border: '1px solid var(--color-bg-hover)',
                 color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500,
@@ -1575,7 +1605,7 @@ export const Tasks: React.FC = () => {
           {visibleTasks.map(task => (
             <div key={task.id}>
               <div
-                className={recentlyCompleted === task.id ? 'dex-task-complete' : undefined}
+                className={`dex-task-item dex-tasks-task-row${recentlyCompleted === task.id ? ' dex-task-complete' : ''}`}
                 draggable={sortBy === 'manual'}
                 onDragStart={() => { dragIdRef.current = task.id; }}
                 onDragOver={e => { if (sortBy !== 'manual') return; e.preventDefault(); setDragOverId(task.id); }}
@@ -1595,7 +1625,7 @@ export const Tasks: React.FC = () => {
                 onContextMenu={e => showCtx(e, buildTaskCtxItems(task))}
               >
                 {sortBy === 'manual' && (
-                  <span style={{ flexShrink: 0, color: 'var(--color-text-muted)', opacity: 0.5, lineHeight: 0 }}>
+                  <span className="dex-tasks-drag-handle" style={{ flexShrink: 0, color: 'var(--color-text-muted)', opacity: 0.5, lineHeight: 0 }}>
                     <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
                       <circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/>
                       <circle cx="3" cy="8" r="1.5"/><circle cx="7" cy="8" r="1.5"/>
@@ -1715,6 +1745,7 @@ export const Tasks: React.FC = () => {
                 {/* Quick Snooze: one click -> Tomorrow (right-click for more via context menu). */}
                 {!task.completed && (
                   <button
+                    className="dex-tasks-row-action"
                     style={{ ...styles.priorityBtn, opacity: isSnoozed(task) ? 1 : 0.55 }}
                     onClick={(e) => { e.stopPropagation(); if (isSnoozed(task)) unsnooze(task.id); else snoozeTomorrow(task.id); }}
                     aria-label={isSnoozed(task) ? `Unsnooze task: ${task.title}` : `Snooze task to tomorrow: ${task.title}`}
@@ -1729,6 +1760,7 @@ export const Tasks: React.FC = () => {
 
                 {/* Star / flag toggle for the Flagged smart list. */}
                 <button
+                  className="dex-tasks-row-action"
                   style={{ ...styles.priorityBtn, opacity: task.flagged ? 1 : 0.45 }}
                   onClick={(e) => { e.stopPropagation(); toggleFlag(task.id); }}
                   aria-label={task.flagged ? `Unflag task: ${task.title}` : `Flag task: ${task.title}`}
@@ -1743,14 +1775,17 @@ export const Tasks: React.FC = () => {
                 </button>
 
                 <button
+                  className="dex-tasks-row-action"
                   style={styles.priorityBtn}
                   onClick={(e) => { e.stopPropagation(); cyclePriority(task.id); }}
                   title={`Priority: ${getPriorityLabel(task.priority)} (click to cycle)`}
+                  aria-label={`Cycle priority for "${task.title}" (currently ${getPriorityLabel(task.priority)})`}
                 >
                   <Icons.flag color={getPriorityColor(task.priority)} />
                 </button>
 
                 <button
+                  className="dex-tasks-row-action dex-tasks-delete"
                   style={styles.deleteBtn}
                   onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
                   aria-label={`Delete task: ${task.title}`}
@@ -1909,7 +1944,7 @@ export const Tasks: React.FC = () => {
                     <div style={{ display: 'flex', gap: 4 }}>
                       {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => (
                         <button key={r} aria-label={`Set repeat to ${r}`} onClick={() => setRecurring(task.id, r)} style={{
-                          padding: '4px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+                          padding: '4px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer',
                           border: '1px solid var(--color-border-subtle)',
                           background: (task.recurring || 'none') === r ? 'var(--color-accent-light)' : 'var(--color-bg-inset)',
                           color: (task.recurring || 'none') === r ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -1958,36 +1993,81 @@ export const Tasks: React.FC = () => {
           {remainingTasks > 0 && (
             <button
               onClick={() => setTaskVisibleCount(v => v + TASKS_PER_PAGE)}
-              style={{ display: 'block', width: '100%', margin: '6px 0 10px', padding: 'var(--space-2) 10px', fontSize: 12, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer' }}
+              style={{ display: 'block', width: '100%', margin: '6px 0 10px', padding: 'var(--space-2) 10px', fontSize: 12, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer' }}
             >
               Load {Math.min(TASKS_PER_PAGE, remainingTasks)} more ({remainingTasks} remaining)
             </button>
           )}
 
-          {sortedTasks.length === 0 && (
+          {sortedTasks.length === 0 && (() => {
+            // List-aware empty states. A search/filter that hides everything gets its
+            // own copy so the user knows it's a filter, not an empty list.
+            const isFiltered = !!searchQuery.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || chipPriority || chipList || chipHasDue;
+            const accent = isFiltered
+              ? 'var(--color-accent, #0a84ff)'
+              : selectedList === 'overdue'
+                ? 'var(--color-error, #ff453a)'
+                : selectedList === 'flagged'
+                  ? 'var(--color-warning, #ff9f0a)'
+                  : 'var(--color-success, #30d158)';
+            const headline = isFiltered
+              ? 'No matches'
+              : selectedList === 'today'
+                ? 'All clear for today'
+                : selectedList === 'overdue'
+                  ? 'Nothing overdue'
+                  : selectedList === 'upcoming'
+                    ? 'Nothing scheduled ahead'
+                    : selectedList === 'flagged'
+                      ? 'No flagged tasks'
+                      : selectedList === 'completed'
+                        ? 'Nothing completed yet'
+                        : 'No tasks here';
+            const body = isFiltered
+              ? 'No tasks match the current search or filters. Try clearing them.'
+              : selectedList === 'today'
+                ? 'Tasks due today will show up here. Add one above to get going.'
+                : selectedList === 'overdue'
+                  ? "You're caught up — no tasks have slipped past their due date."
+                  : selectedList === 'upcoming'
+                    ? 'Tasks with a future due date will appear here.'
+                    : selectedList === 'flagged'
+                      ? 'Flag a task with the star to surface it here.'
+                      : selectedList === 'completed'
+                        ? 'Completed tasks collect here as you check them off.'
+                        : 'Type a task above and press Enter to create one.';
+            return (
             <div style={styles.empty}>
-              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'var(--color-success-muted, rgba(48,209,88,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #30d158)" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <div style={{ width: 72, height: 72, borderRadius: 18, background: 'color-mix(in srgb, ' + accent + ' 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </div>
-              <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
-                {selectedList === 'today' ? 'All clear for today' : 'No tasks here'}
+              <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)', letterSpacing: '-0.01em' }}>
+                {headline}
               </span>
-              <span style={{ fontSize: 13, color: 'var(--color-text-muted, #8a8a8a)', marginTop: 4, maxWidth: 260, textAlign: 'center', lineHeight: 1.5 }}>
-                {selectedList === 'today' ? 'Tasks due today will show up here. Add one above!' : 'Type a task above and press Enter to create one.'}
+              <span style={{ fontSize: 13, color: 'var(--color-text-muted, #8a8a8a)', marginTop: 6, maxWidth: 280, textAlign: 'center', lineHeight: 1.5 }}>
+                {body}
               </span>
               <button
-                onClick={() => newTaskInputRef.current?.focus()}
+                onClick={() => {
+                  if (isFiltered) {
+                    setSearchQuery(''); setStatusFilter('all'); setPriorityFilter('all');
+                    setChipPriority(null); setChipList(null); setChipHasDue(false);
+                  } else {
+                    newTaskInputRef.current?.focus();
+                  }
+                }}
                 style={{
-                  marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-5)', borderRadius: 6,
-                  background: 'var(--color-accent, #0a84ff)', color: '#fff',
+                  marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', borderRadius: 'var(--radius-lg, 10px)',
+                  background: 'var(--color-accent, #0a84ff)', color: 'var(--color-accent-text, #fff)',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
-                New Task
+                {isFiltered ? 'Clear filters' : 'New Task'}
               </button>
             </div>
-          )}
+            );
+          })()}
           </>
           )}
         </div>
@@ -2082,6 +2162,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 'var(--space-3) var(--space-5)',
+    borderRadius: 0,
     borderBottom: '1px solid var(--color-border)',
   },
   headerTitle: {
@@ -2100,7 +2181,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleCompleted: {
     padding: '5px 10px',
-    borderRadius: '4px',
+    borderRadius: '10px',
     border: 'none',
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-secondary)',
@@ -2128,7 +2209,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   bulkBtn: {
     padding: '4px 12px',
-    borderRadius: 'var(--radius-sm, 4px)',
+    borderRadius: 'var(--radius-lg, 10px)',
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -2160,7 +2241,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '32px',
     height: '32px',
-    borderRadius: '6px',
+    borderRadius: '10px',
     border: 'none',
     background: 'var(--color-accent)',
     color: 'var(--color-accent-text)',

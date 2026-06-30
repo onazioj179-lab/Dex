@@ -236,6 +236,9 @@ const SmartInbox: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [groupMode, setGroupMode] = useState<'time' | 'source'>('time');
+  const [query, setQuery] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   // Locally-applied read/cleared state for items the hub can't persist
   // (live + activity), and an optimistic overlay over hub rows.
   const [localRead, setLocalRead] = useState<Set<string>>(new Set());
@@ -353,10 +356,18 @@ const SmartInbox: React.FC = () => {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allItems]);
 
-  const visibleItems = useMemo(
-    () => (sourceFilter === 'all' ? allItems : allItems.filter((it) => it.source === sourceFilter)),
-    [allItems, sourceFilter],
-  );
+  const visibleItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allItems.filter((it) => {
+      if (sourceFilter !== 'all' && it.source !== sourceFilter) return false;
+      if (unreadOnly && it.read) return false;
+      if (q) {
+        const hay = `${it.title} ${it.body} ${it.source}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allItems, sourceFilter, query, unreadOnly]);
 
   const unreadCount = useMemo(() => allItems.reduce((n, it) => (it.read ? n : n + 1), 0), [allItems]);
 
@@ -378,6 +389,29 @@ const SmartInbox: React.FC = () => {
     } catch {
       /* noop */
     }
+  }, []);
+
+  // Mark a single item read (optimistic local + hub when persistent).
+  const markOneRead = useCallback((item: InboxItem) => {
+    setLocalRead((prev) => (prev.has(item.key) ? prev : new Set(prev).add(item.key)));
+    if (item.hubId != null) {
+      const dex = bridge();
+      if (dex) {
+        try { void dex.invoke('notification-center:markRead', item.hubId); } catch { /* noop */ }
+      }
+    }
+  }, []);
+
+  // Dismiss (archive) a single item from the feed.
+  const dismissOne = useCallback((item: InboxItem) => {
+    setCleared((prev) => (prev.has(item.key) ? prev : new Set(prev).add(item.key)));
+    if (item.hubId != null) {
+      const dex = bridge();
+      if (dex) {
+        try { void dex.invoke('notification-center:markRead', item.hubId); } catch { /* noop */ }
+      }
+    }
+    emitToast('info', 'Dismissed');
   }, []);
 
   const markAllRead = useCallback(async () => {
@@ -426,12 +460,55 @@ const SmartInbox: React.FC = () => {
     return secs;
   }, [visibleItems, groupMode]);
 
+  // Flat ordered list of visible keys, for arrow-key navigation across sections.
+  const flatKeys = useMemo(() => sections.flatMap((s) => s.items.map((it) => it.key)), [sections]);
+
+  // Keep the active row valid as the feed changes; default to the first row.
+  useEffect(() => {
+    if (flatKeys.length === 0) { setActiveKey(null); return; }
+    setActiveKey((cur) => (cur && flatKeys.includes(cur) ? cur : flatKeys[0]));
+  }, [flatKeys]);
+
+  // Roving keyboard navigation over the message list (Apple-Mail style j/k + arrows).
+  const onListKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (flatKeys.length === 0) return;
+    const idx = activeKey ? flatKeys.indexOf(activeKey) : -1;
+    const focusRow = (key: string) => {
+      setActiveKey(key);
+      try {
+        (document.querySelector(`[data-inbox-row="${CSS.escape(key)}"]`) as HTMLElement | null)?.focus();
+      } catch { /* CSS.escape may be absent in old engines — selection state still updates */ }
+    };
+    const item = activeKey ? visibleItems.find((it) => it.key === activeKey) : undefined;
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'j':
+        e.preventDefault();
+        focusRow(flatKeys[Math.min(flatKeys.length - 1, idx + 1)] ?? flatKeys[0]);
+        break;
+      case 'ArrowUp':
+      case 'k':
+        e.preventDefault();
+        focusRow(flatKeys[Math.max(0, idx - 1)] ?? flatKeys[0]);
+        break;
+      case 'e':
+        if (item) { e.preventDefault(); dismissOne(item); }
+        break;
+      case 'r':
+        if (item) { e.preventDefault(); markOneRead(item); }
+        break;
+      default:
+        break;
+    }
+  }, [flatKeys, activeKey, visibleItems, dismissOne, markOneRead]);
+
   // -------------------------------------------------------------------------
   // Render.
   // -------------------------------------------------------------------------
 
   return (
     <div style={S.container}>
+      <style>{INBOX_CSS}</style>
       {/* Header */}
       <div style={S.header}>
         <div style={S.titleWrap}>
@@ -440,34 +517,79 @@ const SmartInbox: React.FC = () => {
         </div>
         <div style={S.headerActions}>
           <button
+            className="inbox-tool-btn"
             style={S.toolBtn}
             onClick={() => setGroupMode((m) => (m === 'time' ? 'source' : 'time'))}
             title={groupMode === 'time' ? 'Group by source' : 'Group by time'}
           >
             {groupMode === 'time' ? 'By time' : 'By source'}
           </button>
-          <button style={S.toolBtn} onClick={markAllRead} disabled={unreadCount === 0} title="Mark all as read">
+          <button className="inbox-tool-btn" style={S.toolBtn} onClick={markAllRead} disabled={unreadCount === 0} title="Mark all as read">
             Mark all read
           </button>
-          <button style={S.toolBtn} onClick={clearAll} disabled={allItems.length === 0} title="Clear inbox">
+          <button className="inbox-tool-btn" style={S.toolBtn} onClick={clearAll} disabled={allItems.length === 0} title="Clear inbox">
             Clear
           </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={S.searchBar}>
+        <div style={S.searchWrap}>
+          <svg style={S.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            className="inbox-search-input"
+            style={S.searchInput}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search inbox"
+            aria-label="Search inbox"
+            spellCheck={false}
+          />
+          {query && (
+            <button
+              className="inbox-tool-btn"
+              style={S.searchClear}
+              onClick={() => setQuery('')}
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
       {/* Source filter */}
       <div style={S.filterBar}>
         <button
+          className="inbox-chip"
           style={{ ...S.chip, ...(sourceFilter === 'all' ? S.chipActive : {}) }}
           onClick={() => setSourceFilter('all')}
+          aria-pressed={sourceFilter === 'all'}
         >
           All
         </button>
+        <button
+          className="inbox-chip"
+          style={{ ...S.chip, ...(unreadOnly ? S.chipActive : {}) }}
+          onClick={() => setUnreadOnly((v) => !v)}
+          aria-pressed={unreadOnly}
+          title="Show only unread"
+        >
+          Unread{unreadCount > 0 ? ` ${unreadCount}` : ''}
+        </button>
+        <span style={S.chipSep} aria-hidden="true" />
         {sources.map((src) => (
           <button
             key={src}
+            className="inbox-chip"
             style={{ ...S.chip, ...(sourceFilter === src ? S.chipActive : {}) }}
             onClick={() => setSourceFilter(src)}
+            aria-pressed={sourceFilter === src}
           >
             {src}
           </button>
@@ -480,36 +602,81 @@ const SmartInbox: React.FC = () => {
       </div>
 
       {/* Body */}
-      <div style={S.body}>
+      <div
+        style={S.body}
+        role="listbox"
+        aria-label="Inbox messages"
+        tabIndex={-1}
+        onKeyDown={onListKeyDown}
+      >
         {loading ? (
-          <div style={S.empty}>
-            <div style={S.emptyTitle}>Loading inbox…</div>
+          <div style={S.list}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="inbox-skeleton-row" style={S.skeletonRow}>
+                <span style={S.skeletonDot} className="inbox-shimmer" />
+                <span style={S.skeletonLines}>
+                  <span style={{ ...S.skeletonLine, width: '55%' }} className="inbox-shimmer" />
+                  <span style={{ ...S.skeletonLine, width: '85%' }} className="inbox-shimmer" />
+                </span>
+              </div>
+            ))}
           </div>
         ) : visibleItems.length === 0 ? (
           <div style={S.empty}>
-            <div style={S.emptyGlyph}>{'✉'}</div>
+            <div style={S.emptyGlyph} aria-hidden="true">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
             <div style={S.emptyTitle}>
-              {sourceFilter === 'all' ? 'Your inbox is clear' : `Nothing from ${sourceFilter}`}
+              {query
+                ? `No matches for “${query}”`
+                : unreadOnly
+                  ? 'No unread items'
+                  : sourceFilter === 'all'
+                    ? 'Your inbox is clear'
+                    : `Nothing from ${sourceFilter}`}
             </div>
             <div style={S.emptyHint}>
-              {sourceFilter === 'all'
-                ? 'Notifications and recent cross-app activity will collect here. Click an item to jump to its app.'
-                : 'Try a different source, or switch back to All.'}
+              {query
+                ? 'Try a different term, or clear the search to see everything.'
+                : unreadOnly
+                  ? 'You are all caught up. Toggle Unread off to review past items.'
+                  : sourceFilter === 'all'
+                    ? 'Notifications and recent cross-app activity will collect here. Click an item to jump to its app.'
+                    : 'Try a different source, or switch back to All.'}
             </div>
           </div>
         ) : (
           sections.map((section) => (
             <div key={section.label} style={S.section}>
-              <div style={S.sectionLabel}>{section.label}</div>
+              <div style={S.sectionLabel}>
+                <span>{section.label}</span>
+                <span style={S.sectionCount}>{section.items.length}</span>
+              </div>
               <div style={S.list}>
                 {section.items.map((item) => (
-                  <button
+                  <div
                     key={item.key}
+                    data-inbox-row={item.key}
+                    className={`inbox-row dex-liquid-glass-strong${item.read ? '' : ' inbox-row-unread'}${activeKey === item.key ? ' inbox-row-active' : ''}`}
                     style={{ ...S.row, ...(item.read ? {} : S.rowUnread) }}
-                    onClick={() => openSource(item)}
+                    role="option"
+                    aria-selected={activeKey === item.key}
+                    aria-label={`${item.title}${item.body ? `, ${item.body}` : ''}, from ${item.source}, ${relativeTime(item.ts)}${item.read ? '' : ', unread'}`}
+                    tabIndex={activeKey === item.key ? 0 : -1}
+                    onClick={() => { setActiveKey(item.key); openSource(item); }}
+                    onFocus={() => setActiveKey(item.key)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openSource(item);
+                      }
+                    }}
                     title={`Open ${item.source}`}
                   >
-                    <span style={{ ...S.iconDot, background: ICON_COLOR[item.icon] + '22', color: ICON_COLOR[item.icon] }}>
+                    <span style={{ ...S.iconDot, background: ICON_COLOR[item.icon] + '22', color: ICON_COLOR[item.icon] }} aria-hidden="true">
                       {ICON_GLYPH[item.icon]}
                     </span>
                     <span style={S.rowMain}>
@@ -524,7 +691,34 @@ const SmartInbox: React.FC = () => {
                         {!item.read && <span style={S.unreadDot} aria-label="unread" />}
                       </span>
                     </span>
-                  </button>
+                    {/* Hover/focus quick actions (Apple Mail swipe-action parity). */}
+                    <span className="inbox-row-actions" style={S.rowActions}>
+                      {!item.read && (
+                        <button
+                          className="inbox-row-action"
+                          style={S.rowAction}
+                          title="Mark as read"
+                          aria-label="Mark as read"
+                          onClick={(e) => { e.stopPropagation(); markOneRead(item); }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        className="inbox-row-action"
+                        style={S.rowAction}
+                        title="Dismiss"
+                        aria-label="Dismiss"
+                        onClick={(e) => { e.stopPropagation(); dismissOne(item); }}
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m2 0v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -538,6 +732,33 @@ const SmartInbox: React.FC = () => {
 // ---------------------------------------------------------------------------
 // Styles — inline + design tokens, matching standalone-app conventions.
 // ---------------------------------------------------------------------------
+
+// Scoped CSS — hover, focus-visible, hover-reveal actions and skeleton shimmer.
+// (Class-based pseudo-states can't be expressed via inline style objects.)
+const INBOX_CSS = `
+.inbox-tool-btn:hover:not(:disabled) { background: var(--color-bg-hover, var(--color-bg-surface)); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
+.inbox-tool-btn:active:not(:disabled) { transform: scale(0.97); }
+.inbox-tool-btn:disabled { opacity: 0.45; cursor: default; }
+.inbox-tool-btn:focus-visible, .inbox-chip:focus-visible, .inbox-row:focus-visible, .inbox-row-action:focus-visible, .inbox-search-input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.inbox-chip:hover { color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
+.inbox-search-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.inbox-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); border-color: var(--color-border, rgba(255,255,255,0.15)); }
+.inbox-row.inbox-row-unread:hover { border-color: var(--color-accent); }
+.inbox-row.inbox-row-active { border-color: var(--color-accent); }
+.inbox-row:active { transform: scale(0.995); }
+.inbox-row-actions { opacity: 0; transform: translateX(4px); transition: opacity 0.12s ease, transform 0.12s ease; pointer-events: none; }
+.inbox-row:hover .inbox-row-actions, .inbox-row:focus-within .inbox-row-actions, .inbox-row.inbox-row-active .inbox-row-actions { opacity: 1; transform: none; pointer-events: auto; }
+.inbox-row-action:hover { background: var(--color-bg-base); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
+.inbox-row-action:active { transform: scale(0.92); }
+.inbox-shimmer { position: relative; overflow: hidden; }
+.inbox-shimmer::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-text-primary) 8%, transparent), transparent); animation: inbox-shimmer 1.3s ease-in-out infinite; }
+@keyframes inbox-shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .inbox-row:active, .inbox-tool-btn:active:not(:disabled), .inbox-row-action:active { transform: none; }
+  .inbox-shimmer::after { animation: none; }
+  .inbox-row-actions { transition: none; }
+}
+`;
 
 const S: Record<string, React.CSSProperties> = {
   container: {
@@ -560,7 +781,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   headerActions: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
   toolBtn: {
-    padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border)',
+    padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s ease',
@@ -583,24 +804,80 @@ const S: Record<string, React.CSSProperties> = {
     marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-muted)',
     fontStyle: 'italic', whiteSpace: 'nowrap',
   },
+  chipSep: {
+    width: 1, alignSelf: 'stretch', minHeight: 16, margin: '0 2px',
+    background: 'var(--color-border)', flexShrink: 0,
+  },
+  searchBar: {
+    flexShrink: 0, padding: 'var(--space-3) var(--space-5) 0',
+  },
+  searchWrap: {
+    position: 'relative', display: 'flex', alignItems: 'center',
+  },
+  searchIcon: {
+    position: 'absolute', left: 10, color: 'var(--color-text-muted)', pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%', boxSizing: 'border-box',
+    padding: '7px 30px 7px 30px', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
+    color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'var(--font-family)',
+    outline: 'none', transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+  },
+  searchClear: {
+    position: 'absolute', right: 6, width: 22, height: 22,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent',
+    color: 'var(--color-text-muted)', fontSize: 16, lineHeight: 1, cursor: 'pointer',
+    padding: 0, fontFamily: 'var(--font-family)',
+  },
   body: { flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-4) var(--space-6)' },
+  skeletonRow: {
+    display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
+    padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)',
+  },
+  skeletonDot: {
+    flexShrink: 0, width: 26, height: 26, borderRadius: 'var(--radius-md)',
+    background: 'var(--color-bg-surface)',
+  },
+  skeletonLines: { display: 'flex', flexDirection: 'column', gap: 7, flex: 1, paddingTop: 3 },
+  skeletonLine: { height: 9, borderRadius: 5, background: 'var(--color-bg-surface)' },
   section: { marginBottom: 'var(--space-4)' },
   sectionLabel: {
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
     fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6,
     color: 'var(--color-text-muted)', padding: '0 var(--space-2)',
     margin: 'var(--space-2) 0',
   },
+  sectionCount: {
+    fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)',
+    background: 'var(--color-bg-surface)', borderRadius: 8, padding: '1px 7px',
+    fontVariantNumeric: 'tabular-nums', letterSpacing: 0,
+  },
   list: { display: 'flex', flexDirection: 'column', gap: 4 },
   row: {
+    position: 'relative',
     display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', textAlign: 'left',
-    padding: 'var(--space-3)', borderRadius: 10, border: '1px solid transparent',
-    background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)',
+    padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)',
+    border: '1px solid transparent',
+    color: 'var(--color-text-primary)',
     cursor: 'pointer', width: '100%', fontFamily: 'var(--font-family)',
+    transition: 'border-color 0.12s ease, background 0.12s ease, transform 0.12s ease',
+  },
+  rowUnread: { borderColor: 'var(--color-accent)' },
+  rowActions: {
+    position: 'absolute', top: 'var(--space-2)', right: 'var(--space-2)',
+    display: 'flex', alignItems: 'center', gap: 4,
+  },
+  rowAction: {
+    width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
+    background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
+    cursor: 'pointer', padding: 0, fontFamily: 'var(--font-family)',
     transition: 'all 0.12s ease',
   },
-  rowUnread: { borderColor: 'var(--color-border)', background: 'var(--color-bg-elevated)' },
   iconDot: {
-    flexShrink: 0, width: 26, height: 26, borderRadius: 8,
+    flexShrink: 0, width: 26, height: 26, borderRadius: 'var(--radius-md)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, fontWeight: 700, marginTop: 1,
   },
@@ -626,7 +903,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   rowKind: {
     fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4,
-    color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 6,
+    color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 'var(--radius-sm)',
     background: 'var(--color-bg-base)',
   },
   unreadDot: {
@@ -637,7 +914,10 @@ const S: Record<string, React.CSSProperties> = {
     height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', textAlign: 'center', padding: 'var(--space-6)', gap: 'var(--space-2)',
   },
-  emptyGlyph: { fontSize: 40, opacity: 0.5, marginBottom: 'var(--space-2)' },
+  emptyGlyph: {
+    color: 'var(--color-text-muted)', opacity: 0.7, marginBottom: 'var(--space-2)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
   emptyTitle: { fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' },
   emptyHint: { fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 320, lineHeight: 1.5 },
 };

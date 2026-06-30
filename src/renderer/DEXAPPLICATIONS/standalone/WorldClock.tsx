@@ -130,6 +130,8 @@ const WorldClock: React.FC = () => {
   const [showAnalog, setShowAnalog] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
+  // Active row in the search list for keyboard (Arrow/Enter) navigation.
+  const [activeResult, setActiveResult] = useState(0);
 
   const [is24h, setIs24h] = useState<boolean>(() => {
     try {
@@ -291,7 +293,30 @@ const WorldClock: React.FC = () => {
     }
     addZone(zone);
     setQuery('');
+    setActiveResult(0);
   }, [addZone]);
+
+  // Keep the keyboard cursor in range as the result set shrinks/grows.
+  useEffect(() => { setActiveResult(0); }, [query]);
+
+  // Arrow/Enter/Escape navigation over the search results.
+  const onSearchKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveResult(i => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveResult(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const pick = searchResults[activeResult];
+      if (pick) chooseResult(pick);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (query) setQuery('');
+      else setShowAdd(false);
+    }
+  }, [searchResults, activeResult, chooseResult, query]);
 
   const getTimeInZone = (zone: ClockZone) => {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -341,7 +366,27 @@ const WorldClock: React.FC = () => {
   const formatDate = (d: Date) =>
     d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-  const AnalogClock: React.FC<{ time: Date; size: number }> = ({ time, size }) => {
+  // Whole-day delta between a zone's wall-clock date and the reference date,
+  // independent of the sub-day hour delta. Used to label "tomorrow"/"yesterday".
+  const dayDelta = (zoneTime: Date, ref: Date) => {
+    const a = new Date(zoneTime.getFullYear(), zoneTime.getMonth(), zoneTime.getDate());
+    const b = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+    return Math.round((a.getTime() - b.getTime()) / 86400000);
+  };
+
+  // Human relative-offset string, e.g. "+3h, tomorrow" or "Same as home".
+  const relativeLabel = (zoneTime: Date, ref: Date, refLabel: string) => {
+    const dh = Math.round((zoneTime.getTime() - ref.getTime()) / 3600000);
+    const dd = dayDelta(zoneTime, ref);
+    const dayWord = dd === 1 ? 'tomorrow' : dd === -1 ? 'yesterday'
+      : dd > 1 ? `+${dd} days` : dd < -1 ? `${dd} days` : '';
+    if (dh === 0 && !dayWord) return `Same as ${refLabel}`;
+    const hourPart = dh === 0 ? `Same hour` : `${dh > 0 ? '+' : ''}${dh}h`;
+    const suffix = dayWord ? `, ${dayWord}` : ` vs ${refLabel}`;
+    return `${hourPart}${suffix}`;
+  };
+
+  const AnalogClock: React.FC<{ time: Date; size: number; day?: boolean }> = ({ time, size, day = true }) => {
     const cx = size / 2, cy = size / 2;
     const hr = time.getHours() % 12 + time.getMinutes() / 60;
     const mn = time.getMinutes() + time.getSeconds() / 60;
@@ -351,6 +396,11 @@ const WorldClock: React.FC = () => {
     const mAngle = (mn / 60) * 360;
     const sAngle = (sc / 60) * 360;
     const rad = (deg: number) => (deg * Math.PI) / 180;
+    // The dial face and hands invert their contrast for night zones so the
+    // little clocks read like a real day/night world map at a glance.
+    const faceFill = day ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.35)';
+    const handColor = 'var(--color-text-primary)';
+    const tickColor = day ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)';
 
     // Hand rendered as vertical line from center going up, rotated by transform
     const Hand: React.FC<{ angle: number; len: number; w: number; color: string; smooth?: boolean }> =
@@ -367,16 +417,19 @@ const WorldClock: React.FC = () => {
       );
 
     return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cx} cy={cy} r={cx - 2} fill="none" stroke="var(--color-border)" strokeWidth="1.5" />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img"
+        aria-label={`Analog clock showing ${formatTime(time)}`}>
+        <circle cx={cx} cy={cy} r={cx - 2} fill={faceFill} stroke="var(--color-border)" strokeWidth="1.5" />
         {[...Array(12)].map((_, i) => {
           const a = rad((i / 12) * 360 - 90);
-          const r1 = cx - 6, r2 = cx - 12;
-          return <line key={i} x1={cx + Math.cos(a) * r1} y1={cy + Math.sin(a) * r1} x2={cx + Math.cos(a) * r2} y2={cy + Math.sin(a) * r2} stroke="var(--color-text-tertiary)" strokeWidth="1.5" />;
+          // Quarter ticks (12/3/6/9) are longer and bolder, like a real dial.
+          const major = i % 3 === 0;
+          const r1 = cx - 5, r2 = cx - (major ? 13 : 9);
+          return <line key={i} x1={cx + Math.cos(a) * r1} y1={cy + Math.sin(a) * r1} x2={cx + Math.cos(a) * r2} y2={cy + Math.sin(a) * r2} stroke={tickColor} strokeWidth={major ? 2 : 1} strokeLinecap="round" />;
         })}
-        <Hand angle={hAngle} len={cx * 0.5} w={3} color="var(--color-text-primary)" />
-        <Hand angle={mAngle} len={cx * 0.7} w={2} color="var(--color-text-primary)" />
-        <Hand angle={sAngle} len={cx * 0.75} w={1} color="var(--color-error)" smooth={false} />
+        <Hand angle={hAngle} len={cx * 0.5} w={3} color={handColor} />
+        <Hand angle={mAngle} len={cx * 0.7} w={2} color={handColor} />
+        <Hand angle={sAngle} len={cx * 0.75} w={1} color="var(--color-error, #FF453A)" smooth={false} />
         <circle cx={cx} cy={cy} r={3} fill="var(--color-error, #FF453A)" />
       </svg>
     );
@@ -391,6 +444,29 @@ const WorldClock: React.FC = () => {
 
   return (
     <div style={s.container}>
+      {/* Scoped polish: hover lift, focus-visible rings, control reveal. */}
+      <style>{`
+        .wc-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .wc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+        .wc-card .wc-icon-btn { opacity: 0; transition: opacity 0.15s ease; }
+        .wc-card:hover .wc-icon-btn,
+        .wc-card:focus-within .wc-icon-btn { opacity: 1; }
+        .wc-icon-btn { border-radius: 6px; }
+        .wc-icon-btn:hover { color: var(--color-text-primary); background: var(--color-bg-hover, rgba(255,255,255,0.08)); }
+        .wc-result-row { transition: background 0.12s ease; }
+        .wc-result-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; }
+        .wc-search:focus-visible,
+        .wc-icon-btn:focus-visible,
+        .wc-result-row:focus-visible,
+        .wc-card:focus-visible {
+          outline: 2px solid var(--color-accent, #0A84FF);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wc-card, .wc-card .wc-icon-btn, .wc-result-row { transition: none; }
+          .wc-card:hover { transform: none; }
+        }
+      `}</style>
       {/* Toolbar */}
       <div className="dex-liquid-glass" style={s.toolbar}>
         <span style={s.title}>World Clock</span>
@@ -415,23 +491,40 @@ const WorldClock: React.FC = () => {
       {showAdd && (
         <div className="dex-liquid-glass-strong" style={s.addPanel}>
           <input
-            className="dex-liquid-glass"
+            className="dex-liquid-glass wc-search"
             style={s.searchInput}
             value={query}
             onChange={e => setQuery(e.target.value)}
+            onKeyDown={onSearchKey}
             placeholder="Search a city or timezone (e.g. Tokyo, America/Denver)"
             aria-label="Search city or timezone"
+            role="combobox"
+            aria-expanded={searchResults.length > 0}
+            aria-controls="wc-results"
+            aria-activedescendant={searchResults[activeResult] ? `wc-result-${searchResults[activeResult].id}` : undefined}
             autoFocus
           />
           {searchResults.length === 0 ? (
-            <div style={s.searchEmpty}>No matching cities or timezones.</div>
+            <div style={s.searchEmpty}>
+              {query.trim()
+                ? `No cities or timezones match "${query.trim()}".`
+                : 'Start typing to search the timezone catalog.'}
+            </div>
           ) : (
-            <div style={s.resultsList}>
-              {searchResults.map(zone => (
+            <div style={s.resultsList} id="wc-results" role="listbox">
+              {searchResults.map((zone, ri) => (
                 <button
                   key={zone.id}
-                  style={s.resultRow}
+                  id={`wc-result-${zone.id}`}
+                  className="wc-result-row"
+                  role="option"
+                  aria-selected={ri === activeResult}
+                  style={{
+                    ...s.resultRow,
+                    background: ri === activeResult ? 'var(--color-bg-hover, rgba(255,255,255,0.08))' : 'transparent',
+                  }}
                   onClick={() => chooseResult(zone)}
+                  onMouseEnter={() => setActiveResult(ri)}
                   aria-label={`Add ${zone.label}`}
                 >
                   <span style={s.resultLabel}>{zone.label}</span>
@@ -447,8 +540,17 @@ const WorldClock: React.FC = () => {
       {/* Clock Grid */}
       {activeZones.length === 0 ? (
         <div style={s.emptyState}>
-          <div style={s.emptyTitle}>No timezones added</div>
-          <div style={s.emptyHint}>Use the + button to search and add a city.</div>
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ opacity: 0.5 }}>
+            <circle cx="12" cy="12" r="9" stroke="var(--color-text-tertiary)" strokeWidth="1.5" />
+            <path d="M12 7.5V12l3 2" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div style={s.emptyTitle}>No cities yet</div>
+          <div style={s.emptyHint}>Track time around the world. Add your first city to begin.</div>
+          <button
+            className="wc-search"
+            style={s.emptyCta}
+            onClick={() => setShowAdd(true)}
+          >Add a city</button>
         </div>
       ) : (
       <div style={s.clockGrid}>
@@ -462,8 +564,8 @@ const WorldClock: React.FC = () => {
           // relative to the user's local time. Both sides are wall-clock Dates
           // so the ms delta is DST-correct.
           const ref = homeTime ?? now;
-          const dh = Math.round((zoneTime.getTime() - ref.getTime()) / 3600000);
           const refLabel = homeTime ? 'home' : 'here';
+          const relLabel = relativeLabel(zoneTime, ref, refLabel);
 
           const cardBg = isHome
             ? 'var(--color-accent-light, rgba(10,132,255,0.14))'
@@ -472,6 +574,7 @@ const WorldClock: React.FC = () => {
           return (
             <div
               key={zone.id}
+              className="wc-card"
               draggable
               onDragStart={() => setDragId(zone.id)}
               onDragOver={e => e.preventDefault()}
@@ -492,12 +595,14 @@ const WorldClock: React.FC = () => {
               {/* Top-right controls */}
               <div style={s.cardControls}>
                 <button
+                  className="wc-icon-btn"
                   style={{ ...s.iconBtn, color: isHome ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
                   onClick={() => setHomeId(isHome ? null : zone.id)}
                   aria-label={isHome ? `Unpin ${zone.label} as home` : `Pin ${zone.label} as home`}
                   title={isHome ? 'Home (click to unpin)' : 'Set as home'}
                 >{isHome ? '★' : '☆'}</button>
                 <button
+                  className="wc-icon-btn"
                   style={{ ...s.iconBtn, opacity: idx === 0 ? 0.3 : 1 }}
                   onClick={() => moveZone(zone.id, -1)}
                   disabled={idx === 0}
@@ -505,6 +610,7 @@ const WorldClock: React.FC = () => {
                   title="Move left"
                 >{'‹'}</button>
                 <button
+                  className="wc-icon-btn"
                   style={{ ...s.iconBtn, opacity: idx === activeZones.length - 1 ? 0.3 : 1 }}
                   onClick={() => moveZone(zone.id, 1)}
                   disabled={idx === activeZones.length - 1}
@@ -512,6 +618,7 @@ const WorldClock: React.FC = () => {
                   title="Move right"
                 >{'›'}</button>
                 <button
+                  className="wc-icon-btn"
                   style={s.iconBtn}
                   onClick={() => removeZone(zone.id)}
                   aria-label={`Remove ${zone.label}`}
@@ -524,14 +631,27 @@ const WorldClock: React.FC = () => {
                 {isHome && <span style={s.homeTag}>HOME</span>}
               </div>
               <div style={s.clockOffset}>{formatOffset(zone)}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                {dh === 0 ? `Same as ${refLabel}` : `${dh > 0 ? '+' : ''}${dh}h vs ${refLabel}`}
-              </div>
-              {showAnalog && <AnalogClock time={zoneTime} size={100} />}
+              <div style={s.relOffset}>{relLabel}</div>
+              {showAnalog && <AnalogClock time={zoneTime} size={100} day={isDay} />}
               <div style={s.clockTime}>{formatTime(zoneTime)}</div>
               <div style={s.clockDate}>{formatDate(zoneTime)}</div>
               <div style={s.statusRow}>
-                <span style={{ fontSize: 13 }}>{isDay ? '☀ Day' : '☾ Night'}</span>
+                <span style={s.dayNight}>
+                  {isDay ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="4.5" fill="var(--color-warning, #FFD60A)" />
+                      {[...Array(8)].map((_, i) => {
+                        const a = (i / 8) * Math.PI * 2;
+                        return <line key={i} x1={12 + Math.cos(a) * 7} y1={12 + Math.sin(a) * 7} x2={12 + Math.cos(a) * 9.5} y2={12 + Math.sin(a) * 9.5} stroke="var(--color-warning, #FFD60A)" strokeWidth="1.6" strokeLinecap="round" />;
+                      })}
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z" fill="var(--color-text-secondary)" />
+                    </svg>
+                  )}
+                  {isDay ? 'Day' : 'Night'}
+                </span>
                 {working && <span style={s.workBadge}>Working hours</span>}
               </div>
             </div>
@@ -634,6 +754,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   clockLabel: { fontSize: 14, fontWeight: 600, marginTop: 12 },
   clockOffset: { fontSize: 11, color: 'var(--color-text-secondary)' },
+  relOffset: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' },
+  dayNight: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)' },
   clockTime: {
     fontSize: 24, fontWeight: 300, fontVariantNumeric: 'tabular-nums',
     letterSpacing: '-0.01em', marginTop: 4,
@@ -653,8 +775,13 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
     padding: 'var(--space-5)', textAlign: 'center' as const,
   },
-  emptyTitle: { fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' },
-  emptyHint: { fontSize: 12, color: 'var(--color-text-tertiary)' },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' },
+  emptyHint: { fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 260 },
+  emptyCta: {
+    marginTop: 'var(--space-2)', padding: '7px 16px', borderRadius: 10,
+    border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
+    fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
+  },
 };
 
 export default memo(WorldClock);

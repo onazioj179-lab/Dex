@@ -13,6 +13,7 @@
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
 import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { planSilenceRemoval } from '../../../shared/media/silenceDetect';
@@ -154,11 +155,6 @@ const LayoutIcon = (
   </svg>
 );
 
-const CloseIcon = (
-  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M4 4l8 8M12 4l-8 8" />
-  </svg>
-);
 
 const ZoomInIcon = (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -203,7 +199,7 @@ const DiagBottomRightIcon = (
 const VinxEditor: React.FC = () => {
   const project = useVinxStore(s => s.project);
   // Creative app settings from Settings page
-  const appSettings = useCreativeAppSettings('vinx');
+  useCreativeAppSettings('vinx');
   // Track app usage in pattern engine and engagement system
   useAppTracking('videoeditor');
   const collab = useCollaborationFeatures({ appId: 'vinx', projectName: project.name, autoCheckpointInterval: 300000 });
@@ -468,7 +464,6 @@ const VinxEditor: React.FC = () => {
   }, [selectedClipIds, _updateClip, getClipById, _removeClip, _addClip, project]);
 
   const engineRef = useRef<PlaybackEngine | null>(null);
-  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // DEX system-level volume multiplier (0-1), respects AppManager gain
   const sysGainRef = useRef<number>(
     (() => { try { return Math.min(1, Math.max(0, Number(localStorage.getItem('dex-system-volume') ?? '100') / 100)); } catch { return 1; } })()
@@ -476,6 +471,9 @@ const VinxEditor: React.FC = () => {
   const programCanvasRef = useRef<HTMLDivElement>(null);
   const sourceCanvasRef = useRef<HTMLDivElement>(null);
   const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
+  // UKI natural-language assistant bar. Drives the previously-orphaned
+  // handleVinxOp handler (silence removal, speed ramp, etc.).
+  const [showAiBar, setShowAiBar] = useState(false);
 
   // Quick Export (WebM) — real canvas.captureStream + MediaRecorder render of
   // the live timeline playback. Tracks an in-flight capture + its progress.
@@ -1071,6 +1069,25 @@ const VinxEditor: React.FC = () => {
   return (
     <div style={appContainerStyle} className="vinx-app" {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop videos to import</div>}
+      {showAiBar && (
+        <div
+          className="dex-creative-panel-strong"
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', width: 'min(560px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 'var(--z-max)', padding: 'var(--space-2)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.4px' }}>VINX ASSISTANT</span>
+            <button aria-label="Close assistant" onClick={() => setShowAiBar(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>x</button>
+          </div>
+          <CreativeCommandBar
+            appId="vinx"
+            facts={{ clipId: selectedClipIds[0], sequenceId: activeSequence?.id }}
+            onApplyOp={handleVinxOp}
+            examples={['remove silence', 'slow motion 0.5x', 'stabilize', 'auto color']}
+            placeholder="Describe an edit..."
+          />
+        </div>
+      )}
       <style>{`
         /* === VINX - PROFESSIONAL NLE STYLES === */
         .vinx-app button { font-family: inherit; }
@@ -1134,7 +1151,7 @@ const VinxEditor: React.FC = () => {
           onChange={e => setProjectName(e.target.value)}
           spellCheck={false}
         />
-        <div style={saveBadgeStyle(isDirty)} title={isDirty ? 'Unsaved changes' : 'Saved'} />
+        <div style={saveBadgeStyle(isDirty)} />
 
         <div style={toolbarSeparatorStyle} />
 
@@ -1144,7 +1161,6 @@ const VinxEditor: React.FC = () => {
           style={undoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={undo}
           disabled={undoStack.length === 0}
-          title="Undo (Ctrl+Z)"
         >
           {UndoIcon}
         </button>
@@ -1153,7 +1169,6 @@ const VinxEditor: React.FC = () => {
           style={redoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={redo}
           disabled={redoStack.length === 0}
-          title="Redo (Ctrl+Shift+Z)"
         >
           {RedoIcon}
         </button>
@@ -1182,13 +1197,13 @@ const VinxEditor: React.FC = () => {
 
         {/* Layout presets */}
         <div style={{ display: 'flex', gap: 4 }}>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('edit')} title="Edit layout" aria-label="Edit layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('edit')} aria-label="Edit layout preset">
             {LayoutIcon} Edit
           </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('color')} title="Color layout" aria-label="Color layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('color')} aria-label="Color layout preset">
             <DexIcon name="palette" size={10} /> Color
           </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('audio')} title="Audio layout" aria-label="Audio layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('audio')} aria-label="Audio layout preset">
             <DexIcon name="volume" size={10} /> Audio
           </button>
         </div>
@@ -1196,7 +1211,7 @@ const VinxEditor: React.FC = () => {
         <div style={toolbarSeparatorStyle} />
 
         {/* Save */}
-        <button style={toolbarBtnStyle} onClick={markSaved} title="Save (Ctrl+S)" aria-label="Save project">
+        <button style={toolbarBtnStyle} onClick={markSaved} aria-label="Save project">
           <DexIcon name="save" size={10} /> Save
         </button>
 
@@ -1211,7 +1226,6 @@ const VinxEditor: React.FC = () => {
             saveEngagement(checkRes.state);
             rewardUnlocks(checkRes.newUnlocks);
           }}
-          title="Export (Ctrl+E)"
           aria-label="Export project"
         >
           {ExportIcon} Export
@@ -1221,7 +1235,6 @@ const VinxEditor: React.FC = () => {
         <button
           style={quickExport.active ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={quickExport.active ? handleCancelQuickExport : handleQuickExport}
-          title={quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM) — records the timeline as it plays'}
           aria-label={quickExport.active ? 'Cancel Quick Export' : 'Quick Export to WebM'}
         >
           {ExportIcon}
@@ -1241,7 +1254,6 @@ const VinxEditor: React.FC = () => {
             <button
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
-              title="Share & Collaborate"
               aria-label={collab.activeCollaboratorCount > 0 ? `Share project (${collab.activeCollaboratorCount} active collaborators)` : 'Share and collaborate on project'}
             >
               <DexIcon name="users" size={12} />
@@ -1257,17 +1269,29 @@ const VinxEditor: React.FC = () => {
 
         <div style={toolbarSeparatorStyle} />
 
+        <button
+          aria-label="Toggle AI assistant"
+          aria-pressed={showAiBar}
+          onClick={() => setShowAiBar(v => !v)}
+          style={{ ...toolbarBtnStyle, background: showAiBar ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : undefined, color: showAiBar ? 'var(--color-accent)' : undefined }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg> Assistant
+        </button>
+
+        <div style={toolbarSeparatorStyle} />
+
         <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
           <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ ...toolbarBtnStyle, background: showFeaturesMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : undefined, color: showFeaturesMenu ? 'var(--color-accent)' : undefined }}>
             <DexIcon name="sliders" size={10} /> Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg>
           </button>
           {showFeaturesMenu && (
-            <div role="menu" className="dex-liquid-glass-strong" onKeyDown={(e) => { if (e.key === 'Escape') setShowFeaturesMenu(false); }} style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+            <div role="menu" className="dex-creative-panel-strong" onKeyDown={(e) => { if (e.key === 'Escape') setShowFeaturesMenu(false); }} style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
               <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>COLOR</div>
               {[
                 { label: 'LUT Browser', active: showLUTBrowser, fn: toggleLUTBrowser },
                 { label: 'Speed Ramp', active: showSpeedRampEditor, fn: toggleSpeedRampEditor },
                 { label: 'Freeze Frame', active: false, fn: () => { if (selectedClipIds.length > 0) createFreezeFrame(selectedClipIds[0], currentFrame, project.frameRate * 2); } },
+                { label: 'Clip Color Labels', active: showClipColorLabels, fn: toggleClipColorLabels },
               ].map(item => (
                 <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
@@ -1408,7 +1432,7 @@ const VinxEditor: React.FC = () => {
           <div
             role="status"
             aria-live="polite"
-            className="dex-liquid-glass"
+            className="dex-creative-panel"
             style={{
               position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
               width: 'min(360px, calc(100% - 32px))',
@@ -1450,7 +1474,7 @@ const VinxEditor: React.FC = () => {
         const mcId = sel?.multicamClipId ?? null;
         const mc = mcId ? (project.multicamClips?.find(m => m.id === mcId) ?? null) : null;
         return (
-          <div className="dex-liquid-glass-strong" style={{
+          <div className="dex-creative-panel-strong" style={{
             position: 'absolute', right: 0, top: 64, bottom: 24, width: 'min(320px, calc(100% - 24px))',
             borderRadius: 'var(--radius-lg) 0 0 var(--radius-lg)',
             boxShadow: '-8px 0 24px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' as React.CSSProperties['zIndex'],
@@ -1497,7 +1521,7 @@ const VinxEditor: React.FC = () => {
 
       {/* LUT Browser Panel */}
       {showLUTBrowser && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(440px, calc(100% - 112px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(440px, calc(100% - 112px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>LUT Browser</span>
             <button aria-label="Close LUT Browser" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLUTBrowser}><DexIcon name="close" size={14} /></button>
@@ -1525,7 +1549,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Speed Ramp Panel */}
       {showSpeedRampEditor && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 60, width: 480, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 60, width: 480, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Speed Ramping</span>
             <button aria-label="Close Speed Ramp editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSpeedRampEditor}><DexIcon name="close" size={14} /></button>
@@ -1550,7 +1574,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Subtitle Editor Panel */}
       {showSubtitleEditor && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 'min(320px, 35%)', bottom: 12, width: 'min(320px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 'min(320px, 35%)', bottom: 12, width: 'min(320px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Subtitles (SRT)</span>
             <button aria-label="Close Subtitle editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSubtitleEditor}><DexIcon name="close" size={14} /></button>
@@ -1577,7 +1601,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Loudness Metering Panel */}
       {showLoudnessPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Loudness</span>
             <button aria-label="Close Loudness panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLoudnessPanel}><DexIcon name="close" size={14} /></button>
@@ -1602,7 +1626,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio Ducking Panel */}
       {showAudioDuckingPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 'min(280px, 35%)', top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 'min(280px, 35%)', top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Ducking</span>
             <button aria-label="Close Audio Ducking panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAudioDuckingPanel}><DexIcon name="close" size={14} /></button>
@@ -1626,7 +1650,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Motion Tracker Panel */}
       {showMotionTracker && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 'min(320px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 'min(320px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Motion Tracking</span>
             <button aria-label="Close Motion Tracker" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMotionTracker}><DexIcon name="close" size={14} /></button>
@@ -1647,21 +1671,21 @@ const VinxEditor: React.FC = () => {
                     <span style={{ fontSize: 11, color: t.status === 'complete' ? 'var(--color-success)' : t.status === 'tracking' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{t.status}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button aria-label="Track backward" title="Track Backward" onClick={() => {
+                    <button aria-label="Track backward" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
                       void runMotionTrack('backward', 30).then((trackPoints) => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }}><DexIcon name="chevron-left" size={10} /> Track</button>
-                    <button aria-label="Track forward" title="Track Forward" onClick={() => {
+                    <button aria-label="Track forward" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
                       void runMotionTrack('forward', 60).then((trackPoints) => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
-                    <button aria-label="Delete tracker" title="Delete" onClick={() => {
+                    <button aria-label="Delete tracker" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).filter(tr => tr.id !== t.id) } }));
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, marginLeft: 'auto', color: 'var(--color-error)' }}><DexIcon name="close" size={10} /></button>
                   </div>
@@ -1674,7 +1698,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Mask Editor Panel */}
       {showMaskEditor && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Mask Editor</span>
             <button aria-label="Close Mask Editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMaskEditor}><DexIcon name="close" size={14} /></button>
@@ -1719,7 +1743,7 @@ const VinxEditor: React.FC = () => {
       {/* Project Templates Dialog */}
       {showTemplateDialog && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleTemplateDialog}>
-          <div className="dex-liquid-glass-strong" style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: 'min(80vh, calc(100% - 32px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
+          <div className="dex-creative-panel-strong" style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: 'min(80vh, calc(100% - 32px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Project Templates</span>
               <button aria-label="Close Templates dialog" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleTemplateDialog}><DexIcon name="close" size={14} /></button>
@@ -1754,7 +1778,7 @@ const VinxEditor: React.FC = () => {
       {/* Batch Export Panel */}
       {showBatchExport && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleBatchExport}>
-          <div className="dex-liquid-glass-strong" style={{ width: 'min(480px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div className="dex-creative-panel-strong" style={{ width: 'min(480px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Export</span>
               <button aria-label="Close Batch Export dialog" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleBatchExport}><DexIcon name="close" size={14} /></button>
@@ -1780,7 +1804,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Clip Roles Panel */}
       {showClipRolesPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 12, top: 120, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 12, top: 120, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clip Roles</span>
             <button aria-label="Close Clip Roles panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleClipRolesPanel}><DexIcon name="close" size={14} /></button>
@@ -1802,7 +1826,7 @@ const VinxEditor: React.FC = () => {
 
       {/* PiP Presets Panel */}
       {showPipPresets && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 'min(300px, 38%)', top: 120, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 'min(300px, 38%)', top: 120, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>PiP Presets</span>
             <button aria-label="Close PiP presets" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={togglePipPresets}><DexIcon name="close" size={14} /></button>
@@ -1831,7 +1855,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Reference Frame Panel */}
       {showReferenceFrame && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 'min(350px, 40%)', bottom: 12, width: 'min(280px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 'min(350px, 40%)', bottom: 12, width: 'min(280px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Reference Frame</span>
             <button aria-label="Close Reference Frame panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleReferenceFrame}><DexIcon name="close" size={14} /></button>
@@ -1865,7 +1889,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Auto-Reframe Panel */}
       {showAutoReframe && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 84, width: 360, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 84, width: 360, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Auto-Reframe</span>
             <button aria-label="Close Auto-Reframe panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAutoReframe}><DexIcon name="close" size={14} /></button>
@@ -1887,7 +1911,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Ken Burns / Dynamic Zoom Panel */}
       {showKenBurns && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 'min(300px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 'min(300px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Ken Burns / Dynamic Zoom</span>
             <button aria-label="Close Ken Burns panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleKenBurns}><DexIcon name="close" size={14} /></button>
@@ -1939,7 +1963,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio Crossfade Presets Panel */}
       {showCrossfadePresets && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 400, top: 84, width: 240, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 400, top: 84, width: 240, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crossfade Presets</span>
             <button aria-label="Close Crossfade presets" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleCrossfadePresets}><DexIcon name="close" size={14} /></button>
@@ -1974,7 +1998,7 @@ const VinxEditor: React.FC = () => {
 
       {/* J/L Cut Panel */}
       {showJLCutPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 400, top: 200, width: 240, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 400, top: 200, width: 240, borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>J-Cut / L-Cut</span>
             <button aria-label="Close J/L Cut panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleJLCutPanel}><DexIcon name="close" size={14} /></button>
@@ -1999,7 +2023,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Stabilization Panel */}
       {showStabilizationPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 'min(200px, 30%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 'min(200px, 30%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stabilization</span>
             <button aria-label="Close Stabilization panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleStabilizationPanel}><DexIcon name="close" size={14} /></button>
@@ -2028,7 +2052,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Noise Reduction Panel */}
       {showNoiseReductionPanel && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 'min(380px, 40%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 'min(380px, 40%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Noise Reduction</span>
             <button aria-label="Close Noise Reduction panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleNoiseReductionPanel}><DexIcon name="close" size={14} /></button>
@@ -2058,7 +2082,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Marker Manager Panel */}
       {showMarkerManager && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Markers</span>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -2077,7 +2101,7 @@ const VinxEditor: React.FC = () => {
                     const idx = colors.indexOf(m.color);
                     updateMarker(m.id, { color: colors[(idx + 1) % colors.length] });
                   }} />
-                  <span role="button" tabIndex={0} aria-label={`Go to ${formatTimecode(m.frame, project.frameRate)}`} title="Go to marker" onClick={() => setCurrentFrame(m.frame)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrentFrame(m.frame); } }} style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 70, cursor: 'pointer' }}>{formatTimecode(m.frame, project.frameRate)}</span>
+                  <span role="button" tabIndex={0} aria-label={`Go to ${formatTimecode(m.frame, project.frameRate)}`} onClick={() => setCurrentFrame(m.frame)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrentFrame(m.frame); } }} style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 70, cursor: 'pointer' }}>{formatTimecode(m.frame, project.frameRate)}</span>
                   <input value={m.name} onChange={e => updateMarker(m.id, { name: e.target.value })} style={{ flex: 1, padding: '2px 4px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, minWidth: 0 }} />
                   <select value={m.type} onChange={e => updateMarker(m.id, { type: e.target.value as any })} style={{ padding: '2px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: '#1a1a1a', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                     <option value="standard">Standard</option>
@@ -2095,7 +2119,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio EQ Panel */}
       {showAudioEQ && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', left: 'min(280px, 35%)', bottom: 60, width: 'min(300px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', left: 'min(280px, 35%)', bottom: 60, width: 'min(300px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>5-Band EQ</span>
             <button aria-label="Close Audio EQ" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAudioEQ}><DexIcon name="close" size={14} /></button>
@@ -2135,7 +2159,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Snap Settings Panel */}
       {showSnapSettings && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 'min(200px, 30%)', top: 84, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 'min(200px, 30%)', top: 84, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Snap Settings</span>
             <button aria-label="Close Snap Settings" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSnapSettings}><DexIcon name="close" size={14} /></button>
@@ -2162,7 +2186,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Background Render Queue Panel */}
       {showBackgroundRender && (
-        <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Render Queue</span>
             <button aria-label="Close Render Queue" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleBackgroundRender}><DexIcon name="close" size={14} /></button>
@@ -2192,7 +2216,7 @@ const VinxEditor: React.FC = () => {
         const clip = getClipById(selectedClipIds[0]);
         if (!clip) return null;
         return (
-          <div className="dex-liquid-glass" style={{ position: 'absolute', right: 12, top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(500px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflowY: 'auto' }}>
+          <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(500px, calc(100% - 108px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflowY: 'auto' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clip Inspector</span>
               <button aria-label="Close Clip Inspector" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleClipInspector}><DexIcon name="close" size={14} /></button>
@@ -2232,7 +2256,7 @@ const VinxEditor: React.FC = () => {
       {/* Auto-Color Match Panel */}
       {showAutoColorMatch && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)' }}>
-        <div className="dex-liquid-glass" style={{ width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)' }}>
+        <div className="dex-creative-panel" style={{ width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Auto-Color Match</span>
             <button aria-label="Close Auto-Color Match" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAutoColorMatch}><DexIcon name="close" size={14} /></button>
@@ -2281,7 +2305,7 @@ const VinxEditor: React.FC = () => {
       {/* EDL/XML Export Panel */}
       {showEDLExport && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleEDLExport}>
-          <div className="dex-liquid-glass-strong" style={{ width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div className="dex-creative-panel-strong" style={{ width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>EDL/XML Export</span>
               <button aria-label="Close EDL Export" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleEDLExport}><DexIcon name="close" size={14} /></button>
@@ -2335,7 +2359,7 @@ const VinxEditor: React.FC = () => {
       {/* Keyboard Shortcuts Editor */}
       {showShortcutsEditor && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleShortcutsEditor}>
-          <div className="dex-liquid-glass-strong" style={{ width: 'min(560px, calc(100vw - 48px))', maxHeight: '80vh', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div className="dex-creative-panel-strong" style={{ width: 'min(560px, calc(100vw - 48px))', maxHeight: '80vh', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Keyboard Shortcuts</span>
               <button aria-label="Close Shortcuts Editor" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleShortcutsEditor}><DexIcon name="close" size={14} /></button>
@@ -2372,6 +2396,25 @@ const VinxEditor: React.FC = () => {
       {/* Right-click context menu */}
       {ctxMenu.visible && ctxMenu.clipId && (() => {
         const menuItems = [
+          { label: 'Split at Playhead', fn: () => {
+            const st = useVinxStore.getState();
+            const c = st.getClipById(ctxMenu.clipId!);
+            if (!c) return;
+            const cur = st.currentFrame;
+            if (cur <= c.startFrame || cur >= c.endFrame) return; // playhead must be inside the clip
+            const rel = cur - c.startFrame;
+            const left = { ...c, id: generateId('clip'), endFrame: cur, mediaOutFrame: c.mediaInFrame + rel };
+            const right = { ...c, id: generateId('clip'), startFrame: cur, mediaInFrame: c.mediaInFrame + rel };
+            st._removeClip(c.id); st._addClip(left); st._addClip(right);
+          } },
+          { label: 'Duplicate', fn: () => {
+            const st = useVinxStore.getState();
+            const c = st.getClipById(ctxMenu.clipId!);
+            if (!c) return;
+            const len = c.endFrame - c.startFrame;
+            st._addClip({ ...c, id: generateId('clip'), startFrame: c.endFrame, endFrame: c.endFrame + len });
+          } },
+          null,
           { label: 'Copy Attributes', fn: () => copyClipAttributes(ctxMenu.clipId!) },
           { label: 'Paste Attributes', fn: () => { if (copiedClipAttributes) pasteClipAttributes(ctxMenu.clipId!); }, disabled: !copiedClipAttributes },
           null,
@@ -2381,7 +2424,7 @@ const VinxEditor: React.FC = () => {
           { label: 'Delete Clip', fn: () => _removeClip(ctxMenu.clipId!), danger: true },
         ];
         return (
-          <div className="dex-liquid-glass" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, borderRadius: 'var(--radius-lg)', padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-creative-panel" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, borderRadius: 'var(--radius-lg)', padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>

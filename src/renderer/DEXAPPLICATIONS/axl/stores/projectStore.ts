@@ -14,11 +14,12 @@ import type {
   AXLProject, Part, Constraint, ConstraintType, Measurement, GDTAnnotation,
   BOMEntry, Material, PartFeature, PrimitiveType, BooleanOp, Vec3,
   Transform, Sketch, SketchEntity, SketchConstraint, SketchDimension, Parameter,
-  SimulationResult,
+  SimulationResult, Configuration, ConfigurationPart, NamedView,
 } from '../types';
 import { MATERIAL_DB } from '../constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight } from '../utils/math';
 import { ConstraintSolver } from '../engine/ConstraintSolver';
+import { snapshotConfiguration } from '../AxlInspect';
 
 // The iterative solver understands a core set of geometric constraint types.
 // The UI offers a few CAD-friendly aliases (mate/align/offset) that map onto
@@ -77,6 +78,8 @@ function createDefaultProject(): AXLProject {
     dimensionLines: [],
     sketches: [],
     parameters: [],
+    configurations: [],
+    namedViews: [],
     createdAt: Date.now(),
     modifiedAt: Date.now(),
     version: 1,
@@ -106,6 +109,7 @@ interface ProjectStore {
 
   // Part operations
   addPrimitive: (type: PrimitiveType, customParams?: Record<string, number>, customName?: string) => string;
+  addMeshPart: (name: string, mesh: { positions: number[]; normals: number[]; indices: number[] }) => string;
   deletePart: (partId: string) => void;
   duplicatePart: (partId: string) => string | null;
   applyBoolean: (op: BooleanOp, partIds: string[]) => void;
@@ -141,6 +145,15 @@ interface ProjectStore {
 
   // Parameters
   setParameter: (name: string, value: number, expression?: string) => void;
+
+  // Configurations / Design Variants
+  saveConfiguration: (name: string) => string;
+  applyConfiguration: (configId: string) => void;
+  deleteConfiguration: (configId: string) => void;
+
+  // Named Views / Saved Cameras
+  saveNamedView: (view: Omit<NamedView, 'id'>) => string;
+  deleteNamedView: (viewId: string) => void;
 
   // Simulation (results stored separately)
   simResults: SimulationResult | null;
@@ -233,6 +246,39 @@ export const useProjectStore = create<ProjectStore>()(
             ...state.project,
             modifiedAt: Date.now(),
             assembly: { ...state.project.assembly, parts: [...state.project.assembly.parts, part] },
+          },
+        }));
+        return partId;
+      },
+
+      addMeshPart: (name: string, mesh: { positions: number[]; normals: number[]; indices: number[] }) => {
+        const state = get();
+        state.pushUndo();
+        const partId = genId();
+        const part: Part = {
+          id: partId,
+          name: name || `Imported ${state.project.assembly.parts.length + 1}`,
+          transform: defaultTransform(),
+          material: MATERIAL_DB[0],
+          features: [{
+            id: genId(),
+            type: 'mesh',
+            name: name || 'Imported Mesh',
+            params: { primitiveType: 'mesh' },
+            visible: true,
+            locked: false,
+            mesh,
+          }],
+          meshVertexCount: mesh.positions.length / 3,
+          visible: true,
+          selected: false,
+          color: MATERIAL_DB[0].color,
+        };
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            modifiedAt: Date.now(),
+            assembly: { ...s.project.assembly, parts: [...s.project.assembly.parts, part] },
           },
         }));
         return partId;
@@ -580,6 +626,103 @@ export const useProjectStore = create<ProjectStore>()(
         });
       },
 
+      // ── Configurations / Design Variants ────────────────────────────────
+      saveConfiguration: (name: string) => {
+        const state = get();
+        const id = genId();
+        const config: Configuration = {
+          id,
+          name: name.trim() || `Config ${state.project.configurations.length + 1}`,
+          parts: snapshotConfiguration(state.project.assembly.parts),
+          parameters: state.project.parameters.map((p: Parameter) => ({ ...p })),
+          createdAt: Date.now(),
+        };
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            configurations: [...s.project.configurations, config],
+            activeConfigId: id,
+            modifiedAt: Date.now(),
+          },
+        }));
+        return id;
+      },
+
+      applyConfiguration: (configId: string) => {
+        const state = get();
+        const config = state.project.configurations.find((c: Configuration) => c.id === configId);
+        if (!config) return;
+        state.pushUndo();
+        const byId = new Map<string, ConfigurationPart>(
+          config.parts.map((cp: ConfigurationPart) => [cp.partId, cp] as [string, ConfigurationPart])
+        );
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            activeConfigId: configId,
+            parameters: config.parameters.map((p: Parameter) => ({ ...p })),
+            modifiedAt: Date.now(),
+            assembly: {
+              ...s.project.assembly,
+              parts: s.project.assembly.parts.map((p: Part) => {
+                const cp = byId.get(p.id);
+                if (!cp) return p;
+                // Restore transform, visibility, and the primary feature's params.
+                const primIdx = p.features.findIndex((f: PartFeature) => f.type === 'primitive');
+                const idx = primIdx >= 0 ? primIdx : 0;
+                const features = p.features.map((f: PartFeature, i: number) =>
+                  i === idx ? { ...f, params: { ...f.params, ...cp.params } } : f
+                );
+                return {
+                  ...p,
+                  visible: cp.visible,
+                  transform: {
+                    position: { ...cp.transform.position },
+                    rotation: { ...cp.transform.rotation },
+                    scale: { ...cp.transform.scale },
+                  },
+                  features,
+                };
+              }),
+            },
+          },
+        }));
+      },
+
+      deleteConfiguration: (configId: string) => {
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            configurations: s.project.configurations.filter(c => c.id !== configId),
+            activeConfigId: s.project.activeConfigId === configId ? undefined : s.project.activeConfigId,
+            modifiedAt: Date.now(),
+          },
+        }));
+      },
+
+      // ── Named Views / Saved Cameras ─────────────────────────────────────
+      saveNamedView: (view: Omit<NamedView, 'id'>) => {
+        const id = genId();
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            namedViews: [...s.project.namedViews, { ...view, id }],
+            modifiedAt: Date.now(),
+          },
+        }));
+        return id;
+      },
+
+      deleteNamedView: (viewId: string) => {
+        set((s: ProjectStore) => ({
+          project: {
+            ...s.project,
+            namedViews: s.project.namedViews.filter(v => v.id !== viewId),
+            modifiedAt: Date.now(),
+          },
+        }));
+      },
+
       setSimResults: (results: SimulationResult | null) => set({ simResults: results }),
 
       newProject: () => set({
@@ -604,6 +747,13 @@ export const useProjectStore = create<ProjectStore>()(
         // If persisted project has no parts, replace with default starter project
         if (merged.project?.assembly?.parts?.length === 0) {
           merged.project = createDefaultProject();
+        }
+        // Backfill arrays added in later versions so projects saved before this
+        // release don't crash on `.map`/`.length` of an undefined collection.
+        if (merged.project) {
+          merged.project.configurations = merged.project.configurations ?? [];
+          merged.project.namedViews = merged.project.namedViews ?? [];
+          merged.project.parameters = merged.project.parameters ?? [];
         }
         return merged;
       },

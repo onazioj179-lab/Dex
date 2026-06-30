@@ -353,7 +353,7 @@ fn calculate_entropy(data: &[u8]) -> f64 {
     entropy
 }
 
-fn run_heuristics(path: &Path, buffer: &[u8], ext: &str, sensitivity: &str) -> Option<&'static str> {
+fn run_heuristics(_path: &Path, buffer: &[u8], ext: &str, sensitivity: &str) -> Option<&'static str> {
     let is_exec_ext = EXECUTABLE_EXTENSIONS.iter().any(|e| *e == ext);
     if !is_exec_ext {
         // PE header (MZ) in non-exe file

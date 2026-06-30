@@ -37,6 +37,18 @@ const loadHistory = (): HistoryEntry[] => {
   }
 };
 
+// Scoped interaction polish for the QR generator's controls (a half-applied edit
+// referenced this without defining it; completed here).
+const QR_SCOPED_CSS = `
+[data-dex-qr-root] .qr-tab { transition: background 0.12s ease, color 0.12s ease; }
+[data-dex-qr-root] .qr-tab:hover { background: var(--color-bg-surface); color: var(--color-text-primary); }
+[data-dex-qr-root] .qr-quick { transition: transform 0.12s ease, filter 0.12s ease; }
+[data-dex-qr-root] .qr-quick:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+[data-dex-qr-root] .qr-quick:not(:disabled):active { transform: scale(0.96); }
+[data-dex-qr-root] .qr-field { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+[data-dex-qr-root] .qr-field:focus, [data-dex-qr-root] .qr-field:focus-within { border-color: var(--color-accent); }
+`;
+
 // Minimal QR code generator (byte mode, version 1-10 auto, selectable EC level)
 // Uses canvas for rendering — no external dependencies
 const QRCodeGenerator: React.FC = () => {
@@ -267,8 +279,18 @@ const QRCodeGenerator: React.FC = () => {
     }
   }, [busy]);
 
+  // Human-readable description of the current encoded payload for the preview card.
+  const previewMeta = useMemo(() => {
+    if (!qrMatrix) return null;
+    const modules = qrMatrix.length;
+    const version = (modules - 17) / 4;
+    const bytes = new TextEncoder().encode(qrData).length;
+    return { modules, version, bytes };
+  }, [qrMatrix, qrData]);
+
   return (
-    <div style={s.container}>
+    <div style={s.container} data-dex-qr-root>
+      <style>{QR_SCOPED_CSS}</style>
       {/* Mode tabs */}
       <div style={s.tabs}>
         {([
@@ -281,11 +303,12 @@ const QRCodeGenerator: React.FC = () => {
           <button
             key={m.id}
             onClick={() => setMode(m.id)}
+            className="qr-tab"
             style={{ ...s.tab, ...(mode === m.id ? s.tabActive : {}) }}
             aria-label={`${m.label} mode`}
             aria-pressed={mode === m.id}
           >
-            <span aria-hidden="true">{m.icon}</span> {m.label}
+            <span style={s.tabIcon} aria-hidden="true">{m.icon}</span> {m.label}
           </button>
         ))}
       </div>
@@ -293,11 +316,11 @@ const QRCodeGenerator: React.FC = () => {
       <div style={s.body}>
         {/* Quick actions */}
         <div style={s.quickRow}>
-          <button onClick={pasteFromClipboard} disabled={busy} className="dex-liquid-glass" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Paste from clipboard">
+          <button onClick={pasteFromClipboard} disabled={busy} className="dex-liquid-glass qr-quick" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Paste from clipboard">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
             Paste
           </button>
-          <button onClick={encodeCurrentUrl} disabled={busy} className="dex-liquid-glass" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Encode current URL">
+          <button onClick={encodeCurrentUrl} disabled={busy} className="dex-liquid-glass qr-quick" style={{ ...s.quickBtn, ...(busy ? { opacity: 0.5, cursor: 'default' } : {}) }} aria-label="Encode current URL">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
             Encode URL
           </button>
@@ -310,7 +333,7 @@ const QRCodeGenerator: React.FC = () => {
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="Enter text to encode..."
-              className="dex-liquid-glass-strong"
+              className="dex-liquid-glass-strong qr-field"
               style={s.textarea}
               maxLength={300}
               aria-label="Text to encode"
@@ -321,16 +344,16 @@ const QRCodeGenerator: React.FC = () => {
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://example.com"
-              className="dex-liquid-glass"
+              className="dex-liquid-glass qr-field"
               style={s.input}
               aria-label="URL to encode"
             />
           )}
           {mode === 'wifi' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Network name (SSID)" className="dex-liquid-glass" style={s.input} aria-label="Wi-Fi network name (SSID)" />
-              <input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Password" type="password" className="dex-liquid-glass" style={s.input} aria-label="Wi-Fi password" />
-              <select value={wifiType} onChange={e => setWifiType(e.target.value as any)} className="dex-liquid-glass" style={s.select} aria-label="Wi-Fi security type">
+              <input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Network name (SSID)" className="dex-liquid-glass qr-field" style={s.input} aria-label="Wi-Fi network name (SSID)" />
+              <input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Password" type="password" className="dex-liquid-glass qr-field" style={s.input} aria-label="Wi-Fi password" />
+              <select value={wifiType} onChange={e => setWifiType(e.target.value as any)} className="dex-liquid-glass qr-field" style={s.select} aria-label="Wi-Fi security type">
                 <option value="WPA">WPA/WPA2</option>
                 <option value="WEP">WEP</option>
                 <option value="nopass">No Password</option>
@@ -339,15 +362,15 @@ const QRCodeGenerator: React.FC = () => {
           )}
           {mode === 'contact' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" className="dex-liquid-glass" style={s.input} aria-label="Contact full name" />
-              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone number" className="dex-liquid-glass" style={s.input} aria-label="Contact phone number" />
-              <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" className="dex-liquid-glass" style={s.input} aria-label="Contact email" />
+              <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" className="dex-liquid-glass qr-field" style={s.input} aria-label="Contact full name" />
+              <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone number" className="dex-liquid-glass qr-field" style={s.input} aria-label="Contact phone number" />
+              <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" className="dex-liquid-glass qr-field" style={s.input} aria-label="Contact email" />
             </div>
           )}
           {mode === 'geo' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <input value={geoLat} onChange={e => setGeoLat(e.target.value)} placeholder="Latitude (e.g. 37.7749)" inputMode="decimal" className="dex-liquid-glass" style={s.input} aria-label="Latitude" />
-              <input value={geoLng} onChange={e => setGeoLng(e.target.value)} placeholder="Longitude (e.g. -122.4194)" inputMode="decimal" className="dex-liquid-glass" style={s.input} aria-label="Longitude" />
+              <input value={geoLat} onChange={e => setGeoLat(e.target.value)} placeholder="Latitude (e.g. 37.7749)" inputMode="decimal" className="dex-liquid-glass qr-field" style={s.input} aria-label="Latitude" />
+              <input value={geoLng} onChange={e => setGeoLng(e.target.value)} placeholder="Longitude (e.g. -122.4194)" inputMode="decimal" className="dex-liquid-glass qr-field" style={s.input} aria-label="Longitude" />
             </div>
           )}
         </div>

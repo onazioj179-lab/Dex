@@ -109,10 +109,10 @@ const PasswordGenerator: React.FC = () => {
     if (/[0-9]/.test(pwd)) score++;
     if (/[^a-zA-Z0-9]/.test(pwd)) score += 2;
 
-    if (score <= 3) return { label: 'Weak', pct: 25, color: 'var(--color-error)' };
-    if (score <= 5) return { label: 'Fair', pct: 50, color: 'var(--color-warning)' };
-    if (score <= 7) return { label: 'Good', pct: 75, color: 'var(--color-success)' };
-    return { label: 'Strong', pct: 100, color: 'var(--color-accent)' };
+    if (score <= 3) return { label: 'Weak', pct: 25, tier: 1, color: 'var(--color-error)' };
+    if (score <= 5) return { label: 'Fair', pct: 50, tier: 2, color: 'var(--color-warning)' };
+    if (score <= 7) return { label: 'Good', pct: 75, tier: 3, color: 'var(--color-success)' };
+    return { label: 'Strong', pct: 100, tier: 4, color: 'var(--color-accent)' };
   };
 
   const copy = async () => {
@@ -165,8 +165,17 @@ const PasswordGenerator: React.FC = () => {
   const strength = getStrength(password);
 
   const Toggle: React.FC<{ label: string; active: boolean; onToggle: () => void }> = ({ label, active, onToggle }) => (
-    <div className="pwgen-toggle" style={styles.toggle} onClick={onToggle}>
-      <span style={styles.toggleLabel}>{label}</span>
+    <div
+      className="pwgen-toggle"
+      style={{ ...styles.toggle, ...(active ? { borderColor: 'var(--color-success)' } : {}) }}
+      onClick={onToggle}
+      role="switch"
+      aria-checked={active}
+      aria-label={label}
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+    >
+      <span style={{ ...styles.toggleLabel, ...(active ? { color: 'var(--color-text-primary)' } : {}) }}>{label}</span>
       <div style={{ ...styles.toggleTrack, background: active ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>
         <div style={{ ...styles.toggleKnob, transform: active ? 'translateX(20px)' : 'translateX(0)' }} />
       </div>
@@ -176,18 +185,52 @@ const PasswordGenerator: React.FC = () => {
   return (
     <div style={styles.container} role="region" aria-label="Password Generator">
       <style>{`
-        .pwgen-btn:hover { filter: brightness(1.2); }
-        .pwgen-btn:active { transform: scale(0.98); }
+        .pwgen-btn { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
+        .pwgen-btn:hover { filter: brightness(1.12); }
+        .pwgen-btn:active { transform: scale(0.97); }
         .pwgen-action:hover { background: var(--color-border-subtle) !important; }
-        .pwgen-history-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
-        .pwgen-toggle:hover { background: var(--color-bg-hover) !important; }
+        .pwgen-history-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; transform: translateY(-1px); }
+        .pwgen-toggle:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
         .pwgen-clear:hover { background: var(--color-error-muted, rgba(255,69,58,0.12)) !important; }
+        .pwgen-history-btn:hover { filter: brightness(1.1); border-color: var(--color-border) !important; }
+        .pwgen-copy-icon:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .pwgen-copy-icon:active { transform: scale(0.92); }
+        .pwgen-btn:focus-visible,
+        .pwgen-action:focus-visible,
+        .pwgen-toggle:focus-visible,
+        .pwgen-clear:focus-visible,
+        .pwgen-history-btn:focus-visible,
+        .pwgen-copy-icon:focus-visible {
+          outline: 2px solid var(--color-accent, #0a84ff);
+          outline-offset: 2px;
+        }
+        .pwgen-slider { -webkit-appearance: none; appearance: none; outline: none; }
+        .pwgen-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--color-bg-elevated, #fff);
+          border: 2px solid var(--color-accent, #0a84ff);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+          cursor: pointer;
+          transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        .pwgen-slider::-webkit-slider-thumb:hover { transform: scale(1.12); }
+        .pwgen-slider::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--color-bg-elevated, #fff);
+          border: 2px solid var(--color-accent, #0a84ff);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+          cursor: pointer;
+        }
+        .pwgen-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(10,132,255,0.3); }
+        .pwgen-pwbox { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .pwgen-toggle { -webkit-tap-highlight-color: transparent; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>Password</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button style={{ ...styles.historyBtn, background: showHistory ? 'var(--color-accent)' : 'var(--color-border)' }} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history">
+          <button className="pwgen-history-btn" style={{ ...styles.historyBtn, background: showHistory ? 'var(--color-accent)' : 'var(--color-border)' }} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" aria-pressed={showHistory} title="Saved passwords">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
@@ -198,15 +241,36 @@ const PasswordGenerator: React.FC = () => {
 
       <div style={styles.main}>
         {/* Password Display */}
-        <div style={styles.displayCard}>
-          <div style={styles.passwordBox}>
+        <div className="dex-liquid-glass" style={styles.displayCard}>
+          <div className="pwgen-pwbox" style={{ ...styles.passwordBox, ...(copied ? { borderColor: 'var(--color-success)', boxShadow: '0 0 0 1px var(--color-success)' } : {}) }}>
             <span style={styles.passwordText}>{password}</span>
+            <button
+              className="pwgen-copy-icon"
+              style={styles.inlineCopyBtn}
+              onClick={copy}
+              disabled={copying}
+              aria-label={copied ? 'Copied to clipboard' : 'Copy password'}
+              title={copied ? 'Copied' : 'Copy password'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {copied ? <polyline points="20 6 9 17 4 12"/> : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>}
+              </svg>
+            </button>
           </div>
           
           {/* Strength Bar */}
-          <div style={styles.strengthRow}>
-            <div style={styles.strengthBar}>
-              <div style={{ ...styles.strengthFill, width: `${strength.pct}%`, background: strength.color }} />
+          <div style={styles.strengthRow} role="meter" aria-label="Password strength" aria-valuenow={strength.tier} aria-valuemin={0} aria-valuemax={4} aria-valuetext={strength.label}>
+            <div style={styles.strengthSegments}>
+              {[1, 2, 3, 4].map(seg => (
+                <div
+                  key={seg}
+                  style={{
+                    ...styles.strengthSegment,
+                    background: seg <= strength.tier ? strength.color : 'var(--color-bg-surface)',
+                    boxShadow: seg <= strength.tier ? `0 0 6px ${strength.color}` : 'none',
+                  }}
+                />
+              ))}
             </div>
             <span style={{ ...styles.strengthLabel, color: strength.color }}>{strength.label}</span>
             <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }} title="Estimated entropy (length x log2 of the character pool)">~{Math.round(passwordEntropyBits(password))} bits</span>
@@ -236,20 +300,21 @@ const PasswordGenerator: React.FC = () => {
         </div>
 
         {/* Length Slider */}
-        <div style={styles.section}>
+        <div className="dex-liquid-glass" style={styles.section}>
           <div style={styles.sectionHeader}>
             <span className="dex-label-caps" style={styles.sectionTitle}>Length</span>
             <span style={styles.lengthValue}>{length}</span>
           </div>
           <div style={styles.sliderContainer}>
             <input
+              className="pwgen-slider"
               type="range"
               min="6"
               max="48"
               value={length}
               onChange={e => setLength(Number(e.target.value))}
               aria-label="Password length"
-              style={styles.slider}
+              style={{ ...styles.slider, background: `linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent) ${((length - 6) / 42) * 100}%, var(--color-bg-surface) ${((length - 6) / 42) * 100}%, var(--color-bg-surface) 100%)` }}
             />
             <div style={styles.sliderLabels}>
               <span>6</span>
@@ -259,7 +324,7 @@ const PasswordGenerator: React.FC = () => {
         </div>
 
         {/* Options */}
-        <div style={styles.section}>
+        <div className="dex-liquid-glass" style={styles.section}>
           <span className="dex-label-caps" style={styles.sectionTitle}>Characters</span>
           <div style={styles.optionsGrid}>
             <Toggle label="Uppercase A-Z" active={options.uppercase} onToggle={() => setOptions(p => ({ ...p, uppercase: !p.uppercase }))} />
@@ -271,7 +336,7 @@ const PasswordGenerator: React.FC = () => {
 
         {/* History Panel */}
         {showHistory && (
-          <div style={styles.historyPanel}>
+          <div className="dex-liquid-glass-strong" style={styles.historyPanel}>
             <div style={styles.historyHeader}>
               <span className="dex-label-caps" style={styles.sectionTitle}>History</span>
               {history.length > 0 && (
@@ -280,7 +345,13 @@ const PasswordGenerator: React.FC = () => {
             </div>
             <div style={styles.historyList}>
               {history.length === 0 ? (
-                <div style={styles.emptyHistory}>No saved passwords</div>
+                <div style={styles.emptyHistory}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, marginBottom: 10 }}>
+                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                  </svg>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 4 }}>No saved passwords</div>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>Generate one and tap Save to keep it here</div>
+                </div>
               ) : (
                 history.map(entry => (
                   <div key={entry.id} className="pwgen-history-item" style={styles.historyItem}>
@@ -332,7 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '32px',
     height: '32px',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     display: 'flex',
@@ -350,20 +421,36 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 'var(--space-4)',
   },
   displayCard: {
-    background: 'var(--color-bg-secondary)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-5)',
-    border: '1px solid var(--color-border-subtle)',
-    boxShadow: 'var(--shadow-md)',
   },
   passwordBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-3)',
     background: 'var(--color-bg-surface)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-4)',
     marginBottom: 'var(--space-4)',
     border: '1px solid var(--color-border-subtle)',
   },
+  inlineCopyBtn: {
+    flexShrink: 0,
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '8px',
+    color: 'var(--color-text-tertiary)',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
   passwordText: {
+    flex: 1,
+    minWidth: 0,
     fontFamily: 'var(--font-mono)',
     fontSize: '14px',
     letterSpacing: '1px',
@@ -411,7 +498,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '4px',
+    borderRadius: '10px',
     color: 'var(--color-text-primary)',
     fontSize: '11px',
     fontWeight: 600,
@@ -430,10 +517,8 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 2px 8px rgba(48,209,88,0.4)',
   },
   section: {
-    background: 'var(--color-bg-surface)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-4)',
-    border: '1px solid var(--color-border-subtle)',
   },
   sectionHeader: {
     display: 'flex',
@@ -479,7 +564,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: 'var(--space-3) 14px',
     background: 'var(--color-bg-surface)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     border: '1px solid var(--color-border-subtle)',
@@ -505,10 +590,8 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: 'var(--shadow-sm)',
   },
   historyPanel: {
-    background: 'var(--color-bg-surface)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-4)',
-    border: '1px solid var(--color-border-subtle)',
   },
   historyHeader: {
     display: 'flex',
@@ -524,7 +607,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     padding: '4px var(--space-2)',
-    borderRadius: '3px',
+    borderRadius: '10px',
     transition: 'all 0.15s ease',
     fontFamily: 'var(--dex-font-ui)',
   },
@@ -544,7 +627,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyItem: {
     background: 'var(--color-bg-surface)',
-    borderRadius: '6px',
+    borderRadius: '10px',
     padding: 'var(--space-3)',
     border: '1px solid var(--color-border-subtle)',
     transition: 'all 0.15s ease',

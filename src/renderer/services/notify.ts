@@ -80,6 +80,13 @@ export interface NotifyInput {
    * (e.g. ultra-ephemeral UI feedback). Defaults to false.
    */
   transientOnly?: boolean;
+  /**
+   * When true, SKIP the transient popup banner but still persist to the
+   * notification center (the inverse of `transientOnly`). For low-value,
+   * non-interrupting events (e.g. achievement unlocks) that belong in the center
+   * but must never pop over the user's work. Defaults to false.
+   */
+  silent?: boolean;
 }
 
 /** Reserved key inside the hub `action` JSON for DEX notification metadata. */
@@ -157,6 +164,24 @@ export function readHubMeta(action: unknown): DexNotifyMeta | null {
     icon: normalizeIcon(meta.icon),
     source: typeof meta.source === 'string' && meta.source ? meta.source : 'System',
   };
+}
+
+/**
+ * Decode the deep-link `target` a notification was persisted with, from the hub
+ * `action` envelope (string JSON or object). Returns null when absent/unparseable
+ * so the Notification Center can decide whether an item is activatable. The
+ * `_dexMeta` block is ignored here — only the caller's own action payload carries
+ * a target. Single source of truth for "where does clicking this notification go".
+ */
+export function readHubTarget(action: unknown): string | null {
+  let obj: any = action;
+  if (typeof action === 'string') {
+    if (!action) return null;
+    try { obj = JSON.parse(action); } catch { return null; }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const target = obj.target;
+  return typeof target === 'string' && target.trim() ? target.trim() : null;
 }
 
 /** Safe access to the IPC bridge; null in non-bridge contexts (SSR/tests). */
@@ -260,7 +285,8 @@ export async function notify(input: NotifyInput): Promise<number> {
     if (duration !== undefined) resolved = { ...input, duration };
   }
 
-  emitBanner(resolved, icon, priority);
+  // `silent` notifications go straight to the center with no popup banner.
+  if (!resolved.silent) emitBanner(resolved, icon, priority);
 
   if (resolved.transientOnly) return -1;
   return persistToHub(resolved, icon, priority);

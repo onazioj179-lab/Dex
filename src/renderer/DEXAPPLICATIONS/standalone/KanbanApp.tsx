@@ -166,7 +166,7 @@ const CardDetail: React.FC<{
 
   return (
     <div style={modalStyles.overlay} onMouseDown={onClose}>
-      <div style={modalStyles.modal} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Edit card">
+      <div className="dex-liquid-glass-strong" style={modalStyles.modal} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Edit card">
         <div style={modalStyles.header}>
           <h3 style={modalStyles.headerTitle}>Edit Card</h3>
           <button className="kanban-icon-btn" style={modalStyles.closeBtn} onClick={onClose} aria-label="Close">{Icons.x}</button>
@@ -250,7 +250,7 @@ const CardDetail: React.FC<{
 
 const modalStyles: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' },
-  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', background: 'var(--color-bg-elevated, #1e1e1e)', borderRadius: 10, border: '1px solid var(--color-border, var(--color-border))', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))' },
   headerTitle: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 4 },
@@ -258,11 +258,11 @@ const modalStyles: Record<string, React.CSSProperties> = {
   label: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
   input: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
   select: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
-  addBtn: { padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  addBtn: { padding: '6px 14px', borderRadius: 10, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) var(--space-5)', borderTop: '1px solid var(--color-border, var(--color-border-subtle))' },
-  deleteBtn: { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', background: 'rgba(255,59,48,0.1)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  saveBtn: { padding: 'var(--space-2) var(--space-5)', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  deleteBtn: { padding: 'var(--space-2) var(--space-4)', borderRadius: 10, border: 'none', background: 'rgba(255,59,48,0.1)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { padding: 'var(--space-2) var(--space-4)', borderRadius: 10, border: '1px solid var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  saveBtn: { padding: 'var(--space-2) var(--space-5)', borderRadius: 10, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
 };
 
 // -- Main app -----------------------------------------------------------
@@ -277,6 +277,7 @@ const KanbanApp: React.FC = () => {
   const [showNewCol, setShowNewCol] = useState(false);
   const [dragCard, setDragCard] = useState<{ colId: string; cardIdx: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ colId: string; idx: number } | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('none');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -445,6 +446,7 @@ const KanbanApp: React.FC = () => {
     });
     setDragCard(null);
     setDropTarget(null);
+    setDragOverCol(null);
   }, [dragCard, updateBoard]);
 
   // Board management
@@ -499,17 +501,26 @@ const KanbanApp: React.FC = () => {
   return (
     <div style={styles.container}>
       <style>{`
-        .kanban-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.2); transform: translateY(-1px); border-color: var(--color-border) !important; }
-        .kanban-card:active { transform: scale(0.99); }
+        .kanban-card { position: relative; }
+        .kanban-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.28); transform: translateY(-1px); border-color: var(--color-border) !important; }
+        .kanban-card:active { transform: scale(0.99); cursor: grabbing; }
+        .kanban-card[draggable="true"] { cursor: grab; }
+        .kanban-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+        .kanban-card .kanban-card-grip { position: absolute; top: 8px; right: 8px; opacity: 0; color: var(--color-text-muted); transition: opacity 0.15s ease; pointer-events: none; }
+        .kanban-card:hover .kanban-card-grip { opacity: 0.45; }
         .kanban-btn:hover { filter: brightness(1.15); }
         .kanban-btn:active { transform: scale(0.97); }
+        .kanban-btn:focus-visible, .kanban-tab:focus-visible, .kanban-icon-btn:focus-visible, .kanban-add-card:focus-visible, .kanban-add-col:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
         .kanban-tab:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
         .kanban-add-card:hover { background: var(--color-border-subtle) !important; color: var(--color-text-secondary) !important; }
         .kanban-add-col:hover { border-color: var(--color-text-tertiary) !important; background: var(--color-border-subtle) !important; }
         .kanban-icon-btn:hover { color: var(--color-text-primary) !important; opacity: 1 !important; }
+        .kanban-column { transition: box-shadow 0.18s ease, background 0.18s ease; }
+        .kanban-column.kanban-col-drop { box-shadow: inset 0 0 0 1.5px var(--color-accent); }
+        .kanban-controls-select:hover { border-color: var(--color-text-tertiary) !important; }
       `}</style>
       {/* Top Bar */}
-      <div style={styles.topBar}>
+      <div className="dex-liquid-glass-strong" style={styles.topBar}>
         <div style={styles.topLeft}>
           <div style={styles.boardIcon}>{Icons.board}</div>
           <div>
@@ -537,7 +548,7 @@ const KanbanApp: React.FC = () => {
       </div>
 
       {/* Controls: search / filter / sort */}
-      <div style={styles.controls}>
+      <div className="dex-liquid-glass" style={styles.controls}>
         <div style={{ width: 220 }}>
           <DexSearchInput size="sm" fullWidth value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch('')} placeholder="Search cards..." />
         </div>
@@ -565,15 +576,25 @@ const KanbanApp: React.FC = () => {
 
       {/* Board */}
       <div style={styles.board}>
-        {board.columns.map(col => (
-          <div key={col.id} style={styles.column}
-            onDragOver={e => e.preventDefault()}
+        {board.columns.map(col => {
+          const atLimit = !!col.limit && col.cards.length >= col.limit;
+          const overLimit = !!col.limit && col.cards.length > col.limit;
+          const isDragOver = !viewActive && dragCard && dragOverCol === col.id && dragCard.colId !== col.id;
+          return (
+          <div key={col.id} className={`dex-liquid-glass kanban-column${isDragOver ? ' kanban-col-drop' : ''}`} style={styles.column}
+            onDragOver={e => { e.preventDefault(); if (!viewActive && dragCard) setDragOverCol(col.id); }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(c => c === col.id ? null : c); }}
             onDrop={() => handleDrop(col.id, col.cards.length)}
           >
             <div style={styles.colHeader}>
               <div style={{ ...styles.colDot, background: col.color }} />
               <span style={styles.colTitle}>{col.title}</span>
-              <span style={styles.colCount}>{col.cards.length}{col.limit ? `/${col.limit}` : ''}</span>
+              <span
+                style={{ ...styles.colCount, ...(overLimit ? styles.colCountOver : atLimit ? styles.colCountAtLimit : null) }}
+                title={col.limit ? `${col.cards.length} of ${col.limit} (WIP limit)` : `${col.cards.length} cards`}
+              >
+                {col.cards.length}{col.limit ? `/${col.limit}` : ''}
+              </span>
               <button style={styles.colDeleteBtn} className="kanban-icon-btn" onClick={() => deleteColumn(col.id)} aria-label={`Delete ${col.title} column`}>{Icons.x}</button>
             </div>
 
@@ -619,6 +640,11 @@ const KanbanApp: React.FC = () => {
                     aria-label={`Card: ${card.title}`}
                     onKeyDown={e => e.key === 'Enter' && setEditingCard({ colId: col.id, cardIdx: ci })}
                   >
+                    {!viewActive && (
+                      <span className="kanban-card-grip" aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+                      </span>
+                    )}
                     {card.labels.length > 0 && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                         {card.labels.map((l, li) => (
@@ -629,9 +655,17 @@ const KanbanApp: React.FC = () => {
                     <div style={styles.cardTitle}>{card.title}</div>
                     {card.description && <div style={styles.cardDesc}>{card.description.slice(0, 80)}{card.description.length > 80 ? '...' : ''}</div>}
                     <div style={styles.cardFooter}>
-                      <span style={{ ...styles.priorityBadge, color: (PRIORITY_CONFIG[card.priority] || PRIORITY_CONFIG.medium).color }}>
-                        {Icons.flag} {(PRIORITY_CONFIG[card.priority] || PRIORITY_CONFIG.medium).label}
-                      </span>
+                      {(() => {
+                        const pc = (PRIORITY_CONFIG[card.priority] || PRIORITY_CONFIG.medium);
+                        const emphasized = card.priority === 'high' || card.priority === 'urgent';
+                        // Only hex colors can take an alpha suffix; var() tokens cannot.
+                        const tint = pc.color.startsWith('#') ? `${pc.color}1f` : 'rgba(255,59,48,0.12)';
+                        return (
+                          <span style={{ ...styles.priorityBadge, color: pc.color, ...(emphasized ? { background: tint, padding: '1px 6px', borderRadius: 999 } : null) }}>
+                            {Icons.flag} {pc.label}
+                          </span>
+                        );
+                      })()}
                       {card.recurrence && card.recurrence !== 'none' && (
                         <span style={styles.checkCount} title={`Repeats ${card.recurrence}`}>{Icons.repeat} {card.recurrence}</span>
                       )}
@@ -666,6 +700,10 @@ const KanbanApp: React.FC = () => {
                     <button className="kanban-btn" style={styles.addCardCancel} onClick={() => setAddingToCol(null)} aria-label="Cancel adding card">Cancel</button>
                   </div>
                 </div>
+              ) : atLimit ? (
+                <div style={styles.wipFull} title={`WIP limit reached: max ${col.limit} cards`}>
+                  {Icons.flag} WIP limit reached ({col.cards.length}/{col.limit})
+                </div>
               ) : (
                 <button className="kanban-add-card" style={styles.addCardBtn} onClick={() => { setAddingToCol(col.id); setNewCardTitle(''); }} aria-label={`Add card to ${col.title}`}>
                   {Icons.plus} Add card
@@ -673,7 +711,8 @@ const KanbanApp: React.FC = () => {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* Add column */}
         {showNewCol ? (
@@ -718,10 +757,10 @@ const KanbanApp: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base, #0e0e0e)', overflow: 'hidden' },
-  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, background: 'var(--color-bg-surface-solid, #1C1C1E)' },
+  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   topLeft: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' },
   topRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
-  boardIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--color-accent-soft, rgba(99,102,241,0.12))', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-accent-soft, rgba(99,102,241,0.12))', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   boardTitle: { fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.3px' },
   boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
   progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
@@ -729,20 +768,23 @@ const styles: Record<string, React.CSSProperties> = {
   boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   boardTabActive: { background: 'var(--color-bg-elevated, #2c2c2e)', color: 'var(--color-text-primary, #fafafa)', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' },
   boardTabAdd: { width: 28, height: 28, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  controls: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-5)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, background: 'var(--color-bg-surface, rgba(255,255,255,.01))', flexWrap: 'wrap' },
-  controlSelect: { padding: '5px var(--space-2)', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', outline: 'none', cursor: 'pointer' },
-  controlBtn: { padding: '5px 12px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' },
+  controls: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '8px var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, flexWrap: 'wrap' },
+  controlSelect: { padding: '5px var(--space-2)', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', outline: 'none', cursor: 'pointer' },
+  controlBtn: { padding: '5px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' },
   controlHint: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', opacity: 0.7, marginLeft: 'auto' },
   dropLine: { height: 2, borderRadius: 2, margin: '1px 4px', background: 'var(--color-accent)', boxShadow: '0 0 6px var(--color-accent)' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
-  column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 10, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
-  colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', borderRadius: '10px 10px 0 0' },
+  column: { minWidth: 300, maxWidth: 340, borderRadius: 12, display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0 },
+  colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', borderRadius: '12px 12px 0 0' },
   colDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
   colTitle: { fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', flex: 1 },
-  colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
+  colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'var(--color-border-subtle)', minWidth: 18, textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
+  colCountAtLimit: { color: 'var(--color-warning)', background: 'rgba(255,159,10,0.14)' },
+  colCountOver: { color: 'var(--color-error)', background: 'rgba(255,59,48,0.14)' },
+  wipFull: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px dashed var(--color-warning)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, background: 'rgba(255,159,10,0.06)', margin: 2 },
   colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, opacity: 0.4 },
   cardList: { flex: 1, padding: 'var(--space-2) var(--space-2)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 },
-  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
+  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
   cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4, overflowWrap: 'anywhere', minWidth: 0 },
   cardDesc: { fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, lineHeight: 1.4 },
   cardFooter: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' },

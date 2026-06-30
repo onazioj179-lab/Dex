@@ -6,7 +6,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
-import { useRunningApps } from '../../store/runningApps';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
@@ -14,23 +13,16 @@ import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useToastHelpers } from '../../components/Toast';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { dispatchActivity, updateActivity, completeActivity } from '../../utils/liveActivity';
 import {
-  VIDEO_PRESETS,
-  AUDIO_PRESETS,
-  IMAGE_PRESETS,
-  DEFAULT_QUEUE_SETTINGS,
-  NAMING_TOKENS,
-  GPU_ENCODERS,
   detectGPUCapabilities,
   formatFileSize,
   formatDuration as forgeFormatDuration,
-  estimateEncodingTime,
   estimateOutputFileSize,
-  getAllPresets as getForgePresets,
 } from './ForgeFeatures';
-import type { EncodingPreset, QueueSettings, HardwareInfo } from './ForgeFeatures';
+import type { HardwareInfo } from './ForgeFeatures';
 import {
   detectSourceKind,
   planTarget,
@@ -195,6 +187,21 @@ const Icons = {
   quality: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 12 2 12"/><path d="M12 12 12 2"/></svg>,
 };
 
+/**
+ * Honest inline banner for video-edit panels (watermark, trim, crop, subtitle,
+ * conditional rules). Forge has no in-browser VIDEO encoder — those jobs route
+ * to the native encoder, which is not bundled in this build. So these settings
+ * are RECORDED on the job (and shown in the summary) but the pixels/timeline are
+ * only changed when a native encoder runs. This note stops the panel from
+ * masquerading as a working in-browser edit.
+ */
+const NativeEncoderNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '7px 9px', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.18))', borderRadius: 'var(--radius-lg)', marginBottom: 10 }}>
+    <span style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: 1, display: 'inline-flex' }}>{Icons.alert}</span>
+    <span style={{ fontSize: 10.5, lineHeight: 1.4, color: 'var(--color-warning)' }}>{children}</span>
+  </div>
+);
+
 // ==================== PRESETS ====================
 const DEFAULT_PRESETS: Preset[] = [
   // ProRes Family
@@ -263,7 +270,7 @@ const Forge: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
-  const appSettings = useCreativeAppSettings('forge');
+  useCreativeAppSettings('forge');
   const collab = useCollaborationFeatures({ appId: 'forge', projectName: 'FORGE Queue', autoCheckpointInterval: 300000 });
 
   // Mount guard — prevents setState after unmount in long async operations
@@ -297,7 +304,6 @@ const Forge: React.FC = () => {
   }, [toast]));
 
   // ===== RUNNING APPS =====
-  const { setCurrentApp } = useRunningApps();
 
   // ===== STATE =====
   const [jobs, setJobs] = useState<Job[]>(() => {
@@ -376,9 +382,15 @@ const Forge: React.FC = () => {
   
   // === PRO FEATURES STATE ===
   const [showImageSequence, setShowImageSequence] = useState(false);
-  const [imgSeqFormat, setImgSeqFormat] = useState<'tiff' | 'png' | 'exr' | 'dpx'>('png');
+  // Frame formats the browser canvas can REALLY encode (canvas.toBlob). TIFF/EXR/
+  // DPX were offered before but silently came out as PNG bytes with a lying file
+  // extension — removed. True HDR/film formats need the native encoder.
+  const [imgSeqFormat, setImgSeqFormat] = useState<'png' | 'jpg' | 'webp'>('png');
   const [showAudioExtract, setShowAudioExtract] = useState(false);
-  const [audioExtractFormat, setAudioExtractFormat] = useState<'wav' | 'mp3' | 'flac' | 'aac'>('wav');
+  // Only the two formats the renderer can REALLY produce: uncompressed WAV (via
+  // the PCM encoder) and Opus-in-WebM (via MediaRecorder). mp3/flac/aac were
+  // offered before but always silently came out as Opus — removed for honesty.
+  const [audioExtractFormat, setAudioExtractFormat] = useState<'wav' | 'opus'>('wav');
   const [showWatermark, setShowWatermark] = useState(false);
   const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text');
   const [watermarkText, setWatermarkText] = useState('DEX');
@@ -423,6 +435,10 @@ const Forge: React.FC = () => {
   // True while an async media operation (audio extract / smart join) is running,
   // so its trigger button is disabled and can't kick off overlapping work.
   const [mediaBusy, setMediaBusy] = useState(false);
+  // Live, rotating status verbs for the media operations (replaces frozen
+  // "Extracting…"/"Joining…" labels). Each button reads its own kind.
+  const extractPhrase = useWorkingPhrase(mediaBusy, 'extract');
+  const joinPhrase = useWorkingPhrase(mediaBusy, 'join');
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const previewSourceUrlRef = useRef<string | null>(null);
 
@@ -660,10 +676,18 @@ const Forge: React.FC = () => {
         const wantsHi = /24|pcm_s24/i.test(`${preset?.codec || ''} ${jobAny?.overrideAudioCodec || ''} ${preset?.name || ''}`);
         const bitDepth: 16 | 24 = wantsHi ? 24 : 16;
         setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 30 } : j));
-        // Honor any trim set in the Trim & Split panel (0..1 fractions on the job).
+        // Honor any trim set in the Trim & Split panel (0..1 fractions on the job),
+        // and apply loudness normalization when the user enabled it (real RMS gain
+        // on the decoded PCM — see normalizeAudioBufferRms). Only affects the real
+        // WAV path; lossy targets are native-only and never reach here.
         const tIn = Math.max(0, Math.min(1, jobAny?.trimIn ?? 0));
         const tOut = Math.max(tIn, Math.min(1, jobAny?.trimOut ?? 1));
-        const result = await transcodeAudioToWav(file, { bitDepth, trimIn: tIn, trimOut: tOut });
+        const result = await transcodeAudioToWav(file, {
+          bitDepth,
+          trimIn: tIn,
+          trimOut: tOut,
+          normalizeDb: audioNormalize ? audioNormTarget : undefined,
+        });
         if (!mountedRef.current) return;
         const blobUrl = URL.createObjectURL(result.blob);
         setJobs(prev => prev.map(j => j.id === jobId ? {
@@ -709,7 +733,7 @@ const Forge: React.FC = () => {
     } : j));
     activeEncodings.current.delete(jobId);
     fileMapRef.current.delete(jobId);
-  }, [notifyOnComplete, jobs, presets]);
+  }, [notifyOnComplete, jobs, presets, audioNormalize, audioNormTarget]);
 
   // Mirror encode jobs into the Home "Live Activity" feed (DEX 5.7) so encoding
   // progress shows as a live card on the Home screen. Centralized + throttled to
@@ -913,7 +937,6 @@ const Forge: React.FC = () => {
         });
         if (!result.canceled && result.filePaths?.length > 0) {
           const folderPath = result.filePaths[0];
-          const folderName = folderPath.split(/[\\/]/).pop() || folderPath;
           const folderId = `watch-${Date.now()}`;
           const newFolder: WatchFolder = {
             id: folderId,
@@ -1177,7 +1200,7 @@ const Forge: React.FC = () => {
     btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '9999px' },
     btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '9999px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
-    sidebar: { width: '220px', flexShrink: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    sidebar: { width: '220px', flexShrink: 0, borderRadius: 0, borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
     tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
     tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
@@ -1187,8 +1210,8 @@ const Forge: React.FC = () => {
     queueStats: { display: 'flex', gap: 'var(--space-3)', marginLeft: 'auto' },
     stat: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' },
     queueList: { flex: 1, overflow: 'auto', padding: '10px' },
-    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
-    jobItemSelected: { borderColor: 'var(--color-accent)', background: '#0d1a2e' },
+    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
+    jobItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
     jobInfo: { flex: 1, minWidth: 0 },
     jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -1199,14 +1222,14 @@ const Forge: React.FC = () => {
     jobStatus: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
     jobActions: { display: 'flex', gap: '2px' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' },
-    inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, background: 'var(--color-bg-inset)', borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', overflow: 'auto' },
+    inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, borderRadius: 0, borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', overflow: 'auto' },
     inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     inspectorSection: { marginBottom: 'var(--space-3)' },
     sectionTitle: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', letterSpacing: '0.5px', fontWeight: 600 },
     infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '11px' },
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
-    presetItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    presetItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
     presetItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
@@ -1392,14 +1415,14 @@ const Forge: React.FC = () => {
         </div>
         <div style={{ flex: 1 }} />
         <div style={styles.headerCenter}>
-          <button style={styles.btn} onClick={addFiles} title="Add files to encode" aria-label="Add files to encode">{Icons.plus} Add Files</button>
-          <button style={styles.btn} onClick={addFolder} title="Add folder to encode" aria-label="Add folder to encode">{Icons.folderPlus} Add Folder</button>
+          <button style={styles.btn} onClick={addFiles} aria-label="Add files to encode">{Icons.plus} Add Files</button>
+          <button style={styles.btn} onClick={addFolder} aria-label="Add folder to encode">{Icons.folderPlus} Add Folder</button>
           <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           {isEncoding ? (
-            <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={pauseQueue} title="Pause encoding queue" aria-label="Pause encoding queue">{Icons.pause} Pause</button>
+            <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={pauseQueue} aria-label="Pause encoding queue">{Icons.pause} Pause</button>
           ) : (
-            <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={startQueue} title="Start encoding queue" aria-label="Start encoding queue">{Icons.play} Start Queue</button>
+            <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={startQueue} aria-label="Start encoding queue">{Icons.play} Start Queue</button>
           )}
           <SendToMenu sourceApp="forge" assetKind="video" getAsset={() => {
             const job = jobs.find(j => j.id === selectedJobId) || jobs[0];
@@ -1407,7 +1430,7 @@ const Forge: React.FC = () => {
             return { name: job?.name || 'Forge Output.mp4', data: src, mimeType: 'video/mp4', metadata: { format: job?.format, preset: job?.preset } };
           }} />
           {collab.canShare && (
-            <button onClick={collab.openShareDialog} style={collabButtonStyles} title="Share queue">
+            <button onClick={collab.openShareDialog} style={collabButtonStyles}>
               <DexIcon name="user-plus" size={14} /> Share
             </button>
           )}
@@ -1415,7 +1438,7 @@ const Forge: React.FC = () => {
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '9999px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="dex-creative-panel-strong" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PROCESSING</div>
                 {[
                   { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },
@@ -1461,7 +1484,7 @@ const Forge: React.FC = () => {
       {/* Workspace */}
       <div style={styles.workspace}>
         {/* Sidebar */}
-        <div style={styles.sidebar}>
+        <div className="dex-creative-panel-strong" style={styles.sidebar}>
           <div style={styles.tabs}>
             <button style={{ ...styles.tab, ...(activeTab === 'presets' ? styles.tabActive : {}) }} onClick={() => setActiveTab('presets')} aria-label="Presets tab">
               Presets
@@ -1537,7 +1560,7 @@ const Forge: React.FC = () => {
                   </div>
                 ) : (
                   watchFolders.map(wf => (
-                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '3px', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
+                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ color: wf.active ? 'var(--color-success)' : '#6b7280' }}>{Icons.folderWatch}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '11px', fontWeight: 600 }}>{wf.path}</div>
@@ -1650,7 +1673,7 @@ const Forge: React.FC = () => {
                     <span>{job.preset}</span>
                     <span>{formatDuration(job.duration)}</span>
                     {job.status !== 'completed' && (
-                      <span title="Estimated output size">~{formatBytes(estimateOutputFileSize(job.duration, (job as any).overrideBitrate || presets.find(p => p.id === job.preset)?.bitrate || 8000, 0))}</span>
+                      <span>~{formatBytes(estimateOutputFileSize(job.duration, (job as any).overrideBitrate || presets.find(p => p.id === job.preset)?.bitrate || 8000, 0))}</span>
                     )}
                   </div>
                 </div>
@@ -1680,7 +1703,7 @@ const Forge: React.FC = () => {
 
         {/* Inspector Panel */}
         {selectedJob && (
-          <div style={styles.inspectorPanel}>
+          <div className="dex-creative-panel-strong" style={styles.inspectorPanel}>
             <div style={styles.inspectorTitle}>{selectedJob.name}</div>
             
             <div style={styles.inspectorSection}>
@@ -1770,7 +1793,7 @@ const Forge: React.FC = () => {
                 </select>
 
                 {/* Per-Job Video Overrides */}
-                <div style={{ marginTop: 10, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 10, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>VIDEO</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <div style={{ flex: 1 }}>
@@ -1817,7 +1840,7 @@ const Forge: React.FC = () => {
                 </div>
 
                 {/* Per-Job Audio Overrides */}
-                <div style={{ marginTop: 6, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 6, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>AUDIO</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div style={{ flex: 1 }}>
@@ -1868,13 +1891,13 @@ const Forge: React.FC = () => {
 
             {/* Native-only: honestly flag jobs that need the native encoder — no fake file. */}
             {selectedJob.status === 'unsupported' && (
-              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-warning-muted, rgba(255,159,10,0.12))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-warning)', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-warning-muted, rgba(255,159,10,0.12))', borderRadius: 'var(--radius-lg)', fontSize: '11px', color: 'var(--color-warning)', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                 {Icons.alert} <span>{selectedJob.error || 'Requires the native encoder.'}</span>
               </div>
             )}
 
             {selectedJob.status === 'failed' && selectedJob.error && (
-              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-error-muted, rgba(255,69,58,0.1))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-error-muted, rgba(255,69,58,0.1))', borderRadius: 'var(--radius-lg)', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {Icons.alert} {selectedJob.error}
               </div>
             )}
@@ -1888,23 +1911,18 @@ const Forge: React.FC = () => {
 
       {/* Image Sequence Export */}
       {showImageSequence && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Image Sequence Export</span>
             <button aria-label="Close Image Sequence Export" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowImageSequence(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Frame Format</div>
-            <SegmentedControl options={(['tiff', 'png', 'exr', 'dpx'] as const).map(f => ({ value: f, label: f.toUpperCase() }))} value={imgSeqFormat} onChange={setImgSeqFormat} accentColor="var(--color-accent)" variant="outlined" columns={4} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <SegmentedControl options={(['png', 'jpg', 'webp'] as const).map(f => ({ value: f, label: f.toUpperCase() }))} value={imgSeqFormat} onChange={setImgSeqFormat} accentColor="var(--color-accent)" variant="outlined" columns={3} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>frame_[####].{imgSeqFormat}</div>
             </div>
-            {imgSeqFormat === 'exr' && (
-              <div style={{ padding: 'var(--space-2)', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.15))', marginBottom: 10 }}>
-                <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>32-bit float HDR — ideal for VFX compositing</div>
-              </div>
-            )}
             <button aria-label="Export image sequence" onClick={async () => {
               if (!selectedJob || !fileMapRef.current.has(selectedJob.id)) { toast.warning('Select a video file first'); return; }
               const file = fileMapRef.current.get(selectedJob.id)!;
@@ -1924,8 +1942,8 @@ const Forge: React.FC = () => {
                 video.currentTime = i / fps;
                 await new Promise<void>(r => { video.onseeked = () => r(); });
                 ctx.drawImage(video, 0, 0);
-                const mimeMap: Record<string, string> = { png: 'image/png', tiff: 'image/tiff', exr: 'image/png', dpx: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
-                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mimeMap[imgSeqFormat] || 'image/png'));
+                const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mimeMap[imgSeqFormat] || 'image/png', 0.92));
                 if (blob) frameBlobs.push(blob);
                 if (i % 10 === 0) toast.info(`Frame ${i + 1}/${totalFrames}...`);
               }
@@ -1941,16 +1959,20 @@ const Forge: React.FC = () => {
 
       {/* Audio Extraction */}
       {showAudioExtract && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Extraction</span>
             <button aria-label="Close Audio Extraction" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowAudioExtract(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Output Format</div>
-            <SegmentedControl options={(['wav', 'mp3', 'flac', 'aac'] as const).map(f => ({ value: f, label: f.toUpperCase() }))} value={audioExtractFormat} onChange={setAudioExtractFormat} accentColor="#bf5af2" variant="outlined" columns={4} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
-              {[{ label: 'Sample Rate', value: '48 kHz' }, { label: 'Channels', value: 'Stereo' }, { label: 'Bit Depth', value: audioExtractFormat === 'wav' || audioExtractFormat === 'flac' ? '24-bit' : '16-bit' }].map(i => (
+            <SegmentedControl options={([{ v: 'wav', l: 'WAV' }, { v: 'opus', l: 'Opus (WebM)' }] as const).map(f => ({ value: f.v, label: f.l }))} value={audioExtractFormat} onChange={setAudioExtractFormat} accentColor="#bf5af2" variant="outlined" columns={2} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+              {[
+                { label: 'Codec', value: audioExtractFormat === 'wav' ? 'PCM (lossless)' : 'Opus (lossy)' },
+                { label: 'Channels', value: 'Source' },
+                { label: 'Bit Depth', value: audioExtractFormat === 'wav' ? '16-bit' : '—' },
+              ].map(i => (
                 <div key={i.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{i.label}</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{i.value}</span></div>
               ))}
             </div>
@@ -1958,8 +1980,27 @@ const Forge: React.FC = () => {
               if (mediaBusy) return;
               if (!selectedJob || !fileMapRef.current.has(selectedJob.id)) { toast.warning('Select a video file first'); return; }
               const file = fileMapRef.current.get(selectedJob.id)!;
+              const baseName = selectedJob.name.replace(/\.[^.]+$/, '');
               toast.info('Extracting audio...');
               setMediaBusy(true);
+              // WAV: decode the source and write a real PCM WAV via the shared
+              // encoder — no MediaRecorder, no format lie.
+              if (audioExtractFormat === 'wav') {
+                try {
+                  const result = await transcodeAudioToWav(file, { bitDepth: 16 });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(result.blob);
+                  a.download = `${baseName}.wav`;
+                  a.click(); URL.revokeObjectURL(a.href);
+                  toast.success('Audio extracted as WAV'); setShowAudioExtract(false);
+                } catch (err: any) {
+                  console.error('[Forge] WAV audio extraction failed:', err);
+                  toast.error('Could not extract audio — the source may have no decodable audio track.');
+                } finally { setMediaBusy(false); }
+                return;
+              }
+              // Opus: capture the decoded audio through MediaRecorder. The real
+              // container is WebM, so we download .webm (not a fake .mp3/.aac).
               let audioCtx: AudioContext | null = null;
               try {
                 const arrayBuffer = await file.arrayBuffer();
@@ -1971,6 +2012,7 @@ const Forge: React.FC = () => {
                 source.connect(dest);
                 const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
                 const mime = candidates.find(m => MediaRecorder.isTypeSupported(m)) || 'audio/webm';
+                const ext = mime.includes('ogg') ? 'ogg' : 'webm';
                 const recorder = new MediaRecorder(dest.stream, { mimeType: mime });
                 const chunks: Blob[] = [];
                 recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -1979,27 +2021,28 @@ const Forge: React.FC = () => {
                   const blob = new Blob(chunks, { type: mime });
                   const a = document.createElement('a');
                   a.href = URL.createObjectURL(blob);
-                  a.download = selectedJob.name.replace(/\.[^.]+$/, '') + '.' + audioExtractFormat;
+                  a.download = `${baseName}.${ext}`;
                   a.click(); URL.revokeObjectURL(a.href);
-                  toast.success('Audio extracted successfully'); setShowAudioExtract(false);
+                  toast.success('Audio extracted as Opus (WebM)'); setShowAudioExtract(false);
                   setMediaBusy(false);
                 };
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
               } catch (err: any) { console.error('[Forge] audio extraction failed:', err); toast.error('Could not extract audio. Try a different file or format.'); try { audioCtx?.close(); } catch { /* */ } setMediaBusy(false); }
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: mediaBusy ? 'not-allowed' : 'pointer', opacity: mediaBusy ? 0.5 : 1 }}>{mediaBusy ? 'Extracting…' : 'Extract Audio'}</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: mediaBusy ? 'not-allowed' : 'pointer', opacity: mediaBusy ? 0.5 : 1 }}>{mediaBusy ? `${extractPhrase}…` : 'Extract Audio'}</button>
           </div>
         </div>
       )}
 
       {/* Watermark Overlay */}
       {showWatermark && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', right: 20, top: 80, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Watermark Overlay</span>
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
+            <NativeEncoderNote>Recorded on the job. Compositing a watermark into video frames runs in the native encoder (not in this build).</NativeEncoderNote>
             <SegmentedControl options={(['text', 'image'] as const).map(t => ({ value: t, label: t === 'text' ? 'Text' : 'Image' }))} value={watermarkType} onChange={setWatermarkType} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 10, width: '100%' }} />
             {watermarkType === 'text' && (
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 'var(--space-2)' }} />
@@ -2027,7 +2070,7 @@ const Forge: React.FC = () => {
 
       {/* Trim / Split Panel */}
       {showTrimSplit && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Trim & Split</span>
             <button aria-label="Close Trim and Split" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrimSplit(false)}><DexIcon name="close" size={14} /></button>
@@ -2086,7 +2129,6 @@ const Forge: React.FC = () => {
               <button aria-label="Split video at intervals" onClick={() => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 const segments = 3;
-                const segDuration = selectedJob.duration / segments;
                 const newJobs: Job[] = [];
                 for (let i = 0; i < segments; i++) {
                   newJobs.push({ ...selectedJob, id: `split-${Date.now()}-${i}`, name: `${selectedJob.name.replace(/\.[^.]+$/, '')}_part${i + 1}`, trimIn: i / segments, trimOut: (i + 1) / segments, status: 'queued', progress: 0 } as any);
@@ -2101,12 +2143,13 @@ const Forge: React.FC = () => {
 
       {/* Crop & Pad Panel */}
       {showCropPad && (
-        <div style={{ position: 'fixed', right: 20, top: 100, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', right: 20, top: 100, width: 260, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Pad</span>
             <button aria-label="Close Crop and Pad panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropPad(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
+            <NativeEncoderNote>Crop/pad settings are recorded on the job. Re-framing video pixels runs in the native encoder (not in this build).</NativeEncoderNote>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '9:16'] as const).map(a => (
@@ -2134,13 +2177,14 @@ const Forge: React.FC = () => {
 
       {/* Subtitle Burn-in */}
       {showSubBurnIn && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Subtitle Burn-in</span>
             <button aria-label="Close Subtitle Burn-in" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSubBurnIn(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
+            <NativeEncoderNote>Cues and style are parsed and recorded on the job. Burning subtitles into the video runs in the native encoder (not in this build).</NativeEncoderNote>
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Subtitle File</div>
               <label style={{ padding: '6px var(--space-3)', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -2190,15 +2234,16 @@ const Forge: React.FC = () => {
 
       {/* Conditional Encoding Rules */}
       {showConditionalRules && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Conditional Encoding Rules</span>
             <button aria-label="Close Conditional Rules" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConditionalRules(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
+            <NativeEncoderNote>Rules are saved, but they are evaluated by the native encoder during a video encode (not in this build), so they do not change in-browser image/WAV jobs.</NativeEncoderNote>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>When input matches a condition, automatically apply the action</div>
             {conditionalRules.map((rule, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                 <input type="checkbox" checked={rule.enabled} onChange={() => setConditionalRules(rules => rules.map((r, j) => j === i ? { ...r, enabled: !r.enabled } : r))} style={{ accentColor: 'var(--color-success)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: rule.enabled ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)' }}>IF {rule.condition}</div>
@@ -2214,7 +2259,7 @@ const Forge: React.FC = () => {
 
       {/* Preview Modal */}
       {showPreview && selectedJob && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(560px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(560px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Preview — {selectedJob.name}</span>
             <button aria-label="Close Preview" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowPreview(false)}><DexIcon name="close" size={14} /></button>
@@ -2247,7 +2292,7 @@ const Forge: React.FC = () => {
 
       {/* A/B Compare */}
       {showABCompare && selectedJob?.outputBlobUrl && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(680px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(680px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>A/B Compare — {selectedJob.name}</span>
             <button aria-label="Close A/B Compare" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowABCompare(false)}><DexIcon name="close" size={14} /></button>
@@ -2281,7 +2326,7 @@ const Forge: React.FC = () => {
 
       {/* Batch Rename */}
       {showBatchRename && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Rename Output</span>
             <button aria-label="Close Batch Rename" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowBatchRename(false)}><DexIcon name="close" size={14} /></button>
@@ -2298,7 +2343,7 @@ const Forge: React.FC = () => {
                 }}>{token}</button>
               ))}
             </div>
-            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
                 {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
@@ -2324,7 +2369,7 @@ const Forge: React.FC = () => {
 
       {/* Concat / Merge */}
       {showConcat && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Concatenate / Merge Files</span>
             <button aria-label="Close Concat" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConcat(false)}><DexIcon name="close" size={14} /></button>
@@ -2339,7 +2384,7 @@ const Forge: React.FC = () => {
                   const job = jobs.find(j => j.id === id);
                   if (!job) return null;
                   return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: 'var(--radius-lg)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 16 }}>{idx + 1}.</span>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', flex: 1 }}>{job.name}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -2444,7 +2489,7 @@ const Forge: React.FC = () => {
                   setMediaBusy(false);
                 }
                 setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>{mediaBusy ? 'Joining…' : 'Smart Join (re-encode)'}</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>{mediaBusy ? `${joinPhrase}…` : 'Smart Join (re-encode)'}</button>
             </div>
           </div>
         </div>
@@ -2483,9 +2528,9 @@ const Forge: React.FC = () => {
         const clampedX = Math.max(8, Math.min(ctxMenu.x, window.innerWidth - MENU_W - 8));
         const clampedY = Math.max(8, Math.min(ctxMenu.y, window.innerHeight - MENU_H - 8));
         return (
-          <div style={{ position: 'fixed', left: clampedX, top: clampedY, zIndex: 'var(--z-max)', minWidth: MENU_W, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-creative-panel-strong" style={{ position: 'fixed', left: clampedX, top: clampedY, zIndex: 'var(--z-max)', minWidth: MENU_W, borderRadius: 12, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
+              ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               : <div key={i} className="forge-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>

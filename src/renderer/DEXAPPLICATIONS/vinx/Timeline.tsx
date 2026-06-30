@@ -294,7 +294,11 @@ const ClipVisual: React.FC<{
   onSplit: (clipId: string, frame: number) => void;
   onClipContextMenu?: (clipId: string, trackId: string, x: number, y: number) => void;
 }> = memo(({ clip, track, zoom, scrollX, viewportWidth, selected, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onClipContextMenu }) => {
-  const color = getClipColor(track.type);
+  // When clip color labels are enabled (View menu) and this clip has a label
+  // color set (Inspector), tint the whole clip with that color — Premiere/DaVinci
+  // style. Otherwise fall back to the per-track-type color.
+  const showColorLabels = useVinxStore(s => s.showClipColorLabels);
+  const color = (showColorLabels && clip.color) ? clip.color : getClipColor(track.type);
   const x = frameToPixels(clip.startFrame, zoom) - scrollX;
   const width = frameToPixels(clip.endFrame - clip.startFrame, zoom);
 
@@ -567,7 +571,6 @@ const MarkerFlags: React.FC<{
           role="button"
           tabIndex={0}
           aria-label={`Marker ${m.name} at ${formatTimecode(m.frame, frameRate)}`}
-          title={`${m.name} — ${formatTimecode(m.frame, frameRate)} (right-click to delete)`}
           style={{
             position: 'absolute', left: x - 4, top: RULER_HEIGHT - 9, width: 8, height: 9,
             background: m.color, clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)',
@@ -633,7 +636,6 @@ const TimelineToolbar: React.FC = memo(() => {
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
           onClick={() => setTool(t.tool)}
-          title={`${t.tool} (${t.label})`}
         >
           {t.label}
         </button>
@@ -643,7 +645,6 @@ const TimelineToolbar: React.FC = memo(() => {
 
       <button
         aria-label="Add marker at playhead"
-        title="Add marker at playhead (M)"
         style={{
           height: 20, fontSize: 9, fontWeight: 600, padding: '0 8px',
           border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
@@ -675,9 +676,9 @@ const TimelineToolbar: React.FC = memo(() => {
       <div style={{ flex: '1 1 8px', minWidth: 8 }} />
 
       {/* Track add buttons */}
-      <button aria-label="Add video track" onClick={() => addTrack('video')} style={addTrackBtnStyle} title="Add video track">+V</button>
-      <button aria-label="Add audio track" onClick={() => addTrack('audio')} style={addTrackBtnStyle} title="Add audio track">+A</button>
-      <button aria-label="Add title track" onClick={() => addTrack('title')} style={addTrackBtnStyle} title="Add title track">+T</button>
+      <button aria-label="Add video track" onClick={() => addTrack('video')} style={addTrackBtnStyle}>+V</button>
+      <button aria-label="Add audio track" onClick={() => addTrack('audio')} style={addTrackBtnStyle}>+A</button>
+      <button aria-label="Add title track" onClick={() => addTrack('title')} style={addTrackBtnStyle}>+T</button>
 
       <div style={{ width: 1, height: 14, background: 'var(--color-bg-hover)', margin: '0 4px' }} />
 

@@ -111,6 +111,18 @@ export const CREATIVE_ACTION_SPECS: Record<string, OpSpec> = {
   'axl.designForManufacture': { app: 'axl', op: 'dfmCheck', mutates: false },
   'axl.topologyOptimize': { app: 'axl', op: 'topologyOptimize', mutates: true },
   'axl.massProperties': { app: 'axl', op: 'massProperties', mutates: false },
+  // Mutating CAD actions driven by the command bar (real store ops).
+  'axl.addPrimitive': { app: 'axl', op: 'addPrimitive', mutates: true },
+  'axl.shellPart': { app: 'axl', op: 'shellPart', mutates: true },
+  'axl.draftPart': { app: 'axl', op: 'draftPart', mutates: true },
+  'axl.ribPart': { app: 'axl', op: 'ribPart', mutates: true },
+  'axl.runSimulation': { app: 'axl', op: 'runSimulation', mutates: false },
+  'axl.explode': { app: 'axl', op: 'explode', mutates: true },
+  'axl.section': { app: 'axl', op: 'section', mutates: false },
+  'axl.interference': { app: 'axl', op: 'interference', mutates: false },
+  'axl.generateBOM': { app: 'axl', op: 'generateBOM', mutates: false },
+  'axl.exportModel': { app: 'axl', op: 'exportModel', mutates: false },
+  'axl.newSketch': { app: 'axl', op: 'newSketch', mutates: false },
 };
 
 function makeHandler(spec: OpSpec): ActionHandler {

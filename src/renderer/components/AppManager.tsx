@@ -56,7 +56,7 @@ import AppSwitcher from '../shell/AppSwitcher';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
 import { rewardUnlocks as rewardUnlocksEngine, recordChallengeAction, recordChallengeForStat } from '../services/achievementEngine';
 import { installSendToBridge } from '../services/sendTo';
-import { notify } from '../services/notify';
+import { notify, readHubTarget } from '../services/notify';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import ControlCenter from './ControlCenter';
@@ -71,6 +71,8 @@ import { auditDomTargets } from '../../shared/a11y/targetSize';
 import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
+import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
+import { sharedTick } from '../services/SharedTick';
 import { useStageStore, type StageWindowRef } from '../store/stageStore';
 import { ContextBus } from '../services/ContextBus';
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
@@ -188,6 +190,7 @@ const Rewind = lazyRetry(() => import('../DEXAPPLICATIONS/rewind/Rewind'));
 const KanbanApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/KanbanApp'));
 const AchievementsApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Achievements'));
 const RecycleBin = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/RecycleBin'));
+const PowerRename = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PowerRename'));
 const LiveActivityBrowser = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/LiveActivityBrowser'));
 const Axl = lazyRetry(() => import('../DEXAPPLICATIONS/axl/Axl'));
 const Stopwatch = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Stopwatch'));
@@ -226,7 +229,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -254,6 +257,7 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   passwordgenerator: { w: 440, h: 480 },
   achievements: { w: 600, h: 460 },
   recyclebin: { w: 600, h: 460 },
+  powerrename: { w: 940, h: 620 },
   transfers: { w: 600, h: 460 },
   power: { w: 500, h: 440 },
   axl: { w: 1000, h: 650, maximized: true },
@@ -349,6 +353,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   calculator: Calculator, calendar: Calendar, passwordgenerator: PasswordGenerator,
   rewind: Rewind, kanban: KanbanApp, achievements: AchievementsApp,
   recyclebin: RecycleBin,
+  powerrename: PowerRename,
   axl: Axl,
   stopwatch: Stopwatch, unitconverter: UnitConverter, pomodoro: PomodoroTimer,
   qrcode: QRCodeGenerator, colorpicker: ColorPickerApp,
@@ -414,6 +419,7 @@ const Icons: Record<string, JSX.Element> = {
   kanban: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   achievements: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 22V8h4v14"/><path d="M8 9h8l-1 5H9L8 9z"/></svg>,
   recyclebin: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+  powerrename: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>,
   axl: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><circle cx="12" cy="12" r="3"/><line x1="5" y1="5" x2="8" y2="8"/><line x1="16" y1="5" x2="19" y2="2"/></svg>,
   stopwatch: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M10 2h4"/><path d="M12 2v2"/><path d="M20 5l-1.5 1.5"/></svg>,
   unitconverter: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>,
@@ -457,6 +463,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'projectdash', label: 'Project' },
   { id: 'backup', label: 'Backup & Sync' },
   { id: 'extensions', label: 'Extensions' },
+  { id: 'powerrename', label: 'PowerRename' },
   { id: 'power', label: 'Power' },
   { id: 'recyclebin', label: 'Trash' },
   // Productivity
@@ -531,7 +538,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
     videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
-    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools',
+    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
     stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
     weather: 'Tools', worldclock: 'Tools',
     canvas: 'Tools', timer: 'Tools',
@@ -855,6 +862,9 @@ export const AppManager: React.FC = () => {
       source: n.source,
       timestamp: n.timestamp,
       read: n.read !== 0,
+      // Carry the persisted deep-link envelope so the center can offer an "Open"
+      // affordance; the banner-only path drops the closures, this is what survives.
+      action: n.action,
     }));
   }, [hubNotifications, hubGetOrdered]);
 
@@ -1865,18 +1875,50 @@ export const AppManager: React.FC = () => {
   // one instantly. Reuses the manifest geometry snapshot and the same
   // launch+clamp restore path as crash recovery. Driven by CustomEvents so any
   // UI (menu / command palette / overview) can trigger it without prop-drilling.
+  // Capture the live floating-window layout as WindowSnapshot[]. Shared by named
+  // presets, the auto-snapshot timeline, and the manifest write above.
+  const captureWindowSnaps = useCallback((): WindowSnapshot[] => {
+    const snaps: WindowSnapshot[] = [];
+    detachedApps.forEach((b, appId) => {
+      snaps.push({
+        appId, x: Math.round(b.x), y: Math.round(b.y),
+        width: Math.round(b.w), height: Math.round(b.h), z: b.z,
+        minimized: minimizedApps.has(appId), focused: focusedFloatingAppId === appId,
+      });
+    });
+    return snaps;
+  }, [detachedApps, minimizedApps, focusedFloatingAppId]);
+
+  // Apply a saved layout: relaunch its apps and place each window with clamped
+  // geometry. Shared by preset restore and Time Machine timeline restore.
+  const applyWindowLayout = useCallback((windows: WindowSnapshot[]) => {
+    if (!windows.length) return;
+    const launch = useRunningApps.getState().launchApp;
+    for (const w of windows) {
+      const def = APP_DEFINITIONS[w.appId as AppId];
+      if (def) launch({ id: w.appId, name: def.name, icon: def.icon || w.appId, color: def.color });
+    }
+    const ws = getShellWorkspace(0);
+    const mins: string[] = [];
+    requestAnimationFrame(() => {
+      setDetachedApps(prev => {
+        const next = new Map(prev);
+        for (const w of windows) {
+          const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
+          next.set(w.appId, { ...c, z: w.z });
+          if (w.minimized) mins.push(w.appId);
+        }
+        return next;
+      });
+      if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
+    });
+  }, [getShellWorkspace]);
+
   useEffect(() => {
     const onSave = (e: Event) => {
       const name = (e as CustomEvent).detail?.name as string | undefined;
       if (!name) return;
-      const snaps: WindowSnapshot[] = [];
-      detachedApps.forEach((b, appId) => {
-        snaps.push({
-          appId, x: Math.round(b.x), y: Math.round(b.y),
-          width: Math.round(b.w), height: Math.round(b.h), z: b.z,
-          minimized: minimizedApps.has(appId), focused: focusedFloatingAppId === appId,
-        });
-      });
+      const snaps = captureWindowSnaps();
       const preset = saveWorkspacePreset(name, snaps);
       window.dispatchEvent(new CustomEvent('dex-workspace-presets-changed'));
       void notify({
@@ -1890,25 +1932,7 @@ export const AppManager: React.FC = () => {
       if (!id) return;
       const preset = getWorkspacePreset(id);
       if (!preset || !preset.windows.length) return;
-      const launch = useRunningApps.getState().launchApp;
-      for (const w of preset.windows) {
-        const def = APP_DEFINITIONS[w.appId as AppId];
-        if (def) launch({ id: w.appId, name: def.name, icon: def.icon || w.appId, color: def.color });
-      }
-      const ws = getShellWorkspace(0);
-      const mins: string[] = [];
-      requestAnimationFrame(() => {
-        setDetachedApps(prev => {
-          const next = new Map(prev);
-          for (const w of preset.windows) {
-            const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
-            next.set(w.appId, { ...c, z: w.z });
-            if (w.minimized) mins.push(w.appId);
-          }
-          return next;
-        });
-        if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
-      });
+      applyWindowLayout(preset.windows);
       void notify({ title: 'Workspace restored', body: `"${preset.name}"`, source: 'workspace' });
     };
     // (DEX 5.6) The old `dex-workspace-apply-template` path was retired: built-in
@@ -1921,7 +1945,44 @@ export const AppManager: React.FC = () => {
       window.removeEventListener('dex-workspace-save', onSave);
       window.removeEventListener('dex-workspace-restore', onRestore);
     };
-  }, [detachedApps, minimizedApps, focusedFloatingAppId, getShellWorkspace]);
+  }, [captureWindowSnaps, applyWindowLayout]);
+
+  // -- Time Machine: automatic layout timeline -------------------------------
+  // Snapshot the live layout every few minutes (skipped when empty/unchanged),
+  // expose a manual "snapshot now", and restore any past snapshot by id. Refs
+  // keep the latest capture/apply so the schedule subscribes ONCE and the timer
+  // is never starved by frequent window moves.
+  const captureRef = useRef(captureWindowSnaps);
+  const applyRef = useRef(applyWindowLayout);
+  captureRef.current = captureWindowSnaps;
+  applyRef.current = applyWindowLayout;
+  useEffect(() => {
+    const TICK_ID = 'workspace-timeline';
+    sharedTick.subscribe(TICK_ID, () => {
+      const snap = pushTimelineSnapshot(captureRef.current());
+      if (snap) window.dispatchEvent(new CustomEvent('dex-workspace-timeline-changed'));
+    }, 10 * 60 * 1000);
+    const onSnapshotNow = () => {
+      const snap = pushTimelineSnapshot(captureRef.current());
+      window.dispatchEvent(new CustomEvent('dex-workspace-timeline-changed'));
+      void notify({ title: snap ? 'Workspace snapshot captured' : 'No layout change to snapshot', source: 'workspace' });
+    };
+    const onTimelineRestore = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as string | undefined;
+      if (!id) return;
+      const snap = getTimelineSnapshot(id);
+      if (!snap) return;
+      applyRef.current(snap.windows);
+      void notify({ title: 'Workspace restored', body: 'From the timeline', source: 'workspace' });
+    };
+    window.addEventListener('dex-workspace-snapshot-now', onSnapshotNow);
+    window.addEventListener('dex-workspace-timeline-restore', onTimelineRestore as EventListener);
+    return () => {
+      sharedTick.unsubscribe(TICK_ID);
+      window.removeEventListener('dex-workspace-snapshot-now', onSnapshotNow);
+      window.removeEventListener('dex-workspace-timeline-restore', onTimelineRestore as EventListener);
+    };
+  }, []);
 
   // -- Project Space switching (DEX 5.6 Workspace Intelligence) --------------
   // Switching the active Stage is now a real context switch: capture the
@@ -2743,6 +2804,7 @@ export const AppManager: React.FC = () => {
       kanban: ['project', 'board', 'trello', 'agile', 'sprint'],
       achievements: ['trophies', 'badges', 'awards'],
       recyclebin: ['trash', 'delete', 'recycle', 'bin'],
+      powerrename: ['rename', 'batch', 'bulk', 'regex', 'powertoys', 'pattern'],
       stopwatch: ['timer', 'clock', 'lap', 'countdown', 'time'],
       unitconverter: ['convert', 'units', 'metric', 'imperial', 'measurement'],
       pomodoro: ['timer', 'focus', 'productivity', 'break', 'session'],
@@ -4020,15 +4082,14 @@ export const AppManager: React.FC = () => {
         style={{
           height: 32, display: 'flex', alignItems: 'center',
           padding: '0 var(--space-2)', gap: 2,
-          // Tier 2 of the top chrome: solid, matching the menu bar tone (#0E0E11)
-          // so the two read as one continuous two-tier bar divided by a single
-          // hairline, not two unrelated strips. (No blur in full-flat mode.)
-          background: '#0E0E11',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          // Hairline top highlight + a soft shadow that lifts the chrome off the
-          // content below -- depth, not a dead-flat strip. No backdrop-filter
-          // (blur is off platform-wide; the property was dead GPU cost).
-          boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.05), 0 3px 8px rgba(0,0,0,0.30)',
+          // Tier 2 shares the SAME tone as the title bar above (no #0E0E11 seam)
+          // so the two tiers read as one continuous, seamless top bar.
+          background: 'var(--glass-bg, rgba(20,20,24,0.66))',
+          backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+          WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+          // The single hairline of the whole top chrome -- a crisp content edge,
+          // with NO inner gloss line and NO drop-shadow gap (owner: seamless).
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
           position: 'relative', zIndex: 2,
           flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
           scrollbarWidth: 'none',
@@ -4127,12 +4188,16 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      // Top chrome bar -- solid (opaque --glass-bg), lifted off the content with a
-      // soft shadow + hairline top highlight. No backdrop-filter (blur is off
-      // platform-wide; the property was dead GPU cost).
-      background: 'var(--glass-bg, #141416)',
-      borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.05), 0 3px 8px rgba(0,0,0,0.30)',
+      // Top chrome bar -- liquid glass (master overhaul): translucent --glass-bg
+      // over the adaptive backdrop blur so content scrolling beneath the chrome
+      // frosts through, matching the menus/dock/orbs. Degrades to solid on weak
+      // GPUs / reduced-transparency via the shared token.
+      background: 'var(--glass-bg, rgba(20,20,24,0.66))',
+      backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+      WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+      // Seamless top chrome: tier 1 (this bar) and tier 2 (the tab strip) share
+      // one surface -- no divider, gloss, or shadow between them. The only
+      // hairline of the chrome lives at the bottom of the tab strip.
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -4262,7 +4327,8 @@ export const AppManager: React.FC = () => {
 
         {/* Notification Center bell removed at the owner's request -- the top bar
             stays minimal (system status + control center only). The hub-backed
-            notification center is still reachable from the control-center menu. */}
+            notification center opens from the "Notifications" item in the
+            control-center menu (the dropdown below). */}
         {/* Menu dropdown trigger */}
         <div style={{ position: 'relative' }}>
           <button
@@ -4321,6 +4387,37 @@ export const AppManager: React.FC = () => {
                     <circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
                   </svg>
                   Settings &amp; Profile
+                </button>
+                {/* Notifications -- opens the hub-backed Notification Center. This is
+                    the "reachable from the control-center menu" path the owner asked
+                    for (top bar stays bell-free); previously the center had no opener. */}
+                <button
+                  role="menuitem"
+                  onClick={() => { setShowNotifCenter(true); setTitlebarMenuOpen(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
+                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
+                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                  <span style={{ flex: 1 }}>Notifications</span>
+                  {hubUnreadCount > 0 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: '#fff',
+                      background: 'var(--color-error)', borderRadius: 8,
+                      minWidth: 16, height: 16, padding: '0 5px',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1,
+                    }}>
+                      {hubUnreadCount > 99 ? '99+' : hubUnreadCount}
+                    </span>
+                  )}
                 </button>
                 {/* Network Status */}
                 <div style={{
@@ -4946,6 +5043,28 @@ export const AppManager: React.FC = () => {
         notifications={centerNotifications}
         onClearAll={() => { void hubClearAll(); }}
         onMarkAsRead={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubMarkRead(n); }}
+        onActivate={(item) => {
+          // Revive the persisted deep-link: route through the same
+          // dex-spotlight-navigate contract Quick Actions / Spotlight use, then
+          // mark read + close. Supports a URL, an appId, or "appId:context"
+          // (e.g. "settings:network"). No-ops cleanly when the target is bare.
+          const target = readHubTarget(item.action);
+          if (target) {
+            let detail: { appId: string; contextId?: string };
+            if (/^https?:\/\//i.test(target) || target.startsWith('www.')) {
+              detail = { appId: 'browser', contextId: target };
+            } else if (target.includes(':')) {
+              const [appId, ...rest] = target.split(':');
+              detail = { appId, contextId: rest.join(':') || undefined };
+            } else {
+              detail = { appId: target };
+            }
+            window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail }));
+          }
+          const n = Number(item.id);
+          if (!Number.isNaN(n)) void hubMarkRead(n);
+          setShowNotifCenter(false);
+        }}
         onClose={() => setShowNotifCenter(false)}
       />
 
