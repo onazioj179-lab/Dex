@@ -28,6 +28,7 @@ import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/con
 import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { searchLines } from '../../../shared/search/textSearch';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
 
@@ -491,9 +492,23 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       const text = (editorRef.current?.textContent || '').trim();
       return text ? text.slice(0, 4000) : 'No note is open in Notes.';
     });
+    registerUkiAppAction('notes', {
+      id: 'notes.search',
+      description: 'search the open note for a query and return matching lines.',
+      args: [{ name: 'query', type: 'string' }],
+      example: '{"query":"meeting"}',
+      mutates: false,
+    }, (args) => {
+      const text = (editorRef.current?.textContent || '').trim();
+      if (!text) return 'No note is open in Notes.';
+      const q = String(args.query ?? '');
+      const hits = searchLines(text, q, 25);
+      return hits.length ? hits.map((h) => `${h.line}: ${h.text}`).join('\n') : `No lines match "${q}".`;
+    });
     return () => {
       unregisterUkiAppContext('notes');
       unregisterUkiAppAction('notes.getActiveNote');
+      unregisterUkiAppAction('notes.search');
     };
   }, []);
 
