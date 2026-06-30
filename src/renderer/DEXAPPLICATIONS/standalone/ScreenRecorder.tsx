@@ -619,9 +619,8 @@ const ScreenRecorder: React.FC = () => {
         </div>
 
         {/* Recent captures */}
-        <div style={{
-          width: 260, borderLeft: '1px solid var(--color-border-subtle)',
-          background: 'var(--color-bg-elevated)', display: 'flex', flexDirection: 'column',
+        <div className="dex-liquid-glass-strong" style={{
+          width: 260, borderRadius: 0, display: 'flex', flexDirection: 'column',
           minHeight: 0,
         }}>
           <div style={{
@@ -636,7 +635,7 @@ const ScreenRecorder: React.FC = () => {
             ) : recent.map(item => (
               <div key={item.id} style={{
                 display: 'flex', flexDirection: 'column', gap: 6, padding: 'var(--space-2)',
-                marginBottom: 'var(--space-2)', borderRadius: 8,
+                marginBottom: 'var(--space-2)', borderRadius: 10,
                 background: 'var(--color-bg-base)', border: '1px solid var(--color-border-subtle)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -686,7 +685,7 @@ const fieldLabelStyle: React.CSSProperties = {
 
 function selectStyle(disabled: boolean): React.CSSProperties {
   return {
-    padding: '5px 8px', borderRadius: 6, fontSize: 12,
+    padding: '5px 8px', borderRadius: 10, fontSize: 12,
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
     border: '1px solid var(--color-border-subtle)',
     opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
@@ -703,7 +702,7 @@ function toggleLabelStyle(disabled: boolean): React.CSSProperties {
 
 function controlButtonStyle(disabled: boolean, accent: string, textColor = '#fff'): React.CSSProperties {
   return {
-    padding: 'var(--space-2) 18px', borderRadius: 6, fontSize: 13, fontWeight: 500,
+    padding: 'var(--space-2) 18px', borderRadius: 10, fontSize: 13, fontWeight: 500,
     background: disabled ? 'var(--color-bg-hover)' : accent,
     color: disabled ? 'var(--color-text-muted)' : textColor,
     border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
@@ -714,7 +713,7 @@ function controlButtonStyle(disabled: boolean, accent: string, textColor = '#fff
 
 function miniButtonStyle(bg: string, textColor = '#fff'): React.CSSProperties {
   return {
-    padding: '3px 8px', borderRadius: 5, fontSize: 10, fontWeight: 500,
+    padding: '3px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500,
     background: bg, color: textColor, border: 'none', cursor: 'pointer',
   };
 }

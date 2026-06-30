@@ -1,5 +1,99 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-26e) — Apps sit on the NORMAL background (no framing box) + dead notification UI removed.**
+> tsc 0; VERIFIED LIVE: Trophies root background is now `rgba(0,0,0,0)` on the `rgb(12,12,14)` (`--color-bg-base`)
+> window surface -- the distinct app-coloured box/frame is gone. Owner: stop painting a background "around the
+> app"; content should sit on DEX's normal app background (Apple-Arcade-clean), keep solid panels, no glass.
+> - **Trophies + Games roots → `background: 'transparent'`** so they inherit the AppManager window's
+>   `--color-bg-base` (AppManager.tsx already sets it per app). My earlier near-black `#060607` was a hair off
+>   `--color-bg-base` and that mismatch read as a boxed frame. Cards/panels stay solid (`#101012`/`#16161a`).
+> - **Dead code removed (closed the spawned cleanup task):** deleted the never-mounted `NotificationBell` +
+>   its `NotificationPanel` + `NOTIF_ICON_COLORS` + the now-orphaned `sharedTick` import from
+>   `UnifiedSystems.tsx` (-280 lines). Kept the shared `pillBtnStyle` and the `panelOpen`/`setPanelOpen` store
+>   fields (still used by SystemFeatures + the provider). The reachable menu-opened center supersedes the bell.
+>
+> **CHECKPOINT (2026-06-26d) — Games app: de-glassed to true-black SOLID + real playtime overview.**
+> tsc 0; VERIFIED LIVE (0 console errors; 0 backdrop-blur/glass elements; no `dex-liquid-glass*` class):
+> "Total playtime" band shows 201h aggregate + top games 123h/54h/23h, Continue-playing rail renders.
+> Same direction as Trophies (owner: solid black, not glass; lead with an overview). `pages/Games.tsx`:
+> - **Dropped the glass:** removed `dex-liquid-glass-strong` from the root (now flat `#060607`), replaced the
+>   `glassButton`-based action buttons with solid `#16161a`/`#26262b` buttons. Verified 0 glass elements live.
+> - **Added a real "Total playtime" overview band** (the reference's "Your Statistic" idea): aggregate hours
+>   across all games + games/played counts + the top-3 games by real `games:playtime` (hours each). No fakes.
+> - **Kept** the cover-grid library (a game library IS legitimately a grid, not a "lame list"), storefront
+>   filters, Continue-playing rail, search, scan/refresh. Library degrades to EmptyState without the bridge.
+>
+> **CHECKPOINT (2026-06-26c) — Trophies app: progress-first dashboard, TRUE-BLACK SOLID (no glass), award list removed.**
+> tsc 0; VERIFIED LIVE (0 console errors; 0 backdrop-blur/glass elements in the app subtree): "Your Trophies",
+> "Your statistics" ring, "Progress by category", "Almost there", "Recently unlocked" all render; the old
+> filter bar + ~5000-card award grid are GONE. Owner direction: stop using glass for apps (solid true-black),
+> and DELETE the giant award list -- users want to SEE PROGRESS, not scroll a list. Rebuilt `Achievements.tsx`
+> as an original progress dashboard (NOT a copy of the reference mockup's artwork; no fabricated data):
+> - **Solid true-black theme:** flat `#060607` base, opaque `#101012`/`#16161a` panels, solid `#26262b`
+>   borders, gold accent. Zero translucency, zero `backdrop-filter` (verified live).
+> - **Deleted:** the full achievement card grid + filter/tabs/search/status/recent bar + incremental-render
+>   machinery + the `AchievementCard` component + `DexSearchInput` usage.
+> - **Progress-first content:** Spotlight hero (most-recent unlock, or nearest locked = "Next up"); a
+>   conic-gradient completion ring + points/streak/level tiles; **Progress by category** bars (real got/total
+>   per `CATEGORY_META`, sorted by completion); **Almost there** (top-4 real in-progress trophies); Recently
+>   unlocked rail; daily-challenges bar. Live-update listeners + Share preserved. No faked data.
+>
+> **CHECKPOINT (2026-06-26b) — Master overhaul (perf/OS-thinking): fixed the broken app-background pause primitive.**
+> tsc 0; 5/5 new jsdom hook tests; demonstrated on the LIVE DOM. Against the master spec's "apps outside the
+> viewport should intelligently pause heavy work while preserving instant resume." Found that the shared
+> `useAppActive()` (utils/perfAware.tsx) -- the hook every app is meant to use to pause loops when backgrounded
+> -- was BROKEN: `findContainer()` ignored the caller and returned the *global* `[data-app-state="foreground"]`
+> container, so it returned `true` whenever ANY app was foreground. Result: a backgrounded app never saw itself
+> as inactive. Nexus (its one adopter) kept running its full canvas animation loop while another app was on top
+> -- a core pinned on a hidden window, the exact waste the spec calls out. `useSuspendableRAF`/
+> `useSuspendableInterval` (built but un-adopted) inherited the same bug.
+> - **Fix:** `useAppActive(ref?)` now resolves THIS app's own container via `ref.current.closest('[data-app-container]')`
+>   and tracks *its* `data-app-state` (MutationObserver, attributeFilter-scoped). No-ref calls keep the old
+>   global behavior as a documented back-compat fallback. The ref is forwarded through both suspend hooks.
+> - **Adopted:** Nexus now calls `useAppActive(containerRef)`; its draw loop's `if (!isActiveRef.current) return`
+>   guard finally fires when Nexus is backgrounded.
+> - **Verified:** LIVE DOM with Nexus backgrounded + Calculator foreground -> OLD logic returns true (bug,
+>   keeps animating), NEW logic returns false (pauses). Behavioral frame-stop can't be observed in the headless
+>   preview because the hidden tab globally pauses rAF (FrameGovernor `document-hidden`) -- so the per-app
+>   *decision* is proven by the 5 jsdom tests (background-with-other-foreground / own-foreground / live
+>   background flip / instant-resume / no-ref fallback) instead. `tests/unit/use-app-active.test.tsx`.
+> - **Adopted #2 -- Vinx ScopesPanel.** The waveform/vectorscope `tick` redraws every frame and only guarded on
+>   `document.hidden` (whole-window), so it kept doing per-frame `drawImage`+`getImageData` readbacks while Vinx
+>   sat behind another DEX app. Now also skips on `!isActive` via `useAppActive(canvasRef)` -- the exact case the
+>   author's own comment ("the scopes are not visible anyway") wanted but couldn't express before the fix. tsc 0.
+> - **Deliberately NOT adopted:** Flux playback (its rAF advances the playhead AND drives video recording/export
+>   -- pausing it would corrupt an in-progress export) and audio apps (NoiseGenerator / Imosion -- ambient/music
+>   audio is MEANT to keep playing when you switch apps). Only purely-visual, occluded-when-backgrounded loops
+>   are safe to pause. Shell chrome (ShellOrbs / WallpaperAccent) is always visible, so per-app pause N/A.
+> - **Next adopters (queued):** any remaining purely-visual per-app continuous canvas can pass its container ref.
+>
+> **CHECKPOINT (2026-06-26) — Notification redesign: the center is finally REACHABLE + live deep-links + group digest.**
+> tsc 0 (full project); 13/13 new digest unit tests; VERIFIED LIVE in preview (0 console errors). Closes the
+> "Notification redesign (live actions / quick-reply / grouping / AI summary)" overhaul theme as far as it can
+> be built honestly in a renderer-only pass. Root finding: the hub-backed `NotificationCenter` (shell/
+> NotificationBanners.tsx) had NO opener anywhere -- `setShowNotifCenter(true)` did not exist, and the
+> alternate `NotificationBell`/`NotificationPanel` (UnifiedSystems.tsx) is never mounted. So NO persistent
+> notification center was reachable at all; notifications only flashed as transient banners. Shipped:
+> - **Reachability (the real fix).** Added a "Notifications" item (with the live `hubUnreadCount` badge) to the
+>   top-bar control-center dropdown menu in `AppManager.tsx`, opening the hub-backed center. This honours the
+>   owner's earlier "keep the top bar bell-free; open from the control-center menu" directive -- whose stale
+>   comment claimed it was already reachable (it wasn't). VERIFIED LIVE: menu -> Notifications -> center opens.
+> - **Live deep-link actions.** The persisted hub `action` envelope (a deep-link `target`) was being DROPPED in
+>   the `centerNotifications` mapping, so persisted notifications were dead ends once their banner faded. Now
+>   carried through; each center card with a target renders an "Open" affordance that routes via the proven
+>   `dex-spotlight-navigate` contract (URL -> browser, `appId`, or `appId:context` e.g. `settings:network`),
+>   marks read, and closes. New single-source `readHubTarget()` in services/notify.ts. VERIFIED LIVE: injected
+>   3 records (2 with targets) -> exactly 2 "Open" buttons -> click dispatched `{appId:'files'}` + closed.
+> - **Group digest ("summary" leg, done honestly).** New pure `shared/notifications/digest.ts`
+>   (`summarizeGroup`/`relativeShort`/`topPriority`) renders an on-device per-source digest in the grouped view
+>   ("2 notifications, 1 urgent"). Deterministic counts, NOT a fabricated model gloss -- a provider summary can
+>   layer on `headline` later. VERIFIED LIVE: NETWORK group showed "2 notifications, 1 urgent". 13 unit tests.
+> - **DRY.** Collapsed the duplicated grouped/timeline card markup into one `CenterCard` (deep-link + in-session
+>   action closures + reduced-motion + read styling).
+> - **Honest scope:** quick-reply (inline text input) needs a messaging/relay backend to be real, so it was
+>   FLAGGED not faked. Dead `NotificationBell`/`NotificationPanel` pair left for a separate cleanup pass (chip
+>   spawned) -- removing ~150 lines from the concurrently-edited UnifiedSystems.tsx mid-session was too risky.
+>
 > **CHECKPOINT (2026-06-25s) — AXL: real 2D Sketcher -> 3D solid (parametric core).**
 > tsc 0; 13/13 new sketch unit tests green (`tests/unit/axl-sketch.test.ts`). VERIFIED LIVE: Create -> "New
 > Sketch" opens the gridded sketch overlay with the SKETCH toolbar. (Couldn't drive the mouse-draw live —

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useAsyncResource } from '../utils/useAsyncResource';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
@@ -896,24 +897,25 @@ export const Gallery: React.FC = () => {
   };
 
   // Load all media (pictures + videos) on mount
+  // Initial gallery load via the shared useAsyncResource (owns the mounted-guard,
+  // timeout, AbortController, and set-after-unmount safety that this used to
+  // hand-roll). The loader pulls media + favorites together; the apply effects
+  // fan the result into the existing state.
+  const { data: loadedGallery, loading: galleryLoading, error: galleryError } = useAsyncResource(
+    async (signal) => {
+      const [media, favorites] = await Promise.all([loadAllMedia(), loadFavorites()]);
+      return signal.aborted ? null : { media, favorites };
+    },
+    { timeoutMs: 8000 },
+  );
+  useEffect(() => { setLoading(galleryLoading); }, [galleryLoading]);
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [loadedMedia, loadedFavs] = await Promise.all([loadAllMedia(), loadFavorites()]);
-        if (mounted) {
-          setMedia(loadedMedia);
-          setFavorites(loadedFavs);
-          favoritesLoadedRef.current = true; // Mark initial load complete
-        }
-      } catch { toast.error('Failed to load gallery'); } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
+    if (!loadedGallery) return;
+    setMedia(loadedGallery.media);
+    setFavorites(loadedGallery.favorites);
+    favoritesLoadedRef.current = true; // Mark initial load complete
+  }, [loadedGallery]);
+  useEffect(() => { if (galleryError) toast.error('Failed to load gallery'); }, [galleryError]);
 
   // Save favorites to storage (only after initial load)
   useEffect(() => { 

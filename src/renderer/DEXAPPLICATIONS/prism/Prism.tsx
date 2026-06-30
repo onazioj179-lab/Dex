@@ -2997,7 +2997,6 @@ const Prism: React.FC = () => {
             <button
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
-              title="Share & Collaborate"
               aria-label={collab.activeCollaboratorCount > 0 ? `Share project (${collab.activeCollaboratorCount} active collaborators)` : 'Share project'}
             >
               {collab.activeCollaboratorCount > 0 ? `${collab.activeCollaboratorCount} collaborators` : 'Share'}
@@ -3038,14 +3037,13 @@ const Prism: React.FC = () => {
             <option value="bmp">BMP (Bitmap)</option>
           </select>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <button className="prism-btn" style={styles.btn} onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" aria-label="Undo">{Icons.undo}</button>
-          <button className="prism-btn" style={styles.btn} onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" aria-label="Redo">{Icons.redo}</button>
+          <button className="prism-btn" style={styles.btn} onClick={undo} disabled={historyIndex <= 0} aria-label="Undo">{Icons.undo}</button>
+          <button className="prism-btn" style={styles.btn} onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Redo">{Icons.redo}</button>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <button
             className="prism-btn"
             style={{ ...styles.btn, color: showAiBar ? '#ff375f' : undefined, background: showAiBar ? '#2e1520' : undefined }}
             onClick={() => setShowAiBar(v => !v)}
-            title="AI assistant — describe an edit in plain language"
             aria-label="Toggle AI assistant"
             aria-pressed={showAiBar}
           >
@@ -3090,7 +3088,6 @@ const Prism: React.FC = () => {
                     e.preventDefault();
                     if (hasMultiple) setOpenToolGroup(isOpen ? null : group.id);
                   }}
-                  title={currentTool ? (currentTool.key ? `${currentTool.name} (${currentTool.key})` : currentTool.name) : group.label}
                   aria-label={currentTool?.name || group.label}
                   aria-haspopup={hasMultiple ? 'true' : undefined}
                   aria-expanded={isOpen ? 'true' : undefined}
@@ -3183,7 +3180,6 @@ const Prism: React.FC = () => {
                 type="color"
                 value={foregroundColor}
                 onChange={(e) => setForegroundColor(e.target.value)}
-                title="Foreground color"
                 aria-label="Foreground color"
                 style={{ position: 'absolute', top: 0, left: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
@@ -3191,7 +3187,6 @@ const Prism: React.FC = () => {
                 type="color"
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                title="Background color"
                 aria-label="Background color"
                 style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
@@ -3428,7 +3423,7 @@ const Prism: React.FC = () => {
             ))}
             {/* Zoom Controls Overlay */}
             <div className="dex-creative-panel" style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-lg)', padding: '6px var(--space-3)', zIndex: 40 }}>
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.max(10, z - 10))} title="Zoom Out" aria-label="Zoom out">-</button>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.max(10, z - 10))} aria-label="Zoom out">-</button>
               <input 
                 type="range" 
                 min="10" 
@@ -3436,12 +3431,11 @@ const Prism: React.FC = () => {
                 aria-label="Canvas zoom"
                 value={zoom} 
                 onChange={(e) => setZoom(Number(e.target.value))} 
-                style={{ width: '100px', accentColor: '#ff375f', cursor: 'pointer' }} 
-                title={`Canvas zoom: ${Math.round(zoom)}%`}
+                style={{ width: '100px', accentColor: '#ff375f', cursor: 'pointer' }}
               />
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.min(500, z + 10))} title="Zoom In" aria-label="Zoom in">+</button>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.min(500, z + 10))} aria-label="Zoom in">+</button>
               <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom)}%</span>
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '11px' }} onClick={() => setZoom(100)} title="Reset to 100%" aria-label="Reset zoom">Fit</button>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '11px' }} onClick={() => setZoom(100)} aria-label="Reset zoom">Fit</button>
             </div>
           </div>
         </div>
@@ -3655,15 +3649,14 @@ const Prism: React.FC = () => {
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Layers</span>
               <div style={{ display: 'flex', gap: '4px' }}>
-                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('image')} title="Add Layer" aria-label="Add layer">{Icons.plus}</button>
-                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('text')} title="Add Text" aria-label="Add text layer">{Icons.text}</button>
-                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('shape')} title="Add Shape" aria-label="Add shape layer">{Icons.shape}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('image')} aria-label="Add layer">{Icons.plus}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('text')} aria-label="Add text layer">{Icons.text}</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => addLayer('shape')} aria-label="Add shape layer">{Icons.shape}</button>
                 <div style={{ position: 'relative' }}>
                   <button
                     className="prism-icon-btn"
                     style={styles.iconBtn}
                     onClick={(e) => { e.stopPropagation(); setShowAddAdjustmentMenu(v => !v); }}
-                    title="Add Adjustment Layer"
                     aria-label="Add adjustment layer"
                     aria-haspopup="menu"
                     aria-expanded={showAddAdjustmentMenu}
@@ -3693,7 +3686,6 @@ const Prism: React.FC = () => {
                     className="prism-icon-btn"
                     style={styles.iconBtn}
                     onClick={(e) => { e.stopPropagation(); setShowLayerBoolean(v => !v); }}
-                    title="Combine Layers (Boolean)"
                     aria-label="Combine layers with boolean operation"
                     aria-haspopup="menu"
                     aria-expanded={showLayerBoolean}
@@ -3706,7 +3698,6 @@ const Prism: React.FC = () => {
                           key={op}
                           role="menuitem"
                           tabIndex={0}
-                          title={BOOLEAN_OP_INFO[op].description}
                           style={{ padding: '6px 10px', fontSize: 11, color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: 3 }}
                           onClick={() => { void applyLayerBooleanOp(op); }}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void applyLayerBooleanOp(op); } }}
@@ -3715,7 +3706,7 @@ const Prism: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => { void flattenImage(); }} title="Flatten Image" aria-label="Flatten all layers">&#9633;&#9633;</button>
+                <button className="prism-icon-btn" style={styles.iconBtn} onClick={() => { void flattenImage(); }} aria-label="Flatten all layers">&#9633;&#9633;</button>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
@@ -4165,7 +4156,7 @@ const Prism: React.FC = () => {
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Luminosity Mask</div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {(['shadows', 'midtones', 'highlights'] as const).map(band => (
-                  <button key={band} aria-label={`Select ${band}`} title={`Smart Mask: select ${band}`} onClick={() => {
+                  <button key={band} aria-label={`Select ${band}`} onClick={() => {
                     const canvas = canvasRef.current; if (!canvas) return;
                     const ctx = canvas.getContext('2d'); if (!ctx) return;
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);

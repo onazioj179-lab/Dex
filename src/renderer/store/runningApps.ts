@@ -395,6 +395,7 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Read and annotate PDF documents' },
   pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative', description: 'NES-style pixel grid editor with frames' },
   maps: { name: 'DEX Maps', color: 'var(--color-app-maps)', icon: 'maps', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Interactive vector maps, place search, and navigation' },
+  powerrename: { name: 'PowerRename', color: '#FF375F', icon: 'powerrename', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Batch file renaming with find/replace, regex, case transforms, and numbering' },
 
   // Storefront and Games surfaces (registry-backed so dock, Launchpad, UKI resolve metadata)
   store: { name: 'Store', color: '#0A84FF', icon: 'store', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },

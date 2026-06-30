@@ -1589,9 +1589,12 @@ export const DexProgress: React.FC<DexProgressProps> = ({
 // ---------------------------------------------------------------------------
 // DexSearchInput
 // ---------------------------------------------------------------------------
-export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'style'> {
+export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'style' | 'onSubmit'> {
   size?: 'sm' | 'md' | 'lg';
   onClear?: () => void;
+  /** Fired with the current value when the user presses Enter. Replaces the
+   *  native form onSubmit (an input never form-submits), hence the Omit above. */
+  onSubmit?: (value: string) => void;
   loading?: boolean;
   fullWidth?: boolean;
   style?: React.CSSProperties;
@@ -1600,16 +1603,29 @@ export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTML
 export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(({
   size = 'md',
   onClear,
+  onSubmit,
   loading = false,
   fullWidth = false,
   value,
   onChange,
+  onKeyDown,
+  disabled,
   placeholder = 'Search...',
   style,
   ...props
 }, ref) => {
   const [focused, setFocused] = useState(false);
   const hasValue = value !== undefined && value !== '';
+
+  // Standard search-field keyboard affordances: Enter submits the current value,
+  // Escape clears it. Both are opt-in (no-op unless the caller wires a handler)
+  // and chain to any onKeyDown the caller passed, so existing call sites are
+  // unaffected.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && onSubmit) onSubmit(String(value ?? ''));
+    else if (event.key === 'Escape' && onClear) onClear();
+    onKeyDown?.(event);
+  };
 
   // Canonical control rhythm -- identical to Button/TextInput heights so a search
   // field lines up pixel-for-pixel with every other control on the same row.
@@ -1680,9 +1696,12 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
       <input
         ref={ref}
         type="text"
+        role="searchbox"
         className="dex-search-field"
         value={value}
         onChange={onChange}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
         placeholder={placeholder}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -1691,8 +1710,8 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
       />
       {loading ? (
         <DexSpinner size={14} />
-      ) : (
-        <button 
+      ) : (hasValue && !disabled) ? (
+        <button
           type="button"
           aria-label="Clear search"
           style={clearBtnStyle}
@@ -1703,6 +1722,8 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
             <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
+      ) : (
+        null
       )}
     </div>
   );

@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { useAppActive } from '../../utils/perfAware';
 
 export type ScopeMode = 'waveform' | 'vectorscope' | 'histogram';
 
@@ -27,6 +28,14 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
   const sampleCanvas = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const frameToggle = useRef(0);
+
+  // Pause the scope readback when Vinx is backgrounded WITHIN DEX (another app on
+  // top). `document.hidden` only covers the whole window being hidden; this covers
+  // the in-app foreground/background state. Mirrored to a ref so the long-lived
+  // tick closure reads the live value without restarting the loop.
+  const isActive = useAppActive(canvasRef);
+  const isActiveRef = useRef(isActive);
+  useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -54,11 +63,11 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
     };
 
     const tick = () => {
-      // Skip all sampling/drawing while the window is hidden (minimized or background
-      // tab). drawImage + getImageData on a video every other frame is expensive, and
-      // the scopes are not visible anyway. requestAnimationFrame already throttles when
-      // hidden, but this avoids the per-tick readback entirely.
-      if (document.hidden) {
+      // Skip all sampling/drawing while the scopes can't be seen: the window is
+      // hidden (minimized / background tab) OR Vinx is backgrounded behind another
+      // DEX app. drawImage + getImageData on a video is expensive and pointless when
+      // nothing is on screen. rAF stays alive (cheap) so it resumes instantly.
+      if (document.hidden || !isActiveRef.current) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }

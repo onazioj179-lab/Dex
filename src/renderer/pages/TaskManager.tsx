@@ -237,13 +237,127 @@ interface MetricCardProps {
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ label, value, detail, history, tone, max = 100 }) => (
-  <div style={styles.statCard}>
+  <div className="dex-liquid-glass" style={styles.statCard}>
     <div style={styles.statLabel}>{label}</div>
     <div style={{ ...styles.statValue, color: tone }}>{value}</div>
     <div style={styles.statDetail}>{detail}</div>
     <div style={styles.sparkWrap}>
       <Sparkline history={history} color={tone} ariaLabel={`${label} history`} max={max} />
     </div>
+  </div>
+);
+
+// Overview hero: a single radial gauge (the "current project" donut from the
+// concept). SVG so it stays razor-sharp at any DPI and animates the sweep.
+interface DonutProps { value: number; max?: number; size?: number; stroke?: number; color: string; ariaLabel: string }
+const Donut: React.FC<DonutProps> = ({ value, max = 100, size = 104, stroke = 11, color, ariaLabel }) => {
+  const radius = (size - stroke) / 2;
+  const circ = 2 * Math.PI * radius;
+  const pct = Math.max(0, Math.min(1, value / (max <= 0 ? 1 : max)));
+  const dash = circ * pct;
+  const mid = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={ariaLabel}>
+      <circle cx={mid} cy={mid} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+      <circle
+        cx={mid} cy={mid} r={radius} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${dash} ${circ - dash}`} transform={`rotate(-90 ${mid} ${mid})`}
+        style={{ transition: 'stroke-dasharray 0.55s cubic-bezier(0.22,1,0.36,1)', filter: `drop-shadow(0 0 5px ${color}55)` }}
+      />
+    </svg>
+  );
+};
+
+// The big "Tasks Done" area chart from the concept, re-cast as a live load
+// graph: a smooth monotone curve with a soft gradient fill and an endpoint glow.
+interface AreaChartProps { history: number[]; color: string; height?: number; max?: number; ariaLabel: string }
+const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max = 100, ariaLabel }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(120, Math.floor(rect.width));
+    const h = Math.max(80, Math.floor(rect.height));
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const padT = 10;
+    const padB = 6;
+    const plotH = h - padT - padB;
+    ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 3; i++) {
+      const y = padT + (plotH / 3) * i;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    const samples = history.slice(-HISTORY_LENGTH);
+    if (samples.length < 2) return;
+    const safeMax = max <= 0 ? 1 : max;
+    const stepX = w / (samples.length - 1);
+    const pts: [number, number][] = samples.map((v, i) => {
+      const clamped = Math.max(0, Math.min(safeMax, v));
+      return [i * stepX, padT + plotH * (1 - clamped / safeMax)];
+    });
+
+    // Smooth curve through the points (midpoint cubic) -> the polished concept look.
+    const trace = (close: boolean) => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [x0, y0] = pts[i];
+        const [x1, y1] = pts[i + 1];
+        const cx = (x0 + x1) / 2;
+        ctx.bezierCurveTo(cx, y0, cx, y1, x1, y1);
+      }
+      if (close) {
+        ctx.lineTo(pts[pts.length - 1][0], h);
+        ctx.lineTo(pts[0][0], h);
+        ctx.closePath();
+      }
+    };
+
+    const grad = ctx.createLinearGradient(0, padT, 0, h);
+    grad.addColorStop(0, color + '5e');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    trace(true);
+    ctx.fill();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    trace(false);
+    ctx.stroke();
+
+    const last = pts[pts.length - 1];
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(last[0], last[1], 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color + '44';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(last[0], last[1], 3.4, 0, Math.PI * 2); ctx.stroke();
+  }, [history, color, max, height]);
+  return <canvas ref={canvasRef} role="img" aria-label={ariaLabel} style={{ width: '100%', height, display: 'block' }} />;
+};
+
+// Compact "asset" tile (the Company files / Dribbble assets cards in the concept).
+interface AssetTileProps { icon: string; tint: string; value: string; label: string; detail: string }
+const AssetTile: React.FC<AssetTileProps> = ({ icon, tint, value, label, detail }) => (
+  <div className="dex-liquid-glass" style={styles.assetTile}>
+    <span style={{ ...styles.assetGlyph, background: tint + '22', color: tint, borderColor: tint + '40' }}>
+      <DexIcon name={icon} size={16} color={tint} strokeWidth={2.2} />
+    </span>
+    <div style={{ minWidth: 0 }}>
+      <div style={styles.assetValue}>{value}</div>
+      <div style={styles.assetLabel}>{label}</div>
+    </div>
+    <div style={styles.assetDetail}>{detail}</div>
   </div>
 );
 
@@ -761,92 +875,171 @@ const TaskManager: React.FC = () => {
         </div>
       )}
 
-      <div style={styles.statsGrid}>
-        <MetricCard
-          label="DEX Apps"
-          value={String(shellApps.length)}
-          detail={`${runningApps.length} sessions tracked`}
-          history={appHistory}
-          tone={appsTone}
-          max={Math.max(8, ...appHistory, shellApps.length)}
-        />
-        <MetricCard
-          label="CPU"
-          value={`${cpuUsage}%`}
-          detail={cpuDetail}
-          history={cpuHistory}
-          tone={toneFor(cpuUsage)}
-        />
-        <MetricCard
-          label="Memory"
-          value={`${memoryPercent}%`}
-          detail={memoryDetail}
-          history={memoryHistory}
-          tone={toneFor(memoryPercent)}
-        />
-        {hasBattery && (
-          <MetricCard
-            label="Battery"
-            value={`${batteryPercent}%`}
-            detail={batteryDetail}
-            history={batteryHistory}
-            tone={batteryTone(batteryPercent, !!battery?.charging)}
-          />
-        )}
-        {detailLevel >= 2 && (
-          <>
-            <MetricCard
-              label="Processes"
-              value={bridgeAvailable ? String(processCount) : 'Local'}
-              detail={bridgeAvailable ? `${visibleProcesses.length} listed - sampled every 3s` : 'DEX apps only'}
-              history={processHistory}
-              tone="#5E5CE6"
-              max={Math.max(50, ...processHistory)}
+      {/* Overview hero — the concept's Overview page, driven by live system data:
+          two headline cards + a radial load gauge, a row of asset tiles, the big
+          smooth load chart, and a right-hand "focus" card mirroring the project
+          panel (top process + progress + running-app avatars + uptime). */}
+      <div style={styles.heroGrid}>
+        <div style={styles.heroLeft}>
+          <div style={styles.heroTopRow}>
+            <div className="dex-liquid-glass" style={styles.heroBigCard}>
+              <span style={styles.heroIconTile}><DexIcon name="layers" size={20} color="#fff" strokeWidth={2.3} /></span>
+              <div style={styles.heroBigValue}>
+                {bridgeAvailable ? processCount : shellApps.length}
+                <span style={styles.heroBigPlus}>+</span>
+              </div>
+              <div style={styles.heroBigLabel}>{bridgeAvailable ? 'Active processes' : 'DEX apps running'}</div>
+              <div style={styles.heroDelta}>
+                <span style={{ color: appsTone }}>{shellApps.length} DEX apps</span> open · sampled live
+              </div>
+            </div>
+
+            <div className="dex-liquid-glass" style={styles.heroDonutCard}>
+              <div style={styles.heroDonutTitle}>System Load</div>
+              <div style={styles.heroDonutWrap}>
+                <Donut value={cpuUsage} color={toneFor(cpuUsage)} ariaLabel={`CPU load ${cpuUsage} percent`} />
+                <div style={styles.heroDonutCenter}>
+                  <div style={{ fontSize: 24, fontWeight: 780, color: toneFor(cpuUsage), fontVariantNumeric: 'tabular-nums' }}>{cpuUsage}%</div>
+                  <div style={styles.heroDonutUnit}>CPU</div>
+                </div>
+              </div>
+              <div style={styles.heroDonutFoot}>{cpuDetail}</div>
+            </div>
+          </div>
+
+          <div style={styles.heroAssetRow}>
+            <AssetTile
+              icon="hard-drive"
+              tint="#5E5CE6"
+              value={`${memoryPercent}%`}
+              label="Memory"
+              detail={memoryDetail}
             />
-          </>
-        )}
-        {/* Lower-signal diagnostics (uptime, throughput, disk) live in Advanced so
-            the default Diagnostics view stays focused on CPU/Memory/Processes. */}
-        {detailLevel >= 3 && (
-          <>
-            <div style={styles.statCard}>
-              <div style={styles.statLabel}>Uptime</div>
-              <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 20 }}>{formatUptime(uptimeSeconds)}</div>
-              <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
+            {hasBattery ? (
+              <AssetTile
+                icon="battery"
+                tint={batteryTone(batteryPercent, !!battery?.charging)}
+                value={`${batteryPercent}%`}
+                label="Battery"
+                detail={batteryDetail}
+              />
+            ) : status.disk ? (
+              <AssetTile
+                icon="database"
+                tint={toneFor(diskPercent)}
+                value={`${diskPercent}%`}
+                label="Disk"
+                detail={diskDetail}
+              />
+            ) : (
+              <AssetTile
+                icon="wifi"
+                tint={networkConnected ? '#5AC8FA' : 'var(--color-text-tertiary)'}
+                value={networkConnected ? 'Online' : 'Offline'}
+                label="Network"
+                detail={`${formatBps(rxBps)} down`}
+              />
+            )}
+          </div>
+
+          <div className="dex-liquid-glass" style={styles.chartCard}>
+            <div style={styles.chartHead}>
+              <div>
+                <div style={styles.chartTitle}>Load history</div>
+                <div style={styles.chartSub}>CPU utilization over the last {Math.min(cpuHistory.length, HISTORY_LENGTH)} samples</div>
+              </div>
+              <div style={styles.chartRangePills} aria-hidden="true">
+                <span style={styles.chartPill}>CPU</span>
+                <span style={{ ...styles.chartPill, ...styles.chartPillMuted }}>Live</span>
+              </div>
+            </div>
+            <AreaChart history={cpuHistory} color="#7B5CFF" max={100} ariaLabel="CPU load over time" />
+          </div>
+        </div>
+
+        <div className="dex-liquid-glass-strong" style={styles.focusCard}>
+          <div style={styles.focusTop}>
+            <span style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '18', margin: 0 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: healthTone, display: 'inline-block' }} />
+              {healthLabel}
+            </span>
+            <span style={styles.focusUptime}>{formatUptime(uptimeSeconds)} up</span>
+          </div>
+          <div style={styles.focusHeading}>{topProcess?.name || 'System idle'}</div>
+          <div style={styles.focusKicker}>{topProcess ? 'Top process by CPU' : 'No heavy process right now'}</div>
+
+          <div style={styles.focusProgressRow}>
+            <span>Load</span>
+            <span style={{ color: toneFor(Math.round(topProcess?.cpu || cpuUsage)) }}>{Math.round(topProcess?.cpu || cpuUsage)}%</span>
+          </div>
+          <div style={styles.focusProgressTrack}>
+            <div style={{ ...styles.focusProgressFill, width: `${Math.max(3, Math.min(100, Math.round(topProcess?.cpu || cpuUsage)))}%`, background: toneFor(Math.round(topProcess?.cpu || cpuUsage)) }} />
+          </div>
+
+          <div style={styles.focusAvatars}>
+            {shellApps.slice(0, 5).map((app, i) => {
+              const def = APP_DEFINITIONS[app.id];
+              return (
+                <span key={app.id} title={def?.name || app.name} style={{ ...styles.focusAvatar, marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}>
+                  <DexIcon name={def?.icon || app.icon || app.id} size={14} color="#fff" strokeWidth={2.2} />
+                </span>
+              );
+            })}
+            <span style={styles.focusAvatarsLabel}>
+              {shellApps.length === 0 ? 'No apps open' : `${shellApps.length} app${shellApps.length === 1 ? '' : 's'} active`}
+            </span>
+          </div>
+
+          {topProcess && (topProcess.cpu || 0) > 60 && (
+            <button style={styles.focusAction} onClick={() => handleEndProcess(topProcess.pid, topProcess.name)} aria-label={`End ${topProcess.name}`}>
+              End {topProcess.name}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lower-signal diagnostics (uptime, throughput) stay available in Advanced. */}
+      {detailLevel >= 3 && (
+        <div style={styles.statsGrid}>
+          <MetricCard
+            label="Processes"
+            value={bridgeAvailable ? String(processCount) : 'Local'}
+            detail={bridgeAvailable ? `${visibleProcesses.length} listed - sampled every 3s` : 'DEX apps only'}
+            history={processHistory}
+            tone="#5E5CE6"
+            max={Math.max(50, ...processHistory)}
+          />
+          <MetricCard
+            label="Network Rx"
+            value={formatBps(rxBps)}
+            detail={networkConnected ? 'Receiving' : 'Offline'}
+            history={netRxHistory}
+            tone="#5AC8FA"
+            max={Math.max(1024, ...netRxHistory)}
+          />
+          <MetricCard
+            label="Network Tx"
+            value={formatBps(txBps)}
+            detail={networkConnected ? 'Sending' : 'Offline'}
+            history={netTxHistory}
+            tone="#FF9F0A"
+            max={Math.max(1024, ...netTxHistory)}
+          />
+          {status.disk && (
+            <div className="dex-liquid-glass" style={styles.statCard}>
+              <div style={styles.statLabel}>Disk</div>
+              <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 20 }}>{diskPercent}%</div>
+              <div style={styles.statDetail}>{diskDetail}</div>
               <div style={styles.sparkWrap} />
             </div>
-            <MetricCard
-              label="Network Rx"
-              value={formatBps(rxBps)}
-              detail={networkConnected ? 'Receiving' : 'Offline'}
-              history={netRxHistory}
-              tone="#5AC8FA"
-              max={Math.max(1024, ...netRxHistory)}
-            />
-            <MetricCard
-              label="Network Tx"
-              value={formatBps(txBps)}
-              detail={networkConnected ? 'Sending' : 'Offline'}
-              history={netTxHistory}
-              tone="#FF9F0A"
-              max={Math.max(1024, ...netTxHistory)}
-            />
-            {status.disk && (
-              <div style={styles.statCard}>
-                <div style={styles.statLabel}>Disk</div>
-                <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 20 }}>{diskPercent}%</div>
-                <div style={styles.statDetail}>{diskDetail}</div>
-                <div style={styles.sparkWrap} />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {detailLevel >= 2 && (
       <div style={styles.contentGrid}>
         {stages.length > 0 && (
-        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, gridColumn: '1 / -1' }}>
           <div style={styles.panelHeader}>
             <span>Workspaces</span>
             <span style={styles.countPill}>{stages.length}</span>
@@ -894,7 +1087,7 @@ const TaskManager: React.FC = () => {
         </section>
         )}
 
-        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, gridColumn: '1 / -1' }}>
           <div style={styles.panelHeader}>
             <span>Workflows</span>
             <span style={styles.countPill}>{workflows.length}</span>
@@ -916,7 +1109,7 @@ const TaskManager: React.FC = () => {
           </div>
         </section>
 
-        <section style={{ ...styles.panel, ...(detailLevel < 3 ? { gridColumn: '1 / -1' } : null) }}>
+        <section className="dex-liquid-glass" style={{ ...styles.panel, ...(detailLevel < 3 ? { gridColumn: '1 / -1' } : null) }}>
           <div style={styles.panelHeader}>
             <span>Open Apps</span>
             <span style={styles.countPill}>{shellApps.length}</span>
@@ -954,7 +1147,7 @@ const TaskManager: React.FC = () => {
         </section>
 
         {detailLevel >= 3 && (
-        <section style={styles.panel}>
+        <section className="dex-liquid-glass" style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1100,7 +1293,7 @@ const TaskManager: React.FC = () => {
             )}
           </div>
           {selectedProcess && (
-            <div style={styles.detailPanel} role="region" aria-label={`Details for ${selectedProcess.name}`}>
+            <div className="dex-liquid-glass-strong" style={styles.detailPanel} role="region" aria-label={`Details for ${selectedProcess.name}`}>
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle} title={selectedProcess.name}>{selectedProcess.name}</span>
                 <button
@@ -1162,13 +1355,56 @@ const styles: Record<string, React.CSSProperties> = {
   healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
   healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 8, border: '1px solid' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-2)' },
-  statCard: { padding: 11, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 3 },
+  statCard: { padding: 11, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 3 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { fontSize: 20, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   sparkWrap: { marginTop: 5, height: 36 },
+
+  // -- Overview hero (the concept layout) ---------------------------------
+  heroGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.85fr) minmax(248px, 0.85fr)', gap: 'var(--space-3)', alignItems: 'stretch' },
+  heroLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 },
+  heroTopRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 'var(--space-3)' },
+  heroBigCard: { position: 'relative', padding: '16px 18px', borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 132, justifyContent: 'flex-end', overflow: 'hidden' },
+  heroIconTile: { position: 'absolute', top: 16, left: 18, width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', boxShadow: '0 10px 26px rgba(10,132,255,0.30)' },
+  heroBigValue: { display: 'flex', alignItems: 'baseline', gap: 2, fontSize: 38, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' },
+  heroBigPlus: { fontSize: 22, fontWeight: 700, color: 'var(--color-accent)' },
+  heroBigLabel: { fontSize: 13, fontWeight: 650, color: 'var(--color-text-primary)' },
+  heroDelta: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
+  heroDonutCard: { padding: 16, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minHeight: 132 },
+  heroDonutTitle: { alignSelf: 'flex-start', fontSize: 11, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 },
+  heroDonutWrap: { position: 'relative', display: 'grid', placeItems: 'center' },
+  heroDonutCenter: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 },
+  heroDonutUnit: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' },
+  heroDonutFoot: { fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' },
+  heroAssetRow: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-3)' },
+  assetTile: { display: 'flex', alignItems: 'center', gap: 11, padding: '13px 14px', borderRadius: 14 },
+  assetGlyph: { width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center', border: '1px solid', flexShrink: 0 },
+  assetValue: { fontSize: 18, fontWeight: 750, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' },
+  assetLabel: { fontSize: 11.5, color: 'var(--color-text-tertiary)', fontWeight: 600 },
+  assetDetail: { marginLeft: 'auto', fontSize: 10.5, color: 'var(--color-text-tertiary)', textAlign: 'right', maxWidth: 96, lineHeight: 1.25 },
+  chartCard: { padding: 16, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 12 },
+  chartHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  chartTitle: { fontSize: 14, fontWeight: 720, letterSpacing: '-0.01em' },
+  chartSub: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
+  chartRangePills: { display: 'flex', alignItems: 'center', gap: 6 },
+  chartPill: { padding: '3px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 650, background: 'rgba(123,92,255,0.18)', color: '#B7A4FF', border: '1px solid rgba(123,92,255,0.30)' },
+  chartPillMuted: { background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border-subtle)' },
+  focusCard: { position: 'relative', padding: 18, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 9, overflow: 'hidden', background: 'linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-bg-glass-strong)' },
+  focusTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  focusUptime: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' },
+  focusHeading: { marginTop: 4, fontSize: 20, fontWeight: 760, letterSpacing: '-0.02em', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  focusKicker: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
+  focusProgressRow: { marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, fontWeight: 650, color: 'var(--color-text-secondary)' },
+  focusProgressTrack: { height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
+  focusProgressFill: { height: '100%', borderRadius: 999, transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)' },
+  focusAvatars: { marginTop: 8, display: 'flex', alignItems: 'center' },
+  focusAvatar: { width: 28, height: 28, borderRadius: 999, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '2px solid var(--color-bg-glass-strong, #111)', boxShadow: '0 4px 12px rgba(0,0,0,0.35)' },
+  focusAvatarsLabel: { marginLeft: 10, fontSize: 11, color: 'var(--color-text-tertiary)' },
+  focusAction: { marginTop: 'auto', height: 34, borderRadius: 9, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.12)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer', fontWeight: 650, fontSize: 12.5 },
+
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 'var(--space-3)' },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden' },
   panelHeader: { height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' },
@@ -1200,7 +1436,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggleButton: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   toggleButtonActive: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' },
   iconAction: { display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0 },
-  detailPanel: { flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', background: 'var(--color-bg-surface)', display: 'flex', flexDirection: 'column', gap: 8 },
+  detailPanel: { flexShrink: 0, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 },
   detailHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   detailTitle: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   detailClose: { width: 22, height: 22, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 },

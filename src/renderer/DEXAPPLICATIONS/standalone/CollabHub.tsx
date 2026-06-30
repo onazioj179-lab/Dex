@@ -56,7 +56,7 @@ const styles: Record<string, React.CSSProperties> = {
   logo: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     background: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
     display: 'flex',
     alignItems: 'center',
@@ -87,7 +87,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     background: 'var(--color-bg-hover, rgba(255,255,255,0.08))',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     color: 'var(--color-text-primary, #fff)',
     cursor: 'pointer',
     display: 'flex',
@@ -112,7 +112,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     background: 'transparent',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -130,7 +130,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     background: 'var(--color-accent)',
     color: 'var(--color-accent-text, #fff)',
-    borderRadius: 4,
+    borderRadius: 'var(--radius-sm)',
     minWidth: 18,
     textAlign: 'center',
   },
@@ -145,9 +145,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 'var(--space-4)',
   },
   card: {
-    background: 'var(--color-bg-elevated, linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%))',
-    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-    borderRadius: 10,
+    borderRadius: 'var(--radius-lg)',
     padding: 'var(--space-5)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -175,7 +173,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 4,
+    borderRadius: 'var(--radius-md)',
     color: 'var(--color-text-muted, #636366)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -232,7 +230,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     fontSize: 11,
     fontWeight: 600,
-    borderRadius: 4,
+    borderRadius: 'var(--radius-sm)',
     textTransform: 'uppercase',
     letterSpacing: '0.03em',
   },
@@ -248,7 +246,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -263,16 +261,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 14,
     padding: '14px var(--space-4)',
-    background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
-    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
-    borderRadius: 10,
+    borderRadius: 'var(--radius-lg)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   checkpointIcon: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     background: 'linear-gradient(135deg, #30d158, #34c759)',
     display: 'flex',
     alignItems: 'center',
@@ -339,7 +335,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 'var(--radius-lg)',
   },
 };
 
@@ -1303,6 +1299,7 @@ const CollabHub: React.FC = () => {
                 return (
                   <div
                     key={project.id}
+                    className="dex-liquid-glass"
                     style={styles.card}
                     onClick={() => handleOpenProject(project)}
                     onMouseEnter={e => {
@@ -1312,7 +1309,7 @@ const CollabHub: React.FC = () => {
                       if (menuBtn) menuBtn.style.opacity = '1';
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'var(--color-border-subtle, rgba(255,255,255,0.08))';
+                      e.currentTarget.style.borderColor = 'transparent';
                       e.currentTarget.style.transform = 'translateY(0)';
                       const menuBtn = e.currentTarget.querySelector('[data-menu-btn]') as HTMLElement;
                       if (menuBtn) menuBtn.style.opacity = '0';
@@ -1418,9 +1415,10 @@ const CollabHub: React.FC = () => {
               {allCheckpoints.map(cp => (
                 <div
                   key={cp.id}
+                  className="dex-liquid-glass"
                   style={styles.checkpointItem}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.08))'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.04))'; }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-border, rgba(255,255,255,0.15))'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; }}
                 >
                   <div style={styles.checkpointIcon}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
@@ -1497,7 +1495,7 @@ const CollabHub: React.FC = () => {
                   <div style={{
                     width: 40,
                     height: 40,
-                    borderRadius: 8,
+                    borderRadius: 'var(--radius-lg)',
                     background: item.iconBg,
                     display: 'flex',
                     alignItems: 'center',
@@ -1523,7 +1521,7 @@ const CollabHub: React.FC = () => {
                           padding: '2px 6px',
                           fontSize: 10,
                           fontWeight: 600,
-                          borderRadius: 3,
+                          borderRadius: 'var(--radius-sm)',
                           background: item.status === 'approved'
                             ? 'var(--color-success-muted, rgba(48,209,88,0.15))'
                             : 'var(--color-error-muted, rgba(255,69,58,0.15))',
@@ -1550,7 +1548,7 @@ const CollabHub: React.FC = () => {
                             background: 'var(--color-success, #30d158)',
                             color: 'var(--color-accent-text, #fff)',
                             border: 'none',
-                            borderRadius: 6,
+                            borderRadius: 'var(--radius-md)',
                             cursor: isLoading ? 'not-allowed' : 'pointer',
                             opacity: isLoading ? 0.6 : 1,
                             transition: 'all 0.15s ease',
@@ -1570,7 +1568,7 @@ const CollabHub: React.FC = () => {
                             background: 'transparent',
                             color: 'var(--color-error, #ff453a)',
                             border: '1px solid var(--color-error-muted, rgba(255,69,58,0.3))',
-                            borderRadius: 6,
+                            borderRadius: 'var(--radius-md)',
                             cursor: isLoading ? 'not-allowed' : 'pointer',
                             opacity: isLoading ? 0.6 : 1,
                             transition: 'all 0.15s ease',
@@ -1602,15 +1600,13 @@ const CollabHub: React.FC = () => {
         {activeTab === 'rooms' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {/* Local-session honesty banner + create */}
-            <div style={{
+            <div className="dex-liquid-glass" style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 'var(--space-3)',
               padding: 'var(--space-3) var(--space-4)',
-              background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
-              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-              borderRadius: 10,
+              borderRadius: 'var(--radius-lg)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <span style={{
@@ -1683,12 +1679,12 @@ const CollabHub: React.FC = () => {
                           gap: 6,
                           padding: 'var(--space-3) var(--space-4)',
                           background: selected
-                            ? 'var(--color-bg-active, rgba(255,255,255,0.1))'
+                            ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)'
                             : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
                           border: selected
-                            ? '1px solid var(--dex-focus-color, rgba(255,255,255,0.25))'
+                            ? '1px solid var(--color-accent)'
                             : '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
-                          borderRadius: 10,
+                          borderRadius: 'var(--radius-lg)',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
                           color: 'var(--color-text-primary, #fff)',
@@ -1709,7 +1705,7 @@ const CollabHub: React.FC = () => {
                           {joined && (
                             <span style={{
                               fontSize: 9, fontWeight: 700, padding: '2px 6px',
-                              borderRadius: 4, background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
+                              borderRadius: 'var(--radius-sm)', background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
                               color: 'var(--color-success, #30d158)', flexShrink: 0,
                             }}>
                               JOINED
@@ -1732,12 +1728,10 @@ const CollabHub: React.FC = () => {
                 {activeRoom ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0 }}>
                     {/* Header */}
-                    <div style={{
+                    <div className="dex-liquid-glass" style={{
                       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
                       gap: 'var(--space-3)', padding: 'var(--space-4)',
-                      background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
-                      border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-                      borderRadius: 10,
+                      borderRadius: 'var(--radius-lg)',
                     }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
@@ -1802,7 +1796,7 @@ const CollabHub: React.FC = () => {
                         padding: 'var(--space-4)',
                         background: 'linear-gradient(135deg, rgba(48,209,88,0.08), rgba(48,209,88,0.02))',
                         border: '1px solid var(--color-success-muted, rgba(48,209,88,0.25))',
-                        borderRadius: 10,
+                        borderRadius: 'var(--radius-lg)',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -1824,7 +1818,7 @@ const CollabHub: React.FC = () => {
                             </div>
                           </div>
                           <span style={{
-                            fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                            fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 'var(--radius-sm)',
                             background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
                             color: 'var(--color-success, #30d158)', flexShrink: 0,
                           }}>
@@ -1873,7 +1867,7 @@ const CollabHub: React.FC = () => {
                               fontFamily: 'var(--dex-font-ui)',
                               background: 'var(--color-bg-base, rgba(0,0,0,0.25))',
                               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
-                              borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                              borderRadius: 'var(--radius-lg)', color: 'var(--color-text-primary, #fff)',
                               outline: 'none',
                             }}
                           />
@@ -1928,7 +1922,7 @@ const CollabHub: React.FC = () => {
                                 flex: 1, padding: '8px 12px', fontSize: 13,
                                 background: 'var(--color-bg-base, rgba(0,0,0,0.2))',
                                 border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
-                                borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                                borderRadius: 'var(--radius-lg)', color: 'var(--color-text-primary, #fff)',
                                 outline: 'none',
                               }}
                             />
@@ -1946,11 +1940,9 @@ const CollabHub: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 'var(--space-4)', alignItems: 'start' }}>
                       {/* Chat */}
-                      <div style={{
+                      <div className="dex-liquid-glass-strong" style={{
                         display: 'flex', flexDirection: 'column',
-                        border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-                        borderRadius: 10, overflow: 'hidden',
-                        background: 'var(--color-bg-hover, rgba(255,255,255,0.02))',
+                        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                       }}>
                         <div
                           ref={chatScrollRef}
@@ -2011,7 +2003,7 @@ const CollabHub: React.FC = () => {
                               flex: 1, padding: '8px 12px', fontSize: 13,
                               background: 'var(--color-bg-base, rgba(0,0,0,0.2))',
                               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
-                              borderRadius: 8, color: 'var(--color-text-primary, #fff)',
+                              borderRadius: 'var(--radius-lg)', color: 'var(--color-text-primary, #fff)',
                               outline: 'none', opacity: isJoined(activeRoom.id) ? 1 : 0.5,
                             }}
                           />
@@ -2038,7 +2030,7 @@ const CollabHub: React.FC = () => {
                           .map(m => (
                             <div key={m.id} style={{
                               display: 'flex', alignItems: 'center', gap: 10,
-                              padding: '8px 10px', borderRadius: 8,
+                              padding: '8px 10px', borderRadius: 'var(--radius-lg)',
                               background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
                               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
                             }}>
@@ -2079,7 +2071,7 @@ const CollabHub: React.FC = () => {
                       {[...activeRoom.activity].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30).map(a => (
                         <div key={a.id} style={{
                           display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '8px 12px', borderRadius: 8,
+                          padding: '8px 12px', borderRadius: 'var(--radius-lg)',
                           background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
                           border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.05))',
                         }}>

@@ -5,7 +5,6 @@
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { premiumGlassToolbar } from '../../styles/glassMenu';
 import { sendToNotes } from '../../services/sendTo';
 
 interface Annotation {
@@ -278,7 +277,7 @@ const PDFViewer: React.FC = () => {
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
       fontFamily: 'var(--font-family)',
     }}>
-      <div style={{ ...premiumGlassToolbar, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div className="dex-liquid-glass" style={{ ...toolbarLayout, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <DexIcon name="file-text" size={18} color="var(--color-text-primary)" />
           <button onClick={openPdf} style={btnPrimary}>Open PDF</button>
@@ -299,7 +298,7 @@ const PDFViewer: React.FC = () => {
               aria-label="Page number"
               title="Jump to page"
               style={{
-                width: 44, padding: '4px 6px', textAlign: 'center', borderRadius: 4, fontSize: 12,
+                width: 44, padding: '4px 6px', textAlign: 'center', borderRadius: 'var(--radius-lg)', fontSize: 12,
                 background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
                 border: '1px solid var(--color-border-subtle)',
               }}
@@ -322,7 +321,7 @@ const PDFViewer: React.FC = () => {
             aria-label="Zoom level"
             title="Zoom level"
             style={{
-              fontSize: 12, padding: '5px 6px', borderRadius: 4,
+              fontSize: 12, padding: '5px 6px', borderRadius: 'var(--radius-lg)',
               background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
               border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
             }}
@@ -431,8 +430,15 @@ const PDFViewer: React.FC = () => {
   );
 };
 
+// Flush glass toolbar strip: the .dex-liquid-glass class owns the translucent
+// material, so this object carries only layout. borderRadius:0 + a hairline
+// borderBottom keep it edge-to-edge as window chrome.
+const toolbarLayout: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, minHeight: 40, borderRadius: 0,
+  borderBottom: '1px solid var(--color-border-subtle)',
+};
 const btn: React.CSSProperties = {
-  padding: '6px 10px', borderRadius: 4, fontSize: 12,
+  padding: '6px 10px', borderRadius: 'var(--radius-lg)', fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };

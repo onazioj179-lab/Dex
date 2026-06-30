@@ -16,6 +16,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DexSearchInput } from '../../styles/components';
+import { VirtualList } from '../../components/VirtualList';
 import { APP_DEFINITIONS, useRunningApps } from '../../store/runningApps';
 import { sendToNotes } from '../../services/sendTo';
 
@@ -324,7 +325,7 @@ const LiveActivityBrowser: React.FC = () => {
       >
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+          width: 28, height: 28, borderRadius: 'var(--radius-sm)', flexShrink: 0,
           background: 'var(--color-bg-inset)',
           color: def?.color || 'var(--color-text-tertiary)',
         }}>
@@ -370,11 +371,11 @@ const LiveActivityBrowser: React.FC = () => {
           aria-label={paused ? 'Resume live feed' : 'Pause live feed'}
           title={paused ? 'Resume live feed' : 'Pause live feed'}
           style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: 'pointer',
+            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: paused ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-            border: `1px solid ${paused ? 'var(--dex-focus-color, #fff)' : 'var(--color-border)'}`,
-            color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
+            background: paused ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+            border: `1px solid ${paused ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            color: paused ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
           }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -389,7 +390,7 @@ const LiveActivityBrowser: React.FC = () => {
           aria-label="Send filtered activity to Notes"
           title="Send the current view to Notes"
           style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
+            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: busy ? 'default' : 'pointer',
             background: 'transparent', border: '1px solid var(--color-border)',
             color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
             opacity: busy ? 0.5 : 1,
@@ -401,7 +402,7 @@ const LiveActivityBrowser: React.FC = () => {
           disabled={busy}
           aria-label="Clear activity log"
           style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
+            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: busy ? 'default' : 'pointer',
             background: 'transparent', border: '1px solid var(--color-border)',
             color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
             opacity: busy ? 0.5 : 1,
@@ -422,10 +423,10 @@ const LiveActivityBrowser: React.FC = () => {
                 aria-pressed={active}
                 onClick={() => setTypeFilter(t)}
                 style={{
-                  height: 24, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+                  height: 24, padding: '0 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
-                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >{t}{count ? ` ${count}` : ''}</button>
@@ -452,10 +453,10 @@ const LiveActivityBrowser: React.FC = () => {
                 aria-pressed={active}
                 onClick={() => setRange(r.key)}
                 style={{
-                  height: 22, padding: '0 9px', borderRadius: 5, cursor: 'pointer',
+                  height: 22, padding: '0 9px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >{r.label}</button>
@@ -475,10 +476,10 @@ const LiveActivityBrowser: React.FC = () => {
                 aria-pressed={active}
                 onClick={() => setGroupMode(mode)}
                 style={{
-                  height: 22, padding: '0 9px', borderRadius: 5, cursor: 'pointer',
+                  height: 22, padding: '0 9px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >{label}</button>
@@ -500,10 +501,10 @@ const LiveActivityBrowser: React.FC = () => {
                 aria-pressed={active}
                 onClick={() => setAppFilter(a)}
                 style={{
-                  height: 24, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+                  height: 24, padding: '0 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-                  border: `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
+                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >{label}</button>
@@ -538,7 +539,15 @@ const LiveActivityBrowser: React.FC = () => {
             </div>
           ))
         ) : (
-          filtered.map(renderRow)
+          // Flat feed can grow to thousands of rows -- window it through the
+          // shared VirtualList so only the visible slice mounts.
+          <VirtualList
+            items={filtered}
+            rowHeight={44}
+            renderRow={(e) => renderRow(e)}
+            getKey={(e) => e.id}
+            ariaLabel="Activity feed"
+          />
         )}
       </div>
     </div>

@@ -32,8 +32,9 @@ interface AppActivity {
   lastRefreshAt: number;
 }
 
-const ACTIVE_IDLE_THRESHOLD_MS = 60_000;
-const EXTENDED_IDLE_THRESHOLD_MS = 5 * 60_000;
+// Idle-state thresholds removed: the shell no longer transitions to low-power /
+// extended-idle on inactivity (see evaluate()). Only the per-app activity
+// windows below remain, for the background-refresh throttle.
 const ACTIVE_APP_WINDOW_MS = 2 * 60_000;
 const SEMI_ACTIVE_APP_WINDOW_MS = 30 * 60_000;
 
@@ -130,10 +131,13 @@ class IdleContinuityService {
 
   private evaluate(): void {
     const now = Date.now();
-    const idleForMs = now - this.lastActivityAt;
-    if (idleForMs >= EXTENDED_IDLE_THRESHOLD_MS) this.setState('extended-idle');
-    else if (idleForMs >= ACTIVE_IDLE_THRESHOLD_MS) this.setState('low-power-active');
-    else this.setState('active');
+    // Idle state transitions REMOVED (owner direction): DEX is a long-session
+    // desktop, so the shell must never visibly react to inactivity -- no
+    // low-power dimming, no animation pausing, no "extended-idle" reclaim. The
+    // state stays 'active' forever. We keep the per-app background-refresh
+    // throttle below, which is keyed on each app's own foreground/background
+    // status (not on the user being idle) and is invisible/battery-friendly.
+    this.setState('active');
     this.fireDueBackgroundRefreshes(now);
   }
 

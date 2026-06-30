@@ -667,9 +667,13 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', left: 0, right: 0, ...dropStyle,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
-              // Fully opaque so Home wallpaper/widgets never bleed through and
-              // make results unreadable (full-flat: no blur to lean on).
-              background: 'var(--color-bg-surface-solid, #141416)',
+              // Liquid glass (master overhaul) -- the strong variant: translucent
+              // enough to bloom the wallpaper/content behind it, opaque enough that
+              // result text stays readable. Falls back to solid on weak GPUs /
+              // reduced-transparency via the shared token + universal low-tier rule.
+              background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',
+              backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
+              WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
               border: '1px solid var(--color-border)',
               borderRadius: 10,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',

@@ -52,7 +52,15 @@ const PANEL_MIN_HEIGHT = 120;
 // makes talking to the AI feel like coding.
 const PLAIN_TRANSLATE_SYS = [
   'You translate a plain-English request into a single DexScript program for the DEX platform.',
-  'DexScript is a small JavaScript-like language: `let x = 1`, `print(...)`, `if/else`, `for`, `while`, function defs, arithmetic and string ops.',
+  'DexScript is a small JavaScript-like language: `let x = 1`, `print(...)`, `if/else` (also `elif`), `for x in 1..10 {}`, `for item in list {}`, `while`, `fn name(args) {}`, arithmetic and string ops.',
+  'A standard library is available as globals (call as shown):',
+  '  print(...args)  — output a line.   type(v) — "null"|"list"|"number"|"string"|...',
+  '  math: pi, e, tau, sqrt, cbrt, abs, pow, hypot, round(n,d?), floor, ceil, trunc, sign, min, max, clamp(n,lo,hi), sum(...), avg(...), gcd(a,b), lcm(a,b), random(min?,max?), sin/cos/tan, log/log2/log10, deg(r), rad(d).',
+  '  str: upper(s), lower(s), trim(s), len(s), contains(s,sub), starts(s,sub), ends(s,sub), split(s,sep), join(list,sep), replace(s,a,b), repeat(s,n), reverse(s), padLeft(s,n,c?), padRight(s,n,c?), capitalize(s).',
+  '  list: range(n) or range(a,b,step?), map(a,f), filter(a,f), reduce(a,f,init), each(a,f), sum(a), avg(a), min(a), max(a), sort(a,f?), reverse(a), unique(a), first(a), last(a), len(a), contains(a,v), indexOf(a,v), slice(a,s,e), flatten(a), zip(a,b), push(a,v), pop(a).',
+  '  fmt: number(n), currency(n,cur?), percent(n,d?), fixed(n,d?), bytes(n).',
+  '  time: now(), date(), time(), year(), month(), day(), weekday(), iso().   json: encode(v), decode(s), pretty(v).   assert(cond,msg?).',
+  'There is NO file, network, or DOM access — pure computation only. Prefer the stdlib over reimplementing it.',
   'Output ONLY the DexScript code — no prose, no explanation, no markdown fences. The code must be runnable as-is.',
   'Prefer `print(...)` to surface results so the user sees output when it runs.',
 ].join('\n');

@@ -5196,6 +5196,40 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   box-shadow: 0 0 0 3px var(--focus-ring-color), 0 1px 4px rgba(0,0,0,0.3);
 }
 
+/* Pro analog console sliders for the creative apps (Vinx / Prism / Forge):
+   a recessed track with a bevelled metal cap, matching Imosion's hardware feel.
+   Scoped to the shared .dex-creative-panel root so it never touches the rest of the OS. */
+.dex-creative-panel input[type="range"],
+.dex-creative-panel-strong input[type="range"],
+.flux-root input[type="range"] {
+  height: 5px;
+  background: linear-gradient(180deg, #0a0a0c, #1a1a1e);
+  border: 1px solid #050507;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
+  border-radius: 3px;
+}
+.dex-creative-panel input[type="range"]::-webkit-slider-thumb,
+.dex-creative-panel-strong input[type="range"]::-webkit-slider-thumb,
+.flux-root input[type="range"]::-webkit-slider-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: linear-gradient(180deg, #52525c, #1a1a20);
+  border: 1px solid #050507;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.dex-creative-panel input[type="range"]::-moz-range-thumb,
+.dex-creative-panel-strong input[type="range"]::-moz-range-thumb,
+.flux-root input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; border: 1px solid #050507;
+  background: linear-gradient(180deg, #52525c, #1a1a20);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.dex-creative-panel input[type="range"]::-moz-range-track,
+.dex-creative-panel-strong input[type="range"]::-moz-range-track,
+.flux-root input[type="range"]::-moz-range-track {
+  height: 5px; border-radius: 3px; border: 1px solid #050507;
+  background: linear-gradient(180deg, #0a0a0c, #1a1a1e);
+}
+
 /* Segmented control indicator */
 .tahoe-segmented-indicator { transition: transform 0.12s var(--ease-tahoe), width 0.12s var(--ease-tahoe); will-change: transform; }
 
