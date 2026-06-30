@@ -404,4 +404,5 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   // Health & Bio Engineering
   health: { name: 'Health Studio', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Body composition, energy expenditure, cardio zones, and hydration targets' },
   bio: { name: 'Bio Engineering Studio', color: '#5E5CE6', icon: 'flux', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'DNA/RNA transcription + translation, GC/Tm/MW analysis, and solution prep' },
+  security: { name: 'Security Center', color: '#FF9F0A', icon: 'lock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'UKI action audit trail — full traceability of everything the assistant does' },
 };

@@ -206,6 +206,7 @@ const DexCode = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/DexCode'))
 const Nexus = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Nexus'));
 const HealthStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/HealthStudio'));
 const BioStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/BioStudio'));
+const SecurityCenter = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SecurityCenter'));
 const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
 const Canvas = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Canvas'));
@@ -232,7 +233,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'security';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -372,6 +373,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   backup: BackupSync, extensions: ExtensionsManager,
   health: HealthStudio,
   bio: BioStudio,
+  security: SecurityCenter,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
