@@ -27,6 +27,7 @@ import { getActiveWorkspace } from '../uki/context';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../uki/answerEngine';
 import { useSpinnerVerb } from '../uki/spinnerVerbs';
 import { computeLingerMs } from '../uki/sleepTiming';
+import { useSmoothDrag } from '../hooks/useSmoothDrag';
 
 // Mutating UKI app-actions (e.g. tasks.addTask) never run without the user's
 // approval. Wire the confirm surface once so the agent's action registry can
@@ -1258,8 +1259,6 @@ const UkiOverlay: React.FC = () => {
     } catch { /* ignore */ }
     return null;
   });
-  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const draggingRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
   // Animated waveform state — use refs to avoid 60fps state re-renders
   const [waveHeights, setWaveHeights] = useState([4, 4, 4, 4, 4]);
@@ -1385,35 +1384,24 @@ const UkiOverlay: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Robust drag via pointer events (survives fast moves / leaving the window),
-  // with body cursor + selection lock while dragging, persistence on release,
-  // and a re-clamp on window resize.
+  // Dragging now rides the shared useSmoothDrag hook (same feel as the DEX Bar
+  // and Home icons): rAF-batched, pointer-captured, committed once on release —
+  // no more per-move re-render of the whole overlay. Only the resize re-clamp
+  // stays as a window listener.
+  const drag = useSmoothDrag({
+    x: panelPos?.x ?? 20,
+    y: panelPos?.y ?? 80,
+    clamp: (x, y) => clampPanelPos(x, y),
+    onCommit: (x, y) => {
+      const c = clampPanelPos(x, y);
+      setPanelPos(c);
+      try { localStorage.setItem('dex-uki-panel-pos', JSON.stringify(c)); } catch { /* ignore */ }
+    },
+  });
   useEffect(() => {
-    const handleMove = (event: PointerEvent) => {
-      if (!draggingRef.current) return;
-      const next = clampPanelPos(event.clientX - dragOffsetRef.current.x, event.clientY - dragOffsetRef.current.y);
-      setPanelPos(prev => (prev && prev.x === next.x && prev.y === next.y) ? prev : next);
-    };
-    const handleUp = () => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setPanelPos(prev => {
-        if (prev) { try { localStorage.setItem('dex-uki-panel-pos', JSON.stringify(prev)); } catch { /* ignore */ } }
-        return prev;
-      });
-    };
     const handleResize = () => setPanelPos(prev => (prev ? clampPanelPos(prev.x, prev.y) : prev));
-
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, [clampPanelPos]);
 
   const [streamingResponse, setStreamingResponse] = useState('');
@@ -1831,16 +1819,12 @@ const UkiOverlay: React.FC = () => {
 
   const stateInfo = STATE_LABELS[state] || { label: '', color: 'var(--color-text-tertiary)' };
   const displayText = transcript || partialTranscript;
+  // Start a drag only from empty header space — never when a control under the
+  // pointer should handle the click. Delegates to the shared smooth-drag hook.
   const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest('button, input, textarea, a, [role="button"]')) return;
-    // Offset is relative to the positioned panel root, not the header, so the
-    // panel doesn't jump when the drag begins.
-    const rect = (panelRef.current ?? event.currentTarget).getBoundingClientRect();
-    dragOffsetRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    draggingRef.current = true;
-    document.body.style.cursor = 'grabbing';
-    document.body.style.userSelect = 'none';
+    drag.handlers.onPointerDown(event);
   };
 
   return (
@@ -1850,8 +1834,8 @@ const UkiOverlay: React.FC = () => {
       onMouseLeave={() => { hoveredRef.current = false; armSleep(); }}
       style={{
       position: 'fixed',
-      top: panelPos?.y ?? 80,
-      left: panelPos?.x ?? 20,
+      top: drag.y,
+      left: drag.x,
       width: 380,
       maxWidth: 'calc(100vw - 40px)',
       zIndex: zIndex.overlay,
@@ -1909,11 +1893,16 @@ const UkiOverlay: React.FC = () => {
         )}
         {/* State bar — the drag handle (only the header moves the panel, so
             clicking the content/response area never starts a drag) */}
-        <div onPointerDown={handleDragStart} style={{
+        <div
+          onPointerDown={handleDragStart}
+          onPointerMove={drag.handlers.onPointerMove}
+          onPointerUp={drag.handlers.onPointerUp}
+          onPointerCancel={drag.handlers.onPointerCancel}
+          style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           padding: '10px 14px',
           borderBottom: '1px solid var(--color-bg-hover)',
-          cursor: 'grab',
+          cursor: drag.dragging ? 'grabbing' : 'grab',
           touchAction: 'none',
         }}>
           {/* Animated indicator */}

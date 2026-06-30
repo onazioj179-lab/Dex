@@ -20,7 +20,7 @@ const KEYWORDS = new Set([
   'break', 'continue', 'true', 'false', 'null', 'try', 'catch', 'throw',
 ]);
 
-const BUILTINS = new Set(['print', 'math', 'time', 'json', 'sys', 'type']);
+const BUILTINS = new Set(['print', 'math', 'time', 'json', 'sys', 'type', 'str', 'list', 'fmt', 'assert']);
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

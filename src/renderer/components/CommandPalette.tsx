@@ -21,6 +21,7 @@ import { scopedQuery } from '../services/commandScope';
 import { getRecentCommandIds, recordRecentCommand } from '../services/recentCommands';
 import { listPresets, type WorkspacePreset } from '../shell/WorkspacePresets';
 import { useStageStore, STAGE_KIND_META, type StageKind } from '../store/stageStore';
+import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces';
 import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBoundary';
 import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexCommands';
@@ -245,6 +246,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'presentation', title: 'Open Presentation', icon: Icons.gallery, category: 'app', action: () => openApp('presentation'), keywords: ['slides', 'present', 'deck', 'pdf', 'keynote'] },
     { id: 'pdfviewer', title: 'Open PDF Viewer', icon: Icons.markdown, category: 'app', action: () => openApp('pdfviewer'), keywords: ['pdf', 'document', 'annotate', 'read'] },
     { id: 'pixelart', title: 'Open Pixel Art', icon: Icons.colorpicker, category: 'app', action: () => openApp('pixelart'), keywords: ['pixel', 'art', 'sprite', 'nes', 'draw'] },
+    { id: 'powerrename', title: 'Open PowerRename', icon: Icons.files, category: 'app', action: () => openApp('powerrename'), keywords: ['rename', 'batch', 'bulk', 'regex', 'powertoys', 'pattern'] },
 
     // Actions
     { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },
@@ -257,6 +259,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'save-diagnostics', title: 'Save Diagnostics Report', subtitle: 'Download crash + environment info', icon: Icons.files, category: 'action', action: () => { exportDiagnostics(); }, keywords: ['diagnostics', 'crash', 'report', 'debug', 'support', 'recovery', 'logs'] },
     { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
     { id: 'arrange-windows', title: 'Arrange Windows', subtitle: 'Tile open windows into a grid', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), keywords: ['tile', 'grid', 'arrange', 'organize', 'windows', 'layout', 'cascade'] },
+    { id: 'workspace-timeline', title: 'Workspace Time Machine', subtitle: 'Restore your desktop layout to an earlier moment', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-open-workspace-timeline')), keywords: ['time machine', 'snapshot', 'history', 'layout', 'restore', 'workspace', 'rewind', 'undo'] },
+    { id: 'snapshot-workspace', title: 'Snapshot Workspace Now', subtitle: 'Capture the current window layout', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-workspace-snapshot-now')), keywords: ['snapshot', 'capture', 'layout', 'save', 'time machine'] },
     { id: 'tile-master', title: 'Tile: Master + Stack', subtitle: 'Wide primary pane, the rest stacked beside it', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows', { detail: { layout: 'master' } })), keywords: ['tile', 'master', 'stack', 'primary', 'main', 'arrange', 'layout', 'tiling'] },
     { id: 'tile-columns', title: 'Tile: Columns', subtitle: 'Every window an equal full-height column', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows', { detail: { layout: 'columns' } })), keywords: ['tile', 'columns', 'vertical', 'side by side', 'arrange', 'layout', 'tiling'] },
     { id: 'tile-rows', title: 'Tile: Rows', subtitle: 'Every window an equal full-width row', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows', { detail: { layout: 'rows' } })), keywords: ['tile', 'rows', 'horizontal', 'stacked', 'arrange', 'layout', 'tiling'] },
@@ -304,14 +308,32 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       })),
   ], [openApp, wsPresets, stages, activeStageId]);
 
+  // Settings deep-links: one command per Settings page, dispatched only while
+  // searching (kept out of the default/empty list so it stays uncluttered). The
+  // section list is the shared source of truth (settingsSections.ts), so typing
+  // "wifi" -> Network, "theme" -> Appearance, etc. jumps straight to that pane.
+  const settingsCommands: Command[] = useMemo(() => SETTINGS_SECTIONS.map(s => ({
+    id: `settings-${s.id}`,
+    title: `Settings: ${s.name}`,
+    subtitle: 'Open this settings page',
+    icon: Icons.settings,
+    category: 'settings' as const,
+    action: () => window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
+      detail: { appId: 'settings', contextId: s.id },
+    })),
+    keywords: s.keywords ? s.keywords.split(/\s+/) : [],
+  })), []);
+
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) {
       // Empty box: surface recently-used commands at the top (deduped from the
       // normal groups below), then the full list. `recentIds` is refreshed in
       // state whenever the palette opens, so this memo recomputes with fresh data.
+      // Recents can include settings deep-links the user actually used, so look
+      // those up across both lists -- but the default body stays just `commands`.
       const recent = recentIds
-        .map(id => commands.find(c => c.id === id))
+        .map(id => commands.find(c => c.id === id) ?? settingsCommands.find(c => c.id === id))
         .filter((c): c is Command => !!c)
         .map(c => ({ ...c, category: 'recent' as const }));
       if (recent.length === 0) return commands;
@@ -349,7 +371,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       keywords: [],
     });
 
-    const scored = commands
+    const scored = [...commands, ...settingsCommands]
       .filter(cmd => !allowedCategories || allowedCategories.has(cmd.category))
       .map(cmd => {
       const titleScore = fuzzyScore(q, cmd.title);
@@ -380,7 +402,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       });
     }
     return [...inlineResults, ...scored.map(x => x.cmd), ...fallbacks];
-  }, [commands, query, recentIds]);
+  }, [commands, settingsCommands, query, recentIds]);
 
   // Flatten into the SAME order the list renders (grouped by category). The list
   // is rendered grouped, so the visual top-to-bottom order differs from the

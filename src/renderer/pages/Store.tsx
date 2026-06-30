@@ -22,7 +22,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
-import { premiumGlassPanel, premiumGlassToolbar } from '../styles/glassMenu';
 import { APP_DEFINITIONS } from '../store/runningApps';
 
 // ---------------------------------------------------------------------------
@@ -350,9 +349,17 @@ export default function Store(): React.ReactElement {
         {!compact && <div style={styles.cardDesc}>{app.description}</div>}
         <div style={styles.cardFoot}>
           <span style={styles.catChip}>{CATEGORY_LABELS[app.category]}</span>
-          <span style={styles.installedBadge}>
-            <DexIcon name="check-circle" size={12} /> Installed
-          </span>
+          {ratings[app.id] ? (
+            // Surface the user's own rating on the card -- it was stored but only
+            // ever visible inside the detail view before.
+            <span style={{ display: 'inline-flex', alignItems: 'center' }} title={`You rated this ${ratings[app.id]} of 5`}>
+              {renderStars(app.id, 11, false)}
+            </span>
+          ) : (
+            <span style={styles.installedBadge}>
+              <DexIcon name="check-circle" size={12} /> Installed
+            </span>
+          )}
         </div>
       </div>
     );
@@ -633,21 +640,27 @@ function tintBorder(color: string): string {
 // ---------------------------------------------------------------------------
 
 const styles: Record<string, React.CSSProperties> = {
+  // Root page surface. No background here -> transparent, so the page sits on the
+  // window's normal `--color-bg-base` (no glass, no framing box). Full-bleed.
   container: {
-    ...premiumGlassPanel,
     height: '100%',
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
     color: 'var(--color-text-primary)',
     overflow: 'hidden',
+    borderRadius: 0,
   },
+  // Toolbar header — transparent (no glass); only the bottom hairline + layout.
   header: {
-    ...premiumGlassToolbar,
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 'var(--space-3)',
     padding: 'var(--space-3) var(--space-4)',
+    borderBottom: '1px solid var(--pg-border)',
+    borderRadius: 0,
+    display: 'flex',
+    alignItems: 'center',
   },
   titleBlock: { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
   backBtn: {
@@ -656,7 +669,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     minHeight: 32,
     padding: '0 var(--space-3)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     border: '1px solid var(--pg-border-strong)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)',
@@ -667,7 +680,7 @@ const styles: Record<string, React.CSSProperties> = {
   storeIcon: {
     width: 34,
     height: 34,
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -697,7 +710,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     padding: '0 10px',
     border: '1px solid var(--pg-border-strong)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
@@ -712,7 +725,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     padding: '0 8px 0 10px',
     border: '1px solid var(--pg-border-strong)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-lg)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
@@ -788,14 +801,15 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     gap: 'var(--space-3)',
   },
+  // App tile — solid surface (no glass), sits on the normal app background.
   card: {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     padding: 'var(--space-3)',
-    border: '1px solid var(--pg-border)',
-    borderRadius: 10,
+    borderRadius: 'var(--radius-lg)',
     background: 'var(--color-bg-surface)',
+    border: '1px solid var(--pg-border)',
     color: 'var(--color-text-primary)',
     textAlign: 'left',
     cursor: 'pointer',
@@ -819,7 +833,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 6,
+    borderRadius: 'var(--radius-md)',
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
@@ -904,7 +918,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     minHeight: 36,
     padding: '0 16px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     border: 'none',
     background: 'var(--color-accent)',
     color: '#fff',
@@ -918,7 +932,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     minHeight: 36,
     padding: '0 14px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-lg)',
     border: '1px solid var(--pg-border-strong)',
     background: 'var(--color-bg-surface)',
     fontSize: 13,
@@ -935,7 +949,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     padding: '5px 10px',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     border: '1px solid var(--pg-border)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-text-secondary)',

@@ -15,6 +15,8 @@ import { isReduceMotion } from '../utils/MotionController';
 import { playNotification } from './SpatialAudio';
 import { selectVisible } from '../../shared/notifications/center';
 import type { NotificationRecord, NotificationPriority } from '../../shared/notifications/group';
+import { summarizeGroup, type DigestItem } from '../../shared/notifications/digest';
+import { readHubTarget } from '../services/notify';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -44,6 +46,12 @@ export interface BannerNotification {
   undoAction?: () => void;
   /** Whether notification has been read */
   read?: boolean;
+  /**
+   * Persisted hub `action` envelope (JSON string or object) carrying the deep-link
+   * `target`. Present on hub-backed Notification Center items; absent on transient
+   * banners. When it decodes to a target, the Center item becomes activatable.
+   */
+  action?: string | Record<string, unknown> | null;
 }
 
 interface NotificationBannersProps {
@@ -588,13 +596,121 @@ const ICON_COLORS: Record<string, string> = {
 
 type ViewMode = 'timeline' | 'grouped';
 
+// ---------------------------------------------------------------------------
+// CENTER CARD — one notification row, shared by the timeline + grouped views.
+// Surfaces what the transient banner showed but the center used to drop: the
+// persisted deep-link (an "Open" affordance) and any in-session action closures.
+// ---------------------------------------------------------------------------
+
+const CenterCard: React.FC<{
+  n: BannerNotification;
+  /** Mark the row read (fires on row click). */
+  onMarkAsRead?: (id: string) => void;
+  /** Activate the persisted deep-link target (fires on the Open affordance). */
+  onActivate?: (n: BannerNotification) => void;
+  /** Show the source line (timeline view); the grouped view has a source header. */
+  showSource?: boolean;
+}> = ({ n, onMarkAsRead, onActivate, showSource }) => {
+  const [hovered, setHovered] = useState(false);
+  const color = n.color ?? ICON_COLORS[n.icon ?? 'info'] ?? 'var(--color-accent)';
+  const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
+  const target = readHubTarget(n.action);
+  const closures = n.actions ?? [];
+
+  return (
+    <div
+      onClick={() => onMarkAsRead?.(n.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 6,
+        background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
+        border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
+        cursor: 'pointer',
+        transition: isReduceMotion() ? 'none' : 'background 0.15s ease, border-color 0.15s ease',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{
+          width: n.read ? 6 : 8, height: n.read ? 6 : 8, borderRadius: '50%',
+          background: n.read ? 'var(--color-text-tertiary)' : color,
+          flexShrink: 0, marginTop: 5,
+          opacity: n.read ? 0.5 : 1,
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 12, fontWeight: n.read ? 500 : 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+              {n.title}
+            </span>
+            {relativeTime && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{relativeTime}</span>}
+          </div>
+          {showSource && n.source && (
+            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{n.source}</div>
+          )}
+          {n.body && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.4, marginTop: 3 }}>
+              {n.body}
+            </div>
+          )}
+          {/* Actions row: persisted deep-link ("Open") + any in-session closures. */}
+          {(target || closures.length > 0) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {target && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onActivate?.(n); }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', borderRadius: 6, border: 'none',
+                    background: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    color: 'var(--color-accent)', fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: isReduceMotion() ? 'none' : 'background 0.12s ease',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent) 26%, transparent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent) 16%, transparent)'; }}
+                >
+                  Open
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              )}
+              {closures.map((a, i) => (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); a.onClick(); }}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                    background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
+                    fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  }}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Hover hint that the row is read-on-click when unread. */}
+        {hovered && !n.read && !target && (
+          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', flexShrink: 0, marginTop: 4 }}>
+            Mark read
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const NotificationCenter: React.FC<{
   open: boolean;
   notifications: BannerNotification[];
   onClearAll: () => void;
   onClose: () => void;
   onMarkAsRead?: (id: string) => void;
-}> = ({ open, notifications, onClearAll, onClose, onMarkAsRead }) => {
+  /** Activate a persisted deep-link target (navigate + close). */
+  onActivate?: (n: BannerNotification) => void;
+}> = ({ open, notifications, onClearAll, onClose, onMarkAsRead, onActivate }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const groups = useMemo(() => groupNotificationsBySource(notifications), [notifications]);
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -735,107 +851,54 @@ export const NotificationCenter: React.FC<{
               <span style={{ fontSize: 11 }}>You're all caught up</span>
             </div>
           ) : viewMode === 'grouped' ? (
-            /* Grouped View */
-            groups.map(group => (
-              <div key={group.source} style={{ marginBottom: 'var(--space-3)' }}>
-                {/* Group header */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '4px 0', marginBottom: 6,
-                }}>
-                  <span className="dex-label-caps" style={{ color: 'var(--color-text-secondary)' }}>
-                    {group.source}
-                  </span>
-                  {group.unreadCount > 0 && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 600, color: 'var(--color-accent)',
-                      background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
-                      padding: '1px 5px', borderRadius: 6,
-                    }}>
-                      {group.unreadCount} new
-                    </span>
-                  )}
-                </div>
-                {/* Group notifications */}
-                {group.notifications.map(n => {
-                  const color = n.color ?? ICON_COLORS[n.icon ?? 'info'] ?? 'var(--color-accent)';
-                  const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
-                  return (
-                    <div 
-                      key={n.id} 
-                      onClick={() => onMarkAsRead?.(n.id)}
-                      style={{
-                        padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 4,
-                        background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
-                        border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
-                        cursor: 'pointer',
-                        transition: 'background 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        {!n.read && (
-                          <div style={{
-                            width: 6, height: 6, borderRadius: '50%',
-                            background: 'var(--color-accent)', flexShrink: 0, marginTop: 5,
-                          }} />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                            <span style={{ fontSize: 12, fontWeight: n.read ? 500 : 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                              {n.title}
-                            </span>
-                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{relativeTime}</span>
-                          </div>
-                          {n.body && (
-                            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.4, marginTop: 2 }}>
-                              {n.body}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))
-          ) : (
-            /* Timeline View */
-            notifications.map(n => {
-              const color = n.color ?? ICON_COLORS[n.icon ?? 'info'] ?? 'var(--color-accent)';
-              const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
+            /* Grouped View — each source header carries an honest digest line. */
+            groups.map(group => {
+              const digestItems: DigestItem[] = group.notifications.map(n => ({
+                priority: (n.priority ?? 'normal') as NotificationPriority,
+                ts: n.timestamp ?? 0,
+                read: n.read,
+              }));
+              const digest = summarizeGroup(digestItems);
               return (
-                <div key={n.id} style={{
-                  padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 6,
-                  background: 'var(--color-bg-surface)',
-                  border: '1px solid var(--color-border-subtle)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: color, flexShrink: 0, marginTop: 4,
-                    }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                          {n.title}
-                        </span>
-                        {relativeTime && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{relativeTime}</span>}
+                <div key={group.source} style={{ marginBottom: 'var(--space-3)' }}>
+                  {/* Group header + digest */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '4px 0', marginBottom: 6,
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span className="dex-label-caps" style={{ color: 'var(--color-text-secondary)' }}>
+                        {group.source}
+                      </span>
+                      <div style={{
+                        fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+                      }}>
+                        {digest.headline}
                       </div>
-                      {n.source && (
-                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                          {n.source}
-                        </div>
-                      )}
-                      {n.body && (
-                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.4, marginTop: 3 }}>
-                          {n.body}
-                        </div>
-                      )}
                     </div>
+                    {group.unreadCount > 0 && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 600, color: 'var(--color-accent)',
+                        background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
+                        padding: '1px 5px', borderRadius: 6, flexShrink: 0,
+                      }}>
+                        {group.unreadCount} new
+                      </span>
+                    )}
                   </div>
+                  {/* Group notifications */}
+                  {group.notifications.map(n => (
+                    <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} />
+                  ))}
                 </div>
               );
             })
+          ) : (
+            /* Timeline View */
+            notifications.map(n => (
+              <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} showSource />
+            ))
           )}
         </div>
       </div>

@@ -39,7 +39,7 @@ const toast = (type: 'success' | 'error' | 'info', message: string) => {
 };
 
 const inputStyle: React.CSSProperties = {
-  padding: '6px 9px', borderRadius: 6, border: '1px solid var(--color-border)',
+  padding: '6px 9px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)',
   background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', outline: 'none',
   fontFamily: 'var(--font-mono)', fontSize: 12, minWidth: 0,
 };
@@ -451,10 +451,11 @@ export default function EnvManager(): React.ReactElement {
 
   const editable = !isSystem; // global, per-app, and profile scopes are editable
 
+  // Profile tools panel rides on the .dex-liquid-glass-strong class (text-heavy:
+  // validation, diff, import), so background + border come from the class.
   const sectionStyle: React.CSSProperties = {
     display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-    padding: 'var(--space-3)', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface)',
+    padding: 'var(--space-3)', borderRadius: 'var(--radius-xl)',
   };
 
   return (
@@ -489,7 +490,7 @@ export default function EnvManager(): React.ReactElement {
 
       {/* Profile toolbar + tools (local profiles only) */}
       {isProfile && activeProfile && (
-        <div style={sectionStyle}>
+        <div className="dex-liquid-glass-strong" style={sectionStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <strong style={{ fontSize: 13 }}>{activeProfile.name}</strong>
             <span style={{ flex: 1 }} />
@@ -534,7 +535,7 @@ export default function EnvManager(): React.ReactElement {
                 <span style={{ opacity: 0.7 }}>Required keys:</span>
                 {requiredKeys.length === 0 && <span style={{ opacity: 0.5 }}>none</span>}
                 {requiredKeys.map(k => (
-                  <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', fontFamily: 'var(--font-mono)' }}>
+                  <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', fontFamily: 'var(--font-mono)' }}>
                     {k}
                     <button style={{ ...glassButton, padding: '0 4px', fontSize: 10 }} onClick={() => setRequiredKeys(prev => prev.filter(x => x !== k))} aria-label={`Remove required ${k}`}>×</button>
                   </span>
@@ -590,7 +591,7 @@ export default function EnvManager(): React.ReactElement {
           {rows.map(row => {
             const isRevealed = revealed.has(row.name);
             return (
-              <li key={row.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
+              <li key={row.name} className="dex-liquid-glass" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 'var(--radius-lg)' }}>
                 <span style={{ width: 220, flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-accent)' }} className="truncate" title={row.name}>{row.name}</span>
                 {isSystem ? (
                   <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, opacity: 0.85 }} title={isRevealed ? row.value : undefined}>

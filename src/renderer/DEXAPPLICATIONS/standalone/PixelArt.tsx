@@ -811,9 +811,8 @@ const PixelArt: React.FC = () => {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Palette */}
-        <div style={{
-          width: 144, padding: 10, borderRight: '1px solid var(--color-border-subtle)',
-          background: 'var(--color-bg-elevated)',
+        <div className="dex-liquid-glass" style={{
+          width: 144, padding: 10, borderRadius: 0,
           display: 'flex', flexDirection: 'column', gap: 8,
           alignContent: 'start', overflowY: 'auto',
         }}>
@@ -906,10 +905,9 @@ const PixelArt: React.FC = () => {
       </div>
 
       {/* Frame strip + playback controls */}
-      <div style={{
-        display: 'flex', gap: 'var(--space-2)', padding: 10,
-        borderTop: '1px solid var(--color-border-subtle)',
-        background: 'var(--color-bg-elevated)', alignItems: 'center', overflowX: 'auto',
+      <div className="dex-liquid-glass" style={{
+        display: 'flex', gap: 'var(--space-2)', padding: 10, borderRadius: 0,
+        alignItems: 'center', overflowX: 'auto',
       }}>
         {frames.map((_f, i) => {
           const src = thumbs[i];
@@ -984,12 +982,12 @@ const PixelArt: React.FC = () => {
 
 const toolBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center',
-  padding: '6px 10px', borderRadius: 4, fontSize: 12, textTransform: 'capitalize',
+  padding: '6px 10px', borderRadius: 10, fontSize: 12, textTransform: 'capitalize',
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
 const selectStyle: React.CSSProperties = {
-  padding: '6px var(--space-2)', borderRadius: 4, fontSize: 12,
+  padding: '6px var(--space-2)', borderRadius: 10, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

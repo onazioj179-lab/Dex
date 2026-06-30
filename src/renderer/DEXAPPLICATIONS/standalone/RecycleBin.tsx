@@ -103,19 +103,20 @@ const rootStyle: React.CSSProperties = {
   color: 'var(--color-text-primary, #e5e5ea)',
   overflow: 'hidden',
 };
+// Flush glass header strip: the .dex-liquid-glass class supplies the translucent
+// material; borderRadius:0 + a hairline borderBottom keep it edge-to-edge chrome.
 const headerStyle: React.CSSProperties = {
-  padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0,
-  background: 'var(--color-bg-surface-solid, #1C1C1E)',
+  padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0, borderRadius: 0,
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const listArea: React.CSSProperties = {
   flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-5) var(--space-5)',
 };
+// Flush glass selection toolbar; class owns the material, borderRadius:0 keeps it edge-to-edge.
 const selectToolbar: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  padding: '8px var(--space-6)', flexShrink: 0,
+  padding: '8px var(--space-6)', flexShrink: 0, borderRadius: 0,
   borderBottom: '1px solid var(--color-border-subtle)',
-  background: 'var(--color-bg-surface)',
 };
 const groupHeader: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
@@ -123,10 +124,10 @@ const groupHeader: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10, padding: 'var(--space-2) 10px',
-  borderRadius: 6, cursor: 'default', transition: 'background 0.15s',
+  borderRadius: 'var(--radius-lg)', cursor: 'default', transition: 'background 0.15s',
 };
 const btnSmall: React.CSSProperties = {
-  padding: '4px 10px', borderRadius: 4, border: 'none', fontSize: 12,
+  padding: '4px 10px', borderRadius: 'var(--radius-lg)', border: 'none', fontSize: 12,
   fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s',
 };
 const emptyState: React.CSSProperties = {
@@ -165,7 +166,7 @@ const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelet
       {/* Badge */}
       <span style={{
         display: 'inline-block', minWidth: 38, textAlign: 'center',
-        padding: '2px 6px', borderRadius: 4,
+        padding: '2px 6px', borderRadius: 'var(--radius-md)',
         background: badgeColor, fontSize: 11, fontWeight: 700,
         color: days <= 7 ? '#fff' : 'var(--color-text-secondary)',
       }}>
@@ -469,7 +470,7 @@ const RecycleBin: React.FC = () => {
   return (
     <div style={rootStyle}>
       {/* Header */}
-      <div style={headerStyle}>
+      <div className="dex-liquid-glass" style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Trash</div>
@@ -584,7 +585,7 @@ const RecycleBin: React.FC = () => {
 
       {/* Selection toolbar */}
       {!loading && totalVisible > 0 && (
-        <div style={selectToolbar}>
+        <div className="dex-liquid-glass" style={selectToolbar}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"

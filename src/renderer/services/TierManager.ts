@@ -150,10 +150,13 @@ export function getHardwareSummary(): HardwareSummary {
   const screenHeight = Math.min(window.screen.height, window.screen.width);
 
   let gpuRenderer = 'unknown';
-  // Conservative default: treat unknown GPUs as weak so first-launch picks a
-  // safer tier on machines where we can't read the renderer string. Better to
-  // start in low/mid and let users opt up than to crash on first open.
-  let weakGPU = true;
+  // Only CONFIRMED software rendering counts as weak. An unreadable GPU string
+  // (webviews routinely mask WEBGL_debug_renderer_info for privacy) is treated
+  // as NOT weak so capable machines aren't wrongly pinned to the low tier --
+  // which would strip the liquid glass down to a flat surface. The runtime
+  // AdaptivePerfMonitor downgrades at the first sign of real frame drops, so an
+  // optimistic start is safe.
+  let weakGPU = false;
   try {
     const c = document.createElement('canvas');
     const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
@@ -161,14 +164,16 @@ export function getHardwareSummary(): HardwareSummary {
       const ext = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
       if (ext) {
         gpuRenderer = (gl as WebGLRenderingContext).getParameter(ext.UNMASKED_RENDERER_WEBGL) || 'unknown';
-        const isSoftware = /swiftshader|llvmpipe|mesa|software|microsoft basic/i.test(gpuRenderer);
-        const isKnownDiscrete = /(nvidia|geforce|rtx|gtx|radeon|rx |arc |intel.*(iris|xe|uhd 7|uhd 6|hd 6))/i.test(gpuRenderer);
-        // Only mark NOT-weak when we positively recognise a real discrete or
-        // modern integrated GPU. Anything else (unknown vendor / very old) stays weak.
-        weakGPU = isSoftware || !isKnownDiscrete;
+        // Confirmed software / basic renderers genuinely cannot handle GPU
+        // compositing. (Mesa is a real hardware driver on Linux, so it is NOT
+        // treated as software here.)
+        weakGPU = /swiftshader|llvmpipe|software|microsoft basic|softpipe/i.test(gpuRenderer);
       }
+    } else {
+      // No WebGL at all -> genuinely can't GPU-composite.
+      weakGPU = true;
     }
-  } catch { /* no WebGL */ }
+  } catch { weakGPU = true; }
 
   _cachedSummary = { cores, memoryGB, gpuRenderer, weakGPU, screenHeight };
   return _cachedSummary;
@@ -354,6 +359,11 @@ export function runDailyOptimizeCheck(): boolean {
 // First-launch initialization
 // ---------------------------------------------------------------------------
 
+// Bump when the auto-detection heuristic changes so existing users with a
+// stale auto-detected tier get re-evaluated once (manual overrides are kept).
+const DETECTION_VERSION = '2';
+const STORAGE_KEY_DETECT_VERSION = 'dex-tier-detect-version';
+
 export function initializeTier(): DeviceTier {
   const stored = getStoredTier();
 
@@ -362,6 +372,20 @@ export function initializeTier(): DeviceTier {
     applyTierPresets(stored);
     return stored;
   }
+
+  // Detection logic changed: discard a stale AUTO tier so the improved heuristic
+  // runs fresh (this is what unsticks machines wrongly pinned to "low", which had
+  // flattened the liquid glass). One-time per detection version.
+  try {
+    if (localStorage.getItem(STORAGE_KEY_DETECT_VERSION) !== DETECTION_VERSION) {
+      localStorage.setItem(STORAGE_KEY_DETECT_VERSION, DETECTION_VERSION);
+      localStorage.removeItem(STORAGE_KEY_TIER);
+      localStorage.removeItem(STORAGE_KEY_LAST_OPTIMIZE);
+      const detected = detectDeviceTier();
+      applyTierPresets(detected);
+      return detected;
+    }
+  } catch { /* storage unavailable -- fall through to normal path */ }
 
   if (stored) {
     // Have a stored tier — apply it, but check for daily re-optimization

@@ -1128,7 +1128,7 @@ const VinxEditor: React.FC = () => {
           onChange={e => setProjectName(e.target.value)}
           spellCheck={false}
         />
-        <div style={saveBadgeStyle(isDirty)} title={isDirty ? 'Unsaved changes' : 'Saved'} />
+        <div style={saveBadgeStyle(isDirty)} />
 
         <div style={toolbarSeparatorStyle} />
 
@@ -1138,7 +1138,6 @@ const VinxEditor: React.FC = () => {
           style={undoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={undo}
           disabled={undoStack.length === 0}
-          title="Undo (Ctrl+Z)"
         >
           {UndoIcon}
         </button>
@@ -1147,7 +1146,6 @@ const VinxEditor: React.FC = () => {
           style={redoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={redo}
           disabled={redoStack.length === 0}
-          title="Redo (Ctrl+Shift+Z)"
         >
           {RedoIcon}
         </button>
@@ -1176,13 +1174,13 @@ const VinxEditor: React.FC = () => {
 
         {/* Layout presets */}
         <div style={{ display: 'flex', gap: 4 }}>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('edit')} title="Edit layout" aria-label="Edit layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('edit')} aria-label="Edit layout preset">
             {LayoutIcon} Edit
           </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('color')} title="Color layout" aria-label="Color layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('color')} aria-label="Color layout preset">
             <DexIcon name="palette" size={10} /> Color
           </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('audio')} title="Audio layout" aria-label="Audio layout preset">
+          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('audio')} aria-label="Audio layout preset">
             <DexIcon name="volume" size={10} /> Audio
           </button>
         </div>
@@ -1190,7 +1188,7 @@ const VinxEditor: React.FC = () => {
         <div style={toolbarSeparatorStyle} />
 
         {/* Save */}
-        <button style={toolbarBtnStyle} onClick={markSaved} title="Save (Ctrl+S)" aria-label="Save project">
+        <button style={toolbarBtnStyle} onClick={markSaved} aria-label="Save project">
           <DexIcon name="save" size={10} /> Save
         </button>
 
@@ -1205,7 +1203,6 @@ const VinxEditor: React.FC = () => {
             saveEngagement(checkRes.state);
             rewardUnlocks(checkRes.newUnlocks);
           }}
-          title="Export (Ctrl+E)"
           aria-label="Export project"
         >
           {ExportIcon} Export
@@ -1215,7 +1212,6 @@ const VinxEditor: React.FC = () => {
         <button
           style={quickExport.active ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={quickExport.active ? handleCancelQuickExport : handleQuickExport}
-          title={quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM) — records the timeline as it plays'}
           aria-label={quickExport.active ? 'Cancel Quick Export' : 'Quick Export to WebM'}
         >
           {ExportIcon}
@@ -1235,7 +1231,6 @@ const VinxEditor: React.FC = () => {
             <button
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
-              title="Share & Collaborate"
               aria-label={collab.activeCollaboratorCount > 0 ? `Share project (${collab.activeCollaboratorCount} active collaborators)` : 'Share and collaborate on project'}
             >
               <DexIcon name="users" size={12} />
@@ -1254,7 +1249,6 @@ const VinxEditor: React.FC = () => {
         <button
           aria-label="Toggle AI assistant"
           aria-pressed={showAiBar}
-          title="AI assistant — describe an edit in plain language"
           onClick={() => setShowAiBar(v => !v)}
           style={{ ...toolbarBtnStyle, background: showAiBar ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : undefined, color: showAiBar ? 'var(--color-accent)' : undefined }}
         >
@@ -1559,21 +1553,21 @@ const VinxEditor: React.FC = () => {
                     <span style={{ fontSize: 11, color: t.status === 'complete' ? 'var(--color-success)' : t.status === 'tracking' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{t.status}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button aria-label="Track backward" title="Track Backward" onClick={() => {
+                    <button aria-label="Track backward" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
                       void runMotionTrack('backward', 30).then((trackPoints) => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }}><DexIcon name="chevron-left" size={10} /> Track</button>
-                    <button aria-label="Track forward" title="Track Forward" onClick={() => {
+                    <button aria-label="Track forward" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
                       void runMotionTrack('forward', 60).then((trackPoints) => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
-                    <button aria-label="Delete tracker" title="Delete" onClick={() => {
+                    <button aria-label="Delete tracker" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).filter(tr => tr.id !== t.id) } }));
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, marginLeft: 'auto', color: 'var(--color-error)' }}><DexIcon name="close" size={10} /></button>
                   </div>
@@ -1989,7 +1983,7 @@ const VinxEditor: React.FC = () => {
                     const idx = colors.indexOf(m.color);
                     updateMarker(m.id, { color: colors[(idx + 1) % colors.length] });
                   }} />
-                  <span role="button" tabIndex={0} aria-label={`Go to ${formatTimecode(m.frame, project.frameRate)}`} title="Go to marker" onClick={() => setCurrentFrame(m.frame)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrentFrame(m.frame); } }} style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 70, cursor: 'pointer' }}>{formatTimecode(m.frame, project.frameRate)}</span>
+                  <span role="button" tabIndex={0} aria-label={`Go to ${formatTimecode(m.frame, project.frameRate)}`} onClick={() => setCurrentFrame(m.frame)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrentFrame(m.frame); } }} style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 70, cursor: 'pointer' }}>{formatTimecode(m.frame, project.frameRate)}</span>
                   <input value={m.name} onChange={e => updateMarker(m.id, { name: e.target.value })} style={{ flex: 1, padding: '2px 4px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, minWidth: 0 }} />
                   <select value={m.type} onChange={e => updateMarker(m.id, { type: e.target.value as any })} style={{ padding: '2px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: '#1a1a1a', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                     <option value="standard">Standard</option>
@@ -2284,6 +2278,25 @@ const VinxEditor: React.FC = () => {
       {/* Right-click context menu */}
       {ctxMenu.visible && ctxMenu.clipId && (() => {
         const menuItems = [
+          { label: 'Split at Playhead', fn: () => {
+            const st = useVinxStore.getState();
+            const c = st.getClipById(ctxMenu.clipId!);
+            if (!c) return;
+            const cur = st.currentFrame;
+            if (cur <= c.startFrame || cur >= c.endFrame) return; // playhead must be inside the clip
+            const rel = cur - c.startFrame;
+            const left = { ...c, id: generateId('clip'), endFrame: cur, mediaOutFrame: c.mediaInFrame + rel };
+            const right = { ...c, id: generateId('clip'), startFrame: cur, mediaInFrame: c.mediaInFrame + rel };
+            st._removeClip(c.id); st._addClip(left); st._addClip(right);
+          } },
+          { label: 'Duplicate', fn: () => {
+            const st = useVinxStore.getState();
+            const c = st.getClipById(ctxMenu.clipId!);
+            if (!c) return;
+            const len = c.endFrame - c.startFrame;
+            st._addClip({ ...c, id: generateId('clip'), startFrame: c.endFrame, endFrame: c.endFrame + len });
+          } },
+          null,
           { label: 'Copy Attributes', fn: () => copyClipAttributes(ctxMenu.clipId!) },
           { label: 'Paste Attributes', fn: () => { if (copiedClipAttributes) pasteClipAttributes(ctxMenu.clipId!); }, disabled: !copiedClipAttributes },
           null,
