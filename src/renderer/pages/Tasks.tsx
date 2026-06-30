@@ -18,6 +18,7 @@ import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { searchLines } from '../../shared/search/textSearch';
 import { DexSearchInput } from '../styles/components';
 
 // ===========================================================================
@@ -583,10 +584,25 @@ export const Tasks: React.FC = () => {
       setTasks((prev) => [newTask, ...prev]);
       return `Added task "${title}".`;
     });
+    registerUkiAppAction('tasks', {
+      id: 'tasks.search',
+      description: 'search the task list for a query and return matching task titles.',
+      args: [{ name: 'query', type: 'string' }],
+      example: '{"query":"invoice"}',
+      mutates: false,
+    }, (args) => {
+      const c = ukiCtxRef.current;
+      if (!c.tasks.length) return 'No tasks.';
+      const q = String(args.query ?? '');
+      const blob = c.tasks.map((t) => `${t.completed ? '[x]' : '[ ]'} ${t.title}`).join('\n');
+      const hits = searchLines(blob, q, 25);
+      return hits.length ? hits.map((h) => h.text).join('\n') : `No tasks match "${q}".`;
+    });
     return () => {
       unregisterUkiAppContext('tasks');
       unregisterUkiAppAction('tasks.listTasks');
       unregisterUkiAppAction('tasks.addTask');
+      unregisterUkiAppAction('tasks.search');
     };
   }, []);
   const dragIdRef = React.useRef<string | null>(null);

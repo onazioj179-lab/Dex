@@ -12,6 +12,40 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v6.0.1 — Scale, traceability, and smarter recall (2026-06-30)
+
+A focused follow-up to 6.0.0: DEX stays smooth no matter how many apps are
+open, everything the assistant does is now traceable, and UKI can find things
+across your notes, code, and history.
+
+### New
+
+- **Security Center.** A live, traceable audit trail of every action the
+  assistant (UKI) takes — which app, the redacted arguments, the outcome
+  (ran / denied / failed / blocked), and when. Filter by writes or outcome.
+  Open it from the launcher or search "Security".
+- **Cross-session recall.** Ask UKI "what did I do last Thursday" and Rewind
+  resolves the day (today / yesterday / a weekday / "N days ago") and surfaces
+  that session's activity.
+- **Find-in-document search** across Notes, Markdown, DexCode, and Tasks —
+  ranked results from one shared search core, available to UKI as well.
+
+### Improved
+
+- **Smoother under load.** A cooperative frame scheduler runs background work
+  from every open app in small, priority-ordered, time-budgeted slices that
+  yield to input and rendering — so the UI no longer janks as more apps stay
+  open. Off-screen, suspended apps consume zero scheduler time.
+- **UKI can act in more apps.** A standard action registry lets running apps
+  expose confirm-gated read/write actions UKI can invoke directly.
+
+### Fixed
+
+- Heavy per-app polling loops (Live Activity, Learn, Project Dashboard) no
+  longer each pile onto the main thread; they share the scheduler instead.
+
+---
+
 ## v6.0.0 — A real desktop: windows, zones, and a faster core (2026-06-24)
 
 DEX becomes an OS-grade shell, not just an app — proper window management, a

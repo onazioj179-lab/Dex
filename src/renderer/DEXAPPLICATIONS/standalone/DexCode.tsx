@@ -29,6 +29,7 @@ import {
 } from './dexCode/fileIO';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { searchLines } from '../../../shared/search/textSearch';
 import {
   pickProjectFolder, loadProject, getStoredProjectRoot, clearStoredProject,
   readProjectFile, searchProject, projectName, buildSymbolIndex,
@@ -299,10 +300,28 @@ const DexCode: React.FC = () => {
       setFileName(name);
       return `Opened new file "${name}" in DexCode (${content.split('\n').length} lines). Use Save to write it to disk.`;
     });
+    // UKI can SEARCH the open file and get back ranked matching lines (the
+    // retrieval core for working over large files without dumping the whole
+    // thing into the prompt).
+    registerUkiAppAction('dexcode', {
+      id: 'dexcode.search',
+      description: 'search the file open in DexCode for a query and return the best-matching lines with their line numbers.',
+      args: [{ name: 'query', type: 'string' }],
+      example: '{"query":"function add"}',
+      mutates: false,
+    }, (args) => {
+      const s = ukiCtxRef.current;
+      if (!s.code) return 'No file is open in DexCode.';
+      const q = String(args.query ?? '');
+      const hits = searchLines(s.code, q, 25);
+      if (!hits.length) return `No lines match "${q}".`;
+      return hits.map((h) => `${h.line}: ${h.text}`).join('\n');
+    });
     return () => {
       unregisterUkiAppContext('dexcode');
       unregisterUkiAppAction('dexcode.readActiveFile');
       unregisterUkiAppAction('dexcode.newFile');
+      unregisterUkiAppAction('dexcode.search');
     };
   }, []);
 

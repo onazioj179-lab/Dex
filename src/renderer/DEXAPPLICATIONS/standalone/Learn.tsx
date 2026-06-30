@@ -18,6 +18,7 @@ import { platform } from '../../utils';
 import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
 import { sendToNotes } from '../../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { frameScheduler } from '../../services/FrameScheduler';
 
 // -- Helpers ---------------------------------------------------------------
 const fmtMs = (ms: number): string => {
@@ -543,7 +544,7 @@ const Learn: React.FC = () => {
       ipc.invoke('system:getMemoryUsage').then((mem: number) => setMemoryUsage(mem || 0)).catch(() => {});
     };
     updateMetrics();
-    metricsInterval.current = setInterval(updateMetrics, 2000);
+    metricsInterval.current = setInterval(() => frameScheduler.schedule(updateMetrics, { appId: 'learn', priority: 'idle' }), 2000);
     
     return () => {
       if (metricsInterval.current) clearInterval(metricsInterval.current);

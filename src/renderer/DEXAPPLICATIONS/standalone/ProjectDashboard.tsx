@@ -24,6 +24,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStageStore, STAGE_KIND_META, type StageKind } from '../../store/stageStore';
 import { ContextBus, type ContextChannel } from '../../services/ContextBus';
+import { frameScheduler } from '../../services/FrameScheduler';
 
 // ---------------------------------------------------------------------------
 // Cross-app helpers (match the standalone-app conventions)
@@ -345,7 +346,7 @@ const ProjectDashboard: React.FC = () => {
     // the overview stays roughly live without subscribing to every store.
     const onFocus = () => refresh();
     window.addEventListener('focus', onFocus);
-    const interval = window.setInterval(refresh, 15000);
+    const interval = window.setInterval(() => frameScheduler.schedule(refresh, { appId: 'projectdash', priority: 'idle' }), 15000);
     // Catch cross-app activity as it streams in — the bus drives the live feed.
     const offs: Array<() => void> = [];
     const channels: ContextChannel[] = [
