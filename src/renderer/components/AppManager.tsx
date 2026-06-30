@@ -3201,14 +3201,14 @@ export const AppManager: React.FC = () => {
                 const dragWorkspace = getShellWorkspace(0);
                 const el = titleBar.parentElement as HTMLElement;
                 if (el) {
-                  // Disable transitions for a crisp drag. Position via left/top
-                  // (NOT transform): DEX forces `transform: none !important` on
-                  // hovered/active/focused elements at the low perf tier, which
-                  // would wipe a transform-based drag mid-grab on exactly the
-                  // low-end machines we must support. left/top is immune — the
-                  // same reason useSmoothDrag positions with left/top.
+                  // OS-grade smooth drag: promote the window to its OWN GPU
+                  // compositor layer so moving it NEVER repaints the (heavy) app
+                  // content inside. Position is driven by a GPU `transform`
+                  // (composited, zero per-frame layout/reflow) set with `!important`
+                  // priority so the low perf tier's `transform: none !important`
+                  // rule cannot wipe it mid-grab — smooth on every machine, every tier.
                   el.style.transition = 'none';
-                  el.style.willChange = 'left, top';
+                  el.style.willChange = 'transform';
                   el.setAttribute('data-dragging', 'true');
                 }
                 // Sharp drag, same trick as the DEX dock: NEVER cancel the in-flight
@@ -3236,16 +3236,16 @@ export const AppManager: React.FC = () => {
                     currentX = loose.x;
                     currentY = loose.y;
                     if (el) {
-                      // Position via left/top (immune to the low-tier
-                      // `transform: none !important` rule). Re-assert the drag
-                      // styles every frame: a mid-drag React re-render (e.g. the
-                      // snap-zone setState) reconciles the window's style prop and
-                      // would otherwise restore transition/will-change and snap the
-                      // window back to its pre-drag spot for a frame.
+                      // GPU translate3d on the window's own layer — the app content
+                      // inside is NOT repainted as the window moves (this is what
+                      // makes it glide like a native OS window). Re-assert every
+                      // frame because a mid-drag React re-render (snap-zone setState)
+                      // reconciles the style prop; `setProperty(..., 'important')`
+                      // beats the low-tier `transform: none !important` rule so it
+                      // never stutters or snaps back, on any tier.
                       el.style.transition = 'none';
-                      el.style.willChange = 'left, top';
-                      el.style.left = currentX + 'px';
-                      el.style.top = currentY + 'px';
+                      el.style.willChange = 'transform';
+                      el.style.setProperty('transform', `translate3d(${currentX - origX}px, ${currentY - origY}px, 0)`, 'important');
                     }
                     // Live snap-zone preview -- throttled to ~64ms. It's a hit-test
                     // plus a setState, too costly to run every frame and unnecessary
@@ -3293,22 +3293,24 @@ export const AppManager: React.FC = () => {
                   const ease = 'cubic-bezier(0.2,0.9,0.3,1)';
                   const snapEase = `left ${snapMs}ms ${ease}, top ${snapMs}ms ${ease}, width ${snapMs}ms ${ease}, height ${snapMs}ms ${ease}`;
                   if (snapToCustomZone(appId, ev.clientX, ev.clientY)) {
-                    if (el) { el.style.transition = snapEase; }
+                    if (el) { el.style.removeProperty('transform'); el.style.transition = snapEase; }
                     return;
                   }
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
-                    if (el) { el.style.transition = snapEase; }
+                    if (el) { el.style.removeProperty('transform'); el.style.transition = snapEase; }
                     tileWindow(appId, zone);
                   } else {
                     // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
                     const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
                     if (el) {
-                      // Commit the final left/top; React reconciles to the same
-                      // values on the setDetachedApps re-render below, so the window
-                      // never flashes back to its pre-drag spot.
+                      // Commit the final left/top and drop the transform in the SAME
+                      // frame: left/top now equals the released position, so clearing
+                      // the GPU transform leaves the window exactly where it was
+                      // dropped (no flash back to its pre-drag spot).
                       el.style.left = clamped.x + 'px';
                       el.style.top = clamped.y + 'px';
+                      el.style.removeProperty('transform');
                     }
                     setDetachedApps(prev => {
                       const b = prev.get(appId);
