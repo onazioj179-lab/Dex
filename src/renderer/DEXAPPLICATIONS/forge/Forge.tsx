@@ -28,8 +28,11 @@ import {
   planTarget,
   transcodeImage,
   transcodeAudioToWav,
+  decodeAudioPeaks,
+  type AudioPeaks,
 } from './transcode';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
+import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -396,6 +399,12 @@ const Forge: React.FC = () => {
   const [showTrimSplit, setShowTrimSplit] = useState(false);
   const [trimIn, setTrimIn] = useState(0);
   const [trimOut, setTrimOut] = useState(100);
+  // Real decoded waveform for the trim panel + its loading/error state.
+  const [trimWave, setTrimWave] = useState<AudioPeaks | null>(null);
+  const [trimWaveState, setTrimWaveState] = useState<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle');
+  // Which handle the user is dragging on the waveform ('in' | 'out' | null).
+  const trimDragRef = useRef<'in' | 'out' | null>(null);
+  const trimTrackRef = useRef<HTMLDivElement>(null);
   const [showCropPad, setShowCropPad] = useState(false);
   const [cropAspect, setCropAspect] = useState<'free' | '16:9' | '4:3' | '1:1' | '9:16'>('free');
   const [padColor, setPadColor] = useState('#000000');
@@ -667,11 +676,16 @@ const Forge: React.FC = () => {
         const wantsHi = /24|pcm_s24/i.test(`${preset?.codec || ''} ${jobAny?.overrideAudioCodec || ''} ${preset?.name || ''}`);
         const bitDepth: 16 | 24 = wantsHi ? 24 : 16;
         setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 30 } : j));
-        // Apply loudness normalization when the user enabled it (real RMS gain
-        // on the decoded PCM — see normalizeAudioBufferRms). Only affects the
-        // real WAV path; lossy targets are native-only and never reach here.
+        // Honor any trim set in the Trim & Split panel (0..1 fractions on the job),
+        // and apply loudness normalization when the user enabled it (real RMS gain
+        // on the decoded PCM — see normalizeAudioBufferRms). Only affects the real
+        // WAV path; lossy targets are native-only and never reach here.
+        const tIn = Math.max(0, Math.min(1, jobAny?.trimIn ?? 0));
+        const tOut = Math.max(tIn, Math.min(1, jobAny?.trimOut ?? 1));
         const result = await transcodeAudioToWav(file, {
           bitDepth,
+          trimIn: tIn,
+          trimOut: tOut,
           normalizeDb: audioNormalize ? audioNormTarget : undefined,
         });
         if (!mountedRef.current) return;
@@ -1115,6 +1129,56 @@ const Forge: React.FC = () => {
   []);
 
   const selectedJob = useMemo(() => jobs.find(j => j.id === selectedJobId), [jobs, selectedJobId]);
+
+  // When the Trim panel opens for an audio job, decode a real waveform and seed
+  // the in/out sliders from any trim already stored on the job. Video can't be
+  // decoded in the renderer, so we flag those as unsupported (sliders still work).
+  useEffect(() => {
+    if (!showTrimSplit || !selectedJob) return;
+    const jobAny = selectedJob as any;
+    setTrimIn(Math.round((jobAny.trimIn ?? 0) * 100));
+    setTrimOut(Math.round((jobAny.trimOut ?? 1) * 100));
+    const file = fileMapRef.current.get(selectedJob.id);
+    if (!file || !selectedJob.isAudio) { setTrimWave(null); setTrimWaveState(selectedJob.isAudio ? 'error' : 'unsupported'); return; }
+    let cancelled = false;
+    setTrimWaveState('loading');
+    setTrimWave(null);
+    decodeAudioPeaks(file, 480)
+      .then(w => { if (!cancelled) { setTrimWave(w); setTrimWaveState('ready'); } })
+      .catch(() => { if (!cancelled) { setTrimWave(null); setTrimWaveState('error'); } });
+    return () => { cancelled = true; };
+  }, [showTrimSplit, selectedJob]);
+
+  // Drag an in/out handle on the waveform. Converts pointer X to a 0..100 percent
+  // against the track width and keeps the handles from crossing.
+  const onTrimHandleMove = useCallback((e: React.PointerEvent) => {
+    const which = trimDragRef.current;
+    if (!which || !trimTrackRef.current) return;
+    const rect = trimTrackRef.current.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / (rect.width || 1)) * 100));
+    if (which === 'in') setTrimIn(Math.min(Math.round(pct), trimOut - 1));
+    else setTrimOut(Math.max(Math.round(pct), trimIn + 1));
+  }, [trimIn, trimOut]);
+
+  const startTrimHandleDrag = useCallback((which: 'in' | 'out', e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    trimDragRef.current = which;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  }, []);
+
+  const endTrimHandleDrag = useCallback((e: React.PointerEvent) => {
+    trimDragRef.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+  }, []);
+
+  // Seconds = trim percent * decoded duration, for the readout under the waveform.
+  const fmtTrimTime = useCallback((pct: number) => {
+    if (!trimWave) return `${pct}%`;
+    const s = (pct / 100) * trimWave.duration;
+    const m = Math.floor(s / 60);
+    const sec = (s - m * 60);
+    return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
+  }, [trimWave]);
   // Single pass for the header counts instead of three separate filters per render
   const { queuedJobs, processingJobs, completedJobs } = useMemo(() => {
     let queued = 0, processing = 0, completed = 0;
@@ -1216,6 +1280,62 @@ const Forge: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedJobId, jobs, isEncoding, addFiles, removeJob, startQueue, pauseQueue, undo, redo, pushUndo]);
 
+  // Standardized menu bar: consolidates Forge's long span of tools into File /
+  // Edit / Queue / Tools menus with grouped submenus, all wired to real handlers.
+  const forgeMenus: CreativeMenu[] = [
+    {
+      id: 'file', label: 'File', items: [
+        { label: 'Add Files…', shortcut: 'Ctrl+O', onSelect: () => addFiles() },
+        { label: 'Add Folder…', onSelect: () => { void addFolder(); } },
+        { separator: true },
+        { label: 'Clear Completed', disabled: !jobs.some(j => j.status === 'completed'), onSelect: () => setJobs(prev => prev.filter(j => j.status !== 'completed')) },
+        { label: 'Clear Queue', danger: true, disabled: jobs.length === 0, onSelect: () => { setJobs([]); setSelectedJobId(null); } },
+      ],
+    },
+    {
+      id: 'edit', label: 'Edit', items: [
+        { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: () => undo() },
+        { label: 'Redo', shortcut: 'Ctrl+Shift+Z', onSelect: () => redo() },
+        { separator: true },
+        { label: 'Remove Selected', shortcut: 'Del', danger: true, disabled: !selectedJobId, onSelect: () => { if (selectedJobId) { pushUndo(); removeJob(selectedJobId); } } },
+      ],
+    },
+    {
+      id: 'queue', label: 'Queue', items: [
+        { label: isEncoding ? 'Pause Encoding' : 'Start Encoding', shortcut: 'Space', disabled: jobs.length === 0, onSelect: () => (isEncoding ? pauseQueue() : startQueue()) },
+        { separator: true },
+        { label: 'Notify When Done', checked: notifyOnComplete, onSelect: () => setNotifyOnComplete(v => !v) },
+      ],
+    },
+    {
+      id: 'tools', label: 'Tools', items: [
+        {
+          label: 'Media', submenu: [
+            { label: 'Trim & Split', checked: showTrimSplit, onSelect: () => setShowTrimSplit(v => !v) },
+            { label: 'Crop & Pad', checked: showCropPad, onSelect: () => setShowCropPad(v => !v) },
+            { label: 'Watermark', checked: showWatermark, onSelect: () => setShowWatermark(v => !v) },
+            { label: 'Audio Extract', checked: showAudioExtract, onSelect: () => setShowAudioExtract(v => !v) },
+            { label: 'Image Sequence', checked: showImageSequence, onSelect: () => setShowImageSequence(v => !v) },
+            { label: 'Subtitle Burn-in', checked: showSubBurnIn, onSelect: () => setShowSubBurnIn(v => !v) },
+          ],
+        },
+        {
+          label: 'Batch', submenu: [
+            { label: 'Batch Rename', checked: showBatchRename, onSelect: () => setShowBatchRename(v => !v) },
+            { label: 'Concatenate', checked: showConcat, onSelect: () => { setShowConcat(v => !v); setConcatOrder(jobs.map(j => j.id)); } },
+            { label: 'Auto Rules', checked: showConditionalRules, onSelect: () => setShowConditionalRules(v => !v) },
+          ],
+        },
+        {
+          label: 'Inspect', submenu: [
+            { label: 'Preview', checked: showPreview, disabled: !selectedJob, onSelect: () => { if (selectedJob) setShowPreview(v => !v); } },
+            { label: 'A/B Compare', checked: showABCompare, disabled: !selectedJob?.outputBlobUrl, onSelect: () => { if (selectedJob?.outputBlobUrl) setShowABCompare(v => !v); } },
+          ],
+        },
+      ],
+    },
+  ];
+
   return (
     <div style={styles.container}
       onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}
@@ -1285,6 +1405,8 @@ const Forge: React.FC = () => {
         .forge-tools-btn { transition: background 0.12s ease, color 0.12s ease; }
         .forge-tools-btn:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; color: var(--color-text-primary) !important; }
       `}</style>
+      {/* Standardized menu bar (File / Edit / Queue / Tools with submenus) */}
+      <CreativeMenuBar menus={forgeMenus} accent="var(--color-accent)" />
       {/* Header */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
@@ -1954,14 +2076,45 @@ const Forge: React.FC = () => {
             <button aria-label="Close Trim and Split" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrimSplit(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <NativeEncoderNote>In/out points are recorded on the job (Split also queues real per-segment jobs), but cutting and re-encoding the video runs in the native encoder (not in this build).</NativeEncoderNote>
-            <div style={{ height: 40, background: 'var(--color-border-subtle)', borderRadius: 4, position: 'relative', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', left: `${trimIn}%`, right: `${100 - trimOut}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', borderLeft: '2px solid var(--color-accent)', borderRight: '2px solid var(--color-accent)' }} />
-              <svg width="100%" height="40" viewBox="0 0 380 40" preserveAspectRatio="none" style={{ position: 'absolute', top: 0 }}>
-                {/* Waveform unavailable in renderer — audio not decoded yet */}
-                <line x1="0" y1="20" x2="380" y2="20" stroke="#303040" strokeWidth="1"/>
-                {[...Array(24)].map((_, i) => <rect key={i} x={i * 16 + 2} y={17} width="3" height="6" fill="#303040" rx="1"/>)}
+            <div
+              ref={trimTrackRef}
+              onPointerMove={onTrimHandleMove}
+              style={{ height: 64, background: 'var(--color-bg-inset)', borderRadius: 4, position: 'relative', marginBottom: 6, overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}
+            >
+              {/* Real waveform (audio), or an honest message for video/unavailable. */}
+              <svg width="100%" height="64" viewBox="0 0 480 64" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0 }}>
+                <line x1="0" y1="32" x2="480" y2="32" stroke="var(--color-border-subtle)" strokeWidth="1" />
+                {trimWaveState === 'ready' && trimWave && trimWave.peaks.map((p, i) => {
+                  const x = (i / trimWave.peaks.length) * 480;
+                  const h = Math.max(1, p * 60);
+                  const inX = (trimIn / 100) * 480, outX = (trimOut / 100) * 480;
+                  const inRange = x >= inX && x <= outX;
+                  return <rect key={i} x={x} y={32 - h / 2} width={Math.max(0.6, 480 / trimWave.peaks.length - 0.3)} height={h} fill={inRange ? 'var(--color-accent)' : 'var(--color-text-muted)'} opacity={inRange ? 0.95 : 0.4} />;
+                })}
               </svg>
+              {/* Selected region overlay */}
+              <div style={{ position: 'absolute', left: `${trimIn}%`, width: `${trimOut - trimIn}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', pointerEvents: 'none' }} />
+              {/* Draggable IN handle */}
+              <div onPointerDown={e => startTrimHandleDrag('in', e)} onPointerMove={onTrimHandleMove} onPointerUp={endTrimHandleDrag} title="Drag in point" style={{ position: 'absolute', left: `${trimIn}%`, top: 0, bottom: 0, width: 10, marginLeft: -5, cursor: 'ew-resize', display: 'flex', alignItems: 'stretch', zIndex: 3 }}>
+                <div style={{ width: 2, margin: '0 auto', background: 'var(--color-accent)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent)' }} />
+              </div>
+              {/* Draggable OUT handle */}
+              <div onPointerDown={e => startTrimHandleDrag('out', e)} onPointerMove={onTrimHandleMove} onPointerUp={endTrimHandleDrag} title="Drag out point" style={{ position: 'absolute', left: `${trimOut}%`, top: 0, bottom: 0, width: 10, marginLeft: -5, cursor: 'ew-resize', display: 'flex', alignItems: 'stretch', zIndex: 3 }}>
+                <div style={{ width: 2, margin: '0 auto', background: 'var(--color-error)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-error) 40%, transparent)' }} />
+              </div>
+              {trimWaveState !== 'ready' && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-muted)', pointerEvents: 'none' }}>
+                  {trimWaveState === 'loading' ? 'Decoding waveform…'
+                    : trimWaveState === 'unsupported' ? 'Waveform preview is audio-only — sliders still set the trim'
+                    : trimWaveState === 'error' ? 'Could not decode audio — sliders still set the trim'
+                    : 'Select an audio job to preview its waveform'}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', marginBottom: 8 }}>
+              <span>In {fmtTrimTime(trimIn)}</span>
+              {trimWave && <span style={{ color: 'var(--color-text-secondary)' }}>Selection {fmtTrimTime(trimOut - trimIn)}</span>}
+              <span>Out {fmtTrimTime(trimOut)}</span>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 10 }}>
               <div style={{ flex: 1 }}><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>In Point</div><input type="range" min="0" max="99" value={trimIn} onChange={e => setTrimIn(Math.min(Number(e.target.value), trimOut - 1))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{trimIn}%</div></div>
