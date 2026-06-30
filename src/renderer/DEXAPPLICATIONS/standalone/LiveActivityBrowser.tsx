@@ -19,6 +19,7 @@ import { DexSearchInput } from '../../styles/components';
 import { VirtualList } from '../../components/VirtualList';
 import { APP_DEFINITIONS, useRunningApps } from '../../store/runningApps';
 import { sendToNotes } from '../../services/sendTo';
+import { frameScheduler } from '../../services/FrameScheduler';
 
 // --- bridge ---------------------------------------------------------------
 // Same invoke seam the feature stores use; degrades to empty under web/no-bridge.
@@ -181,7 +182,9 @@ const LiveActivityBrowser: React.FC = () => {
 
   useEffect(() => {
     void load();
-    timer.current = setInterval(() => { void load(); }, REFRESH_MS);
+    // Route the periodic reload through the FrameScheduler so it runs inside the
+    // per-tier frame budget instead of blocking the UI under load.
+    timer.current = setInterval(() => { frameScheduler.schedule(() => { void load(); }, { appId: 'liveactivity', priority: 'idle' }); }, REFRESH_MS);
     const onVis = () => { if (document.visibilityState === 'visible') void load(); };
     document.addEventListener('visibilitychange', onVis);
     return () => {
