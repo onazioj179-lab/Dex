@@ -152,34 +152,52 @@ export function useWhenVisible<T extends HTMLElement = HTMLDivElement>(
 // ---------------------------------------------------------------------------
 
 /**
- * Returns true only when the parent app container has data-app-state="foreground".
+ * Returns true only when THIS app's own container has data-app-state="foreground".
  * Heavy components can pause animations/timers when backgrounded.
+ *
+ * Pass a `ref` to any node your component renders — the hook walks up to the
+ * nearest `[data-app-container]` ancestor and tracks *its* state. This is the
+ * correct, per-app signal.
+ *
+ * Without a ref the hook falls back to "is ANY app foreground", which is only
+ * accurate when a single app instance exists — every caller then reads the same
+ * global container, so a backgrounded app would never see itself as inactive.
+ * The fallback exists for back-compat; always pass a ref for real pausing.
  */
-export function useAppActive(): boolean {
+export function useAppActive<T extends HTMLElement = HTMLElement>(
+  ref?: React.RefObject<T | null>,
+): boolean {
   const [active, setActive] = useState(true);
 
   useEffect(() => {
-    // Walk up to find [data-app-container]
-    const findContainer = (): HTMLElement | null => {
-      let el: HTMLElement | null = document.activeElement as HTMLElement;
-      // Fallback: look for the foreground container
-      const fg = document.querySelector('[data-app-container][data-app-state="foreground"]');
-      return fg as HTMLElement | null;
+    // Resolve the container whose foreground/background state governs us: our own
+    // ancestor when a ref is supplied, else the (approximate) global foreground.
+    const ownContainer = (): HTMLElement | null => {
+      if (ref?.current) {
+        return ref.current.closest('[data-app-container]') as HTMLElement | null;
+      }
+      return document.querySelector(
+        '[data-app-container][data-app-state="foreground"]',
+      ) as HTMLElement | null;
     };
 
-    const observer = new MutationObserver(() => {
-      const container = findContainer();
-      setActive(container?.getAttribute('data-app-state') === 'foreground');
-    });
+    const compute = () => {
+      setActive(ownContainer()?.getAttribute('data-app-state') === 'foreground');
+    };
+    compute(); // sync initial state (don't wait for the first mutation)
 
-    // Observe the parent that manages app states
-    const desktop = document.querySelector('[data-app-container]')?.parentElement;
+    // Observe the desktop subtree so a state flip on our container (or its
+    // creation/swap) recomputes. attributeFilter keeps this cheap.
+    const desktop =
+      ownContainer()?.parentElement ??
+      document.querySelector('[data-app-container]')?.parentElement ??
+      document.body;
+    const observer = new MutationObserver(compute);
     if (desktop) {
       observer.observe(desktop, { attributes: true, subtree: true, attributeFilter: ['data-app-state'] });
     }
-
     return () => observer.disconnect();
-  }, []);
+  }, [ref]);
 
   return active;
 }
@@ -204,10 +222,11 @@ export function useAppActive(): boolean {
  */
 export function useSuspendableRAF(
   callback: (deltaTime: number) => void,
-  options: { enabled?: boolean; throttleFps?: number } = {}
+  options: { enabled?: boolean; throttleFps?: number; ref?: React.RefObject<HTMLElement | null> } = {}
 ): { isRunning: boolean; pause: () => void; resume: () => void } {
   const { enabled = true, throttleFps = 60 } = options;
-  const isAppActive = useAppActive();
+  // Pass the caller's container ref so "app active" is per-app, not global.
+  const isAppActive = useAppActive(options.ref);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   
@@ -284,10 +303,11 @@ export function useSuspendableRAF(
 export function useSuspendableInterval(
   callback: () => void,
   intervalMs: number,
-  options: { enabled?: boolean } = {}
+  options: { enabled?: boolean; ref?: React.RefObject<HTMLElement | null> } = {}
 ): void {
   const { enabled = true } = options;
-  const isAppActive = useAppActive();
+  // Pass the caller's container ref so "app active" is per-app, not global.
+  const isAppActive = useAppActive(options.ref);
   const callbackRef = useRef(callback);
 
   useEffect(() => {
