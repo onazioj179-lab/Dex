@@ -80,38 +80,37 @@ describe('StatusBar', () => {
 });
 
 describe('SearchInput', () => {
-  it('controls value and fires onChange on typing', () => {
-    const onChange = vi.fn();
+  it('exposes a searchbox role and fires onChange on typing', () => {
+    // The canonical search field is a controlled input: onChange receives the
+    // native change event. Capture target.value *inside* the handler — reading
+    // it afterwards returns '' because React reverts the controlled DOM node.
+    const onChange = vi.fn((e: React.ChangeEvent<HTMLInputElement>) => e.target.value);
     render(<SearchInput value="" onChange={onChange} />);
-    const input = screen.getByRole('searchbox');
-    fireEvent.change(input, { target: { value: 'hello' } });
-    expect(onChange).toHaveBeenCalledWith('hello');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'hello' } });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.results[0].value).toBe('hello');
   });
 
   it('Enter triggers onSubmit with current value', () => {
     const onSubmit = vi.fn();
     render(<SearchInput value="abc" onChange={() => {}} onSubmit={onSubmit} />);
-    const input = screen.getByRole('searchbox');
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
     expect(onSubmit).toHaveBeenCalledWith('abc');
   });
 
-  it('Escape clears the value and fires onClear', () => {
-    const onChange = vi.fn();
+  it('Escape fires onClear', () => {
     const onClear = vi.fn();
-    render(<SearchInput value="abc" onChange={onChange} onClear={onClear} />);
-    const input = screen.getByRole('searchbox');
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(onChange).toHaveBeenCalledWith('');
+    render(<SearchInput value="abc" onChange={() => {}} onClear={onClear} />);
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
   it('renders a clear button when value is non-empty and not disabled', () => {
-    const onChange = vi.fn();
-    render(<SearchInput value="abc" onChange={onChange} />);
+    const onClear = vi.fn();
+    render(<SearchInput value="abc" onChange={() => {}} onClear={onClear} />);
     const clear = screen.getByRole('button', { name: 'Clear search' });
     fireEvent.click(clear);
-    expect(onChange).toHaveBeenCalledWith('');
+    expect(onClear).toHaveBeenCalledTimes(1);
   });
 
   it('hides the clear button when disabled or empty', () => {
