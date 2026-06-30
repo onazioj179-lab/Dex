@@ -1,5 +1,23 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
+> Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
+> green / 0 failed-test markers (new suites 18/18: frame-scheduler, rewind-recall, text-search, use-app-active).
+> Cut as a patch release (6.0.0 → 6.0.1), built locally via `tauri build`, published on onazioj179-lab/Dex; the
+> prior DEX releases (v6.0.0 on Dex, dex-v5.1.0 on dex-updates) were pruned (other products left untouched). Work:
+> - **Cooperative FrameScheduler** (`services/FrameScheduler.ts` + `hooks/useScheduledWork.ts`): priority bands
+>   (`user > normal > idle`) run background work in time-sliced bursts under a per-device-tier budget
+>   (`TIER_BUDGET_MS` low 3ms → ultra 12ms), yielding via MessageChannel; tasks for a `suspended` app are deferred
+>   until it resumes (pairs with `services/AppLifecycle.ts` + `TierManager`). Adopted in LiveActivityBrowser,
+>   Learn, ProjectDashboard.
+> - **UKI app-action registry** (`uki/appActionRegistry.ts` + `shared/uki/appActions.ts`): apps register
+>   confirm-gated read/write actions; `agentRunner` exposes them as dynamic tool specs. Adopted across 15 apps.
+> - **Security Center app** (`standalone/SecurityCenter.tsx`, registered `security:`): live audit trail of every
+>   UKI action (app, redacted args, outcome, time) from the registry's ring buffer, updating on
+>   `dex-uki-action-audit`, with All/Writes/outcome filters. Built on the AppShell standard.
+> - **UKI retrieval**: `shared/search/textSearch.ts` (`searchLines`) backs notes/markdown/dexcode/tasks search;
+>   `shared/rewind/recall.ts` (`resolveRecallDate`) powers cross-session recall in Rewind. Both pure + unit-tested.
+>
 > **DONE (2026-06-26) — Creative suite standardization + multi-window "use all at once".**
 > Cleared the queued creative-app work (all tsc 0, watermark 0 (2187), verified live in preview):
 > (1) **Flux draggable keyframes** — timeline keyframe diamonds are now drag-to-retime (pointer
