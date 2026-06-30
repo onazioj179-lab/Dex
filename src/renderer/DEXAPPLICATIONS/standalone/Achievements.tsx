@@ -6,12 +6,15 @@
 // =============================================================================
 /**
  * DEX Achievements / Trophies App
- * Clean minimal card layout with progress bars. NO emojis.
+ * A progress-first dashboard (NOT a long list of every award): a Spotlight hero,
+ * a radial completion ring + stat tiles, per-category progress bars, an
+ * "almost there" rail, recent unlocks, and daily challenges. True-black SOLID
+ * surfaces (no glass / no translucency). All values are real. NO emojis.
  */
 
-import React, { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { DexSearchInput, toast } from '../../styles/components';
+import { toast } from '../../styles/components';
 import {
   ACHIEVEMENTS, CATEGORY_META, RARITY_META,
   type Achievement, type AchievementCategory, type UserStats,
@@ -25,19 +28,38 @@ import {
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
 
-type TabFilter = 'all' | AchievementCategory;
-type StatusFilter = 'all' | 'unlocked' | 'locked';
+// True-black SOLID theme (no glass, no translucency). Gold accent for trophies.
+const GOLD = '#f5b942';
+const GOLD_DEEP = '#d97706';
+const PANEL = '#101012';
+const PANEL_2 = '#16161a';
+const BORDER = '#26262b';
+const TXT = '#f1ece5';
+const TXT_DIM = '#8a8a90';
+
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Good night';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function relTime(ts: number): string {
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  const d = Math.floor(s / 86400);
+  return d === 1 ? 'yesterday' : `${d}d ago`;
+}
 
 const Achievements: React.FC = () => {
   const [engagement, setEngagement] = useState<EngagementState>(() => loadEngagement());
-  const [activeTab, setActiveTab] = useState<TabFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortRecent, setSortRecent] = useState(false);
   const [challenges, setChallenges] = useState<DailyChallengeState>(() => loadChallenges());
 
   // Live-update: the achievement engine fires these when an unlock or challenge
-  // lands (from any app), so an open Trophies grid reflects it without a reopen.
+  // lands (from any app), so an open Trophies dashboard reflects it instantly.
   useEffect(() => {
     const reloadAch = () => setEngagement(loadEngagement());
     const reloadCh = () => setChallenges(loadChallenges());
@@ -48,21 +70,6 @@ const Achievements: React.FC = () => {
       window.removeEventListener(CHALLENGE_UPDATED_EVENT, reloadCh);
     };
   }, []);
-
-  // Incremental rendering: never mount all ~5000 cards at once -- that janked the
-  // window open, tripped the blank-screen guard, and made the paint so heavy a
-  // screenshot caught it mid-render. Start with a window and grow it as the user
-  // scrolls; reset to the top window whenever the active filter changes.
-  const cardsScrollRef = useRef<HTMLDivElement>(null);
-  const [visibleCount, setVisibleCount] = useState(120);
-  const handleCardsScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 500) setVisibleCount(c => c + 120);
-  }, []);
-  useEffect(() => {
-    setVisibleCount(120);
-    if (cardsScrollRef.current) cardsScrollRef.current.scrollTop = 0;
-  }, [activeTab, statusFilter, searchQuery, sortRecent]);
 
   useEffect(() => {
     const updated = { ...engagement };
@@ -76,25 +83,58 @@ const Achievements: React.FC = () => {
   const unlocked = useMemo(() => new Set(engagement.unlockedAchievements), [engagement.unlockedAchievements]);
   const stats = useMemo(() => getAchievementStats(engagement.unlockedAchievements), [engagement.unlockedAchievements]);
   const rank = stats.rank;
-
   const unlockedAt = engagement.unlockedAt || {};
-  const filtered = useMemo(() => {
-    let list = ACHIEVEMENTS;
-    if (activeTab !== 'all') list = list.filter(a => a.category === activeTab);
-    if (statusFilter === 'unlocked') list = list.filter(a => unlocked.has(a.id));
-    if (statusFilter === 'locked') list = list.filter(a => !unlocked.has(a.id));
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(a => a.title.toLowerCase().includes(q) || a.description.toLowerCase().includes(q));
-    }
-    if (sortRecent) {
-      // Most-recently-unlocked first; un-timestamped (locked) fall to the end.
-      list = [...list].sort((a, b) => (unlockedAt[b.id] || 0) - (unlockedAt[a.id] || 0));
-    }
-    return list;
-  }, [activeTab, statusFilter, searchQuery, unlocked, sortRecent, unlockedAt]);
+  const byId = useMemo(() => new Map(ACHIEVEMENTS.map(a => [a.id, a])), []);
 
-  // Build a shareable plain-text progress summary and copy it to the clipboard.
+  // Recently-unlocked rail (real timestamps), most recent first.
+  const recentUnlocks = useMemo(() => {
+    return Object.entries(unlockedAt)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, ts]) => ({ ach: byId.get(id), ts }))
+      .filter((x): x is { ach: Achievement; ts: number } => Boolean(x.ach))
+      .slice(0, 10);
+  }, [unlockedAt, byId]);
+
+  // Spotlight = most-recent unlock; else the locked trophy closest to completion.
+  const spotlight = useMemo(() => {
+    if (recentUnlocks[0]) return { ach: recentUnlocks[0].ach, isUnlocked: true, ts: recentUnlocks[0].ts };
+    let best: Achievement | null = null;
+    let bestPct = -1;
+    for (const a of ACHIEVEMENTS) {
+      if (unlocked.has(a.id) || a.secret) continue;
+      const p = a.progress ? a.progress(engagement.stats) : null;
+      const pct = p && p.target > 0 ? p.current / p.target : 0;
+      if (pct > bestPct) { bestPct = pct; best = a; }
+    }
+    return best ? { ach: best, isUnlocked: false, ts: 0 } : null;
+  }, [recentUnlocks, unlocked, engagement.stats]);
+
+  // Per-category progress (the core "see progress" view, replacing the award list).
+  const categoryProgress = useMemo(() => {
+    return (Object.keys(CATEGORY_META) as AchievementCategory[]).map(k => {
+      const meta = CATEGORY_META[k];
+      const inCat = ACHIEVEMENTS.filter(a => a.category === k);
+      const total = inCat.length;
+      const got = inCat.reduce((n, a) => n + (unlocked.has(a.id) ? 1 : 0), 0);
+      return { key: k, title: meta.title, icon: meta.icon, color: meta.color, total, got, pct: total ? (got / total) * 100 : 0 };
+    }).sort((a, b) => b.pct - a.pct);
+  }, [unlocked]);
+
+  // "Almost there" — locked trophies with real in-progress measures, nearest first.
+  const almostThere = useMemo(() => {
+    const arr: { ach: Achievement; cur: number; tgt: number; pct: number }[] = [];
+    for (const a of ACHIEVEMENTS) {
+      if (unlocked.has(a.id) || a.secret) continue;
+      const p = a.progress ? a.progress(engagement.stats) : null;
+      if (!p || p.target <= 0) continue;
+      const pct = Math.min(100, (p.current / p.target) * 100);
+      if (pct <= 0 || pct >= 100) continue;
+      arr.push({ ach: a, cur: p.current, tgt: p.target, pct });
+    }
+    arr.sort((x, y) => y.pct - x.pct);
+    return arr.slice(0, 4);
+  }, [unlocked, engagement.stats]);
+
   const shareProgress = useCallback(() => {
     const lines = [
       `DEX Trophies — ${stats.rank.title}`,
@@ -116,195 +156,295 @@ const Achievements: React.FC = () => {
     }
   }, [stats, challenges.currentStreak]);
 
-  const categories = useMemo(() => {
-    const all = { key: 'all' as TabFilter, label: 'All', count: ACHIEVEMENTS.length };
-    const cats = (Object.keys(CATEGORY_META) as AchievementCategory[]).map(k => ({
-      key: k as TabFilter,
-      label: CATEGORY_META[k].title,
-      count: ACHIEVEMENTS.filter(a => a.category === k).length,
-    }));
-    return [all, ...cats];
-  }, []);
-
-  // -- Render ------------------------------------------------------------
   const rankProgress = rank.pointsNeeded > 0 ? (stats.points / (stats.points + rank.pointsNeeded)) * 100 : 100;
 
   return (
-    <div style={{
-      height: '100%', display: 'flex', flexDirection: 'column',
-      background: 'var(--color-bg-base, #0a0a0f)',
-      color: 'var(--color-text-primary, #e5e5ea)',
-      overflow: 'hidden',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0,
-        background: 'var(--color-bg-surface-solid, #1C1C1E)',
-        borderBottom: '1px solid var(--color-border-subtle)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', color: TXT, overflow: 'hidden' }}>
+      <style>{`
+        .tr-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+        .tr-scroll::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 6px; }
+        .tr-card { transition: transform .15s ease, border-color .15s ease; }
+        .tr-card:hover { transform: translateY(-2px); border-color: #3a3a42; }
+      `}</style>
+
+      <div className="tr-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 26px 30px' }}>
+
+        {/* Greeting header */}
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
             <div style={{
-              width: 38, height: 38, borderRadius: 8,
-              background: 'linear-gradient(135deg, #ff9f0a, #d97706)',
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <DexIcon name="trophy" size={20} color="#fff" />
+              <DexIcon name="trophy" size={22} color="#1a0f08" />
             </div>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>Trophies</h1>
-              <p style={{ fontSize: 11, margin: 0, opacity: 0.45 }}>
-                {stats.totalUnlocked} / {stats.totalAchievements} unlocked
-              </p>
+              <div style={{ fontSize: 12, color: TXT_DIM, fontWeight: 500 }}>{timeGreeting()}, champion</div>
+              <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>Your Trophies</h1>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {engagement.stats.currentStreak > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 11, background: PANEL, border: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600 }}>
+                <DexIcon name="flame" size={15} color={GOLD} />
+                {engagement.stats.currentStreak}d streak
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 11, background: PANEL, border: `1px solid ${BORDER}` }}>
+              <DexIcon name={rank.icon} size={16} color={GOLD} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{rank.title}</span>
+              <div style={{ width: 52, height: 4, borderRadius: 3, background: '#2a2a30', overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', background: GOLD }} />
+              </div>
+            </div>
             <button onClick={shareProgress} title="Copy progress summary" style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontSize: 'var(--text-xs)', fontWeight: 600,
-              background: 'var(--color-bg-hover, rgba(255,255,255,.04))',
-              color: 'var(--color-text-secondary, rgba(255,255,255,.7))',
+              display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 11,
+              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`, color: '#1a0f08',
             }}>
+              <DexIcon name="share" size={14} color="#1a0f08" />
               Share
             </button>
-            {engagement.stats.currentStreak > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, opacity: 0.7 }}>
-                <DexIcon name="flame" size={14} color="#ff9f0a" />
-                <span>{engagement.stats.currentStreak}d streak</span>
-              </div>
-            )}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-              padding: '6px var(--space-3)', borderRadius: 8,
-              background: 'var(--color-bg-hover, rgba(255,255,255,.04))',
-            }}>
-              <DexIcon name={rank.icon} size={16} color="#ff9f0a" />
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{rank.title}</span>
-              <div style={{ width: 48, height: 3, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.08))', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', borderRadius: 2, background: 'var(--color-warning)' }} />
-              </div>
+          </div>
+        </header>
+
+        {/* Hero: Spotlight + Stats ring */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
+          <HeroSpotlight spotlight={spotlight} stats={engagement.stats} totalUnlocked={stats.totalUnlocked} />
+          <StatsRing
+            completion={stats.completionPercent}
+            totalUnlocked={stats.totalUnlocked}
+            totalAchievements={stats.totalAchievements}
+            points={stats.points}
+            streak={engagement.stats.currentStreak}
+            level={getChallengeLevel(challenges.totalXP)}
+          />
+        </div>
+
+        {/* Progress by category (the core view) */}
+        <section style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 11px' }}>Progress by category</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 11 }}>
+            {categoryProgress.map(c => {
+              const done = c.total > 0 && c.got >= c.total;
+              return (
+                <div key={c.key} className="tr-card" style={{ padding: 15, borderRadius: 15, background: PANEL, border: `1px solid ${BORDER}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: `${c.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={c.icon} size={18} color={c.color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
+                      <div style={{ fontSize: 11, color: TXT_DIM, marginTop: 1 }}>{c.got} / {c.total} unlocked</div>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: done ? '#30d158' : c.color, fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.round(c.pct)}%
+                    </div>
+                  </div>
+                  <div style={{ height: 7, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+                    <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 4, background: done ? '#30d158' : `linear-gradient(90deg, ${c.color}99, ${c.color})`, transition: 'width .2s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Almost there — real in-progress trophies, nearest to unlock */}
+        {almostThere.length > 0 && (
+          <section style={{ marginBottom: 16 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 11px' }}>Almost there</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 11 }}>
+              {almostThere.map(({ ach, cur, tgt, pct }) => {
+                const meta = RARITY_META[ach.rarity];
+                return (
+                  <div key={ach.id} className="tr-card" title={ach.description} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 15, background: PANEL, border: `1px solid ${BORDER}` }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: `${meta.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={ach.icon} size={20} color={meta.color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.title}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, flexShrink: 0 }}>{Math.round(pct)}%</span>
+                      </div>
+                      <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: '#1f1f24', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: TXT_DIM, flexShrink: 0 }}>{cur.toLocaleString()}/{tgt.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-          </div>
-        </div>
-      </div>
-
-      {/* Category Tabs + Search */}
-      <div style={{
-        padding: '10px var(--space-6)', flexShrink: 0,
-        borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,.04))',
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-      }}>
-        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
-          {categories.map(cat => (
-            <button key={cat.key} onClick={() => setActiveTab(cat.key)} aria-pressed={activeTab === cat.key} aria-label={`Filter: ${cat.label}`} style={{
-              padding: '5px var(--space-3)', borderRadius: 6, border: 'none', cursor: 'pointer',
-              fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap',
-              background: activeTab === cat.key ? 'var(--color-warning-soft, rgba(245,158,11,.15))' : 'var(--color-bg-hover, rgba(255,255,255,.03))',
-              color: activeTab === cat.key ? 'var(--color-warning)' : 'var(--color-text-tertiary, rgba(255,255,255,.5))',
-              transition: 'all .15s',
-            }}>
-              {cat.label}
-              <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.5 }}>{cat.count}</span>
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          <div style={{ flex: 1, maxWidth: 280 }}>
-            <DexSearchInput
-              size="sm"
-              fullWidth
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onClear={() => setSearchQuery('')}
-              placeholder="Search..."
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 2, background: 'var(--color-bg-hover, rgba(255,255,255,.03))', borderRadius: 6, padding: 2 }}>
-            {(['all', 'unlocked', 'locked'] as StatusFilter[]).map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} aria-pressed={statusFilter === s} aria-label={`Show ${s}`} style={{
-                padding: '4px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
-                fontSize: 11, fontWeight: 500, textTransform: 'capitalize',
-                background: statusFilter === s ? 'var(--color-warning-soft, rgba(245,158,11,.15))' : 'transparent',
-                color: statusFilter === s ? 'var(--color-warning)' : 'var(--color-text-tertiary, rgba(255,255,255,.45))',
-              }}>{s}</button>
-            ))}
-          </div>
-          <button onClick={() => setSortRecent(v => !v)} aria-pressed={sortRecent} aria-label="Sort by most recently unlocked" title="Sort by most recently unlocked" style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-            fontSize: 11, fontWeight: 500,
-            background: sortRecent ? 'var(--color-warning-soft, rgba(245,158,11,.15))' : 'var(--color-bg-hover, rgba(255,255,255,.03))',
-            color: sortRecent ? 'var(--color-warning)' : 'var(--color-text-tertiary, rgba(255,255,255,.45))',
-          }}>
-            Recent
-          </button>
-        </div>
-      </div>
-
-      <DailyChallengesBar challenges={challenges} />
-
-      {/* Achievement Cards */}
-      <div ref={cardsScrollRef} onScroll={handleCardsScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)' }}>
-        {filtered.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.35 }}>
-            <DexIcon name="search" size={36} color="var(--color-text-tertiary, rgba(255,255,255,.2))" />
-            <p style={{ marginTop: 10, fontSize: 13 }}>No achievements found</p>
-          </div>
-        ) : (
-          <>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 'var(--space-2)',
-            }}>
-              {filtered.slice(0, visibleCount).map(ach => (
-                <AchievementCard key={ach.id} achievement={ach} isUnlocked={unlocked.has(ach.id)} stats={engagement.stats} />
-              ))}
-            </div>
-            {visibleCount < filtered.length && (
-              <div style={{ textAlign: 'center', padding: '14px 0 4px', fontSize: 11, opacity: 0.4 }}>
-                Showing {Math.min(visibleCount, filtered.length).toLocaleString()} of {filtered.length.toLocaleString()} — scroll for more
-              </div>
-            )}
-          </>
+          </section>
         )}
+
+        {/* Recently unlocked rail */}
+        {recentUnlocks.length > 0 && (
+          <section style={{ marginBottom: 16 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 11px' }}>Recently unlocked</h2>
+            <div className="tr-scroll" style={{ display: 'flex', gap: 11, overflowX: 'auto', paddingBottom: 4 }}>
+              {recentUnlocks.map(({ ach, ts }) => {
+                const meta = RARITY_META[ach.rarity];
+                return (
+                  <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 15, background: PANEL_2, border: `1px solid ${meta.color}33` }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 9, background: `${meta.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={ach.icon} size={20} color={meta.color} />
+                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.title}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: meta.color }}>{ach.points} pts</span>
+                      <span style={{ fontSize: 10, color: TXT_DIM }}>{relTime(ts)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <DailyChallengesBar challenges={challenges} />
       </div>
     </div>
   );
 };
 
+// -- Hero spotlight card --------------------------------------------------
+const HeroSpotlight: React.FC<{
+  spotlight: { ach: Achievement; isUnlocked: boolean; ts: number } | null;
+  stats: UserStats;
+  totalUnlocked: number;
+}> = memo(({ spotlight, stats, totalUnlocked }) => {
+  if (!spotlight) {
+    return (
+      <div style={{ borderRadius: 18, padding: 24, minHeight: 188, background: PANEL, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>Start your collection</div>
+        <div style={{ fontSize: 12.5, color: TXT_DIM, lineHeight: 1.5 }}>
+          Use DEX apps to unlock your first trophy. Your spotlight pick will appear here.
+        </div>
+      </div>
+    );
+  }
+  const { ach, isUnlocked, ts } = spotlight;
+  const meta = RARITY_META[ach.rarity];
+  const prog = ach.progress ? ach.progress(stats) : null;
+  const pct = prog && prog.target > 0 ? Math.min(100, (prog.current / prog.target) * 100) : (isUnlocked ? 100 : 0);
+
+  return (
+    <div style={{
+      position: 'relative', borderRadius: 18, padding: 24, minHeight: 188, overflow: 'hidden',
+      background: PANEL, border: `1px solid ${BORDER}`,
+      borderLeft: `3px solid ${meta.color}`,
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    }}>
+      {/* Faint oversized glyph */}
+      <div style={{ position: 'absolute', right: -16, bottom: -28, opacity: 0.06, pointerEvents: 'none' }}>
+        <DexIcon name={ach.icon} size={180} color={meta.color} />
+      </div>
+      <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1a0f08', background: GOLD, padding: '4px 9px', borderRadius: 7 }}>Spotlight</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: meta.color, background: `${meta.color}1f`, padding: '4px 9px', borderRadius: 7 }}>{ach.rarity}</span>
+          <span style={{ fontSize: 11, color: TXT_DIM }}>{isUnlocked ? `Unlocked ${relTime(ts)}` : 'Next up'}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0, background: `${meta.color}1f`, border: `1px solid ${meta.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <DexIcon name={isUnlocked ? ach.icon : 'lock'} size={28} color={meta.color} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{ach.title}</div>
+            <div style={{ fontSize: 12.5, color: TXT_DIM, marginTop: 3, maxWidth: 380, lineHeight: 1.4 }}>{ach.description}</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <DexIcon name="star" size={14} color={GOLD} />
+          <span style={{ fontSize: 13, fontWeight: 700 }}>{ach.points} pts</span>
+        </div>
+        {!isUnlocked && prog ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
+            <div style={{ flex: 1, height: 6, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+            </div>
+            <span style={{ fontSize: 11, color: TXT_DIM, flexShrink: 0 }}>{prog.current.toLocaleString()}/{prog.target.toLocaleString()}</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#30d158', fontSize: 12, fontWeight: 700 }}>
+            <DexIcon name="check-circle" size={14} color="#30d158" />
+            Earned · {totalUnlocked.toLocaleString()} total
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+HeroSpotlight.displayName = 'HeroSpotlight';
+
+// -- Radial completion ring + stat tiles ----------------------------------
+const StatsRing: React.FC<{
+  completion: number; totalUnlocked: number; totalAchievements: number;
+  points: number; streak: number; level: { level: number; title: string };
+}> = memo(({ completion, totalUnlocked, totalAchievements, points, streak, level }) => {
+  const pct = Math.max(0, Math.min(100, completion));
+  const tiles = [
+    { icon: 'star', label: 'Points', value: points.toLocaleString() },
+    { icon: 'flame', label: 'Streak', value: `${streak}d` },
+    { icon: 'award', label: 'Level', value: `${level.level}` },
+  ];
+  return (
+    <div style={{ borderRadius: 18, padding: 20, minHeight: 188, background: PANEL, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 14, fontWeight: 700 }}>Your statistics</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div style={{ position: 'relative', width: 104, height: 104, flexShrink: 0 }}>
+          <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: `conic-gradient(${GOLD} ${pct}%, #1f1f24 ${pct}%)` }} />
+          <div style={{ position: 'absolute', inset: 11, borderRadius: '50%', background: PANEL, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 2 }}>complete</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>{totalUnlocked.toLocaleString()}</div>
+          <div style={{ fontSize: 12, color: TXT_DIM, marginTop: 3 }}>of {totalAchievements.toLocaleString()} trophies unlocked</div>
+          <div style={{ marginTop: 9, fontSize: 11.5, fontWeight: 600, color: GOLD }}>{level.title}</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 9 }}>
+        {tiles.map(t => (
+          <div key={t.label} style={{ padding: '10px 8px', borderRadius: 12, textAlign: 'center', background: PANEL_2, border: `1px solid ${BORDER}` }}>
+            <DexIcon name={t.icon} size={15} color={GOLD} />
+            <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{t.value}</div>
+            <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+StatsRing.displayName = 'StatsRing';
+
 // -- Daily Challenges bar -------------------------------------------------
-// Surfaces the (previously unwired) daily-challenge system inside Trophies, plus
-// a compact local self-progress board (level / streak / XP) -- no new page.
 const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo(({ challenges }) => {
   const level = getChallengeLevel(challenges.totalXP);
   const today = challenges.challenges;
   if (!today.length) return null;
 
   return (
-    <div style={{
-      flexShrink: 0, padding: '10px var(--space-6)',
-      borderBottom: '1px solid var(--color-border-subtle)',
-      display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-      background: 'var(--color-bg-surface, rgba(255,255,255,.012))',
-    }}>
-      {/* Local progress board */}
+    <div style={{ padding: '13px 16px', borderRadius: 16, border: `1px solid ${BORDER}`, background: PANEL, display: 'flex', alignItems: 'center', gap: 18 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 96 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-warning)' }} />
-          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', opacity: 0.7, color: 'var(--color-warning)' }}>
-            Daily
-          </span>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Daily</span>
         </div>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Lv {level.level} · {level.title}</div>
-        <div style={{ fontSize: 10, opacity: 0.5 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Lv {level.level} · {level.title}</div>
+        <div style={{ fontSize: 10, color: TXT_DIM }}>
           {challenges.totalXP.toLocaleString()} XP{challenges.currentStreak > 0 ? ` · ${challenges.currentStreak}d streak` : ''}
         </div>
       </div>
 
-      {/* Local self-history: a sparkline of daily XP earned + your best day */}
       {challenges.history.length > 0 && (() => {
         const hist = challenges.history.slice(-14);
         const max = Math.max(1, ...hist.map(h => h.xpEarned));
@@ -313,43 +453,32 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 88 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 26 }} title="Daily XP earned (last 14 days)">
               {hist.map((h, i) => (
-                <div key={i} title={`${h.date}: ${h.xpEarned} XP`} style={{
-                  width: 5, height: `${Math.max(2, Math.round((h.xpEarned / max) * 26))}px`,
-                  borderRadius: 1, background: 'var(--color-warning)', opacity: h.xpEarned > 0 ? 0.85 : 0.25,
-                }} />
+                <div key={i} title={`${h.date}: ${h.xpEarned} XP`} style={{ width: 5, height: `${Math.max(2, Math.round((h.xpEarned / max) * 26))}px`, borderRadius: 1, background: GOLD, opacity: h.xpEarned > 0 ? 0.85 : 0.25 }} />
               ))}
             </div>
-            <div style={{ fontSize: 9, opacity: 0.5, letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase' }}>
-              Best {best} XP · {challenges.history.length}d
-            </div>
+            <div style={{ fontSize: 9, color: TXT_DIM, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Best {best} XP · {challenges.history.length}d</div>
           </div>
         );
       })()}
 
-      {/* Today's challenges */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flex: 1, overflowX: 'auto' }}>
+      <div className="tr-scroll" style={{ display: 'flex', gap: 9, flex: 1, overflowX: 'auto' }}>
         {today.map(ch => {
           const threshold = ch.condition?.threshold || 0;
           const pct = threshold > 0 ? Math.min(100, (ch.progress / threshold) * 100) : 0;
           return (
-            <div key={ch.id} title={ch.description} style={{
-              flex: '1 1 0', minWidth: 150,
-              padding: '7px var(--space-3)', borderRadius: 8,
-              background: ch.completed ? 'var(--color-success-soft, rgba(48,209,88,.12))' : 'var(--color-bg-hover, rgba(255,255,255,.03))',
-              border: '1px solid var(--color-border-subtle)',
-            }}>
+            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 11, background: ch.completed ? 'rgba(48,209,88,0.12)' : PANEL_2, border: `1px solid ${ch.completed ? 'rgba(48,209,88,0.3)' : BORDER}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                  <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? '#30d158' : 'var(--color-text-secondary)'} />
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.title}</span>
+                  <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? '#30d158' : GOLD} />
+                  <span style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.title}</span>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-warning)', flexShrink: 0 }}>+{ch.xpReward}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: GOLD, flexShrink: 0 }}>+{ch.xpReward}</span>
               </div>
-              <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.08))', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: ch.completed ? '#30d158' : 'var(--color-warning)', transition: 'width .18s' }} />
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ flex: 1, height: 3, borderRadius: 2, background: '#1f1f24', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: ch.completed ? '#30d158' : GOLD, transition: 'width .18s' }} />
                 </div>
-                <span style={{ fontSize: 9, opacity: 0.45, flexShrink: 0 }}>{ch.progress}/{ch.condition.threshold}</span>
+                <span style={{ fontSize: 9, color: TXT_DIM, flexShrink: 0 }}>{ch.progress}/{ch.condition.threshold}</span>
               </div>
             </div>
           );
@@ -359,86 +488,6 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
   );
 });
 DailyChallengesBar.displayName = 'DailyChallengesBar';
-
-// -- Achievement Card (minimal) -------------------------------------------
-const AchievementCard: React.FC<{
-  achievement: Achievement;
-  isUnlocked: boolean;
-  stats: UserStats;
-}> = memo(({ achievement, isUnlocked, stats }) => {
-  const meta = RARITY_META[achievement.rarity];
-  const isSecret = achievement.secret && !isUnlocked;
-  const prog = achievement.progress ? achievement.progress(stats) : null;
-  const pct = prog && prog.target > 0
-    ? Math.min(100, (prog.current / prog.target) * 100)
-    : (isUnlocked ? 100 : 0);
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px var(--space-3)', borderRadius: 8,
-      background: isUnlocked ? 'var(--color-bg-hover, rgba(255,255,255,.04))' : 'var(--color-bg-surface, rgba(255,255,255,.015))',
-      border: '1px solid var(--color-border-subtle, rgba(255,255,255,.04))',
-      opacity: isUnlocked ? 1 : 0.55,
-      transition: 'opacity .18s',
-    }}>
-      {/* Icon */}
-      <div style={{
-        width: 34, height: 34, borderRadius: 6, flexShrink: 0,
-        background: isUnlocked ? `${meta.color}18` : 'var(--color-bg-hover, rgba(255,255,255,.04))',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <DexIcon
-          name={isSecret ? 'help-circle' : achievement.icon}
-          size={18}
-          color={isUnlocked ? meta.color : 'var(--color-text-tertiary, rgba(255,255,255,.2))'}
-        />
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-          <div style={{
-            fontSize: 12, fontWeight: 600,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {isSecret ? '???' : achievement.title}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            {isUnlocked && <DexIcon name="check-circle" size={12} color="#30d158" />}
-            <span style={{ fontSize: 10, fontWeight: 600, color: meta.color }}>{achievement.points}pts</span>
-          </div>
-        </div>
-        <div style={{
-          fontSize: 10, opacity: 0.4, marginTop: 1,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {isSecret ? 'Hidden achievement' : achievement.description}
-        </div>
-        {/* Progress bar */}
-        {!isUnlocked && prog && (
-          <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.08))', overflow: 'hidden' }}>
-              <div style={{
-                width: `${pct}%`, height: '100%', borderRadius: 2,
-                background: `linear-gradient(90deg, ${meta.color}80, ${meta.color})`,
-                transition: 'width .18s',
-              }} />
-            </div>
-            <span style={{ fontSize: 9, opacity: 0.4, flexShrink: 0 }}>
-              {prog.current.toLocaleString()}/{prog.target.toLocaleString()}
-            </span>
-          </div>
-        )}
-        {isUnlocked && (
-          <div style={{ marginTop: 5, height: 3, borderRadius: 2, background: `${meta.color}30` }}>
-            <div style={{ width: '100%', height: '100%', borderRadius: 2, background: meta.color }} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
 
 Achievements.displayName = 'Achievements';
 export default memo(Achievements);
