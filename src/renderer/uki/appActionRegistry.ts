@@ -38,6 +38,53 @@ export function setUkiActionConfirmHandler(fn: ActionConfirmHandler | null): voi
   confirmHandler = fn;
 }
 
+// ---------------------------------------------------------------------------
+// Audit trail — every UKI action invocation is recorded for traceability, so a
+// security-conscious user (or a Defender / audit view) can see exactly what the
+// assistant did: which app, redacted args, whether it was allowed, and when.
+// Bounded ring buffer + a `dex-uki-action-audit` event per entry.
+// ---------------------------------------------------------------------------
+
+export type UkiActionOutcome = 'ran' | 'denied' | 'failed' | 'blocked';
+
+export interface UkiActionAuditEntry {
+  id: string;
+  appId: string;
+  mutates: boolean;
+  args: Record<string, unknown>;
+  outcome: UkiActionOutcome;
+  result: string;
+  ts: number;
+}
+
+const AUDIT_MAX = 500;
+const auditLog: UkiActionAuditEntry[] = [];
+
+/** Truncate string args so the audit never stores unbounded/sensitive payloads. */
+function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    out[k] = typeof v === 'string' && v.length > 120 ? `${v.slice(0, 120)}…` : v;
+  }
+  return out;
+}
+
+function recordAudit(e: Omit<UkiActionAuditEntry, 'ts'>): void {
+  const entry: UkiActionAuditEntry = { ...e, ts: Date.now() };
+  auditLog.push(entry);
+  if (auditLog.length > AUDIT_MAX) auditLog.shift();
+  try {
+    window.dispatchEvent(new CustomEvent('dex-uki-action-audit', { detail: entry }));
+  } catch {
+    /* non-DOM context */
+  }
+}
+
+/** The UKI action audit trail (oldest first, most recent last). */
+export function getUkiActionAudit(): readonly UkiActionAuditEntry[] {
+  return auditLog;
+}
+
 /** Register (or replace) an action for an app. Call from the component's effect. */
 export function registerUkiAppAction(
   appId: string,
@@ -84,8 +131,11 @@ export function isUkiAppAction(id: string): boolean {
 export async function runUkiAction(id: string, args: Record<string, unknown>): Promise<string> {
   const entry = getAppAction(registry, id);
   if (!entry) return `Unknown app action "${id}".`;
+  const redacted = redactArgs(args);
   if (!runningAppIds().has(entry.appId)) {
-    return `${entry.appId} is not running — open it first with open_app, then retry.`;
+    const result = `${entry.appId} is not running — open it first with open_app, then retry.`;
+    recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
+    return result;
   }
   if (entry.spec.mutates) {
     let allowed = false;
@@ -97,13 +147,19 @@ export async function runUkiAction(id: string, args: Record<string, unknown>): P
       }
     }
     if (!allowed) {
-      return `"${id}" changes ${entry.appId} and needs the user's confirmation, which was not given. Not performed.`;
+      const result = `"${id}" changes ${entry.appId} and needs the user's confirmation, which was not given. Not performed.`;
+      recordAudit({ id, appId: entry.appId, mutates: true, args: redacted, outcome: 'denied', result });
+      return result;
     }
   }
   try {
     const out = await entry.handler(args);
-    return typeof out === 'string' && out.trim() ? out : 'Done.';
+    const result = typeof out === 'string' && out.trim() ? out : 'Done.';
+    recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'ran', result });
+    return result;
   } catch (e) {
-    return `Action "${id}" failed: ${(e as Error)?.message || 'error'}`;
+    const result = `Action "${id}" failed: ${(e as Error)?.message || 'error'}`;
+    recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'failed', result });
+    return result;
   }
 }

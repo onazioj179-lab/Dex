@@ -15,6 +15,7 @@ import { DexSearchInput } from '../../styles/components';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
 import { useAppLifecycle } from '../../hooks/useAppLifecycle';
+import { useScheduledInterval } from '../../hooks/useScheduledWork';
 import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { spaceAt } from '../../store/stageActivityLog';
@@ -541,14 +542,14 @@ const Rewind: React.FC = () => {
   // so it consumes nothing while idle/backgrounded and resumes on return.
   const lifecyclePhase = useAppLifecycle('rewind', {});
 
-  // Auto-refresh timeline every 30s (low-end friendly)
-  useEffect(() => {
-    if (lifecyclePhase !== 'foreground') return;
-    const timer = setInterval(() => {
-      loadTimeline();
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [loadTimeline, lifecyclePhase]);
+  // Auto-refresh timeline every 30s — routed through the FrameScheduler so the
+  // (potentially large) reload runs inside the per-tier frame budget instead of
+  // blocking the UI, and pauses entirely while Rewind is off-screen.
+  useScheduledInterval(loadTimeline, 30000, {
+    appId: 'rewind',
+    priority: 'idle',
+    enabled: lifecyclePhase === 'foreground',
+  });
 
   // Auto-refresh backend status every 2s (always-on, silent)
   useEffect(() => {
