@@ -23,6 +23,7 @@ import { getAudioPlaybackService } from '../services/media/AudioPlaybackService'
 import { useNowPlaying } from '../services/nowPlaying';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 
 // ===========================================================================
 // TYPES
@@ -303,7 +304,23 @@ export const Audio: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('audio');
+    // Let UKI read what's playing as a callable action (read-only).
+    registerUkiAppAction('audio', {
+      id: 'audio.nowPlaying',
+      description: 'report the currently playing track, playback state and queue length.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      const t = c.currentTrack;
+      if (!t) return `Nothing is playing. ${c.tracks.length} tracks in the library.`;
+      return `${c.isPlaying ? 'Playing' : 'Paused'}: "${t.title}" by ${t.artist}${t.album ? ` (${t.album})` : ''}. ${c.queue.length} in queue.`;
+    });
+    return () => {
+      unregisterUkiAppContext('audio');
+      unregisterUkiAppAction('audio.nowPlaying');
+    };
   }, []);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);

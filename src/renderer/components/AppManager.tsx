@@ -42,7 +42,8 @@ import AskUkiContextMenu from './AskUkiContextMenu';
 // eager startup path. Pull straight from the source module instead.
 import { DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from '../uki/knowledge';
 import { AppErrorBoundary as CanonicalErrorBoundary } from '../services/ErrorBoundary';
-import { getStoredTier, shouldKeepAlive, getMaxConcurrentApps, type DeviceTier } from '../services/TierManager';
+import { getStoredTier, shouldKeepAlive, getMaxConcurrentApps, getLifecycleTier, type DeviceTier } from '../services/TierManager';
+import { appLifecycle } from '../services/AppLifecycle';
 
 // Shell interaction layers
 import { gestureEngine } from '../shell/GestureEngine';
@@ -203,6 +204,8 @@ const WorldClock = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/WorldCl
 const NoiseGenerator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/NoiseGenerator'));
 const DexCode = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/DexCode'));
 const Nexus = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Nexus'));
+const HealthStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/HealthStudio'));
+const BioStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/BioStudio'));
 const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
 const Canvas = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Canvas'));
@@ -229,7 +232,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -367,6 +370,8 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   ssh: SshClient,
   spaces: WorkspaceSpaces, inbox: SmartInbox, projectdash: ProjectDashboard,
   backup: BackupSync, extensions: ExtensionsManager,
+  health: HealthStudio,
+  bio: BioStudio,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -3211,7 +3216,12 @@ export const AppManager: React.FC = () => {
                 const dragWorkspace = getShellWorkspace(0);
                 const el = titleBar.parentElement as HTMLElement;
                 if (el) {
-                  // Disable transitions and enable GPU acceleration for smooth drag
+                  // OS-grade smooth drag: promote the window to its OWN GPU
+                  // compositor layer so moving it NEVER repaints the (heavy) app
+                  // content inside. Position is driven by a GPU `transform`
+                  // (composited, zero per-frame layout/reflow) set with `!important`
+                  // priority so the low perf tier's `transform: none !important`
+                  // rule cannot wipe it mid-grab — smooth on every machine, every tier.
                   el.style.transition = 'none';
                   el.style.willChange = 'transform';
                   el.setAttribute('data-dragging', 'true');
@@ -3241,13 +3251,16 @@ export const AppManager: React.FC = () => {
                     currentX = loose.x;
                     currentY = loose.y;
                     if (el) {
-                      // GPU-accelerated transform (no layout/reflow during drag). Re-assert
-                      // the drag styles every frame: a mid-drag React re-render (e.g. the
-                      // snap-zone setState) reconciles the window's style prop and would
-                      // otherwise restore transition/will-change, degrading the drag.
+                      // GPU translate3d on the window's own layer — the app content
+                      // inside is NOT repainted as the window moves (this is what
+                      // makes it glide like a native OS window). Re-assert every
+                      // frame because a mid-drag React re-render (snap-zone setState)
+                      // reconciles the style prop; `setProperty(..., 'important')`
+                      // beats the low-tier `transform: none !important` rule so it
+                      // never stutters or snaps back, on any tier.
                       el.style.transition = 'none';
                       el.style.willChange = 'transform';
-                      el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
+                      el.style.setProperty('transform', `translate3d(${currentX - origX}px, ${currentY - origY}px, 0)`, 'important');
                     }
                     // Live snap-zone preview -- throttled to ~64ms. It's a hit-test
                     // plus a setState, too costly to run every frame and unnecessary
@@ -3295,23 +3308,24 @@ export const AppManager: React.FC = () => {
                   const ease = 'cubic-bezier(0.2,0.9,0.3,1)';
                   const snapEase = `left ${snapMs}ms ${ease}, top ${snapMs}ms ${ease}, width ${snapMs}ms ${ease}, height ${snapMs}ms ${ease}`;
                   if (snapToCustomZone(appId, ev.clientX, ev.clientY)) {
-                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
+                    if (el) { el.style.removeProperty('transform'); el.style.transition = snapEase; }
                     return;
                   }
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
-                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
+                    if (el) { el.style.removeProperty('transform'); el.style.transition = snapEase; }
                     tileWindow(appId, zone);
                   } else {
                     // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
                     const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
                     if (el) {
-                      // Commit the final left/top in the SAME frame the transform is
-                      // dropped, so the window never flashes back to its pre-drag spot
-                      // for a frame (the old order cleared transform first -> a jump).
+                      // Commit the final left/top and drop the transform in the SAME
+                      // frame: left/top now equals the released position, so clearing
+                      // the GPU transform leaves the window exactly where it was
+                      // dropped (no flash back to its pre-drag spot).
                       el.style.left = clamped.x + 'px';
                       el.style.top = clamped.y + 'px';
-                      el.style.transform = '';
+                      el.style.removeProperty('transform');
                     }
                     setDetachedApps(prev => {
                       const b = prev.get(appId);
@@ -3940,6 +3954,58 @@ export const AppManager: React.FC = () => {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSafeSnapshot.join(',')]);
+
+  // -- AppLifecycle phase emitter ------------------------------------------
+  // Keep-alive never unmounts apps; instead we broadcast a per-app phase so
+  // heavy apps can release GPU/audio/timers while off-screen (opt-in via
+  // useAppLifecycle). Foreground = current / split / a non-minimized detached
+  // window; everything else mounted = background. Runs in its own effect (NOT
+  // inside the render memo) so it never fires during render. Extended idle
+  // promotes background heavy apps to 'suspended' in the effect below.
+  useEffect(() => {
+    const foreground = new Set<string>();
+    if (currentApp) foreground.add(currentApp);
+    if (splitMode !== 'off' && splitApp) foreground.add(splitApp);
+    detachedApps.forEach((_b, id) => { if (!minimizedApps.has(id)) foreground.add(id); });
+
+    mountedAppsSafeSnapshot.forEach((appId) => {
+      if (foreground.has(appId)) {
+        appLifecycle.setPhase(appId, 'foreground');
+      } else if (appLifecycle.getPhase(appId) !== 'suspended') {
+        // Leave an active suspend in place; the idle effect owns its resume.
+        appLifecycle.setPhase(appId, 'background');
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSafeSnapshot.join(',')]);
+
+  // -- Suspend heavy background apps on extended idle ----------------------
+  // On deep idle, heavy (GPU/audio) apps that are not foreground drop to
+  // 'suspended' so they free GL contexts / audio buffers. On resume to active,
+  // they return to 'background' (the emitter above re-foregrounds the visible
+  // one). Light apps are never suspended. Components stay mounted throughout.
+  useEffect(() => {
+    const onIdleChange = (e: Event) => {
+      const state = (e as CustomEvent).detail?.current as string | undefined;
+      if (state === 'extended-idle') {
+        mountedAppsSafeSnapshot.forEach((appId) => {
+          if (getLifecycleTier(appId) === 'light') return;
+          if (appLifecycle.getPhase(appId) === 'background') {
+            appLifecycle.setPhase(appId, 'suspended');
+          }
+        });
+      } else if (state === 'active') {
+        mountedAppsSafeSnapshot.forEach((appId) => {
+          if (appLifecycle.getPhase(appId) === 'suspended') {
+            appLifecycle.setPhase(appId, 'background');
+          }
+        });
+      }
+    };
+    window.addEventListener('dex-idle-continuity-change', onIdleChange as EventListener);
+    return () => window.removeEventListener('dex-idle-continuity-change', onIdleChange as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mountedAppsSafeSnapshot.join(',')]);
 
 
   // APP_MENU_CATEGORIES is computed once at module scope — no useMemo needed

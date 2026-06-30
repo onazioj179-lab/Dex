@@ -26,6 +26,7 @@ import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
 import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 
 // ===========================================================================
 // TYPES
@@ -492,7 +493,23 @@ export const Files: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('files');
+    // Let UKI LIST the current folder's entries as a callable action (read-only).
+    registerUkiAppAction('files', {
+      id: 'files.listCurrentFolder',
+      description: 'list the files and folders shown in the current Files location.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.files.length) return `No items in ${c.currentPath || c.selectedLocation || 'this location'}.`;
+      const names = c.files.slice(0, 200).map((f) => f.name).join(', ');
+      return `${c.files.length} items in ${c.currentPath || c.selectedLocation}: ${names}`.slice(0, 4000);
+    });
+    return () => {
+      unregisterUkiAppContext('files');
+      unregisterUkiAppAction('files.listCurrentFolder');
+    };
   }, []);
 
   const saveSmartFolder = useCallback(() => {

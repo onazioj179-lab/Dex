@@ -20,6 +20,7 @@ import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 interface EnvBridge {
   listSystem: () => Promise<Array<{ name: string; value: string }>>;
@@ -256,7 +257,22 @@ export default function EnvManager(): React.ReactElement {
         },
       };
     });
-    return () => unregisterUkiAppContext('env');
+    // Let UKI read the env var KEYS (names only, never values) in this scope.
+    registerUkiAppAction('env', {
+      id: 'env.listKeys',
+      description: 'list the environment variable keys in the current scope (names only, never values).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const s = ukiCtxRef.current;
+      if (!s.rows.length) return 'No environment variables in this scope.';
+      return s.rows.slice(0, 200).map((r) => r.name).join(', ');
+    });
+    return () => {
+      unregisterUkiAppContext('env');
+      unregisterUkiAppAction('env.listKeys');
+    };
   }, []);
 
   // ---- bridge-backed mutations (unchanged behavior) -----------------------

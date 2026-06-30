@@ -19,6 +19,7 @@ import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 
 // ===========================================================================
 // TYPES
@@ -302,7 +303,48 @@ export const Browser: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('browser');
+    // Let UKI see every open tab (title + URL) as a callable action (read-only).
+    registerUkiAppAction('browser', {
+      id: 'browser.listTabs',
+      description: 'list the open browser tabs with their titles and URLs.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.tabs.length) return 'No open tabs.';
+      return c.tabs.slice(0, 50).map((t, i) => `${i + 1}. ${t.title || '(untitled)'} — ${t.url || 'about:blank'}`).join('\n');
+    });
+    // UKI can OPEN a URL in a new tab (mutating -> confirm-gated). The webview
+    // mounts with the tab's initial url, so setting it here navigates.
+    registerUkiAppAction('browser', {
+      id: 'browser.openUrl',
+      description: 'open a URL in a new browser tab.',
+      args: [{ name: 'url', type: 'string' }],
+      example: '{"url":"https://example.com"}',
+      mutates: true,
+    }, (args) => {
+      let url = String(args.url ?? '').trim();
+      if (!url) return 'No URL provided.';
+      if (!/^https?:\/\//i.test(url) && !/^about:/i.test(url)) url = `https://${url}`;
+      const newTab: Tab = {
+        id: `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        title: url,
+        url,
+        loading: true,
+        background: false,
+        navHistory: [url],
+        navIndex: 0,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTab(newTab.id);
+      return `Opened ${url} in a new tab.`;
+    });
+    return () => {
+      unregisterUkiAppContext('browser');
+      unregisterUkiAppAction('browser.listTabs');
+      unregisterUkiAppAction('browser.openUrl');
+    };
   }, []);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try {

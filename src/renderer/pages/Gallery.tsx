@@ -21,6 +21,7 @@ import DexIcon from '../components/DexIcon';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
 
@@ -557,7 +558,23 @@ export const Gallery: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('gallery');
+    // Let UKI list the media in the current album as a callable action (read-only).
+    registerUkiAppAction('gallery', {
+      id: 'gallery.listMedia',
+      description: 'list the media items shown in the current Gallery album.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.sortedMedia.length) return `No media in album "${c.selectedAlbum}".`;
+      const names = c.sortedMedia.slice(0, 100).map((m) => m.name).join(', ');
+      return `${c.sortedMedia.length} items in "${c.selectedAlbum}": ${names}`.slice(0, 4000);
+    });
+    return () => {
+      unregisterUkiAppContext('gallery');
+      unregisterUkiAppAction('gallery.listMedia');
+    };
   }, []);
 
   const selectAll = useCallback(() => {

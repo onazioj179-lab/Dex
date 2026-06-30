@@ -14,6 +14,7 @@ import { decodeAudioToMono } from '../../services/media/decodeAudio';
 import { useRunningApps } from '../../store/runningApps';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import DexIcon from '../../components/DexIcon';
 import Knob from './components/Knob';
 import Fader from './components/Fader';
@@ -2221,6 +2222,26 @@ const Imosion: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+
+  // App lifecycle: a hidden DAW must not bleed audio. Stop the transport and
+  // suspend the AudioContext when Imosion is backgrounded/suspended; resume the
+  // context on return (the engine re-resumes on the next play regardless).
+  useAppLifecycle('imosion', {
+    onBackground: () => {
+      setIsPlaying(false);
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state === 'running') ctx.suspend().catch(() => { /* ignore */ });
+    },
+    onSuspend: () => {
+      setIsPlaying(false);
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state === 'running') ctx.suspend().catch(() => { /* ignore */ });
+    },
+    onForeground: () => {
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => { /* ignore */ });
+    },
+  });
   const playbackPosition = currentTime;
   const [duration] = useState(300);
   const [isLooping, setIsLooping] = useState(false);
