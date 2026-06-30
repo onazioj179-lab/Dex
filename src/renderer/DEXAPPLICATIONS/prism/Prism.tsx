@@ -7,6 +7,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from '
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import DexIcon from '../../components/DexIcon';
 import { ResizablePanel } from '../../components/ResizablePanel';
+import { MenuBar } from '../../components/appShell/MenuBar';
+import type { MenuGroup } from '../../components/appShell/menuTypes';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
@@ -592,7 +595,6 @@ const Prism: React.FC = () => {
   const [histChannel, setHistChannel] = useState<'rgb' | 'r' | 'g' | 'b' | 'lum'>('rgb');
 
   // ===== PRO FEATURES STATE =====
-  const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
   // UKI natural-language assistant bar ("remove background", "auto enhance").
   // Drives the previously-orphaned applyCreativeOp handler below.
   const [showAiBar, setShowAiBar] = useState(false);
@@ -796,17 +798,12 @@ const Prism: React.FC = () => {
   const checkerPatternRef = useRef<CanvasPattern | null>(null);
   const layerImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Close features menu on outside click or Escape key
-  useEffect(() => {
-    const handleClick = () => setShowFeaturesMenu(false);
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFeaturesMenu(false); };
-    window.addEventListener('click', handleClick);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
+  // App lifecycle: cancel any pending canvas drag frame when Prism is
+  // backgrounded/suspended so no stale rAF callback fires off-screen.
+  useAppLifecycle('prism', {
+    onBackground: () => { if (canvasDragRafRef.current) { cancelAnimationFrame(canvasDragRafRef.current); canvasDragRafRef.current = 0; } },
+    onSuspend: () => { if (canvasDragRafRef.current) { cancelAnimationFrame(canvasDragRafRef.current); canvasDragRafRef.current = 0; } },
+  });
 
   // Cancel any pending canvas-drag rAF on unmount so a frame scheduled mid-drag
   // (hand/lasso/pen) cannot fire setState after the component is gone.
@@ -2863,7 +2860,70 @@ const Prism: React.FC = () => {
 
   const selectedLayer = layers.find(l => l.id === selectedLayerId);
 
-  // Running apps integration
+  // Declarative Features menu (replaces the old hand-rolled dropdown). Sections
+  // become caps-label groups; `checked` reflects each panel's open state.
+  const featureMenus: MenuGroup[] = [{
+    id: 'features',
+    label: 'Features',
+    sections: [
+      { id: 'adjustments', label: 'Adjustments', items: [
+        { id: 'curves', label: 'Curves', checked: showCurves, run: () => setShowCurves(v => !v) },
+        { id: 'levels', label: 'Levels', checked: showLevels, run: () => setShowLevels(v => !v) },
+        { id: 'channelMixer', label: 'Channel Mixer', checked: showChannelMixer, run: () => setShowChannelMixer(v => !v) },
+        { id: 'selectiveColor', label: 'Selective Color', checked: showSelectiveColor, run: () => setShowSelectiveColor(v => !v) },
+        { id: 'colorBalance', label: 'Color Balance', checked: showColorBalance, run: () => setShowColorBalance(v => !v) },
+        { id: 'photoFilter', label: 'Photo Filter', checked: showPhotoFilter, run: () => setShowPhotoFilter(v => !v) },
+        { id: 'gradientMap', label: 'Gradient Map', checked: showGradientMap, run: () => setShowGradientMap(v => !v) },
+        { id: 'colorLut', label: 'Color LUT', checked: showColorLookup, run: () => setShowColorLookup(v => !v) },
+      ] },
+      { id: 'filters', label: 'Filters', items: [
+        { id: 'contentAwareFill', label: 'Content-Aware Fill', checked: showContentAwareFill, run: () => setShowContentAwareFill(v => !v) },
+        { id: 'liquify', label: 'Liquify', checked: showLiquify, run: () => setShowLiquify(v => !v) },
+        { id: 'freqSeparation', label: 'Frequency Separation', checked: showFreqSeparation, run: () => setShowFreqSeparation(v => !v) },
+        { id: 'filterGallery', label: 'Filter Gallery', checked: showFilterGallery, run: () => setShowFilterGallery(v => !v) },
+        { id: 'lensCorrection', label: 'Lens Correction', checked: showLensCorrection, run: () => setShowLensCorrection(v => !v) },
+        { id: 'unsharpMask', label: 'Unsharp Mask', checked: showUnsharpMask, run: () => setShowUnsharpMask(v => !v) },
+        { id: 'addNoise', label: 'Add Noise', checked: showAddNoise, run: () => setShowAddNoise(v => !v) },
+        { id: 'hdrMerge', label: 'HDR Merge', checked: showHDRMerge, run: () => setShowHDRMerge(v => !v) },
+      ] },
+      { id: 'selection', label: 'Selection', items: [
+        { id: 'selectSubject', label: 'Select Subject', checked: showSelectSubject, run: () => setShowSelectSubject(v => !v) },
+        { id: 'colorRange', label: 'Color Range', checked: showColorRange, run: () => setShowColorRange(v => !v) },
+        { id: 'refineEdge', label: 'Refine Edge', checked: showRefineEdge, run: () => setShowRefineEdge(v => !v) },
+        { id: 'quickMask', label: 'Quick Mask', checked: quickMaskMode, run: () => setQuickMaskMode(v => !v) },
+      ] },
+      { id: 'retouching', label: 'Retouching', items: [
+        { id: 'spotHealing', label: 'Spot Healing', checked: showSpotHealing, run: () => setShowSpotHealing(v => { const next = !v; if (next) setActiveTool('heal'); return next; }) },
+      ] },
+      { id: 'transform', label: 'Transform', items: [
+        { id: 'canvasSize', label: 'Canvas Size', checked: showCanvasSize, run: () => { setCanvasSizeNew({ width: canvasSize.width, height: canvasSize.height }); setShowCanvasSize(v => !v); } },
+        { id: 'rotateImage', label: 'Rotate Image', checked: showImageRotation, run: () => setShowImageRotation(v => !v) },
+      ] },
+      { id: 'color', label: 'Color', items: [
+        { id: 'replaceColor', label: 'Replace Color', checked: showReplaceColor, run: () => setShowReplaceColor(v => !v) },
+        { id: 'posterize', label: 'Posterize', checked: showPosterize, run: () => setShowPosterize(v => !v) },
+        { id: 'threshold', label: 'Threshold', checked: showThreshold, run: () => setShowThreshold(v => !v) },
+      ] },
+      { id: 'composition', label: 'Composition', items: [
+        { id: 'smartObjects', label: 'Smart Objects', checked: showSmartObjects, run: () => setShowSmartObjects(v => !v) },
+        { id: 'layerStyles', label: 'Layer Styles', checked: showLayerStyles, run: () => setShowLayerStyles(v => !v) },
+        { id: 'panorama', label: 'Panorama', checked: showPanorama, run: () => setShowPanorama(v => !v) },
+        { id: 'focusStack', label: 'Focus Stack', checked: showFocusStack, run: () => setShowFocusStack(v => !v) },
+        { id: 'rawDevelop', label: 'RAW Develop', checked: showRAWDevelop, run: () => setShowRAWDevelop(v => !v) },
+      ] },
+      { id: 'export', label: 'Export', items: [
+        { id: 'batchProcess', label: 'Batch Process', checked: showBatchProcess, run: () => setShowBatchProcess(v => !v) },
+        { id: 'slices', label: 'Slices', checked: showSliceExport, run: () => setShowSliceExport(v => !v) },
+        { id: 'artboards', label: 'Artboards', checked: showArtboards, run: () => setShowArtboards(v => !v) },
+        { id: 'assetLibrary', label: 'Asset Library', checked: showAssetLibrary, run: () => setShowAssetLibrary(v => !v) },
+      ] },
+      { id: 'view', label: 'View', items: [
+        { id: 'rulers', label: 'Rulers', checked: showRulers, run: () => setShowRulers(v => !v) },
+        { id: 'guides', label: 'Guides', checked: showGuidesPanel, run: () => setShowGuidesPanel(v => !v) },
+        { id: 'actions', label: 'Actions', checked: showActions, run: () => setShowActions(v => !v) },
+      ] },
+    ],
+  }];
 
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
@@ -2993,104 +3053,7 @@ const Prism: React.FC = () => {
             Assistant
           </button>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
-            <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} onMouseEnter={e => { if (!showFeaturesMenu) e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { if (!showFeaturesMenu) e.currentTarget.style.background = 'transparent'; }} style={{ background: showFeaturesMenu ? '#2e1520' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#ff375f' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
-            {showFeaturesMenu && (
-              <div className="dex-creative-panel-strong" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', zIndex: 6000, padding: '4px' }} onClick={(e) => e.stopPropagation()}>
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>ADJUSTMENTS</div>
-                {[
-                  { label: 'Curves', active: showCurves, fn: () => setShowCurves(v => !v) },
-                  { label: 'Levels', active: showLevels, fn: () => setShowLevels(v => !v) },
-                  { label: 'Channel Mixer', active: showChannelMixer, fn: () => setShowChannelMixer(v => !v) },
-                  { label: 'Selective Color', active: showSelectiveColor, fn: () => setShowSelectiveColor(v => !v) },
-                  { label: 'Color Balance', active: showColorBalance, fn: () => setShowColorBalance(v => !v) },
-                  { label: 'Photo Filter', active: showPhotoFilter, fn: () => setShowPhotoFilter(v => !v) },
-                  { label: 'Gradient Map', active: showGradientMap, fn: () => setShowGradientMap(v => !v) },
-                  { label: 'Color LUT', active: showColorLookup, fn: () => setShowColorLookup(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>FILTERS</div>
-                {[
-                  { label: 'Content-Aware Fill', active: showContentAwareFill, fn: () => setShowContentAwareFill(v => !v) },
-                  { label: 'Liquify', active: showLiquify, fn: () => setShowLiquify(v => !v) },
-                  { label: 'Frequency Separation', active: showFreqSeparation, fn: () => setShowFreqSeparation(v => !v) },
-                  { label: 'Filter Gallery', active: showFilterGallery, fn: () => setShowFilterGallery(v => !v) },
-                  { label: 'Lens Correction', active: showLensCorrection, fn: () => setShowLensCorrection(v => !v) },
-                  { label: 'Unsharp Mask', active: showUnsharpMask, fn: () => setShowUnsharpMask(v => !v) },
-                  { label: 'Add Noise', active: showAddNoise, fn: () => setShowAddNoise(v => !v) },
-                  { label: 'HDR Merge', active: showHDRMerge, fn: () => setShowHDRMerge(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>SELECTION</div>
-                {[
-                  { label: 'Select Subject', active: showSelectSubject, fn: () => setShowSelectSubject(v => !v) },
-                  { label: 'Color Range', active: showColorRange, fn: () => setShowColorRange(v => !v) },
-                  { label: 'Refine Edge', active: showRefineEdge, fn: () => setShowRefineEdge(v => !v) },
-                  { label: 'Quick Mask', active: quickMaskMode, fn: () => setQuickMaskMode(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>RETOUCHING</div>
-                {[
-                  { label: 'Spot Healing', active: showSpotHealing, fn: () => setShowSpotHealing(v => { const next = !v; if (next) setActiveTool('heal'); return next; }) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>TRANSFORM</div>
-                {[
-                  { label: 'Canvas Size', active: showCanvasSize, fn: () => { setCanvasSizeNew({ width: canvasSize.width, height: canvasSize.height }); setShowCanvasSize(v => !v); } },
-                  { label: 'Rotate Image', active: showImageRotation, fn: () => setShowImageRotation(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>COLOR</div>
-                {[
-                  { label: 'Replace Color', active: showReplaceColor, fn: () => setShowReplaceColor(v => !v) },
-                  { label: 'Posterize', active: showPosterize, fn: () => setShowPosterize(v => !v) },
-                  { label: 'Threshold', active: showThreshold, fn: () => setShowThreshold(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>COMPOSITION</div>
-                {[
-                  { label: 'Smart Objects', active: showSmartObjects, fn: () => setShowSmartObjects(v => !v) },
-                  { label: 'Layer Styles', active: showLayerStyles, fn: () => setShowLayerStyles(v => !v) },
-                  { label: 'Panorama', active: showPanorama, fn: () => setShowPanorama(v => !v) },
-                  { label: 'Focus Stack', active: showFocusStack, fn: () => setShowFocusStack(v => !v) },
-                  { label: 'RAW Develop', active: showRAWDevelop, fn: () => setShowRAWDevelop(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
-                {[
-                  { label: 'Batch Process', active: showBatchProcess, fn: () => setShowBatchProcess(v => !v) },
-                  { label: 'Slices', active: showSliceExport, fn: () => setShowSliceExport(v => !v) },
-                  { label: 'Artboards', active: showArtboards, fn: () => setShowArtboards(v => !v) },
-                  { label: 'Asset Library', active: showAssetLibrary, fn: () => setShowAssetLibrary(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIEW</div>
-                {[
-                  { label: 'Rulers', active: showRulers, fn: () => setShowRulers(v => !v) },
-                  { label: 'Guides', active: showGuidesPanel, fn: () => setShowGuidesPanel(v => !v) },
-                  { label: 'Actions', active: showActions, fn: () => setShowActions(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
-                ))}
-              </div>
-            )}
-          </div>
+          <MenuBar groups={featureMenus} />
         </div>
 
       </div>

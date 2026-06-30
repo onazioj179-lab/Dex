@@ -33,7 +33,10 @@
     "icon": ["../assets/icon.ico", "../assets/icon.png"],
     "windows": {
       "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.digicert.com"
+      "timestampUrl": "http://timestamp.digicert.com",
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
     }
   }
 }

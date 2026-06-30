@@ -31,9 +31,12 @@ import { TtlCache, createToolBudget, chargeTool, type ToolBudget } from '../../s
 import { notify } from '../services/notify';
 import { APP_DEFINITIONS } from '../store/runningApps';
 
-import { isKnownTool, validateToolCall, renderToolCatalog, type ToolName } from '../../shared/uki/toolValidation';
+import { isKnownTool, createToolCatalog, type ToolName, type ToolCatalog } from '../../shared/uki/toolValidation';
+import { runnableActionToolSpecs, runUkiAction } from './appActionRegistry';
 
-const AGENT_PROTOCOL = `
+/** Build the agent system protocol around a (core + dynamic) tool catalog. */
+function buildAgentProtocol(catalogPrompt: string): string {
+  return `
 You are UKI, the in-OS assistant for DEX, and you can ACT, not just talk. You have tools.
 
 When a tool would help, reply with EXACTLY one line and nothing else:
@@ -46,28 +49,31 @@ I will run it and reply with a line that starts with "RESULT:" containing the ou
 (use another tool, or give your final answer). When you have the answer, reply NORMALLY with no TOOL line.
 
 Use tools deliberately:
-${renderToolCatalog()}
+${catalogPrompt}
 
-Rules: take real action when the user asks you to control DEX. Search the web before answering about current
-events or anything you cannot be sure of. Keep final answers concise and friendly. Never invent a tool result.
+Rules: take real action when the user asks you to control DEX. App-specific tools (names with a dot, e.g.
+notes.getActiveNote) act on the matching running app — open it first with open_app if it isn't running.
+Search the web before answering about current events or anything you cannot be sure of. Keep final answers
+concise and friendly. Never invent a tool result.
 `.trim();
+}
 
 // Web-search results are stable for a few minutes; cache to avoid re-fetching on
 // a follow-up turn in the same conversation.
 const webSearchCache = new TtlCache<string, string>(5 * 60 * 1000, 200);
 
-interface ToolCall { name: ToolName; args: Record<string, unknown>; jsonError: boolean; }
+interface ToolCall { name: string; args: Record<string, unknown>; jsonError: boolean; }
 
 // Tool-argument schemas + validation live in shared/uki/toolValidation.ts (pure,
 // testable, main+renderer). The loop below gates every call through
 // validateToolCall so a structurally-invalid call is repaired, never run.
 
 /** Extract the first valid `TOOL <name> {json}` directive, or null for a final answer. */
-function parseToolDirective(reply: string): ToolCall | null {
-  const m = reply.match(/(?:^|\n)\s*(?:`{3}\s*)?TOOL\s+([a-zA-Z_]+)[ \t]*(\{[\s\S]*?\})?/);
+function parseToolDirective(reply: string, catalog: ToolCatalog): ToolCall | null {
+  const m = reply.match(/(?:^|\n)\s*(?:`{3}\s*)?TOOL\s+([a-zA-Z_][a-zA-Z0-9_.]*)[ \t]*(\{[\s\S]*?\})?/);
   if (!m) return null;
   const name = m[1];
-  if (!isKnownTool(name)) return null;
+  if (!catalog.isKnown(name)) return null;
   let args: Record<string, unknown> = {};
   let jsonError = false;
   if (m[2]) { try { args = JSON.parse(m[2]); } catch { jsonError = true; } }
@@ -97,8 +103,13 @@ export async function webSearch(query: string): Promise<string> {
   return out;
 }
 
-async function runTool(name: ToolName, args: Record<string, unknown>): Promise<string> {
-  switch (name) {
+async function runTool(name: string, args: Record<string, unknown>): Promise<string> {
+  // Dynamic app actions (dotted names) are routed to the app-action registry,
+  // which gates mutating actions on user confirmation and never throws.
+  if (!isKnownTool(name)) {
+    return runUkiAction(name, args);
+  }
+  switch (name as ToolName) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
     case 'open_app': {
@@ -150,7 +161,6 @@ export interface UkiAgentOptions {
 export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null> {
   const pushStep = opts.pushStep ?? (() => {});
   const maxSteps = opts.maxSteps ?? 5;
-  const sys = `${opts.systemPrompt}\n\n${AGENT_PROTOCOL}`;
   const messages: ChatMessage[] = [...(opts.history ?? [])];
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
@@ -159,13 +169,18 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   let repairCount = 0; // consecutive invalid tool calls — bounds the repair loop
 
   for (let step = 0; step < maxSteps; step++) {
+    // Rebuild the catalog each step so the actions of an app UKI just opened
+    // become callable within the same turn (core tools + running apps' actions).
+    const catalog = createToolCatalog(runnableActionToolSpecs());
+    const sys = `${opts.systemPrompt}\n\n${buildAgentProtocol(catalog.prompt())}`;
+
     const reply = await askConfiguredLLM(userTurn, sys, {
       history: messages,
       chatOptions: { temperature: 0.5, maxTokens: 700 },
     });
     if (!reply) return null; // provider failure -> caller degrades
 
-    const call = parseToolDirective(reply);
+    const call = parseToolDirective(reply, catalog);
     if (!call) return reply; // no tool requested -> final answer
 
     // Record the model's tool request turn so it sees its own prior steps.
@@ -177,7 +192,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
     // running, and hand the model a precise repair instruction. Bounded so a
     // model that keeps mis-calling is forced to a final answer (also capped by
     // maxSteps). A degenerate tool run never happens.
-    const validation = validateToolCall(call.name, call.args, call.jsonError);
+    const validation = catalog.validate(call.name, call.args, call.jsonError);
     if (!validation.ok) {
       repairCount++;
       pushStep(`Rejected ${call.name}: ${validation.error}`);
@@ -188,6 +203,11 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
     }
     repairCount = 0;
 
+    // Cap any tool without an explicit core limit (i.e. dynamic app actions)
+    // so a misbehaving model cannot spam one app action.
+    if (budget.perToolLimit[call.name] === undefined) {
+      budget = { ...budget, perToolLimit: { ...budget.perToolLimit, [call.name]: 5 } };
+    }
     const charged = chargeTool(budget, call.name);
     budget = charged.budget;
     if (!charged.ok) {
@@ -209,7 +229,8 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
 
   // Step cap hit -- force a tool-free synthesis from everything gathered.
   pushStep('Max tool steps reached -- synthesising answer');
-  return askConfiguredLLM('Give your best final answer now. Do NOT use any more tools.', sys, {
+  const finalSys = `${opts.systemPrompt}\n\n${buildAgentProtocol(createToolCatalog(runnableActionToolSpecs()).prompt())}`;
+  return askConfiguredLLM('Give your best final answer now. Do NOT use any more tools.', finalSys, {
     history: messages,
     chatOptions: { temperature: 0.5, maxTokens: 700 },
   });

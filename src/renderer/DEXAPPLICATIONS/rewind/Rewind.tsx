@@ -14,6 +14,7 @@ import DexIcon from '../../components/DexIcon';
 import { DexSearchInput } from '../../styles/components';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { spaceAt } from '../../store/stageActivityLog';
@@ -536,13 +537,18 @@ const Rewind: React.FC = () => {
     loadPhase5();
   }, [loadTimeline, loadSummary, loadSettings, loadPhase5]);
 
+  // App lifecycle: pause all background polling when Rewind is not on screen,
+  // so it consumes nothing while idle/backgrounded and resumes on return.
+  const lifecyclePhase = useAppLifecycle('rewind', {});
+
   // Auto-refresh timeline every 30s (low-end friendly)
   useEffect(() => {
+    if (lifecyclePhase !== 'foreground') return;
     const timer = setInterval(() => {
       loadTimeline();
     }, 30000);
     return () => clearInterval(timer);
-  }, [loadTimeline]);
+  }, [loadTimeline, lifecyclePhase]);
 
   // Auto-refresh backend status every 2s (always-on, silent)
   useEffect(() => {
@@ -559,17 +565,20 @@ const Rewind: React.FC = () => {
         }
       } catch (e) { if (import.meta.env.DEV) console.warn('[Rewind] Status load failed:', e); }
     };
-    loadStatus();
-    const timer = setInterval(loadStatus, 10000);
-    return () => clearInterval(timer);
-  }, []);
+    if (lifecyclePhase === 'foreground') {
+      loadStatus();
+      const timer = setInterval(loadStatus, 10000);
+      return () => clearInterval(timer);
+    }
+  }, [lifecyclePhase]);
 
   // Auto-refresh analytics every 60s (always-on, silent)
   useEffect(() => {
+    if (lifecyclePhase !== 'foreground') return;
     loadAnalytics();
     const timer = setInterval(loadAnalytics, 120 * 1000);
     return () => clearInterval(timer);
-  }, [loadAnalytics]);
+  }, [loadAnalytics, lifecyclePhase]);
 
   // Phase 4: poll session lock state every 5s
   useEffect(() => {
@@ -580,16 +589,18 @@ const Rewind: React.FC = () => {
         setSessionLocked(locked);
       } catch (e) { if (import.meta.env.DEV) console.warn('[Rewind] Session lock check failed:', e); }
     };
-const timer = setInterval(check, 15000);
+    if (lifecyclePhase !== 'foreground') return;
+    const timer = setInterval(check, 15000);
     return () => clearInterval(timer);
-  }, []);
+  }, [lifecyclePhase]);
 
   useEffect(() => {
+    if (lifecyclePhase !== 'foreground') return;
     const timer = setInterval(() => {
       loadPhase5();
     }, 5 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [loadPhase5]);
+  }, [loadPhase5, lifecyclePhase]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

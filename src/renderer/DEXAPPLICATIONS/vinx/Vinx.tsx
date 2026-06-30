@@ -14,6 +14,9 @@ import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
 import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
+import { MenuBar } from '../../components/appShell/MenuBar';
+import type { MenuGroup } from '../../components/appShell/menuTypes';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { planSilenceRemoval } from '../../../shared/media/silenceDetect';
@@ -469,7 +472,6 @@ const VinxEditor: React.FC = () => {
   );
   const programCanvasRef = useRef<HTMLDivElement>(null);
   const sourceCanvasRef = useRef<HTMLDivElement>(null);
-  const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
   // UKI natural-language assistant bar. Drives the previously-orphaned
   // handleVinxOp handler (silence removal, speed ramp, etc.).
   const [showAiBar, setShowAiBar] = useState(false);
@@ -575,13 +577,6 @@ const VinxEditor: React.FC = () => {
     }
   }, []);
 
-  // Close features menu on outside click
-  useEffect(() => {
-    const handleClick = () => setShowFeaturesMenu(false);
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, []);
-
   // -- Initialize PlaybackEngine --
   useEffect(() => {
     const engine = new PlaybackEngine({
@@ -670,6 +665,22 @@ const VinxEditor: React.FC = () => {
     engine.stop();
     setCurrentFrame(0);
   }, [setIsPlaying, setCurrentFrame]);
+
+  // -- App lifecycle: stop playback when Vinx is backgrounded/suspended so no
+  // rAF/decoding runs off-screen. Keep-alive means we never unmount; we just
+  // release the playback loop. Playback stays paused on return (user resumes).
+  useAppLifecycle('videoeditor', {
+    onBackground: () => {
+      if (useVinxStore.getState().isPlaying) {
+        useVinxStore.getState().setIsPlaying(false);
+        engineRef.current?.pause();
+      }
+    },
+    onSuspend: () => {
+      useVinxStore.getState().setIsPlaying(false);
+      engineRef.current?.pause();
+    },
+  });
 
   const handleSeek = useCallback((frame: number) => {
     const engine = engineRef.current;
@@ -969,6 +980,71 @@ const VinxEditor: React.FC = () => {
 
   const speeds = [0.25, 0.5, 1, 2, 4];
 
+  // Declarative Features menu (replaces the old hand-rolled dropdown). Sections
+  // become caps-label groups; `checked` reflects each panel's open state.
+  const featureMenus: MenuGroup[] = [{
+    id: 'features',
+    label: 'Features',
+    sections: [
+      { id: 'color', label: 'Color', items: [
+        { id: 'lutBrowser', label: 'LUT Browser', checked: showLUTBrowser, run: toggleLUTBrowser },
+        { id: 'speedRamp', label: 'Speed Ramp', checked: showSpeedRampEditor, run: toggleSpeedRampEditor },
+        { id: 'freezeFrame', label: 'Freeze Frame', run: () => { if (selectedClipIds.length > 0) createFreezeFrame(selectedClipIds[0], currentFrame, project.frameRate * 2); } },
+        { id: 'clipColorLabels', label: 'Clip Color Labels', checked: showClipColorLabels, run: toggleClipColorLabels },
+      ] },
+      { id: 'audio', label: 'Audio', items: [
+        { id: 'loudness', label: 'Loudness (LUFS)', checked: showLoudnessPanel, run: toggleLoudnessPanel },
+        { id: 'audioDucking', label: 'Audio Ducking', checked: showAudioDuckingPanel, run: toggleAudioDuckingPanel },
+        { id: 'voiceover', label: 'Voiceover', checked: isRecordingVoiceover, run: toggleVoiceoverRecording },
+        { id: 'voiceIsolation', label: 'Voice Isolation', checked: voiceIsolationEnabled, run: toggleVoiceIsolation },
+        { id: 'crossfade', label: 'Crossfade Presets', checked: showCrossfadePresets, run: toggleCrossfadePresets },
+        { id: 'audioEq', label: 'Audio EQ', checked: showAudioEQ, run: toggleAudioEQ },
+      ] },
+      { id: 'video', label: 'Video', items: [
+        { id: 'motionTracker', label: 'Motion Tracker', checked: showMotionTracker, run: toggleMotionTracker },
+        { id: 'maskEditor', label: 'Mask Editor', checked: showMaskEditor, run: toggleMaskEditor },
+        { id: 'stabilization', label: 'Stabilization', checked: showStabilizationPanel, run: toggleStabilizationPanel },
+        { id: 'noiseReduction', label: 'Noise Reduction', checked: showNoiseReductionPanel, run: toggleNoiseReductionPanel },
+        { id: 'kenBurns', label: 'Ken Burns Zoom', checked: showKenBurns, run: toggleKenBurns },
+      ] },
+      { id: 'editing', label: 'Editing', items: [
+        { id: 'clipRoles', label: 'Clip Roles', checked: showClipRolesPanel, run: toggleClipRolesPanel },
+        { id: 'pip', label: 'Picture-in-Picture', checked: showPipPresets, run: togglePipPresets },
+        { id: 'referenceFrame', label: 'Reference Frame', checked: showReferenceFrame, run: toggleReferenceFrame },
+        { id: 'autoReframe', label: 'Auto-Reframe', checked: showAutoReframe, run: toggleAutoReframe },
+        { id: 'jlCut', label: 'J/L Cut Presets', checked: showJLCutPanel, run: toggleJLCutPanel },
+        { id: 'adjustmentLayer', label: 'Adjustment Layer', run: addAdjustmentLayer },
+        { id: 'reverseClip', label: 'Reverse Clip', run: () => { if (selectedClipIds.length > 0) reverseClip(selectedClipIds[0]); } },
+        { id: 'copyAttrs', label: 'Copy Attributes', run: () => { if (selectedClipIds.length > 0) copyClipAttributes(selectedClipIds[0]); } },
+        { id: 'pasteAttrs', label: 'Paste Attributes', run: () => { if (copiedClipAttributes && selectedClipIds.length > 0) pasteClipAttributes(selectedClipIds[0]); } },
+      ] },
+      { id: 'subtitles', label: 'Subtitles', items: [
+        { id: 'subtitles', label: 'Subtitles (SRT)', checked: showSubtitleEditor, run: toggleSubtitleEditor },
+        { id: 'multicamMode', label: 'Multicam Mode', checked: multicamMode, run: toggleMulticamMode },
+        { id: 'multicamPanel', label: 'Multicam Angles Panel', checked: showMulticamPanel, run: () => setShowMulticamPanel(!showMulticamPanel) },
+        { id: 'timecodeOverlay', label: 'Timecode Overlay', checked: timecodeOverlayEnabled, run: toggleTimecodeOverlay },
+      ] },
+      { id: 'markers', label: 'Markers', items: [
+        { id: 'markerManager', label: 'Marker Manager', checked: showMarkerManager, run: toggleMarkerManager },
+        { id: 'snapSettings', label: 'Snap Settings', checked: showSnapSettings, run: toggleSnapSettings },
+      ] },
+      { id: 'export', label: 'Export', items: [
+        { id: 'renderQueue', label: 'Render Queue', checked: showBackgroundRender, run: toggleBackgroundRender },
+        { id: 'edlExport', label: 'EDL/XML Export', checked: showEDLExport, run: toggleEDLExport },
+        { id: 'shortcuts', label: 'Keyboard Shortcuts', checked: showShortcutsEditor, run: toggleShortcutsEditor },
+        { id: 'templates', label: 'Templates', run: toggleTemplateDialog },
+        { id: 'batchExport', label: 'Batch Export', checked: showBatchExport, run: toggleBatchExport },
+      ] },
+      { id: 'preview', label: 'Preview', items: [
+        { id: 'setIn', label: 'Set In Point (I)', run: setInPoint },
+        { id: 'setOut', label: 'Set Out Point (O)', run: setOutPoint },
+        { id: 'clearInOut', label: 'Clear In/Out', run: clearInOutPoints },
+        { id: 'clipInspector', label: 'Clip Inspector', checked: showClipInspector, run: toggleClipInspector },
+        { id: 'renderPreview', label: 'Render Preview', checked: renderPreviewStatus === 'rendering', run: renderPreviewStatus === 'rendering' ? cancelRenderPreview : startRenderPreview },
+      ] },
+    ],
+  }];
+
   return (
     <div style={appContainerStyle} className="vinx-app" {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop videos to import</div>}
@@ -1187,102 +1263,7 @@ const VinxEditor: React.FC = () => {
 
         <div style={toolbarSeparatorStyle} />
 
-        <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
-          <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ ...toolbarBtnStyle, background: showFeaturesMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : undefined, color: showFeaturesMenu ? 'var(--color-accent)' : undefined }}>
-            <DexIcon name="sliders" size={10} /> Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg>
-          </button>
-          {showFeaturesMenu && (
-            <div role="menu" className="dex-creative-panel-strong" onKeyDown={(e) => { if (e.key === 'Escape') setShowFeaturesMenu(false); }} style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>COLOR</div>
-              {[
-                { label: 'LUT Browser', active: showLUTBrowser, fn: toggleLUTBrowser },
-                { label: 'Speed Ramp', active: showSpeedRampEditor, fn: toggleSpeedRampEditor },
-                { label: 'Freeze Frame', active: false, fn: () => { if (selectedClipIds.length > 0) createFreezeFrame(selectedClipIds[0], currentFrame, project.frameRate * 2); } },
-                { label: 'Clip Color Labels', active: showClipColorLabels, fn: toggleClipColorLabels },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>AUDIO</div>
-              {[
-                { label: 'Loudness (LUFS)', active: showLoudnessPanel, fn: toggleLoudnessPanel },
-                { label: 'Audio Ducking', active: showAudioDuckingPanel, fn: toggleAudioDuckingPanel },
-                { label: 'Voiceover', active: isRecordingVoiceover, fn: toggleVoiceoverRecording },
-                { label: 'Voice Isolation', active: voiceIsolationEnabled, fn: toggleVoiceIsolation },
-                { label: 'Crossfade Presets', active: showCrossfadePresets, fn: toggleCrossfadePresets },
-                { label: 'Audio EQ', active: showAudioEQ, fn: toggleAudioEQ },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>VIDEO</div>
-              {[
-                { label: 'Motion Tracker', active: showMotionTracker, fn: toggleMotionTracker },
-                { label: 'Mask Editor', active: showMaskEditor, fn: toggleMaskEditor },
-                { label: 'Stabilization', active: showStabilizationPanel, fn: toggleStabilizationPanel },
-                { label: 'Noise Reduction', active: showNoiseReductionPanel, fn: toggleNoiseReductionPanel },
-                { label: 'Ken Burns Zoom', active: showKenBurns, fn: toggleKenBurns },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>EDITING</div>
-              {[
-                { label: 'Clip Roles', active: showClipRolesPanel, fn: toggleClipRolesPanel },
-                { label: 'Picture-in-Picture', active: showPipPresets, fn: togglePipPresets },
-                { label: 'Reference Frame', active: showReferenceFrame, fn: toggleReferenceFrame },
-                { label: 'Auto-Reframe', active: showAutoReframe, fn: toggleAutoReframe },
-                { label: 'J/L Cut Presets', active: showJLCutPanel, fn: toggleJLCutPanel },
-                { label: 'Adjustment Layer', active: false, fn: addAdjustmentLayer },
-                { label: 'Reverse Clip', active: false, fn: () => { if (selectedClipIds.length > 0) reverseClip(selectedClipIds[0]); } },
-                { label: 'Copy Attributes', active: false, fn: () => { if (selectedClipIds.length > 0) copyClipAttributes(selectedClipIds[0]); } },
-                { label: 'Paste Attributes', active: false, fn: () => { if (copiedClipAttributes && selectedClipIds.length > 0) pasteClipAttributes(selectedClipIds[0]); } },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>SUBTITLES</div>
-              {[
-                { label: 'Subtitles (SRT)', active: showSubtitleEditor, fn: toggleSubtitleEditor },
-                { label: 'Multicam Mode', active: multicamMode, fn: toggleMulticamMode },
-                { label: 'Multicam Angles Panel', active: showMulticamPanel, fn: () => setShowMulticamPanel(!showMulticamPanel) },
-                { label: 'Timecode Overlay', active: timecodeOverlayEnabled, fn: toggleTimecodeOverlay },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>MARKERS</div>
-              {[
-                { label: 'Marker Manager', active: showMarkerManager, fn: toggleMarkerManager },
-                { label: 'Snap Settings', active: showSnapSettings, fn: toggleSnapSettings },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>EXPORT</div>
-              {[
-                { label: 'Render Queue', active: showBackgroundRender, fn: toggleBackgroundRender },
-                { label: 'EDL/XML Export', active: showEDLExport, fn: toggleEDLExport },
-                { label: 'Keyboard Shortcuts', active: showShortcutsEditor, fn: toggleShortcutsEditor },
-                { label: 'Templates', active: false, fn: toggleTemplateDialog },
-                { label: 'Batch Export', active: showBatchExport, fn: toggleBatchExport },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-              <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PREVIEW</div>
-              {[
-                { label: 'Set In Point (I)', active: false, fn: setInPoint },
-                { label: 'Set Out Point (O)', active: false, fn: setOutPoint },
-                { label: 'Clear In/Out', active: false, fn: clearInOutPoints },
-                { label: 'Clip Inspector', active: showClipInspector, fn: toggleClipInspector },
-                { label: 'Render Preview', active: renderPreviewStatus === 'rendering', fn: renderPreviewStatus === 'rendering' ? cancelRenderPreview : startRenderPreview },
-              ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-              ))}
-            </div>
-          )}
-        </div>
+        <MenuBar groups={featureMenus} />
 
 
       </div>

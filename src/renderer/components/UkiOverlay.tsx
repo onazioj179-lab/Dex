@@ -22,10 +22,19 @@ import { buildSystemPrompt } from '../uki';
 import { hasConfiguredProvider } from '../uki/providers/connect';
 import { runUkiAgent, webSearch } from '../uki/agentRunner';
 import { formatUkiContexts } from '../uki/appContextRegistry';
+import { setUkiActionConfirmHandler } from '../uki/appActionRegistry';
 import { getActiveWorkspace } from '../uki/context';
 import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../uki/answerEngine';
 import { useSpinnerVerb } from '../uki/spinnerVerbs';
 import { computeLingerMs } from '../uki/sleepTiming';
+
+// Mutating UKI app-actions (e.g. tasks.addTask) never run without the user's
+// approval. Wire the confirm surface once so the agent's action registry can
+// gate every document-changing action behind an explicit yes/no.
+setUkiActionConfirmHandler((entry, args) => {
+  const argStr = Object.keys(args).length ? `\n\n${JSON.stringify(args)}` : '';
+  return window.confirm(`UKI wants to: ${entry.spec.description}${argStr}\n\nAllow this change to ${entry.appId}?`);
+});
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel

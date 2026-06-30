@@ -84,6 +84,47 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
         Some(&entry.value)
     }
 
+    /// Fetch a live value WITHOUT refreshing its LRU recency — for stats,
+    /// monitoring, or speculative reads that must not perturb eviction order.
+    /// Expired entries are removed and reported as a miss, exactly like
+    /// [`Cache::get`]; the only difference is that the entry's recency is
+    /// left untouched, so a peeked entry is no safer from eviction than before.
+    pub fn peek(&mut self, key: &K) -> Option<&V> {
+        let now = Instant::now();
+        let expired = self.map.get(key).map(|e| Self::is_expired(e, now)).unwrap_or(false);
+        if expired {
+            self.map.remove(key);
+            return None;
+        }
+        self.map.get(key).map(|e| &e.value)
+    }
+
+    /// Return the live value for `key`, or compute it with `f`, insert it (with
+    /// the cache's default TTL), and return the freshly-inserted value. The
+    /// closure runs ONLY on a miss (absent or expired). Refreshes LRU recency
+    /// on a hit, like [`Cache::get`]. This is the ergonomic memoization path so
+    /// callers stop writing the get-or-compute-then-insert dance by hand.
+    pub fn get_or_insert_with<F: FnOnce() -> V>(&mut self, key: K, f: F) -> &V {
+        let now = Instant::now();
+        let hit = self.map.get(&key).map(|e| !Self::is_expired(e, now)).unwrap_or(false);
+        if hit {
+            let used = self.next_tick();
+            let entry = self.map.get_mut(&key).expect("checked hit");
+            entry.used = used;
+            return &entry.value;
+        }
+        let value = f();
+        self.insert(key.clone(), value);
+        &self.map.get(&key).expect("just inserted").value
+    }
+
+    /// Iterate the keys of all STORED entries (order unspecified). May include
+    /// not-yet-purged expired entries — call [`Cache::purge_expired`] first if
+    /// you need liveness.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.map.keys()
+    }
+
     /// Whether a live entry exists for `key`. Does NOT refresh LRU recency.
     pub fn contains_key(&self, key: &K) -> bool {
         self.map
@@ -234,5 +275,53 @@ mod tests {
         let mut c: Cache<&str, i32> = Cache::with_ttl(8, Duration::from_millis(0));
         c.insert("k", 1); // uses the default 0ms TTL
         assert_eq!(c.get(&"k"), None);
+    }
+
+    #[test]
+    fn peek_does_not_refresh_lru() {
+        let mut c: Cache<&str, i32> = Cache::new(2);
+        c.insert("a", 1); // older
+        c.insert("b", 2); // newer
+        // Contrast with get(): peeking "a" must NOT make it more recent than "b".
+        assert_eq!(c.peek(&"a"), Some(&1));
+        c.insert("c", 3); // over capacity -> evict LRU, which is still "a"
+        assert!(!c.contains_key(&"a"), "peek must not save the LRU entry from eviction");
+        assert!(c.contains_key(&"b"));
+        assert!(c.contains_key(&"c"));
+    }
+
+    #[test]
+    fn peek_expired_is_a_miss_and_purges() {
+        let mut c: Cache<&str, i32> = Cache::new(8);
+        c.insert_with_ttl("k", 1, Duration::from_millis(0));
+        assert_eq!(c.peek(&"k"), None, "expired entry peeks as a miss");
+        assert_eq!(c.len(), 0, "and is purged on the peek");
+    }
+
+    #[test]
+    fn get_or_insert_with_computes_only_on_miss() {
+        let mut c: Cache<&str, i32> = Cache::new(4);
+        let mut calls = 0;
+        assert_eq!(*c.get_or_insert_with("a", || { calls += 1; 10 }), 10);
+        assert_eq!(*c.get_or_insert_with("a", || { calls += 1; 99 }), 10, "second call is a hit");
+        assert_eq!(calls, 1, "the closure runs only on the miss");
+    }
+
+    #[test]
+    fn get_or_insert_with_recomputes_after_expiry() {
+        let mut c: Cache<&str, i32> = Cache::with_ttl(4, Duration::from_millis(0));
+        assert_eq!(*c.get_or_insert_with("a", || 1), 1);
+        // The 0ms TTL means the entry is expired by the next access -> recompute.
+        assert_eq!(*c.get_or_insert_with("a", || 2), 2, "expired entry recomputes");
+    }
+
+    #[test]
+    fn keys_lists_stored_entries() {
+        let mut c: Cache<&str, i32> = Cache::new(4);
+        c.insert("a", 1);
+        c.insert("b", 2);
+        let mut ks: Vec<&str> = c.keys().copied().collect();
+        ks.sort();
+        assert_eq!(ks, vec!["a", "b"]);
     }
 }

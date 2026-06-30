@@ -8,6 +8,7 @@ import { DexSearchInput } from '../../styles/components';
 import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../../shared/time/dateHelpers';
 import { textIncludesAll, priorityRank, byField } from '../../../shared/collections/sortFilter';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 // -- Types --------------------------------------------------------------
 
@@ -471,8 +472,8 @@ const KanbanApp: React.FC = () => {
   // Registered once on mount; a latest-value ref (refreshed each render) lets the
   // pure resolver read live state without re-registering.
   const selectedCardTitle = editingCardData?.title;
-  const ukiCtxRef = useRef({ board, totalCards, search, filterPriority, sortField, selectedCardTitle });
-  useEffect(() => { ukiCtxRef.current = { board, totalCards, search, filterPriority, sortField, selectedCardTitle }; });
+  const ukiCtxRef = useRef({ board, totalCards, search, filterPriority, sortField, selectedCardTitle, updateBoard });
+  useEffect(() => { ukiCtxRef.current = { board, totalCards, search, filterPriority, sortField, selectedCardTitle, updateBoard }; });
   useEffect(() => {
     registerUkiAppContext('kanban', () => {
       const c = ukiCtxRef.current;
@@ -493,7 +494,50 @@ const KanbanApp: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('kanban');
+    // Let UKI read the board's columns and cards as a callable action (read-only).
+    registerUkiAppAction('kanban', {
+      id: 'kanban.listBoard',
+      description: 'list the Kanban board columns and the card titles in each.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const b = ukiCtxRef.current.board;
+      if (!b) return 'No Kanban board is open.';
+      return b.columns
+        .map((col) => `${col.title} (${col.cards.length}): ${col.cards.slice(0, 20).map((c) => c.title).join(', ') || '—'}`)
+        .join('\n');
+    });
+    // UKI can ADD a card to a column (mutating -> confirm-gated).
+    registerUkiAppAction('kanban', {
+      id: 'kanban.addCard',
+      description: 'add a card to the board, defaulting to the first column unless a column title is given.',
+      args: [{ name: 'title', type: 'string' }, { name: 'column', type: 'string', optional: true }],
+      example: '{"title":"Fix login bug","column":"To Do"}',
+      mutates: true,
+    }, (args) => {
+      const title = String(args.title ?? '').trim();
+      if (!title) return 'No card title provided.';
+      const { board: b, updateBoard: upd } = ukiCtxRef.current;
+      if (!b || !b.columns.length) return 'No Kanban board/columns to add to.';
+      const colName = String(args.column ?? '').trim().toLowerCase();
+      const target = colName
+        ? (b.columns.find((c) => c.title.toLowerCase() === colName) || b.columns[0])
+        : b.columns[0];
+      upd((brd) => ({
+        ...brd,
+        columns: brd.columns.map((c) => c.id === target.id ? {
+          ...c,
+          cards: [...c.cards, { id: crypto.randomUUID(), title, description: '', labels: [], priority: 'medium' as const, createdAt: Date.now(), checklist: [] }],
+        } : c),
+      }));
+      return `Added card "${title}" to ${target.title}.`;
+    });
+    return () => {
+      unregisterUkiAppContext('kanban');
+      unregisterUkiAppAction('kanban.listBoard');
+      unregisterUkiAppAction('kanban.addCard');
+    };
   }, []);
 
   return (

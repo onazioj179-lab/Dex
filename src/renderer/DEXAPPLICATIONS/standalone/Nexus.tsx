@@ -28,6 +28,7 @@
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { getPerfTier } from '../../utils/adaptiveCanvas';
 import { useAppActive } from '../../utils/perfAware';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { parseAccentColor, type RGB } from '../../utils/accentFamily';
 import { useUkiStore } from '../../store/ukiStore';
 import { getSecuritySummary } from '../../store/permissionStore';
@@ -331,8 +332,12 @@ const Nexus: React.FC = () => {
   useEffect(() => { ukiRef.current = { state: ukiState, audio: ukiAudio }; }, [ukiState, ukiAudio]);
 
   const isActive = useAppActive();
+  // Gate the force-graph render on the app lifecycle phase too: keep-alive apps
+  // stay in the DOM, so an IntersectionObserver alone keeps Nexus simulating
+  // under a covering app. Only run when locally active AND in the foreground.
+  const lifecyclePhase = useAppLifecycle('nexus', {});
   const isActiveRef = useRef(isActive);
-  useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+  useEffect(() => { isActiveRef.current = isActive && lifecyclePhase === 'foreground'; }, [isActive, lifecyclePhase]);
 
   // --- Live data: subscribe Nexus ingest + rebuild markers on change ---------
   // Reads the active filter from filterRef (not deps) so rapid search keystrokes

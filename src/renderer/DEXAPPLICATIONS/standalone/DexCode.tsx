@@ -28,6 +28,7 @@ import {
   saveFile,
 } from './dexCode/fileIO';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import {
   pickProjectFolder, loadProject, getStoredProjectRoot, clearStoredProject,
   readProjectFile, searchProject, projectName, buildSymbolIndex,
@@ -262,7 +263,39 @@ const DexCode: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('dexcode');
+    // Let UKI READ the open file's full source as a callable action (read-only).
+    registerUkiAppAction('dexcode', {
+      id: 'dexcode.readActiveFile',
+      description: 'read the full source of the file currently open in DexCode.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const s = ukiCtxRef.current;
+      if (!s.code) return 'No file is open in DexCode.';
+      const name = s.currentFilePath || s.fileName;
+      return `// ${name}\n${s.code}`.slice(0, 6000);
+    });
+    // UKI can OPEN a new file/buffer with generated content (mutating -> confirm).
+    registerUkiAppAction('dexcode', {
+      id: 'dexcode.newFile',
+      description: 'open a NEW file in DexCode with the given name and content (replaces the editor buffer; the user saves it to disk).',
+      args: [{ name: 'name', type: 'string', optional: true }, { name: 'content', type: 'string' }],
+      example: '{"name": "hello.dex", "content": "print(1)"}',
+      mutates: true,
+    }, (args) => {
+      const content = String(args.content ?? '');
+      const name = String(args.name ?? '').trim() || 'untitled.dex';
+      setCode(content);
+      setCurrentFilePath(null);
+      setFileName(name);
+      return `Opened new file "${name}" in DexCode (${content.split('\n').length} lines). Use Save to write it to disk.`;
+    });
+    return () => {
+      unregisterUkiAppContext('dexcode');
+      unregisterUkiAppAction('dexcode.readActiveFile');
+      unregisterUkiAppAction('dexcode.newFile');
+    };
   }, []);
 
   // File system handlers

@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { useNotesStore, type NoteListItem } from '../../store/notesStore';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import {
@@ -220,6 +221,28 @@ const DexNotes: React.FC = () => {
     sidebarCollapsed, listCollapsed, paneSize,
     loading, saving, searching,
   } = store;
+
+  // UKI app-action: create a note (mutating -> confirm-gated). A ref keeps the
+  // handler reading the live store/folder without re-registering each render.
+  const notesCreateRef = useRef({ store, selectedFolderId });
+  notesCreateRef.current = { store, selectedFolderId };
+  useEffect(() => {
+    registerUkiAppAction('notes', {
+      id: 'notes.createNote',
+      description: 'create a new note with the given title.',
+      args: [{ name: 'title', type: 'string' }],
+      example: '{"title": "Meeting notes"}',
+      mutates: true,
+    }, async (args) => {
+      const title = String(args.title ?? '').trim() || 'Untitled';
+      const { store: s, selectedFolderId: folder } = notesCreateRef.current;
+      const id = await s.createNote(folder || undefined);
+      if (!id) return 'Could not create the note.';
+      s.updateNote(id, { title });
+      return `Created note "${title}".`;
+    });
+    return () => unregisterUkiAppAction('notes.createNote');
+  }, []);
 
   // -- Refs -------------------------------------------------------------
 
