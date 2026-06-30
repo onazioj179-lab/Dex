@@ -479,9 +479,8 @@ fn assess_impact(system: &Value, change_type: &str) -> &'static str {
         .unwrap_or(0);
     if dependents > 3 {
         "high"
-    } else if dependents > 0 {
-        "medium"
-    } else if change_type == "status" {
+    } else if dependents > 0 || change_type == "status" {
+        // Some dependents, or a status change with none, is medium impact.
         "medium"
     } else {
         "low"

@@ -272,7 +272,6 @@ export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120
             borderRadius: 2, cursor: 'ns-resize', touchAction: 'none',
             border: '1px solid var(--color-border-subtle)',
           }}
-          title="Master"
         >
           <div
             style={{

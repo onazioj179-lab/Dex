@@ -241,7 +241,10 @@ export const selectEmergencyStopped = (s: DexState) => s.emergencyStopped;
 const STALE_THRESHOLD_MS = 30_000; // 30 seconds
 let _lastRefreshAt = 0;
 
-if (typeof window !== 'undefined') {
+// Guard against double-binding when this module is re-evaluated (HMR / repeat
+// import) so the focus refresh listener is wired at most once for the session.
+if (typeof window !== 'undefined' && !(window as { __dexFocusRefreshWired?: boolean }).__dexFocusRefreshWired) {
+  (window as { __dexFocusRefreshWired?: boolean }).__dexFocusRefreshWired = true;
   window.addEventListener('focus', () => {
     const now = Date.now();
     if (now - _lastRefreshAt < STALE_THRESHOLD_MS) return;

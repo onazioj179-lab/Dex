@@ -9,9 +9,13 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { TerminalTabs } from '../../components/TerminalTabs';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
+import { hasConfiguredProvider, askConfiguredLLM } from '../../uki/providers/connect';
+import { runUkiAgent } from '../../uki/agentRunner';
+import { buildSystemPrompt } from '../../uki';
 import { findMatchingBracket } from '../../../shared/format/bracketMatcher';
 import { highlightDexScript } from './dexCode/highlight';
 import { extractSymbols, lineStartOffset, SYMBOL_TAG } from './dexCode/symbols';
@@ -39,6 +43,34 @@ export { transpileDexScript, executeDexScript, highlightDexScript };
 // 70% of the editor area at drag time so the editor never collapses.
 const PANEL_HEIGHT_KEY = 'dex-code-panel-height';
 const PANEL_MIN_HEIGHT = 120;
+
+// --- Plain-English mode -----------------------------------------------------
+// "Write what you want in English, run it." UKI either TRANSLATES the English
+// into DexScript (transparent: the code lands in the editor, editable) or
+// EXECUTES the intent directly via its agent tools. AI makes coding easy; this
+// makes talking to the AI feel like coding.
+const PLAIN_TRANSLATE_SYS = [
+  'You translate a plain-English request into a single DexScript program for the DEX platform.',
+  'DexScript is a small JavaScript-like language: `let x = 1`, `print(...)`, `if/else` (also `elif`), `for x in 1..10 {}`, `for item in list {}`, `while`, `fn name(args) {}`, arithmetic and string ops.',
+  'A standard library is available as globals (call as shown):',
+  '  print(...args)  — output a line.   type(v) — "null"|"list"|"number"|"string"|...',
+  '  math: pi, e, tau, sqrt, cbrt, abs, pow, hypot, round(n,d?), floor, ceil, trunc, sign, min, max, clamp(n,lo,hi), sum(...), avg(...), gcd(a,b), lcm(a,b), random(min?,max?), sin/cos/tan, log/log2/log10, deg(r), rad(d).',
+  '  str: upper(s), lower(s), trim(s), len(s), contains(s,sub), starts(s,sub), ends(s,sub), split(s,sep), join(list,sep), replace(s,a,b), repeat(s,n), reverse(s), padLeft(s,n,c?), padRight(s,n,c?), capitalize(s).',
+  '  list: range(n) or range(a,b,step?), map(a,f), filter(a,f), reduce(a,f,init), each(a,f), sum(a), avg(a), min(a), max(a), sort(a,f?), reverse(a), unique(a), first(a), last(a), len(a), contains(a,v), indexOf(a,v), slice(a,s,e), flatten(a), zip(a,b), push(a,v), pop(a).',
+  '  fmt: number(n), currency(n,cur?), percent(n,d?), fixed(n,d?), bytes(n).',
+  '  time: now(), date(), time(), year(), month(), day(), weekday(), iso().   json: encode(v), decode(s), pretty(v).   assert(cond,msg?).',
+  'There is NO file, network, or DOM access — pure computation only. Prefer the stdlib over reimplementing it.',
+  'Output ONLY the DexScript code — no prose, no explanation, no markdown fences. The code must be runnable as-is.',
+  'Prefer `print(...)` to surface results so the user sees output when it runs.',
+].join('\n');
+
+/** Strip ```lang fences / stray backticks an LLM may wrap code in. */
+function stripCodeFences(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/^```[a-zA-Z]*\n([\s\S]*?)\n```$/);
+  if (fence) t = fence[1];
+  return t.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
+}
 
 // Gutter line numbers, memoized so typing on a single line does not rebuild the
 // whole column of <div>s every keystroke -- it only re-renders when the line
@@ -107,6 +139,26 @@ const DexCode: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
+  // Live verbs for the Run button ("Running / Executing / Crunching").
+  const runPhrase = useWorkingPhrase(isRunning, 'run');
+
+  // Plain-English mode: write intent in English; UKI translates it to DexScript
+  // ('code', transparent + editable) or executes it directly ('doit').
+  const [langMode, setLangMode] = useState<'dexscript' | 'plain'>(() => {
+    try { return localStorage.getItem('dex-code-lang-mode') === 'plain' ? 'plain' : 'dexscript'; } catch { return 'dexscript'; }
+  });
+  const [plainMode, setPlainMode] = useState<'code' | 'doit'>(() => {
+    try { return localStorage.getItem('dex-code-plain-mode') === 'doit' ? 'doit' : 'code'; } catch { return 'code'; }
+  });
+  const [plainText, setPlainText] = useState(() => {
+    try { return localStorage.getItem('dex-code-plain-text') || ''; } catch { return ''; }
+  });
+  useEffect(() => { try { localStorage.setItem('dex-code-lang-mode', langMode); } catch { /* quota */ } }, [langMode]);
+  useEffect(() => { try { localStorage.setItem('dex-code-plain-mode', plainMode); } catch { /* quota */ } }, [plainMode]);
+  useEffect(() => { try { localStorage.setItem('dex-code-plain-text', plainText); } catch { /* quota */ } }, [plainText]);
+  // Verb for the Run button while UKI is working a plain-English request.
+  const aiPhrase = useWorkingPhrase(isRunning && langMode === 'plain', plainMode === 'doit' ? 'run' : 'generic');
+
   const [terminalOpen, setTerminalOpen] = useState(false);
   // Autosave status for the status bar. 'saving' while the debounce is pending,
   // 'saved' briefly after the write lands, then idle. Purely a UI affordance --
@@ -399,6 +451,50 @@ const DexCode: React.FC = () => {
     }, 0);
   }, [code]);
 
+  // Run a PLAIN-ENGLISH request through UKI. 'code' translates English ->
+  // DexScript, drops it in the editor (transparent + editable), and runs it;
+  // 'doit' hands the intent to UKI's agent loop and reports what it did.
+  const runPlain = useCallback(async () => {
+    const intent = plainText.trim();
+    if (!intent) return;
+    setOutputCollapsedPersist(false);
+    if (!hasConfiguredProvider()) {
+      setOutput([]);
+      setError('Plain English needs an AI provider. Add a key in Settings > AI Providers, then try again.');
+      return;
+    }
+    setIsRunning(true);
+    setError(null);
+    setOutput([]);
+    try {
+      if (plainMode === 'code') {
+        const gen = await askConfiguredLLM(intent, PLAIN_TRANSLATE_SYS, { chatOptions: { temperature: 0.2, maxTokens: 700 } });
+        const generated = stripCodeFences(gen || '');
+        if (!generated) { setError('Could not turn that into code. Try rephrasing.'); return; }
+        // Surface the generated program in the editor so it's transparent and
+        // the user can tweak + re-run it as DexScript.
+        setCode(generated);
+        setLangMode('dexscript');
+        const result = executeDexScript(generated);
+        setOutput([`// Generated from: ${intent}`, ...result.output]);
+        setError(result.error);
+        setDuration(result.duration);
+      } else {
+        const steps: string[] = [];
+        const answer = await runUkiAgent({ userText: intent, systemPrompt: buildSystemPrompt(), pushStep: (s) => steps.push(s) });
+        setOutput([
+          ...(steps.length ? [...steps.map(s => `· ${s}`), ''] : []),
+          answer || '(UKI returned no response — is a provider key set?)',
+        ]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsRunning(false);
+      setTimeout(() => { if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight; }, 0);
+    }
+  }, [plainText, plainMode, setOutputCollapsedPersist]);
+
   // -- REPL: evaluate a single DexScript expression in isolation and append its
   // output to the console (DEX 5.7). The runtime is stateless per call, so each
   // entry runs independently -- a quick scratchpad for testing expressions
@@ -547,6 +643,8 @@ const DexCode: React.FC = () => {
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [workspaceHits, setWorkspaceHits] = useState<WorkspaceHit[]>([]);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  // Live verb for the project-wide code search status.
+  const searchPhrase = useWorkingPhrase(workspaceBusy, 'search');
 
   // Restore the last-opened project folder on mount.
   useEffect(() => {
@@ -945,7 +1043,7 @@ const DexCode: React.FC = () => {
 
       {/* Sidebar — collapsible (Ctrl+B / Navigator button) */}
       {!sidebarCollapsed && (
-      <aside style={S.sidebar}>
+      <aside className="dex-liquid-glass-strong" style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <span style={S.sidebarTitle}>DEXCODE</span>
         </div>
@@ -1037,9 +1135,9 @@ const DexCode: React.FC = () => {
                   onKeyDown={e => { if (e.key === 'Enter') runWorkspaceSearch(); }}
                   placeholder="Search in project…"
                   aria-label="Search in project"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none' }}
                 />
-                {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>Searching…</div>}
+                {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{searchPhrase}…</div>}
                 {workspaceHits.length > 0 ? (
                   <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
                     <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
@@ -1107,7 +1205,7 @@ const DexCode: React.FC = () => {
                     onChange={e => setOutlineFilter(e.target.value)}
                     placeholder="Filter symbols…"
                     aria-label="Filter symbols"
-                    style={{ width: '100%', boxSizing: 'border-box', margin: '2px 0 4px', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none' }}
+                    style={{ width: '100%', boxSizing: 'border-box', margin: '2px 0 4px', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none' }}
                   />
                 )}
                 {filteredSymbols.length === 0 ? (
@@ -1217,7 +1315,7 @@ const DexCode: React.FC = () => {
       {/* Main workspace */}
       <section ref={workspaceRef} style={S.workspace}>
         {/* Top bar */}
-        <div style={S.topBar}>
+        <div className="dex-liquid-glass-strong" style={S.topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <input
               value={fileName + (isModified ? ' •' : '')}
@@ -1233,15 +1331,52 @@ const DexCode: React.FC = () => {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Language toggle: real DexScript vs plain-English-via-UKI. */}
+            <div role="tablist" aria-label="Editor language" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 8, padding: 2, gap: 2 }}>
+              {(['dexscript', 'plain'] as const).map(m => (
+                <button
+                  key={m}
+                  role="tab"
+                  aria-selected={langMode === m}
+                  onClick={() => setLangMode(m)}
+                  style={{
+                    padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: langMode === m ? 'var(--color-accent)' : 'transparent',
+                    color: langMode === m ? '#fff' : 'var(--color-text-secondary)',
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                  }}
+                >{m === 'dexscript' ? 'Code' : 'Plain English'}</button>
+              ))}
+            </div>
+            {/* In plain mode, choose whether UKI writes code or just acts. */}
+            {langMode === 'plain' && (
+              <div role="tablist" aria-label="Plain-English behaviour" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 8, padding: 2, gap: 2 }}>
+                {(['code', 'doit'] as const).map(m => (
+                  <button
+                    key={m}
+                    role="tab"
+                    aria-selected={plainMode === m}
+                    title={m === 'code' ? 'UKI writes DexScript you can see and edit, then runs it' : 'UKI carries out your request directly'}
+                    onClick={() => setPlainMode(m)}
+                    style={{
+                      padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+                      background: plainMode === m ? 'var(--color-accent-light)' : 'transparent',
+                      color: plainMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                      transition: 'background 0.15s ease, color 0.15s ease',
+                    }}
+                  >{m === 'code' ? 'Show code' : 'Just do it'}</button>
+                ))}
+              </div>
+            )}
             <button
-              onClick={runCode}
-              disabled={isRunning}
+              onClick={langMode === 'plain' ? runPlain : runCode}
+              disabled={isRunning || (langMode === 'plain' && !plainText.trim())}
               style={S.runBtn}
               onMouseEnter={e => { if (!isRunning) e.currentTarget.style.background = 'var(--color-text-secondary)'; }}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--color-text-primary)'}
             >
               <DexIcon name="play" size={13} color="var(--color-bg-base)" />
-              <span>{isRunning ? 'Running...' : 'Run'}</span>
+              <span>{isRunning ? `${(langMode === 'plain' ? aiPhrase : runPhrase)}...` : 'Run'}</span>
             </button>
             <button
               onClick={() => { setOutput([]); setError(null); }}
@@ -1299,7 +1434,7 @@ const DexCode: React.FC = () => {
         {/* Quick Open (Ctrl/Cmd+P) — fuzzy file finder over the project + recents */}
         {showQuickOpen && (
           <div style={S.quickOpenScrim} onMouseDown={closeQuickOpen}>
-            <div style={S.quickOpenPanel} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Quick Open">
+            <div className="dex-liquid-glass-strong" style={S.quickOpenPanel} onMouseDown={e => e.stopPropagation()} role="dialog" aria-label="Quick Open">
               <div style={S.quickOpenSearch}>
                 <DexIcon name="search" size={13} color="var(--color-text-tertiary)" />
                 <input
@@ -1422,34 +1557,53 @@ const DexCode: React.FC = () => {
                 </div>
               </div>
             )}
-            <div style={S.editorWrapper}>
-              {/* Line numbers — memoized; only re-renders when the count changes */}
-              <LineNumbers count={lineCount} />
-              {/* Syntax highlight overlay */}
-              <pre
-                ref={highlightRef}
-                style={{...S.highlightOverlay, fontSize}}
-                dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
-                aria-hidden="true"
-              />
-              {/* Actual textarea */}
-              <textarea
-                ref={editorRef}
-                value={code}
-                onChange={e => setCode(e.target.value)}
-                onScroll={handleScroll}
-                onKeyDown={handleKeyDown}
-                onKeyUp={updateCursorPos}
-                onClick={e => { updateCursorPos(); if (e.ctrlKey || e.metaKey) gotoDefinition(identifierAt()); }}
-                onSelect={updateCursorPos}
-                title="Ctrl/Cmd+Click or F12: Go to Definition · Shift+F12: Find References"
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                style={{...S.editor, fontSize}}
-                aria-label="DexScript code editor"
-              />
-            </div>
+            {langMode === 'plain' ? (
+              /* Plain-English surface: a clean prose textarea. No highlighting,
+                 no line numbers — you're writing intent, not code. Cmd/Ctrl+Enter
+                 runs it, matching the code editor's muscle memory. */
+              <div style={S.editorWrapper}>
+                <textarea
+                  value={plainText}
+                  onChange={e => setPlainText(e.target.value)}
+                  onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void runPlain(); } }}
+                  placeholder={plainMode === 'code'
+                    ? 'Describe what the program should do, in plain English.\n\ne.g. "Print the numbers 1 to 10, but say Fizz for multiples of 3."\n\nUKI writes the DexScript, drops it in the editor, and runs it. Cmd/Ctrl+Enter to run.'
+                    : 'Tell UKI what to do, in plain English.\n\ne.g. "Open the calculator and search the web for today\'s date."\n\nUKI carries it out with its tools. Cmd/Ctrl+Enter to run.'}
+                  spellCheck
+                  style={{ ...S.editor, fontSize: fontSize + 1, fontFamily: 'var(--dex-font-ui)', whiteSpace: 'pre-wrap', padding: 'var(--space-3)' }}
+                  aria-label="Plain English instructions"
+                />
+              </div>
+            ) : (
+              <div style={S.editorWrapper}>
+                {/* Line numbers — memoized; only re-renders when the count changes */}
+                <LineNumbers count={lineCount} />
+                {/* Syntax highlight overlay */}
+                <pre
+                  ref={highlightRef}
+                  style={{...S.highlightOverlay, fontSize}}
+                  dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
+                  aria-hidden="true"
+                />
+                {/* Actual textarea */}
+                <textarea
+                  ref={editorRef}
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  onScroll={handleScroll}
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={updateCursorPos}
+                  onClick={e => { updateCursorPos(); if (e.ctrlKey || e.metaKey) gotoDefinition(identifierAt()); }}
+                  onSelect={updateCursorPos}
+                  title="Ctrl/Cmd+Click or F12: Go to Definition · Shift+F12: Find References"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  style={{...S.editor, fontSize}}
+                  aria-label="DexScript code editor"
+                />
+              </div>
+            )}
           </div>
 
           {/* Output Panel */}
@@ -1656,7 +1810,7 @@ const S: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: 'pointer',
     transition: 'background 0.12s, color 0.12s',
   },
@@ -1669,7 +1823,7 @@ const S: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'var(--color-accent, #4a9eff)',
     color: 'var(--color-accent-text, #fff)',
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: 'pointer',
   },
   sidebarHeader: {
@@ -1692,7 +1846,8 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 0,
     padding: 0,
-    background: 'var(--color-bg-surface-solid)',
+    borderRadius: 0,
+    boxShadow: 'none',
     borderRight: '1px solid var(--color-border)',
     overflow: 'auto',
     scrollbarWidth: 'none',
@@ -1735,7 +1890,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     gap: 2,
     padding: 'var(--space-2) 10px',
-    borderRadius: 6,
+    borderRadius: 10,
     border: '1px solid var(--color-border)',
     background: 'var(--color-bg-inset, rgba(255,255,255,0.04))',
     color: 'var(--color-text-primary)',
@@ -1748,7 +1903,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 'var(--space-2)',
     padding: '7px 10px',
-    borderRadius: 4,
+    borderRadius: 10,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -1788,7 +1943,7 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     gap: 4,
     padding: 'var(--space-2)',
-    borderRadius: 6,
+    borderRadius: 10,
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
     alignItems: 'center',
@@ -1808,8 +1963,9 @@ const S: Record<string, React.CSSProperties> = {
     height: 40,
     minHeight: 40,
     padding: '0 var(--space-3)',
+    borderRadius: 0,
+    boxShadow: 'none',
     borderBottom: '1px solid var(--color-border)',
-    background: 'var(--color-bg-elevated)',
     flexShrink: 0,
     gap: 6,
     position: 'relative',
@@ -1818,7 +1974,7 @@ const S: Record<string, React.CSSProperties> = {
   fileInput: {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
-    borderRadius: 4,
+    borderRadius: 10,
     padding: '4px 10px',
     color: 'var(--color-text-primary)',
     fontSize: 12,
@@ -1832,7 +1988,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 5,
     padding: '5px 14px',
-    borderRadius: 4,
+    borderRadius: 10,
     border: 'none',
     background: 'var(--color-text-primary)',
     color: 'var(--color-bg-base)',
@@ -1843,7 +1999,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   clearBtn: {
     padding: '5px 10px',
-    borderRadius: 4,
+    borderRadius: 10,
     border: '1px solid var(--color-border)',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -2054,7 +2210,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 3,
     height: 22,
     padding: '0 6px',
-    borderRadius: 4,
+    borderRadius: 10,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -2106,10 +2262,7 @@ const S: Record<string, React.CSSProperties> = {
     maxHeight: '70%',
     display: 'flex',
     flexDirection: 'column' as const,
-    background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 8,
-    boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+    borderRadius: 14,
     overflow: 'hidden',
   },
   quickOpenSearch: {
@@ -2143,7 +2296,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 8,
     width: '100%',
     padding: '6px 8px',
-    borderRadius: 5,
+    borderRadius: 10,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',

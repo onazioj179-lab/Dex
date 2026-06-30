@@ -46,7 +46,7 @@ const PropertiesPanel: React.FC = () => {
   }, [selectedPartId, constraintPartB, constraintType, constraintValue, addConstraint, solveConstraints, showToast]);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderLeft: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
+    <div className="dex-axl-panel-strong" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 0, boxShadow: 'none', borderLeft: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
       {/* Panel tabs - Blender N-panel style */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
         {(['properties', 'material', 'constraints'] as PanelTab[]).map(tab => {
@@ -61,7 +61,7 @@ const PropertiesPanel: React.FC = () => {
           </button>
           );
         })}
-        <button key="tokens" onClick={() => setTokensActive(true)} title="Design Tokens"
+        <button key="tokens" onClick={() => setTokensActive(true)}
           style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: tokensActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: tokensActive ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: tokensActive ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2a10 10 0 0 0 0 20 1.5 1.5 0 0 0 1.06-2.56A1.5 1.5 0 0 1 14.5 17H16a4 4 0 0 0 4-4 10 10 0 0 0-8-11z"/></svg>
           TOKENS
@@ -81,7 +81,7 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             {(['position', 'rotation', 'scale'] as (keyof Transform)[]).map(key => (
-              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 4, padding: '6px var(--space-2)' }}>
+              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 10, padding: '6px var(--space-2)' }}>
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                   {key === 'position' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>}
                   {key === 'rotation' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>}
@@ -105,7 +105,7 @@ const PropertiesPanel: React.FC = () => {
               </div>
             ))}
 
-            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4 }}>
+            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 10 }}>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                 OBJECT DATA
@@ -157,7 +157,7 @@ const PropertiesPanel: React.FC = () => {
                   display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px var(--space-2)', fontSize: 10,
                   background: selectedPart.material.id === mat.id ? 'var(--color-accent-light)' : 'transparent',
                   border: selectedPart.material.id === mat.id ? '1px solid var(--color-accent-muted)' : '1px solid transparent',
-                  borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
+                  borderRadius: 10, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
                 }}>
                 <div style={{ width: 14, height: 14, borderRadius: 2, background: mat.color, border: '1px solid var(--color-border)' }} />
                 <div style={{ flex: 1 }}>

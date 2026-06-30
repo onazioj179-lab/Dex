@@ -28,15 +28,24 @@ const _tier = (): 'low' | 'mid' | 'high' | 'ultra' => {
   return 'high';
 };
 
-/** Backdrop-filter helper. DEX Sharp full-flat (2026-06-13, owner direction
- * "strip the glass and all, put them on place like other OSes"): UI surfaces are
- * solid/placed, not frosted. Backdrop blur is disabled platform-wide here — this
- * is the single point of control, so every glass preset and call site inherits
- * the flat look and loses the GPU compositing cost (and the muddy see-through).
- * To bring a translucent material back, restore the tiered computation that the
- * git history of this function holds. Params kept for call-site compatibility. */
-export const adaptiveBlur = (_highBlur: number, _highSaturate = 200): { backdropFilter: string; WebkitBackdropFilter: string } => {
-  return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
+/** Backdrop-filter helper. Master overhaul (real liquid glass): every glass
+ * preset and call site shares ONE adaptive backdrop blur so the whole shell --
+ * menus, dropdowns, popovers, sidebars, toolbars, modals, the floating chrome --
+ * reads as the same frosted material. The blur radius scales with the device
+ * perf tier so weak hardware isn't asked to composite a 32px blur every frame:
+ *   low   -> none  (also stripped platform-wide by the universal low-tier rule)
+ *   mid   -> 60% radius
+ *   high  -> full radius
+ *   ultra -> full radius + a touch more saturation for extra "lensing"
+ * Pair the returned filter with a TRANSLUCENT background (the --color-bg-glass /
+ * --glass-bg tokens) or the blur has nothing to show through. */
+export const adaptiveBlur = (highBlur: number, highSaturate = 200): { backdropFilter: string; WebkitBackdropFilter: string } => {
+  const tier = _tier();
+  if (tier === 'low') return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
+  const radius = tier === 'mid' ? Math.round(highBlur * 0.6) : highBlur;
+  const sat = tier === 'ultra' ? Math.min(highSaturate + 20, 240) : highSaturate;
+  const value = `blur(${radius}px) saturate(${sat}%)`;
+  return { backdropFilter: value, WebkitBackdropFilter: value };
 };
 
 /** Returns a scaled box-shadow value based on device capability */
@@ -336,11 +345,13 @@ export function liquidGlass(
   overrides?: Partial<React.CSSProperties>,
 ): React.CSSProperties {
   const p = GLASS_PRESETS[intensity];
-  // DEX Sharp full-flat: solid, placed surface — no backdrop blur, no
-  // translucency. Elevation is conveyed by the drop shadow alone (how native
-  // OS panels read). The intensity now only scales radius/border/shadow depth.
+  // Master overhaul (real liquid glass): a translucent fill over the adaptive
+  // backdrop blur, so intensity scales the see-through material -- not just the
+  // shadow depth. Degrades to solid on weak GPUs / reduced-transparency via the
+  // shared token + universal low-tier rules.
   return {
-    background: 'var(--color-bg-elevated)',
+    background: 'var(--color-bg-glass, rgba(22,22,26,0.74))',
+    ...adaptiveBlur(p.blur, p.sat),
     border: p.border,
     borderRadius: p.radius,
     boxShadow: `${p.shadow}, ${p.highlight}`,

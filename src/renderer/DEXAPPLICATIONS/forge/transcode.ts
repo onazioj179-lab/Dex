@@ -201,6 +201,15 @@ export interface WavEncodeOptions {
   trimIn?: number;
   /** Trim end as a 0..1 fraction of the source duration. Defaults to 1. */
   trimOut?: number;
+  /**
+   * Loudness normalization target in dBFS (the Forge UI labels it "LUFS").
+   * When set, the decoded PCM is gain-adjusted so its integrated RMS loudness
+   * matches the target. This is an RMS approximation of LUFS — true ITU-R
+   * BS.1770 K-weighting needs a filterbank we do not bundle — but it is a real,
+   * audible loudness match, not a no-op. Gain is capped so peaks never exceed
+   * 0 dBFS (no clipping). A typical target is -14 (streaming) to -16.
+   */
+  normalizeDb?: number;
 }
 
 /** Real peak/amplitude data for drawing a waveform, plus the clip duration. */
@@ -289,6 +298,49 @@ function sliceBuffer(buffer: AudioBuffer, trimIn: number, trimOut: number): Buff
 }
 
 /**
+ * In-place RMS loudness normalization of an AudioBuffer's channel data toward a
+ * target dBFS. Returns the applied gain (1 = unchanged). Clip-safe: the gain is
+ * never allowed to push the true peak above 0 dBFS. Silence is left untouched.
+ */
+export function normalizeAudioBufferRms(buffer: AudioBuffer, targetDb: number): number {
+  const numChannels = buffer.numberOfChannels;
+  const numFrames = buffer.length;
+  if (numChannels === 0 || numFrames === 0) return 1;
+
+  let sumSquares = 0;
+  let peak = 0;
+  let count = 0;
+  for (let c = 0; c < numChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < numFrames; i++) {
+      const s = data[i];
+      sumSquares += s * s;
+      const a = s < 0 ? -s : s;
+      if (a > peak) peak = a;
+    }
+    count += numFrames;
+  }
+  const rms = Math.sqrt(sumSquares / count);
+  // Nothing to normalize: digital silence or no headroom information.
+  if (rms <= 1e-6 || peak <= 1e-6) return 1;
+
+  const targetLinear = Math.pow(10, targetDb / 20);
+  let gain = targetLinear / rms;
+  // Clip guard: never let the loudest sample exceed full scale.
+  const maxGain = 0.999 / peak;
+  if (gain > maxGain) gain = maxGain;
+  if (!Number.isFinite(gain) || gain <= 0) return 1;
+  // No-op if the change is inaudible (< ~0.1 dB) to avoid needless float churn.
+  if (Math.abs(20 * Math.log10(gain)) < 0.1) return 1;
+
+  for (let c = 0; c < numChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < numFrames; i++) data[i] = data[i] * gain;
+  }
+  return gain;
+}
+
+/**
  * Decode an audio File via AudioContext.decodeAudioData and write a real
  * little-endian PCM WAV blob. No external dependencies.
  */
@@ -311,6 +363,12 @@ export async function transcodeAudioToWav(file: File, opts: WavEncodeOptions = {
     });
   } finally {
     try { await audioCtx.close(); } catch { /* noop */ }
+  }
+
+  // Optional loudness normalization (mutates the decoded PCM in place before
+  // we serialize the WAV). Real, audible gain — never a stored no-op.
+  if (typeof opts.normalizeDb === 'number') {
+    normalizeAudioBufferRms(audioBuffer, opts.normalizeDb);
   }
 
   const bitDepth: 16 | 24 = opts.bitDepth === 24 ? 24 : 16;

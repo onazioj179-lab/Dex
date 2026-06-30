@@ -6,17 +6,29 @@
 //! must use these rather than growing local copies (Refinement initiative:
 //! no duplicate functionality).
 
-/// A UUIDv4-shaped identifier seeded from the wall clock and process id, mixed
-/// through SplitMix64. Used where Electron used `crypto.randomUUID()` for local
-/// row ids / session labels — collision resistance across one machine's
-/// processes is all that is required, so this does not need to be (and is not)
-/// cryptographically random.
+/// A UUIDv4-shaped identifier seeded from the wall clock, process id, and a
+/// per-process monotonic counter, mixed through SplitMix64. Used where Electron
+/// used `crypto.randomUUID()` for local row ids / session labels — collision
+/// resistance across one machine's processes is all that is required, so this
+/// does not need to be (and is not) cryptographically random.
+///
+/// The counter is load-bearing: `nanos ^ pid` alone repeats whenever two ids are
+/// minted inside the same clock tick (trivial in a tight loop — a row-id
+/// generator's exact hot path), which would hand out duplicate "unique" ids.
+/// `fetch_add` gives every call within a process a distinct seed, across threads
+/// too, so successive ids never collide.
 pub fn pseudo_uuid_v4() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let mut seed = nanos ^ ((std::process::id() as u64) << 32);
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut seed = nanos
+        ^ ((std::process::id() as u64) << 32)
+        ^ count.wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let mut next = || {
         seed = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = seed;
@@ -35,5 +47,65 @@ pub fn pseudo_uuid_v4() -> String {
         bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// Shape must be a canonical UUIDv4 string: 8-4-4-4-12 lowercase hex with the
+    /// version nibble pinned to `4` and the variant nibble in {8,9,a,b}.
+    #[test]
+    fn pseudo_uuid_v4_has_canonical_shape() {
+        for _ in 0..1_000 {
+            let id = pseudo_uuid_v4();
+            let parts: Vec<&str> = id.split('-').collect();
+            assert_eq!(parts.len(), 5, "expected 5 dash groups in {id}");
+            assert_eq!(
+                parts.iter().map(|p| p.len()).collect::<Vec<_>>(),
+                vec![8, 4, 4, 4, 12],
+                "group lengths wrong in {id}"
+            );
+            assert!(
+                id.chars().all(|c| c == '-' || c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                "non lowercase-hex character in {id}"
+            );
+            assert_eq!(&parts[2][..1], "4", "version nibble must be 4 in {id}");
+            assert!(
+                matches!(&parts[3][..1], "8" | "9" | "a" | "b"),
+                "variant nibble must be 8/9/a/b in {id}"
+            );
+        }
+    }
+
+    /// Regression: minting ids in a tight loop must not collide. The old
+    /// `nanos ^ pid` seed repeated within a single clock tick and produced
+    /// duplicates here; the per-process counter fixes it.
+    #[test]
+    fn pseudo_uuid_v4_is_unique_in_a_tight_loop() {
+        let n = 100_000;
+        let mut seen = HashSet::with_capacity(n);
+        for _ in 0..n {
+            assert!(seen.insert(pseudo_uuid_v4()), "duplicate id minted in a tight loop");
+        }
+        assert_eq!(seen.len(), n);
+    }
+
+    /// Distinct ids across threads minted concurrently (the counter is atomic).
+    #[test]
+    fn pseudo_uuid_v4_is_unique_across_threads() {
+        let per_thread = 20_000;
+        let handles: Vec<_> = (0..4)
+            .map(|_| std::thread::spawn(move || (0..per_thread).map(|_| pseudo_uuid_v4()).collect::<Vec<_>>()))
+            .collect();
+        let mut seen = HashSet::with_capacity(per_thread * 4);
+        for h in handles {
+            for id in h.join().expect("thread panicked") {
+                assert!(seen.insert(id), "duplicate id minted across threads");
+            }
+        }
+        assert_eq!(seen.len(), per_thread * 4);
+    }
 }
 

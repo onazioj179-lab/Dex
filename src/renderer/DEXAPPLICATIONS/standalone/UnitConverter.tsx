@@ -166,7 +166,29 @@ const UnitConverter: React.FC = () => {
   }, []);
 
   return (
-    <div style={s.container}>
+    <div style={s.container} role="region" aria-label="Unit Converter">
+      <style>{`
+        .uc-search:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
+        .uc-tab { transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+        .uc-tab:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+        .uc-tab:active { transform: scale(0.96); }
+        .uc-tab:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+        .uc-select { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .uc-select:hover { border-color: var(--color-border) !important; }
+        .uc-select:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
+        .uc-input:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
+        .uc-swap { transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease; }
+        .uc-swap:hover { background: var(--color-bg-hover) !important; color: var(--color-accent) !important; transform: rotate(180deg); }
+        .uc-swap:active { transform: rotate(180deg) scale(0.92); }
+        .uc-swap:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+        .uc-copy { transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+        .uc-copy:not(:disabled):hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .uc-copy:not(:disabled):active { transform: scale(0.92); }
+        .uc-copy:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+        .uc-recent { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease; }
+        .uc-recent:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; color: var(--color-text-primary) !important; transform: translateY(-1px); }
+        .uc-recent:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+      `}</style>
       {/* Unit search */}
       <div style={s.searchBar}>
         <input
@@ -176,25 +198,28 @@ const UnitConverter: React.FC = () => {
           onKeyDown={e => { if (e.key === 'Enter') runUnitSearch(); }}
           onBlur={runUnitSearch}
           placeholder="Find a unit — e.g. km, pounds, MB, kWh"
-          className="dex-liquid-glass"
+          className="dex-liquid-glass uc-search"
           style={s.search}
           aria-label="Find a unit"
         />
       </div>
 
       {/* Category tabs */}
-      <div style={s.tabs}>
+      <div style={s.tabs} role="tablist" aria-label="Conversion category">
         {CATEGORIES.map(cat => (
           <button
             key={cat}
             onClick={() => handleCategoryChange(cat)}
+            className="uc-tab"
+            role="tab"
+            aria-selected={cat === category}
             style={{
               ...s.tab,
               ...(cat === category ? s.tabActive : {}),
             }}
             title={cat}
           >
-            <span style={{ fontSize: 16 }}>{CAT_ICONS[cat]}</span>
+            <span style={s.tabIcon}>{CAT_ICONS[cat]}</span>
             <span style={s.tabLabel}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
           </button>
         ))}
@@ -204,29 +229,33 @@ const UnitConverter: React.FC = () => {
       <div style={s.converterArea}>
         {/* From */}
         <div style={s.unitBlock}>
+          <div className="dex-label-caps" style={s.blockLabel}>From</div>
           <select
             value={fromIdx}
             onChange={e => setFromIdx(Number(e.target.value))}
-            className="dex-liquid-glass"
+            className="dex-liquid-glass uc-select"
             style={s.select}
             aria-label="Convert from unit"
           >
             {units.map((u, i) => <option key={i} value={i}>{u.label} ({u.symbol})</option>)}
           </select>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            className="dex-liquid-glass-strong"
-            style={s.input}
-            placeholder="0"
-            aria-label="Value to convert"
-          />
+          <div style={s.inputWrap}>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              className="dex-liquid-glass-strong uc-input"
+              style={s.input}
+              placeholder="0"
+              aria-label="Value to convert"
+            />
+            {units[fromIdx] && <span style={s.inputUnit}>{units[fromIdx].symbol}</span>}
+          </div>
         </div>
 
         {/* Swap button */}
-        <button onClick={swap} className="dex-liquid-glass" style={s.swapBtn} title="Swap units">
+        <button onClick={swap} className="dex-liquid-glass uc-swap" style={s.swapBtn} title="Swap units" aria-label="Swap units">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
           </svg>
@@ -234,22 +263,24 @@ const UnitConverter: React.FC = () => {
 
         {/* To */}
         <div style={s.unitBlock}>
+          <div className="dex-label-caps" style={s.blockLabel}>To</div>
           <select
             value={toIdx}
             onChange={e => setToIdx(Number(e.target.value))}
-            className="dex-liquid-glass"
+            className="dex-liquid-glass uc-select"
             style={s.select}
             aria-label="Convert to unit"
           >
             {units.map((u, i) => <option key={i} value={i}>{u.label} ({u.symbol})</option>)}
           </select>
           <div style={s.resultRow}>
-            <div style={s.resultDisplay}>
-              {result || '—'}
+            <div style={s.resultDisplay} aria-live="polite">
+              <span style={s.resultValue}>{result || '—'}</span>
+              {result && units[toIdx] && <span style={s.resultUnit}>{units[toIdx].symbol}</span>}
             </div>
             <button
               onClick={copyResult}
-              className="dex-liquid-glass"
+              className="dex-liquid-glass uc-copy"
               style={{ ...s.copyBtn, ...(!result ? s.copyBtnDisabled : {}) }}
               title="Copy result"
               aria-label="Copy result"
@@ -281,6 +312,7 @@ const UnitConverter: React.FC = () => {
                 key={i}
                 onClick={() => { setCategory(r.cat); setFromIdx(r.from); setToIdx(r.to); }}
                 title={`${fu.label} → ${tu.label}`}
+                className="uc-recent"
                 style={{ padding: '4px 10px', borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 {fu.symbol} → {tu.symbol}
@@ -336,13 +368,22 @@ const s: Record<string, React.CSSProperties> = {
     padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
-    transition: 'all 0.15s ease', whiteSpace: 'nowrap',
-    fontFamily: 'var(--font-family)',
+    whiteSpace: 'nowrap', fontFamily: 'var(--font-family)',
   },
   tabActive: {
     background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+    fontWeight: 600,
+  },
+  tabIcon: {
+    fontSize: 12, fontWeight: 700, width: 18, height: 18, flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 6, background: 'var(--color-bg-hover)', lineHeight: 1,
   },
   tabLabel: { fontSize: 12 },
+  blockLabel: {
+    fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.06em',
+    paddingLeft: 2,
+  },
   converterArea: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     gap: 'var(--space-3)', padding: 'var(--space-6) var(--space-5)',

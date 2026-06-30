@@ -24,6 +24,7 @@ import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAch
 import { rewardUnlocks } from '../../services/achievementEngine';
 import DexIcon from '../../components/DexIcon';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { DexSearchInput } from '../../styles/components';
 
 // ─── Extracted Modules ────────────────────────────────────────────────────
@@ -34,6 +35,9 @@ import type {
 import { MATERIAL_DB, STD_PARTS_LIBRARY, GDT_SYMBOLS } from './constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor } from './utils/math';
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
+import { detectInterferences } from './AxlInspect';
+import { importCadFile } from './AxlImport';
+import type { InterferencePair, NamedView } from './types';
 import { exportProject as doExport } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
 import { useViewportStore } from './stores/viewportStore';
@@ -41,6 +45,8 @@ import { useUIStore } from './stores/uiStore';
 import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel } from './engine';
 import type { RenderState, FEResult } from './engine';
 import AXLToolbar from './components/Toolbar';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import SketchOverlay from './components/SketchOverlay';
 import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
 import { ResizablePanel } from '../../components/ResizablePanel';
@@ -83,11 +89,14 @@ const AXL: React.FC = () => {
   const [simType, setSimType] = useState<SimulationType>('stress');
   const [simForce, setSimForce] = useState(1000);
   const [simRunning, setSimRunning] = useState(false);
+  // Live solver verbs ("Simulating / Stepping physics / Solving") for the sim
+  // button + status badge, replacing frozen "Running..."/"Simulating...".
+  const simPhrase = useWorkingPhrase(simRunning, 'simulate');
   const [libSearch, setLibSearch] = useState('');
   const [libCategory, setLibCategory] = useState(0);
   const [aiInput, setAiInput] = useState('');
-  const [featureType, setFeatureType] = useState<'extrude' | 'revolve' | 'chamfer' | 'fillet' | 'pattern'>('extrude');
-  const [featureParams, setFeatureParams] = useState<Record<string, number>>({ depth: 20, angle: 360, distance: 2, radius: 3, count: 4, spacing: 30 });
+  const [featureType, setFeatureType] = useState<'extrude' | 'revolve' | 'chamfer' | 'fillet' | 'pattern' | 'shell' | 'draft' | 'rib'>('extrude');
+  const [featureParams, setFeatureParams] = useState<Record<string, number>>({ depth: 20, angle: 360, distance: 2, radius: 3, count: 4, spacing: 30, thickness: 3, draftAngle: 5 });
   const [gdtSymbol, setGdtSymbol] = useState('\u2316');
   const [gdtTolerance, setGdtTolerance] = useState('0.05');
   const [gdtDatum, setGdtDatum] = useState('A');
@@ -100,11 +109,27 @@ const AXL: React.FC = () => {
   const rendererRef = useRef<AXLRenderer | null>(null);
   const animRef = useRef<number>(0);
   const renderFnRef = useRef<() => void>(() => {});
+  // Render-on-demand: the viewport only redraws when something that affects the
+  // image actually changed. React re-renders this component on every such state
+  // change (camera, project, selection, sim results...), and the assignment of
+  // renderFnRef below flags this dirty. An idle AXL window then costs ~0 GPU/CPU
+  // instead of pinning a core at a steady 60fps redraw.
+  const needsRenderRef = useRef(true);
   const lastMouse = useRef({ x: 0, y: 0, down: false, button: 0 });
   const measureStart = useRef<Vec3 | null>(null);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
+
+  // Inspector (Configurations / Named Views / Interference) transient state
+  const [interferenceResults, setInterferenceResults] = useState<InterferencePair[] | null>(null);
+  const [clearanceGap, setClearanceGap] = useState(0);
+  const [newConfigName, setNewConfigName] = useState('');
+  const [newViewName, setNewViewName] = useState('');
+
+  // Section view (clipping plane) + mesh import
+  const [section, setSection] = useState<{ enabled: boolean; axis: 'x' | 'y' | 'z'; offset: number; flip: boolean }>({ enabled: false, axis: 'x', offset: 0, flip: false });
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Creative Suite Inbox ─────────────────────────────────────────────
   useCreativeInbox('axl', useCallback((asset: { name: string; sourceApp: string; kind?: string; data?: string }) => {
@@ -224,24 +249,6 @@ const AXL: React.FC = () => {
       ui.addAIMessage({ role: 'assistant', content: response, timestamp: Date.now() });
     }, 300);
   }, [aiInput, aiAnalyze, ui]);
-
-  // ROADMAP-600 #095/#296-301 — real local handlers: route the read-only CAD
-  // analysis ops to Axl's own `aiAnalyze` (real volume/weight/tolerance compute,
-  // posted into the AI panel); engine ops (DFM, topology optimise) honestly skip.
-  const handleAxlOp = useCallback((op: CreativeOp): OpApplyResult | Promise<OpApplyResult> => {
-    const queryFor: Record<string, string> = {
-      massProperties: 'weight and mass breakdown',
-      gdtSuggest: 'tolerance and GD&T fit recommendations',
-      parametricSuggest: 'what can you do — feature guidance',
-    };
-    const q = queryFor[op.op];
-    if (q) {
-      const answer = aiAnalyze(q);
-      ui.addAIMessage({ role: 'assistant', content: answer, timestamp: Date.now() });
-      return { outcome: 'applied', note: answer.split('\n')[0].slice(0, 90) };
-    }
-    return enginePendingApplier('Axl')(op);
-  }, [aiAnalyze, ui]);
 
   // ─── Feature Creation ─────────────────────────────────────────────────
   const addFeatureToSelected = useCallback(() => {
@@ -425,6 +432,168 @@ const AXL: React.FC = () => {
     }
   }, []);
 
+  // ─── Inspector: Interference / Clearance ──────────────────────────────
+  const runInterferenceCheck = useCallback(() => {
+    const pairs = detectInterferences(project.assembly.parts, clearanceGap);
+    setInterferenceResults(pairs);
+    const hits = pairs.filter(p => p.status === 'interference').length;
+    const clears = pairs.length - hits;
+    ui.showToast(
+      hits === 0 && clears === 0
+        ? 'No interferences detected'
+        : `${hits} interference${hits === 1 ? '' : 's'}` + (clears ? `, ${clears} clearance issue${clears === 1 ? '' : 's'}` : '')
+    );
+  }, [project.assembly.parts, clearanceGap, ui]);
+
+  // ─── Inspector: Named Views ───────────────────────────────────────────
+  const saveCurrentView = useCallback(() => {
+    const name = newViewName.trim() || `View ${project.namedViews.length + 1}`;
+    pStore.saveNamedView({
+      name,
+      azimuth: cameraAngle.azimuth,
+      elevation: cameraAngle.elevation,
+      distance: cameraAngle.distance,
+      viewMode,
+    });
+    setNewViewName('');
+    ui.showToast(`Saved view "${name}"`);
+  }, [newViewName, project.namedViews.length, pStore, cameraAngle, viewMode, ui]);
+
+  const applyNamedView = useCallback((view: NamedView) => {
+    setViewMode(view.viewMode);
+    setCameraAngle({ azimuth: view.azimuth, elevation: view.elevation, distance: view.distance });
+    ui.showToast(`View "${view.name}"`);
+  }, [ui]);
+
+  // ─── Inspector: Configurations ────────────────────────────────────────
+  const saveCurrentConfig = useCallback(() => {
+    const name = newConfigName.trim() || `Config ${project.configurations.length + 1}`;
+    pStore.saveConfiguration(name);
+    setNewConfigName('');
+    ui.showToast(`Saved configuration "${name}"`);
+  }, [newConfigName, project.configurations.length, pStore, ui]);
+
+  // ─── Mesh Import (OBJ / STL / STEP) ───────────────────────────────────
+  const handleImportFile = useCallback(async (file: File) => {
+    try {
+      const ext = file.name.toLowerCase().split('.').pop() || '';
+      // STL may be binary; read those as ArrayBuffer, text formats as text.
+      const data: string | ArrayBuffer = ext === 'stl' ? await file.arrayBuffer() : await file.text();
+      const result = importCadFile(file.name, data);
+      if (!result) { ui.showToast(`Could not read ${file.name}`); return; }
+      const baseName = file.name.replace(/\.[^.]+$/, '');
+      if (result.kind === 'mesh') {
+        const id = pStore.addMeshPart(baseName, result.mesh);
+        vStore.setSelectedPartId(id);
+        ui.showToast(`Imported ${baseName} — ${result.triangles.toLocaleString()} triangles`);
+      } else {
+        // STEP: imported as a box sized to the file's real point extent.
+        const id = pStore.addPrimitive('box', { width: result.width, height: result.height, depth: result.depth }, baseName);
+        vStore.setSelectedPartId(id);
+        ui.showToast(`Imported STEP extent — ${result.pointCount.toLocaleString()} points`);
+      }
+      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'axlImports', amount: 1 } }));
+    } catch {
+      ui.showToast(`Failed to import ${file.name}`);
+    }
+  }, [pStore, vStore, ui]);
+
+  const triggerImport = useCallback(() => importInputRef.current?.click(), []);
+
+  // ─── UKI-driven AXL ───────────────────────────────────────────────────
+  // The natural-language command bar (CreativeCommandBar) routes recognised
+  // goals here as CreativeOps. Read-only ops answer through aiAnalyze; mutating
+  // ops execute REAL store actions (add a part, shell/draft/rib it, run a study,
+  // section, explode, BOM, export). Anything still engine-bound skips honestly.
+  const handleAxlOp = useCallback((op: CreativeOp): OpApplyResult | Promise<OpApplyResult> => {
+    const req = String((op.params?.request ?? op.params?.goal ?? '') || '').toLowerCase();
+    const sel = project.assembly.parts.find(p => p.id === selectedPartId) || null;
+
+    // Read-only analysis -> aiAnalyze.
+    const queryFor: Record<string, string> = {
+      massProperties: 'weight and mass breakdown',
+      gdtSuggest: 'tolerance and GD&T fit recommendations',
+      parametricSuggest: 'what can you do — feature guidance',
+    };
+    if (queryFor[op.op]) {
+      const answer = aiAnalyze(queryFor[op.op]);
+      ui.addAIMessage({ role: 'assistant', content: answer, timestamp: Date.now() });
+      return { outcome: 'applied', note: answer.split('\n')[0].slice(0, 90) };
+    }
+
+    switch (op.op) {
+      case 'addPrimitive': {
+        const map: Record<string, PrimitiveType> = { cube: 'box', block: 'box', plate: 'box', box: 'box', cylinder: 'cylinder', rod: 'cylinder', shaft: 'cylinder', sphere: 'sphere', ball: 'sphere', cone: 'cone', tube: 'tube', pipe: 'tube', torus: 'torus', ring: 'torus', wedge: 'wedge', ramp: 'wedge' };
+        const key = Object.keys(map).find(k => req.includes(k)) || 'box';
+        const type = map[key];
+        const id = pStore.addPrimitive(type);
+        vStore.setSelectedPartId(id);
+        ui.showToast(`Added ${type}`);
+        return { outcome: 'applied', note: `Added ${type}` };
+      }
+      case 'shellPart':
+      case 'draftPart':
+      case 'ribPart': {
+        if (!sel) return { outcome: 'skipped', note: 'Select a part first' };
+        const kind = op.op === 'shellPart' ? 'shell' : op.op === 'draftPart' ? 'draft' : 'rib';
+        const num = parseFloat((req.match(/(\d+(\.\d+)?)/) || [])[1] || '');
+        const params: Record<string, number> = kind === 'draft'
+          ? { draftAngle: Number.isFinite(num) ? num : 5 }
+          : { thickness: Number.isFinite(num) ? num : 3 };
+        pStore.addFeature(sel.id, { id: genId(), type: kind, name: `${kind.charAt(0).toUpperCase()}${kind.slice(1)} (AI)`, params, visible: true, locked: false });
+        ui.showToast(`${kind} applied to ${sel.name}`);
+        return { outcome: 'applied', note: `${kind} on ${sel.name}` };
+      }
+      case 'runSimulation': {
+        const t: SimulationType = req.includes('thermal') || req.includes('heat') ? 'thermal' : req.includes('motion') || req.includes('deflect') ? 'motion' : 'stress';
+        setSimType(t);
+        if (!ui.showSimulation) ui.toggleSimulation();
+        requestAnimationFrame(() => runSimulation());
+        return { outcome: 'applied', note: `Running ${t} study` };
+      }
+      case 'explode': {
+        pStore.toggleExplodedView();
+        return { outcome: 'applied', note: 'Toggled exploded view' };
+      }
+      case 'section': {
+        const axis: 'x' | 'y' | 'z' = req.includes('y') ? 'y' : req.includes('z') ? 'z' : 'x';
+        setSection(s => ({ ...s, enabled: true, axis }));
+        if (!ui.showInspector) ui.toggleInspector();
+        ui.setInspectorTab('section');
+        return { outcome: 'applied', note: `Section on ${axis.toUpperCase()}` };
+      }
+      case 'interference': {
+        runInterferenceCheck();
+        if (!ui.showInspector) ui.toggleInspector();
+        ui.setInspectorTab('interference');
+        return { outcome: 'applied', note: 'Ran interference check' };
+      }
+      case 'generateBOM': {
+        pStore.generateBOM();
+        if (!ui.showBOM) ui.toggleBOM();
+        return { outcome: 'applied', note: 'Generated BOM' };
+      }
+      case 'newSketch': {
+        if (!ui.showSketch) ui.toggleSketch();
+        return { outcome: 'applied', note: 'Opened the 2D sketcher' };
+      }
+      case 'exportModel': {
+        const fmts: Array<'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf'> = ['stl', 'dxf', 'pdf', 'json', 'png', 'gltf'];
+        const fmt = fmts.find(f => req.includes(f)) || 'stl';
+        handleExport(fmt);
+        return { outcome: 'applied', note: `Exported ${fmt.toUpperCase()}` };
+      }
+      default:
+        return enginePendingApplier('Axl')(op);
+    }
+  }, [aiAnalyze, ui, project.assembly.parts, selectedPartId, pStore, vStore, runSimulation, runInterferenceCheck, handleExport]);
+
+  // Example prompts surfaced in the AXL command bar.
+  const axlAiExamples = useMemo(() => [
+    'add a cylinder', 'shell it 2mm', 'run a stress study',
+    'section along x', 'check interference', 'generate bom',
+  ], []);
+
   const buildRendererState = useCallback((): RenderState => {
     const azimuth = (cameraAngle.azimuth * Math.PI) / 180;
     const elevation = (cameraAngle.elevation * Math.PI) / 180;
@@ -454,8 +623,9 @@ const AXL: React.FC = () => {
       selectedPartId,
       hoveredPartId: null,
       stressMap: simResults?.stressMap ?? null,
+      section: section.enabled ? { axis: section.axis, offset: section.offset, flip: section.flip } : null,
     };
-  }, [cameraAngle, gridVisible, project, selectedPartId, simResults, viewMode, wireframe]);
+  }, [cameraAngle, gridVisible, project, selectedPartId, simResults, viewMode, wireframe, section]);
 
   // ─── 3D Viewport Rendering (Canvas 2D) ────────────────────────────────
   const renderViewport = useCallback(() => {
@@ -979,7 +1149,10 @@ const AXL: React.FC = () => {
   }, [buildRendererState, project, gridVisible, wireframe, cameraAngle, selectedPartId, simResults, viewMode]);
 
   // Keep render function ref in sync (avoids restarting rAF loop on state change)
+  // and flag the viewport dirty: any state change that re-runs this render is,
+  // by definition, something the next frame must reflect.
   renderFnRef.current = renderViewport;
+  needsRenderRef.current = true;
 
   // ─── Canvas resize & render loop ──────────────────────────────────────
   useEffect(() => {
@@ -998,6 +1171,7 @@ const AXL: React.FC = () => {
         canvas.style.width = parent.clientWidth + 'px';
         canvas.style.height = parent.clientHeight + 'px';
         renderer.resize();
+        needsRenderRef.current = true; // new backing-store size needs a redraw
       }
     };
     resize();
@@ -1008,7 +1182,13 @@ const AXL: React.FC = () => {
     let running = true;
     const loop = () => {
       if (!running) return;
-      renderViewportRef.current();
+      // Render only when the scene is dirty. The flag is raised by any state
+      // change (via renderFnRef assignment) and by resize; we clear it after
+      // drawing so a static view settles to zero per-frame work.
+      if (needsRenderRef.current) {
+        needsRenderRef.current = false;
+        renderViewportRef.current();
+      }
       animRef.current = requestAnimationFrame(loop);
     };
     // Only render when tab is visible
@@ -1016,6 +1196,7 @@ const AXL: React.FC = () => {
       if (document.hidden) {
         cancelAnimationFrame(animRef.current);
       } else {
+        needsRenderRef.current = true; // repaint once the tab is visible again
         animRef.current = requestAnimationFrame(loop);
       }
     };
@@ -1244,6 +1425,7 @@ const AXL: React.FC = () => {
       else if (k === 'm') vStore.setTool('measure');
       else if (k === 'w') setWireframe(prev => !prev);
       else if (k === 'x') pStore.toggleExplodedView();
+      else if (k === 'i') ui.toggleInspector();                                              // I = inspector (configs/views/interference)
       else if (k === 'f') applyStandardView('front');                                      // F = front view reset
       else if (k === 't') applyStandardView('top');                                        // T = top view
       else if (k === ' ') { e.preventDefault(); ui.toggleSimulation(); }                  // Space = simulation
@@ -1295,17 +1477,22 @@ const AXL: React.FC = () => {
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
       `}</style>
 
+      {/* Hidden file input driving OBJ/STL/STEP import */}
+      <input ref={importInputRef} type="file" accept=".obj,.stl,.step,.stp" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ''; }} />
+
       {/* ─── Top Toolbar ─────────────────────────────────────────────── */}
       <div data-testid="axl-tools">
         <AXLToolbar
           onExport={handleExport}
           onRunSimulation={runSimulation}
+          onImport={triggerImport}
           onAddFeature={addFeatureToSelected}
           sendToMenu={
             <>
               <SendToMenu sourceApp="axl" assetKind="model" getAsset={() => ({ name: `${project.name}.axl`, data: JSON.stringify(project), mimeType: 'application/json' })} />
               {collab.canShare && (
-                <button onClick={collab.openShareDialog} aria-label="Share project" style={collabButtonStyles} title="Share project">
+                <button onClick={collab.openShareDialog} aria-label="Share project" style={collabButtonStyles}>
                   <DexIcon name="user-plus" size={14} /> Share
                 </button>
               )}
@@ -1403,8 +1590,21 @@ const AXL: React.FC = () => {
             style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', imageRendering: 'auto' }}
           />
 
+          {/* ── 2D Sketch overlay (draw profile -> extrude/revolve solid) ── */}
+          {ui.showSketch && (
+            <SketchOverlay
+              units={project.units}
+              onCommitMesh={(name, mesh) => {
+                const id = pStore.addMeshPart(name, mesh);
+                vStore.setSelectedPartId(id);
+                ui.showToast(`${name} created`);
+              }}
+              onClose={() => ui.toggleSketch()}
+            />
+          )}
+
           {/* ── Blender-style Viewport Header Bar ──────────────────── */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 var(--space-2)', background: 'var(--color-bg-surface-solid, #1E1E22)', borderBottom: '1px solid var(--color-border-subtle)', zIndex: 10 }}>
+          <div className="dex-axl-rail" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 var(--space-2)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', zIndex: 10 }}>
             {/* Viewport Mode */}
             <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: 9999, padding: 2 }}>
               {[
@@ -1414,10 +1614,9 @@ const AXL: React.FC = () => {
                 { mode: 'right' as ViewMode, label: 'Right', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4h12v16H6z"/><line x1="12" y1="4" x2="12" y2="20"/></svg> },
                 { mode: 'drawing' as ViewMode, label: '2D', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg> },
               ].map(v => (
-                <button key={v.mode} onClick={() => applyStandardView(v.mode)}
-                  title={`${v.label} (${v.mode === '3d' ? '1' : v.mode === 'front' ? '2' : v.mode === 'top' ? '3' : v.mode === 'right' ? '4' : '5'})`}
-                  style={{ padding: '3px var(--space-2)', borderRadius: 9999, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, transition: 'all 0.12s', background: viewMode === v.mode ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: viewMode === v.mode ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
-                  {v.icon} {v.label}
+                <button key={v.mode} onClick={() => applyStandardView(v.mode)} aria-label={v.label}
+                  style={{ width: 24, height: 22, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s', background: viewMode === v.mode ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: viewMode === v.mode ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
+                  {v.icon}
                 </button>
               ))}
             </div>
@@ -1426,19 +1625,26 @@ const AXL: React.FC = () => {
 
             {/* Shading Mode */}
             <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: 9999, padding: 2 }}>
-              <button onClick={() => setWireframe(false)} title="Solid" style={{ padding: '3px 7px', borderRadius: 9999, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: !wireframe ? '#1e3a28' : 'transparent', color: !wireframe ? 'var(--color-success)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Solid
+              <button onClick={() => setWireframe(false)} aria-label="Solid shading" style={{ width: 24, height: 22, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: !wireframe ? '#1e3a28' : 'transparent', color: !wireframe ? 'var(--color-success)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
               </button>
-              <button onClick={() => setWireframe(true)} title="Wireframe (W)" style={{ padding: '3px 7px', borderRadius: 9999, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: wireframe ? 'var(--color-accent-light)' : 'transparent', color: wireframe ? 'var(--color-accent)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><line x1="3" y1="8" x2="12" y2="13"/><line x1="21" y1="8" x2="12" y2="13"/><line x1="12" y1="13" x2="12" y2="22"/></svg> Wire
+              <button onClick={() => setWireframe(true)} aria-label="Wireframe shading" style={{ width: 24, height: 22, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: wireframe ? 'var(--color-accent-light)' : 'transparent', color: wireframe ? 'var(--color-accent)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><line x1="3" y1="8" x2="12" y2="13"/><line x1="21" y1="8" x2="12" y2="13"/><line x1="12" y1="13" x2="12" y2="22"/></svg>
               </button>
             </div>
 
             <div style={{ width: 1, height: 16, background: 'var(--color-bg-hover)', margin: '0 4px' }} />
 
             {/* Viewport Overlays */}
-            <button onClick={vStore.toggleGrid} title="Toggle Grid (Ctrl+G)" style={{ padding: '3px 7px', borderRadius: 9999, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: gridVisible ? '#2e2410' : 'transparent', color: gridVisible ? 'var(--color-warning)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Grid
+            <button onClick={vStore.toggleGrid} aria-label="Toggle grid" style={{ width: 24, height: 22, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: gridVisible ? '#2e2410' : 'transparent', color: gridVisible ? 'var(--color-warning)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </button>
+
+            <div style={{ width: 1, height: 16, background: 'var(--color-bg-hover)', margin: '0 4px' }} />
+
+            {/* Inspector: Configurations / Named Views / Interference */}
+            <button onClick={() => ui.toggleInspector()} aria-label="Inspector" style={{ width: 24, height: 22, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ui.showInspector ? 'var(--color-accent-light)' : 'transparent', color: ui.showInspector ? 'var(--color-accent)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
 
             <div style={{ flex: 1 }} />
@@ -1488,7 +1694,7 @@ const AXL: React.FC = () => {
 
           {/* ── Object Info Overlay (Blender N-panel style) ──────────── */}
           {selectedPart && (
-            <div style={{ position: 'absolute', top: 42, left: 10, background: 'var(--color-bg-surface-solid, #141416)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', padding: 'var(--space-2) 10px', fontSize: 10, zIndex: 10, minWidth: 140 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, left: 10, borderRadius: 12, padding: 'var(--space-2) 10px', fontSize: 10, zIndex: 10, minWidth: 140 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: selectedPart.color }} />
                 <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{selectedPart.name}</span>
@@ -1504,7 +1710,7 @@ const AXL: React.FC = () => {
 
           {/* Simulation results overlay */}
           {simResults && ui.showSimulation && (
-            <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'var(--color-bg-elevated)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', fontSize: 11, maxWidth: 320 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 12, padding: 'var(--space-3)', fontSize: 11, maxWidth: 320 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 6 }}>
                 {simType === 'stress' ? 'STRESS ANALYSIS' : simType === 'thermal' ? 'THERMAL ANALYSIS' : 'MOTION STUDY'}
               </div>
@@ -1574,7 +1780,7 @@ const AXL: React.FC = () => {
 
           {/* Simulation controls */}
           {ui.showSimulation && !simResults && (
-            <div style={{ position: 'absolute', bottom: 10, left: 10, background: 'var(--color-bg-elevated)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', fontSize: 11, width: 260 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 12, padding: 'var(--space-3)', fontSize: 11, width: 260 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 'var(--space-2)' }}>SIMULATION</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
@@ -1630,7 +1836,7 @@ const AXL: React.FC = () => {
                 )}
                 <button onClick={runSimulation} disabled={simRunning}
                   style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: simRunning ? 'wait' : 'pointer', boxShadow: 'none' }}>
-                  {simRunning ? 'Running...' : 'Run Simulation'}
+                  {simRunning ? `${simPhrase}...` : 'Run Simulation'}
                 </button>
               </div>
             </div>
@@ -1638,7 +1844,7 @@ const AXL: React.FC = () => {
 
           {/* Measurement Readout Panel */}
           {tool === 'measure' && project.measurements.length > 0 && (
-            <div style={{ position: 'absolute', top: 42, right: 250, background: 'var(--color-bg-elevated)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', padding: 10, fontSize: 10, maxWidth: 220, maxHeight: 200, overflowY: 'auto', zIndex: 10 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 250, borderRadius: 12, padding: 10, fontSize: 10, maxWidth: 220, maxHeight: 200, overflowY: 'auto', zIndex: 10 }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFD60A" strokeWidth="2"><path d="M2 12h5l2-9 4 18 3-9h6"/></svg>
                 MEASUREMENTS ({project.measurements.length})
@@ -1658,7 +1864,7 @@ const AXL: React.FC = () => {
 
           {/* Toast */}
           {ui.toastMsg && (
-            <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', padding: '6px var(--space-4)', fontSize: 11, color: 'var(--color-text-primary)', animation: 'dex-snap-in 0.2s ease-out' }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', borderRadius: 12, padding: '6px var(--space-4)', fontSize: 11, color: 'var(--color-text-primary)', animation: 'dex-snap-in 0.2s ease-out' }}>
               {ui.toastMsg}
             </div>
           )}
@@ -1679,7 +1885,7 @@ const AXL: React.FC = () => {
 
         {/* ─── Parts Library Panel (overlay) ──────────────────────────── */}
         {ui.showPartsLibrary && (
-          <div style={{ position: 'absolute', top: 42, left: 'min(220px, 32%)', width: 'clamp(220px, calc(100% - 244px), 320px)', bottom: 0, background: 'var(--color-bg-elevated)', borderRight: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, left: 'min(220px, 32%)', width: 'clamp(220px, calc(100% - 244px), 320px)', bottom: 0, borderRadius: 0, boxShadow: 'none', borderRight: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Standard Parts</span>
               <button onClick={ui.togglePartsLibrary} aria-label="Close parts library" className="axl-close">&times;</button>
@@ -1732,14 +1938,14 @@ const AXL: React.FC = () => {
 
         {/* ─── Feature Creation Panel (overlay) ──────────────────────── */}
         {ui.showFeatureCreate && (
-          <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', borderRadius: 14, borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Add Feature</span>
               <button onClick={ui.toggleFeatureCreate} aria-label="Close feature create" className="axl-close">&times;</button>
             </div>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', overflow: 'auto' }}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {(['extrude', 'revolve', 'chamfer', 'fillet', 'pattern'] as const).map(ft => (
+                {(['extrude', 'revolve', 'chamfer', 'fillet', 'pattern', 'shell', 'draft', 'rib'] as const).map(ft => (
                   <button key={ft} onClick={() => setFeatureType(ft)}
                     style={{ padding: '4px var(--space-2)', fontSize: 9, fontWeight: 600, borderRadius: 9999, cursor: 'pointer',
                       background: featureType === ft ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)',
@@ -1792,6 +1998,20 @@ const AXL: React.FC = () => {
                   </label>
                 </>
               )}
+              {(featureType === 'shell' || featureType === 'rib') && (
+                <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+                  {featureType === 'shell' ? 'Wall thickness' : 'Rib thickness'} ({project.units}):
+                  <input type="number" value={featureParams.thickness} min={0.5} step={0.5} onChange={e => setFeatureParams(p => ({ ...p, thickness: Number(e.target.value) }))}
+                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                </label>
+              )}
+              {featureType === 'draft' && (
+                <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+                  Draft angle (&deg;):
+                  <input type="number" value={featureParams.draftAngle} min={0} max={45} step={1} onChange={e => setFeatureParams(p => ({ ...p, draftAngle: Number(e.target.value) }))}
+                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                </label>
+              )}
 
               <button onClick={addFeatureToSelected} disabled={!selectedPartId}
                 style={{ padding: '7px var(--space-3)', fontSize: 10, fontWeight: 600, borderRadius: 9999, boxShadow: 'none', cursor: selectedPartId ? 'pointer' : 'not-allowed',
@@ -1806,7 +2026,7 @@ const AXL: React.FC = () => {
 
         {/* ─── GD&T Creation Panel (overlay) ─────────────────────────── */}
         {ui.showGDTCreate && (
-          <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', borderRadius: 14, borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>GD&T Annotation</span>
               <button onClick={ui.toggleGDTCreate} aria-label="Close GD&T create" className="axl-close">&times;</button>
@@ -1815,7 +2035,7 @@ const AXL: React.FC = () => {
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>SYMBOL</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
                 {GDT_SYMBOLS.map(g => (
-                  <button key={g.symbol} onClick={() => setGdtSymbol(g.symbol)} title={g.name}
+                  <button key={g.symbol} onClick={() => setGdtSymbol(g.symbol)}
                     style={{ padding: '5px 0', fontSize: 14, textAlign: 'center', borderRadius: 10, cursor: 'pointer',
                       background: gdtSymbol === g.symbol ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)',
                       color: gdtSymbol === g.symbol ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -1836,7 +2056,7 @@ const AXL: React.FC = () => {
                   style={{ marginLeft: 'var(--space-2)', width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none', textTransform: 'uppercase' }} />
               </label>
 
-              <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-border-subtle)', borderRadius: 8, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-border-subtle)', borderRadius: 10, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 16, color: 'var(--color-accent)' }}>{gdtSymbol}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{gdtTolerance}</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>|</span>
@@ -1876,7 +2096,7 @@ const AXL: React.FC = () => {
 
         {/* ─── Assembly Constraints Panel ────────────────────────────── */}
         {ui.showConstraintPanel && (
-          <div style={{ position: 'absolute', top: 42, right: 240, width: 270, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: 520 }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 240, width: 270, borderRadius: 14, borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: 520 }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Assembly Constraints</span>
               <button aria-label="Close constraints panel" onClick={ui.toggleConstraintPanel} className="axl-close">&times;</button>
@@ -1938,7 +2158,7 @@ const AXL: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>EXISTING CONSTRAINTS ({project.assembly.constraints.length})</span>
                   {/* Manual re-solve: parts can drift after a move/rotate; this re-snaps them. */}
-                  <button aria-label="Re-solve constraints" title="Re-solve constraints" onClick={() => {
+                  <button aria-label="Re-solve constraints" onClick={() => {
                     pStore.pushUndo();
                     const res = pStore.solveConstraints();
                     ui.showToast(res.unsatisfied > 0 ? `Solved -- ${res.unsatisfied} unsatisfied` : res.moved > 0 ? `Solved -- ${res.moved} part(s) moved` : 'All constraints satisfied');
@@ -1962,9 +2182,163 @@ const AXL: React.FC = () => {
           </div>
         )}
 
+        {/* ─── Inspector Panel: Configurations / Views / Interference ─── */}
+        {ui.showInspector && (
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 0, width: 'min(308px, calc(100% - 24px))', bottom: 0, borderRadius: 0, boxShadow: 'none', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>Inspector</span>
+              <button aria-label="Close inspector" onClick={() => ui.toggleInspector()} className="axl-close">&times;</button>
+            </div>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 2, padding: '6px var(--space-2)', borderBottom: '1px solid var(--color-bg-hover)' }}>
+              {([
+                { id: 'configs' as const, label: 'Configs' },
+                { id: 'views' as const, label: 'Views' },
+                { id: 'interference' as const, label: 'Clash' },
+                { id: 'section' as const, label: 'Section' },
+              ]).map(t => (
+                <button key={t.id} onClick={() => ui.setInspectorTab(t.id)}
+                  style={{ flex: 1, padding: '4px 6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, transition: 'all 0.12s', background: ui.inspectorTab === t.id ? 'var(--color-accent-light)' : 'transparent', color: ui.inspectorTab === t.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* ── Configurations / Design Variants ── */}
+              {ui.inspectorTab === 'configs' && (
+                <>
+                  <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+                    Snapshot the current placement and driving geometry as a design variant, then switch between variants non-destructively.
+                  </p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input value={newConfigName} onChange={e => setNewConfigName(e.target.value)} placeholder="Configuration name"
+                      onKeyDown={e => { if (e.key === 'Enter') saveCurrentConfig(); }}
+                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
+                    <button onClick={saveCurrentConfig} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Capture</button>
+                  </div>
+                  {project.configurations.length === 0 && (
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No configurations yet</div>
+                  )}
+                  {project.configurations.map(cfg => (
+                    <div key={cfg.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 8, background: cfg.id === project.activeConfigId ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', border: cfg.id === project.activeConfigId ? '1px solid var(--color-accent-muted)' : '1px solid transparent' }}>
+                      <button onClick={() => pStore.applyConfiguration(cfg.id)} title="Apply configuration" style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cfg.id === project.activeConfigId ? '● ' : ''}{cfg.name}
+                        <span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>{cfg.parts.length} parts</span>
+                      </button>
+                      <button aria-label="Delete configuration" onClick={() => pStore.deleteConfiguration(cfg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* ── Named Views / Saved Cameras ── */}
+              {ui.inspectorTab === 'views' && (
+                <>
+                  <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+                    Save the current camera as a named view and jump back to it anytime.
+                  </p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input value={newViewName} onChange={e => setNewViewName(e.target.value)} placeholder="View name"
+                      onKeyDown={e => { if (e.key === 'Enter') saveCurrentView(); }}
+                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
+                    <button onClick={saveCurrentView} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Save View</button>
+                  </div>
+                  {project.namedViews.length === 0 && (
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No saved views yet</div>
+                  )}
+                  {project.namedViews.map(v => (
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 8, background: 'var(--color-border-subtle)' }}>
+                      <button onClick={() => applyNamedView(v)} title="Go to view" style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {v.name}
+                        <span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{v.viewMode} · Az {v.azimuth.toFixed(0)}° El {v.elevation.toFixed(0)}°</span>
+                      </button>
+                      <button aria-label="Delete view" onClick={() => pStore.deleteNamedView(v.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* ── Interference / Clearance Check ── */}
+              {ui.inspectorTab === 'interference' && (
+                <>
+                  <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+                    Broad-phase bounding-volume scan across all visible parts. Flags overlapping bodies and (optionally) pairs closer than a minimum clearance.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <label style={{ fontSize: 10, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Min clearance</label>
+                    <input type="number" value={clearanceGap} min={0} step={1} onChange={e => setClearanceGap(Math.max(0, Number(e.target.value) || 0))}
+                      style={{ width: 64, padding: '5px 6px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }} />
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{project.units}</span>
+                    <button onClick={runInterferenceCheck} style={{ marginLeft: 'auto', padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Run Check</button>
+                  </div>
+                  {interferenceResults === null && (
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>Run a check to see results</div>
+                  )}
+                  {interferenceResults !== null && interferenceResults.length === 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--color-success)', textAlign: 'center', padding: '16px 0', fontWeight: 600 }}>✓ No interferences detected</div>
+                  )}
+                  {interferenceResults?.map((pair, i) => {
+                    const isHit = pair.status === 'interference';
+                    const col = isHit ? 'var(--color-error)' : 'var(--color-warning)';
+                    return (
+                      <div key={`${pair.partAId}-${pair.partBId}-${i}`} onClick={() => vStore.setSelectedPartId(pair.partAId)} style={{ cursor: 'pointer', padding: '6px var(--space-2)', borderRadius: 8, background: 'var(--color-border-subtle)', borderLeft: `2px solid ${col}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: col }}>{isHit ? 'Interfere' : 'Clearance'}</span>
+                          <span style={{ flex: 1, fontSize: 10, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pair.partAName} ↔ {pair.partBName}</span>
+                        </div>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
+                          {isHit
+                            ? `overlap ${pair.overlap.toFixed(1)} ${project.units}`
+                            : `gap ${(-pair.overlap).toFixed(1)} ${project.units}`}
+                          {` · centers ${pair.centerDistance.toFixed(1)} ${project.units}`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* ── Section View (clipping plane) ── */}
+              {ui.inspectorTab === 'section' && (
+                <>
+                  <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+                    Slice the model with a clipping plane to reveal internal structure. Cuts every part in the viewport.
+                  </p>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={section.enabled} onChange={e => setSection(s => ({ ...s, enabled: e.target.checked }))} />
+                    Enable section plane
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 36 }}>Axis</span>
+                    {(['x', 'y', 'z'] as const).map(ax => (
+                      <button key={ax} disabled={!section.enabled} onClick={() => setSection(s => ({ ...s, axis: ax }))}
+                        style={{ flex: 1, padding: '5px 0', borderRadius: 8, border: 'none', cursor: section.enabled ? 'pointer' : 'default', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', opacity: section.enabled ? 1 : 0.4, background: section.axis === ax ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: section.axis === ax ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{ax}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 36 }}>Offset</span>
+                    <input type="range" min={-150} max={150} step={1} value={section.offset} disabled={!section.enabled}
+                      onChange={e => setSection(s => ({ ...s, offset: Number(e.target.value) }))} style={{ flex: 1, opacity: section.enabled ? 1 : 0.4 }} />
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', width: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{section.offset} {project.units}</span>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--color-text-primary)', cursor: 'pointer', opacity: section.enabled ? 1 : 0.4 }}>
+                    <input type="checkbox" disabled={!section.enabled} checked={section.flip} onChange={e => setSection(s => ({ ...s, flip: e.target.checked }))} />
+                    Flip side
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ─── Settings Panel (overlay) ─────────────────────── */}
         {ui.showSettings && (
-          <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(300px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 0, width: 'min(300px, calc(100% - 24px))', bottom: 0, borderRadius: 0, boxShadow: 'none', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>Settings</span>
               <button aria-label="Close settings" onClick={() => ui.toggleSettings()} className="axl-close">&times;</button>
@@ -2053,13 +2427,24 @@ const AXL: React.FC = () => {
 
         {/* ─── AI Design Copilot Panel (overlay) ─────────────────────── */}
         {ui.showAI && (
-          <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(320px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 0, width: 'min(320px, calc(100% - 24px))', bottom: 0, borderRadius: 0, boxShadow: 'none', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>AI Design Copilot</span>
               </div>
               <button onClick={ui.toggleAI} aria-label="Close AI panel" className="axl-close">&times;</button>
+            </div>
+
+            {/* UKI command bar — natural-language CAD actions (real store ops) */}
+            <div style={{ padding: '10px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+              <CreativeCommandBar
+                appId="axl"
+                facts={{ partId: selectedPartId, partCount: project.assembly.parts.length }}
+                onApplyOp={handleAxlOp}
+                examples={axlAiExamples}
+                placeholder="e.g. add a cylinder, shell it 2mm"
+              />
             </div>
 
             <div style={{ padding: 'var(--space-2) 10px', display: 'flex', gap: 4, flexWrap: 'wrap', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -2110,7 +2495,7 @@ const AXL: React.FC = () => {
       {ui.showBOM && project.bom.length > 0 && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}
           onClick={ui.toggleBOM}>
-          <div style={{ background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', padding: 'var(--space-5)', maxWidth: 700, maxHeight: '70vh', overflow: 'auto', width: '90%' }}
+          <div className="dex-axl-panel-strong" style={{ borderRadius: 14, padding: 'var(--space-5)', maxWidth: 700, maxHeight: '70vh', overflow: 'auto', width: '90%' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
               <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>Bill of Materials \u2014 {project.name}</div>
@@ -2169,7 +2554,7 @@ const AXL: React.FC = () => {
         <span style={{ color: 'var(--color-border-subtle)' }}>|</span>
         <span style={{ color: simRunning ? 'var(--color-warning)' : 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 3 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: simRunning ? 'var(--color-warning)' : 'var(--color-success)' }} />
-          {simRunning ? 'Simulating...' : 'Ready'}
+          {simRunning ? `${simPhrase}...` : 'Ready'}
         </span>
       </div>
 
@@ -2201,10 +2586,10 @@ const AXL: React.FC = () => {
         const left = Math.max(4, Math.min(ctxMenu.x, window.innerWidth - MENU_W - 4));
         const top = Math.max(4, Math.min(ctxMenu.y, window.innerHeight - estHeight - 4));
         return (
-          <div style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', width: MENU_W, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-axl-panel-strong" style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', width: MENU_W, borderRadius: 12, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
-              : <div key={i} className="axl-ctx-item" onClick={() => { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); }} style={{ padding: '6px 14px', fontSize: 11, color: (item as any).danger ? 'var(--color-error)' : '#e0e0e0', cursor: 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
+              ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
+              : <div key={i} className="axl-ctx-item" onClick={() => { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); }} style={{ padding: '6px 14px', fontSize: 11, color: (item as any).danger ? 'var(--color-error)' : '#e0e0e0', cursor: 'pointer', borderRadius: 8, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

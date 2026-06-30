@@ -16,7 +16,7 @@ import { sharedTick } from '../services/SharedTick';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useLiveActivity, type LiveActivity, type ActivityType } from '../utils/liveActivity';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
-import { glassPanel, glassOverlay } from '../styles/glassMenu';
+import { glassOverlay } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { useRecentFiles } from '../store/useRecentFiles';
@@ -24,9 +24,9 @@ import { HomeWidgets, HomeDashboard } from '../components/HomeWidgets';
 import { useWidgetStore } from '../store/widgetStore';
 import DexIcon from '../components/DexIcon';
 import { Z_CONTEXT_MENU, Z_MODAL } from '../utils/zIndexTokens';
-import { useHomeAppsStore } from '../store/homeAppsStore';
 import { useHomePinnedFilesStore, type HomePinnedFile } from '../store/homePinnedFilesStore';
 import { useHomePinnedAppsStore, type HomePinnedApp } from '../store/homePinnedAppsStore';
+import { useSmoothDrag } from '../hooks/useSmoothDrag';
 
 // App icon images
 import vinxIconPng from '../../../appicons/vinx.png';
@@ -64,7 +64,6 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
   const movePinnedFile = useHomePinnedFilesStore(s => s.movePinnedFile);
   const unpinFile = useHomePinnedFilesStore(s => s.unpinFile);
   const addRecent = useRecentFiles(s => s.addRecent);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
 
   const openFile = useCallback(async () => {
     try {
@@ -79,47 +78,36 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
     }
   }, [addRecent, file.name, file.path]);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: file.x, origY: file.y, moved: false };
-  }, [file.x, file.y]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
-    movePinnedFile(file.id, dragRef.current.origX + dx, dragRef.current.origY + dy);
-  }, [file.id, movePinnedFile]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    const wasClick = !dragRef.current?.moved;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* pointer already released */ }
-    dragRef.current = null;
-    if (wasClick && e.detail >= 2) void openFile();
-  }, [openFile]);
+  // Shared smooth drag: rAF-batched, store written once on release (was a store
+  // write per pointermove that re-rendered every icon).
+  const drag = useSmoothDrag({
+    x: file.x, y: file.y,
+    onCommit: (nx, ny) => movePinnedFile(file.id, nx, ny),
+    onRelease: (e, moved) => { if (!moved && e.detail >= 2) void openFile(); },
+  });
 
   return (
     <button
       type="button"
       aria-label={`Pinned file ${file.name}`}
-      title={`${file.name}\n${file.path}\nDouble-click to open. Drag to move.`}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      title={`${file.name}\n${file.path}\nDouble-click to open. Space to Quick Look. Drag to move.`}
+      {...drag.handlers}
       onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); void openFile(); }}
+      onKeyDown={(e) => {
+        // Space = Quick Look (macOS-style), handled by the global QuickLookHost.
+        if (e.key === ' ') {
+          e.preventDefault(); e.stopPropagation();
+          window.dispatchEvent(new CustomEvent('dex-quicklook', { detail: { path: file.path, name: file.name } }));
+        }
+      }}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinFile(file.id); }}
       style={{
         position: 'absolute',
-        left: file.x,
-        top: file.y,
+        left: drag.x,
+        top: drag.y,
         width: 88,
         minHeight: 86,
-        zIndex: 9,
+        zIndex: drag.dragging ? 1000 : 9,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -129,11 +117,13 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
         borderRadius: 10,
         background: 'transparent',
         color: '#fff',
-        cursor: 'grab',
+        cursor: drag.dragging ? 'grabbing' : 'grab',
         textAlign: 'center',
         userSelect: 'none',
         touchAction: 'none',
-        transition: 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
+        // No position easing while dragging — the icon must track the pointer
+        // 1:1; only the chrome (bg/border/shadow) eases.
+        transition: drag.dragging ? 'none' : 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = ''; }}
@@ -143,7 +133,7 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
       <span style={{
         width: 42,
         height: 42,
-        borderRadius: 8,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -176,7 +166,6 @@ PinnedFileShortcut.displayName = 'PinnedFileShortcut';
 const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
   const movePinnedApp = useHomePinnedAppsStore(s => s.movePinnedApp);
   const unpinApp = useHomePinnedAppsStore(s => s.unpinApp);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const def = APP_DEFINITIONS[pin.appId];
 
   const launchApp = useCallback(() => {
@@ -184,28 +173,12 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
     window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: pin.appId } }));
   }, [def, pin.appId]);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pin.x, origY: pin.y, moved: false };
-  }, [pin.x, pin.y]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
-    movePinnedApp(pin.id, dragRef.current.origX + dx, dragRef.current.origY + dy);
-  }, [pin.id, movePinnedApp]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    const wasClick = !dragRef.current?.moved;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* released */ }
-    dragRef.current = null;
-    if (wasClick && e.detail >= 2) launchApp();
-  }, [launchApp]);
+  // Shared smooth drag (rAF-batched, commit-on-release) — same feel as the DEX Bar.
+  const drag = useSmoothDrag({
+    x: pin.x, y: pin.y,
+    onCommit: (nx, ny) => movePinnedApp(pin.id, nx, ny),
+    onRelease: (e, moved) => { if (!moved && e.detail >= 2) launchApp(); },
+  });
 
   if (!def) return null;
   const png = APP_ICON_PNGS[pin.appId];
@@ -215,19 +188,16 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
       type="button"
       aria-label={`Pinned app ${def.name}`}
       title={`${def.name}\nDouble-click to open. Drag to move. Right-click to unpin.`}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      {...drag.handlers}
       onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); launchApp(); }}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinApp(pin.id); }}
       style={{
         position: 'absolute',
-        left: pin.x,
-        top: pin.y,
+        left: drag.x,
+        top: drag.y,
         width: 88,
         minHeight: 86,
-        zIndex: 9,
+        zIndex: drag.dragging ? 1000 : 9,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -237,11 +207,11 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
         borderRadius: 10,
         background: 'transparent',
         color: '#fff',
-        cursor: 'grab',
+        cursor: drag.dragging ? 'grabbing' : 'grab',
         textAlign: 'center',
         userSelect: 'none',
         touchAction: 'none',
-        transition: 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
+        transition: drag.dragging ? 'none' : 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = ''; }}
@@ -304,8 +274,8 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
 
   return (
     <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
-      <div onMouseDown={e => e.stopPropagation()} style={{
-        ...glassPanel,
+      <div onMouseDown={e => e.stopPropagation()} className="dex-liquid-glass-strong" style={{
+        borderRadius: 16,
         width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(72vh, calc(100vh - 32px))',
         overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
       }}>
@@ -336,7 +306,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   aria-label={pinned ? `${def.name} already pinned` : `Pin ${def.name}`}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                    padding: '10px 6px', borderRadius: 8,
+                    padding: '10px 6px', borderRadius: 12,
                     background: 'transparent',
                     border: '1px solid transparent',
                     color: 'var(--color-text-primary)', fontSize: 11,
@@ -345,14 +315,14 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   }}
                 >
                   <span style={{
-                    width: 40, height: 40, borderRadius: 8,
+                    width: 40, height: 40, borderRadius: 10,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
                     boxShadow: png ? 'none' : '0 3px 10px rgba(0,0,0,0.28)',
                     color: '#fff', overflow: 'hidden',
                   }}>
                     {png
-                      ? <img src={png} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />
+                      ? <img src={png} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }} />
                       : <DexIcon name={def.icon as any} size={22} color="currentColor" />}
                   </span>
                   <span style={{ width: '100%', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.name}</span>
@@ -716,11 +686,11 @@ export const Home: React.FC = () => {
                 items[next]?.focus();
               }
             }}
+            className="dex-liquid-glass-strong"
             style={{
               position: 'fixed', left: ctxMenu.x, top: ctxMenu.y,
               zIndex: Z_CONTEXT_MENU, minWidth: 200, padding: '5px 0',
-              background: 'var(--color-bg-elevated)',
-              borderRadius: 10, border: '1px solid var(--color-border-subtle)',
+              borderRadius: 12,
               boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
@@ -752,7 +722,7 @@ export const Home: React.FC = () => {
                     background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13,
                     textAlign: 'left', cursor: 'pointer',
-                    borderRadius: 6,
+                    borderRadius: 10,
                     transition: 'background 0.12s ease',
                   }}
                 >
@@ -799,8 +769,8 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
   return (
     <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
-      <div onMouseDown={e => e.stopPropagation()} style={{
-        ...glassPanel,
+      <div onMouseDown={e => e.stopPropagation()} className="dex-liquid-glass-strong" style={{
+        borderRadius: 16,
         width: 'min(580px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', overflow: 'hidden', padding: 0,
         display: 'flex', flexDirection: 'column',
       }}>
@@ -811,7 +781,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 0 }}>Wallpaper</h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose a desktop background</p>
             </div>
-            <button onClick={onClose} aria-label="Close wallpaper picker" className="dex-hover-bg" style={{ background: 'var(--color-border-subtle)', border: 'none', borderRadius: 6, width: 28, height: 28, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
+            <button onClick={onClose} aria-label="Close wallpaper picker" className="dex-hover-bg" style={{ background: 'var(--color-border-subtle)', border: 'none', borderRadius: 10, width: 28, height: 28, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -837,7 +807,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       title={p.name}
                       className="dex-hover-lift"
                       style={{
-                        width: '100%', aspectRatio: '16/10', borderRadius: 8,
+                        width: '100%', aspectRatio: '16/10', borderRadius: 10,
                         background: bg,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
@@ -884,7 +854,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             onClick={handleFileSelect}
             className="dex-hover-bg"
             style={{
-              width: '100%', height: 52, borderRadius: 8,
+              width: '100%', height: 52, borderRadius: 10,
               background: 'var(--color-border-subtle)',
               border: presetId === 'custom' ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-bg-hover)',
               cursor: 'pointer',
@@ -921,177 +891,6 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
   );
 };
 
-// ======================================================================
-// QUICK ACCESS APPS - Customizable via right-click
-// ======================================================================
-const ALL_AVAILABLE_APPS = [
-  { id: 'files', label: 'Files', icon: 'folder' },
-  { id: 'browser', label: 'Browser', icon: 'globe' },
-  { id: 'notes', label: 'Notes', icon: 'edit' },
-  { id: 'settings', label: 'Settings', icon: 'settings' },
-  { id: 'tasks', label: 'Tasks', icon: 'check-square' },
-  { id: 'dexcode', label: 'DexCode', icon: 'code' },
-  { id: 'videoeditor', label: 'VINX', icon: 'film' },
-  { id: 'kanban', label: 'Kanban', icon: 'columns' },
-  { id: 'weather', label: 'Weather', icon: 'cloud' },
-  { id: 'nexus', label: 'Nexus', icon: 'bar-chart' },
-  { id: 'imosion', label: 'Imosion', icon: 'music' },
-  { id: 'forge', label: 'Forge', icon: 'zap' },
-  { id: 'calculator', label: 'Calculator', icon: 'calculator' },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-  { id: 'gallery', label: 'Gallery', icon: 'image' },
-  { id: 'prism', label: 'Prism', icon: 'image' },
-  { id: 'flux', label: 'Flux', icon: 'layers' },
-  { id: 'canvas', label: 'Canvas', icon: 'edit' },
-  { id: 'timer', label: 'Timer', icon: 'clock' },
-  { id: 'rewind', label: 'Rewind', icon: 'rewind' },
-];
-
-const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLaunch }) => {
-  const { apps, addApp, removeApp } = useHomeAppsStore();
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; appId?: string } | null>(null);
-
-  const handleContext = (e: React.MouseEvent, appId?: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const p = clampEventToViewport(e, { width: 200, height: 300 });
-    setCtxMenu({ x: p.left, y: p.top, appId });
-  };
-
-  const appsToShow = apps.map(a => {
-    const def = ALL_AVAILABLE_APPS.find(d => d.id === a.id) || { id: a.id, label: a.id, icon: 'box' };
-    return def;
-  });
-
-  const availableToAdd = ALL_AVAILABLE_APPS.filter(a => !apps.some(p => p.id === a.id));
-
-  return (
-    <div style={{ marginTop: 18, padding: '0 var(--space-6)', animation: 'fadeIn 0.3s ease-out 0.06s both' }}>
-      <style>{`
-        .home-app-btn {
-          display: flex; flex-direction: column; align-items: center; gap: 6px;
-          width: 76px; min-width: 76px; height: 80px;
-          padding: 10px 6px 8px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.10);
-          border-radius: 14px;
-          cursor: pointer;
-          box-shadow: 0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10);
-          transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
-          position: relative;
-          overflow: hidden;
-        }
-        .home-app-btn::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.14), transparent 70%);
-          opacity: 0;
-          transition: opacity 0.2s ease;
-          pointer-events: none;
-        }
-        .home-app-btn:hover {
-          transform: translateY(-2px);
-          background: rgba(255,255,255,0.11);
-          border-color: rgba(255,255,255,0.18);
-          box-shadow: 0 14px 34px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.14);
-        }
-        .home-app-btn:hover::before { opacity: 1; }
-        .home-app-btn:active { transform: translateY(0); }
-        .home-app-btn img, .home-app-btn svg {
-          transition: transform 0.2s ease;
-        }
-        .home-app-btn:hover img, .home-app-btn:hover svg {
-          transform: scale(1.08);
-        }
-      `}</style>
-      <div
-        style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start' }}
-        onContextMenu={(e) => handleContext(e)}
-      >
-        {appsToShow.map((app, i) => (
-          <button
-            key={app.id}
-            className="home-app-btn"
-            onClick={() => onLaunch(app.id)}
-            onContextMenu={(e) => handleContext(e, app.id)}
-            aria-label={`Open ${app.label}`}
-            style={{ animationDelay: `${i * 0.04}s` }}
-          >
-            {APP_ICON_PNGS[app.id] ? (
-              <img src={APP_ICON_PNGS[app.id]} alt="" style={{ width: 42, height: 42, borderRadius: 6 }} />
-            ) : (
-              <DexIcon name={app.icon} size={42} color="rgba(255,255,255,0.9)" />
-            )}
-              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.3)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Right-click context menu */}
-      {ctxMenu && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: Z_CONTEXT_MENU - 1 }} onClick={() => setCtxMenu(null)} />
-          <div
-            role="menu"
-            style={{
-              position: 'fixed',
-              left: ctxMenu.x,
-              top: ctxMenu.y,
-              zIndex: Z_CONTEXT_MENU,
-              minWidth: 180,
-              padding: '6px 0',
-              background: 'var(--color-bg-elevated)',
-              borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
-              animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.92) translateY(-4px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
-            {ctxMenu.appId && (
-              <button
-                onClick={() => { removeApp(ctxMenu.appId!); setCtxMenu(null); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', padding: 'var(--space-2) 14px',
-                  background: 'transparent', border: 'none', color: 'var(--color-error, #FF453A)', fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                  borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.15)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}
-              >
-                <DexIcon name="x" size={14} /> Remove from Home
-              </button>
-            )}
-            {availableToAdd.length > 0 && (
-              <>
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px var(--space-2)' }} />
-                <div style={{ padding: '6px 14px', fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '0.03em' }}>Add App</div>
-                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                  {availableToAdd.map(app => (
-                    <button
-                      key={app.id}
-                      onClick={() => { addApp(app.id); setCtxMenu(null); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: 'calc(100% - 8px)', padding: 'var(--space-2) 14px',
-                        background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                        borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(10,132,255,0.15)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}
-                    >
-                      <DexIcon name={app.icon} size={16} /> {app.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
 
 // ======================================================================
 // ACTIVITY CARD

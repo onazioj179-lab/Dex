@@ -318,7 +318,7 @@ const SpaceCard: React.FC<SpaceCardProps> = memo(
     const apps = space.appIds.map((id) => ({ id, def: APP_DEFINITIONS[id] }));
 
     return (
-      <div style={s.card}>
+      <div className="dex-liquid-glass-strong" style={s.card}>
         <div style={s.cardHeader}>
           {isEditing ? (
             <input
@@ -431,7 +431,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     background: 'var(--color-bg-secondary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     outline: 'none',
   },
   primaryBtn: {
@@ -442,7 +442,7 @@ const s: Record<string, React.CSSProperties> = {
     color: '#fff',
     background: 'var(--color-accent)',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
@@ -496,9 +496,7 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
   },
   card: {
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: 10,
+    borderRadius: 'var(--radius-lg)',
     padding: 14,
     display: 'flex',
     flexDirection: 'column',
@@ -529,7 +527,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     background: 'var(--color-bg-primary)',
     border: '1px solid var(--color-accent)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-sm)',
     outline: 'none',
   },
   cardMeta: {
@@ -589,7 +587,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent)',
     background: 'var(--color-accent-soft, rgba(10,132,255,0.12))',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     cursor: 'pointer',
   },
   iconBtn: {
@@ -601,7 +599,7 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-muted)',
     background: 'transparent',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 8,
+    borderRadius: 'var(--radius-md)',
     cursor: 'pointer',
   },
 };

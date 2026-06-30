@@ -880,7 +880,7 @@ const Canvas: React.FC = () => {
   return (
     <div style={s.container}>
       {/* Toolbar */}
-      <div style={s.toolbar}>
+      <div className="dex-liquid-glass" style={s.toolbar}>
         <div style={s.toolGroup}>
           {penTools.map(t => (
             <button
@@ -1083,7 +1083,7 @@ const Canvas: React.FC = () => {
         </div>
 
         {/* Layers panel */}
-        <div style={s.layersPanel}>
+        <div className="dex-liquid-glass" style={s.layersPanel}>
           <div style={s.layersHeader}>
             <span style={s.layersTitle}>Layers</span>
             <button style={s.smallBtn} onClick={addLayer} title="Add layer" aria-label="Add layer">
@@ -1176,8 +1176,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 'var(--space-2)',
     padding: 'var(--space-2) var(--space-3)',
-    background: 'var(--color-bg-elevated)',
-    borderBottom: '1px solid var(--color-border)',
+    borderRadius: 0,
     flexShrink: 0,
     flexWrap: 'wrap',
   },
@@ -1194,7 +1193,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 4,
+    borderRadius: 10,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -1227,7 +1226,7 @@ const s: Record<string, React.CSSProperties> = {
     height: 24,
     padding: 0,
     border: '1px solid var(--color-border)',
-    borderRadius: 4,
+    borderRadius: 10,
     background: 'transparent',
     cursor: 'pointer',
   },
@@ -1243,7 +1242,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 3,
+    borderRadius: 10,
     color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
   },
@@ -1274,7 +1273,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 4,
+    borderRadius: 10,
     color: 'var(--color-text-secondary)',
     fontSize: 12,
     cursor: 'pointer',
@@ -1291,7 +1290,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 4,
+    borderRadius: 10,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -1327,8 +1326,7 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    background: 'var(--color-bg-elevated)',
-    borderLeft: '1px solid var(--color-border)',
+    borderRadius: 0,
   },
   layersHeader: {
     display: 'flex',
@@ -1352,7 +1350,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: '1px solid var(--color-border)',
-    borderRadius: 4,
+    borderRadius: 10,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
   },
@@ -1366,7 +1364,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   layerItem: {
     padding: '6px 8px',
-    borderRadius: 6,
+    borderRadius: 10,
     background: 'var(--color-bg-base)',
     border: '1px solid var(--color-border)',
     cursor: 'pointer',
@@ -1400,7 +1398,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 4,
+    borderRadius: 10,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
   },

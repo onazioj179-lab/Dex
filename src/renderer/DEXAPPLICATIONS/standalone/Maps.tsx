@@ -29,6 +29,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DexIcon from '../../components/DexIcon';
+import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { DexSearchInput } from '../../styles/components';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
@@ -140,18 +141,49 @@ const ctrlBtn: React.CSSProperties = {
   width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
   color: 'var(--color-text-primary)', cursor: 'pointer', padding: 0,
-  transition: 'background 0.12s ease',
+  transition: 'background 0.12s ease, color 0.12s ease',
 };
 
+// Scoped polish: focus-visible rings, crisp hover transitions and a subtle pop
+// for the action buttons inside cards/drawers. Mirrors this file's inline
+// language (DEX tokens, hairline chrome) so nothing leaks to other apps.
+const MAPS_STYLE = `
+.dex-maps-root :focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.dex-maps-root button { transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease; }
+.dex-maps-root .dex-maps-card-btn:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-strong, var(--color-border)) !important; }
+.dex-maps-root .dex-maps-card-btn:active { transform: scale(0.97); }
+.dex-maps-root .dex-maps-iconbtn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; border-radius: 8px; }
+.dex-maps-root .dex-maps-result { transition: background 0.1s ease; }
+.dex-maps-pulse { animation: dexMapsPulse 1.4s ease-in-out infinite; }
+@keyframes dexMapsPulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+.dex-maps-card-enter { animation: dexMapsCardIn 0.18s ease both; }
+@keyframes dexMapsCardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+`;
+
+// Floating popovers / drawers over the map. The translucent material + blur +
+// rim come from `.dex-liquid-glass-strong` (applied via className on each
+// consumer); only the layout/shape stays inline here.
 const panel: React.CSSProperties = {
-  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-  borderRadius: 10, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+  borderRadius: 'var(--radius-lg)', overflow: 'hidden',
 };
 
 const rowBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
   padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer',
   color: 'var(--color-text-primary)', fontSize: 13,
+};
+
+// Shared "card action" button (Copy / Save / Notes / Reset) — one source of truth
+// so the in-card controls stay pixel-identical and pick up the hover/active polish.
+const cardBtn: React.CSSProperties = {
+  flex: 1, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  background: 'var(--color-bg-base)', border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)',
+  fontSize: 12, fontWeight: 600, cursor: 'pointer',
 };
 
 type Pin = { lat: number; lon: number };
@@ -167,6 +199,8 @@ const DexMaps: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
+  // Live verb for the place-search status ("Searching / Scanning / Hunting…").
+  const searchPhrase = useWorkingPhrase(searching, 'search');
   const [place, setPlace] = useState('San Francisco');
   const [failed, setFailed] = useState(false);
 
@@ -473,7 +507,8 @@ const DexMaps: React.FC = () => {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
+    <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
+      <style>{MAPS_STYLE}</style>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
 
       {/* Mirror current view for UKI screen-context. */}
@@ -497,19 +532,23 @@ const DexMaps: React.FC = () => {
           aria-label="Search places"
         />
         {results.length > 0 && (
-          <div role="listbox" aria-label="Search results" style={{ ...panel, marginTop: 6 }}>
+          <div role="listbox" aria-label="Search results" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             {results.map((r, i) => (
-              <div key={`${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg"
-                style={{ display: 'flex', alignItems: 'center' }}>
+              <div key={`${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg dex-maps-result"
+                style={{ display: 'flex', alignItems: 'center', borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
                 <button onClick={() => pick(r)}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, flex: 1, textAlign: 'left',
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0, textAlign: 'left',
                     padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{r.name}</span>
-                  {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{r.detail}</span>}
+                  <DexIcon name="map-pin" size={14} color="var(--color-text-tertiary)" />
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</span>
+                    {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.detail}</span>}
+                  </span>
                 </button>
                 <button aria-label={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'} title={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'}
+                  className="dex-maps-iconbtn"
                   onMouseDown={(e) => { e.preventDefault(); toggleSaved(r); }}
-                  style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: isSaved(r.lat, r.lon) ? '#FFD60A' : 'var(--color-text-tertiary)' }}>
+                  style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: isSaved(r.lat, r.lon) ? '#FFD60A' : 'var(--color-text-tertiary)' }}>
                   <DexIcon name={isSaved(r.lat, r.lon) ? 'star' : 'star-outline'} size={15} />
                 </button>
               </div>
@@ -517,26 +556,34 @@ const DexMaps: React.FC = () => {
           </div>
         )}
         {showRecentPanel && (
-          <div role="listbox" aria-label="Recent searches" style={{ ...panel, marginTop: 6 }}>
+          <div role="listbox" aria-label="Recent searches" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--color-border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Recent</span>
-              <button onMouseDown={(e) => { e.preventDefault(); setRecent([]); }} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', padding: 0 }}>Clear</button>
+              <button onMouseDown={(e) => { e.preventDefault(); setRecent([]); }} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
             </div>
             {recent.map((r, i) => (
-              <button key={`rec-${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg"
-                onMouseDown={(e) => { e.preventDefault(); pick(r); }} style={rowBtn}>
+              <button key={`rec-${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg dex-maps-result"
+                onMouseDown={(e) => { e.preventDefault(); pick(r); }} style={{ ...rowBtn, borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
                 <DexIcon name="clock" size={14} color="var(--color-text-tertiary)" />
-                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
-                  <span style={{ fontSize: 13 }}>{r.name}</span>
-                  {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{r.detail}</span>}
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</span>
+                  {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.detail}</span>}
                 </span>
               </button>
             ))}
           </div>
         )}
+        {query.trim() && searching && results.length === 0 && (
+          <div role="status" aria-label="Searching" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ marginTop: 6, padding: '10px 12px', ...panel, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+            <span className="dex-maps-pulse" style={{ display: 'flex' }}><DexIcon name="search" size={14} color="var(--color-text-tertiary)" /></span>
+            {searchPhrase} places…
+          </div>
+        )}
         {query.trim() && !searching && results.length === 0 && (
-          <div role="status" style={{ marginTop: 6, padding: '10px 12px', ...panel, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-            No places found
+          <div role="status" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
+            <DexIcon name="map-pin" size={20} color="var(--color-text-tertiary)" />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No places found</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Try a city, landmark, or address.</span>
           </div>
         )}
       </div>
@@ -567,34 +614,36 @@ const DexMaps: React.FC = () => {
 
       {/* Saved places drawer */}
       {drawer === 'saved' && (
-        <div style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
+        <div className="dex-liquid-glass-strong dex-maps-card-enter" style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Saved places</span>
-            <button aria-label="Close" onClick={() => setDrawer(null)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Saved places{saved.length ? ` · ${saved.length}` : ''}</span>
+            <button aria-label="Close" className="dex-maps-iconbtn" onClick={() => setDrawer(null)} style={{ width: 24, height: 24, background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DexIcon name="close" size={15} />
             </button>
           </div>
           <div style={{ overflowY: 'auto' }}>
             {saved.length === 0 && (
-              <div style={{ padding: '16px 12px', fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-                Star a search result or a dropped pin to save it here.
+              <div style={{ padding: '22px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
+                <DexIcon name="star-outline" size={22} color="var(--color-text-tertiary)" />
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No saved places yet</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>Star a search result or a dropped pin to keep it here.</span>
               </div>
             )}
             {saved.map((s, i) => (
-              <div key={`saved-${s.lat},${s.lon},${i}`} className="dex-hover-bg" style={{ display: 'flex', alignItems: 'center' }}>
-                <button onClick={() => { goTo(s.lat, s.lon, s.name, 12, s.detail); }} style={{ ...rowBtn, flex: 1 }}>
+              <div key={`saved-${s.lat},${s.lon},${i}`} className="dex-hover-bg dex-maps-result" style={{ display: 'flex', alignItems: 'center', borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
+                <button onClick={() => { goTo(s.lat, s.lon, s.name, 12, s.detail); }} style={{ ...rowBtn, flex: 1, minWidth: 0 }}>
                   <DexIcon name="map-pin" size={14} color="var(--color-text-tertiary)" />
                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{s.name}</span>
-                    {s.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.detail}</span>}
+                    {s.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{s.detail}</span>}
                   </span>
                 </button>
-                <button aria-label="Use in distance measurement" title="Use in distance measurement" onClick={() => measureFromSaved(s)}
-                  style={{ width: 30, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
+                <button aria-label="Use in distance measurement" title="Use in distance measurement" className="dex-maps-iconbtn" onClick={() => measureFromSaved(s)}
+                  style={{ width: 30, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
                   <DexIcon name="crosshair" size={14} />
                 </button>
-                <button aria-label="Remove saved place" title="Remove" onClick={() => toggleSaved(s)}
-                  style={{ width: 32, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
+                <button aria-label="Remove saved place" title="Remove" className="dex-maps-iconbtn" onClick={() => toggleSaved(s)}
+                  style={{ width: 32, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
                   <DexIcon name="trash" size={14} />
                 </button>
               </div>
@@ -605,7 +654,7 @@ const DexMaps: React.FC = () => {
 
       {/* Measure drawer */}
       {drawer === 'measure' && (
-        <div style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Distance</span>
             <button aria-label="Close" onClick={() => { setDrawer(null); setMeasuring(false); clearMeasure(); }} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex' }}>
@@ -632,7 +681,7 @@ const DexMaps: React.FC = () => {
               </>
             )}
             {measurePts.length > 0 && (
-              <button onClick={clearMeasure} style={{ marginTop: 12, width: '100%', height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={clearMeasure} style={{ marginTop: 12, width: '100%', height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="refresh" size={13} /> Reset
               </button>
             )}
@@ -642,7 +691,7 @@ const DexMaps: React.FC = () => {
 
       {/* Pin info card (coords + copy / save / send-to-notes) */}
       {pin && !measuring && (
-        <div style={{ position: 'absolute', left: 12, bottom: 72, width: 'min(300px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'absolute', left: 12, bottom: 72, width: 'min(300px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
           <div style={{ padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ minWidth: 0 }}>
@@ -655,13 +704,13 @@ const DexMaps: React.FC = () => {
               </button>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-              <button onClick={copyPin} title="Copy coordinates" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={copyPin} title="Copy coordinates" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="copy" size={13} /> Copy
               </button>
-              <button onClick={() => toggleSaved(pin)} title={isSaved(pin.lat, pin.lon) ? 'Remove from saved' : 'Save place'} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 8, color: isSaved(pin.lat, pin.lon) ? '#FFD60A' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => toggleSaved(pin)} title={isSaved(pin.lat, pin.lon) ? 'Remove from saved' : 'Save place'} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: isSaved(pin.lat, pin.lon) ? '#FFD60A' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name={isSaved(pin.lat, pin.lon) ? 'star' : 'star-outline'} size={13} /> {isSaved(pin.lat, pin.lon) ? 'Saved' : 'Save'}
               </button>
-              <button onClick={sendPinToNotes} title="Send location to Notes" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={sendPinToNotes} title="Send location to Notes" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="send" size={13} /> Notes
               </button>
             </div>

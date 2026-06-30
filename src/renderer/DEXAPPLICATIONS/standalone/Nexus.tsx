@@ -330,7 +330,7 @@ const Nexus: React.FC = () => {
   const ukiRef = useRef({ state: ukiState, audio: ukiAudio });
   useEffect(() => { ukiRef.current = { state: ukiState, audio: ukiAudio }; }, [ukiState, ukiAudio]);
 
-  const isActive = useAppActive();
+  const isActive = useAppActive(containerRef);
   const isActiveRef = useRef(isActive);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 

@@ -67,7 +67,7 @@ const TimerCard: React.FC<{ timer: TimerEntry }> = ({ timer }) => {
   };
 
   return (
-    <div style={s.card}>
+    <div className="dex-liquid-glass" style={s.card}>
       <div style={s.cardHeader}>
         {editing ? (
           <input
@@ -154,7 +154,14 @@ const Timer: React.FC = () => {
   }, [customMin, customSec, newLabel, addTimer]);
 
   return (
-    <div style={s.container}>
+    <div style={s.container} className="dex-timer">
+      <style>{`
+        .dex-timer button { transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease, border-color 0.12s ease; }
+        .dex-timer button:not(:disabled):hover { filter: brightness(1.07); }
+        .dex-timer button:not(:disabled):active { transform: scale(0.96); }
+        .dex-timer input[style] { transition: border-color 0.12s ease; }
+        .dex-timer input:focus { border-color: var(--color-accent) !important; }
+      `}</style>
       {/* New-timer composer */}
       <div style={s.composer}>
         <div style={s.composerRow}>
@@ -220,21 +227,21 @@ const s: Record<string, React.CSSProperties> = {
   textInput: {
     flex: 1, minWidth: 120, padding: '10px var(--space-3)', fontSize: 14,
     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-    borderRadius: 8, color: 'var(--color-text-primary)', outline: 'none',
+    borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none',
     fontFamily: 'var(--font-family)',
   },
   inputGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
   numInput: {
     width: 56, padding: '8px var(--space-2)', fontSize: 20, fontWeight: 600,
     textAlign: 'center', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border)', borderRadius: 6,
+    border: '1px solid var(--color-border)', borderRadius: 10,
     color: 'var(--color-text-primary)', outline: 'none',
   },
   inputLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 },
   inputColon: { fontSize: 20, color: 'var(--color-text-tertiary)', marginBottom: 14 },
   addBtn: {
     padding: '10px var(--space-5)', background: 'var(--color-accent)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 8,
+    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetsRow: { display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' },
@@ -250,8 +257,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   card: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)',
-    padding: 'var(--space-4)', background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border)', borderRadius: 12,
+    padding: 'var(--space-4)', borderRadius: 12,
   },
   cardHeader: { display: 'flex', alignItems: 'center', width: '100%', gap: 'var(--space-2)' },
   labelBtn: {
@@ -262,13 +268,13 @@ const s: Record<string, React.CSSProperties> = {
   },
   labelInput: {
     flex: 1, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)',
-    borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 600,
+    borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 600,
     padding: '4px var(--space-2)', outline: 'none', fontFamily: 'var(--font-family)',
   },
   removeBtn: {
     width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)',
-    cursor: 'pointer', borderRadius: 6, flexShrink: 0,
+    cursor: 'pointer', borderRadius: 10, flexShrink: 0,
   },
   circleContainer: { position: 'relative', width: 200, height: 200 },
   timeDisplay: {
@@ -281,14 +287,14 @@ const s: Record<string, React.CSSProperties> = {
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     padding: '10px var(--space-4)', background: 'var(--color-accent)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 8,
+    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   secondaryBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 40, height: 40, background: 'var(--color-bg-elevated)',
     color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)',
-    borderRadius: 8, cursor: 'pointer', flexShrink: 0,
+    borderRadius: 10, cursor: 'pointer', flexShrink: 0,
   },
   empty: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
