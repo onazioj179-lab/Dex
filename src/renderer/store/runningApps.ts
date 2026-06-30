@@ -399,4 +399,8 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   // Storefront and Games surfaces (registry-backed so dock, Launchpad, UKI resolve metadata)
   store: { name: 'Store', color: '#0A84FF', icon: 'store', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },
   games: { name: 'Games', color: '#30D158', icon: 'games', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'Built-in casual games hub' },
+
+  // Health & Bio Engineering
+  health: { name: 'Health Studio', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Body composition, energy expenditure, cardio zones, and hydration targets' },
+  bio: { name: 'Bio Engineering Studio', color: '#5E5CE6', icon: 'flux', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'DNA/RNA transcription + translation, GC/Tm/MW analysis, and solution prep' },
 };

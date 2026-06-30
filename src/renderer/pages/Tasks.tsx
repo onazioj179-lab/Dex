@@ -17,6 +17,7 @@ import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { DexSearchInput } from '../styles/components';
 
 // ===========================================================================
@@ -547,7 +548,46 @@ export const Tasks: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('tasks');
+    // UKI can READ the task list (no confirm) and ADD a task (mutating -> needs
+    // the user's confirmation via the wired confirm surface).
+    registerUkiAppAction('tasks', {
+      id: 'tasks.listTasks',
+      description: "list the user's tasks with their done/active status.",
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.tasks.length) return 'No tasks.';
+      return c.tasks.slice(0, 100).map((t) => `${t.completed ? '[x]' : '[ ]'} ${t.title}`).join('\n');
+    });
+    registerUkiAppAction('tasks', {
+      id: 'tasks.addTask',
+      description: 'add a new task with the given title.',
+      args: [{ name: 'title', type: 'string' }],
+      example: '{"title": "Buy milk"}',
+      mutates: true,
+    }, (args) => {
+      const title = String(args.title ?? '').trim();
+      if (!title) return 'No task title provided.';
+      const newTask: Task = {
+        id: crypto.randomUUID(),
+        title,
+        completed: false,
+        priority: 'medium',
+        dueDate: null,
+        dueTime: null,
+        list: 'personal',
+        notes: '',
+      };
+      setTasks((prev) => [newTask, ...prev]);
+      return `Added task "${title}".`;
+    });
+    return () => {
+      unregisterUkiAppContext('tasks');
+      unregisterUkiAppAction('tasks.listTasks');
+      unregisterUkiAppAction('tasks.addTask');
+    };
   }, []);
   const dragIdRef = React.useRef<string | null>(null);
   const newTaskInputRef = React.useRef<HTMLInputElement>(null);

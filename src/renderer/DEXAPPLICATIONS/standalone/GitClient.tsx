@@ -14,6 +14,7 @@ import { glassPanel, glassButton } from '../../styles/glassMenu';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 interface GitStatusFile {
   path: string;
@@ -233,7 +234,26 @@ export default function GitClient(): React.ReactElement {
         },
       };
     });
-    return () => unregisterUkiAppContext('git');
+    // Let UKI read the repo's git status as a callable action (read-only).
+    registerUkiAppAction('git', {
+      id: 'git.status',
+      description: 'report the current git repo, branch, ahead/behind, and staged/changed counts.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const s = ukiCtxRef.current;
+      if (!s.repoPath) return 'No git repository is open.';
+      const repoName = (s.status?.root || s.repoPath).split(/[\\/]/).filter(Boolean).pop() || s.repoPath;
+      const branch = s.status?.branch || '(detached)';
+      const ahead = s.status?.ahead ?? 0;
+      const behind = s.status?.behind ?? 0;
+      return `Repo ${repoName} on ${branch} — ${s.staged.length} staged, ${s.unstaged.length} changed, ${ahead} ahead / ${behind} behind.`;
+    });
+    return () => {
+      unregisterUkiAppContext('git');
+      unregisterUkiAppAction('git.status');
+    };
   }, []);
 
   const toggleStage = useCallback((f: GitStatusFile) => {

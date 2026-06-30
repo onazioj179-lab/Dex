@@ -207,6 +207,27 @@ export function isHeavyApp(appId: string): boolean {
   return HEAVY_APP_IDS.includes(appId);
 }
 
+// ---------------------------------------------------------------------------
+// Lifecycle tiers — drive the AppLifecycle protocol (background/suspend policy).
+// heavy-gpu : stop the rAF/canvas loop on background, lose the GL context on
+//             suspend (extended idle / memory pressure).
+// heavy-audio: suspend the AudioContext + free re-decodable buffers as soon as
+//             the app loses the foreground (no audio should bleed from a hidden
+//             DAW, and the hardware audio thread frees immediately).
+// light     : no-op; never suspended.
+// ---------------------------------------------------------------------------
+
+export type LifecycleTier = 'heavy-gpu' | 'heavy-audio' | 'light';
+
+const HEAVY_GPU_APP_IDS = ['flux', 'prism', 'vinx', 'axl', 'video-editor', 'image-editor'];
+const HEAVY_AUDIO_APP_IDS = ['imosion', 'forge', 'audio'];
+
+export function getLifecycleTier(appId: string): LifecycleTier {
+  if (HEAVY_GPU_APP_IDS.includes(appId)) return 'heavy-gpu';
+  if (HEAVY_AUDIO_APP_IDS.includes(appId)) return 'heavy-audio';
+  return 'light';
+}
+
 export function shouldKeepAlive(_appId: string, _tier: DeviceTier): boolean {
   // Owner directive: apps NEVER close, blank, or unmount on their own -- not on
   // idle, not when backgrounded, not under memory pressure, on any tier. Every

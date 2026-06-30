@@ -9,6 +9,7 @@ import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -214,7 +215,25 @@ const PresentationBuilder: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('presentation');
+    // Let UKI outline the deck (slide number + title text) as a read action.
+    registerUkiAppAction('presentation', {
+      id: 'presentation.outline',
+      description: 'outline the deck: each slide number and its title/first text.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const s = ukiCtxRef.current;
+      if (!s.slides.length) return 'The deck is empty.';
+      return s.slides.slice(0, 100).map((sl, i) => {
+        const t = sl.blocks.find((b) => b.type === 'text')?.content?.trim() || '(no text)';
+        return `${i + 1}. ${t.slice(0, 80)}`;
+      }).join('\n');
+    });
+    return () => {
+      unregisterUkiAppContext('presentation');
+      unregisterUkiAppAction('presentation.outline');
+    };
   }, []);
 
   // ---- Slide ops ----

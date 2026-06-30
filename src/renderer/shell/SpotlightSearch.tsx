@@ -424,7 +424,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // Focus input on overlay open
   useEffect(() => {
     if (variant === 'overlay' && isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
   }, [isOpen, variant]);
 
