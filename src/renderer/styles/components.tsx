@@ -1589,10 +1589,11 @@ export const DexProgress: React.FC<DexProgressProps> = ({
 // ---------------------------------------------------------------------------
 // DexSearchInput
 // ---------------------------------------------------------------------------
-export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'style'> {
+export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'style' | 'onSubmit'> {
   size?: 'sm' | 'md' | 'lg';
   onClear?: () => void;
-  /** Fired with the current value when the user presses Enter. */
+  /** Fired with the current value when the user presses Enter. Replaces the
+   *  native form onSubmit (an input never form-submits), hence the Omit above. */
   onSubmit?: (value: string) => void;
   loading?: boolean;
   fullWidth?: boolean;
