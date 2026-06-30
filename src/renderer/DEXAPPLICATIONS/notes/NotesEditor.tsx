@@ -27,6 +27,7 @@ import {
 import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/connect';
 import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
 
@@ -479,7 +480,21 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         },
       };
     });
-    return () => unregisterUkiAppContext('notes');
+    // Let UKI READ the open note as a callable action (read-only, no confirm).
+    registerUkiAppAction('notes', {
+      id: 'notes.getActiveNote',
+      description: 'read the full plain text of the note currently open in Notes.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const text = (editorRef.current?.textContent || '').trim();
+      return text ? text.slice(0, 4000) : 'No note is open in Notes.';
+    });
+    return () => {
+      unregisterUkiAppContext('notes');
+      unregisterUkiAppAction('notes.getActiveNote');
+    };
   }, []);
 
   // Initial render: set editor HTML

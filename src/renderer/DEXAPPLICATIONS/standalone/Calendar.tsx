@@ -10,6 +10,7 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
 import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 interface CalendarEvent {
   id: string;
@@ -661,7 +662,54 @@ const Calendar: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('calendar');
+    // Let UKI read the calendar's events as a callable action (read-only).
+    registerUkiAppAction('calendar', {
+      id: 'calendar.listEvents',
+      description: 'list calendar events with their date, time and title.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.events.length) return 'No events on the calendar.';
+      const sorted = [...c.events]
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+        .slice(0, 60);
+      return sorted.map((e) => `${e.date}${e.time ? ` ${e.time}` : ''} — ${e.title}`).join('\n');
+    });
+    // UKI can ADD an event (mutating -> confirm-gated).
+    registerUkiAppAction('calendar', {
+      id: 'calendar.addEvent',
+      description: 'add a calendar event on a date (YYYY-MM-DD) with a title and optional time (HH:MM).',
+      args: [
+        { name: 'title', type: 'string' },
+        { name: 'date', type: 'string' },
+        { name: 'time', type: 'string', optional: true },
+      ],
+      example: '{"title":"Dentist","date":"2026-07-02","time":"14:30"}',
+      mutates: true,
+    }, (args) => {
+      const title = String(args.title ?? '').trim();
+      const date = String(args.date ?? '').trim();
+      if (!title || !date) return 'Need a title and a date (YYYY-MM-DD).';
+      const time = String(args.time ?? '').trim();
+      const newEvent: CalendarEvent = {
+        id: crypto.randomUUID(),
+        title,
+        date,
+        time: time || '09:00',
+        endTime: '',
+        color: '#4A9EFF',
+        description: '',
+      };
+      setEvents((prev) => [...prev, newEvent]);
+      return `Added "${title}" on ${date}${time ? ` at ${time}` : ''}.`;
+    });
+    return () => {
+      unregisterUkiAppContext('calendar');
+      unregisterUkiAppAction('calendar.listEvents');
+      unregisterUkiAppAction('calendar.addEvent');
+    };
   }, []);
 
   return (

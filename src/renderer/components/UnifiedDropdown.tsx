@@ -47,6 +47,8 @@ export interface DropdownItem {
   disabled?: boolean;
   danger?: boolean;
   divider?: boolean;
+  /** Non-interactive caps micro-label heading a section. */
+  header?: boolean;
   children?: DropdownItem[];
 }
 
@@ -83,6 +85,8 @@ export interface UnifiedDropdownProps {
   closeOnSelect?: boolean;
   /** Aria label for menu */
   ariaLabel?: string;
+  /** Internal: closes the entire menu tree (threaded down to nested submenus). */
+  closeRoot?: () => void;
 }
 
 export interface DropdownRef {
@@ -167,10 +171,26 @@ const styles = {
     marginLeft: 'auto',
     flexShrink: 0,
   },
+  submenuChevron: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    color: colors.text.tertiary,
+    flexShrink: 0,
+  },
   divider: {
     height: 1,
     background: colors.border.subtle,
     margin: '4px var(--space-2)',
+  },
+  sectionHeader: {
+    padding: '6px var(--space-3) 2px',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    color: colors.text.tertiary,
+    userSelect: 'none' as const,
   },
 };
 
@@ -185,6 +205,92 @@ function getInitialTransform(placement: DropdownPlacement): string {
   if (placement.startsWith('right')) return 'translateX(-8px) scale(0.96)';
   return 'scale(0.96)';
 }
+
+// ---------------------------------------------------------------------------
+// Submenu row — renders a nested UnifiedDropdown for items with children.
+// Opens on hover (with a close grace period so the pointer can travel into the
+// flyout) and on click/Enter; leaf selection inside closes the whole tree via
+// closeRoot.
+// ---------------------------------------------------------------------------
+
+interface DropdownSubmenuItemProps {
+  item: DropdownItem;
+  itemStyle: React.CSSProperties;
+  isFocused: boolean;
+  registerRef: (el: HTMLButtonElement | null) => void;
+  registerOpener: (fn: ((open: boolean) => void) | null) => void;
+  onFocus: () => void;
+  onSelect?: (item: DropdownItem) => void;
+  closeOnSelect: boolean;
+  closeRoot: () => void;
+}
+
+const DropdownSubmenuItem: React.FC<DropdownSubmenuItemProps> = ({
+  item,
+  itemStyle,
+  isFocused,
+  registerRef,
+  registerOpener,
+  onFocus,
+  onSelect,
+  closeOnSelect,
+  closeRoot,
+}) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    registerOpener(setOpen);
+    return () => registerOpener(null);
+  }, [registerOpener]);
+
+  const clearCloseTimer = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    clearCloseTimer();
+    closeTimer.current = setTimeout(() => setOpen(false), 180);
+  };
+  useEffect(() => clearCloseTimer, []);
+
+  return (
+    <>
+      <button
+        ref={(el) => { btnRef.current = el; registerRef(el); }}
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        tabIndex={isFocused ? 0 : -1}
+        style={itemStyle}
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => { clearCloseTimer(); onFocus(); setOpen(true); }}
+        onMouseLeave={scheduleClose}
+      >
+        {item.icon && <span style={styles.itemIcon}>{item.icon}</span>}
+        <span style={styles.itemLabel}>{item.label}</span>
+        <span style={styles.submenuChevron} aria-hidden="true">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M4 2.5L6.5 5L4 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </button>
+      <UnifiedDropdown
+        triggerRef={btnRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        items={item.children}
+        onSelect={onSelect}
+        closeOnSelect={closeOnSelect}
+        closeRoot={closeRoot}
+        placement="right-start"
+      />
+    </>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -209,6 +315,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
       style,
       closeOnSelect = true,
       ariaLabel,
+      closeRoot,
     },
     ref
   ) => {
@@ -218,6 +325,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     const [focusedIndex, setFocusedIndex] = useState(-1);
     const [animState, setAnimState] = useState<'entering' | 'visible' | 'exiting'>('entering');
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const submenuOpeners = useRef<Map<string, (open: boolean) => void>>(new Map());
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
@@ -226,7 +334,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     }));
 
     // Get flattened selectable items (skip dividers)
-    const selectableItems = items?.filter(item => !item.divider && !item.disabled) || [];
+    const selectableItems = items?.filter(item => !item.divider && !item.disabled && !item.header) || [];
 
     // Calculate position with viewport edge detection
     useLayoutEffect(() => {
@@ -338,12 +446,16 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
       // Small delay to prevent the click that opened it from closing it
       const timeoutId = setTimeout(() => {
         const handleMouseDown = (e: MouseEvent) => {
-          const target = e.target as Node;
+          const target = e.target as HTMLElement;
           if (
-            containerRef.current && 
+            containerRef.current &&
             !containerRef.current.contains(target) &&
             triggerRef.current &&
-            !triggerRef.current.contains(target)
+            !triggerRef.current.contains(target) &&
+            // A nested submenu is portaled outside this container; treat clicks
+            // inside ANY dropdown surface as "inside" so a parent menu does not
+            // close out from under its own open submenu.
+            !target.closest?.('[data-dex-dropdown]')
           ) {
             onClose();
           }
@@ -396,6 +508,14 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
             setFocusedIndex(selectableItems.length - 1);
             itemRefs.current[selectableItems.length - 1]?.focus();
             break;
+          case 'ArrowRight': {
+            const it = selectableItems[focusedIndex];
+            if (it?.children?.length) {
+              e.preventDefault();
+              submenuOpeners.current.get(it.id)?.(true);
+            }
+            break;
+          }
           case 'Enter':
           case ' ':
             if (focusedIndex >= 0 && selectableItems[focusedIndex]) {
@@ -428,13 +548,21 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
       }
     }, [open, selectableItems.length]);
 
+    const rootClose = useCallback(() => {
+      (closeRoot ?? onClose)();
+    }, [closeRoot, onClose]);
+
     const handleItemSelect = useCallback((item: DropdownItem) => {
       if (item.disabled) return;
+      if (item.children && item.children.length > 0) {
+        submenuOpeners.current.get(item.id)?.(true);
+        return;
+      }
       onSelect?.(item);
       if (closeOnSelect) {
-        onClose();
+        rootClose();
       }
-    }, [onSelect, closeOnSelect, onClose]);
+    }, [onSelect, closeOnSelect, rootClose]);
 
     if (!open) return null;
 
@@ -475,6 +603,14 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           return <div key={`divider-${index}`} style={styles.divider} role="separator" />;
         }
 
+        if (item.header) {
+          return (
+            <div key={item.id} style={styles.sectionHeader} role="presentation">
+              {item.label}
+            </div>
+          );
+        }
+
         const currentSelectableIndex = selectableIndex;
         if (!item.disabled) selectableIndex++;
 
@@ -485,6 +621,26 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           ...(item.disabled ? styles.itemDisabled : {}),
           ...(item.danger ? styles.itemDanger : {}),
         };
+
+        if (!item.disabled && item.children && item.children.length > 0) {
+          return (
+            <DropdownSubmenuItem
+              key={item.id}
+              item={item}
+              itemStyle={itemStyle}
+              isFocused={isFocused}
+              registerRef={(el) => { itemRefs.current[currentSelectableIndex] = el; }}
+              registerOpener={(fn) => {
+                if (fn) submenuOpeners.current.set(item.id, fn);
+                else submenuOpeners.current.delete(item.id);
+              }}
+              onFocus={() => setFocusedIndex(currentSelectableIndex)}
+              onSelect={onSelect}
+              closeOnSelect={closeOnSelect}
+              closeRoot={rootClose}
+            />
+          );
+        }
 
         return (
           <button
@@ -513,6 +669,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           ref={containerRef}
           role="menu"
           tabIndex={-1}
+          data-dex-dropdown=""
           aria-label={ariaLabel || 'Dropdown menu'}
           className={`dex-liquid-glass${className ? ` ${className}` : ''}`}
           style={containerStyle}

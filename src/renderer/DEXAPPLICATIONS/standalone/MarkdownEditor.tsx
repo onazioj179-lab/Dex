@@ -8,6 +8,7 @@ import DOMPurify from 'dompurify';
 import { lintMarkdown } from '../../../shared/format/markdownLint';
 import { sendToNotes } from '../../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 const STORAGE_KEY = 'dex-markdown-content';
 const FILE_KEY = 'dex-markdown-filename';
@@ -314,7 +315,22 @@ const MarkdownEditor: React.FC = () => {
         },
       };
     });
-    return () => unregisterUkiAppContext('markdown');
+    // Let UKI read the open markdown document as a callable action (read-only).
+    registerUkiAppAction('markdown', {
+      id: 'markdown.readDocument',
+      description: 'read the full markdown text currently open in the editor.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      if (!c.content) return 'The markdown document is empty.';
+      return `# ${c.fileName}\n${c.content}`.slice(0, 6000);
+    });
+    return () => {
+      unregisterUkiAppContext('markdown');
+      unregisterUkiAppAction('markdown.readDocument');
+    };
   }, []);
 
   // Proportional scroll sync between editor + preview panes.

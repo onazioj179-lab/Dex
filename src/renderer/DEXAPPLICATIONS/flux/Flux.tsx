@@ -12,6 +12,7 @@ import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCol
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { ResizablePanel } from '../../components/ResizablePanel';
+import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { CreativeSlider } from '../../components/controls';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { clampEventToViewport } from '../../utils/menuPosition';
@@ -588,7 +589,6 @@ const Flux: React.FC = () => {
   const [canvasError, setCanvasError] = React.useState(false);
 
   // ===== PRO FEATURES STATE =====
-  const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
   // Text Animator
   const [showTextAnimator, setShowTextAnimator] = useState(false);
   const [textAnimMode, setTextAnimMode] = useState<'character' | 'word' | 'line'>('character');
@@ -740,17 +740,12 @@ const Flux: React.FC = () => {
     })();
   }, []);
 
-  // Close features menu on outside click or Escape key
-  useEffect(() => {
-    const handleClick = () => setShowFeaturesMenu(false);
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFeaturesMenu(false); };
-    window.addEventListener('click', handleClick);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
+  // App lifecycle: stop preview playback (and its rAF loop) when Flux is
+  // backgrounded/suspended so no animation frames render off-screen.
+  useAppLifecycle('flux', {
+    onBackground: () => setIsPlaying(false),
+    onSuspend: () => setIsPlaying(false),
+  });
 
   // ===== RETENTIVE MEMORY - Load/Save Workspace State =====
   useEffect(() => {
@@ -2522,83 +2517,6 @@ const Flux: React.FC = () => {
               {collab.activeCollaboratorCount > 0 ? `${collab.activeCollaboratorCount} collaborators` : 'Share'}
             </button>
           )}
-          <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
-            <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? 'rgba(191,90,242,0.1)' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#bf5af2' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
-            {showFeaturesMenu && (
-              <div className="dex-liquid-glass-strong" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="dex-label-caps" style={{ padding: '6px var(--space-3) 4px' }}>ANIMATION</div>
-                {[
-                  { label: 'Text Animator', active: showTextAnimator, fn: () => setShowTextAnimator(v => !v) },
-                  { label: 'Graph Editor', active: showGraphEditor, fn: () => setShowGraphEditor(v => !v) },
-                  { label: 'Expressions', active: showExpressionEditor, fn: () => setShowExpressionEditor(v => !v) },
-                  { label: 'Time Remap', active: showTimeRemap, fn: () => setShowTimeRemap(v => !v) },
-                  { label: 'Morph Shapes', active: showMorphShapes, fn: () => setShowMorphShapes(v => !v) },
-                  { label: 'Wiggle', active: showAutoWiggle, fn: () => setShowAutoWiggle(v => !v) },
-                  { label: 'Stagger', active: showStagger, fn: () => setShowStagger(v => !v) },
-                  { label: 'Motion Path', active: showMotionPath, fn: () => setShowMotionPath(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>COMPOSITION</div>
-                {[
-                  { label: 'Null Objects', active: showNullObjects, fn: () => setShowNullObjects(v => !v) },
-                  { label: 'Precompose', active: showPrecompose, fn: () => setShowPrecompose(v => !v) },
-                  { label: 'Track Mattes', active: showTrackMattes, fn: () => setShowTrackMattes(v => !v) },
-                  { label: 'FX Stack', active: showEffectsStack, fn: () => setShowEffectsStack(v => !v) },
-                  { label: 'Masks', active: showMaskSystem, fn: () => setShowMaskSystem(v => !v) },
-                  { label: 'Trim Paths', active: showTrimPaths, fn: () => setShowTrimPaths(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>RENDERING</div>
-                {[
-                  { label: 'Particles+', active: showAdvancedParticles, fn: () => setShowAdvancedParticles(v => !v) },
-                  { label: 'Camera Rig', active: showCameraRig, fn: () => setShowCameraRig(v => !v) },
-                  { label: 'Environment Map', active: showEnvironment, fn: () => setShowEnvironment(v => !v) },
-                  { label: '3D Text', active: show3DText, fn: () => setShow3DText(v => !v) },
-                  { label: 'Shaders', active: showShaderEffects, fn: () => setShowShaderEffects(v => !v) },
-                  { label: 'Frame Blending', active: showFrameBlending, fn: () => setShowFrameBlending(v => !v) },
-                  { label: 'Motion Blur', active: showMotionBlur, fn: () => setShowMotionBlur(v => !v) },
-                  { label: 'Color Correction', active: showColorCorrection, fn: () => setShowColorCorrection(v => !v) },
-                  { label: 'Stroke Effects', active: showStrokeEffects, fn: () => setShowStrokeEffects(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>EFFECTS</div>
-                {[
-                  { label: 'Audio Reactive', active: showAudioReactive, fn: () => setShowAudioReactive(v => !v) },
-                  { label: 'Repeater', active: showRepeater, fn: () => setShowRepeater(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>LAYOUT</div>
-                {[
-                  { label: 'Alignment', active: showAlignment, fn: () => setShowAlignment(v => !v) },
-                  { label: 'Guides', active: showGuideLayer, fn: () => setShowGuideLayer(v => !v) },
-                  { label: 'Markers', active: showMarkers, fn: () => setShowMarkers(v => !v) },
-                  { label: 'Snapshot', active: showSnapshot, fn: () => setShowSnapshot(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>EXPORT</div>
-                {[
-                  { label: 'GIF Export', active: showGifExport, fn: () => setShowGifExport(v => !v) },
-                  { label: 'Lottie Export', active: showLottieExport, fn: () => setShowLottieExport(v => !v) },
-                  { label: 'Templates', active: showCompTemplates, fn: () => setShowCompTemplates(v => !v) },
-                  { label: 'Render Queue', active: showRenderQueue, fn: () => setShowRenderQueue(v => !v) },
-                  { label: 'Export Presets', active: showExportPresets, fn: () => setShowExportPresets(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
