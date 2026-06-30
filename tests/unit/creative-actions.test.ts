@@ -52,7 +52,7 @@ describe('UKI creative actions', () => {
   });
 
   it('expanded the app skill registry with the new creative-control set', () => {
-    // 41 original + 36 new creative-control skills.
-    expect(totalSkillCount()).toBe(77);
+    // 41 original + 36 creative-control + 11 later additions (e.g. AXL overhaul).
+    expect(totalSkillCount()).toBe(88);
   });
 });
