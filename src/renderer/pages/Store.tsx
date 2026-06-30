@@ -327,7 +327,6 @@ export default function Store(): React.ReactElement {
         tabIndex={0}
         onClick={() => setSelectedId(app.id)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(app.id); } }}
-        className="dex-liquid-glass"
         style={{ ...styles.card, ...(compact ? styles.cardCompact : null) }}
         title={`${app.name} — view details`}
       >
@@ -393,8 +392,8 @@ export default function Store(): React.ReactElement {
     const isFav = favorites.has(selected.id);
     const perms = derivePermissions(selected);
     return (
-      <div className="dex-liquid-glass-strong" style={styles.container}>
-        <header className="dex-liquid-glass" style={styles.header}>
+      <div style={styles.container}>
+        <header style={styles.header}>
           <div style={styles.titleBlock}>
             <button type="button" onClick={() => setSelectedId(null)} style={styles.backBtn} title="Back to store">
               <DexIcon name="arrow-left" size={16} />
@@ -479,8 +478,8 @@ export default function Store(): React.ReactElement {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="dex-liquid-glass-strong" style={styles.container}>
-      <header className="dex-liquid-glass" style={styles.header}>
+    <div style={styles.container}>
+      <header style={styles.header}>
         <div style={styles.titleBlock}>
           <div style={styles.storeIcon} aria-hidden><DexIcon name="store" size={18} /></div>
           <div style={{ minWidth: 0 }}>
@@ -641,9 +640,8 @@ function tintBorder(color: string): string {
 // ---------------------------------------------------------------------------
 
 const styles: Record<string, React.CSSProperties> = {
-  // Root page surface. Glass comes from the `.dex-liquid-glass-strong` class on
-  // the JSX element (see-through frosted); only layout lives here. Full-bleed
-  // page, so no radius.
+  // Root page surface. No background here -> transparent, so the page sits on the
+  // window's normal `--color-bg-base` (no glass, no framing box). Full-bleed.
   container: {
     height: '100%',
     minHeight: 0,
@@ -653,8 +651,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     borderRadius: 0,
   },
-  // Toolbar header. The `.dex-liquid-glass` class on the element supplies the
-  // frosted material; the bottom hairline + layout stay here.
+  // Toolbar header — transparent (no glass); only the bottom hairline + layout.
   header: {
     flexWrap: 'wrap',
     justifyContent: 'space-between',
@@ -804,14 +801,15 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     gap: 'var(--space-3)',
   },
-  // App tile. Frosted glass comes from `.dex-liquid-glass` on the element; only
-  // layout + radius live here (background/border are supplied by the class).
+  // App tile — solid surface (no glass), sits on the normal app background.
   card: {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     padding: 'var(--space-3)',
     borderRadius: 'var(--radius-lg)',
+    background: 'var(--color-bg-surface)',
+    border: '1px solid var(--pg-border)',
     color: 'var(--color-text-primary)',
     textAlign: 'left',
     cursor: 'pointer',
