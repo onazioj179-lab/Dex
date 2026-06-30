@@ -9,6 +9,7 @@ import { lintMarkdown } from '../../../shared/format/markdownLint';
 import { sendToNotes } from '../../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { searchLines } from '../../../shared/search/textSearch';
 
 const STORAGE_KEY = 'dex-markdown-content';
 const FILE_KEY = 'dex-markdown-filename';
@@ -327,9 +328,23 @@ const MarkdownEditor: React.FC = () => {
       if (!c.content) return 'The markdown document is empty.';
       return `# ${c.fileName}\n${c.content}`.slice(0, 6000);
     });
+    registerUkiAppAction('markdown', {
+      id: 'markdown.search',
+      description: 'search the open markdown document for a query and return matching lines with line numbers.',
+      args: [{ name: 'query', type: 'string' }],
+      example: '{"query":"installation"}',
+      mutates: false,
+    }, (args) => {
+      const c = ukiCtxRef.current;
+      if (!c.content) return 'The markdown document is empty.';
+      const q = String(args.query ?? '');
+      const hits = searchLines(c.content, q, 25);
+      return hits.length ? hits.map((h) => `${h.line}: ${h.text}`).join('\n') : `No lines match "${q}".`;
+    });
     return () => {
       unregisterUkiAppContext('markdown');
       unregisterUkiAppAction('markdown.readDocument');
+      unregisterUkiAppAction('markdown.search');
     };
   }, []);
 
