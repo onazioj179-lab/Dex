@@ -2131,10 +2131,10 @@ export const AppManager: React.FC = () => {
     });
   }, [detachedApps, detachApp, getMaximizedWindowBounds, getShellWorkspace]);
 
-  // Auto tile: arrange all detached windows evenly
+  // Auto tile: arrange all detached windows evenly. Reads the window set from the
+  // latest state inside the updater so it stays correct when called immediately
+  // after detaching apps (e.g. "Tile all running apps").
   const autoTileAll = useCallback(() => {
-    const ids = Array.from(detachedApps.keys());
-    if (ids.length === 0) return;
     const workspace = getShellWorkspace(0);
     const W = workspace.w;
     const TOP = workspace.y;
@@ -2151,10 +2151,12 @@ export const AppManager: React.FC = () => {
       5: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'],
       6: ['top-left', 'top-right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
     };
-    const count = Math.min(ids.length, 6);
-    const layout = layouts[count] || layouts[6];
 
     setDetachedApps(prev => {
+      const ids = Array.from(prev.keys());
+      if (ids.length === 0) return prev;
+      const count = Math.min(ids.length, 6);
+      const layout = layouts[count] || layouts[6];
       const next = new Map(prev);
       const halfW = Math.floor((W - PAD * 3) / 2);
       const thirdW = Math.floor((W - PAD * 4) / 3);
@@ -2232,7 +2234,17 @@ export const AppManager: React.FC = () => {
       });
       return next;
     });
-  }, [detachedApps, getShellWorkspace]);
+  }, [getShellWorkspace]);
+
+  // "Use all apps at once": detach every running, non-minimized app into a
+  // floating window, then tile them together — the macOS/Windows multitasking
+  // gesture. autoTileAll reads the latest detached set inside its updater, so the
+  // queued state updates (detach then tile) resolve in order without a stale set.
+  const tileAllRunningApps = useCallback(() => {
+    const open = runningApps.filter(a => a.id !== 'home' && !minimizedApps.has(a.id as AppId));
+    open.forEach(a => { if (!detachedApps.has(a.id as AppId)) detachApp(a.id as AppId); });
+    autoTileAll();
+  }, [runningApps, minimizedApps, detachedApps, detachApp, autoTileAll]);
 
   // Dynamic multi-split layouts (DEX 5.5 maturity initiative): arrange the open
   // floating windows into full-height columns whose widths follow the given
@@ -2495,7 +2507,10 @@ export const AppManager: React.FC = () => {
   // tiler runs (back-compat).
   useEffect(() => {
     const onArrange = (e: Event) => {
-      const layout = (e as CustomEvent).detail?.layout as TilingLayout | undefined;
+      const detail = (e as CustomEvent).detail || {};
+      const layout = detail.layout as TilingLayout | undefined;
+      // includeAll: first pull every running app into a window, then tile.
+      if (detail.includeAll) { tileAllRunningApps(); return; }
       if (layout) applyTilingLayout(layout);
       else autoTileAll();
     };
@@ -2515,7 +2530,7 @@ export const AppManager: React.FC = () => {
       window.removeEventListener('dex-split-layout', onSplit);
       window.removeEventListener('dex-grid-layout', onGrid);
     };
-  }, [autoTileAll, applySplitRatio, applyGridLayout, applyTilingLayout]);
+  }, [autoTileAll, applySplitRatio, applyGridLayout, applyTilingLayout, tileAllRunningApps]);
 
   // Keyboard shortcuts -- use ref-based handler to avoid re-registering on every state change
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
