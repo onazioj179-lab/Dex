@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": ["../assets/icon.ico", "../assets/icon.png"],
     "windows": {
       "digestAlgorithm": "sha256",
