@@ -58,8 +58,17 @@ export const AssistedTextarea = React.forwardRef<HTMLTextAreaElement, AssistedTe
       if (!assist) return;
       const caret = el.selectionStart ?? el.value.length;
       handleTextChange(el.value, caret);
+      // Position synchronously (no rAF — a paused/throttled rAF would stop the
+      // popup from ever showing). Caret-accurate when the mirror measurement
+      // lands inside the field; otherwise (auto-grow / flex / unusual CSS) fall
+      // back to the field's bottom edge so the popup always hugs the field and
+      // never drifts into empty space.
       const rect = getTextareaCaretRect(el, caret);
-      setPos({ top: rect.top + rect.height + 3, left: rect.left });
+      const field = el.getBoundingClientRect();
+      let top = rect.top + rect.height + 3;
+      if (top < field.top || top > field.bottom + 14) top = field.bottom + 3;
+      const left = Math.max(field.left, Math.min(rect.left, field.right - 48));
+      setPos({ top, left });
       setActive(0);
     }, [assist, handleTextChange]);
 

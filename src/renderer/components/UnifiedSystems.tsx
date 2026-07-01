@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { AssistedTextarea } from './AssistedTextarea';
 import { DexLoader } from './LoadingStates';
 import { DexSearchInput } from '../styles/components';
 import {
@@ -481,7 +482,7 @@ export function ScratchpadOverlay(): React.ReactElement | null {
           <span style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 600 }}>Quick Scratchpad</span>
           <button onClick={handleClose} aria-label="Close scratchpad" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '16px' }}>x</button>
         </div>
-        <textarea
+        <AssistedTextarea
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -619,7 +620,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               </button>
             ))}
           </div>
-          <textarea
+          <AssistedTextarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe your issue or idea..."
