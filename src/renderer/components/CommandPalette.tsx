@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useClipboardStore } from '../store/clipboardStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { toggleTheme } from '../utils/theme';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { safeMath, formatResult } from '../utils/safeMath';
@@ -252,7 +253,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },
     { id: 'new-task', title: 'Create New Task', subtitle: 'Add a new task', icon: Icons.newTask, category: 'action', action: () => { openApp('tasks'); }, keywords: ['add', 'todo'] },
     { id: 'new-workflow', title: 'Create New Workflow', subtitle: 'Build automation', icon: Icons.workflows, category: 'action', action: () => { openApp('workflows'); }, keywords: ['automate', 'create'] },
-    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
+    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { void useAuthStore.getState().lock(); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
     { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { useClipboardStore.getState().clearAll(); }, keywords: ['clean', 'privacy'] },
     { id: 'toggle-dex-bar', title: 'Show / Hide DEX Bar', subtitle: 'Toggle the floating launcher bar', icon: Icons.home, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-toggle-bar')); }, keywords: ['bar', 'launcher', 'dock', 'floating', 'show', 'hide', 'restore'], shortcut: `${_M}+Shift+B` },
