@@ -82,7 +82,10 @@ const chromeStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-2)',
-  minHeight: 38,
+  // Canonical app-header height. 34 is the natural floor of a 26px MenuBar +
+  // 4px vertical padding, and keeps this shell in one 32-34 rhythm with the
+  // CreativeMenuBar (32) and the custom app headers (32).
+  minHeight: 34,
   padding: '4px var(--space-2)',
   background: 'var(--color-bg-elevated)',
   borderBottom: hairline.default,

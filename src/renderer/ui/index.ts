@@ -29,8 +29,9 @@ export type { BadgeProps, BadgeTone, BadgeSize } from './Badge';
 export { TextInput, Textarea } from './TextInput';
 export type { TextInputProps, TextareaProps, InputSize } from './TextInput';
 
-export { AppShell, Toolbar } from './AppShell';
-export type { AppShellProps, ToolbarProps } from './AppShell';
+// NOTE: the former ui/AppShell (a second, unused AppShell/Toolbar) was removed
+// to end the duplicate-shell confusion. The canonical shell is
+// `components/appShell` (AppShell + MenuBar). Import it from there.
 
 export { Modal } from './Modal';
 export type { ModalProps, ModalSize } from './Modal';

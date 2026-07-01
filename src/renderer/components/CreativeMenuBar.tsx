@@ -163,7 +163,7 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
 // Menu bar
 // ---------------------------------------------------------------------------
 export const CreativeMenuBar: React.FC<CreativeMenuBarProps> = ({
-  menus, accent = 'var(--color-accent)', leading, trailing, style, className, height = 30,
+  menus, accent = 'var(--color-accent)', leading, trailing, style, className, height = 32,
 }) => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
