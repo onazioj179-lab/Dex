@@ -75,7 +75,9 @@ const NexusUkiPanel: React.FC = () => {
   const thoughtTrail = useUkiStore((s) => s.thoughtTrail);
   const knowledgeNodes = useUkiStore((s) => s.knowledgeNodes);
 
-  const recentTurns = useMemo(() => conversationHistory.slice(-3).reverse(), [conversationHistory]);
+  // Full history (newest first), capped for perf. Nexus "houses UKI histories":
+  // the user scrolls this to see past turns / what was worked on over time.
+  const historyTurns = useMemo(() => [...conversationHistory].slice(-40).reverse(), [conversationHistory]);
   const recentThoughts = useMemo(() => thoughtTrail.slice(-5).reverse(), [thoughtTrail]);
   const topNodes = useMemo(
     () => [...knowledgeNodes].sort((a, b) => b.weight - a.weight).slice(0, 12),
@@ -119,11 +121,12 @@ const NexusUkiPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Recent conversation */}
-      {recentTurns.length > 0 && (
+      {/* History — full scrollable UKI conversation timeline (newest first). */}
+      {historyTurns.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Recent</div>
-          {recentTurns.map((t) => (
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>History · {conversationHistory.length}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingRight: 2 }}>
+          {historyTurns.map((t) => (
             <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '8px 10px', borderRadius: 'var(--radius-md, 8px)', fontWeight: 400 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: t.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)', textTransform: 'uppercase' }}>{t.intent || 'chat'}</span>
@@ -135,6 +138,7 @@ const NexusUkiPanel: React.FC = () => {
               )}
             </div>
           ))}
+          </div>
         </div>
       )}
 
