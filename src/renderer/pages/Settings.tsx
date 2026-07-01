@@ -1882,6 +1882,21 @@ export const Settings: React.FC = () => {
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
   const [settingsSearch, setSettingsSearch] = useState('');
+  // Collapsible sidebar categories (fold the settings sub-menus). Persisted; the
+  // category containing the active section always stays expanded so you can see
+  // where you are.
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => {
+    try { const raw = localStorage.getItem('dex-settings-collapsed-cats'); if (raw) return new Set(JSON.parse(raw) as string[]); } catch { /* ignore */ }
+    return new Set();
+  });
+  const toggleCat = useCallback((label: string) => {
+    setCollapsedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      try { localStorage.setItem('dex-settings-collapsed-cats', JSON.stringify([...next])); } catch { /* quota */ }
+      return next;
+    });
+  }, []);
   // Keyboard-driven cursor into the flat search results (-1 = nothing focused).
   const [searchCursor, setSearchCursor] = useState(0);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -4914,10 +4929,21 @@ export const Settings: React.FC = () => {
             return SECTION_CATEGORIES.map(cat => {
               const items = cat.ids.map(id => sectionMap.get(id)).filter(Boolean) as SettingSection[];
               if (items.length === 0) return null;
+              // Category folds shut on click, but never hides the active section.
+              const catCollapsed = collapsedCats.has(cat.label) && !cat.ids.includes(activeSection);
               return (
                 <React.Fragment key={cat.label}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>{cat.label}</div>
-                  {items.map(section => (
+                  <button
+                    type="button"
+                    onClick={() => toggleCat(cat.label)}
+                    aria-expanded={!catCollapsed}
+                    aria-label={`${catCollapsed ? 'Expand' : 'Collapse'} ${cat.label}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: catCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s ease', opacity: 0.7 }}><polyline points="6 9 12 15 18 9" /></svg>
+                    <span>{cat.label}</span>
+                  </button>
+                  {!catCollapsed && items.map(section => (
                     <button
                       key={section.id}
                       className="settings-nav"

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { AssistedTextarea } from '../components/AssistedTextarea';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
@@ -1856,7 +1857,7 @@ export const Tasks: React.FC = () => {
                   {/* Description */}
                   <div style={{ marginBottom: 'var(--space-3)' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Description</div>
-                    <textarea
+                    <AssistedTextarea
                       value={task.description || ''}
                       onChange={(e) => setDescription(task.id, e.target.value)}
                       placeholder="Add a description..."
