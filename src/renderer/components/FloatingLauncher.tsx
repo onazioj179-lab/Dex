@@ -30,7 +30,7 @@ import DexIcon from './DexIcon';
 const MOVE_THRESHOLD = 6; // px before a press becomes a drag
 const BAR_H = 44;         // collapsed capsule height
 const PILL_R = BAR_H / 2; // full-capsule radius when collapsed
-const PANEL_R = 16;       // rounded-rect radius when the widget drawer is open
+const PANEL_R = 14;       // widget-drawer radius — matches --radius-xl / .dex-liquid-glass so it reads as menu-family
 const EXPAND_KEY = 'dex-nook-expanded';
 const SEARCH_W_KEY = 'dex-nook-search-w';
 const SEARCH_W_DEFAULT = 240;
@@ -317,9 +317,12 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         // The glass bg + border still clip to border-radius (background respects
         // the radius regardless of overflow); only overflowing children show.
         overflow: 'visible',
+        // Elevation from the canonical popover shadow token (same float as every
+        // dropdown/menu) so the bar shares ONE elevation scale with menus; only
+        // the drag-lift delta + the specular glass rims stay inline.
         boxShadow: (dragging
-          ? '0 16px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.5)'
-          : '0 8px 28px rgba(0,0,0,0.42), 0 0 0 0.5px rgba(0,0,0,0.45)')
+          ? 'var(--pg-shadow-popover-strong, 0 10px 40px rgba(0,0,0,0.33)), 0 0 0 0.5px rgba(0,0,0,0.5)'
+          : 'var(--pg-shadow-popover, 0 10px 30px rgba(0,0,0,0.36)), 0 0 0 0.5px rgba(0,0,0,0.45)')
           + ', inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
         userSelect: 'none',
         // Premium one-time entrance: opacity-only (no transform) so it never

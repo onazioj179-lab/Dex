@@ -519,6 +519,11 @@ export function detectGPUCapabilities(): HardwareInfo {
     }
   }
 
+  // Release the throwaway detection context so it doesn't consume a slot in the
+  // browser's small live-WebGL-context pool -- opening/closing Forge (or any
+  // co-resident WebGL app) repeatedly would otherwise force-lose real contexts.
+  (gl as WebGLRenderingContext | null)?.getExtension('WEBGL_lose_context')?.loseContext();
+
   // Check MediaRecorder codec support as a proxy for hardware encoding
   const checkCodec = (codec: string) => {
     try { return MediaRecorder.isTypeSupported(`video/webm;codecs=${codec}`); } catch { return false; }

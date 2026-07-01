@@ -29,8 +29,8 @@ export type { BadgeProps, BadgeTone, BadgeSize } from './Badge';
 export { TextInput, Textarea } from './TextInput';
 export type { TextInputProps, TextareaProps, InputSize } from './TextInput';
 
-export { AppShell, Toolbar } from './AppShell';
-export type { AppShellProps, ToolbarProps } from './AppShell';
+// The canonical AppShell now lives in components/appShell (import it from there).
+// The old ui/AppShell duplicate was removed; this barrel no longer re-exports it.
 
 export { Modal } from './Modal';
 export type { ModalProps, ModalSize } from './Modal';

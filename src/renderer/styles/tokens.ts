@@ -53,12 +53,12 @@ export const gap = {
 // ---------------------------------------------------------------------------
 export const radius = {
   none: 0,
-  xs: 2,
-  sm: 3,
-  md: 4,
-  lg: 6,
-  xl: 8,
-  '2xl': 10,
+  xs: 4,
+  sm: 6,
+  md: 8,
+  lg: 11,
+  xl: 14,
+  '2xl': 18,
   full: 9999,
 } as const;
 
@@ -179,8 +179,10 @@ export const hairline = {
   strong: '1px solid rgba(255, 255, 255, 0.14)',
 } as const;
 
-/** Keyboard-accessible focus ring (use on :focus-visible only). */
-export const focusRing = '0 0 0 2px #0c0c0e, 0 0 0 4px #4a9eff';
+/** Keyboard-accessible focus ring (use on :focus-visible only). Monochrome +
+ *  theme-aware, matching --dex-focus-ring in design-tokens.css (owner direction:
+ *  focus is WHITE on dark / near-black on light, distinct from the blue accent). */
+export const focusRing = '0 0 0 2px var(--dex-bg, #0c0c0e), 0 0 0 4px var(--dex-focus-color, #ffffff)';
 
 // ---------------------------------------------------------------------------
 // Colors — theme-aware. Each value is a CSS custom property (which flips with

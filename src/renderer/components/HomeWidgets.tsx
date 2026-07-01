@@ -548,8 +548,9 @@ const NexusMiniWidget: React.FC = () => {
 
     const draw = () => {
       if (!isVisibleRef.current) {
-        // Pause when document hidden — save CPU/GPU
-        rafRef.current = requestAnimationFrame(draw);
+        // Pause when document hidden — stop scheduling entirely (don't just
+        // early-return and re-arm, which keeps the loop alive). The
+        // visibilitychange handler restarts it when the tab is shown again.
         return;
       }
       frameRef.current++;
@@ -584,8 +585,13 @@ const NexusMiniWidget: React.FC = () => {
       rafRef.current = requestAnimationFrame(draw);
     };
 
-    // Visibility change handler to pause/resume animation
-    const onVis = () => { isVisibleRef.current = !document.hidden; };
+    // Visibility change handler to pause/resume animation. On resume, restart
+    // the loop (it stops itself while hidden).
+    const onVis = () => {
+      const visible = !document.hidden;
+      isVisibleRef.current = visible;
+      if (visible) { cancelAnimationFrame(rafRef.current); draw(); }
+    };
     document.addEventListener('visibilitychange', onVis);
     
     draw();
