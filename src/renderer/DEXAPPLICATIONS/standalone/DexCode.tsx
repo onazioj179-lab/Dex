@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { TerminalTabs } from '../../components/TerminalTabs';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
 import { hasConfiguredProvider, askConfiguredLLM } from '../../uki/providers/connect';
@@ -1614,7 +1615,7 @@ const DexCode: React.FC = () => {
                  no line numbers — you're writing intent, not code. Cmd/Ctrl+Enter
                  runs it, matching the code editor's muscle memory. */
               <div style={S.editorWrapper}>
-                <textarea
+                <AssistedTextarea
                   value={plainText}
                   onChange={e => setPlainText(e.target.value)}
                   onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void runPlain(); } }}
@@ -1624,6 +1625,7 @@ const DexCode: React.FC = () => {
                   spellCheck
                   style={{ ...S.editor, fontSize: fontSize + 1, fontFamily: 'var(--dex-font-ui)', whiteSpace: 'pre-wrap', padding: 'var(--space-3)' }}
                   aria-label="Plain English instructions"
+                  assist
                 />
               </div>
             ) : (
