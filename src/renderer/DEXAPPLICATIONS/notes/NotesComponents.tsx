@@ -787,6 +787,54 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
 
   const autosaveState: 'idle' | 'saving' | 'saved' = saving ? 'saving' : lastSavedAt ? 'saved' : 'idle';
 
+  // -- Print / Save-as-PDF / Share -----------------------------------------
+  // Bridge-free (works in the browser dev server AND the Tauri WebView): reads
+  // the live rendered note from the `.dexnotes-editable` contenteditable so the
+  // output matches exactly what's on screen. Print's dialog doubles as "Save as
+  // PDF" (how every browser/WebView turns a page into a PDF).
+  const emitNoteToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+  };
+  const readNoteContent = () => {
+    const el = typeof document !== 'undefined' ? (document.querySelector('.dexnotes-editable') as HTMLElement | null) : null;
+    return {
+      title: (note?.title || 'Untitled note').toString(),
+      html: el ? el.innerHTML : '',
+      text: el ? (el.innerText || el.textContent || '') : (((note as any)?.plain_text || '') as string),
+    };
+  };
+  const printNote = () => {
+    const { title, html, text } = readNoteContent();
+    const esc = (s: string) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+    const body = html || `<pre>${esc(text)}</pre>`;
+    const win = window.open('', '_blank', 'width=820,height=1000');
+    if (!win) { emitNoteToast('Allow pop-ups to print or save as PDF', 'error'); return; }
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>`
+      + '*{box-sizing:border-box}body{font:14px/1.65 -apple-system,"Segoe UI",Roboto,sans-serif;color:#111;max-width:760px;margin:40px auto;padding:0 28px}'
+      + 'h1{font-size:24px;margin:0 0 18px}img{max-width:100%;height:auto}pre{white-space:pre-wrap;word-wrap:break-word}'
+      + 'table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:5px 9px}'
+      + 'blockquote{border-left:3px solid #ccc;margin:0;padding-left:14px;color:#555}@media print{body{margin:0;max-width:none}}'
+      + `</style></head><body><h1>${esc(title)}</h1>${body}</body></html>`);
+    win.document.close();
+    win.focus();
+    // Let the new document lay out before invoking the print/PDF dialog.
+    setTimeout(() => { try { win.print(); } catch { /* window closed */ } }, 300);
+  };
+  const shareNote = async () => {
+    const { title, text } = readNoteContent();
+    const payload = `${title}\n\n${text}`.trim();
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({ title, text });
+        return;
+      }
+    } catch { return; /* user cancelled the share sheet */ }
+    try {
+      await navigator.clipboard.writeText(payload);
+      emitNoteToast('Note copied — paste anywhere to share', 'success');
+    } catch { emitNoteToast('Could not share this note', 'error'); }
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -913,6 +961,21 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   Export as .{fmt}
+                </div>
+              ))}
+              <div style={{ height: 1, background: colors.border, margin: '4px 0' }} />
+              {[
+                { id: 'print', label: 'Print / Save as PDF', run: printNote },
+                { id: 'share', label: 'Share…', run: shareNote },
+              ].map(item => (
+                <div
+                  key={item.id}
+                  style={{ padding: '6px var(--space-3)', fontSize: 12, color: colors.text, cursor: 'pointer' }}
+                  onClick={() => { item.run(); setShowExportMenu(false); }}
+                  onMouseEnter={e => (e.currentTarget.style.background = colors.bgHover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {item.label}
                 </div>
               ))}
             </div>
