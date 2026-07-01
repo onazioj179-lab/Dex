@@ -389,7 +389,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 'var(--space-3) var(--space-4)',
-    height: '44px',
+    height: 'var(--app-header-height, 44px)',
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface-solid, #1C1C1E)',
   },

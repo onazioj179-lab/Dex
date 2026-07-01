@@ -70,6 +70,11 @@ export function usePerformance() {
   // Input tracking
   const lastInputTime = useRef(0);
   const inputIdleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Holds the cleanup returned by setupInputTracking so the 9 document listeners
+  // it registers are actually removed on unmount. Previously that returned
+  // cleanup was discarded and cleanupInputTracking only cleared the idle timeout,
+  // so every mount leaked its input listeners (they capture setState + closures).
+  const inputCleanupRef = useRef<null | (() => void)>(null);
 
   // -------------------------------------------------------------------------
   // INITIALIZATION
@@ -102,8 +107,9 @@ export function usePerformance() {
         // Start frame monitoring
         startFrameMonitoring();
         
-        // Setup input tracking
-        setupInputTracking();
+        // Setup input tracking — keep the returned cleanup so its listeners are
+        // removed on unmount (see cleanupInputTracking).
+        inputCleanupRef.current = setupInputTracking();
         
       } catch (err) {
         console.error('[Performance] Init error:', err);
@@ -278,7 +284,11 @@ export function usePerformance() {
   const cleanupInputTracking = useCallback(() => {
     if (inputIdleTimeout.current) {
       clearTimeout(inputIdleTimeout.current);
+      inputIdleTimeout.current = null;
     }
+    // Remove the 9 document input listeners registered by setupInputTracking.
+    inputCleanupRef.current?.();
+    inputCleanupRef.current = null;
   }, []);
 
   // -------------------------------------------------------------------------
