@@ -96,7 +96,7 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
         position: 'fixed', left: pos.left, top: pos.top, minWidth: MENU_WIDTH,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 8, padding: 4,
+        borderRadius: 12, padding: 4,
         boxShadow: 'var(--pg-shadow-popover, 0 12px 32px rgba(0,0,0,0.45))',
         zIndex: 'var(--z-modal)' as unknown as number,
         animation: 'dex-panel-in 120ms ease-out',
@@ -105,7 +105,7 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
     >
       {items.map((item, i) => {
         if (item.separator) {
-          return <div key={`sep-${i}`} style={{ height: 1, margin: '4px 6px', background: 'var(--color-border-subtle)' }} />;
+          return <div key={`sep-${i}`} style={{ height: 1, margin: '4px var(--space-2)', background: 'var(--color-border-subtle)' }} />;
         }
         const hasSub = !!(item.submenu && item.submenu.length);
         const isOpen = openSub?.index === i;
@@ -124,9 +124,9 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
               onClose();
             }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 8px', borderRadius: 5, cursor: item.disabled ? 'default' : 'pointer',
-              fontSize: 12, lineHeight: 1.4,
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: 'var(--space-2) var(--space-3)', borderRadius: 6, cursor: item.disabled ? 'default' : 'pointer',
+              fontSize: 13, lineHeight: 1.4,
               color: item.disabled ? 'var(--color-text-muted)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
               background: isOpen ? `color-mix(in srgb, ${accent} 14%, transparent)` : 'transparent',
               opacity: item.disabled ? 0.5 : 1,
@@ -224,7 +224,7 @@ export const CreativeMenuBar: React.FC<CreativeMenuBarProps> = ({
             style={{
               border: 'none', background: isActive ? `color-mix(in srgb, ${accent} 16%, transparent)` : 'transparent',
               color: menu.disabled ? 'var(--color-text-muted)' : isActive ? accent : 'var(--color-text-secondary)',
-              fontSize: 12, fontWeight: 500, padding: '4px 8px', borderRadius: 5,
+              fontSize: 13, fontWeight: 500, padding: '0 10px', borderRadius: 6,
               cursor: menu.disabled ? 'default' : 'pointer', whiteSpace: 'nowrap',
               fontFamily: 'inherit', height: height - 8,
             }}

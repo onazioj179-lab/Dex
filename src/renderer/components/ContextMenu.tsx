@@ -216,14 +216,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                   left: subDir === 'right' ? '100%' : undefined,
                   right: subDir === 'left' ? '100%' : undefined,
                   minWidth: 160, maxWidth: 'min(220px, calc(100vw - 16px))', maxHeight: 320, overflowY: 'auto',
-                  padding: '5px 0', borderRadius: 8,
+                  padding: '5px 0', borderRadius: 12,
                   // Liquid glass, matching the parent .dex-liquid-glass menu so a
                   // submenu reads as the same material rather than a solid slab.
                   background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',
                   backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
                   WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
                   border: '1px solid var(--color-border)',
-                  boxShadow: 'var(--pg-shadow-panel)',
+                  boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px var(--color-border-subtle), var(--pg-gloss-top)',
                 }}>
                   {item.submenu!.map((sub, si) => (
                     <div
