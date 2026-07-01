@@ -4,6 +4,7 @@
  * Live preview markdown editor with syntax highlighting
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import DOMPurify from 'dompurify';
 import { lintMarkdown } from '../../../shared/format/markdownLint';
 import { sendToNotes } from '../../services/sendTo';
@@ -518,7 +519,7 @@ const MarkdownEditor: React.FC = () => {
         )}
         {viewMode !== 'preview' && (
           <div style={{ ...s.pane, borderRight: viewMode === 'split' ? '1px solid var(--color-border, rgba(255,255,255,0.08))' : 'none', overflow: 'hidden' }}>
-            <textarea
+            <AssistedTextarea
               ref={editorRef}
               value={content}
               onChange={e => setContent(e.target.value)}
