@@ -10,6 +10,7 @@
 // =============================================================================
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { AssistedTextarea } from './AssistedTextarea';
 import {
   useCollaborationStore,
   useChatMessages,
@@ -644,7 +645,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
           ...styles.inputWrapper,
           ...(isFocused ? styles.inputWrapperFocused : {}),
         }}>
-          <textarea
+          <AssistedTextarea
             ref={textareaRef}
             style={styles.textarea}
             placeholder="Message your team..."
