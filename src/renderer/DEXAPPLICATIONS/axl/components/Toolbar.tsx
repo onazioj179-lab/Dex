@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import React, { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ToolMode, PrimitiveType } from '../types';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
@@ -57,10 +58,20 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
   const { tool, setTool } = useViewportStore();
   const ui = useUIStore();
 
-  // Only one flyout open at a time. A full-viewport backdrop closes it.
+  // Only one flyout open at a time. Menus render in a portal (below) anchored to
+  // their trigger, so the toolbar's own horizontal scroll (overflow-x:auto, which
+  // forces overflow-y to clip too) can't cut them off. A backdrop closes it.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const close = useCallback(() => setOpenMenu(null), []);
-  const toggleMenu = useCallback((id: string) => setOpenMenu(m => (m === id ? null : id)), []);
+  const [menuAnchor, setMenuAnchor] = useState<{ left: number; top: number } | null>(null);
+  const close = useCallback(() => { setOpenMenu(null); setMenuAnchor(null); }, []);
+  const toggleMenu = useCallback((id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setOpenMenu(m => {
+      if (m === id) { setMenuAnchor(null); return null; }
+      const r = e.currentTarget.getBoundingClientRect();
+      setMenuAnchor({ left: r.left, top: r.bottom + 5 });
+      return id;
+    });
+  }, []);
 
   const handleUndo = useCallback(() => { if (undoStack.length > 0) undo(); }, [undoStack, undo]);
   const handleRedo = useCallback(() => { if (redoStack.length > 0) redo(); }, [redoStack, redo]);
@@ -74,11 +85,10 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
     transition: 'background 0.12s, color 0.12s',
   });
 
-  const menuPanel: React.CSSProperties = {
-    position: 'absolute', top: '100%', left: 0, marginTop: 5,
+  const menuPanelBase: React.CSSProperties = {
     borderRadius: 12, padding: 5, minWidth: 168, maxWidth: 'calc(100vw - 24px)',
     maxHeight: 'min(360px, calc(100vh - 72px))', overflow: 'auto',
-    boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-max)',
+    boxShadow: 'var(--pg-shadow-popover)',
   };
 
   const itemStyle = (active = false): React.CSSProperties => ({
@@ -96,16 +106,23 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
     </button>
   );
 
-  const Flyout = ({ id, children }: { id: string; children: React.ReactNode }) => (
-    openMenu === id ? (
+  const Flyout = ({ id, children }: { id: string; children: React.ReactNode }) => {
+    if (openMenu !== id || !menuAnchor) return null;
+    // Keep the menu on-screen (clamp against the right edge). Portaled to body so
+    // the toolbar's overflow / the app container's containing block can't clip it.
+    const left = Math.max(8, Math.min(menuAnchor.left, window.innerWidth - 184));
+    return createPortal(
       <>
         <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-modal)' }} />
-        <div role="menu" className="dex-axl-panel-strong" style={menuPanel} onClick={e => e.stopPropagation()}>
+        <div role="menu" className="dex-axl-panel-strong"
+          style={{ ...menuPanelBase, position: 'fixed', top: menuAnchor.top, left, zIndex: 'var(--z-max)' }}
+          onClick={e => e.stopPropagation()}>
           {children}
         </div>
-      </>
-    ) : null
-  );
+      </>,
+      document.body
+    );
+  };
 
   const activeTool = TOOLS.find(t => t.mode === tool);
 
@@ -146,7 +163,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Create (primitives + parts library) */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button aria-label="Create" aria-haspopup="menu" aria-expanded={openMenu === 'create'} style={trigStyle(openMenu === 'create')} onClick={() => toggleMenu('create')}>
+        <button aria-label="Create" aria-haspopup="menu" aria-expanded={openMenu === 'create'} style={trigStyle(openMenu === 'create')} onClick={(e) => toggleMenu('create', e)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><line x1="12" y1="22" x2="12" y2="12" /></svg>
           {CARET}
         </button>
@@ -176,7 +193,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Modeling (feature / GD&T / constraints) */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button aria-label="Modeling" aria-haspopup="menu" aria-expanded={openMenu === 'model'} style={trigStyle(openMenu === 'model' || ui.showFeatureCreate || ui.showGDTCreate || ui.showConstraintPanel)} onClick={() => toggleMenu('model')}>
+        <button aria-label="Modeling" aria-haspopup="menu" aria-expanded={openMenu === 'model'} style={trigStyle(openMenu === 'model' || ui.showFeatureCreate || ui.showGDTCreate || ui.showConstraintPanel)} onClick={(e) => toggleMenu('model', e)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
           {CARET}
         </button>
@@ -192,7 +209,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Analyze (simulation / inspector / BOM / exploded) */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button aria-label="Analyze" aria-haspopup="menu" aria-expanded={openMenu === 'analyze'} style={trigStyle(openMenu === 'analyze' || ui.showSimulation || ui.showInspector || ui.showBOM)} onClick={() => toggleMenu('analyze')}>
+        <button aria-label="Analyze" aria-haspopup="menu" aria-expanded={openMenu === 'analyze'} style={trigStyle(openMenu === 'analyze' || ui.showSimulation || ui.showInspector || ui.showBOM)} onClick={(e) => toggleMenu('analyze', e)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
           {CARET}
         </button>
@@ -212,7 +229,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Export */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button aria-label="Export" aria-haspopup="menu" aria-expanded={openMenu === 'export'} style={trigStyle(openMenu === 'export')} onClick={() => toggleMenu('export')}>
+        <button aria-label="Export" aria-haspopup="menu" aria-expanded={openMenu === 'export'} style={trigStyle(openMenu === 'export')} onClick={(e) => toggleMenu('export', e)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
           {CARET}
         </button>
