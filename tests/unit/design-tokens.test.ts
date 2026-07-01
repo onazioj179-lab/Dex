@@ -37,7 +37,10 @@ describe('DEX design tokens (UI patch)', () => {
     expect(css).toMatch(/--dex-icon-md:\s*20px/);
     expect(css).toMatch(/--dex-icon-lg:\s*24px/);
     expect(hairline.default).toContain('1px solid');
-    expect(focusRing).toContain('#4a9eff');
+    // Focus ring is theme-aware (white on dark / near-black on light), distinct
+    // from the blue accent — a two-layer box-shadow keyed off --dex-focus-color.
+    expect(focusRing).toContain('var(--dex-focus-color');
+    expect(focusRing).toMatch(/0 0 0 \dpx/);
   });
 
   it('provides tabular numerals + shell primitives', () => {
