@@ -158,9 +158,16 @@ export default defineConfig({
     // Use modern syntax target
     target: 'es2022',
   },
-  // Item 142: CSS processing optimizations
+  // Item 142: CSS processing.
+  // NOTE: the lightningcss transformer was REMOVED. Its bundled browser data
+  // conservatively decided Chromium needs the `-webkit-` prefix for
+  // `backdrop-filter`, so it emitted ONLY `-webkit-backdrop-filter` and DROPPED
+  // the standard property. But the Tauri WebView2 / preview Chromium engine
+  // ignores the `-webkit-` alias and honors ONLY the unprefixed form (verified),
+  // so this silently killed EVERY glass surface app-wide regardless of the CSS.
+  // Vite's default pipeline (esbuild) leaves `backdrop-filter` intact, so real
+  // liquid glass renders. `cssMinify: 'esbuild'` (above) still minifies builds.
   css: {
     devSourcemap: false,
-    transformer: 'lightningcss',
   },
 });

@@ -792,14 +792,13 @@ export function injectScrollbarStyles(): void {
       outline-offset: 2px;
     }
 
-    /* Window unfocus dim */
-    .dex-window-blurred {
-      opacity: 0.95;
-      transition: opacity 0.2s ease;
-    }
+    /* Window focus state — DEX does NOT dim or change when it loses OS focus.
+       (The old rule dimmed the whole app to opacity 0.95 on blur, part of the
+       "DEX looks dead until you tap it" annoyance.) Kept as full-opacity no-ops
+       so any code still toggling these classes has no visual effect. */
+    .dex-window-blurred,
     .dex-window-focused {
       opacity: 1;
-      transition: opacity 0.15s ease;
     }
 
     /* Performance audit overlay */
