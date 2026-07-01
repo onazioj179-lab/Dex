@@ -1,5 +1,32 @@
 # DEX — Roadmap (single source of truth)
 
+> **CHECKPOINT (2026-07-01) — GLASS REMOVED: whole OS is now one consistent, solid, non-glass surface.**
+> Owner reversed the master-overhaul glass direction. Done + verified live in preview (computed `backdropFilter`,
+> per the never-screenshot rule):
+> - Default `glassMode: 'off'`, `glassOpacity: 1` in `store/shellPreferencesStore.ts`; one-time migration
+>   (`dex-glass-removed-v1` flag) flips any previously-persisted translucent mode to solid so existing installs
+>   actually go non-glass. Settings master toggle still exists for deliberate opt-in.
+> - Closed the real inconsistency: the FloatingLauncher (and floating chrome) used HARDCODED `.dex-liquid-glass`
+>   classes that ignored the glass mode. Added `html[data-glass-effective-mode="off"] .dex-liquid-glass{…}` in
+>   `design-system.css` so BOTH glass systems (token-driven + hardcoded classes) now follow the one control point
+>   (`applyGlassVars`). Verified: live `[data-dex-nook]` launcher → `backdrop-filter:none`, solid #000, matches menus.
+>
+> **ACTIVE GOAL (2026-07-01) — "DEX as a real OS": pro-grade, consistent, fast UX (owner mandate).**
+> Single vision, ordered by confidence. Each item ships small + verified; no change unless ~98% sure.
+> 1. **Consistency pass (in progress).** One look across the whole OS — solid/no-glass done. Next: unify header
+>    heights, radius/shadow tokens, dedupe AppShell, kill loose "tools" icons (see [[project-ui-consistency]]).
+> 2. **Control Center redesign.** Owner explicitly dislikes it. Rework toward a clean, foldable, collapsible
+>    panel (sections/sub-menus/overlays that collapse where needed). NEEDS owner taste input before building.
+> 3. **Fold-in everywhere.** Collapsible groups, sub-menus, drawer/overlay patterns for small apps + dense
+>    functions so nothing is a flat wall of controls. Reuse `CollapsibleSidePanel` / `CollapsibleToolGroup`.
+> 4. **Interaction polish.** Less hover-highlight where it's noisy; better popups that stay open on hold;
+>    trackpad-friendly drags; apps move around like a real OS (windowing already exists — tighten it).
+> 5. **Speed / "alive" feel.** Responsive, real motion where it helps; static where motion is noise
+>    (pair with FrameScheduler + reduced-motion).
+> 6. **Readiness tracks.** Creative + hub users; DexCode/Terminal for dev + cybersecurity; UKI + Nexus under
+>    this same consistent shell. Privacy-first: everything passes through DEX, encryption on DEX-managed data.
+> 7. **Stability.** Fix the crashing/backup-restore paths surfaced by the owner (needs repro specifics).
+>
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
 > green / 0 failed-test markers (new suites 18/18: frame-scheduler, rewind-recall, text-search, use-app-active).

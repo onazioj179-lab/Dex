@@ -82,7 +82,7 @@ const chromeStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-2)',
-  minHeight: 38,
+  minHeight: 'var(--app-header-height, 38px)',
   padding: '4px var(--space-2)',
   background: 'var(--color-bg-elevated)',
   borderBottom: hairline.default,

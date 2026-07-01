@@ -383,9 +383,21 @@
   --radius-xl: 14px;
   --radius-2xl: 18px;
   --radius-full: 9999px;
-  
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Chrome / control sizing — ONE source of truth for app headers, toolbars,
+     and interactive control heights so every app's chrome lines up. The shared
+     AppShell chrome and MenuBar consume these; new/ported app headers should use
+     --app-header-height instead of a magic number. (2026-07 consistency pass.)
+     ───────────────────────────────────────────────────────────────────────── */
+  --app-header-height: 44px;   /* app title/menu bar — the app-wide header standard (standalone apps already use 44; AppShell chrome consumes this so it matches) */
+  --toolbar-height: 40px;      /* secondary toolbars/action strips */
+  --control-height: 28px;      /* buttons, inputs, segmented controls */
+  --control-height-sm: 24px;   /* compact/inline controls */
+  --control-height-lg: 34px;   /* prominent primary controls */
+
   --shadow-none: none;
-  
+
   /* ─────────────────────────────────────────────────────────────────────────
      Glass/Blur Effects
      ───────────────────────────────────────────────────────────────────────── */
@@ -864,6 +876,24 @@ html[data-perf-tier="low"] .dex-liquid-glass-strong {
     -webkit-backdrop-filter: none;
     background: var(--color-bg-surface, #161618);
   }
+}
+/* Glass mode OFF (owner direction: the whole OS is consistently non-glass).
+   The hardcoded liquid-glass classes are the ONLY glass surfaces NOT driven by
+   the --color-bg-glass tokens, so without this they'd stay frosted while every
+   menu/panel went solid -- the exact reason the floating DEX Bar never matched
+   the app menus. Tie them to the same runtime control point: applyGlassVars()
+   writes data-glass-effective-mode="off" on <html>, and here the floating chrome
+   goes solid using the SAME tokens the menus use, so they match by construction.
+   Border + shadow from the base class stay, so surfaces keep depth (not flat). */
+html[data-glass-effective-mode="off"] .dex-liquid-glass {
+  background: var(--color-bg-glass, #000);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-glass-effective-mode="off"] .dex-liquid-glass-strong {
+  background: var(--color-bg-glass-strong, #000);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 /* Glass-token fallbacks: when the backdrop blur is unavailable -- weak GPUs
    (perf-tier "low" strips backdrop-filter platform-wide) or the user prefers

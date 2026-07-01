@@ -23,6 +23,10 @@ import { create } from 'zustand';
 import { normalizeDockEdge, normalizeDockPreset, normalizeDockAlign, type DockEdge, type DockSizePreset, type DockAlign } from '../../shared/shell/dockGeometry';
 
 export const DEX_SHELL_PREFS_KEY = 'dex-shell-preferences-v1';
+// One-time migration marker: the OS moved to a consistent non-glass look, so any
+// install that still has a translucent glass mode persisted is flipped to 'off'
+// exactly once. Presence of this key means the migration already ran.
+const GLASS_REMOVED_FLAG = 'dex-glass-removed-v1';
 
 export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 
@@ -61,11 +65,14 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
   dockAlign: 'center',
   dockPreset: 'regular',
-  // Full Apple-style liquid glass out of the box (owner direction). The master
-  // toggle in Settings flips this to 'off' for fully-opaque true-black surfaces.
-  glassOpacity: 0.6,
+  // No glass out of the box (owner direction, 2026-07): the WHOLE OS reads as one
+  // consistent, solid, non-translucent surface — every menu, panel, dropdown,
+  // sidebar, and the floating chrome (DEX Bar). 'off' makes applyGlassVars() emit
+  // fully-opaque true-black surfaces with zero blur. The Settings toggle can still
+  // opt back into translucent glass for anyone who wants it.
+  glassOpacity: 1,
   glassTint: '#0a0a0a',
-  glassMode: 'liquid',
+  glassMode: 'off',
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -107,7 +114,18 @@ function loadInitial(): ShellPreferences {
       : null;
     if (!raw) return { ...DEFAULT_SHELL_PREFERENCES };
     const parsed = JSON.parse(raw);
-    return mergePrefs(parsed);
+    const merged = mergePrefs(parsed);
+    // One-time glass-removal migration: flip a previously-saved translucent glass
+    // mode to solid ONCE so existing installs match the new consistent default.
+    // The Settings toggle still works afterwards for deliberate re-enable.
+    try {
+      if (localStorage.getItem(GLASS_REMOVED_FLAG) !== '1') {
+        if (merged.glassMode !== 'off') { merged.glassMode = 'off'; merged.glassOpacity = 1; }
+        localStorage.setItem(GLASS_REMOVED_FLAG, '1');
+        persist(merged);
+      }
+    } catch { /* quota / sandbox — the new default already lands 'off' */ }
+    return merged;
   } catch {
     return { ...DEFAULT_SHELL_PREFERENCES };
   }
