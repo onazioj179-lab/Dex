@@ -402,14 +402,16 @@
      Glass/Blur Effects
      ───────────────────────────────────────────────────────────────────────── */
   
-  /* DEX Sharp full-flat (2026-06-13): backdrop blur disabled platform-wide.
-     Surfaces are solid/placed, so every `var(--blur-*)` consumer (inline or in
-     CSS) renders with no frost and no GPU compositing cost. Restore the GOAL-6D
-     values (2/4/8/13px) here to bring frosted glass back. */
-  --blur-sm: blur(0px);
-  --blur-md: blur(0px);
-  --blur-lg: blur(0px);
-  --blur-xl: blur(0px);
+  /* Frosted-glass radius scale — the ONE canonical blur ladder (master overhaul:
+     real liquid glass restored). Every `var(--blur-*)` consumer (inline + the
+     ~50 CSS glass classes) pulls its frost from here, so blur tunes in one place
+     and the perf/thermal gates scale it DOWN per tier (mid caps to --blur-md,
+     low/hot strip to none). Kept crisp, not muddy: chrome uses the heavier
+     runtime --glass-blur (24–32px); this ladder is for lighter tokenized frost. */
+  --blur-sm: blur(4px);
+  --blur-md: blur(8px);
+  --blur-lg: blur(16px);
+  --blur-xl: blur(24px);
   --saturate: saturate(180%);
   
   /* ─────────────────────────────────────────────────────────────────────────
@@ -6230,10 +6232,12 @@ html, body {
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Text selection color */
+/* Text selection — one subtle, native-feel tint. color:inherit so selected
+   secondary/tertiary/tinted text keeps its own color instead of being forced to
+   primary. (This is the last-loaded ::selection rule, so it is the winner.) */
 ::selection {
-  background: rgba(74, 158, 255, 0.35);
-  color: var(--color-text-primary);
+  background: rgba(74, 158, 255, 0.24);
+  color: inherit;
 }
 
 /* Code text style */

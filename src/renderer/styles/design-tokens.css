@@ -273,6 +273,18 @@ html, body, #root {
   transform: scale(0.97);
 }
 
+/* Universal hover response — the shared "light response" the OS uses on every
+   interactive element (the master spec calls the old hover "weak"). A subtle
+   brightness lift only: GPU-cheap, never shifts layout, so it is safe on dense
+   toolbars and list rows. :where() = specificity 0, so any component's own
+   hover still wins. Gated to real pointers so touch never sticks a hover state;
+   the low-tier `* { filter:none !important }` guard strips it on weak GPUs. */
+@media (hover: hover) and (pointer: fine) {
+  :where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):hover {
+    filter: brightness(1.09);
+  }
+}
+
 /* Data/numeric elements align by default (tabular figures). */
 :where(time, [data-numeric], .tabular) {
   font-variant-numeric: tabular-nums lining-nums;

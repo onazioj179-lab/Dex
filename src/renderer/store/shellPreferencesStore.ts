@@ -256,6 +256,27 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     root.style.setProperty('--glass-bg', `rgba(${tint}, ${Math.max(op - 0.08, 0.5)})`);
     root.style.setProperty('--glass-blur', filter);
   }
+
+  // Unified glass authority: when glass is off/reduced (or low-end / OS
+  // reduced-transparency mapped to those), flip the platform-wide opt-out so
+  // EVERY glass surface — the runtime-driven chrome AND the ~50 tokenized
+  // `var(--blur-*)` consumers — flattens together. This makes Settings › Liquid
+  // Glass the single authority over the whole app's blur, not just the chrome
+  // fill tokens. When glass is on, clear the overrides so the canonical
+  // design-system.css blur ladder (and the tier gates) apply.
+  if (effectiveMode === 'off' || effectiveMode === 'reduced') {
+    root.setAttribute('data-no-blur', 'true');
+    root.style.setProperty('--blur-sm', 'blur(0px)');
+    root.style.setProperty('--blur-md', 'blur(0px)');
+    root.style.setProperty('--blur-lg', 'blur(0px)');
+    root.style.setProperty('--blur-xl', 'blur(0px)');
+  } else {
+    root.removeAttribute('data-no-blur');
+    root.style.removeProperty('--blur-sm');
+    root.style.removeProperty('--blur-md');
+    root.style.removeProperty('--blur-lg');
+    root.style.removeProperty('--blur-xl');
+  }
 }
 
 export function applyNightShift(prefs: Pick<ShellPreferences, 'nightShift' | 'nightShiftIntensity'>): void {
