@@ -516,16 +516,25 @@ const VinxEditor: React.FC = () => {
   // Audio EQ state
   const [eqPreset, setEqPreset] = useState('Flat');
   const [eqBands, setEqBands] = useState([0, 0, 0, 0, 0, 0]);
-  const eqContextRef = useRef<{ ctx: AudioContext; filters: BiquadFilterNode[]; source: MediaElementAudioSourceNode } | null>(null);
+  const eqContextRef = useRef<{ ctx: AudioContext; filters: BiquadFilterNode[]; source: MediaElementAudioSourceNode; boundEl: HTMLMediaElement } | null>(null);
 
-  // Apply EQ when bands change — wires into the first video element via Web Audio
+  // Apply EQ when bands change — wires into the active media element via Web Audio
   useEffect(() => {
     const freqs = [80, 250, 1000, 4000, 12000];
     const allFlat = eqBands.every(b => b === 0);
+    const el = document.querySelector('video, audio') as HTMLMediaElement | null;
     let eq = eqContextRef.current;
+    // If the active media element changed (a different clip mounted a new
+    // <video>/<audio>), the cached graph is routed to a stale element and EQ
+    // silently stops working. Tear it down so we rebind to the current element.
+    if (eq && el && eq.boundEl !== el) {
+      try { eq.source.disconnect(); } catch { /* noop */ }
+      try { void eq.ctx.close(); } catch { /* noop */ }
+      eqContextRef.current = null;
+      eq = null;
+    }
     if (!eq) {
       if (allFlat) return;
-      const el = document.querySelector('video, audio') as HTMLMediaElement | null;
       if (!el) return;
       try {
         const ctx = new AudioContext();
@@ -545,7 +554,7 @@ const VinxEditor: React.FC = () => {
           filters[i].connect(filters[i + 1]);
         }
         filters[filters.length - 1].connect(ctx.destination);
-        eq = { ctx, filters, source };
+        eq = { ctx, filters, source, boundEl: el };
         eqContextRef.current = eq;
       } catch (_) {
         return;

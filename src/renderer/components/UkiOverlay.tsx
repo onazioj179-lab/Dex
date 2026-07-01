@@ -1520,6 +1520,9 @@ const UkiOverlay: React.FC = () => {
     }
   }, [speakResponses]);
 
+  // Last user query, so async system-tool results (top processes / battery)
+  // can be committed to history against the question that triggered them.
+  const lastUserTextRef = useRef('');
   const streamResponse = useCallback((reply: string, intent: string, userText: string, speakIt = true) => {
     setIsThinking(false);
     const finalSteps = [...thoughtStepsRef.current];
@@ -1545,6 +1548,7 @@ const UkiOverlay: React.FC = () => {
     // query instead of the bound input box.
     const text = (typeof override === 'string' ? override : inputText).trim();
     if (!text) return;
+    lastUserTextRef.current = text;
     if (typeof override !== 'string') {
       setInputText('');
       // Collapse the auto-grown textarea back to a single row; height is set
@@ -1778,6 +1782,22 @@ const UkiOverlay: React.FC = () => {
       }
     }
   }, [inputText, streamResponse, commitTurn]);
+
+  // Route async system-tool results back into the response stream. Some
+  // trySystemTool branches (top processes, battery) resolve AFTER their
+  // synchronous "Checking..." placeholder and fire the real answer via a
+  // `dex-uki-async-response` event. Nothing listened for it, so those answers
+  // were dropped -- "what's using my CPU?" only ever showed the placeholder.
+  useEffect(() => {
+    const onAsync = (e: Event) => {
+      const resp = (e as CustomEvent).detail?.response;
+      if (typeof resp === 'string' && resp.trim()) {
+        streamResponse(resp, 'system-tool', lastUserTextRef.current || 'system');
+      }
+    };
+    window.addEventListener('dex-uki-async-response', onAsync as EventListener);
+    return () => window.removeEventListener('dex-uki-async-response', onAsync as EventListener);
+  }, [streamResponse]);
 
   // Global "ask UKI" bridge: any surface can dispatch
   //   window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query } }))
