@@ -20,7 +20,7 @@ import { glassOverlay } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { useRecentFiles } from '../store/useRecentFiles';
-import { HomeWidgets, HomeDashboard } from '../components/HomeWidgets';
+import { HomeWidgets } from '../components/HomeWidgets';
 import { useWidgetStore } from '../store/widgetStore';
 import DexIcon from '../components/DexIcon';
 import { Z_CONTEXT_MENU, Z_MODAL } from '../utils/zIndexTokens';
@@ -360,7 +360,6 @@ export const Home: React.FC = () => {
   const [showAppPicker, setShowAppPicker] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [searchSticky, setSearchSticky] = useState(false);
   const [repaintNonce, setRepaintNonce] = useState(0);
   // When the embedded Spotlight has results open, fade the widget layer out so
   // the clock/widgets never paint over (and obscure) the results dropdown.
@@ -415,13 +414,6 @@ export const Home: React.FC = () => {
       window.removeEventListener('dex:idle-resume', forceHomeRepaint as EventListener);
       document.removeEventListener('visibilitychange', forceHomeRepaint);
     };
-  }, []);
-
-  // Sticky search on scroll
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-      setSearchSticky(scrollRef.current.scrollTop > 120);
-    }
   }, []);
 
   // Launch app helper
@@ -582,7 +574,6 @@ export const Home: React.FC = () => {
       {/* Scrollable content */}
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
         style={{
           position: 'relative', zIndex: 2,
           // min-height: 0 is REQUIRED: as a flex child this is the scroll
