@@ -6,16 +6,21 @@
 // =============================================================================
 /**
  * DEX Control Center
- * Premium right-side glass panel of system controls, inspired by
- * macOS / visionOS / iPadOS control centers but uniquely DEX:
- * monochrome glass, accent color reserved for active/on states only.
+ * Right-side system-controls panel. Redesigned 2026-07 to match the OS-wide
+ * consistency direction:
+ *   - SOLID (no glass), sharp, monochrome; accent reserved for active/on states.
+ *   - A compact QUICK-TOGGLE grid on top for the instant on/off controls.
+ *   - COLLAPSIBLE sections below for the detailed controls; collapse state is
+ *     persisted, so the panel folds down to exactly what the user cares about.
+ *   - No more per-tile up/down reorder arrows (visual clutter); fold instead.
  *
  * Self-managing: toggles open in response to the window CustomEvent
- * `dex-toggle-control-center`. Every control here drives a REAL backend
- * (existing Zustand stores, services, or browser APIs) -- nothing is faked.
+ * `dex-toggle-control-center`. Every control drives a REAL backend (existing
+ * Zustand stores, services, or browser APIs) — nothing is faked.
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { CollapsibleSection } from './CollapsibleSection';
 import { isReduceMotion } from '../utils/MotionController';
 import { useNetworkStore, NETWORK_MODE_LABELS, type NetworkMode } from '../store/networkStore';
 import { useShellPreferences, type GlassMode } from '../store/shellPreferencesStore';
@@ -100,40 +105,29 @@ function saveBrightness(value: number): void {
 applyBrightness(loadBrightness());
 
 // ---------------------------------------------------------------------------
-// Module ordering -- persisted, reorderable.
+// Collapsible-section state -- persisted. Each section can fold to just its
+// header, and the panel remembers what the user folded away.
 // ---------------------------------------------------------------------------
 
-const ORDER_KEY = 'dex-control-center-order-v1';
-type ModuleId = 'network' | 'appearance' | 'nightShift' | 'brightness' | 'dnd' | 'performance' | 'battery';
+const COLLAPSE_KEY = 'dex-control-center-collapsed-v2';
+type SectionId = 'network' | 'display' | 'performance' | 'battery';
 
-const DEFAULT_ORDER: ModuleId[] = [
-  'network',
-  'appearance',
-  'nightShift',
-  'brightness',
-  'dnd',
-  'performance',
-  'battery',
-];
-
-function loadOrder(): ModuleId[] {
+function loadCollapsed(): Set<SectionId> {
   try {
-    const raw = localStorage.getItem(ORDER_KEY);
-    if (!raw) return [...DEFAULT_ORDER];
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    if (!raw) return new Set();
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [...DEFAULT_ORDER];
-    const valid = parsed.filter((id): id is ModuleId => DEFAULT_ORDER.includes(id as ModuleId));
-    // Append any modules added since the order was saved, preserving stored order.
-    for (const id of DEFAULT_ORDER) if (!valid.includes(id)) valid.push(id);
-    return valid;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is SectionId =>
+      id === 'network' || id === 'display' || id === 'performance' || id === 'battery'));
   } catch {
-    return [...DEFAULT_ORDER];
+    return new Set();
   }
 }
 
-function saveOrder(order: ModuleId[]): void {
+function saveCollapsed(set: Set<SectionId>): void {
   try {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set]));
   } catch {
     /* ignore */
   }
@@ -199,26 +193,18 @@ function useBattery(active: boolean): BatteryInfo {
 const ACCENT = 'var(--color-accent)';
 const ACCENT_SOFT = 'var(--color-accent-light)';
 
-const tileStyle: React.CSSProperties = {
-  background: 'var(--color-bg-surface, rgba(255,255,255,0.04))',
-  border: '1px solid var(--color-border-subtle)',
+// NB: longhands only (backgroundColor + borderWidth/Style/Color), never the
+// `background`/`border` shorthands. QuickTile spreads this and then overrides
+// backgroundColor/borderColor for its on-state; mixing a shorthand here with a
+// longhand override makes React null out the un-mentioned longhands (the on-state
+// accent silently fell back to the base surface). Longhands compose cleanly.
+const surfaceStyle: React.CSSProperties = {
+  backgroundColor: 'var(--color-bg-surface, rgba(255,255,255,0.04))',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderColor: 'var(--color-border-subtle)',
   borderRadius: 'var(--radius-lg, 12px)',
-  padding: 'var(--space-3, 12px)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
   minWidth: 0,
-};
-
-const tileLabelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  letterSpacing: '0.02em',
-  textTransform: 'uppercase',
-  color: 'var(--color-text-tertiary)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
 };
 
 const Segmented = <T extends string>({
@@ -276,111 +262,63 @@ const Segmented = <T extends string>({
   </div>
 );
 
-const Toggle = ({
+// ---------------------------------------------------------------------------
+// Quick toggle tile -- big tap target for instant on/off controls. Lights up
+// with the accent fill when on, like a real control-center chip.
+// ---------------------------------------------------------------------------
+
+const QuickTile = ({
   on,
+  label,
+  state,
+  icon,
   onClick,
-  ariaLabel,
 }: {
   on: boolean;
+  label: string;
+  state: string;
+  icon: React.ReactNode;
   onClick: () => void;
-  ariaLabel: string;
 }) => (
   <button
     role="switch"
     aria-checked={on}
-    aria-label={ariaLabel}
+    aria-label={`${label}: ${state}`}
     onClick={onClick}
     style={{
-      width: 40,
-      height: 24,
-      flexShrink: 0,
-      borderRadius: 999,
-      border: '1px solid ' + (on ? ACCENT : 'var(--color-border)'),
-      background: on ? ACCENT : 'var(--color-bg-hover)',
-      position: 'relative',
+      ...surfaceStyle,
+      textAlign: 'left',
+      padding: 'var(--space-3, 12px)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
       cursor: 'pointer',
-      padding: 0,
-      transition: 'background 0.15s ease, border-color 0.15s ease',
+      backgroundColor: on ? ACCENT_SOFT : (surfaceStyle.backgroundColor as string),
+      borderColor: on ? ACCENT : 'var(--color-border-subtle)',
+      transition: 'background-color 0.14s ease, border-color 0.14s ease',
     }}
   >
     <span
+      aria-hidden="true"
       style={{
-        position: 'absolute',
-        top: 2,
-        left: on ? 18 : 2,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        background: '#fff',
-        transition: 'left 0.15s cubic-bezier(0.23,1,0.32,1)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: on ? ACCENT : 'var(--color-bg-hover)',
+        color: on ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
+        transition: 'background 0.14s ease, color 0.14s ease',
       }}
-    />
+    >
+      {icon}
+    </span>
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+      <span style={{ fontSize: 11, color: on ? ACCENT : 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{state}</span>
+    </span>
   </button>
-);
-
-const ReorderButtons = ({
-  onUp,
-  onDown,
-  canUp,
-  canDown,
-}: {
-  onUp: () => void;
-  onDown: () => void;
-  canUp: boolean;
-  canDown: boolean;
-}) => {
-  const btn = (enabled: boolean): React.CSSProperties => ({
-    width: 20,
-    height: 16,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: 4,
-    cursor: enabled ? 'pointer' : 'default',
-    opacity: enabled ? 0.55 : 0.18,
-    color: 'var(--color-text-secondary)',
-    padding: 0,
-  });
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 'auto', gap: 0 }}>
-      <button style={btn(canUp)} disabled={!canUp} onClick={onUp} aria-label="Move module up" title="Move up">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
-      </button>
-      <button style={btn(canDown)} disabled={!canDown} onClick={onDown} aria-label="Move module down" title="Move down">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Module header row (label + optional reorder controls).
-// ---------------------------------------------------------------------------
-
-const ModuleShell = ({
-  label,
-  icon,
-  reorder,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  reorder?: React.ReactNode;
-  children: React.ReactNode;
-}) => (
-  <div style={tileStyle}>
-    <div style={{ display: 'flex', alignItems: 'center' }}>
-      <span style={tileLabelStyle}>
-        {icon}
-        {label}
-      </span>
-      {reorder}
-    </div>
-    {children}
-  </div>
 );
 
 // ---------------------------------------------------------------------------
@@ -392,7 +330,7 @@ const PANEL_WIDTH = 360;
 const ControlCenter: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [order, setOrder] = useState<ModuleId[]>(() => loadOrder());
+  const [collapsed, setCollapsed] = useState<Set<SectionId>>(() => loadCollapsed());
   const [brightness, setBrightnessState] = useState<number>(() => loadBrightness());
   const reduceMotion = isReduceMotion();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -441,16 +379,12 @@ const ControlCenter: React.FC = () => {
     };
   }, [open, refreshNetwork, reduceMotion]);
 
-  const move = useCallback((id: ModuleId, dir: -1 | 1) => {
-    setOrder((prev) => {
-      const idx = prev.indexOf(id);
-      const next = idx + dir;
-      if (idx < 0 || next < 0 || next >= prev.length) return prev;
-      const copy = [...prev];
-      const [item] = copy.splice(idx, 1);
-      copy.splice(next, 0, item);
-      saveOrder(copy);
-      return copy;
+  const toggleSection = useCallback((id: SectionId) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      saveCollapsed(next);
+      return next;
     });
   }, []);
 
@@ -466,210 +400,173 @@ const ControlCenter: React.FC = () => {
     setTierManual(true);
   }, []);
 
-  // Module render registry. Each entry carries its searchable name + node.
-  const modules = useMemo(() => {
-    const reorderFor = (id: ModuleId) => {
-      const visibleIndex = order.indexOf(id);
-      return (
-        <ReorderButtons
-          onUp={() => move(id, -1)}
-          onDown={() => move(id, 1)}
-          canUp={visibleIndex > 0}
-          canDown={visibleIndex >= 0 && visibleIndex < order.length - 1}
-        />
-      );
-    };
-
-    const registry: Record<ModuleId, { name: string; node: React.ReactNode }> = {
-      network: {
-        name: 'Network Connection Mode Offline',
-        node: (
-          <ModuleShell
-            key="network"
-            label="Network"
-            reorder={reorderFor('network')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13a10 10 0 0 1 14 0" /><path d="M8.5 16.5a5 5 0 0 1 7 0" /><line x1="12" y1="20" x2="12" y2="20" /></svg>
-            }
-          >
-            <Segmented<NetworkMode>
-              ariaLabel="Network mode"
-              value={networkMode}
-              onChange={(m) => void setNetworkMode(m)}
-              options={[
-                { id: 'full', label: 'Full' },
-                { id: 'local-only', label: 'Local' },
-                { id: 'disabled', label: 'Off' },
-              ]}
-            />
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              {NETWORK_MODE_LABELS[networkMode]}
-            </span>
-          </ModuleShell>
-        ),
-      },
-      appearance: {
-        name: 'Appearance Liquid Glass Material Transparency',
-        node: (
-          <ModuleShell
-            key="appearance"
-            label="Liquid Glass"
-            reorder={reorderFor('appearance')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M3 9h18M9 21V9" /></svg>
-            }
-          >
-            <Segmented<GlassMode>
-              ariaLabel="Liquid glass mode"
-              value={glassMode}
-              onChange={(m) => setGlassMode(m)}
-              options={[
-                { id: 'off', label: 'Off' },
-                { id: 'reduced', label: 'Low' },
-                { id: 'normal', label: 'On' },
-                { id: 'liquid', label: 'Liquid' },
-              ]}
-            />
-          </ModuleShell>
-        ),
-      },
-      nightShift: {
-        name: 'Night Shift Warm Color Temperature',
-        node: (
-          <ModuleShell
-            key="nightShift"
-            label="Night Shift"
-            reorder={reorderFor('nightShift')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-            }
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                {nightShift ? 'Warm filter on' : 'Off'}
-              </span>
-              <Toggle on={nightShift} onClick={() => setNightShift(!nightShift)} ariaLabel="Toggle Night Shift" />
-            </div>
-          </ModuleShell>
-        ),
-      },
-      brightness: {
-        name: 'Brightness Screen Dimmer Display',
-        node: (
-          <ModuleShell
-            key="brightness"
-            label="Brightness"
-            reorder={reorderFor('brightness')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
-            }
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                type="range"
-                min={MIN_BRIGHTNESS}
-                max={100}
-                step={1}
-                value={brightness}
-                onChange={(e) => onBrightness(parseInt(e.target.value, 10))}
-                aria-label="Screen brightness"
-                style={{ flex: 1, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', minWidth: 36, textAlign: 'right' }}>
-                {brightness}%
-              </span>
-            </div>
-          </ModuleShell>
-        ),
-      },
-      dnd: {
-        name: 'Do Not Disturb Notifications Focus Silence',
-        node: (
-          <ModuleShell
-            key="dnd"
-            label="Do Not Disturb"
-            reorder={reorderFor('dnd')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /><line x1="3" y1="3" x2="21" y2="21" /></svg>
-            }
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                {dnd ? 'Notifications silenced' : 'Notifications on'}
-              </span>
-              <Toggle on={dnd} onClick={() => void setDnd(!dnd)} ariaLabel="Toggle Do Not Disturb" />
-            </div>
-          </ModuleShell>
-        ),
-      },
-      performance: {
-        name: 'Performance Tier Graphics Quality Power',
-        node: (
-          <ModuleShell
-            key="performance"
-            label="Performance"
-            reorder={reorderFor('performance')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-            }
-          >
-            <Segmented<DeviceTier>
-              ariaLabel="Performance tier"
-              value={(tier ?? 'mid') as DeviceTier}
-              onChange={(t) => applyTier(t)}
-              options={ALL_TIERS.map((t) => ({ id: t, label: getTierLabel(t) }))}
-            />
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              {tier ? `Tier: ${getTierLabel(tier)}` : 'Auto-detecting'}
-              {tierManual ? ' (manual)' : ' (auto)'}
-            </span>
-          </ModuleShell>
-        ),
-      },
-      battery: {
-        name: 'Battery Power Charge Level',
-        node: (
-          <ModuleShell
-            key="battery"
-            label="Battery"
-            reorder={reorderFor('battery')}
-            icon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" /><line x1="23" y1="13" x2="23" y2="11" /></svg>
-            }
-          >
-            {battery.supported ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ position: 'relative', width: 36, height: 16, borderRadius: 3, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: 1.5 }}>
-                  <div style={{ height: '100%', width: `${battery.level}%`, borderRadius: 1.5, background: battery.level > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
-                  <div style={{ position: 'absolute', right: -3, top: '50%', transform: 'translateY(-50%)', width: 2, height: 6, borderRadius: '0 1px 1px 0', background: 'var(--color-text-tertiary)' }} />
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{battery.level}%</span>
-                {battery.charging && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-success)' }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-                    Charging
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Battery status unavailable on this device</span>
-            )}
-          </ModuleShell>
-        ),
-      },
-    };
-    return registry;
-  }, [order, move, networkMode, setNetworkMode, glassMode, setGlassMode, nightShift, setNightShift, brightness, onBrightness, dnd, setDnd, tier, tierManual, applyTier, battery]);
-
   const q = query.trim().toLowerCase();
-  const visible = order.filter((id) => {
-    if (!q) return true;
-    return modules[id].name.toLowerCase().includes(q);
-  });
+  const matches = useCallback((name: string) => !q || name.toLowerCase().includes(q), [q]);
+  // While filtering, sections force-expand so the matched control is visible.
+  const isOpen = useCallback((id: SectionId) => (q ? true : !collapsed.has(id)), [q, collapsed]);
+
+  // Quick toggles (instant on/off). Searchable by their descriptive names.
+  const quick = useMemo(() => ([
+    {
+      key: 'nightShift',
+      name: 'Night Shift Warm Color Temperature Display',
+      node: (
+        <QuickTile
+          key="nightShift"
+          on={nightShift}
+          label="Night Shift"
+          state={nightShift ? 'On' : 'Off'}
+          onClick={() => setNightShift(!nightShift)}
+          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>}
+        />
+      ),
+    },
+    {
+      key: 'dnd',
+      name: 'Do Not Disturb Notifications Focus Silence',
+      node: (
+        <QuickTile
+          key="dnd"
+          on={dnd}
+          label="Do Not Disturb"
+          state={dnd ? 'Silenced' : 'Off'}
+          onClick={() => void setDnd(!dnd)}
+          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /><line x1="3" y1="3" x2="21" y2="21" /></svg>}
+        />
+      ),
+    },
+  ]), [nightShift, setNightShift, dnd, setDnd]);
+  const visibleQuick = quick.filter((t) => matches(t.name));
+
+  // Detailed sections (collapsible). Each carries a searchable name.
+  const sections = useMemo(() => ([
+    {
+      id: 'network' as SectionId,
+      name: 'Network Connection Mode Offline Local Full',
+      node: (
+        <CollapsibleSection
+          key="network"
+          label="Network"
+          collapsed={!isOpen('network')}
+          onToggle={() => toggleSection('network')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13a10 10 0 0 1 14 0" /><path d="M8.5 16.5a5 5 0 0 1 7 0" /><line x1="12" y1="20" x2="12" y2="20" /></svg>}
+        >
+          <Segmented<NetworkMode>
+            ariaLabel="Network mode"
+            value={networkMode}
+            onChange={(m) => void setNetworkMode(m)}
+            options={[
+              { id: 'full', label: 'Full' },
+              { id: 'local-only', label: 'Local' },
+              { id: 'disabled', label: 'Off' },
+            ]}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{NETWORK_MODE_LABELS[networkMode]}</span>
+        </CollapsibleSection>
+      ),
+    },
+    {
+      id: 'display' as SectionId,
+      name: 'Display Brightness Screen Dimmer Liquid Glass Material Transparency Appearance',
+      node: (
+        <CollapsibleSection
+          key="display"
+          label="Display"
+          collapsed={!isOpen('display')}
+          onToggle={() => toggleSection('display')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>}
+        >
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Brightness</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range"
+              min={MIN_BRIGHTNESS}
+              max={100}
+              step={1}
+              value={brightness}
+              onChange={(e) => onBrightness(parseInt(e.target.value, 10))}
+              aria-label="Screen brightness"
+              style={{ flex: 1, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', minWidth: 36, textAlign: 'right' }}>{brightness}%</span>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Glass material</span>
+          <Segmented<GlassMode>
+            ariaLabel="Liquid glass mode"
+            value={glassMode}
+            onChange={(m) => setGlassMode(m)}
+            options={[
+              { id: 'off', label: 'Off' },
+              { id: 'reduced', label: 'Low' },
+              { id: 'normal', label: 'On' },
+              { id: 'liquid', label: 'Liquid' },
+            ]}
+          />
+        </CollapsibleSection>
+      ),
+    },
+    {
+      id: 'performance' as SectionId,
+      name: 'Performance Tier Graphics Quality Power',
+      node: (
+        <CollapsibleSection
+          key="performance"
+          label="Performance"
+          collapsed={!isOpen('performance')}
+          onToggle={() => toggleSection('performance')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>}
+        >
+          <Segmented<DeviceTier>
+            ariaLabel="Performance tier"
+            value={(tier ?? 'mid') as DeviceTier}
+            onChange={(t) => applyTier(t)}
+            options={ALL_TIERS.map((t) => ({ id: t, label: getTierLabel(t) }))}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            {tier ? `Tier: ${getTierLabel(tier)}` : 'Auto-detecting'}
+            {tierManual ? ' (manual)' : ' (auto)'}
+          </span>
+        </CollapsibleSection>
+      ),
+    },
+    {
+      id: 'battery' as SectionId,
+      name: 'Battery Power Charge Level',
+      node: (
+        <CollapsibleSection
+          key="battery"
+          label="Battery"
+          collapsed={!isOpen('battery')}
+          onToggle={() => toggleSection('battery')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" /><line x1="23" y1="13" x2="23" y2="11" /></svg>}
+        >
+          {battery.supported ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ position: 'relative', width: 36, height: 16, borderRadius: 3, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: 1.5 }}>
+                <div style={{ height: '100%', width: `${battery.level}%`, borderRadius: 1.5, background: battery.level > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
+                <div style={{ position: 'absolute', right: -3, top: '50%', transform: 'translateY(-50%)', width: 2, height: 6, borderRadius: '0 1px 1px 0', background: 'var(--color-text-tertiary)' }} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{battery.level}%</span>
+              {battery.charging && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-success)' }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                  Charging
+                </span>
+              )}
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Battery status unavailable on this device</span>
+          )}
+        </CollapsibleSection>
+      ),
+    },
+  ]), [isOpen, toggleSection, networkMode, setNetworkMode, brightness, onBrightness, glassMode, setGlassMode, tier, tierManual, applyTier, battery]);
+  const visibleSections = sections.filter((s) => matches(s.name));
 
   if (!open) return null;
 
   const transition = reduceMotion ? 'none' : 'transform 0.26s cubic-bezier(0.23,1,0.32,1), opacity 0.2s ease';
+  const nothingMatches = q !== '' && visibleQuick.length === 0 && visibleSections.length === 0;
 
   return (
     <>
@@ -684,7 +581,7 @@ const ControlCenter: React.FC = () => {
           background: 'transparent',
         }}
       />
-      {/* Sliding glass panel */}
+      {/* Sliding panel (solid; goes glass only if the user opts glass back on) */}
       <div
         ref={panelRef}
         className="dex-liquid-glass-strong"
@@ -746,14 +643,21 @@ const ControlCenter: React.FC = () => {
           />
         </div>
 
-        {/* Modules */}
+        {/* Body: quick toggles grid + collapsible sections */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {visible.length === 0 ? (
+          {nothingMatches ? (
             <div style={{ padding: '24px 8px', textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               No controls match &ldquo;{query}&rdquo;
             </div>
           ) : (
-            visible.map((id) => <React.Fragment key={id}>{modules[id].node}</React.Fragment>)
+            <>
+              {visibleQuick.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {visibleQuick.map((t) => t.node)}
+                </div>
+              )}
+              {visibleSections.map((s) => s.node)}
+            </>
           )}
         </div>
       </div>

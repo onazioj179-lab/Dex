@@ -327,20 +327,95 @@ class RootErrorBoundary extends React.Component<
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', maxWidth: 400, textAlign: 'center' }}>
             Something went wrong and DEX has to reload. Your data is safe — reloading will restore your workspace.
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
-              border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
-              cursor: 'pointer', marginTop: 'var(--space-2)',
-              boxShadow: '0 4px 16px rgba(10,132,255,0.35)',
-            }}
-          >Reload DEX</button>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
+                border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(10,132,255,0.35)',
+              }}
+            >Reload DEX</button>
+            {/* Escape hatch: if reloading keeps crashing, the cause is usually a
+                poisoned local value (e.g. a bad restore). Clear DEX-owned storage
+                and reload so the next boot starts clean. */}
+            <button
+              onClick={() => {
+                // eslint-disable-next-line no-alert
+                if (window.confirm('DEX keeps crashing? This clears local settings/cached state on this device and reloads. Encrypted backups and files are NOT affected. Continue?')) {
+                  clearDexStorageAndReload();
+                }
+              }}
+              style={{
+                padding: '10px 24px', background: 'transparent', color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border, rgba(255,255,255,0.2))', borderRadius: 8,
+                fontSize: 13, cursor: 'pointer',
+              }}
+            >Reset &amp; reload</button>
+          </div>
         </div>
       );
     }
     return this.props.children;
   }
+}
+
+// Break a corrupt-storage CRASH LOOP. A bad backup restore (or any poisoned
+// localStorage value) can make a store's module-init throw — that happens before
+// React mounts, so RootErrorBoundary can't catch it, and "Reload" just reloads
+// the same poison forever. This clears DEX-owned keys (restore only ever writes
+// DEX keys) so the next boot starts clean. Pure DOM, no React/imports, so it
+// works even when the app bundle failed to initialize.
+function clearDexStorageAndReload(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.toLowerCase().startsWith('dex')) keys.push(k);
+    }
+    keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+  } catch { /* storage unavailable — reload anyway */ }
+  window.location.reload();
+}
+
+// Last-resort recovery screen painted with raw DOM, used when React itself never
+// got a chance to render (a throw during module init / bootstrap). Offers a plain
+// reload and the crash-loop escape hatch above.
+function renderBootRecovery(message: string): void {
+  const host = document.getElementById('root');
+  if (!host) return;
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.setAttribute('role', 'alertdialog');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;background:#0a0a0f;color:#e5e5ea;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:24px;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:18px;font-weight:600;';
+  title.textContent = 'DEX could not start';
+  const detail = document.createElement('div');
+  detail.style.cssText = 'font-size:13px;color:#a1a1aa;max-width:420px;line-height:1.5;';
+  detail.textContent = message;
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:10px;margin-top:8px;';
+  const reload = document.createElement('button');
+  reload.textContent = 'Reload DEX';
+  reload.style.cssText = 'padding:10px 24px;background:#0a84ff;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;';
+  reload.onclick = () => window.location.reload();
+  const reset = document.createElement('button');
+  reset.textContent = 'Reset DEX data & reload';
+  reset.style.cssText = 'padding:10px 24px;background:transparent;color:#e5e5ea;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;cursor:pointer;';
+  reset.onclick = () => {
+    // eslint-disable-next-line no-alert
+    if (window.confirm('This clears DEX local settings and cached state on this device, then reloads. Encrypted backups and files are NOT affected. Continue?')) {
+      clearDexStorageAndReload();
+    }
+  };
+  btnRow.appendChild(reload);
+  btnRow.appendChild(reset);
+  wrap.appendChild(title);
+  wrap.appendChild(detail);
+  wrap.appendChild(btnRow);
+  host.appendChild(wrap);
 }
 
 const container = document.getElementById('root')!;
@@ -353,8 +428,18 @@ const container = document.getElementById('root')!;
 const rootHost = window as unknown as { __dexReactRoot?: ReturnType<typeof ReactDOM.createRoot> };
 const root = rootHost.__dexReactRoot ?? (rootHost.__dexReactRoot = ReactDOM.createRoot(container));
 
-root.render(
-  <RootErrorBoundary>
-    <App />
-  </RootErrorBoundary>
-);
+try {
+  root.render(
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
+  );
+} catch (err) {
+  // A synchronous throw during the initial render (e.g. a store's module-init
+  // choking on corrupt localStorage) lands here — outside any React boundary.
+  // Show the raw-DOM recovery screen so the user isn't stuck on a white void.
+  console.error('[DEX] Bootstrap render failed:', err);
+  renderBootRecovery((err as Error)?.message
+    ? `Startup error: ${(err as Error).message}`
+    : 'Something went wrong while starting up. Reload, or reset local data if it keeps happening.');
+}

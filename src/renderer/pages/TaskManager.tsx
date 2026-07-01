@@ -9,6 +9,7 @@ import DexIcon from '../components/DexIcon';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import NexusUkiPanel from '../components/NexusUkiPanel';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
@@ -875,6 +876,11 @@ const TaskManager: React.FC = () => {
         </div>
       )}
 
+      {/* UKI-driven Nexus: surfaces UKI's live mind (status, memory, recent turns,
+          reasoning trail, knowledge graph) from the ukiStore. Folds away when not
+          wanted; degrades to a calm empty state before UKI has done anything. */}
+      <NexusUkiPanel />
+
       {/* Overview hero — the concept's Overview page, driven by live system data:
           two headline cards + a radial load gauge, a row of asset tiles, the big
           smooth load chart, and a right-hand "focus" card mirroring the project
@@ -1355,7 +1361,7 @@ const styles: Record<string, React.CSSProperties> = {
   healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
   healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 8, border: '1px solid' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-2)' },
-  statCard: { padding: 11, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 3 },
+  statCard: { padding: 11, borderRadius: 'var(--radius-lg, 12px)', display: 'flex', flexDirection: 'column', gap: 3 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { fontSize: 20, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
@@ -1365,13 +1371,13 @@ const styles: Record<string, React.CSSProperties> = {
   heroGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.85fr) minmax(248px, 0.85fr)', gap: 'var(--space-3)', alignItems: 'stretch' },
   heroLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 },
   heroTopRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 'var(--space-3)' },
-  heroBigCard: { position: 'relative', padding: '16px 18px', borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 132, justifyContent: 'flex-end', overflow: 'hidden' },
+  heroBigCard: { position: 'relative', padding: '16px 18px', borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 4, minHeight: 132, justifyContent: 'flex-end', overflow: 'hidden' },
   heroIconTile: { position: 'absolute', top: 16, left: 18, width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', boxShadow: '0 10px 26px rgba(10,132,255,0.30)' },
   heroBigValue: { display: 'flex', alignItems: 'baseline', gap: 2, fontSize: 38, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' },
   heroBigPlus: { fontSize: 22, fontWeight: 700, color: 'var(--color-accent)' },
   heroBigLabel: { fontSize: 13, fontWeight: 650, color: 'var(--color-text-primary)' },
   heroDelta: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
-  heroDonutCard: { padding: 16, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minHeight: 132 },
+  heroDonutCard: { padding: 16, borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minHeight: 132 },
   heroDonutTitle: { alignSelf: 'flex-start', fontSize: 11, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 },
   heroDonutWrap: { position: 'relative', display: 'grid', placeItems: 'center' },
   heroDonutCenter: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 },
@@ -1383,14 +1389,14 @@ const styles: Record<string, React.CSSProperties> = {
   assetValue: { fontSize: 18, fontWeight: 750, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' },
   assetLabel: { fontSize: 11.5, color: 'var(--color-text-tertiary)', fontWeight: 600 },
   assetDetail: { marginLeft: 'auto', fontSize: 10.5, color: 'var(--color-text-tertiary)', textAlign: 'right', maxWidth: 96, lineHeight: 1.25 },
-  chartCard: { padding: 16, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 12 },
+  chartCard: { padding: 16, borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 12 },
   chartHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   chartTitle: { fontSize: 14, fontWeight: 720, letterSpacing: '-0.01em' },
   chartSub: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   chartRangePills: { display: 'flex', alignItems: 'center', gap: 6 },
   chartPill: { padding: '3px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 650, background: 'rgba(123,92,255,0.18)', color: '#B7A4FF', border: '1px solid rgba(123,92,255,0.30)' },
   chartPillMuted: { background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border-subtle)' },
-  focusCard: { position: 'relative', padding: 18, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 9, overflow: 'hidden', background: 'linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-bg-glass-strong)' },
+  focusCard: { position: 'relative', padding: 18, borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 9, overflow: 'hidden', background: 'linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-bg-glass-strong)' },
   focusTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   focusUptime: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' },
   focusHeading: { marginTop: 4, fontSize: 20, fontWeight: 760, letterSpacing: '-0.02em', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -1404,7 +1410,7 @@ const styles: Record<string, React.CSSProperties> = {
   focusAction: { marginTop: 'auto', height: 34, borderRadius: 9, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.12)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer', fontWeight: 650, fontSize: 12.5 },
 
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 'var(--space-3)' },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-lg, 12px)', overflow: 'hidden' },
   panelHeader: { height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' },
