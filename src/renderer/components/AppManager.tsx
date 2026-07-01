@@ -3080,6 +3080,13 @@ export const AppManager: React.FC = () => {
     ? mountedAppsSnapshot
     : ['home' as AppId, ...mountedAppsSnapshot];
   const keepAliveElements = useMemo(() => {
+    // A non-home app shown inline (i.e. NOT a detached floating window) fully
+    // covers the desktop. When that happens, Home must stop being a live layer
+    // behind it -- otherwise it keeps opacity/pointer-events/aria and bleeds
+    // through any non-opaque region of the foreground app ("app opens but home
+    // stays as another layer"). Home remains the visible desktop only when it's
+    // current/split, or when only detached (floating) windows sit above it.
+    const desktopCovered = !!currentApp && currentApp !== 'home' && !detachedApps.has(currentApp);
     return mountedAppsSafeSnapshot.map(appId => {
       const Comp = APP_COMPONENTS[appId];
       if (!Comp) return null;
@@ -3903,7 +3910,7 @@ export const AppManager: React.FC = () => {
 
       // -- Normal (non-detached) rendering ----------------------------------
       // Home is always visible as the desktop background behind floating windows
-      const showInline = isVisible || appId === 'home';
+      const showInline = isVisible || (appId === 'home' && !desktopCovered);
       const continuityClass = idleContinuity.getAppClass(appId);
       const refreshIntervalMs = idleContinuity.getRefreshInterval(appId);
 

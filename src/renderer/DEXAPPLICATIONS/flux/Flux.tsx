@@ -732,12 +732,14 @@ const Flux: React.FC = () => {
 
   // Detect hardware tier for 3D gating
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const profile = await (window as any).electron?.invoke?.('resource-governor:getHardwareProfile');
-        if (profile?.tier) setHardwareTier(profile.tier);
+        if (mounted && profile?.tier) setHardwareTier(profile.tier);
       } catch { /* not in Electron or governor unavailable */ }
     })();
+    return () => { mounted = false; };
   }, []);
 
   // App lifecycle: stop preview playback (and its rAF loop) when Flux is
@@ -749,6 +751,7 @@ const Flux: React.FC = () => {
 
   // ===== RETENTIVE MEMORY - Load/Save Workspace State =====
   useEffect(() => {
+    let mounted = true;
     const saved = localStorage.getItem('flux-workspace');
     if (saved) {
       try {
@@ -772,7 +775,7 @@ const Flux: React.FC = () => {
     (async () => {
       try {
         const ipcData = await (window as any).electron?.invoke?.('capability:storage:get', 'flux-workspace');
-        if (ipcData) {
+        if (mounted && ipcData) {
           const data = typeof ipcData === 'string' ? JSON.parse(ipcData) : ipcData;
           if (data.activeTool) setActiveTool(data.activeTool);
           if (data.fps) setFps(data.fps);
@@ -786,6 +789,7 @@ const Flux: React.FC = () => {
         }
       } catch { /* IPC not available */ }
     })();
+    return () => { mounted = false; };
   }, []);
 
   const fluxSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

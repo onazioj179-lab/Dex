@@ -181,7 +181,11 @@ html[data-thermal-state="critical"] [data-decorative="true"] { display: none !im
    on top by higher specificity. Do NOT add more bare `:focus-visible` blocks —
    the previous duplicates fought over the cascade and produced a doubled ring. */
 :focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff) !important;
+  /* ONE canonical keyboard-focus ring, monochrome + theme-aware (owner
+     direction: white on dark / near-black on light, distinct from the blue
+     accent which is reserved for primary actions). Outline (not box-shadow) so
+     it can never be clipped by overflow:hidden / rounded ancestors. */
+  outline: 2px solid var(--dex-focus-color, #ffffff) !important;
   outline-offset: 2px !important;
   border-radius: var(--radius-sm);
 }
@@ -254,20 +258,23 @@ body,
   filter: none !important;
 }
 
-/* ── GLOBAL BLUR KILL ───────────────────────────────────────────────────────
-   User wants no blur anywhere in the UI. This rule disables every
-   backdrop-filter and inline filter:blur(...) across the entire app. It runs
-   AFTER all component styles because it lives near the top of globals.css and
-   uses !important. */
-*,
-*::before,
-*::after {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
+/* ── OPT-OUT BLUR KILL ───────────────────────────────────────────────────────
+   The unified glass engine is ON by default (owner direction: true-black +
+   liquid glass — the master overhaul reverses the old no-glass era). Blur is
+   stripped platform-wide ONLY when the user opts out: Settings › Liquid Glass =
+   Off/Reduced flips html[data-no-blur="true"] via applyGlassVars(), and the
+   GPU-compat fallback adds html.dex-no-blur. Perf-tier / thermal gates (below +
+   design-system.css) independently strip blur on weak/hot hardware. This
+   replaces the former unconditional `* { backdrop-filter:none !important }`
+   that killed real glass on every tier regardless of the user's setting. */
 html[data-no-blur="true"] *,
 html[data-no-blur="true"] *::before,
-html[data-no-blur="true"] *::after {
+html[data-no-blur="true"] *::after,
+html.dex-no-blur *,
+html.dex-no-blur *::before,
+html.dex-no-blur *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   filter: none !important;
 }
 
@@ -609,18 +616,19 @@ html[data-memory-pressure="high"] .ambient-glow {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WINDOW BLUR: Power saving when DEX is not the focused application
+   WINDOW BLUR: DEX stays LIVE when it is not the focused OS window
    ═══════════════════════════════════════════════════════════════════════════ */
-html[data-window-focus="blurred"] * {
-  animation-play-state: paused !important;
-}
-/* NOTE: we deliberately do NOT blank canvases/videos when the window loses
-   focus. Doing so (content-visibility:hidden) made every WebGL/2D viewport go
-   solid black the instant DEX wasn't the frontmost OS window, and it only
-   "recovered" once the user tapped back in — the black-until-tap bug. Pausing
-   animations above is enough power saving; a backgrounded canvas keeps showing
-   its last composited frame at zero render cost. Per-app render loops already
-   throttle themselves on document `visibilitychange`. */
+/* DEX keeps animating and updating when it loses OS focus — clocks, spinners,
+   live status and now-playing all keep running, so you NEVER have to click back
+   into DEX just to see the current state. The old rule here
+   (`html[data-window-focus="blurred"] * { animation-play-state: paused }`)
+   froze the entire UI the instant DEX wasn't frontmost and only "recovered"
+   when you tapped it — the tap-to-wake / black-until-tap annoyance. Removed.
+   We also do NOT blank canvases/videos on blur (that caused solid-black
+   viewports). Only truly ambient/decorative layers drop on blur to save a
+   little GPU; nothing functional or its motion is affected. Per-app render
+   loops still throttle themselves on document `visibilitychange` (minimized),
+   which is the correct place to save power — not on mere focus loss. */
 html[data-window-focus="blurred"] .decorative,
 html[data-window-focus="blurred"] .particle-bg,
 html[data-window-focus="blurred"] .ambient-glow {
@@ -2339,9 +2347,14 @@ textarea,
 [data-dropdown-menu],
 [data-context-menu] {
   z-index: var(--z-menu, 9500) !important;
-  background: var(--color-bg-elevated, #1c1c1e) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  /* Unified glass menus (master spec): the popover layer reads as the same
+     frosted material as the rest of the shell. Non-!important so a component's
+     own glass class (.dex-liquid-glass on ContextMenu / UnifiedDropdown) still
+     wins; generic menus without a glass class fall back to the strong glass
+     fill + blur here. Perf/thermal gates + the opt-out kill still degrade it. */
+  background: var(--color-bg-glass-strong, var(--color-bg-elevated, #1c1c1e));
+  backdrop-filter: var(--glass-blur, var(--blur-lg) saturate(180%));
+  -webkit-backdrop-filter: var(--glass-blur, var(--blur-lg) saturate(180%));
   isolation: isolate;
 }
 

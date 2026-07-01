@@ -27,6 +27,44 @@
 >    this same consistent shell. Privacy-first: everything passes through DEX, encryption on DEX-managed data.
 > 7. **Stability.** Fix the crashing/backup-restore paths surfaced by the owner (needs repro specifics).
 >
+> NOTE: the "UNIFIED GLASS ENGINE" checkpoint below is now SUPERSEDED — the owner reversed direction and glass
+> was removed (this checkpoint). Kept below for history; the lightningcss/glass-killer learnings still apply.
+
+> **CHECKPOINT (2026-07-01) — Master overhaul, pass 1: the UNIFIED GLASS ENGINE is actually alive + shared-layer unification.**
+> Fixed the crash-on-localhost first (`ui/index.ts` still re-exported the deleted `ui/AppShell`), then ran a 7-agent
+> audit of the shared design layer vs DEX_MASTER_OVERHAUL_PROMPT and shipped the highest-leverage shared-layer pass
+> (one edit elevates every app). VERIFIED LIVE in preview via computed styles (screenshots time out — the animated
+> glass shell never idles).
+> - **THE build bug that killed ALL glass** (see [[project-lightningcss-glass-killer]]): vite.config used
+>   `css.transformer:'lightningcss'`, whose bundled data emitted ONLY `-webkit-backdrop-filter` and DROPPED the
+>   standard `backdrop-filter` — but the WebView2/preview Chromium honors ONLY the unprefixed form (verified), so
+>   every glass surface was blur-free app-wide regardless of CSS. **Removed the lightningcss transformer** (esbuild
+>   default keeps the property; `cssMinify:'esbuild'` still minifies). `css.lightningcss.*` options were ignored in
+>   Vite 5.4 dev, so target-tuning didn't help — removal was the fix.
+> - **Re-enabled the glass engine (3 CSS kills → gated):** `globals.css` universal `* { backdrop-filter:none
+>   !important }` → scoped to `html[data-no-blur="true"]`/`.dex-no-blur` (glass ON by default); menu/popover block
+>   no longer forces opaque+blur-none (menus inherit glass); `design-system.css` `--blur-sm/md/lg/xl` restored from
+>   `blur(0px)` → `4/8/16/24px`.
+> - **Unified runtime authority:** `applyGlassVars()` now sets/clears `data-no-blur` (and zeroes `--blur-*`) by
+>   effective glass mode, so Settings › Liquid Glass = Off/Reduced flattens EVERY surface (verified toggling on/off).
+> - **Focus/selection/hover:** one canonical focus ring, monochrome WHITE (`--dex-focus-color`) in globals.css +
+>   tokens.ts `focusRing` (was blue, doubled); `::selection` → subtle 0.24 + `color:inherit` (was 0.35 + forced
+>   primary); added the shared "light response" hover primitive (`:where(button,[role=button]):hover { filter:
+>   brightness(1.09) }`, `@media (hover:hover)`, low-tier-killed) the spec asked for.
+> - **Token mirror + launcher:** `tokens.ts radius` corrected to match the canonical CSS scale (was the old boxy
+>   2/3/4/6/8/10 → now 4/6/8/11/14/18, re-rounds 45+ inline surfaces); FloatingLauncher elevation now uses
+>   `--pg-shadow-popover(-strong)` + `PANEL_R 14` to read as menu-family.
+> - **Killed tap-to-wake:** DEX no longer freezes/dims when it loses OS focus. Removed
+>   `globals.css html[data-window-focus="blurred"] * { animation-play-state: paused }` (froze ALL animation
+>   until you clicked back in) and MotionController's `.dex-window-blurred { opacity: 0.95 }` dim. DEX stays fully
+>   live + undimmed when unfocused; power saving stays on document `visibilitychange` (minimized) via SharedTick,
+>   which is the correct place. Verified: animation-play-state stays `running` and root opacity `1` while blurred.
+> - **Audit follow-ups (NOT yet done — high-value next):** ContextMenu → thin adapter over UnifiedDropdown (shared
+>   item/submenu material); real minimize animation (apply existing `.minimize-to-dock` keyframes in AppManager);
+>   Control Center collapsible/pinnable sections; delete dead `shell/FloatingWindow.tsx`+`snapEngine.ts`+
+>   `WindowDepthManager.ts`; delete 6 dead duplicate `:focus-visible` blocks in design-system.css; reconcile the
+>   3 motion-duration scales. Full findings in this session's `dex-design-audit` workflow output.
+>
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
 > green / 0 failed-test markers (new suites 18/18: frame-scheduler, rewind-recall, text-search, use-app-active).
