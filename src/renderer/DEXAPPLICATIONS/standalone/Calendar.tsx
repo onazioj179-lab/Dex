@@ -6,6 +6,7 @@
  * drag-to-create slots, recurring events, and ICS import/export.
  */
 import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
 import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
@@ -1359,7 +1360,7 @@ const Calendar: React.FC = () => {
                   />
                 ))}
               </div>
-              <textarea
+              <AssistedTextarea
                 style={styles.textarea}
                 placeholder="Add description..."
                 value={newEvent.description}

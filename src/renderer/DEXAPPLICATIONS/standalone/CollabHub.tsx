@@ -11,6 +11,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import {
   useCollaborationStore,
   SharedProject,
@@ -1855,7 +1856,7 @@ const CollabHub: React.FC = () => {
                           <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
                             Shared scratch note · synced across windows
                           </div>
-                          <textarea
+                          <AssistedTextarea
                             value={liveScratch}
                             onChange={e => handleLiveScratchChange(e.target.value)}
                             onBlur={handleLiveScratchBlur}

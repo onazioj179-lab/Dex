@@ -5,6 +5,7 @@
  * fullscreen present mode (presenter clock + notes), canvas/print export, outline import.
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
@@ -838,7 +839,7 @@ const PresentationBuilder: React.FC = () => {
 
           <label style={fieldLabel}>
             <span>Speaker notes</span>
-            <textarea
+            <AssistedTextarea
               value={currentSlide?.notes ?? ''}
               onChange={e => updateCurrentSlide(s => ({ ...s, notes: e.target.value }))}
               placeholder="Notes for this slide (shown in present mode only)…"
@@ -858,7 +859,7 @@ const PresentationBuilder: React.FC = () => {
                 <>
                   <label style={fieldLabel}>
                     <span>Text</span>
-                    <textarea
+                    <AssistedTextarea
                       value={selectedBlock.content}
                       onChange={e => updateBlock(selectedBlock.id, { content: e.target.value })}
                       rows={3}
@@ -959,7 +960,7 @@ const PresentationBuilder: React.FC = () => {
               Each heading line becomes a slide title. Indented or bullet lines (- / * / •) become content.
               This replaces the current deck.
             </div>
-            <textarea
+            <AssistedTextarea
               value={outlineText}
               onChange={e => setOutlineText(e.target.value)}
               autoFocus
