@@ -36,6 +36,13 @@ const CRED_KEY: &str = "auth:credentials";
 const MAX_ATTEMPTS: i64 = 5;
 const LOCKOUT_MINUTES: i64 = 5;
 const RECOVERY_CODE_COUNT: usize = 10;
+/// Security cooldown between successive password CHANGES (anti-spam / anti-abuse:
+/// stops an attacker with brief access from churning the password, and stops
+/// change-spam). Never blocks LOGIN and never blocks account RECOVERY, so it can
+/// never lock a legitimate user out.
+const PASSWORD_CHANGE_COOLDOWN_MINUTES: i64 = 60;
+/// Minimum number of security questions required to enrol recovery.
+const MIN_SECURITY_QUESTIONS: usize = 3;
 
 /// In-memory set of valid session tokens. Never persisted — a restart
 /// invalidates all sessions, which is the correct security default.
@@ -218,6 +225,17 @@ fn reset_failures(app: &tauri::AppHandle) {
     let _ = save_credentials(app, creds);
 }
 
+/// If a lockout window has fully elapsed, clear the counter so the user gets a
+/// FRESH set of attempts rather than being re-locked by a single wrong entry.
+/// This guarantees the lockout is always temporary — never a permanent wall.
+fn clear_expired_lockout(app: &tauri::AppHandle) {
+    let creds = load_credentials(app);
+    let until = creds.get("lockedUntil").and_then(|v| v.as_i64()).unwrap_or(0);
+    if until > 0 && until <= now_ms() {
+        reset_failures(app);
+    }
+}
+
 /// Mint a fresh in-memory session token.
 fn issue_token() -> String {
     let token = to_hex(&crate::keys_ctl::os_random_bytes(32));
@@ -324,12 +342,18 @@ fn setup_biometric(app: &tauri::AppHandle) -> Value {
 
 /// Shared PIN/password unlock path with lockout + token issuance + migration.
 fn authenticate(app: &tauri::AppHandle, prefix: &str, input: &str) -> Value {
+    clear_expired_lockout(app);
     let creds = load_credentials(app);
     let remaining = lockout_remaining_minutes(&creds);
     if remaining > 0 {
+        let hint = if has_security_questions(&creds) {
+            " Or recover your account with your security questions."
+        } else {
+            ""
+        };
         return json!({
             "success": false,
-            "error": format!("Too many attempts. Try again in {remaining} minute(s)."),
+            "error": format!("Too many attempts. Try again in {remaining} minute(s).{hint}"),
         });
     }
     if verify_secret(app, prefix, input) {
@@ -387,6 +411,21 @@ fn two_field_args(args: &Value, cur_key: &str, new_key: &str) -> (String, String
     (cur, new)
 }
 
+/// Remaining password-change cooldown in minutes, or 0 if a change is allowed.
+fn password_change_cooldown_remaining(creds: &Map<String, Value>) -> i64 {
+    let last = creds.get("passwordChangedAt").and_then(|v| v.as_i64()).unwrap_or(0);
+    if last <= 0 {
+        return 0;
+    }
+    let elapsed_ms = now_ms() - last;
+    let window_ms = PASSWORD_CHANGE_COOLDOWN_MINUTES * 60_000;
+    if elapsed_ms < window_ms {
+        ((window_ms - elapsed_ms) + 59_999) / 60_000
+    } else {
+        0
+    }
+}
+
 fn change_password(app: &tauri::AppHandle, current: &str, new: &str) -> Value {
     if !verify_secret(app, "password", current) {
         return json!({ "success": false, "error": "Current password is incorrect." });
@@ -394,7 +433,23 @@ fn change_password(app: &tauri::AppHandle, current: &str, new: &str) -> Value {
     if new.len() < 8 {
         return json!({ "success": false, "error": "Password must be at least 8 characters." });
     }
-    setup_password(app, new)
+    // Anti-spam cooldown between changes. Account recovery (security questions)
+    // resets the password WITHOUT going through here, so a user who forgot their
+    // password is never blocked by this.
+    let cooldown = password_change_cooldown_remaining(&load_credentials(app));
+    if cooldown > 0 {
+        return json!({
+            "success": false,
+            "error": format!("For security you can change your password again in {cooldown} minute(s)."),
+        });
+    }
+    let result = setup_password(app, new);
+    if result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+        let mut creds = load_credentials(app);
+        creds.insert("passwordChangedAt".into(), json!(now_ms()));
+        let _ = save_credentials(app, creds);
+    }
+    result
 }
 
 fn change_pin(app: &tauri::AppHandle, current: &str, new: &str) -> Value {
@@ -524,6 +579,166 @@ fn authenticate_recovery(app: &tauri::AppHandle, code: &str) -> Value {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Security questions — the "never permanently locked out" recovery path
+// ---------------------------------------------------------------------------
+
+/// Normalise an answer so trivial formatting differences don't fail a match:
+/// trim, collapse internal whitespace, lowercase.
+fn normalize_answer(answer: &str) -> String {
+    answer.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
+fn has_security_questions(creds: &Map<String, Value>) -> bool {
+    creds
+        .get("securityQuestions")
+        .and_then(|v| v.as_array())
+        .map(|a| !a.is_empty())
+        .unwrap_or(false)
+}
+
+/// Parse `[{question, answer}, ...]` from either a JSON-string arg or a JSON
+/// array arg.
+fn parse_qa(args: &Value) -> Vec<(String, String)> {
+    let arr = match args.get(0) {
+        Some(Value::String(s)) => serde_json::from_str::<Value>(s).ok(),
+        Some(v) => Some(v.clone()),
+        None => None,
+    };
+    let mut out = Vec::new();
+    if let Some(Value::Array(items)) = arr {
+        for it in items {
+            let q = it.get("question").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+            let a = it.get("answer").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if !q.is_empty() && !normalize_answer(&a).is_empty() {
+                out.push((q, a));
+            }
+        }
+    }
+    out
+}
+
+/// `auth:setup:securityQuestions` — enrol recovery questions. Answers are
+/// Argon2id-hashed (normalised first); the plaintext answers are never stored.
+fn setup_security_questions(app: &tauri::AppHandle, args: &Value) -> Value {
+    let qa = parse_qa(args);
+    if qa.len() < MIN_SECURITY_QUESTIONS {
+        return json!({
+            "success": false,
+            "error": format!("Enrol at least {MIN_SECURITY_QUESTIONS} security questions."),
+        });
+    }
+    let mut stored = Vec::with_capacity(qa.len());
+    for (question, answer) in qa {
+        let salt = crate::keys_ctl::os_random_bytes(32);
+        let hash = match hash_argon2(&normalize_answer(&answer), &salt) {
+            Some(h) => h,
+            None => return json!({ "success": false, "error": "Failed to secure answers." }),
+        };
+        stored.push(json!({
+            "question": question,
+            "answerHash": hash,
+            "answerSalt": to_hex(&salt),
+            "answerAlgo": "argon2id",
+        }));
+    }
+    let mut creds = load_credentials(app);
+    creds.insert("securityQuestions".into(), json!(stored));
+    if save_credentials(app, creds) {
+        json!({ "success": true })
+    } else {
+        json!({ "success": false, "error": "Failed to save security questions." })
+    }
+}
+
+/// `auth:getSecurityQuestions` — the enrolled questions (NEVER the answers), so
+/// the recovery UI can prompt for them.
+fn get_security_questions(app: &tauri::AppHandle) -> Value {
+    let creds = load_credentials(app);
+    let questions: Vec<Value> = creds
+        .get("securityQuestions")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .enumerate()
+                .map(|(i, e)| json!({
+                    "index": i,
+                    "question": e.get("question").and_then(|v| v.as_str()).unwrap_or(""),
+                }))
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "enabled": !questions.is_empty(), "questions": questions })
+}
+
+/// `auth:recoverAccount` — verify ALL security-question answers, then clear any
+/// lockout, optionally reset the password, and sign the user in. This is the
+/// guaranteed way back in: it ignores the login lockout and the change cooldown.
+///
+/// Args (JSON-string or object): `{ answers: [string...], newPassword?: string }`.
+fn recover_account(app: &tauri::AppHandle, args: &Value) -> Value {
+    let obj = match args.get(0) {
+        Some(Value::String(s)) => serde_json::from_str::<Value>(s).ok(),
+        Some(v) => Some(v.clone()),
+        None => None,
+    };
+    let obj = match obj {
+        Some(Value::Object(o)) => o,
+        _ => return json!({ "success": false, "error": "Invalid recovery request." }),
+    };
+    let answers: Vec<String> = obj
+        .get("answers")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
+        .unwrap_or_default();
+
+    let creds = load_credentials(app);
+    let questions = match creds.get("securityQuestions").and_then(|v| v.as_array()) {
+        Some(q) if !q.is_empty() => q.clone(),
+        _ => return json!({ "success": false, "error": "No security questions are set up." }),
+    };
+    if answers.len() != questions.len() {
+        return json!({ "success": false, "error": "Please answer all security questions." });
+    }
+    // Every answer must match (constant-time-ish over the full set).
+    let mut all_ok = true;
+    for (entry, answer) in questions.iter().zip(answers.iter()) {
+        let salt_hex = entry.get("answerSalt").and_then(|v| v.as_str()).unwrap_or("");
+        let stored = entry.get("answerHash").and_then(|v| v.as_str()).unwrap_or("");
+        let candidate = hash_argon2(&normalize_answer(answer), &from_hex(salt_hex));
+        let matched = candidate.map(|h| ct_eq(&h, stored)).unwrap_or(false);
+        if !matched {
+            all_ok = false;
+        }
+    }
+    if !all_ok {
+        record_failure(app);
+        return json!({ "success": false, "error": "One or more answers are incorrect." });
+    }
+
+    // Correct: always let them back in. Clear lockout first.
+    reset_failures(app);
+
+    // Optional password reset (bypasses the change cooldown — this IS the
+    // forgot-password path).
+    if let Some(new_pw) = obj.get("newPassword").and_then(|v| v.as_str()) {
+        if !new_pw.is_empty() {
+            if new_pw.len() < 8 {
+                return json!({ "success": false, "error": "New password must be at least 8 characters." });
+            }
+            let mut c = load_credentials(app);
+            if !set_secret(&mut c, "password", new_pw) {
+                return json!({ "success": false, "error": "Failed to set new password." });
+            }
+            c.insert("passwordChangedAt".into(), json!(now_ms()));
+            if !save_credentials(app, c) {
+                return json!({ "success": false, "error": "Failed to save new password." });
+            }
+        }
+    }
+    json!({ "success": true, "token": issue_token() })
+}
+
 fn verify_session(token: &str) -> Value {
     let ok = !token.is_empty()
         && session_tokens()
@@ -579,6 +794,7 @@ fn lockout_status(creds: &Map<String, Value>) -> Value {
 }
 
 fn get_state(app: &tauri::AppHandle) -> Value {
+    let creds = load_credentials(app);
     let (has_password, has_pin, has_biometric, _) = cred_flags(app);
     let is_enabled = has_password || has_pin || has_biometric;
     json!({
@@ -590,7 +806,10 @@ fn get_state(app: &tauri::AppHandle) -> Value {
         "hasPassword": has_password,
         "hasPin": has_pin,
         "hasBiometric": has_biometric,
-        "lockoutStatus": lockout_status(&load_credentials(app)),
+        // Recovery availability so the lock screen can offer "Forgot? Recover".
+        "hasSecurityQuestions": has_security_questions(&creds),
+        "hasRecoveryCodes": creds.get("recoveryCodes").and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false),
+        "lockoutStatus": lockout_status(&creds),
     })
 }
 
@@ -662,6 +881,13 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "auth:updateConfig" => update_config(app),
         "auth:lock" => lock(app),
 
+        // Security-question account recovery — the guaranteed way back in.
+        "auth:setup:securityQuestions" | "auth:setSecurityQuestions" => {
+            setup_security_questions(app, args)
+        }
+        "auth:getSecurityQuestions" => get_security_questions(app),
+        "auth:recoverAccount" => recover_account(app, args),
+
         // Per-method disable (Settings "Disable" toggles) — actually erase the
         // credential instead of only flipping a UI flag.
         "auth:disablePin" => disable_secret(app, "pin"),
@@ -727,5 +953,55 @@ mod tests {
         for c in [b'0', b'O', b'1', b'I', b'l'] {
             assert!(!ALPHABET.contains(&c), "ambiguous char {} present", c as char);
         }
+    }
+
+    #[test]
+    fn answer_normalization_is_forgiving_but_distinct() {
+        assert_eq!(normalize_answer("  My   First  CAR "), "my first car");
+        assert_eq!(normalize_answer("Fido"), normalize_answer("  fido "));
+        assert_ne!(normalize_answer("blue"), normalize_answer("green"));
+        assert_eq!(normalize_answer("   "), "");
+    }
+
+    #[test]
+    fn password_change_cooldown_math() {
+        let mut creds = Map::new();
+        // No prior change: no cooldown.
+        assert_eq!(password_change_cooldown_remaining(&creds), 0);
+        // Just changed: full cooldown pending (rounded up, > 0).
+        creds.insert("passwordChangedAt".into(), json!(now_ms()));
+        let rem = password_change_cooldown_remaining(&creds);
+        assert!(rem > 0 && rem <= PASSWORD_CHANGE_COOLDOWN_MINUTES);
+        // Changed long ago: cooldown elapsed.
+        creds.insert(
+            "passwordChangedAt".into(),
+            json!(now_ms() - (PASSWORD_CHANGE_COOLDOWN_MINUTES + 1) * 60_000),
+        );
+        assert_eq!(password_change_cooldown_remaining(&creds), 0);
+    }
+
+    #[test]
+    fn lockout_remaining_and_attempts() {
+        let mut creds = Map::new();
+        assert_eq!(lockout_remaining_minutes(&creds), 0);
+        assert_eq!(attempts_remaining(&creds), MAX_ATTEMPTS);
+        // Armed lockout in the future.
+        creds.insert("lockedUntil".into(), json!(now_ms() + 3 * 60_000));
+        assert!(lockout_remaining_minutes(&creds) > 0);
+        // Expired lockout reads as unlocked (clear_expired_lockout will reset it).
+        creds.insert("lockedUntil".into(), json!(now_ms() - 1000));
+        assert_eq!(lockout_remaining_minutes(&creds), 0);
+        creds.insert("failedAttempts".into(), json!(2));
+        assert_eq!(attempts_remaining(&creds), MAX_ATTEMPTS - 2);
+    }
+
+    #[test]
+    fn has_security_questions_detects_enrolment() {
+        let mut creds = Map::new();
+        assert!(!has_security_questions(&creds));
+        creds.insert("securityQuestions".into(), json!([]));
+        assert!(!has_security_questions(&creds));
+        creds.insert("securityQuestions".into(), json!([{ "question": "q", "answerHash": "h" }]));
+        assert!(has_security_questions(&creds));
     }
 }

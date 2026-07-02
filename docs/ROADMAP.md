@@ -3344,6 +3344,32 @@ Rewrote `src-tauri/src/auth.rs` into a full credential engine:
 
 Verified: `cargo check` clean, 5 new auth unit tests pass, `tsc` clean.
 
+### Auth hardening round 2 — never-locked-out recovery + anti-abuse (2026-07-01)
+
+Owner follow-up: harden the password system (can't be cracked/spammed/misused) but
+make ABSOLUTELY sure nobody is ever permanently locked out — add security-question
+recovery so a user can always get back in and reset their password.
+
+- **Security-question account recovery** (the guaranteed way back in): enrol ≥3
+  questions in Settings (answers Argon2id-hashed, normalised — trim/whitespace/
+  case-insensitive so honest answers match). `auth:recoverAccount` verifies all
+  answers, clears any lockout, optionally resets the password, and signs you in.
+  It bypasses BOTH the login lockout and the change cooldown — it's the forgot-
+  password path. Wired into the LockScreen ("Forgot? Recover with security
+  questions") and Settings enrolment.
+- **Lockout can never be permanent**: `clear_expired_lockout` resets the counter
+  once the window elapses, so you get a fresh set of attempts instead of being
+  re-locked by one wrong entry. Correct password/PIN always works; recovery always
+  works. (Still no idle/timeout lock.)
+- **Password-change cooldown** (anti-spam/anti-abuse): 60 min between successive
+  password *changes* — never blocks login, never blocks recovery, so it can't lock
+  anyone out.
+- State now reports `hasSecurityQuestions` / `hasRecoveryCodes` so the lock screen
+  offers the right recovery options.
+
+Verified: `cargo check` clean, 9 auth unit tests pass (added cooldown / lockout /
+normalization / enrolment-detection), `tsc` clean, preview boots error-free.
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.
