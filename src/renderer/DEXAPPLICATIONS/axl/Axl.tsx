@@ -34,6 +34,7 @@ import type {
 } from './types';
 import { MATERIAL_DB, STD_PARTS_LIBRARY, GDT_SYMBOLS } from './constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor } from './utils/math';
+import { alignSnapPosition } from './utils/alignSnap';
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
 import { detectInterferences } from './AxlInspect';
 import { importCadFile } from './AxlImport';
@@ -78,7 +79,7 @@ const AXL: React.FC = () => {
   useAutoSave('axl', useCallback(() => ({ project }), [project]), isDirty, 30_000);
   const simResults = useProjectStore(s => s.simResults);
   const pStore = useProjectStore();
-  const { tool, selectedPartId, gridVisible } = useViewportStore();
+  const { tool, selectedPartId, hoveredPartId, gridVisible, snapEnabled } = useViewportStore();
   const vStore = useViewportStore();
   const ui = useUIStore();
 
@@ -117,6 +118,10 @@ const AXL: React.FC = () => {
   const needsRenderRef = useRef(true);
   const lastMouse = useRef({ x: 0, y: 0, down: false, button: 0 });
   const measureStart = useRef<Vec3 | null>(null);
+  // Alignment-snap inference guides (world-space center pairs) drawn while a
+  // move drag is snapped onto another part's axis. Ref, not state: per-frame
+  // data that the render loop reads directly.
+  const snapGuidesRef = useRef<{ axis: 'x' | 'y' | 'z'; a: Vec3; b: Vec3 }[]>([]);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
@@ -621,11 +626,11 @@ const AXL: React.FC = () => {
       gridVisible,
       showEdges: wireframe,
       selectedPartId,
-      hoveredPartId: null,
+      hoveredPartId,
       stressMap: simResults?.stressMap ?? null,
       section: section.enabled ? { axis: section.axis, offset: section.offset, flip: section.flip } : null,
     };
-  }, [cameraAngle, gridVisible, project, selectedPartId, simResults, viewMode, wireframe, section]);
+  }, [cameraAngle, gridVisible, project, selectedPartId, hoveredPartId, simResults, viewMode, wireframe, section]);
 
   // ─── 3D Viewport Rendering (Canvas 2D) ────────────────────────────────
   const renderViewport = useCallback(() => {
@@ -648,7 +653,26 @@ const AXL: React.FC = () => {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    ctx.fillStyle = 'var(--color-bg-elevated)';
+    // Canvas 2D cannot resolve CSS custom properties — assigning 'var(--x)' to
+    // fillStyle/strokeStyle is silently IGNORED (the previous color sticks), so
+    // every var()-based color below was painting wrong (black grid, invisible
+    // selection ring, unthemed HUD). Resolve the theme tokens to literals once
+    // per frame; fallbacks match the dark theme's real values.
+    const theme = (() => {
+      const cs = getComputedStyle(canvas);
+      const v = (name: string, fallback: string) => (cs.getPropertyValue(name) || '').trim() || fallback;
+      return {
+        bg: v('--color-bg-elevated', '#141416'),
+        gridLine: v('--color-bg-hover', 'rgba(255,255,255,0.07)'),
+        accent: v('--color-accent', '#0a84ff'),
+        error: v('--color-error', '#ff453a'),
+        success: v('--color-success', '#32d74b'),
+        warning: v('--color-warning', '#ff9f0a'),
+        hud: v('--color-text-tertiary', 'rgba(255,255,255,0.45)'),
+      };
+    })();
+
+    ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, w, h);
 
     // Grid
@@ -656,7 +680,7 @@ const AXL: React.FC = () => {
       const gridSize = 20;
       const gridCount = 30;
       const cx = w / 2, cy = h / 2;
-      ctx.strokeStyle = 'var(--color-bg-hover)';
+      ctx.strokeStyle = theme.gridLine;
       ctx.lineWidth = 0.5;
       for (let i = -gridCount; i <= gridCount; i++) {
         const x = cx + i * gridSize * Math.cos(cameraAngle.azimuth * Math.PI / 180);
@@ -673,15 +697,15 @@ const AXL: React.FC = () => {
       }
       // Axis lines
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'var(--color-error)';
+      ctx.strokeStyle = theme.error;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 80, cy); ctx.stroke();
-      ctx.fillStyle = 'var(--color-error)'; ctx.font = '10px system-ui'; ctx.fillText('X', cx + 84, cy + 4);
-      ctx.strokeStyle = 'var(--color-success)';
+      ctx.fillStyle = theme.error; ctx.font = '10px system-ui'; ctx.fillText('X', cx + 84, cy + 4);
+      ctx.strokeStyle = theme.success;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 80); ctx.stroke();
-      ctx.fillStyle = 'var(--color-success)'; ctx.fillText('Y', cx + 4, cy - 84);
-      ctx.strokeStyle = 'var(--color-accent)';
+      ctx.fillStyle = theme.success; ctx.fillText('Y', cx + 4, cy - 84);
+      ctx.strokeStyle = theme.accent;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 50, cy + 30); ctx.stroke();
-      ctx.fillStyle = 'var(--color-accent)'; ctx.fillText('Z', cx - 62, cy + 38);
+      ctx.fillStyle = theme.accent; ctx.fillText('Z', cx - 62, cy + 38);
     }
 
     // Render parts
@@ -947,7 +971,7 @@ const AXL: React.FC = () => {
             ctx.fill();
             ctx.setLineDash([]);
             // Label
-            ctx.fillStyle = 'var(--color-text-tertiary)';
+            ctx.fillStyle = theme.hud;
             ctx.font = '8px system-ui';
             ctx.fillText(`E:${depth}`, -halfSz - dOff * 0.3, halfSz - dOff * 0.5 + 10);
             break;
@@ -976,7 +1000,7 @@ const AXL: React.FC = () => {
             ctx.lineTo(ax - 4, ay + 3);
             ctx.closePath();
             ctx.fill();
-            ctx.fillStyle = 'var(--color-text-tertiary)';
+            ctx.fillStyle = theme.hud;
             ctx.font = '8px system-ui';
             ctx.fillText(`R:${angle}°`, ax + 5, ay);
             break;
@@ -996,7 +1020,7 @@ const AXL: React.FC = () => {
               ctx.lineTo(cx2, cy2 + (cy2 < 0 ? cDist : -cDist));
               ctx.stroke();
             });
-            ctx.fillStyle = 'var(--color-text-tertiary)';
+            ctx.fillStyle = theme.hud;
             ctx.font = '8px system-ui';
             ctx.fillText(`C:${dist}`, halfSz + 4, -halfSz);
             break;
@@ -1013,7 +1037,7 @@ const AXL: React.FC = () => {
             ctx.beginPath(); ctx.arc(halfSz - fRad, -halfSz + fRad, fRad, Math.PI * 1.5, Math.PI * 2); ctx.stroke();
             ctx.beginPath(); ctx.arc(halfSz - fRad, halfSz - fRad, fRad, 0, Math.PI * 0.5); ctx.stroke();
             ctx.beginPath(); ctx.arc(-halfSz + fRad, halfSz - fRad, fRad, Math.PI * 0.5, Math.PI); ctx.stroke();
-            ctx.fillStyle = 'var(--color-text-tertiary)';
+            ctx.fillStyle = theme.hud;
             ctx.font = '8px system-ui';
             ctx.fillText(`R:${rad}`, halfSz + 4, -halfSz);
             break;
@@ -1032,7 +1056,7 @@ const AXL: React.FC = () => {
               ctx.strokeRect(ox - sz / 2, -sz / 2, sz, sz);
             }
             ctx.setLineDash([]);
-            ctx.fillStyle = 'var(--color-text-tertiary)';
+            ctx.fillStyle = theme.hud;
             ctx.font = '8px system-ui';
             ctx.fillText(`×${count}`, spacing * (count - 1) + sz / 2 + 4, 0);
             break;
@@ -1083,7 +1107,7 @@ const AXL: React.FC = () => {
 
       // Selection highlight
       if (part.id === selectedPartId) {
-        ctx.strokeStyle = 'var(--color-accent)';
+        ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         const sz = Math.max((params.width as number) || 50, (params.radius as number) ? (params.radius as number) * 2 : 50, 50);
@@ -1091,20 +1115,54 @@ const AXL: React.FC = () => {
         ctx.setLineDash([]);
       }
 
+      // Hover highlight -- a lighter SOLID ring so the part under the pointer
+      // reads as clickable before you commit (selection keeps the dashed ring).
+      if (part.id === hoveredPartId && part.id !== selectedPartId) {
+        ctx.strokeStyle = theme.accent;
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.5;
+        const hz = Math.max((params.width as number) || 50, (params.radius as number) ? (params.radius as number) * 2 : 50, 50);
+        ctx.strokeRect(-hz / 2 - 4, -hz / 2 - 4, hz + 8, hz + 8);
+        ctx.globalAlpha = 1;
+      }
+
       ctx.restore();
     });
+
+    // Alignment-snap inference guides: while a move drag is snapped onto
+    // another part's axis, draw a dashed line through the two aligned centers
+    // (SolidWorks/Figma-style) so the snap reads as intentional, not a jump.
+    if (snapGuidesRef.current.length) {
+      const projGuide = (p: Vec3) => {
+        const gx = p.x * Math.cos(effAz) - (p.z || 0) * Math.sin(effAz);
+        const gy = -p.y * Math.cos(effEl) + (p.x * Math.sin(effAz) + (p.z || 0) * Math.cos(effAz)) * Math.sin(effEl);
+        return { x: w / 2 + gx * camScale, y: h / 2 + gy * camScale };
+      };
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 4]);
+      snapGuidesRef.current.forEach(g => {
+        const pa = projGuide(g.a);
+        const pb = projGuide(g.b);
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+        ctx.setLineDash([]);
+        [pa, pb].forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.stroke(); });
+        ctx.setLineDash([5, 4]);
+      });
+      ctx.setLineDash([]);
+    }
 
     // Measurements overlay
     project.measurements.forEach(m => {
       if (m.points.length >= 2) {
         const p1 = { x: w / 2 + m.points[0].x, y: h / 2 - m.points[0].y };
         const p2 = { x: w / 2 + m.points[1].x, y: h / 2 - m.points[1].y };
-        ctx.strokeStyle = 'var(--color-warning)';
+        ctx.strokeStyle = theme.warning;
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'var(--color-warning)';
+        ctx.fillStyle = theme.warning;
         ctx.font = '10px system-ui';
         ctx.fillText(m.label, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
       }
@@ -1132,21 +1190,21 @@ const AXL: React.FC = () => {
       const tw = ctx.measureText(frameText).width + 12;
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(px + 15, py - 18, tw, 18);
-      ctx.strokeStyle = 'var(--color-accent)';
+      ctx.strokeStyle = theme.accent;
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 15, py - 18, tw, 18);
       ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 15, py - 9); ctx.stroke();
-      ctx.fillStyle = 'var(--color-accent)';
+      ctx.fillStyle = theme.accent;
       ctx.fillText(frameText, px + 21, py - 5);
     });
 
     // Camera info
-    ctx.fillStyle = 'var(--color-text-tertiary)';
+    ctx.fillStyle = theme.hud;
     ctx.font = '10px system-ui';
     ctx.fillText(`${viewMode.toUpperCase()} | Grid: ${project.gridSnap}${project.units} | Parts: ${parts.length}`, 12, h - 10);
     ctx.fillText(`Az: ${cameraAngle.azimuth.toFixed(0)}\u00b0 El: ${cameraAngle.elevation.toFixed(0)}\u00b0`, w - 140, h - 10);
     ctx.restore(); // undo DPR scale
-  }, [buildRendererState, project, gridVisible, wireframe, cameraAngle, selectedPartId, simResults, viewMode]);
+  }, [buildRendererState, project, gridVisible, wireframe, cameraAngle, selectedPartId, hoveredPartId, simResults, viewMode]);
 
   // Keep render function ref in sync (avoids restarting rAF loop on state change)
   // and flag the viewport dirty: any state change that re-runs this render is,
@@ -1221,6 +1279,46 @@ const AXL: React.FC = () => {
   }, [ui.showExport, ui.toggleExport]);
 
   // ─── Mouse interaction ────────────────────────────────────────────────
+
+  // Shared screen-space hit-test for click-select AND hover. Uses the SAME
+  // camera transform as rendering (including the exploded-view offset the old
+  // inline test ignored) and carries cameraAngle/viewMode in its deps — the
+  // previous inline version captured a stale camera, so after orbiting, clicks
+  // tested against the OLD view until an unrelated project change rebuilt it.
+  const hitTestAtPoint = useCallback((clientX: number, clientY: number): string | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const w = rect.width, h = rect.height;
+    const azRad = cameraAngle.azimuth * Math.PI / 180;
+    const elRad = cameraAngle.elevation * Math.PI / 180;
+    const camScale = 500 / Math.max(100, cameraAngle.distance);
+    let effAz = azRad, effEl = elRad;
+    if (viewMode === 'front') { effAz = 0; effEl = 0; }
+    else if (viewMode === 'top') { effAz = 0; effEl = Math.PI / 2 * 0.99; }
+    else if (viewMode === 'right') { effAz = Math.PI / 2; effEl = 0; }
+    for (const part of [...project.assembly.parts].reverse()) {
+      if (!part.visible) continue;
+      const px = part.transform.position.x;
+      const py = part.transform.position.y;
+      const pz = part.transform.position.z || 0;
+      let isoX = px * Math.cos(effAz) - pz * Math.sin(effAz);
+      let isoY = -py * Math.cos(effEl) + (px * Math.sin(effAz) + pz * Math.cos(effAz)) * Math.sin(effEl);
+      if (project.assembly.exploded) {
+        const dist = project.assembly.explodeDistance || 50;
+        const mag = Math.sqrt(px * px + py * py + pz * pz) || 1;
+        isoX += (px / mag) * dist * Math.cos(effAz);
+        isoY -= (py / mag) * dist * Math.cos(effEl);
+      }
+      const sx = w / 2 + isoX * camScale;
+      const sy = h / 2 + isoY * camScale;
+      if (Math.abs(mx - sx) < 30 && Math.abs(my - sy) < 30) return part.id;
+    }
+    return null;
+  }, [cameraAngle, viewMode, project.assembly.parts, project.assembly.exploded, project.assembly.explodeDistance]);
+
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
     lastMouse.current = { x: e.clientX, y: e.clientY, down: true, button: e.button };
     // Capture pointer for all types (mouse, touch, pen) to ensure smooth drag
@@ -1232,36 +1330,7 @@ const AXL: React.FC = () => {
     }
 
     if (tool === 'select') {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const w = rect.width, h = rect.height;
-      // Use same isometric projection as rendering for accurate hit-testing
-      const azRad = cameraAngle.azimuth * Math.PI / 180;
-      const elRad = cameraAngle.elevation * Math.PI / 180;
-      const camScale = 500 / Math.max(100, cameraAngle.distance);
-      let effAz = azRad, effEl = elRad;
-      if (viewMode === 'front') { effAz = 0; effEl = 0; }
-      else if (viewMode === 'top') { effAz = 0; effEl = Math.PI / 2 * 0.99; }
-      else if (viewMode === 'right') { effAz = Math.PI / 2; effEl = 0; }
-      let hit: string | null = null;
-      for (const part of [...project.assembly.parts].reverse()) {
-        const px = part.transform.position.x;
-        const py = part.transform.position.y;
-        const pz = part.transform.position.z || 0;
-        const isoX = px * Math.cos(effAz) - pz * Math.sin(effAz);
-        const isoY = -py * Math.cos(effEl) + (px * Math.sin(effAz) + pz * Math.cos(effAz)) * Math.sin(effEl);
-        const sx = w / 2 + isoX * camScale;
-        const sy = h / 2 + isoY * camScale;
-        const sz = 30;
-        if (Math.abs(mx - sx) < sz && Math.abs(my - sy) < sz) {
-          hit = part.id;
-          break;
-        }
-      }
-      vStore.setSelectedPartId(hit);
+      vStore.setSelectedPartId(hitTestAtPoint(e.clientX, e.clientY));
     }
 
     if (tool === 'measure') {
@@ -1281,10 +1350,18 @@ const AXL: React.FC = () => {
         ui.showToast(`Distance: ${dist.toFixed(1)} ${project.units}`);
       }
     }
-  }, [tool, project, pStore, vStore, ui]);
+  }, [tool, project, pStore, vStore, ui, hitTestAtPoint]);
 
   const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!lastMouse.current.down) return;
+    if (!lastMouse.current.down) {
+      // Hover feedback: highlight the part under the pointer and switch the
+      // cursor, so the viewport reads as interactive before you click.
+      const id = hitTestAtPoint(e.clientX, e.clientY);
+      if (id !== hoveredPartId) vStore.setHoveredPartId(id);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = id ? (tool === 'move' ? 'move' : 'pointer') : '';
+      return;
+    }
     const dx = e.clientX - lastMouse.current.x;
     const dy = e.clientY - lastMouse.current.y;
     lastMouse.current.x = e.clientX;
@@ -1322,9 +1399,26 @@ const AXL: React.FC = () => {
       const worldDz = -sdx * sinAz + sdy * cosAz * sinEl;
       const part = project.assembly.parts.find(p => p.id === selectedPartId);
       if (part) {
-        pStore.updatePartTransform(selectedPartId, 'position', 'x', Math.round((part.transform.position.x + worldDx) / snap) * snap);
-        pStore.updatePartTransform(selectedPartId, 'position', 'y', Math.round((part.transform.position.y + worldDy) / snap) * snap);
-        pStore.updatePartTransform(selectedPartId, 'position', 'z', Math.round((part.transform.position.z + worldDz) / snap) * snap);
+        // Alignment inference (utils/alignSnap): pull an axis onto another
+        // part's center when within ~8 screen px (tolerance scales with zoom),
+        // so parts line up like real CAD instead of only landing on grid
+        // multiples. Alt bypasses ALL snapping for free placement; the
+        // viewport-store snap toggle turns inference off persistently.
+        const { position, guides } = alignSnapPosition(
+          {
+            x: part.transform.position.x + worldDx,
+            y: part.transform.position.y + worldDy,
+            z: (part.transform.position.z || 0) + worldDz,
+          },
+          project.assembly.parts
+            .filter(p => p.id !== selectedPartId && p.visible)
+            .map(p => ({ id: p.id, position: { x: p.transform.position.x, y: p.transform.position.y, z: p.transform.position.z || 0 } })),
+          { tolerance: Math.max(1, 8 / camScale), gridSnap: snap, snapEnabled, free: e.altKey },
+        );
+        snapGuidesRef.current = guides;
+        pStore.updatePartTransform(selectedPartId, 'position', 'x', position.x);
+        pStore.updatePartTransform(selectedPartId, 'position', 'y', position.y);
+        pStore.updatePartTransform(selectedPartId, 'position', 'z', position.z);
       }
     }
 
@@ -1344,10 +1438,14 @@ const AXL: React.FC = () => {
         pStore.updatePartTransform(selectedPartId, 'scale', 'z', Math.max(0.05, part.transform.scale.z * scaleFactor));
       }
     }
-  }, [tool, selectedPartId, project.gridSnap, project.assembly.parts, pStore]);
+  }, [tool, selectedPartId, hoveredPartId, project.gridSnap, project.assembly.parts, pStore, vStore, cameraAngle, snapEnabled, hitTestAtPoint]);
 
   const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
     lastMouse.current.down = false;
+    if (snapGuidesRef.current.length) {
+      snapGuidesRef.current = [];
+      needsRenderRef.current = true; // erase the inference guides
+    }
     try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
   }, [tool, selectedPartId, pStore]);
 
@@ -1585,6 +1683,7 @@ const AXL: React.FC = () => {
             onPointerDown={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
+            onPointerLeave={() => { if (hoveredPartId) vStore.setHoveredPartId(null); }}
             onWheel={handleWheel}
             onContextMenu={e => { e.preventDefault(); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top }); }}
             style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', imageRendering: 'auto' }}
