@@ -176,7 +176,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
-  const { launchApp } = useRunningApps();
+  // Select ONLY the stable launchApp action — the palette is always mounted,
+  // and a whole-store subscription made every running-apps write re-render it
+  // (and, when a write landed during another component's render, triggered
+  // React's "Cannot update CommandPalette while rendering AppManager" warning).
+  const launchApp = useRunningApps(s => s.launchApp);
 
   // Helper: launch an app by id using the canonical APP_DEFINITIONS registry
   const openApp = useCallback((appId: string) => {
