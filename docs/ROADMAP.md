@@ -23,6 +23,13 @@
 > 4. **Creative app pass — AXL FIRST, then Imosion, Vinx, Forge.** Owner: "each and every creative app… AXL
 >    needs to be better", UI/UX included. Also Nexus: gauge + probabilities (predictive load/idle stats on the
 >    donut gauge), app/flow tracking ("internal freeform to manage apps, track apps, flows").
+>    **AXL pass 1 ✅ (2026-07-02):** fixed Canvas-2D `var()` colors being silently IGNORED (grid/axes/selection
+>    ring/measurements/GD&T/HUD all painted wrong — theme now resolved to literals per frame); fixed stale-camera
+>    closures (post-orbit clicks hit-tested the OLD view — shared `hitTestAtPoint` w/ correct deps + exploded
+>    offset); wired the orphaned `hoveredPartId` (accent hover ring + cursor); added CAD alignment snapping
+>    (`utils/alignSnap` pure + 7 tests: per-axis pull onto other part centers ~8px, dashed inference guides,
+>    Alt = free, store toggle). NEXT AXL: edge/vertex snap candidates, modal/buckling solvers (typed, unwired),
+>    parametric expressions (param store exists, no UI), then Imosion.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
