@@ -8,18 +8,158 @@
 // AXL Properties Panel (Right Panel)
 // ═══════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useCallback } from 'react';
-import type { Vec3, Transform, ConstraintType } from '../types';
+import React, { useState, useCallback, useMemo } from 'react';
+import type { Vec3, Transform, ConstraintType, Parameter } from '../types';
 import { MATERIAL_DB } from '../constants';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore, type PanelTab } from '../stores/uiStore';
+import { evaluateExpression, resolveParameters, type ParamScope } from '../utils/exprEval';
 import DesignTokensPanel from './DesignTokensPanel';
 
+// ─── Expression-capable numeric input ────────────────────────────────────────
+// Accepts a plain number OR a parametric expression ("width * 2", "sqrt(r)").
+// Commits on Enter/blur; Escape reverts. Invalid input surfaces via onError
+// and leaves the committed value untouched.
+const ExprInput: React.FC<{
+  value: number;
+  scope: ParamScope;
+  onCommit: (n: number) => void;
+  onError: (msg: string) => void;
+  style?: React.CSSProperties;
+  ariaLabel?: string;
+}> = ({ value, scope, onCommit, onError, style, ariaLabel }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const raw = draft.trim();
+    setDraft(null);
+    if (!raw) return;
+    const n = Number(raw);
+    if (Number.isFinite(n)) { if (n !== value) onCommit(n); return; }
+    try {
+      onCommit(evaluateExpression(raw, scope));
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      title='Number or expression, e.g. "width * 2"'
+      value={draft ?? String(Math.round(value * 1000) / 1000)}
+      onChange={e => setDraft(e.target.value)}
+      onFocus={e => { setDraft(String(value)); e.currentTarget.select(); }}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') setDraft(null);
+      }}
+      style={style}
+    />
+  );
+};
+
+// One parameter row: shows the expression (or plain value) as editable text;
+// committing re-resolves the WHOLE table so chained references stay live.
+const ParamRowInput: React.FC<{
+  parameter: Parameter;
+  all: Parameter[];
+  apply: (next: Parameter[]) => boolean;
+}> = ({ parameter, all, apply }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = parameter.expression ?? String(parameter.value);
+  const commit = () => {
+    if (draft === null) return;
+    const raw = draft.trim();
+    setDraft(null);
+    if (!raw || raw === shown) return;
+    const numeric = Number(raw);
+    const entry: Parameter = Number.isFinite(numeric)
+      ? { ...parameter, value: numeric, expression: undefined }
+      : { ...parameter, expression: raw };
+    apply(all.map(p => (p.name === parameter.name ? entry : p)));
+  };
+  return (
+    <input
+      type="text"
+      aria-label={`Parameter ${parameter.name} expression`}
+      value={draft ?? shown}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setDraft(null); }}
+      style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+    />
+  );
+};
+
+const ParamAddRow: React.FC<{
+  existing: Parameter[];
+  apply: (next: Parameter[]) => boolean;
+  showToast: (msg: string) => void;
+}> = ({ existing, apply, showToast }) => {
+  const [name, setName] = useState('');
+  const [expr, setExpr] = useState('');
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n)) { showToast('Name must be letters/digits/underscore, not starting with a digit'); return; }
+    if (n === 'pi') { showToast('"pi" is a built-in constant'); return; }
+    const raw = expr.trim();
+    const numeric = Number(raw);
+    const entry: Parameter = Number.isFinite(numeric) && raw !== ''
+      ? { name: n, value: numeric }
+      : { name: n, value: 0, expression: raw || '0' };
+    if (apply([...existing.filter(p => p.name !== n), entry])) { setName(''); setExpr(''); }
+  };
+  return (
+    <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+      <input
+        type="text" placeholder="name" aria-label="New parameter name"
+        value={name} onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') add(); }}
+        style={{ width: 64, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+      />
+      <input
+        type="text" placeholder="value or expression" aria-label="New parameter value or expression"
+        value={expr} onChange={e => setExpr(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') add(); }}
+        style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+      />
+      <button onClick={add} disabled={!name.trim()} aria-label="Add parameter"
+        style={{ fontSize: 9, fontWeight: 600, padding: '3px 8px', background: name.trim() ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: name.trim() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: name.trim() ? 'pointer' : 'default' }}>
+        Add
+      </button>
+    </div>
+  );
+};
+
 const PropertiesPanel: React.FC = () => {
-  const { project, pushUndo, setPartMaterial, updatePartTransform, duplicatePart, deletePart, togglePartVisibility, addConstraint, solveConstraints } = useProjectStore();
+  const { project, pushUndo, setPartMaterial, updatePartTransform, duplicatePart, deletePart, togglePartVisibility, addConstraint, solveConstraints, setParameter, removeParameter } = useProjectStore();
   const { selectedPartId, setSelectedPartId } = useViewportStore();
   const { panelTab, setPanelTab, showToast } = useUIStore();
+
+  // Parameter scope for expression inputs (resolved values by name)
+  const paramScope = useMemo<ParamScope>(() => {
+    const scope: ParamScope = {};
+    project.parameters.forEach(p => { scope[p.name] = p.value; });
+    return scope;
+  }, [project.parameters]);
+
+  // Re-resolve the whole parameter table (expressions may chain); on error
+  // nothing is written and the message is surfaced.
+  const applyParameters = useCallback((next: Parameter[]): boolean => {
+    try {
+      const resolved = resolveParameters(next);
+      resolved.forEach(p => setParameter(p.name, p.value, p.expression));
+      return true;
+    } catch (err) {
+      showToast(`Parameter error: ${(err as Error).message}`);
+      return false;
+    }
+  }, [setParameter, showToast]);
 
   // Design Tokens tab lives in local state so it stays additive — no change to
   // the shared PanelTab type or the UI store. When active it overrides the
@@ -92,11 +232,12 @@ const PropertiesPanel: React.FC = () => {
                   {(['x', 'y', 'z'] as (keyof Vec3)[]).map(axis => (
                     <label key={axis} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontSize: 8, color: axis === 'x' ? 'var(--color-error)' : axis === 'y' ? 'var(--color-success)' : 'var(--color-accent)', fontWeight: 700 }}>{axis.toUpperCase()}</span>
-                      <input
-                        type="number"
+                      <ExprInput
                         value={selectedPart.transform[key][axis]}
-                        onChange={e => { pushUndo(); updatePartTransform(selectedPart.id, key, axis, Number(e.target.value)); }}
-                        step={key === 'rotation' ? 5 : key === 'scale' ? 0.1 : project.gridSnap}
+                        scope={paramScope}
+                        ariaLabel={`${selectedPart.name} ${key} ${axis}`}
+                        onCommit={n => { pushUndo(); updatePartTransform(selectedPart.id, key, axis, n); }}
+                        onError={msg => showToast(msg)}
                         style={{ width: '100%', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid', borderColor: axis === 'x' ? 'rgba(255,69,58,0.25)' : axis === 'y' ? 'rgba(48,209,88,0.25)' : 'rgba(10,132,255,0.25)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 5px', outline: 'none', fontVariantNumeric: 'tabular-nums' }}
                       />
                     </label>
@@ -144,6 +285,37 @@ const PropertiesPanel: React.FC = () => {
         {!tokensActive && panelTab === 'properties' && !selectedPart && (
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: 'var(--space-5) 0', textAlign: 'center' }}>
             Select a part to view properties
+          </div>
+        )}
+
+        {/* Parameters — project-global parametric table. Any transform input
+            above can reference these by name ("width * 2"); expressions may
+            chain and resolve as a table (circular refs are rejected). */}
+        {!tokensActive && panelTab === 'properties' && (
+          <div style={{ marginTop: 10, padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 10 }}>
+            <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+              PARAMETERS
+            </div>
+            {project.parameters.length === 0 && (
+              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+                Define named values ("width", "bolt_d") and drive dimensions with expressions.
+              </div>
+            )}
+            {project.parameters.map(p => (
+              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-secondary)', width: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>{p.name}</span>
+                <ParamRowInput parameter={p} all={project.parameters} apply={applyParameters} />
+                <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(p.value)}>
+                  {p.expression ? `= ${Math.round(p.value * 1000) / 1000}` : ''}
+                </span>
+                <button onClick={() => removeParameter(p.name)} aria-label={`Delete parameter ${p.name}`}
+                  style={{ width: 16, height: 16, padding: 0, background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 10, lineHeight: 1 }}>
+                  ×
+                </button>
+              </div>
+            ))}
+            <ParamAddRow existing={project.parameters} apply={applyParameters} showToast={showToast} />
           </div>
         )}
 

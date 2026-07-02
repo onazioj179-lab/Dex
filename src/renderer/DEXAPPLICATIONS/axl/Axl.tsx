@@ -34,7 +34,8 @@ import type {
 } from './types';
 import { MATERIAL_DB, STD_PARTS_LIBRARY, GDT_SYMBOLS } from './constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor } from './utils/math';
-import { alignSnapPosition } from './utils/alignSnap';
+import { alignSnapPosition, primitiveHalfExtents, type SnapGuide } from './utils/alignSnap';
+import { computeModalStudy, computeBucklingStudy } from './engine/modalBuckling';
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
 import { detectInterferences } from './AxlInspect';
 import { importCadFile } from './AxlImport';
@@ -121,7 +122,7 @@ const AXL: React.FC = () => {
   // Alignment-snap inference guides (world-space center pairs) drawn while a
   // move drag is snapped onto another part's axis. Ref, not state: per-frame
   // data that the render loop reads directly.
-  const snapGuidesRef = useRef<{ axis: 'x' | 'y' | 'z'; a: Vec3; b: Vec3 }[]>([]);
+  const snapGuidesRef = useRef<SnapGuide[]>([]);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
@@ -394,6 +395,38 @@ const AXL: React.FC = () => {
         const maxTemp = Math.max(...results.map(r => r.stress));
         pStore.setSimResults({ maxStress: maxTemp, safetyFactor: 200 / (maxTemp - ambientTemp), stressMap: results.map(r => ({ partId: r.partId, ratio: r.ratio })), converged: true, timestamp: Date.now() });
         ui.showToast(`Thermal analysis -- Peak: ${maxTemp.toFixed(1)}\u00b0C`);
+      } else if (simType === 'modal' || simType === 'buckling') {
+        // \u2500\u2500 Analytical modal / buckling studies (engine/modalBuckling) \u2500\u2500
+        // Previously these SimulationType values silently fell through to the
+        // motion study. Same per-part beam idealization the motion study uses.
+        const inputs = parts.map(p => {
+          const feat = p.features[0]?.params || {};
+          const vol = calcVolume((feat.primitiveType as PrimitiveType) || 'box', feat as Record<string, number>);
+          return { id: p.id, youngsModulusGPa: p.material.youngsModulus, densityKgM3: p.material.density, volumeMm3: vol };
+        });
+        if (simType === 'modal') {
+          const study = computeModalStudy(inputs, simForce);
+          pStore.setSimResults({
+            type: 'modal',
+            maxStress: study.minF1Hz,
+            safetyFactor: study.separationFactor,
+            stressMap: study.parts.map(r => ({ partId: r.partId, ratio: r.ratio })),
+            converged: true,
+            timestamp: Date.now(),
+          });
+          ui.showToast(`Modal analysis -- lowest f\u2081 ${study.minF1Hz.toFixed(0)} Hz, separation ${study.separationFactor.toFixed(1)}\u00d7`);
+        } else {
+          const study = computeBucklingStudy(inputs, simForce);
+          pStore.setSimResults({
+            type: 'buckling',
+            maxStress: study.minCriticalLoadN,
+            safetyFactor: study.minSafetyFactor,
+            stressMap: study.parts.map(r => ({ partId: r.partId, ratio: r.ratio })),
+            converged: true,
+            timestamp: Date.now(),
+          });
+          ui.showToast(`Buckling analysis -- critical load ${(study.minCriticalLoadN / 1000).toFixed(1)} kN, SF ${study.minSafetyFactor.toFixed(1)}\u00d7`);
+        }
       } else {
         const g = 9810;
         const results = parts.map(p => {
@@ -1399,11 +1432,13 @@ const AXL: React.FC = () => {
       const worldDz = -sdx * sinAz + sdy * cosAz * sinEl;
       const part = project.assembly.parts.find(p => p.id === selectedPartId);
       if (part) {
-        // Alignment inference (utils/alignSnap): pull an axis onto another
-        // part's center when within ~8 screen px (tolerance scales with zoom),
-        // so parts line up like real CAD instead of only landing on grid
-        // multiples. Alt bypasses ALL snapping for free placement; the
+        // Alignment inference (utils/alignSnap): pull an axis onto the NEAREST
+        // candidate within ~8 screen px (tolerance scales with zoom) — center
+        // alignment, face-touch, or face-flush against other parts' extents —
+        // so parts line up and mate like real CAD instead of only landing on
+        // grid multiples. Alt bypasses ALL snapping for free placement; the
         // viewport-store snap toggle turns inference off persistently.
+        const movedFeat = (part.features[0]?.params || {}) as Record<string, unknown>;
         const { position, guides } = alignSnapPosition(
           {
             x: part.transform.position.x + worldDx,
@@ -1412,8 +1447,21 @@ const AXL: React.FC = () => {
           },
           project.assembly.parts
             .filter(p => p.id !== selectedPartId && p.visible)
-            .map(p => ({ id: p.id, position: { x: p.transform.position.x, y: p.transform.position.y, z: p.transform.position.z || 0 } })),
-          { tolerance: Math.max(1, 8 / camScale), gridSnap: snap, snapEnabled, free: e.altKey },
+            .map(p => {
+              const feat = (p.features[0]?.params || {}) as Record<string, unknown>;
+              return {
+                id: p.id,
+                position: { x: p.transform.position.x, y: p.transform.position.y, z: p.transform.position.z || 0 },
+                halfExtents: primitiveHalfExtents(feat.primitiveType as string | undefined, feat, p.transform.scale),
+              };
+            }),
+          {
+            tolerance: Math.max(1, 8 / camScale),
+            gridSnap: snap,
+            snapEnabled,
+            free: e.altKey,
+            movedHalfExtents: primitiveHalfExtents(movedFeat.primitiveType as string | undefined, movedFeat, part.transform.scale),
+          },
         );
         snapGuidesRef.current = guides;
         pStore.updatePartTransform(selectedPartId, 'position', 'x', position.x);
@@ -1811,19 +1859,23 @@ const AXL: React.FC = () => {
           {simResults && ui.showSimulation && (
             <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 12, padding: 'var(--space-3)', fontSize: 11, maxWidth: 320 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 6 }}>
-                {simType === 'stress' ? 'STRESS ANALYSIS' : simType === 'thermal' ? 'THERMAL ANALYSIS' : 'MOTION STUDY'}
+                {simType === 'stress' ? 'STRESS ANALYSIS' : simType === 'thermal' ? 'THERMAL ANALYSIS' : simType === 'modal' ? 'MODAL ANALYSIS' : simType === 'buckling' ? 'BUCKLING ANALYSIS' : 'MOTION STUDY'}
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <div>
                   <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>
-                    {simType === 'stress' ? 'Max Stress' : simType === 'thermal' ? 'Peak Temp' : 'Max Deflection'}
+                    {simType === 'stress' ? 'Max Stress' : simType === 'thermal' ? 'Peak Temp' : simType === 'modal' ? 'Lowest f\u2081' : simType === 'buckling' ? 'Critical Load' : 'Max Deflection'}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: simResults.safetyFactor > 2 ? 'var(--color-success)' : simResults.safetyFactor > 1 ? 'var(--color-warning)' : 'var(--color-error)' }}>
-                    {simType === 'stress' ? `${simResults.maxStress.toFixed(1)} MPa` : simType === 'thermal' ? `${simResults.maxStress.toFixed(1)}\u00b0C` : `${simResults.maxStress.toFixed(3)}${project.units}`}
+                    {simType === 'stress' ? `${simResults.maxStress.toFixed(1)} MPa`
+                      : simType === 'thermal' ? `${simResults.maxStress.toFixed(1)}\u00b0C`
+                      : simType === 'modal' ? `${simResults.maxStress.toFixed(0)} Hz`
+                      : simType === 'buckling' ? `${(simResults.maxStress / 1000).toFixed(1)} kN`
+                      : `${simResults.maxStress.toFixed(3)}${project.units}`}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Safety Factor</div>
+                  <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{simType === 'modal' ? 'Separation' : 'Safety Factor'}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: simResults.safetyFactor > 2 ? 'var(--color-success)' : simResults.safetyFactor > 1 ? 'var(--color-warning)' : 'var(--color-error)' }}>
                     {simResults.safetyFactor.toFixed(2)}&times;
                   </div>
@@ -1838,7 +1890,7 @@ const AXL: React.FC = () => {
                 )}
               </div>
               <div style={{ marginTop: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>
-                {simType === 'thermal' ? `Heat: ${simForce}W` : `Force: ${simForce}N`} | {project.assembly.parts.length} parts analyzed
+                {simType === 'thermal' ? `Heat: ${simForce}W` : simType === 'modal' ? `Excitation: ${simForce}Hz` : `Force: ${simForce}N`} | {project.assembly.parts.length} parts analyzed
                 {simType === 'stress' && simResults.feaSolved ? ` | ${simResults.elementCount ?? 0} FE elements (direct stiffness)` : ''}
               </div>
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1889,14 +1941,16 @@ const AXL: React.FC = () => {
                     <option value="stress">Static Stress</option>
                     <option value="motion">Motion Study</option>
                     <option value="thermal">Thermal</option>
+                    <option value="modal">Modal (Frequency)</option>
+                    <option value="buckling">Buckling</option>
                   </select>
                 </label>
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
-                  {simType === 'thermal' ? 'Heat (W):' : 'Force (N):'}
+                  {simType === 'thermal' ? 'Heat (W):' : simType === 'modal' ? 'Excitation (Hz):' : 'Force (N):'}
                   <input type="number" value={simForce} onChange={e => setSimForce(Number(e.target.value))}
                     style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
                 </label>
-                {simType !== 'thermal' && (
+                {simType !== 'thermal' && simType !== 'modal' && (
                   <div>
                     <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>LOAD DIRECTION</div>
                     <div style={{ display: 'flex', gap: 3 }}>

@@ -145,6 +145,7 @@ interface ProjectStore {
 
   // Parameters
   setParameter: (name: string, value: number, expression?: string) => void;
+  removeParameter: (name: string) => void;
 
   // Configurations / Design Variants
   saveConfiguration: (name: string) => string;
@@ -624,6 +625,16 @@ export const useProjectStore = create<ProjectStore>()(
           }
           return { project: { ...state.project, parameters: params, modifiedAt: Date.now() } };
         });
+      },
+
+      removeParameter: (name: string) => {
+        set((state: ProjectStore) => ({
+          project: {
+            ...state.project,
+            parameters: state.project.parameters.filter((p: Parameter) => p.name !== name),
+            modifiedAt: Date.now(),
+          },
+        }));
       },
 
       // ── Configurations / Design Variants ────────────────────────────────
