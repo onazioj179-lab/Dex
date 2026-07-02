@@ -67,9 +67,22 @@
 >    affect in-browser jobs — they DO fire on real image/WAV encodes). 82/82 creative tests (14 new: groove 9,
 >    ducking already counted, plus expr coverage). tsc clean. NOTE: preview MCP was down this round → verified
 >    by unit tests + tsc, not live browser.
->    REMAINING (round 4 candidates): Imosion recording monitor; Vinx command-based multicam/speed ops (undo) +
->    real 3D-LUT color math; Forge WebCodecs video encode. Or track 2 (UKI task scheduling on shared/automation
->    cron + src-tauri/task_queue.rs) / track 5-6 (browser ad-block default, Store lifecycle).
+>    **CREATIVE ROUND 4 ✅ (2026-07-02, later):** Forge can now ENCODE VIDEO in-browser — real video→WebM
+>    (VP9/VP8+Opus) via canvas.captureStream + MediaRecorder (`transcodeVideoToWebm` in transcode.ts; new
+>    `video-webm` route in planTarget gated by `canEncodeWebmVideo`; wired in processJob with resolution
+>    downscale + progress). Kills the "all video unsupported" wall for the WebM VP9 preset; MP4/H.264/HEVC/ProRes
+>    still honestly native-only (no browser muxer). Shared `computeScaledDimensions` extracted + tested (also
+>    de-dups the image path). Vinx multicam angle switch is now UNDOABLE (`createMulticamAngleCommand` +
+>    `setMulticamAngle` store action — it mutated the store directly before, bypassing undo). Imosion input
+>    monitoring is REAL (was a dead toggle): getUserMedia → MediaStreamSource → gain → ctx.destination, torn
+>    down cleanly on disable/unmount. tsc 0; 36/36 round-4 suite (10 new video-webm tests). NOTE: runtime probe
+>    confirmed VP9+Opus/captureStream all supported + source WebM generated, but a full real-time video
+>    round-trip can't run in the hidden preview tab (browser throttles background <video> playback) — same
+>    proven technique as Vinx quickExport; verified by capability probe + unit tests + tsc, not a live encode.
+>    REMAINING (round 5 candidates): Vinx real 3D-LUT color math + command-based speed ops; Forge WebCodecs
+>    faster-than-realtime encode (needs an MP4/WebM muxer dep); Imosion take comping. Or track 2 (UKI task
+>    scheduling on shared/automation cron + src-tauri/task_queue.rs) / track 5-6 (browser ad-block default,
+>    Store lifecycle).
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps

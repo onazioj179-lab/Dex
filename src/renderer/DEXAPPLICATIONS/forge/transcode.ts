@@ -99,6 +99,37 @@ export interface TranscodeResult {
   height: number;
 }
 
+/**
+ * Resolve output dimensions for a resize (pure — shared by the image and video
+ * transcode paths, unit-tested). When only one axis is given, aspect ratio is
+ * preserved unless preserveAspect === false. Even-number rounding keeps video
+ * encoders (which require 2-divisible dimensions) happy. Result is always >= 2.
+ */
+export function computeScaledDimensions(
+  srcW: number,
+  srcH: number,
+  targetW?: number,
+  targetH?: number,
+  preserveAspect = true,
+  evenOnly = false,
+): { width: number; height: number } {
+  const sW = srcW > 0 ? srcW : 1;
+  const sH = srcH > 0 ? srcH : 1;
+  let outW = targetW && targetW > 0 ? Math.round(targetW) : 0;
+  let outH = targetH && targetH > 0 ? Math.round(targetH) : 0;
+  if (outW && !outH) outH = preserveAspect === false ? sH : Math.round(outW * (sH / sW));
+  if (outH && !outW) outW = preserveAspect === false ? sW : Math.round(outH * (sW / sH));
+  if (!outW) outW = sW;
+  if (!outH) outH = sH;
+  outW = Math.max(evenOnly ? 2 : 1, outW);
+  outH = Math.max(evenOnly ? 2 : 1, outH);
+  if (evenOnly) {
+    if (outW % 2 !== 0) outW += 1;
+    if (outH % 2 !== 0) outH += 1;
+  }
+  return { width: outW, height: outH };
+}
+
 /** Decode a File into a drawable bitmap, preferring createImageBitmap, falling back to Image. */
 async function decodeImage(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; release: () => void }> {
   if (typeof createImageBitmap === 'function') {
@@ -144,14 +175,9 @@ export async function transcodeImage(
     const srcH = decoded.height || 1;
 
     // Resolve output dimensions, optionally preserving aspect when only one axis given.
-    let outW = opts.width && opts.width > 0 ? Math.round(opts.width) : 0;
-    let outH = opts.height && opts.height > 0 ? Math.round(opts.height) : 0;
-    if (outW && !outH) outH = opts.preserveAspect === false ? srcH : Math.round(outW * (srcH / srcW));
-    if (outH && !outW) outW = opts.preserveAspect === false ? srcW : Math.round(outH * (srcW / srcH));
-    if (!outW) outW = srcW;
-    if (!outH) outH = srcH;
-    outW = Math.max(1, outW);
-    outH = Math.max(1, outH);
+    const { width: outW, height: outH } = computeScaledDimensions(
+      srcW, srcH, opts.width, opts.height, opts.preserveAspect !== false,
+    );
 
     const canvas = document.createElement('canvas');
     canvas.width = outW;
@@ -454,11 +480,28 @@ function writeAscii(view: DataView, offset: number, text: string): void {
 
 export interface TargetPlan {
   /** What we will actually do with this job. */
-  route: 'image' | 'audio-wav' | 'native';
+  route: 'image' | 'audio-wav' | 'video-webm' | 'native';
   /** Resolved image target when route === 'image'. */
   imageTarget?: ImageTarget;
   /** Human-readable reason when route === 'native'. */
   reason?: string;
+}
+
+/** Does this target string map to a WebM video container we can really encode? */
+export function isWebmVideoTarget(format: string): boolean {
+  const f = (format || '').toLowerCase();
+  return f === 'webm' || f === 'vp9' || f === 'vp8' || f === 'vp9/webm' || f === 'vp8/webm';
+}
+
+/** True when the runtime can record a WebM video stream (MediaRecorder + a VP codec). */
+export function canEncodeWebmVideo(): boolean {
+  if (typeof MediaRecorder === 'undefined' || typeof document === 'undefined') return false;
+  try {
+    const c = document.createElement('canvas');
+    if (typeof (c as any).captureStream !== 'function') return false;
+    return ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .some(m => MediaRecorder.isTypeSupported(m));
+  } catch { return false; }
 }
 
 /**
@@ -488,14 +531,144 @@ export function planTarget(file: File, format: string): TargetPlan {
   }
 
   if (kind === 'video') {
-    const webCodecs = typeof (window as any).VideoEncoder === 'function';
+    // WebM (VP8/VP9 + Opus) IS achievable in-browser via canvas.captureStream
+    // + MediaRecorder — a real re-encode (see transcodeVideoToWebm). Every
+    // other video container (MP4/H.264/HEVC/ProRes/...) still needs the native
+    // encoder; the browser has no muxer for them.
+    if (isWebmVideoTarget(fmt) && canEncodeWebmVideo()) return { route: 'video-webm' };
     return {
       route: 'native',
-      reason: webCodecs
-        ? 'Video transcode requires the native encoder (WebCodecs VideoEncoder is present but full muxing/encode is not built without a dependency).'
-        : 'Video transcode requires the native encoder — in-browser video encoding is unavailable without bundling ffmpeg.',
+      reason: 'Video transcode to this container requires the native encoder. In-browser Forge can re-encode video to WebM (VP9) — pick the "WebM VP9" preset.',
     };
   }
 
   return { route: 'native', reason: 'Unknown source type — cannot transcode in-browser.' };
+}
+
+// ==================== REAL VIDEO -> WEBM (canvas capture + MediaRecorder) ====
+
+export interface VideoEncodeOptions {
+  /** Output width. If omitted, source width is kept. */
+  width?: number;
+  /** Output height. If omitted, preserves aspect from width, else source. */
+  height?: number;
+  /** Target video bitrate in bits/sec (default 8 Mbps). */
+  videoBitsPerSecond?: number;
+  /** Progress 0..1 as the source plays through. */
+  onProgress?: (fraction: number) => void;
+}
+
+/** Pick the best-supported WebM video mime the runtime can record. */
+export function pickWebmVideoMime(): string | null {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const m of candidates) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch { /* keep trying */ }
+  }
+  return null;
+}
+
+/**
+ * Re-encode a video File to WebM (VP9/VP8 + Opus) entirely in-browser: decode
+ * with a hidden <video>, draw each frame to a canvas at the target resolution,
+ * capture that canvas as a video track, tap the element's audio as an audio
+ * track, and record the combined stream with MediaRecorder. Produces a REAL,
+ * playable .webm.
+ *
+ * This is a REAL-TIME re-encode (the source plays through once), so a 60s clip
+ * takes ~60s — honest, not faked. Resolution downscaling is applied on the
+ * draw. Audio is included when the source has a decodable track.
+ */
+export async function transcodeVideoToWebm(
+  file: File,
+  opts: VideoEncodeOptions = {},
+): Promise<TranscodeResult> {
+  const mime = pickWebmVideoMime();
+  if (!mime) throw new Error('This runtime cannot record WebM video (MediaRecorder/VP codec unavailable).');
+
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.src = url;
+  video.muted = true; // allow programmatic play without a gesture
+  video.playsInline = true;
+  (video as any).crossOrigin = 'anonymous';
+
+  const cleanup = (extra?: () => void) => {
+    try { extra?.(); } catch { /* noop */ }
+    try { URL.revokeObjectURL(url); } catch { /* noop */ }
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    video.onloadedmetadata = () => resolve();
+    video.onerror = () => reject(new Error('Could not decode this video source in the browser.'));
+  });
+
+  const srcW = video.videoWidth || 1;
+  const srcH = video.videoHeight || 1;
+  const { width, height } = computeScaledDimensions(srcW, srcH, opts.width, opts.height, true, true);
+  const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) { cleanup(); throw new Error('Cannot acquire canvas 2D context for video encoding.'); }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const fps = 30;
+  const canvasStream = (canvas as any).captureStream(fps) as MediaStream;
+
+  // Tap the source audio (best-effort — silent/absent tracks are fine).
+  let audioCtx: AudioContext | null = null;
+  try {
+    audioCtx = new AudioContext();
+    const srcNode = audioCtx.createMediaElementSource(video);
+    const dest = audioCtx.createMediaStreamDestination();
+    srcNode.connect(dest);
+    // Do NOT connect to audioCtx.destination — this is an offline capture, not playback.
+    dest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+  } catch {
+    try { audioCtx?.close(); } catch { /* noop */ }
+    audioCtx = null;
+  }
+
+  const recorder = new MediaRecorder(canvasStream, {
+    mimeType: mime,
+    videoBitsPerSecond: opts.videoBitsPerSecond ?? 8_000_000,
+  });
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  let rafId = 0;
+  const draw = () => {
+    ctx.drawImage(video, 0, 0, width, height);
+    if (duration > 0 && opts.onProgress) {
+      try { opts.onProgress(Math.min(0.99, video.currentTime / duration)); } catch { /* noop */ }
+    }
+    rafId = requestAnimationFrame(draw);
+  };
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
+    recorder.onerror = () => reject(new Error('Video recorder failed mid-encode.'));
+    video.onended = () => {
+      cancelAnimationFrame(rafId);
+      if (recorder.state === 'recording') recorder.stop();
+    };
+    recorder.start(200);
+    video.play().then(() => { rafId = requestAnimationFrame(draw); }).catch(reject);
+  });
+
+  cleanup(() => { cancelAnimationFrame(rafId); try { audioCtx?.close(); } catch { /* noop */ } });
+  if (!blob || blob.size === 0) throw new Error('Video encoder produced no data.');
+  try { opts.onProgress?.(1); } catch { /* noop */ }
+
+  return { blob, ext: 'webm', mime: 'video/webm', width, height };
 }

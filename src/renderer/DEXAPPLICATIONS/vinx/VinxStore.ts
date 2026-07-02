@@ -216,6 +216,7 @@ interface VinxState {
   setRenderQuality: (quality: RenderQuality) => void;
   setSourceViewerFrame: (frame: number) => void;
   setProgramLUT: (lut: { name: string; cssFilter: string } | null) => void;
+  setMulticamAngle: (multicamId: string, angleIndex: number) => void;
 
   // UI
   setMediaBrowserTab: (tab: VinxState['mediaBrowserTab']) => void;
@@ -718,6 +719,19 @@ export const useVinxStore = create<VinxState>((set, get) => {
     setTool: (tool) => set({ activeTool: tool }),
     toggleSnap: () => set(s => ({ snapEnabled: !s.snapEnabled })),
     setProgramLUT: (lut) => set({ programLUT: lut }),
+
+    // Multicam active-angle setter (store action so the switch goes through
+    // one place and can be wrapped in an undo command — the panel used to call
+    // useVinxStore.setState directly, bypassing undo entirely).
+    setMulticamAngle: (multicamId: string, angleIndex: number) => set(s => ({
+      project: {
+        ...s.project,
+        multicamClips: s.project.multicamClips.map(m =>
+          m.id === multicamId ? { ...m, activeAngle: angleIndex } : m),
+        modifiedAt: Date.now(),
+      },
+      isDirty: true,
+    })),
     toggleRippleDelete: () => set(s => ({ rippleDeleteEnabled: !s.rippleDeleteEnabled })),
     toggleLinkedSelection: () => set(s => ({ linkedSelectionEnabled: !s.linkedSelectionEnabled })),
 

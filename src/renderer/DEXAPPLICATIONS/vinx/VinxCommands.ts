@@ -51,6 +51,18 @@ export function createRemoveClipCommand(getState: GetState, clip: Clip): VinxCom
   );
 }
 
+export function createMulticamAngleCommand(
+  getState: GetState,
+  multicamId: string,
+  fromIndex: number,
+  toIndex: number,
+): VinxCommand {
+  return cmd('change-clip-property', `Switch multicam angle`,
+    () => getState().setMulticamAngle(multicamId, toIndex),
+    () => getState().setMulticamAngle(multicamId, fromIndex),
+  );
+}
+
 export function createMoveClipCommand(
   getState: GetState,
   clipId: string,

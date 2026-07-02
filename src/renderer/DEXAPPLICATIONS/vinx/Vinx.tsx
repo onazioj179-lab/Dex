@@ -40,6 +40,7 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { dispatchActivity, updateActivity, completeActivity } from '../../utils/liveActivity';
 import { trackFeature, type TrackPoint } from './vinxMotionTracker';
+import { createMulticamAngleCommand } from './VinxCommands';
 
 /**
  * Run a real frame-diff feature track using the active <video> element.
@@ -291,6 +292,7 @@ const VinxEditor: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Imported "${asset.name}" from ${asset.sourceApp}` } }));
   }, [addMedia]));
   const isDirty = useVinxStore(s => s.isDirty);
+  const executeCommand = useVinxStore(s => s.executeCommand);
   useUnsavedGuard(isDirty);
 
   const { dropProps, dropOverlayStyle } = useFileDrop(
@@ -1455,18 +1457,10 @@ const VinxEditor: React.FC = () => {
                 onSelectAngle={(angleId) => {
                   if (!mc) return;
                   const idx = mc.angles.findIndex(a => a.id === angleId);
-                  if (idx >= 0) {
-                    useVinxStore.setState(s => {
-                      const project = s.project;
-                      return {
-                        project: {
-                          ...project,
-                          multicamClips: project.multicamClips.map(m => m.id === mc.id ? { ...m, activeAngle: idx } : m),
-                          modifiedAt: Date.now(),
-                        },
-                        isDirty: true,
-                      };
-                    });
+                  // Route through a command so the angle switch is undoable —
+                  // it previously mutated the store directly, bypassing undo/redo.
+                  if (idx >= 0 && idx !== mc.activeAngle) {
+                    executeCommand(createMulticamAngleCommand(useVinxStore.getState, mc.id, mc.activeAngle, idx));
                   }
                 }}
               />

@@ -28,6 +28,7 @@ import {
   planTarget,
   transcodeImage,
   transcodeAudioToWav,
+  transcodeVideoToWebm,
   decodeAudioPeaks,
   encodeWav,
   type AudioPeaks,
@@ -747,7 +748,55 @@ const Forge: React.FC = () => {
       return;
     }
 
-    // ----- NATIVE-ONLY (lossy audio, all video codecs, TIFF/AVIF/GIF, etc.) -----
+    // ----- REAL VIDEO -> WebM (canvas capture + MediaRecorder) -----
+    // A genuine in-browser re-encode. Real-time (the source plays through
+    // once), honors preset resolution downscaling, includes audio.
+    if (plan.route === 'video-webm') {
+      try {
+        const jobAny = job as any;
+        let width: number | undefined;
+        let height: number | undefined;
+        const overrideRes: string | undefined = jobAny?.overrideRes;
+        if (overrideRes && /^\d+x\d+$/.test(overrideRes)) {
+          const [w, h] = overrideRes.split('x').map(Number);
+          width = w; height = h;
+        } else if (preset?.width && preset?.height) {
+          width = preset.width; height = preset.height;
+        }
+        const result = await transcodeVideoToWebm(file, {
+          width,
+          height,
+          videoBitsPerSecond: preset?.bitrate ? preset.bitrate * 1000 : 8_000_000,
+          onProgress: (frac) => {
+            if (!mountedRef.current) return;
+            setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: Math.round(frac * 100) } : j));
+          },
+        });
+        if (!mountedRef.current) return;
+        const blobUrl = URL.createObjectURL(result.blob);
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'completed' as const, progress: 100,
+          outputBlobUrl: blobUrl, outputSize: result.blob.size,
+          outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('FORGE — Video Encoded', { body: `${file.name} → WebM ${result.width}×${result.height}` });
+        }
+      } catch (err: any) {
+        if (!mountedRef.current) return;
+        setJobs(prev => prev.map(j => j.id === jobId ? {
+          ...j, status: 'failed' as const, error: err?.message || 'Video → WebM encode failed',
+        } : j));
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Video encode failed: ${err?.message || file.name}` } }));
+      } finally {
+        activeEncodings.current.delete(jobId);
+        fileMapRef.current.delete(jobId);
+      }
+      return;
+    }
+
+    // ----- NATIVE-ONLY (lossy audio, remaining video codecs, TIFF/AVIF/GIF) -----
     // Honestly flag it. Never report a fake "completed" with no real file.
     if (plan.route === 'native') {
       const reason = plan.reason || 'This target requires the native encoder.';
