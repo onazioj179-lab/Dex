@@ -12,6 +12,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
+import { analyzeBeats, analyzeKey, analyzeLoudness, analyzeSilence } from '../services/media/analyzeBeats';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -194,6 +195,60 @@ export const QuickLook: React.FC<QuickLookProps> = ({
 // CONTENT RENDERERS
 // ---------------------------------------------------------------------------
 
+/**
+ * Native audio analysis strip shown under the Quick Look player: tempo (native
+ * for file paths, real Web-Audio engine for URLs), plus musical key and BS.1770
+ * loudness (native-only — shown only when `source` is a real filesystem path,
+ * never faked for a web URL). Renders nothing until at least one figure lands.
+ */
+const AudioAnalysis: React.FC<{ source: string }> = ({ source }) => {
+  const [metrics, setMetrics] = useState<Array<{ label: string; value: string }> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setMetrics(null);
+    void (async () => {
+      const [beats, key, loud, silence] = await Promise.all([
+        analyzeBeats(source).catch(() => null),
+        analyzeKey(source).catch(() => null),
+        analyzeLoudness(source).catch(() => null),
+        analyzeSilence(source).catch(() => null),
+      ]);
+      if (!alive) return;
+      const rows: Array<{ label: string; value: string }> = [];
+      if (beats && beats.bpm > 0) rows.push({ label: 'Tempo', value: `${beats.bpm} BPM` });
+      if (key && key.key) rows.push({ label: 'Key', value: `${key.key} ${key.scale}`.trim() });
+      if (loud) {
+        rows.push({ label: 'Loudness', value: `${loud.lufs.toFixed(1)} LUFS` });
+        rows.push({ label: 'Peak', value: `${loud.peakDbfs.toFixed(1)} dBFS` });
+      }
+      if (silence && silence.removedSec > 0.1) {
+        rows.push({ label: 'Silence', value: `${silence.removedSec.toFixed(1)}s · ${silence.gaps}` });
+      }
+      setMetrics(rows.length ? rows : null);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [source]);
+
+  if (loading) {
+    return <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Analyzing audio…</div>;
+  }
+  if (!metrics) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2) var(--space-4)', justifyContent: 'center', maxWidth: 440 }}>
+      {metrics.map(m => (
+        <div key={m.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>{m.value}</span>
+          <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' }}>{m.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
   switch (item.type) {
     case 'image':
@@ -219,9 +274,10 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'audio':
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-8) 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           <audio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} />
+          <AudioAnalysis source={item.content} />
         </div>
       );
 

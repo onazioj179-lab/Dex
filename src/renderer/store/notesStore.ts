@@ -591,6 +591,16 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
       set({
         notes: notes.map(n => n.id === id ? { ...n, ...updates, updated_at: Date.now() } : n),
       });
+      // Fold this note into the unified native search index so global search
+      // spans notes, not just files. Fire-and-forget: never block the save on it,
+      // and it's a no-op outside the desktop shell.
+      const merged = get().activeNote?.id === id ? get().activeNote : null;
+      const title = (updates.title ?? merged?.title ?? '') as string;
+      const body = (updates.plain_text ?? merged?.plain_text ?? '') as string;
+      if (title || body) {
+        void ipc('search:upsertDoc', id, 'note', title, body, Math.floor(Date.now() / 1000))
+          .catch(() => { /* index sync is best-effort */ });
+      }
     } finally {
       set({ saving: false });
     }
@@ -608,6 +618,8 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
       } catch { /* best effort */ }
     }
     await ipc('dexnotes:delete', id);
+    // Drop it from the unified search index too (best-effort, desktop-only).
+    void ipc('search:removeDoc', id).catch(() => { /* index sync is best-effort */ });
     const { activeNote, notes, selectedNoteId } = get();
     const filtered = notes.filter(n => n.id !== id);
     set({ notes: filtered });

@@ -21,6 +21,8 @@ use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
 use tantivy::{doc, Index, IndexWriter, TantivyDocument, Term};
 
 /// One search result, shaped to match the renderer's file-result contract.
+/// `source` distinguishes unified content ("file" | "note" | "clipboard" | …)
+/// and `id` is the stable identity used to upsert/remove it (a path for files).
 #[derive(Serialize, Clone, Debug)]
 pub struct FileHit {
     pub path: String,
@@ -31,6 +33,8 @@ pub struct FileHit {
     pub modified: u64,
     pub size: u64,
     pub score: f32,
+    pub source: String,
+    pub id: String,
 }
 
 /// Cheap to clone — `Index` is Arc-backed and `Field` is `Copy`, so a clone
@@ -45,6 +49,12 @@ pub struct SearchIndex {
     f_content: Field,
     f_modified: Field,
     f_size: Field,
+    /// Content class: "file" | "note" | "clipboard" | … — lets one index hold
+    /// every kind of DEX content ("fold everything indexed together").
+    f_source: Field,
+    /// Stable identity for upsert/remove (a filesystem path for files, an app id
+    /// for notes/clipboard). Universal delete key across sources.
+    f_id: Field,
     /// Hot cache of recent `query -> results`, shared across cheap clones (Arc) and
     /// CLEARED on every write (index_path / upsert / remove / clear). Invalidate-on-
     /// write means a cached result can never be stale; it only saves repeat-query
@@ -130,9 +140,24 @@ impl SearchIndex {
         let f_content = sb.add_text_field("content", TEXT);
         let f_modified = sb.add_u64_field("modified", STORED);
         let f_size = sb.add_u64_field("size", STORED);
+        let f_source = sb.add_text_field("source", STRING | STORED);
+        let f_id = sb.add_text_field("docid", STRING | STORED);
         let schema = sb.build();
         let mmap = MmapDirectory::open(dir).map_err(|e| e.to_string())?;
-        let index = Index::open_or_create(mmap, schema).map_err(|e| e.to_string())?;
+        // Open the existing index, but if its on-disk schema predates the unified
+        // (source/docid) fields, Tantivy refuses to open it. The index is only a
+        // rebuildable cache, so on a schema mismatch we wipe the dir and recreate
+        // rather than fail — the next sync/rebuild repopulates it.
+        let index = match Index::open_or_create(mmap, schema.clone()) {
+            Ok(i) => i,
+            Err(_) => {
+                for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())?.flatten() {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+                let mmap = MmapDirectory::open(dir).map_err(|e| e.to_string())?;
+                Index::open_or_create(mmap, schema).map_err(|e| e.to_string())?
+            }
+        };
         // Register the edge-ngram (prefix-only) tokenizer + lowercase folding.
         let tokenizer = TextAnalyzer::builder(
             NgramTokenizer::new(2, 12, true).map_err(|e| e.to_string())?,
@@ -148,6 +173,8 @@ impl SearchIndex {
             f_content,
             f_modified,
             f_size,
+            f_source,
+            f_id,
             query_cache: std::sync::Arc::new(std::sync::Mutex::new(dex_cache::Cache::new(64))),
         })
     }
@@ -203,12 +230,14 @@ impl SearchIndex {
         for (path, name, ext, modified, size, content) in prepared {
             writer
                 .add_document(doc!(
-                    self.f_path => path,
+                    self.f_path => path.clone(),
                     self.f_name => name,
                     self.f_ext => ext,
                     self.f_content => content,
                     self.f_modified => modified,
                     self.f_size => size,
+                    self.f_source => "file",
+                    self.f_id => path,
                 ))
                 .map_err(|e| e.to_string())?;
         }
@@ -233,17 +262,64 @@ impl SearchIndex {
         writer.delete_term(Term::from_field_text(self.f_path, &path_str));
         writer
             .add_document(doc!(
-                self.f_path => path_str,
+                self.f_path => path_str.clone(),
                 self.f_name => name,
                 self.f_ext => ext,
                 self.f_content => content,
                 self.f_modified => modified,
                 self.f_size => size,
+                self.f_source => "file",
+                self.f_id => path_str,
             ))
             .map_err(|e| e.to_string())?;
         writer.commit().map_err(|e| e.to_string())?;
         self.invalidate_cache();
         Ok(true)
+    }
+
+    /// Upsert an arbitrary content document (note, clipboard entry, …) into the
+    /// SAME index the files live in — the core of "fold everything indexed
+    /// together". Keyed by the stable `id`: any prior doc with that id is deleted
+    /// in the same commit so re-indexing never duplicates. `title` is prefix-
+    /// searchable (like a filename), `body` is full-text. `source` is the class
+    /// ("note" / "clipboard" / …) echoed back on every hit so the UI can route it.
+    pub fn upsert_doc(
+        &self,
+        id: &str,
+        source: &str,
+        title: &str,
+        body: &str,
+        modified: u64,
+    ) -> Result<(), String> {
+        if id.is_empty() {
+            return Err("doc id must not be empty".into());
+        }
+        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        writer.delete_term(Term::from_field_text(self.f_id, id));
+        writer
+            .add_document(doc!(
+                self.f_path => id,
+                self.f_name => title,
+                self.f_ext => "",
+                self.f_content => body,
+                self.f_modified => modified,
+                self.f_size => body.len() as u64,
+                self.f_source => source,
+                self.f_id => id,
+            ))
+            .map_err(|e| e.to_string())?;
+        writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
+        Ok(())
+    }
+
+    /// Remove any document (of any source) by its stable id. No-op if absent.
+    pub fn remove_doc(&self, id: &str) -> Result<(), String> {
+        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        writer.delete_term(Term::from_field_text(self.f_id, id));
+        writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
+        Ok(())
     }
 
     /// Remove a single file from the index by exact path. A no-op (still `Ok`) if
@@ -298,14 +374,25 @@ impl SearchIndex {
                 };
                 let u = |f: Field| doc.get_first(f).and_then(|v| v.as_u64()).unwrap_or(0);
                 let ext = s(self.f_ext);
+                let source = {
+                    let v = s(self.f_source);
+                    if v.is_empty() { "file".to_string() } else { v }
+                };
+                let path = s(self.f_path);
+                let id = {
+                    let v = s(self.f_id);
+                    if v.is_empty() { path.clone() } else { v }
+                };
                 hits.push(FileHit {
-                    path: s(self.f_path),
+                    path,
                     name: s(self.f_name),
                     extension: ext.clone(),
                     kind: ext,
                     modified: u(self.f_modified),
                     size: u(self.f_size),
                     score,
+                    source,
+                    id,
                 });
             }
         }
@@ -503,5 +590,58 @@ mod tests {
         assert!(idx.search("dep", 10).is_empty());
         assert!(idx.search("artifact", 10).is_empty());
         assert!(idx.search("keep", 10).iter().any(|h| h.name == "keep.txt"));
+    }
+
+    #[test]
+    fn files_notes_and_clipboard_share_one_index() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("report.txt"), b"quarterly figures").unwrap();
+
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        idx.index_path(data_dir.path(), 100).unwrap();
+        idx.upsert_doc("note:1", "note", "Meeting notes", "discuss the roadmap and hiring", 100)
+            .unwrap();
+        idx.upsert_doc("clip:9", "clipboard", "", "https://example.com/roadmap", 200).unwrap();
+        assert_eq!(idx.count(), 3, "one index holds the file, the note and the clip");
+
+        // A file hit carries source "file"; content search still works.
+        let files = idx.search("quarterly", 10);
+        assert!(files.iter().any(|h| h.name == "report.txt" && h.source == "file"));
+
+        // The note is found by its title (prefix) AND its body, tagged "note".
+        let by_title = idx.search("meet", 10);
+        assert!(by_title.iter().any(|h| h.id == "note:1" && h.source == "note"));
+        let by_body = idx.search("hiring", 10);
+        assert!(by_body.iter().any(|h| h.id == "note:1"));
+
+        // The clipboard entry is found by its body and tagged "clipboard".
+        let clip = idx.search("roadmap", 10);
+        assert!(clip.iter().any(|h| h.id == "clip:9" && h.source == "clipboard"));
+        assert!(clip.iter().any(|h| h.id == "note:1"), "note also mentions roadmap");
+    }
+
+    #[test]
+    fn upsert_doc_replaces_and_remove_doc_deletes() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+
+        idx.upsert_doc("note:7", "note", "Draft", "alpha body text", 1).unwrap();
+        assert!(idx.search("alpha", 10).iter().any(|h| h.id == "note:7"));
+
+        // Re-upserting the same id replaces content, never duplicates.
+        idx.upsert_doc("note:7", "note", "Draft", "beta body text", 2).unwrap();
+        assert_eq!(idx.count(), 1, "upsert_doc must replace, not duplicate");
+        assert!(idx.search("beta", 10).iter().any(|h| h.id == "note:7"));
+        assert!(idx.search("alpha", 10).is_empty(), "stale note body is gone");
+
+        // remove_doc deletes it; removing an absent id is a no-op.
+        idx.remove_doc("note:7").unwrap();
+        assert_eq!(idx.count(), 0);
+        idx.remove_doc("note:absent").unwrap();
+        assert_eq!(idx.count(), 0);
+
+        // An empty id is rejected rather than indexing a keyless doc.
+        assert!(idx.upsert_doc("", "note", "x", "y", 0).is_err());
     }
 }
