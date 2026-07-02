@@ -1851,7 +1851,7 @@ const MixerChannel = memo<{
 }>(({ track, index, selected, buses, frozen, onSelect, onUpdate, onTogglePlugin, onOpenBrowser, onReorderPlugins }) => {
   const dB = (track.volume - 1) * 60;
   return (
-    <div onClick={() => onSelect(track.id)} style={{ width: '128px', minWidth: '128px', background: selected ? 'linear-gradient(180deg,#2a2a32,#1f1f26 55%,#191920)' : 'linear-gradient(180deg,#212127,#191920 55%,#141418)', borderRadius: '10px', marginRight: 'var(--space-2)', display: 'flex', flexDirection: 'column', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, overflow: 'hidden', boxShadow: selected ? `0 0 0 1px ${track.color}44, 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)` : '0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+    <div onClick={() => onSelect(track.id)} style={{ width: '128px', minWidth: '128px', background: selected ? 'linear-gradient(180deg,#2a2a32,#1f1f26 55%,#191920)' : 'linear-gradient(180deg,#212127,#191920 55%,#141418)', borderRadius: '10px', marginRight: '16px', display: 'flex', flexDirection: 'column', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, overflow: 'hidden', boxShadow: selected ? `0 0 0 1px ${track.color}44, 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)` : '0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
       {/* Header */}
       <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-border-subtle)', background: `linear-gradient(180deg, ${track.color}2e, ${track.color}10)`, display: 'flex', alignItems: 'center', gap: 5 }}>
         <span onClick={(e) => { e.stopPropagation(); const i = COLORS.indexOf(track.color); onUpdate(track.id, { color: COLORS[(i + 1) % COLORS.length] }); }} style={{ width: 9, height: 9, borderRadius: '50%', background: track.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }} />
@@ -2641,6 +2641,30 @@ const Imosion: React.FC = () => {
       return { outcome: 'applied', note: `detected ${result.onsets.length} beats/onsets` };
     }
     return enginePendingApplier('Imosion')(op);
+  }, [tracks, selectedTrack]);
+
+  // One-click tempo/key detection on the selected track's audio clip. Uses the
+  // real engines directly (native for file paths, Web-Audio + TS for blob clips)
+  // so it "just works" on loaded sound without needing a UKI voice op.
+  const [analyzing, setAnalyzing] = useState(false);
+  const handleAnalyzeSelected = useCallback(async () => {
+    const track = tracks.find(t => t.id === selectedTrack && t.clips?.some(c => c.url))
+      ?? tracks.find(t => t.clips?.some(c => c.url));
+    const clip = track?.clips?.find(c => c.url);
+    const toast = (type: 'success' | 'error' | 'info', message: string) =>
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+    if (!clip?.url) { toast('info', 'Load an audio clip on a track first, then Analyze'); return; }
+    setAnalyzing(true);
+    try {
+      const [beats, key] = await Promise.all([analyzeBeats(clip.url), analyzeKey(clip.url)]);
+      if (!beats || beats.bpm <= 0) { toast('error', 'Could not detect a tempo from this audio'); return; }
+      const keyStr = key?.key ? `, key ${key.key} ${key.scale}` : '';
+      toast('success', `Detected ~${beats.bpm} BPM (${Math.round(beats.confidence * 100)}%)${keyStr}`);
+    } catch {
+      toast('error', 'Audio analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
   }, [tracks, selectedTrack]);
 
   // Keep MIDI ref in sync with selectedTrack state
@@ -6728,6 +6752,7 @@ const Imosion: React.FC = () => {
               <button aria-label="Add FX" onClick={() => setShowPluginBrowser(true)} className="btn btn-primary">{Icon.plugin} Add FX</button>
               <div className="divider" />
               <button aria-label="Spectrum Analyzer" onClick={() => setShowSpectrum(s => !s)} className={`btn ${showSpectrum ? 'btn-active' : ''}`}>Spectrum</button>
+              <button aria-label="Analyze tempo and key of the selected clip" onClick={handleAnalyzeSelected} disabled={analyzing} className="btn">{analyzing ? 'Analyzing…' : 'Analyze'}</button>
             </div>
           </div>
 
@@ -7007,8 +7032,9 @@ const Imosion: React.FC = () => {
                     track.plugins.filter(p => p.type === 'compressor' && (p.params.sidechainSource ?? -1) >= 0).map(p => {
                       const srcIdx = p.params.sidechainSource as number;
                       if (srcIdx < 0 || srcIdx >= tracks.length) return null;
-                      const srcX = 12 + srcIdx * 140 + 66;
-                      const destX = 12 + destIdx * 140 + 66;
+                      // Strip pitch = 128px width + 16px gap = 144; +64 centres it.
+                      const srcX = 12 + srcIdx * 144 + 64;
+                      const destX = 12 + destIdx * 144 + 64;
                       const y1 = 20;
                       const y2 = 40;
                       const midY = (y1 + y2) / 2 - 10;
