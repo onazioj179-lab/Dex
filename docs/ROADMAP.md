@@ -107,7 +107,24 @@
 > handler blocks launch from ANY stale surface (toast "reinstall from the Store"). 15 reducer tests; tsc 0;
 > live-verified: remove persists + blocks launch + shows in Store, calculator still launches, Reset restores
 > everything and the removed app launches again. NEXT track-6: Settings "Apps" reinstall section; future
-> background app-pack download. REMAINING MANDATE: track 2 (UKI task scheduling) is the last untouched track.
+> background app-pack download.
+>
+> **TRACK 2 — UKI BACKGROUND TASK SCHEDULING ✅ (2026-07-02):** Recurring background tasks that fire on the
+> shared heartbeat, self-recheck, and retry-with-backoff (mandate: "automate and work on tasks in the
+> background... rehook ourselves to check on tasks"). Built on the existing pure primitives (cron.ts,
+> backoff.ts). New: `shared/automation/scheduledTasks.ts` — pure engine (computeNextRun for cron+interval,
+> isDue/dueTasks, applyRunResult = success→next slot / failure→backoff then resume cadence; describeSchedule).
+> `store/scheduledTasksStore.ts` — persisted CRUD (`dex-scheduled-tasks`, MIN_INTERVAL 60s clamp).
+> `services/scheduledTaskRunner.ts` — SharedTick subscriber (30s, fireImmediately) that fires due tasks,
+> executes reminder (notify) / app-action (runUkiAction), records each run in the UKI ledger (useUkiTasks,
+> source 'automation' → shows in Nexus), and folds the outcome through applyRunResult. Started in App.tsx boot.
+> `components/ScheduledTasksPanel.tsx` — add cron/interval reminder + enable/disable/delete + next-run/outcome,
+> surfaced in TaskManager next to NexusUkiPanel. tsc 0; 37 unit tests (engine 16, store 5, + existing cron/
+> backoff). LIVE-VERIFIED end-to-end: created a reminder in the UI (persists + shows "every 60 min"/1 active),
+> forced it past-due, and the runner's boot tick fired it (runCount 1, outcome ok), logged an 'automation'
+> task in the UKI ledger (status done), and rescheduled to the future. ALL 7 MANDATE TRACKS NOW SHIPPED.
+> NEXT (polish, not new tracks): app-action scheduled tasks w/ pre-approval; Settings schedule UI; per-site
+> browser shields; Vinx 3D-LUT; Forge muxer; Imosion take comping.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
