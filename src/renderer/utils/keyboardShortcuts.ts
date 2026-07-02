@@ -309,16 +309,15 @@ export const useShortcut = (
 /**
  * Register multiple shortcuts at once
  */
-export const useShortcuts = (shortcuts: Omit<Shortcut, 'action'>[], scope?: string) => {
+export const useShortcuts = (shortcuts: Shortcut[], scope?: string) => {
   useEffect(() => {
-    const unregisters = shortcuts.map(s => 
+    const unregisters = shortcuts.map(s =>
       shortcutManager.register({
         ...s,
         scope: s.scope || scope,
-        action: () => {}, // Placeholder - real action should be provided
       })
     );
-    
+
     return () => unregisters.forEach(u => u());
   }, [shortcuts, scope]);
 };

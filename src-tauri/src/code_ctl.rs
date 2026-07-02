@@ -438,13 +438,16 @@ fn save_file(app: &tauri::AppHandle, file: &Value) -> Value {
 }
 
 // code:deleteFile(fileId) -> bool
-// Decode id, bail false if the file is gone, else unlink and drop it from recent.
+// Decode id, bail false if the file is gone, else move it to the OS recycle bin
+// (recoverable) and drop it from recent. Using `trash::delete` instead of
+// `std::fs::remove_file` matches the rest of DEX's safe-delete model
+// (`files:trash`) so an IDE delete is never an unrecoverable unlink.
 fn delete_file(app: &tauri::AppHandle, file_id: &str) -> Value {
     let file_path = b64_decode_to_utf8(file_id);
     if !Path::new(&file_path).exists() {
         return json!(false);
     }
-    match std::fs::remove_file(&file_path) {
+    match trash::delete(&file_path) {
         Ok(()) => {
             remove_from_recent(app, &file_path);
             json!(true)
@@ -454,9 +457,9 @@ fn delete_file(app: &tauri::AppHandle, file_id: &str) -> Value {
 }
 
 /// Route a `code:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). The two DATA channels are handled; the heavy
-/// mutating channels (saveFile/deleteFile) and any unknown channel return
-/// Value::Null (honest degrade — they are not ported).
+/// sent (see tauriCompat.ts). Read channels (getFiles/readFile) and the mutating
+/// channels (saveFile/deleteFile) are all handled; deleteFile routes through the
+/// OS recycle bin. Any unknown channel returns Value::Null (honest degrade).
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "code:getFiles" => {

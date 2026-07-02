@@ -3280,6 +3280,70 @@ scripting, native plugin sandboxing. These need DSP/ML or native hosting we don'
 - Task Manager — UI/UX pass, Apple-inspired internals
 - Achievements — UI/UX pass, Apple-inspired internals
 
+## Internal-engine hardening pass (2026-07-01)
+
+Owner brief: stop UI-only work, fix the raw internal engines/plumbing so the OS
+is real, tight and reliable ("no fakey"). Ran 4 parallel audits (IPC, window/drag
+engine, system controls, app engines). Filtered speculative/scaling notes; fixed
+the confirmed defects, verified tsc + `cargo check` clean and live-wallpaper CSS
+in-preview:
+
+- **Live wallpapers were fake** — `wpMode === 'live'` rendered a solid color
+  fallback and never animated. Added `liveWallpaperClass` in App.tsx + real CSS
+  keyframes (`dex-live-ember` / `dex-live-aurora` / `dex-live-waves`) in
+  design-system.css (GPU-composited, respects reduced-motion). Verified in preview:
+  class → `animationName: dex-live-aurora`, 18s.
+- **DexCode delete was an unrecoverable unlink** — `code:deleteFile` called
+  `std::fs::remove_file`. Now routes through `trash::delete` (OS recycle bin),
+  matching the rest of DEX's safe-delete model. Fixed stale dispatch doc comment.
+- **Z-order / memory leak** — `WindowDepthManager.removeWindow()` existed but was
+  never called; the depth map grew unbounded and reopened apps inherited stale
+  high z-indices. Now called in `AppManager.handleCloseApp` → `doRemove`.
+- **DexScript sandbox escape (RCE)** — the `Function`-based sandbox couldn't shadow
+  `eval`/dynamic-`import`/`.constructor`. Added a static escape-hatch guard on the
+  transpiled JS (rejects eval/import/constructor/__proto__/globalThis/WebAssembly/
+  importScripts/require) before execution.
+- **`useShortcuts` was a no-op** — registered every shortcut with `action: () => {}`.
+  Fixed the signature to require real actions (was dead + fakey).
+- **Window polish** — `handleFocus` now no-ops for minimized windows (no wasted
+  depth bump / lift cue on an invisible surface); window promotes to a compositor
+  layer (`will-change`) only while dragging/resizing, else `auto`.
+
+Deliberately NOT changed: vault idle auto-lock (contradicts the standing "no idle
+behaviors" direction).
+
+## Auth engine — real password / PIN / fingerprint / face (2026-07-01)
+
+Owner brief: "really get password, PIN and fingerprints" done for real — opt-in
+enrolment in Settings, multiple methods, their computer their choice; and keep the
+no-idle rule (no auto-logout, no screen-blank, no screen-recording lock — the
+session stays alive so they can close the PC and resume anytime).
+
+Found the auth system was half-built: `auth.rs` only implemented enrolment writes
+(weak single-pass salted SHA-256) + getState/getConfig. There was **no native
+verify path at all** — enrolment wrote a hash nothing ever checked, and the store's
+`auth:authenticate*` / change / clear / recovery channels weren't routed. Even
+enrolment channel names were mismatched (`auth:setup:password` native vs the store
+proxy's `auth:setPassword`).
+
+Rewrote `src-tauri/src/auth.rs` into a full credential engine:
+- **Argon2id hashing** (reuses `dex_vault::crypto::derive_key`, no new crate)
+  replacing single SHA-256; each secret stores `{Hash,Salt,Algo}`.
+- **Backward compatible + self-migrating**: pre-existing salted-SHA-256 creds still
+  verify and are transparently re-hashed to Argon2id on the next successful unlock.
+- **Verify path** for password / PIN, plus **biometric** (Windows Hello
+  `UserConsentVerifier` — covers fingerprint AND face), with constant-time compare.
+- **Brute-force lockout** (5 attempts → 5 min) — a per-attempt guard, NOT idle:
+  `lockOnSleep`/`timeoutMinutes`/`requireOnResume` are hard-forced off; `isLocked`
+  is never auto-true, so the session persists across close/resume.
+- **Change / clear / per-method disable** (Settings "Disable" now actually erases
+  the native credential instead of only flipping a UI flag), **recovery codes**
+  (one-time, hashed, consumed on use), and in-memory **session tokens**.
+- Multiple methods coexist; `derive_method` reports the combination.
+- Routes every `auth:*` channel (both the `setup:` and proxy names) in main.rs.
+
+Verified: `cargo check` clean, 5 new auth unit tests pass, `tsc` clean.
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.
