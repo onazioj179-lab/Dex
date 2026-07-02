@@ -185,6 +185,27 @@ export function executeDexScript(source: string): DexScriptResult {
 
   try {
     const jsCode = transpileDexScript(source);
+
+    // Sandbox escape guard. The runtime shadows window/document/fetch/Function
+    // to undefined, but a few constructs still reach the real global scope and
+    // cannot be lexically shadowed in strict mode:
+    //   - eval(...)                 : runs arbitrary code in the caller's scope
+    //   - import(...)               : dynamic import bypasses the shadowing
+    //   - ({}).constructor.constructor : rebuilds Function from a literal
+    //   - __proto__ / globalThis    : prototype/global reach-through
+    //   - WebAssembly / importScripts: alternate code-loading paths
+    // None of these are emitted by transpileDexScript for legitimate scripts, so
+    // rejecting the source outright is safe and keeps the sandbox honest.
+    const ESCAPE_HATCHES = /\b(eval|import|constructor|__proto__|globalThis|WebAssembly|importScripts|require)\b/;
+    const hatch = ESCAPE_HATCHES.exec(jsCode);
+    if (hatch) {
+      return {
+        output,
+        error: `Blocked: '${hatch[1]}' is not permitted in DexScript (sandbox protection).`,
+        duration: performance.now() - startTime,
+      };
+    }
+
     const maxOutputLines = 1000;
     let lineCount = 0;
 

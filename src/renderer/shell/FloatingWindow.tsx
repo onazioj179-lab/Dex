@@ -322,12 +322,15 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
 
   // Focus on click
   const handleFocus = useCallback(() => {
+    // A minimized window renders null, so raising it / playing the lift cue is
+    // wasted work (and would bump the depth counter for an invisible surface).
+    if (minimized) return;
     Depth.bringToFront(id);
     onFocus(id);
     if (windowRef.current) {
       playLift(windowRef.current.getBoundingClientRect().left + size.width / 2);
     }
-  }, [id, onFocus, size.width]);
+  }, [id, minimized, onFocus, size.width]);
 
   // -----------------------------------------------------------------------
   // TITLE BAR DRAGGING
@@ -646,7 +649,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           // title bar + lighter shadow, not by transparency.
           opacity: 1,
           contain: 'layout style',
-          willChange: 'auto',
+          // Promote to its own compositor layer only while actively moving or
+          // resizing, so per-frame geometry changes composite instead of
+          // triggering full paints. Reset to 'auto' at rest to free the layer.
+          willChange: (dragging || resizing) ? 'left, top, width, height' : 'auto',
           transition: 'none',
           // webkit-app-region handled by CSS on [data-floating-window]
         }}

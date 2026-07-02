@@ -2265,6 +2265,11 @@ export const Settings: React.FC = () => {
   };
   
   const handleDisableAuth = (type: 'pin' | 'password' | 'biometric') => {
+    // Actually erase the stored credential natively (not just flip local UI).
+    const channel = type === 'pin' ? 'auth:disablePin'
+      : type === 'password' ? 'auth:disablePassword'
+      : 'auth:disableBiometric';
+    void window.electron?.invoke?.(channel);
     if (type === 'pin') {
       setSettings(prev => ({
         ...prev,
