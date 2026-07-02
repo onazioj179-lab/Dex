@@ -22,6 +22,7 @@ import {
 } from '../../shared/search/SearchOrchestrator';
 import { fuzzyMatch, searchCommands, type CommandRegistry } from '../../shared/commands/registry';
 import { APP_DEFINITIONS } from '../store/runningApps';
+import { useInstalledAppsStore } from '../store/installedAppsStore';
 import { WORKFLOW_TEMPLATES } from './workflowTemplates';
 import { AssetLibrary } from './AssetLibrary';
 import { createCalcProvider } from './calcProvider';
@@ -37,8 +38,11 @@ export function createAppSearchProvider(): SearchProvider {
     async search(query: SearchQuery): Promise<SearchResult[]> {
       const q = query.text.trim();
       const out: SearchResult[] = [];
+      // Removed apps must not appear in spotlight (read the removed set live).
+      const removed = new Set(useInstalledAppsStore.getState().removedAppIds);
       for (const [id, def] of Object.entries(APP_DEFINITIONS) as [string, { name: string; icon?: string }][]) {
         if (HIDDEN_APP_IDS.has(id)) continue;
+        if (removed.has(id)) continue;
         const score = fuzzyMatch(`${def.name} ${id}`, q);
         if (score > 0) {
           out.push({

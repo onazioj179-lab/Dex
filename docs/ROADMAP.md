@@ -95,6 +95,19 @@
 > matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
 > (element hiding), EasyList import, per-site shields UI toggle. Other remaining: Vinx 3D-LUT math; Forge
 > WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
+>
+> **TRACK 6 — STORE APP LIFECYCLE ✅ (2026-07-02):** Install/remove/reinstall/reset is real (mandate:
+> "install Dex apps... remove apps... reinstall... reset... default setting, that's when you can get the app
+> back"). New `store/installedAppsStore.ts` — persisted removed-set (`dex-removed-apps`, empty = all installed
+> so new apps ship installed) + pure tested reducers (applyRemove/applyReinstall/isAppInstalled/
+> filterInstalledItems) + `PROTECTED_APP_IDS` (home/settings/store/files/browser/taskmanager can't be
+> uninstalled). Store.tsx: per-app Remove (installed+non-protected) / Get (reinstall) buttons, Removed badge,
+> header "Reset apps" + removed count. Removed apps hidden everywhere: CommandPalette filters app commands +
+> guards openApp; searchProviders (spotlight) skips removed; and a CENTRAL guard in AppManager's dex-open-app
+> handler blocks launch from ANY stale surface (toast "reinstall from the Store"). 15 reducer tests; tsc 0;
+> live-verified: remove persists + blocks launch + shows in Store, calculator still launches, Reset restores
+> everything and the removed app launches again. NEXT track-6: Settings "Apps" reinstall section; future
+> background app-pack download. REMAINING MANDATE: track 2 (UKI task scheduling) is the last untouched track.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps

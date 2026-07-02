@@ -23,6 +23,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { APP_DEFINITIONS } from '../store/runningApps';
+import { useInstalledAppsStore, canRemoveApp } from '../store/installedAppsStore';
 
 // ---------------------------------------------------------------------------
 // Types + registry projection
@@ -207,6 +208,15 @@ export default function Store(): React.ReactElement {
   const [favorites, setFavorites] = useState<Set<string>>(() => loadStringSet(FAVORITES_KEY));
   const [ratings, setRatings] = useState<Record<string, number>>(() => loadRatings());
 
+  // App lifecycle: removed apps disappear from the launcher/home/palette/search
+  // and show a "Get" (reinstall) action here instead of "Open".
+  const removedAppIds = useInstalledAppsStore(s => s.removedAppIds);
+  const removeApp = useInstalledAppsStore(s => s.removeApp);
+  const reinstallApp = useInstalledAppsStore(s => s.reinstallApp);
+  const resetApps = useInstalledAppsStore(s => s.resetApps);
+  const removedSet = useMemo(() => new Set(removedAppIds), [removedAppIds]);
+  const isRemoved = useCallback((id: string) => removedSet.has(id), [removedSet]);
+
   // Persist on change.
   useEffect(() => { persist(FAVORITES_KEY, [...favorites]); }, [favorites]);
   useEffect(() => { persist(RATINGS_KEY, ratings); }, [ratings]);
@@ -241,6 +251,21 @@ export default function Store(): React.ReactElement {
     openApp(id);
     toast(`Opening ${APP_DEFINITIONS[id]?.name ?? id}`, 'success');
   }, []);
+
+  const handleRemove = useCallback((id: string) => {
+    removeApp(id);
+    toast(`Removed ${APP_DEFINITIONS[id]?.name ?? id}`, 'success');
+  }, [removeApp]);
+
+  const handleReinstall = useCallback((id: string) => {
+    reinstallApp(id);
+    toast(`Reinstalled ${APP_DEFINITIONS[id]?.name ?? id}`, 'success');
+  }, [reinstallApp]);
+
+  const handleResetApps = useCallback(() => {
+    resetApps();
+    toast('All apps restored to defaults', 'success');
+  }, [resetApps]);
 
   // Featured: a stable, curated subset (flagship apps) that exist in the catalog.
   const featured = useMemo(() => {
@@ -355,6 +380,10 @@ export default function Store(): React.ReactElement {
             <span style={{ display: 'inline-flex', alignItems: 'center' }} title={`You rated this ${ratings[app.id]} of 5`}>
               {renderStars(app.id, 11, false)}
             </span>
+          ) : isRemoved(app.id) ? (
+            <span style={{ ...styles.installedBadge, color: 'var(--color-text-tertiary)' }}>
+              <DexIcon name="download" size={12} /> Removed
+            </span>
           ) : (
             <span style={styles.installedBadge}>
               <DexIcon name="check-circle" size={12} /> Installed
@@ -411,13 +440,24 @@ export default function Store(): React.ReactElement {
               <h1 style={styles.detailName}>{selected.name}</h1>
               <div style={styles.detailMetaRow}>
                 <span style={styles.catChip}>{CATEGORY_LABELS[selected.category]}</span>
-                <span style={styles.installedBadge}><DexIcon name="check-circle" size={12} /> Installed</span>
+                {isRemoved(selected.id) ? (
+                  <span style={{ ...styles.installedBadge, color: 'var(--color-text-tertiary)' }}><DexIcon name="download" size={12} /> Removed</span>
+                ) : (
+                  <span style={styles.installedBadge}><DexIcon name="check-circle" size={12} /> Installed</span>
+                )}
                 {selected.version && <span style={styles.metaDim}>v{selected.version}</span>}
               </div>
               <div style={styles.detailActions}>
-                <button type="button" style={styles.primaryBtn} onClick={() => launch(selected.id)}>
-                  <DexIcon name="external-link" size={15} /> Open
-                </button>
+                {isRemoved(selected.id) ? (
+                  // Removed → the only primary action is to reinstall ("Get").
+                  <button type="button" style={styles.primaryBtn} onClick={() => handleReinstall(selected.id)}>
+                    <DexIcon name="download" size={15} /> Get
+                  </button>
+                ) : (
+                  <button type="button" style={styles.primaryBtn} onClick={() => launch(selected.id)}>
+                    <DexIcon name="external-link" size={15} /> Open
+                  </button>
+                )}
                 <button
                   type="button"
                   style={{ ...styles.secondaryBtn, color: isFav ? 'var(--color-error)' : 'var(--color-text-primary)' }}
@@ -427,6 +467,17 @@ export default function Store(): React.ReactElement {
                   <DexIcon name="heart" size={15} />
                   {isFav ? 'Favorited' : 'Favorite'}
                 </button>
+                {/* Remove is only offered for non-protected, currently-installed apps. */}
+                {!isRemoved(selected.id) && canRemoveApp(selected.id) && (
+                  <button
+                    type="button"
+                    style={{ ...styles.secondaryBtn, color: 'var(--color-error)' }}
+                    onClick={() => handleRemove(selected.id)}
+                    title={`Remove ${selected.name} — reinstall any time from the Store`}
+                  >
+                    <DexIcon name="trash" size={15} /> Remove
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -484,8 +535,23 @@ export default function Store(): React.ReactElement {
           <div style={styles.storeIcon} aria-hidden><DexIcon name="store" size={18} /></div>
           <div style={{ minWidth: 0 }}>
             <h1 style={styles.title}>DEX Store</h1>
-            <div style={styles.subtitle}>{catalog.length} apps · all built-in</div>
+            <div style={styles.subtitle}>
+              {catalog.length} apps · all built-in
+              {removedAppIds.length > 0 && ` · ${removedAppIds.length} removed`}
+            </div>
           </div>
+          {/* Reset restores every removed app to the default set (mandate:
+              "reset... default setting, that's when you can get the app back"). */}
+          {removedAppIds.length > 0 && (
+            <button
+              type="button"
+              style={styles.resetAppsBtn}
+              onClick={handleResetApps}
+              title="Reinstall every removed app"
+            >
+              <DexIcon name="refresh" size={13} /> Reset apps
+            </button>
+          )}
         </div>
 
         <div style={styles.controls}>
@@ -939,6 +1005,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer',
   },
+  resetAppsBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 32,
+    padding: '0 12px',
+    marginLeft: 'auto',
+    borderRadius: 999,
+    border: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-surface)',
+    color: 'var(--color-text-secondary)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  } as React.CSSProperties,
   detailSection: { display: 'flex', flexDirection: 'column', gap: 8 },
   sectionTitle: { margin: 0, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' },
   detailDesc: { margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-primary)' },
