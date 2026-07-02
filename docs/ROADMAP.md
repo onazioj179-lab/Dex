@@ -79,10 +79,22 @@
 >    confirmed VP9+Opus/captureStream all supported + source WebM generated, but a full real-time video
 >    round-trip can't run in the hidden preview tab (browser throttles background <video> playback) — same
 >    proven technique as Vinx quickExport; verified by capability probe + unit tests + tsc, not a live encode.
->    REMAINING (round 5 candidates): Vinx real 3D-LUT color math + command-based speed ops; Forge WebCodecs
->    faster-than-realtime encode (needs an MP4/WebM muxer dep); Imosion take comping. Or track 2 (UKI task
->    scheduling on shared/automation cron + src-tauri/task_queue.rs) / track 5-6 (browser ad-block default,
->    Store lifecycle).
+>    (Round 5 pivoted to track 5 — browser ad-block — instead of more creative polish.)
+>
+> **TRACK 5 — BROWSER AD-BLOCK BY DEFAULT ✅ (2026-07-02):** The mandate's "No ads by default" is real now.
+> The browser is an Electron `<webview>` with NO request-interception API, so the old `shouldBlock` only
+> caught top-level NAVIGATION to an ad domain (never happens) — actual ads load as sub-resources and were
+> never touched. Fixes: (1) `DEXAPPLICATIONS/browser/adblockEngine.ts` — tested filter engine (label-boundary
+> suffix match so "notdoubleclick.net" ≠ "doubleclick.net", path entries, tracking patterns, per-site
+> allowlist / "shields down"); Browser.tsx navigation guard now uses it. (2) `adblockContentScript.ts` —
+> `buildAdblockScript` generates a self-contained IIFE injected on every page's `dom-ready` via
+> executeJavaScript; running IN the page it overrides fetch/XHR/sendBeacon/Image and MutationObserver-scrubs
+> ad `<script>/<img>/<iframe>` as they insert — REAL sub-resource blocking. Reports blocks via a console
+> marker the host tallies into `blockedCount`. On by default (blockAds+blockTrackers default true). 26 unit
+> tests incl. a code-injection-breakout guard + behavioral eval; live-verified in WebView2 (all APIs present,
+> matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
+> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: Vinx 3D-LUT math; Forge
+> WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
