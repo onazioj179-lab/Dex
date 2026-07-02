@@ -72,6 +72,7 @@ import ZoneEditor from './ZoneEditor';
 import { auditDomTargets } from '../../shared/a11y/targetSize';
 import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
+import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
 import { sharedTick } from '../services/SharedTick';
@@ -1817,17 +1818,24 @@ export const AppManager: React.FC = () => {
     }
     const z = nextDetachZ();
 
-    // UX: every detached app opens MAXIMIZED so it fills the DEX frame
-    // (no surrounding wallpaper gaps). Users can still drag-restore or
-    // resize from there. Creative apps explicitly mark `maximized: true`
-    // and are unaffected.
+    // UX: restore the app's last FLOATING place if we remember one (mandate:
+    // "remember place when floating"); otherwise open MAXIMIZED so it fills the
+    // DEX frame with no surrounding wallpaper gaps. A remembered maximized rect
+    // is treated as "no float memory" so it reopens filling via the default.
     setDetachedApps(prev => {
       const next = new Map(prev);
-      next.set(appId, { ...getMaximizedWindowBounds(), z });
+      const ws = getShellWorkspace(0);
+      const remembered = getFloatingBounds(appId);
+      if (remembered && !isMaximizedRect(remembered, ws)) {
+        const clamped = clampWindowToWorkspace({ x: remembered.x, y: remembered.y, w: remembered.w, h: remembered.h }, ws);
+        next.set(appId, { ...clamped, z });
+      } else {
+        next.set(appId, { ...getMaximizedWindowBounds(), z });
+      }
       return next;
     });
     if (currentApp === appId) setCurrentApp('home');
-  }, [currentApp, getMaximizedWindowBounds, setCurrentApp]);
+  }, [currentApp, getMaximizedWindowBounds, getShellWorkspace, setCurrentApp]);
 
   const bringToFront = useCallback((appId: AppId) => {
     const z = nextDetachZ();
@@ -1869,6 +1877,7 @@ export const AppManager: React.FC = () => {
   // synchronously on beforeunload.
   useEffect(() => {
     const snaps: WindowSnapshot[] = [];
+    const ws = getShellWorkspace(0);
     detachedApps.forEach((b, appId) => {
       snaps.push({
         appId,
@@ -1878,6 +1887,10 @@ export const AppManager: React.FC = () => {
         minimized: minimizedApps.has(appId),
         focused: focusedFloatingAppId === appId,
       });
+      // Remember the app's floating place so reopening restores it — but skip
+      // maximized/minimized windows so a filled window reopens filled.
+      const rect = { x: b.x, y: b.y, w: b.w, h: b.h };
+      if (!minimizedApps.has(appId) && !isMaximizedRect(rect, ws)) saveFloatingBounds(appId, rect);
     });
     // Don't persist an EMPTY layout: on a fresh boot detachedApps starts empty, and
     // an empty write would wipe the previous session's geometry BEFORE the restore
