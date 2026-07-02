@@ -34,8 +34,18 @@
 >    (`engine/modalBuckling.ts` — cantilever beam modes + Euler critical load, tested vs analytical steel-cube
 >    values, wired into the sim panel with contextual labels); parametric expressions (`utils/exprEval.ts` safe
 >    evaluator + fixed-point table resolver w/ circular detection; PARAMETERS table in PropertiesPanel; ALL
->    transform inputs accept expressions against the parameter scope). 63/63 AXL tests. NEXT: Imosion pass,
->    then Vinx/Forge; deeper AXL later = real eigen-FEA (mass matrix on the truss model), sketch-dim parameters.
+>    transform inputs accept expressions against the parameter scope). 63/63 AXL tests.
+>    **Imosion pass 1 ✅ + shell/canvas sweeps (2026-07-02, later):** Analyze now APPLIES tempo+key to the
+>    project (both the button and the UKI op — which had claimed "applied" without applying); automation-point
+>    drag + clip trim rAF-batched (were per-mousemove setState; automation also re-attached listeners per move);
+>    STEM EXPORT IS REAL (old button downloaded a text manifest! now per-track offline renders, master recipe
+>    minus master bus, silence-checked 24-bit WAVs + MIDI stem). Also: removed the blanket `[role=tab]` ::after
+>    underline that drew a stray line between the tab strip and apps (owner-reported); OS-wide sweep of the
+>    Canvas-2D var()-color bug (18 more sites: AXL Renderer class ×12, Audio waveform, Rewind trend, Prism ×4 —
+>    new shared `utils/canvasTheme.ts`); AXL Renderer.init now degrades to Canvas 2D instead of crashing to the
+>    error boundary when GL setup throws (lost context / GPU reset / HMR remount). NEXT: Vinx/Forge pass;
+>    Imosion deeper = sidechain wiring, reverb IR loading, recording monitor toggle, groove quantize;
+>    deeper AXL = real eigen-FEA (mass matrix on the truss model), sketch-dim parameters.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
