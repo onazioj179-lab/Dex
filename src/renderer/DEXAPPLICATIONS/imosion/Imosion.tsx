@@ -3732,8 +3732,52 @@ const Imosion: React.FC = () => {
   // Comping lanes
   const [showCompLanes, setShowCompLanes] = useState(false);
   const [compLanes, setCompLanes] = useState<{ id: string; name: string; active: boolean }[]>([]);
-  // Input monitoring
+  // Input monitoring — real live mic-through-monitoring (was a dead toggle that
+  // set state and did nothing). When on: open the mic and route it through the
+  // engine's AudioContext to the speakers so the user hears their live input.
   const [inputMonitoring, setInputMonitoring] = useState(false);
+  const monitorStreamRef = useRef<MediaStream | null>(null);
+  const monitorNodesRef = useRef<{ src: MediaStreamAudioSourceNode; gain: GainNode } | null>(null);
+  useEffect(() => {
+    if (!inputMonitoring) return;
+    let cancelled = false;
+    const ctx = getAudioEngine().getContext();
+    if (!ctx) {
+      setInputMonitoring(false);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Audio engine not ready — start playback once, then enable monitoring.' } }));
+      return;
+    }
+    navigator.mediaDevices?.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+      .then(stream => {
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        monitorStreamRef.current = stream;
+        const src = ctx.createMediaStreamSource(stream);
+        const gain = ctx.createGain();
+        gain.gain.value = 0.85;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        monitorNodesRef.current = { src, gain };
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Input monitoring on — use headphones to avoid feedback.' } }));
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setInputMonitoring(false);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Mic access unavailable: ${err?.message || 'no input device / permission denied'}` } }));
+      });
+    return () => {
+      cancelled = true;
+      const nodes = monitorNodesRef.current;
+      if (nodes) {
+        try { nodes.src.disconnect(); } catch { /* noop */ }
+        try { nodes.gain.disconnect(); } catch { /* noop */ }
+        monitorNodesRef.current = null;
+      }
+      if (monitorStreamRef.current) {
+        monitorStreamRef.current.getTracks().forEach(t => { try { t.stop(); } catch { /* noop */ } });
+        monitorStreamRef.current = null;
+      }
+    };
+  }, [inputMonitoring]);
   // Loop recording
   const [loopRecording, setLoopRecording] = useState(false);
   // Count-in (pre-roll bars before recording)
