@@ -2636,7 +2636,13 @@ const Imosion: React.FC = () => {
         // real file path; blob clips get tempo alone, no faked key.
         const key = await analyzeKey(clip.url);
         const keyNote = key ? `, key ${key.key} ${key.scale}` : '';
-        return { outcome: 'applied', note: `detected tempo ~${result.bpm} BPM (confidence ${Math.round(result.confidence * 100)}%)${keyNote}` };
+        // Actually APPLY the detection (this op used to report 'applied'
+        // while only describing the result): project tempo + key follow.
+        setBpm(Math.max(30, Math.min(300, Math.round(result.bpm))));
+        if (key?.key && (MUSICAL_KEYS as string[]).includes(key.key)) {
+          setProjectKey({ root: key.key as MusicalKey, scale: key.scale === 'minor' ? 'minor' : 'major' });
+        }
+        return { outcome: 'applied', note: `set project tempo to ~${result.bpm} BPM (confidence ${Math.round(result.confidence * 100)}%)${keyNote}` };
       }
       return { outcome: 'applied', note: `detected ${result.onsets.length} beats/onsets` };
     }
@@ -2658,8 +2664,15 @@ const Imosion: React.FC = () => {
     try {
       const [beats, key] = await Promise.all([analyzeBeats(clip.url), analyzeKey(clip.url)]);
       if (!beats || beats.bpm <= 0) { toast('error', 'Could not detect a tempo from this audio'); return; }
-      const keyStr = key?.key ? `, key ${key.key} ${key.scale}` : '';
-      toast('success', `Detected ~${beats.bpm} BPM (${Math.round(beats.confidence * 100)}%)${keyStr}`);
+      // Apply, don't just report: the whole point of one-click Analyze is that
+      // the project locks onto the audio. Tempo clamps to the transport range;
+      // key applies only when the (native-only) chromagram produced one.
+      setBpm(Math.max(30, Math.min(300, Math.round(beats.bpm))));
+      if (key?.key && (MUSICAL_KEYS as string[]).includes(key.key)) {
+        setProjectKey({ root: key.key as MusicalKey, scale: key.scale === 'minor' ? 'minor' : 'major' });
+      }
+      const keyStr = key?.key ? `, key set to ${key.key} ${key.scale}` : '';
+      toast('success', `Tempo set to ~${Math.round(beats.bpm)} BPM (${Math.round(beats.confidence * 100)}%)${keyStr}`);
     } catch {
       toast('error', 'Audio analysis failed');
     } finally {
@@ -4426,6 +4439,170 @@ const Imosion: React.FC = () => {
     }
   }, [exportSettings, tracks, duration, masterSettings, sampleRate, pianoRollNotes, bpm]);
 
+  // Real per-track stem export — replaces the old placeholder that downloaded
+  // a TEXT MANIFEST pretending to be stems. Each unmuted track renders through
+  // its own offline graph (volume, pan, enabled EQ/compressor inserts, clip
+  // gain/fades/pitch — the same recipe as the master export, minus the master
+  // bus so stems recombine cleanly) over the FULL project length (stems stay
+  // time-aligned), then downloads as a 24-bit WAV named after the track.
+  // Piano-roll MIDI renders as its own "MIDI" stem when notes exist.
+  const [stemExporting, setStemExporting] = useState(false);
+  const [stemProgress, setStemProgress] = useState('');
+  const exportStems = useCallback(async () => {
+    const toast = (type: 'success' | 'error' | 'info', message: string) =>
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+    setStemExporting(true);
+    try {
+      const sr = exportSettings.sampleRate;
+      const totalDuration = Math.max(duration, ...tracks.flatMap(t => t.clips.map(c => c.startTime + c.duration)));
+      const totalSamples = Math.ceil(totalDuration * sr);
+      if (totalSamples === 0) { toast('info', 'Nothing to export — add clips first'); return; }
+
+      const download = (blob: Blob, name: string) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+      const isAudible = (buf: AudioBuffer): boolean => {
+        const stride = Math.max(1, Math.floor(buf.sampleRate * 0.2));
+        for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+          const data = buf.getChannelData(ch);
+          for (let i = 0; i < data.length; i += stride) {
+            if (Math.abs(data[i]) > 1e-6) return true;
+          }
+        }
+        return false;
+      };
+      const safeName = (name: string) => name.replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '-') || 'track';
+
+      const exportable = tracks.filter(t => !t.muted && t.clips.some(c => c.url));
+      let exported = 0;
+      let silent = 0;
+      let index = 0;
+      for (const track of exportable) {
+        index++;
+        setStemProgress(`Rendering ${index}/${exportable.length}: ${track.name}`);
+        const ctx = new OfflineAudioContext(2, totalSamples, sr);
+        const trackGain = ctx.createGain();
+        trackGain.gain.value = track.volume;
+        const trackPan = ctx.createStereoPanner();
+        trackPan.pan.value = track.pan;
+        let chainTail: AudioNode = trackGain;
+        for (const plugin of track.plugins) {
+          if (!plugin.enabled) continue;
+          try {
+            if (plugin.type === 'eq' && plugin.params) {
+              const low = ctx.createBiquadFilter();
+              low.type = 'lowshelf'; low.frequency.value = 200; low.gain.value = (plugin.params.lowGain || 0);
+              const mid = ctx.createBiquadFilter();
+              mid.type = 'peaking'; mid.frequency.value = 1000; mid.gain.value = (plugin.params.midGain || 0);
+              const high = ctx.createBiquadFilter();
+              high.type = 'highshelf'; high.frequency.value = 4000; high.gain.value = (plugin.params.highGain || 0);
+              chainTail.connect(low); low.connect(mid); mid.connect(high);
+              chainTail = high;
+            } else if (plugin.type === 'compressor' && plugin.params) {
+              const comp = ctx.createDynamicsCompressor();
+              comp.threshold.value = plugin.params.threshold ?? -24;
+              comp.ratio.value = plugin.params.ratio ?? 4;
+              comp.attack.value = plugin.params.attack ?? 0.003;
+              comp.release.value = plugin.params.release ?? 0.25;
+              chainTail.connect(comp);
+              chainTail = comp;
+            }
+          } catch (e) { console.warn('[Stems] plugin error', plugin.type, e); }
+        }
+        chainTail.connect(trackPan);
+        trackPan.connect(ctx.destination);
+
+        for (const clip of track.clips) {
+          try {
+            if (!clip.url) continue;
+            const response = await fetch(clip.url);
+            const arrayBuf = await response.arrayBuffer();
+            if (arrayBuf.byteLength === 0) continue;
+            const buffer = await ctx.decodeAudioData(arrayBuf);
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            if (typeof clip.pitch === 'number' && clip.pitch !== 0) {
+              source.playbackRate.value = Math.pow(2, clip.pitch / 12);
+            }
+            const clipGain = ctx.createGain();
+            clipGain.gain.value = clip.gain;
+            if (clip.fadeIn > 0) {
+              clipGain.gain.setValueAtTime(0, clip.startTime);
+              clipGain.gain.linearRampToValueAtTime(clip.gain, clip.startTime + clip.fadeIn);
+            }
+            if (clip.fadeOut > 0) {
+              const fadeStart = clip.startTime + clip.duration - clip.fadeOut;
+              clipGain.gain.setValueAtTime(clip.gain, fadeStart);
+              clipGain.gain.linearRampToValueAtTime(0, clip.startTime + clip.duration);
+            }
+            source.connect(clipGain);
+            clipGain.connect(trackGain);
+            const bufDur = buffer.duration;
+            const offset = Math.max(0, Math.min(clip.trimStart || 0, bufDur));
+            const playDur = Math.max(0, Math.min(clip.duration, bufDur - offset));
+            if (playDur > 0) source.start(clip.startTime, offset, playDur);
+          } catch (clipErr) {
+            console.warn('[Stems] Skipping clip:', clip.name, clipErr);
+          }
+        }
+
+        const rendered = await ctx.startRendering();
+        if (!isAudible(rendered)) { silent++; continue; }
+        download(audioBufferToWav(rendered, 24), `stem-${safeName(track.name)}.wav`);
+        exported++;
+      }
+
+      // Piano-roll MIDI as its own stem (same synthesis as the master export)
+      if (pianoRollNotes.some(n => !n.muted)) {
+        setStemProgress('Rendering MIDI stem');
+        const ctx = new OfflineAudioContext(2, totalSamples, sr);
+        const midiToFreq = (note: number) => 440 * Math.pow(2, (note - 69) / 12);
+        const beatsToSec = (beats: number) => beats * 60 / bpm;
+        for (const note of pianoRollNotes) {
+          if (note.muted) continue;
+          try {
+            const noteStart = beatsToSec(note.startTime);
+            const noteDur = beatsToSec(note.duration);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = midiToFreq(note.pitch);
+            gain.gain.setValueAtTime(0, noteStart);
+            gain.gain.linearRampToValueAtTime((note.velocity / 127) * 0.15, noteStart + 0.01);
+            gain.gain.setValueAtTime((note.velocity / 127) * 0.15, noteStart + noteDur - 0.05);
+            gain.gain.linearRampToValueAtTime(0, noteStart + noteDur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(noteStart);
+            osc.stop(noteStart + noteDur);
+          } catch (e) { console.warn('[DEX]', e); }
+        }
+        const rendered = await ctx.startRendering();
+        if (isAudible(rendered)) { download(audioBufferToWav(rendered, 24), 'stem-midi.wav'); exported++; }
+      }
+
+      if (exported === 0) {
+        toast('error', 'No audible stems to export — tracks are muted, empty, or silent');
+      } else {
+        toast('success', `Exported ${exported} stem${exported === 1 ? '' : 's'}${silent ? ` (${silent} silent track${silent === 1 ? '' : 's'} skipped)` : ''}`);
+        setShowStemExport(false);
+      }
+    } catch (error) {
+      console.error('[Stems] Failed:', error);
+      toast('error', 'Stem export failed');
+    } finally {
+      setStemExporting(false);
+      setStemProgress('');
+    }
+  }, [exportSettings.sampleRate, tracks, duration, pianoRollNotes, bpm]);
+
   // Create collaboration session
   const createCollabSession = useCallback((sessionName: string) => {
     const hostCollaborator: Collaborator = {
@@ -5928,63 +6105,90 @@ const Imosion: React.FC = () => {
     setForgeClip(prev => prev ? { ...prev, clip: { ...prev.clip, waveform: wf } } : null);
   }, [forgeClip]);
 
-  // Clip resize handler
-  const handleClipResize = useCallback((e: MouseEvent) => {
-    if (!clipResizing) return;
-    const dx = (e.clientX - clipResizing.startX) / zoom;
-    if (clipResizing.edge === 'right') {
-      const newDuration = Math.max(0.1, clipResizing.origDuration + dx);
-      updateClip(clipResizing.trackId, clipResizing.clipId, { duration: newDuration });
-    } else {
-      const newStart = Math.max(0, clipResizing.origStart + dx);
-      const startDelta = newStart - clipResizing.origStart;
-      const newDuration = Math.max(0.1, clipResizing.origDuration - startDelta);
-      updateClip(clipResizing.trackId, clipResizing.clipId, { startTime: newStart, duration: newDuration });
-    }
-  }, [clipResizing, zoom]);
-
-  const handleClipResizeEnd = useCallback(() => {
-    setClipResizing(null);
-  }, []);
-
+  // Clip resize — rAF-batched: gaming mice fire mousemove far above the frame
+  // rate; coalescing to at most one updateClip per frame keeps trimming smooth
+  // on large sessions. The final sampled position is committed on release.
   useEffect(() => {
-    if (clipResizing) {
-      window.addEventListener('mousemove', handleClipResize);
-      window.addEventListener('mouseup', handleClipResizeEnd);
-      return () => { window.removeEventListener('mousemove', handleClipResize); window.removeEventListener('mouseup', handleClipResizeEnd); };
-    }
-  }, [clipResizing, handleClipResize, handleClipResizeEnd]);
+    if (!clipResizing) return;
+    let rafId = 0;
+    let pendingX: number | null = null;
+    const flush = () => {
+      rafId = 0;
+      if (pendingX == null) return;
+      const dx = (pendingX - clipResizing.startX) / zoom;
+      pendingX = null;
+      if (clipResizing.edge === 'right') {
+        updateClip(clipResizing.trackId, clipResizing.clipId, { duration: Math.max(0.1, clipResizing.origDuration + dx) });
+      } else {
+        const newStart = Math.max(0, clipResizing.origStart + dx);
+        const startDelta = newStart - clipResizing.origStart;
+        updateClip(clipResizing.trackId, clipResizing.clipId, { startTime: newStart, duration: Math.max(0.1, clipResizing.origDuration - startDelta) });
+      }
+    };
+    const onMove = (e: MouseEvent) => {
+      pendingX = e.clientX;
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+    const onUp = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      flush();
+      setClipResizing(null);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [clipResizing, zoom, updateClip]);
 
-  // Automation point drag handler
+  // Automation point drag handler — rAF-batched. The old version wrote state
+  // on EVERY pointermove (240 Hz mice = 240 renders/s) and, because it kept
+  // `trackAutomations` in the deps, each write also detached/re-attached the
+  // window listeners mid-drag. Now: at most one state write per frame, min/max
+  // read inside the updater (no automations dep), listeners attach once per
+  // drag, and the final sampled position is committed on release.
   useEffect(() => {
     if (editingAutomation == null || automationDragPoint == null) return;
-    const automation = trackAutomations.find(a => a.id === editingAutomation);
-    if (!automation) return;
-    const handleAutomationDrag = (e: PointerEvent) => {
-      const svg = document.querySelector(`svg[data-automation-id="${editingAutomation}"]`);
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
-      const timeVal = Math.max(0, (e.clientX - rect.left) / (60 * zoom));
-      const normalizedY = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-      const value = automation.min + normalizedY * (automation.max - automation.min);
+    const svg = document.querySelector(`svg[data-automation-id="${editingAutomation}"]`);
+    if (!svg) return;
+    let rafId = 0;
+    let pending: { time: number; norm: number } | null = null;
+    const flush = () => {
+      rafId = 0;
+      const p = pending;
+      pending = null;
+      if (!p) return;
       setTrackAutomations(prev => prev.map(a => {
         if (a.id !== editingAutomation) return a;
         const pts = [...a.points];
-        pts[automationDragPoint!] = { ...pts[automationDragPoint!], time: timeVal, value };
+        pts[automationDragPoint] = { ...pts[automationDragPoint], time: p.time, value: a.min + p.norm * (a.max - a.min) };
         return { ...a, points: pts };
       }));
     };
+    const handleAutomationDrag = (e: PointerEvent) => {
+      const rect = svg.getBoundingClientRect();
+      pending = {
+        time: Math.max(0, (e.clientX - rect.left) / (60 * zoom)),
+        norm: 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+      };
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
     const handleAutomationDragEnd = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      flush();
       setEditingAutomation(null);
       setAutomationDragPoint(null);
     };
     window.addEventListener('pointermove', handleAutomationDrag);
     window.addEventListener('pointerup', handleAutomationDragEnd);
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handleAutomationDrag);
       window.removeEventListener('pointerup', handleAutomationDragEnd);
     };
-  }, [editingAutomation, automationDragPoint, trackAutomations, zoom]);
+  }, [editingAutomation, automationDragPoint, zoom]);
 
   const deleteTrack = useCallback((id: string) => {
     if (tracks.length <= 1) return;
@@ -10222,11 +10426,13 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{frozenTracks.has(t.id) ? 'Frozen' : 'Active'}</span>
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-              <select style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 10 }}>
-                <option value="wav">WAV 24-bit</option><option value="flac">FLAC</option><option value="mp3">MP3 320kbps</option><option value="aac">AAC 256kbps</option><option value="ogg">OGG Vorbis</option>
-              </select>
-              <button onClick={() => { const trackNames = tracks.map(t => t.name).join(', '); const blob = new Blob([`Stem export manifest:\n${trackNames}\nFormat: WAV 24-bit\nExported: ${new Date().toISOString()}`], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'stems-manifest.txt'; a.click(); URL.revokeObjectURL(url); setShowStemExport(false); }} aria-label="Export All Stems" style={{ padding: '6px var(--space-4)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export All Stems</button>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', alignItems: 'center' }}>
+              <span style={{ flex: 1, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                {stemExporting ? stemProgress : 'WAV 24-bit · post-fader, no master bus'}
+              </span>
+              <button onClick={() => { void exportStems(); }} disabled={stemExporting} aria-label="Export All Stems" style={{ padding: '6px var(--space-4)', borderRadius: 4, border: 'none', background: stemExporting ? 'var(--color-bg-hover)' : 'var(--color-accent)', color: stemExporting ? 'var(--color-text-tertiary)' : '#fff', fontSize: 10, fontWeight: 600, cursor: stemExporting ? 'wait' : 'pointer' }}>
+                {stemExporting ? 'Rendering…' : 'Export All Stems'}
+              </button>
             </div>
           </div>
         </div>

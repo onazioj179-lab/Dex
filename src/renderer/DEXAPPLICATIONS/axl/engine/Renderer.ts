@@ -775,7 +775,10 @@ export class AXLRenderer {
 
   init(canvas: HTMLCanvasElement): boolean {
     this.canvas = canvas;
-    const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, premultipliedAlpha: false });
+    let gl: WebGL2RenderingContext | null = null;
+    try {
+      gl = canvas.getContext('webgl2', { antialias: true, alpha: false, premultipliedAlpha: false });
+    } catch { gl = null; }
     if (!gl) {
       console.warn('AXL: WebGL2 not available, falling back to Canvas 2D');
       this.useWebGL = false;
@@ -786,48 +789,63 @@ export class AXLRenderer {
       return false;
     }
 
-    this.gl = gl;
-    this.useWebGL = true;
+    try {
+      this.gl = gl;
+      this.useWebGL = true;
 
-    // Main shader
-    const vs = compileShader(gl, VERT_SRC, gl.VERTEX_SHADER);
-    const fs = compileShader(gl, FRAG_SRC, gl.FRAGMENT_SHADER);
-    this.mainProgram = linkProgram(gl, vs, fs);
-    gl.deleteShader(vs);
-    gl.deleteShader(fs);
+      // Main shader
+      const vs = compileShader(gl, VERT_SRC, gl.VERTEX_SHADER);
+      const fs = compileShader(gl, FRAG_SRC, gl.FRAGMENT_SHADER);
+      this.mainProgram = linkProgram(gl, vs, fs);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
 
-    // Grid shader
-    const gvs = compileShader(gl, GRID_VERT, gl.VERTEX_SHADER);
-    const gfs = compileShader(gl, GRID_FRAG, gl.FRAGMENT_SHADER);
-    this.gridProgram = linkProgram(gl, gvs, gfs);
-    gl.deleteShader(gvs);
-    gl.deleteShader(gfs);
+      // Grid shader
+      const gvs = compileShader(gl, GRID_VERT, gl.VERTEX_SHADER);
+      const gfs = compileShader(gl, GRID_FRAG, gl.FRAGMENT_SHADER);
+      this.gridProgram = linkProgram(gl, gvs, gfs);
+      gl.deleteShader(gvs);
+      gl.deleteShader(gfs);
 
-    // Cache uniform locations
-    this.uModel = gl.getUniformLocation(this.mainProgram, 'uModel')!;
-    this.uView = gl.getUniformLocation(this.mainProgram, 'uView')!;
-    this.uProjection = gl.getUniformLocation(this.mainProgram, 'uProjection')!;
-    this.uNormalMatrix = gl.getUniformLocation(this.mainProgram, 'uNormalMatrix')!;
-    this.uColor = gl.getUniformLocation(this.mainProgram, 'uColor')!;
-    this.uLightDir = gl.getUniformLocation(this.mainProgram, 'uLightDir')!;
-    this.uCameraPos = gl.getUniformLocation(this.mainProgram, 'uCameraPos')!;
-    this.uAlpha = gl.getUniformLocation(this.mainProgram, 'uAlpha')!;
-    this.uShading = gl.getUniformLocation(this.mainProgram, 'uShading')!;
-    this.uSelected = gl.getUniformLocation(this.mainProgram, 'uSelected')!;
-    this.uClipEnabled = gl.getUniformLocation(this.mainProgram, 'uClipEnabled')!;
-    this.uClipPlane = gl.getUniformLocation(this.mainProgram, 'uClipPlane')!;
+      // Cache uniform locations
+      this.uModel = gl.getUniformLocation(this.mainProgram, 'uModel')!;
+      this.uView = gl.getUniformLocation(this.mainProgram, 'uView')!;
+      this.uProjection = gl.getUniformLocation(this.mainProgram, 'uProjection')!;
+      this.uNormalMatrix = gl.getUniformLocation(this.mainProgram, 'uNormalMatrix')!;
+      this.uColor = gl.getUniformLocation(this.mainProgram, 'uColor')!;
+      this.uLightDir = gl.getUniformLocation(this.mainProgram, 'uLightDir')!;
+      this.uCameraPos = gl.getUniformLocation(this.mainProgram, 'uCameraPos')!;
+      this.uAlpha = gl.getUniformLocation(this.mainProgram, 'uAlpha')!;
+      this.uShading = gl.getUniformLocation(this.mainProgram, 'uShading')!;
+      this.uSelected = gl.getUniformLocation(this.mainProgram, 'uSelected')!;
+      this.uClipEnabled = gl.getUniformLocation(this.mainProgram, 'uClipEnabled')!;
+      this.uClipPlane = gl.getUniformLocation(this.mainProgram, 'uClipPlane')!;
 
-    // GL state
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      // GL state
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    // Build grid
-    this.buildGrid();
+      // Build grid
+      this.buildGrid();
 
-    return true;
+      return true;
+    } catch (err) {
+      // A lost/dying GL context (GPU reset, driver timeout, HMR remount
+      // teardown race) makes shader compilation fail with a null info log.
+      // That must NEVER crash AXL out to its error boundary — release GL and
+      // degrade to the Canvas 2D path. (A canvas that already vended a webgl2
+      // context can't vend '2d'; the caller's inline 2D renderer handles a
+      // null ctx by skipping the frame, so worst case is a blank viewport
+      // until the next real remount instead of a component crash.)
+      console.warn('AXL: WebGL2 init failed, falling back to Canvas 2D:', (err as Error)?.message);
+      this.gl = null;
+      this.useWebGL = false;
+      this.fallbackCtx = canvas.getContext('2d');
+      return false;
+    }
   }
 
   private buildGrid() {
