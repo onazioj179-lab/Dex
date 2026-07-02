@@ -29,6 +29,7 @@ import {
   transcodeImage,
   transcodeAudioToWav,
   decodeAudioPeaks,
+  encodeWav,
   type AudioPeaks,
 } from './transcode';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
@@ -2397,24 +2398,62 @@ const Forge: React.FC = () => {
               </div>
             )}
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => {
-                if (concatOrder.length < 2) return;
-                const resolvedPreset = presets.find(p => p.id === selectedPreset);
-                const mergedJob: Job = {
-                  id: `merge-${Date.now()}`,
-                  name: `Merged_${concatOrder.length}_files`,
-                  source: concatOrder.map(id => jobs.find(j => j.id === id)?.source || '').filter(Boolean).join(', '),
-                  destination: '',
-                  format: resolvedPreset?.format || 'H.264',
-                  preset: selectedPreset,
-                  status: 'queued',
-                  progress: 0,
-                  duration: 0,
-                  estimatedTime: 0,
-                };
-                setJobs(prev => [...prev, mergedJob]);
-                setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Merge to Single File</button>
+              <button disabled={mediaBusy} onClick={async () => {
+                // Instant lossless merge — the old version pushed a 'queued'
+                // job with NO source file behind it, which could never process
+                // (a dead job the user waited on forever). Now: decode every
+                // source in order, concatenate the PCM, and write a real WAV
+                // via the shared encoder. No MediaRecorder = no real-time wait.
+                if (mediaBusy || concatOrder.length < 2) return;
+                const sourceFiles: File[] = [];
+                for (const id of concatOrder) {
+                  const file = fileMapRef.current.get(id);
+                  if (file) sourceFiles.push(file);
+                }
+                if (sourceFiles.length < 2) { toast.warning('Need at least 2 files with source data'); return; }
+                setMediaBusy(true);
+                let audioCtx: AudioContext | null = null;
+                try {
+                  audioCtx = new AudioContext();
+                  const buffers: AudioBuffer[] = [];
+                  for (const f of sourceFiles) {
+                    const ab = await f.arrayBuffer();
+                    buffers.push(await audioCtx.decodeAudioData(ab));
+                  }
+                  const totalLength = buffers.reduce((s, b) => s + b.length, 0);
+                  const sr = buffers[0].sampleRate;
+                  const channels = buffers[0].numberOfChannels;
+                  const merged = audioCtx.createBuffer(channels, totalLength, sr);
+                  let offset = 0;
+                  for (const buf of buffers) {
+                    for (let ch = 0; ch < channels; ch++) {
+                      merged.getChannelData(ch).set(buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1)), offset);
+                    }
+                    offset += buf.length;
+                  }
+                  const wavBlob = encodeWav(merged, 24);
+                  try { audioCtx.close(); } catch { /* already closed */ }
+                  audioCtx = null;
+                  const mergeJobId = `merge-${Date.now()}`;
+                  fileMapRef.current.set(mergeJobId, new File([wavBlob], `Merged_${concatOrder.length}_files.wav`, { type: 'audio/wav' }));
+                  setJobs(prev => [...prev, {
+                    id: mergeJobId, name: `Merged_${concatOrder.length}_files.wav`,
+                    source: 'Multiple files', destination: customOutputDir,
+                    format: 'WAV', preset: selectedPreset,
+                    status: 'completed' as const, progress: 100, duration: merged.duration, estimatedTime: 0,
+                    inputSize: sourceFiles.reduce((s, f) => s + f.size, 0), outputSize: wavBlob.size,
+                    outputBlobUrl: URL.createObjectURL(wavBlob), outputExt: 'wav',
+                  }]);
+                  toast.success(`Merged ${sourceFiles.length} files — ${merged.duration.toFixed(1)}s WAV`);
+                  setShowConcat(false);
+                } catch (err: any) {
+                  console.error('[Forge] WAV merge failed:', err);
+                  toast.error('Unable to merge — a source may have no decodable audio track.');
+                  try { audioCtx?.close(); } catch { /* */ }
+                } finally {
+                  setMediaBusy(false);
+                }
+              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>Merge Audio → WAV (instant)</button>
               <button disabled={mediaBusy} onClick={async () => {
                 if (mediaBusy) return;
                 if (concatOrder.length < 2) return;

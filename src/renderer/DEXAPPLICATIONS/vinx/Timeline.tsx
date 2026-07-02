@@ -771,6 +771,12 @@ export const Timeline: React.FC<{
     clipId: string; trackId: string; startFrame: number; offsetFrame: number;
   } | null>(null);
 
+  // Safety net: drag/trim attach window-level pointer listeners inside their
+  // start callbacks; a mid-gesture unmount would strand them forever. The
+  // active gesture registers its remover here; unmount runs it.
+  const gestureCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { gestureCleanupRef.current?.(); }, []);
+
   // -- Trim state --
   const trimRef = useRef<{
     clipId: string; side: 'left' | 'right';
@@ -825,12 +831,17 @@ export const Timeline: React.FC<{
         executeCommand(cmd);
       }
       dragRef.current = null;
+      gestureCleanupRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    gestureCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
   }, [getClipById, zoom, snapEnabled, getActiveSequence, currentFrame, markers, executeCommand]);
 
   const handleTrimStart = useCallback((clipId: string, side: 'left' | 'right') => {
@@ -853,39 +864,60 @@ export const Timeline: React.FC<{
       const c = getClipById(clipId);
       if (!c) return;
 
+      // Live preview via direct mutation (the same pattern as clip drag) —
+      // the single undoable command is created ONCE on release. The old
+      // version executed a TrimClipCommand PER POINTERMOVE, flooding the
+      // undo stack with hundreds of one-pixel entries per trim gesture
+      // (Ctrl+Z then undid the trim a pixel at a time).
       if (side === 'left') {
         const newStart = Math.max(0, c.startFrame + delta);
         const newMediaIn = c.mediaInFrame + (newStart - c.startFrame);
         if (newStart < c.endFrame && newMediaIn >= 0) {
-          const cmd = createTrimClipCommand(
-            storeGetState, clipId,
-            c.startFrame, c.endFrame, c.mediaInFrame, c.mediaOutFrame,
-            newStart, c.endFrame, newMediaIn, c.mediaOutFrame,
-          );
-          executeCommand(cmd);
+          storeGetState()._updateClip(clipId, { startFrame: newStart, mediaInFrame: newMediaIn });
         }
       } else {
         const newEnd = Math.max(c.startFrame + 1, c.endFrame + delta);
         const newMediaOut = c.mediaOutFrame + (newEnd - c.endFrame);
         if (newMediaOut >= 0) {
-          const cmd = createTrimClipCommand(
-            storeGetState, clipId,
-            c.startFrame, c.endFrame, c.mediaInFrame, c.mediaOutFrame,
-            c.startFrame, newEnd, c.mediaInFrame, newMediaOut,
-          );
-          executeCommand(cmd);
+          storeGetState()._updateClip(clipId, { endFrame: newEnd, mediaOutFrame: newMediaOut });
         }
       }
     };
 
     const onUp = () => {
+      const t = trimRef.current;
       trimRef.current = null;
+      gestureCleanupRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      if (!t) return;
+      const c = getClipById(clipId);
+      if (!c) return;
+      const changed = c.startFrame !== t.initialStart || c.endFrame !== t.initialEnd
+        || c.mediaInFrame !== t.initialMediaIn || c.mediaOutFrame !== t.initialMediaOut;
+      if (!changed) return;
+      // Revert the live preview, then apply as ONE command so undo/redo is a
+      // single step (mirrors the clip-drag pattern above).
+      const finalStart = c.startFrame, finalEnd = c.endFrame;
+      const finalIn = c.mediaInFrame, finalOut = c.mediaOutFrame;
+      storeGetState()._updateClip(clipId, {
+        startFrame: t.initialStart, endFrame: t.initialEnd,
+        mediaInFrame: t.initialMediaIn, mediaOutFrame: t.initialMediaOut,
+      });
+      const cmd = createTrimClipCommand(
+        storeGetState, clipId,
+        t.initialStart, t.initialEnd, t.initialMediaIn, t.initialMediaOut,
+        finalStart, finalEnd, finalIn, finalOut,
+      );
+      executeCommand(cmd);
     };
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    gestureCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
   }, [getClipById, zoom, executeCommand]);
 
   const handleSplit = useCallback((clipId: string, frame: number) => {

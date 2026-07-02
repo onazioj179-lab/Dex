@@ -85,6 +85,9 @@ export interface QuickExportOptions {
   filename: string;
   /** Target video bitrate in bits/sec. */
   videoBitsPerSecond?: number;
+  /** Program LUT as a CSS filter string — baked into every rendered frame so
+   *  the export matches what the user sees in the program monitor. */
+  lutFilter?: string;
   /** Start timeline playback at frame 0 at the project's natural speed. */
   startPlayback: () => void;
   /** Stop/pause timeline playback. */
@@ -266,8 +269,13 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
         const dh = vh * scale;
         const dx = (width - dw) / 2;
         const dy = (height - dh) / 2;
+        // Bake the program LUT into the frame (the viewer shows the same
+        // CSS filter — without this the export silently dropped the look).
+        if (opts.lutFilter && opts.lutFilter !== 'none') ctx.filter = opts.lutFilter;
         ctx.drawImage(v, dx, dy, dw, dh);
+        ctx.filter = 'none';
       } catch {
+        ctx.filter = 'none';
         /* cross-origin/tainted frame — skip this element */
       }
     }

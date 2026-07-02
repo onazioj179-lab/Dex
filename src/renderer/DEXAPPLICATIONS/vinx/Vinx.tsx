@@ -63,6 +63,28 @@ import { useCreativeAppSettings } from '../../utils/creative-suite';
 export const VINX_VERSION = '1.0.0';
 export const VINX_BUILD_DATE = '2026-04-11';
 
+// ==================== LUT PRESETS ====================
+// CSS-filter approximations of classic looks. Applied via the store
+// (programLUT) so the choice survives re-renders and Quick Export bakes the
+// same filter into rendered frames. 'none' = clear.
+const LUT_PRESETS: { name: string; category: 'cinematic' | 'filmic' | 'vintage' | 'creative' | 'technical'; cssFilter: string }[] = [
+  { name: 'Teal & Orange', category: 'cinematic', cssFilter: 'sepia(0.3) hue-rotate(-30deg) saturate(1.6) contrast(1.1)' },
+  { name: 'Bleach Bypass', category: 'cinematic', cssFilter: 'saturate(0.4) contrast(1.4) brightness(1.1)' },
+  { name: 'Film Noir', category: 'cinematic', cssFilter: 'grayscale(1) contrast(1.3) brightness(0.9)' },
+  { name: 'Kodak 50D', category: 'filmic', cssFilter: 'sepia(0.15) saturate(1.2) brightness(1.05) contrast(1.05)' },
+  { name: 'Kodak 500T', category: 'filmic', cssFilter: 'sepia(0.1) hue-rotate(-10deg) saturate(1.1) contrast(1.1)' },
+  { name: 'Fuji F-125', category: 'filmic', cssFilter: 'sepia(0.08) hue-rotate(10deg) saturate(1.15)' },
+  { name: 'Super 8', category: 'vintage', cssFilter: 'sepia(0.4) contrast(1.2) brightness(0.95) saturate(0.8)' },
+  { name: 'Polaroid', category: 'vintage', cssFilter: 'sepia(0.25) contrast(0.9) brightness(1.1) saturate(0.85)' },
+  { name: 'VHS', category: 'vintage', cssFilter: 'sepia(0.15) contrast(1.3) brightness(0.85) blur(0.3px) saturate(1.3)' },
+  { name: 'Cyberpunk', category: 'creative', cssFilter: 'hue-rotate(280deg) saturate(2) contrast(1.3) brightness(1.1)' },
+  { name: 'Golden Hour', category: 'creative', cssFilter: 'sepia(0.2) hue-rotate(-15deg) saturate(1.4) brightness(1.1)' },
+  { name: 'Moonlight', category: 'creative', cssFilter: 'hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.15)' },
+  { name: 'Rec.709', category: 'technical', cssFilter: 'none' },
+  { name: 'Log-C→709', category: 'technical', cssFilter: 'contrast(1.5) saturate(1.3) brightness(1.1)' },
+  { name: 'S-Log3→709', category: 'technical', cssFilter: 'contrast(1.6) saturate(1.4) brightness(1.15)' },
+];
+
 // Solid panel backgrounds — no glass effects
 
 // ---------------------------------------------------------------------------
@@ -425,6 +447,8 @@ const VinxEditor: React.FC = () => {
   const setTool = useVinxStore(s => s.setTool);
   const _removeClip = useVinxStore(s => s._removeClip);
   const _addClip = useVinxStore(s => s._addClip);
+  const programLUT = useVinxStore(s => s.programLUT);
+  const setProgramLUT = useVinxStore(s => s.setProgramLUT);
 
   // ROADMAP-600 #199 — UKI creative-op handler. speedRamp + silence removal run
   // for real against the timeline; everything else skips honestly. Silence
@@ -735,6 +759,9 @@ const VinxEditor: React.FC = () => {
       durationFrames,
       filename: fileName,
       videoBitsPerSecond: 8_000_000,
+      // Bake the active program LUT into the export (read live from the
+      // store — the callback deps stay stable)
+      lutFilter: useVinxStore.getState().programLUT?.cssFilter,
       startPlayback: () => {
         setIsPlaying(true);
         engineRef.current?.play(0, 1);
@@ -1452,12 +1479,24 @@ const VinxEditor: React.FC = () => {
                   {(project as any).__luts?.filter?.((l: any) => l.category === cat)?.length === 0 && (
                     <div style={{ gridColumn: '1/-1', padding: 'var(--space-2) 0', fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>Built-in {cat} LUTs ready</div>
                   )}
-                  {['Teal & Orange', 'Bleach Bypass', 'Film Noir', 'Kodak 50D', 'Kodak 500T', 'Fuji F-125', 'Super 8', 'Polaroid', 'VHS', 'Cyberpunk', 'Golden Hour', 'Moonlight', 'Rec.709', 'Log-C→709', 'S-Log3→709'].filter((_, i) => {
-                    const cats = ['cinematic','cinematic','cinematic','filmic','filmic','filmic','vintage','vintage','vintage','creative','creative','creative','technical','technical','technical'];
-                    return cats[i] === cat;
-                  }).map(name => (
-                    <button key={name} aria-label={`Apply ${name} LUT`} onClick={() => { const lutFilters: Record<string,string> = { 'Teal & Orange': 'sepia(0.3) hue-rotate(-30deg) saturate(1.6) contrast(1.1)', 'Bleach Bypass': 'saturate(0.4) contrast(1.4) brightness(1.1)', 'Film Noir': 'grayscale(1) contrast(1.3) brightness(0.9)', 'Kodak 50D': 'sepia(0.15) saturate(1.2) brightness(1.05) contrast(1.05)', 'Kodak 500T': 'sepia(0.1) hue-rotate(-10deg) saturate(1.1) contrast(1.1)', 'Fuji F-125': 'sepia(0.08) hue-rotate(10deg) saturate(1.15)', 'Super 8': 'sepia(0.4) contrast(1.2) brightness(0.95) saturate(0.8)', 'Polaroid': 'sepia(0.25) contrast(0.9) brightness(1.1) saturate(0.85)', 'VHS': 'sepia(0.15) contrast(1.3) brightness(0.85) blur(0.3px) saturate(1.3)', 'Cyberpunk': 'hue-rotate(280deg) saturate(2) contrast(1.3) brightness(1.1)', 'Golden Hour': 'sepia(0.2) hue-rotate(-15deg) saturate(1.4) brightness(1.1)', 'Moonlight': 'hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.15)', 'Rec.709': 'none', 'Log-C→709': 'contrast(1.5) saturate(1.3) brightness(1.1)', 'S-Log3→709': 'contrast(1.6) saturate(1.4) brightness(1.15)' }; const f = lutFilters[name] || 'none'; const viewer = document.querySelector('[data-vinx-program-canvas]') as HTMLElement; if (viewer) viewer.style.filter = f; }} style={{ padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{name}</button>
-                  ))}
+                  {LUT_PRESETS.filter(l => l.category === cat).map(({ name, cssFilter }) => {
+                    const active = programLUT?.name === name;
+                    return (
+                      <button
+                        key={name}
+                        aria-label={`Apply ${name} LUT`}
+                        aria-pressed={active}
+                        // Store-driven (survives re-renders, baked into Quick
+                        // Export) — the old handler wrote element.style
+                        // directly, which vanished on the next render and
+                        // never reached the exported file. Click again to clear.
+                        onClick={() => setProgramLUT(active || cssFilter === 'none' ? null : { name, cssFilter })}
+                        style={{ padding: '6px var(--space-2)', borderRadius: 4, border: active ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)', background: active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}

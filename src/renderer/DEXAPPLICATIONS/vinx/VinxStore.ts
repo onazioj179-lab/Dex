@@ -62,6 +62,11 @@ interface VinxState {
   viewerOverlay: ViewerOverlay;
   renderQuality: RenderQuality;
   sourceViewerFrame: number;
+  /** Active program-monitor LUT (CSS-filter approximation). Store-driven so it
+   *  survives re-renders and is baked into Quick Export via ctx.filter —
+   *  previously the LUT browser wrote element.style directly (ephemeral,
+   *  never exported). null = no LUT. */
+  programLUT: { name: string; cssFilter: string } | null;
 
   // UI
   mediaBrowserTab: 'media' | 'effects' | 'transitions' | 'titles' | 'audio';
@@ -210,6 +215,7 @@ interface VinxState {
   setViewerOverlay: (overlay: ViewerOverlay) => void;
   setRenderQuality: (quality: RenderQuality) => void;
   setSourceViewerFrame: (frame: number) => void;
+  setProgramLUT: (lut: { name: string; cssFilter: string } | null) => void;
 
   // UI
   setMediaBrowserTab: (tab: VinxState['mediaBrowserTab']) => void;
@@ -600,6 +606,7 @@ export const useVinxStore = create<VinxState>((set, get) => {
     viewerOverlay: 'none',
     renderQuality: initialProject.settings.renderQuality,
     sourceViewerFrame: 0,
+    programLUT: null,
 
     mediaBrowserTab: 'media',
     inspectorTab: 'video',
@@ -710,6 +717,7 @@ export const useVinxStore = create<VinxState>((set, get) => {
     // -- Tool --
     setTool: (tool) => set({ activeTool: tool }),
     toggleSnap: () => set(s => ({ snapEnabled: !s.snapEnabled })),
+    setProgramLUT: (lut) => set({ programLUT: lut }),
     toggleRippleDelete: () => set(s => ({ rippleDeleteEnabled: !s.rippleDeleteEnabled })),
     toggleLinkedSelection: () => set(s => ({ linkedSelectionEnabled: !s.linkedSelectionEnabled })),
 
