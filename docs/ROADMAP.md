@@ -28,8 +28,14 @@
 >    closures (post-orbit clicks hit-tested the OLD view — shared `hitTestAtPoint` w/ correct deps + exploded
 >    offset); wired the orphaned `hoveredPartId` (accent hover ring + cursor); added CAD alignment snapping
 >    (`utils/alignSnap` pure + 7 tests: per-axis pull onto other part centers ~8px, dashed inference guides,
->    Alt = free, store toggle). NEXT AXL: edge/vertex snap candidates, modal/buckling solvers (typed, unwired),
->    parametric expressions (param store exists, no UI), then Imosion.
+>    Alt = free, store toggle).
+>    **AXL pass 2 ✅ (2026-07-02) — the "NEXT AXL" list is DONE:** face snapping (center/touch/flush candidates
+>    from primitive extents, nearest-wins, `primitiveHalfExtents` honors scale); modal + buckling solvers
+>    (`engine/modalBuckling.ts` — cantilever beam modes + Euler critical load, tested vs analytical steel-cube
+>    values, wired into the sim panel with contextual labels); parametric expressions (`utils/exprEval.ts` safe
+>    evaluator + fixed-point table resolver w/ circular detection; PARAMETERS table in PropertiesPanel; ALL
+>    transform inputs accept expressions against the parameter scope). 63/63 AXL tests. NEXT: Imosion pass,
+>    then Vinx/Forge; deeper AXL later = real eigen-FEA (mass matrix on the truss model), sketch-dim parameters.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
