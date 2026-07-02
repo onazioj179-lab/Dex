@@ -12,6 +12,7 @@
 
 import type { VinxSequence, Track, Clip, RenderQuality } from './VinxTypes';
 import { frameToSeconds, secondsToFrame } from './VinxTypes';
+import { speedRampAt } from './speedRamp';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -446,15 +447,25 @@ export class PlaybackEngine {
         const clipEnd = frameToSeconds(clip.endFrame, this.frameRate);
         const isInRange = seconds >= clipStart && seconds < clipEnd;
 
+        // Effective media rate: transport speed × clip speed × speed ramp at
+        // the current clip-local frame. Previously only the transport speed
+        // applied — clip.speed and saved speed ramps were stored but never
+        // played. Re-asserted every tick so ramps animate through the clip.
+        const clipLocalFrame = frame - clip.startFrame;
+        const effectiveRate = Math.max(0.0625, Math.min(16,
+          this.playbackSpeed * (clip.speed || 1) * speedRampAt(clip.speedRamp, clipLocalFrame)));
+
         const video = this.videoElements.get(clip.id);
         if (video) {
           if (isInRange && video.paused && this.isPlaying) {
             const mediaIn = frameToSeconds(clip.mediaInFrame, this.frameRate);
             video.currentTime = seconds - clipStart + mediaIn;
-            video.playbackRate = this.playbackSpeed;
             video.play().catch((e: unknown) => { console.warn('[DEX]', e); });
           } else if (!isInRange && !video.paused) {
             video.pause();
+          }
+          if (isInRange && this.isPlaying && Math.abs(video.playbackRate - effectiveRate) > 0.001) {
+            video.playbackRate = effectiveRate;
           }
           video.style.display = isInRange ? '' : 'none';
         }
@@ -464,10 +475,12 @@ export class PlaybackEngine {
           if (isInRange && audioNode.element.paused && this.isPlaying) {
             const mediaIn = frameToSeconds(clip.mediaInFrame, this.frameRate);
             audioNode.element.currentTime = seconds - clipStart + mediaIn;
-            audioNode.element.playbackRate = this.playbackSpeed;
             audioNode.element.play().catch((e: unknown) => { console.warn('[DEX]', e); });
           } else if (!isInRange && !audioNode.element.paused) {
             audioNode.element.pause();
+          }
+          if (isInRange && this.isPlaying && Math.abs(audioNode.element.playbackRate - effectiveRate) > 0.001) {
+            audioNode.element.playbackRate = effectiveRate;
           }
         }
       }

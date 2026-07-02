@@ -36,6 +36,54 @@ import { MATERIAL_DB, STD_PARTS_LIBRARY, GDT_SYMBOLS } from './constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight, stressColor } from './utils/math';
 import { alignSnapPosition, primitiveHalfExtents, type SnapGuide } from './utils/alignSnap';
 import { computeModalStudy, computeBucklingStudy } from './engine/modalBuckling';
+import { evaluateExpression, type ParamScope } from './utils/exprEval';
+
+// Expression-capable feature-parameter input: accepts a plain number OR a
+// parametric expression ("width / 2", "bolt_d * 1.5") evaluated against the
+// project parameter table — same discipline as the PropertiesPanel transform
+// inputs. Commits on Enter/blur; Escape reverts; errors surface via onError.
+const FeatureExprInput: React.FC<{
+  value: number;
+  scope: ParamScope;
+  onCommit: (n: number) => void;
+  onError: (msg: string) => void;
+  width?: number;
+  min?: number;
+  max?: number;
+  ariaLabel?: string;
+}> = ({ value, scope, onCommit, onError, width = 70, min, max, ariaLabel }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const raw = draft.trim();
+    setDraft(null);
+    if (!raw) return;
+    let n = Number(raw);
+    if (!Number.isFinite(n)) {
+      try { n = evaluateExpression(raw, scope); } catch (err) { onError((err as Error).message); return; }
+    }
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    if (n !== value) onCommit(n);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      title='Number or expression, e.g. "width / 2"'
+      value={draft ?? String(Math.round(value * 1000) / 1000)}
+      onChange={e => setDraft(e.target.value)}
+      onFocus={e => { setDraft(String(value)); e.currentTarget.select(); }}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') setDraft(null);
+      }}
+      style={{ marginLeft: 'var(--space-2)', width, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }}
+    />
+  );
+};
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
 import { detectInterferences } from './AxlInspect';
 import { importCadFile } from './AxlImport';
@@ -44,7 +92,7 @@ import { exportProject as doExport } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
 import { useViewportStore } from './stores/viewportStore';
 import { useUIStore } from './stores/uiStore';
-import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel } from './engine';
+import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel, solveTrussModes } from './engine';
 import type { RenderState, FEResult } from './engine';
 import AXLToolbar from './components/Toolbar';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
@@ -99,6 +147,13 @@ const AXL: React.FC = () => {
   const [aiInput, setAiInput] = useState('');
   const [featureType, setFeatureType] = useState<'extrude' | 'revolve' | 'chamfer' | 'fillet' | 'pattern' | 'shell' | 'draft' | 'rib'>('extrude');
   const [featureParams, setFeatureParams] = useState<Record<string, number>>({ depth: 20, angle: 360, distance: 2, radius: 3, count: 4, spacing: 30, thickness: 3, draftAngle: 5 });
+  // Parameter scope for expression-capable feature inputs ("width / 2")
+  const featureScope = useMemo<ParamScope>(() => {
+    const scope: ParamScope = {};
+    project.parameters.forEach(prm => { scope[prm.name] = prm.value; });
+    return scope;
+  }, [project.parameters]);
+  const featureExprError = useCallback((msg: string) => ui.showToast(msg), [ui]);
   const [gdtSymbol, setGdtSymbol] = useState('\u2316');
   const [gdtTolerance, setGdtTolerance] = useState('0.05');
   const [gdtDatum, setGdtDatum] = useState('A');
@@ -406,15 +461,54 @@ const AXL: React.FC = () => {
         });
         if (simType === 'modal') {
           const study = computeModalStudy(inputs, simForce);
+          // Prefer REAL assembly modes: when the parts derive a valid truss
+          // (same derivation the stress FEA uses), solve the generalized
+          // eigenproblem K \u03c6 = \u03c9\u00b2 M \u03c6 with a lumped mass matrix. The per-part
+          // analytical study keeps driving the resonance coloring; the
+          // study-level f\u2081/separation come from the actual assembly.
+          let minF1 = study.minF1Hz;
+          let separation = study.separationFactor;
+          let feaSolved = false;
+          let elementCount: number | undefined;
+          try {
+            const fePartsInput = parts.map(p => {
+              const feat = (p.features[0]?.params || {}) as Record<string, any>;
+              const vol = calcVolume((feat.primitiveType as PrimitiveType) || 'box', feat as Record<string, number>);
+              return {
+                id: p.id,
+                x: p.transform.position.x,
+                y: p.transform.position.y,
+                E: Math.max(p.material.youngsModulus * 1000, 1), // GPa -> MPa
+                area: Math.max(Math.pow(Math.max(vol, 1), 2 / 3), 1),
+                density: Math.max(p.material.density, 1) * 1e-12, // kg/m\u00b3 -> tonne/mm\u00b3
+              };
+            });
+            const edges = project.assembly.constraints.map(c => ({ a: c.partA, b: c.partB }));
+            const derived = deriveTrussFromParts(fePartsInput, edges, simForce, 250);
+            if (derived) {
+              const avgDensity = (parts.reduce((s, p) => s + Math.max(p.material.density, 1), 0) / parts.length || 7850) * 1e-12;
+              const modes = solveTrussModes(derived.model, avgDensity, 3);
+              if (modes.converged && modes.frequenciesHz.length > 0 && modes.frequenciesHz[0] > 0) {
+                minF1 = modes.frequenciesHz[0];
+                separation = simForce > 0 ? Math.min(minF1 / simForce, 999) : 999;
+                feaSolved = true;
+                elementCount = derived.model.elements.length;
+              }
+            }
+          } catch { /* degenerate geometry \u2014 the analytical study stands */ }
           pStore.setSimResults({
             type: 'modal',
-            maxStress: study.minF1Hz,
-            safetyFactor: study.separationFactor,
+            maxStress: minF1,
+            safetyFactor: separation,
             stressMap: study.parts.map(r => ({ partId: r.partId, ratio: r.ratio })),
+            feaSolved,
+            elementCount,
             converged: true,
             timestamp: Date.now(),
           });
-          ui.showToast(`Modal analysis -- lowest f\u2081 ${study.minF1Hz.toFixed(0)} Hz, separation ${study.separationFactor.toFixed(1)}\u00d7`);
+          ui.showToast(feaSolved
+            ? `Modal (FE assembly, ${elementCount} members) -- f\u2081 ${minF1.toFixed(0)} Hz, separation ${separation.toFixed(1)}\u00d7`
+            : `Modal analysis -- lowest f\u2081 ${minF1.toFixed(0)} Hz, separation ${separation.toFixed(1)}\u00d7`);
         } else {
           const study = computeBucklingStudy(inputs, simForce);
           pStore.setSimResults({
@@ -2112,57 +2206,49 @@ const AXL: React.FC = () => {
               {featureType === 'extrude' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   Depth ({project.units}):
-                  <input type="number" value={featureParams.depth} onChange={e => setFeatureParams(p => ({ ...p, depth: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.depth} scope={featureScope} ariaLabel="Extrude depth" onCommit={n => setFeatureParams(p => ({ ...p, depth: n }))} onError={featureExprError} />
                 </label>
               )}
               {featureType === 'revolve' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   Angle (&deg;):
-                  <input type="number" value={featureParams.angle} onChange={e => setFeatureParams(p => ({ ...p, angle: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.angle} scope={featureScope} ariaLabel="Revolve angle" onCommit={n => setFeatureParams(p => ({ ...p, angle: n }))} onError={featureExprError} />
                 </label>
               )}
               {featureType === 'chamfer' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   Distance ({project.units}):
-                  <input type="number" value={featureParams.distance} step={0.5} onChange={e => setFeatureParams(p => ({ ...p, distance: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.distance} scope={featureScope} ariaLabel="Chamfer distance" onCommit={n => setFeatureParams(p => ({ ...p, distance: n }))} onError={featureExprError} />
                 </label>
               )}
               {featureType === 'fillet' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   Radius ({project.units}):
-                  <input type="number" value={featureParams.radius} step={0.5} onChange={e => setFeatureParams(p => ({ ...p, radius: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.radius} scope={featureScope} ariaLabel="Fillet radius" onCommit={n => setFeatureParams(p => ({ ...p, radius: n }))} onError={featureExprError} />
                 </label>
               )}
               {featureType === 'pattern' && (
                 <>
                   <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                     Count:
-                    <input type="number" value={featureParams.count} min={2} max={50} onChange={e => setFeatureParams(p => ({ ...p, count: Number(e.target.value) }))}
-                      style={{ marginLeft: 'var(--space-2)', width: 50, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                    <FeatureExprInput value={featureParams.count} scope={featureScope} width={50} min={2} max={50} ariaLabel="Pattern count" onCommit={n => setFeatureParams(p => ({ ...p, count: Math.round(n) }))} onError={featureExprError} />
                   </label>
                   <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                     Spacing ({project.units}):
-                    <input type="number" value={featureParams.spacing} onChange={e => setFeatureParams(p => ({ ...p, spacing: Number(e.target.value) }))}
-                      style={{ marginLeft: 'var(--space-2)', width: 60, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                    <FeatureExprInput value={featureParams.spacing} scope={featureScope} width={60} ariaLabel="Pattern spacing" onCommit={n => setFeatureParams(p => ({ ...p, spacing: n }))} onError={featureExprError} />
                   </label>
                 </>
               )}
               {(featureType === 'shell' || featureType === 'rib') && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   {featureType === 'shell' ? 'Wall thickness' : 'Rib thickness'} ({project.units}):
-                  <input type="number" value={featureParams.thickness} min={0.5} step={0.5} onChange={e => setFeatureParams(p => ({ ...p, thickness: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.thickness} scope={featureScope} min={0.5} ariaLabel="Wall/rib thickness" onCommit={n => setFeatureParams(p => ({ ...p, thickness: n }))} onError={featureExprError} />
                 </label>
               )}
               {featureType === 'draft' && (
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
                   Draft angle (&deg;):
-                  <input type="number" value={featureParams.draftAngle} min={0} max={45} step={1} onChange={e => setFeatureParams(p => ({ ...p, draftAngle: Number(e.target.value) }))}
-                    style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
+                  <FeatureExprInput value={featureParams.draftAngle} scope={featureScope} min={0} max={45} ariaLabel="Draft angle" onCommit={n => setFeatureParams(p => ({ ...p, draftAngle: n }))} onError={featureExprError} />
                 </label>
               )}
 

@@ -37,6 +37,9 @@ export interface FEElement {
   E: number;
   /** Cross-sectional area (consistent units, e.g. mm^2). */
   area: number;
+  /** Mass density (consistent units — tonne/mm³ with mm/N/MPa geometry).
+   *  Only needed for modal analysis (solveTrussModes). */
+  density?: number;
 }
 
 export interface FELoad {
@@ -298,6 +301,8 @@ export interface FEPartInput {
   E: number;
   /** Representative cross-sectional area (mm^2). */
   area: number;
+  /** Mass density in tonne/mm³ (= kg/m³ × 1e-12). Optional; used for modal. */
+  density?: number;
 }
 
 export interface FEEdgeInput {
@@ -351,7 +356,10 @@ export function deriveTrussFromParts(
     seen.add(key);
     // Average the two endpoints' material props for the member.
     const pa = parts[ai], pb = parts[bi];
-    elements.push({ a: ai, b: bi, E: (pa.E + pb.E) / 2, area: (pa.area + pb.area) / 2 });
+    const density = pa.density !== undefined || pb.density !== undefined
+      ? ((pa.density ?? pb.density ?? 0) + (pb.density ?? pa.density ?? 0)) / 2
+      : undefined;
+    elements.push({ a: ai, b: bi, E: (pa.E + pb.E) / 2, area: (pa.area + pb.area) / 2, density });
     elementParts.push({ a: aId, b: bId });
   };
 
@@ -405,4 +413,159 @@ export function defaultTrussModel(force: number, E: number, area: number, yieldS
     { node: 2, fx: 0, fy: -Math.abs(force) }, // downward load at apex
   ];
   return { nodes, elements, loads, supports, yieldStrength };
+}
+
+// ─── Modal analysis: K φ = ω² M φ on the same truss model ───────────────────
+
+export interface FEModalResult {
+  /** Natural frequencies in Hz, ascending — one per extracted mode. */
+  frequenciesHz: number[];
+  /** Mode shapes as full-DOF vectors [ux0,uy0,ux1,uy1,...], fixed DOFs zero,
+   *  normalized so the largest component magnitude is 1. */
+  modeShapes: number[][];
+  converged: boolean;
+}
+
+/**
+ * Natural frequencies + mode shapes of the assembly truss — a REAL generalized
+ * eigensolve, not a per-part hand formula:
+ *
+ *   1. Assemble the same global stiffness K the static solver uses.
+ *   2. Build a LUMPED mass matrix: element mass ρAL, half to each end node
+ *      (applied to both translational DOFs).
+ *   3. Reduce to free DOFs, symmetrize to a standard problem via
+ *      A = M^{-1/2} K M^{-1/2} (M diagonal, so this is exact and cheap).
+ *   4. Extract the LOWEST modes by inverse power iteration with Gram-Schmidt
+ *      deflation against already-found modes; λ from the Rayleigh quotient.
+ *
+ * Units: with mm / N / MPa geometry+stiffness, pass density in tonne/mm³
+ * (= kg/m³ × 1e-12); ω comes out in rad/s so frequencies are true Hz.
+ */
+export function solveTrussModes(
+  model: FEModel,
+  defaultDensity: number,
+  numModes = 3,
+): FEModalResult {
+  const { nodes, elements, supports } = model;
+  const nNodes = nodes.length;
+  const nDof = nNodes * 2;
+  if (nNodes < 2 || elements.length === 0) {
+    throw new Error('Modal model needs at least 2 nodes and 1 element.');
+  }
+
+  // 1. Stiffness assembly (identical to the static path).
+  const K: number[][] = Array.from({ length: nDof }, () => new Array<number>(nDof).fill(0));
+  // 2. Lumped mass (diagonal).
+  const Mdiag = new Array<number>(nDof).fill(0);
+
+  for (const el of elements) {
+    const ni = nodes[el.a];
+    const nj = nodes[el.b];
+    if (!ni || !nj) throw new Error('Element references a missing node.');
+    const dx = nj.x - ni.x;
+    const dy = nj.y - ni.y;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-9) throw new Error('Zero-length element (coincident nodes).');
+    const c = dx / L, s = dy / L;
+    const k = (el.E * el.area) / L;
+    const cc = c * c, ss = s * s, cs = c * s;
+    const ke = [
+      [cc, cs, -cc, -cs],
+      [cs, ss, -cs, -ss],
+      [-cc, -cs, cc, cs],
+      [-cs, -ss, cs, ss],
+    ];
+    const dof = [el.a * 2, el.a * 2 + 1, el.b * 2, el.b * 2 + 1];
+    for (let r = 0; r < 4; r++) {
+      for (let col = 0; col < 4; col++) K[dof[r]][dof[col]] += k * ke[r][col];
+    }
+    const rho = el.density !== undefined && el.density > 0 ? el.density : defaultDensity;
+    const halfMass = (rho * el.area * L) / 2;
+    for (const d of dof) Mdiag[d] += halfMass;
+  }
+
+  // 3. Free-DOF reduction.
+  const fixed = new Array<boolean>(nDof).fill(false);
+  for (const sup of supports) {
+    if (sup.node < 0 || sup.node >= nNodes) continue;
+    if (sup.ux) fixed[sup.node * 2] = true;
+    if (sup.uy) fixed[sup.node * 2 + 1] = true;
+  }
+  const freeDofs: number[] = [];
+  for (let i = 0; i < nDof; i++) if (!fixed[i]) freeDofs.push(i);
+  const m = freeDofs.length;
+  if (m === 0) throw new Error('Every DOF is constrained — no modes to extract.');
+  for (const d of freeDofs) {
+    if (Mdiag[d] <= 0) throw new Error('A free DOF carries zero mass — modal model is degenerate.');
+  }
+
+  // Symmetrized standard problem A = D K D with D = diag(1/sqrt(m_i)).
+  const D = freeDofs.map(d => 1 / Math.sqrt(Mdiag[d]));
+  const A: number[][] = Array.from({ length: m }, (_, i) =>
+    Array.from({ length: m }, (_, j) => D[i] * K[freeDofs[i]][freeDofs[j]] * D[j]));
+
+  // 4. Inverse power iteration with deflation for the lowest modes.
+  const want = Math.max(1, Math.min(numModes, m));
+  const found: number[][] = [];   // orthonormal eigenvectors of A (y-space)
+  const lambdas: number[] = [];
+  let allConverged = true;
+
+  const dot = (a: number[], b: number[]) => a.reduce((s2, v, i) => s2 + v * b[i], 0);
+  const matVec = (v: number[]) => A.map(row => dot(row, v));
+
+  for (let mode = 0; mode < want; mode++) {
+    // Deterministic non-degenerate start vector, deflated against found modes.
+    let y = Array.from({ length: m }, (_, i) => Math.sin((i + 1) * (mode + 1) * 1.7) + 0.5);
+    let lambda = 0;
+    let converged = false;
+    for (let iter = 0; iter < 200; iter++) {
+      for (const f of found) {
+        const p = dot(y, f);
+        for (let i = 0; i < m; i++) y[i] -= p * f[i];
+      }
+      let z: number[];
+      try {
+        z = solveLinearSystem(A, y); // A z = y → z enriches the SMALLEST modes
+      } catch {
+        allConverged = false;
+        converged = false;
+        break;
+      }
+      for (const f of found) {
+        const p = dot(z, f);
+        for (let i = 0; i < m; i++) z[i] -= p * f[i];
+      }
+      const norm = Math.sqrt(dot(z, z));
+      if (norm < 1e-30) { allConverged = false; break; }
+      for (let i = 0; i < m; i++) z[i] /= norm;
+      const newLambda = dot(z, matVec(z)); // Rayleigh quotient (z normalized)
+      const settled = iter > 2 && Math.abs(newLambda - lambda) <= 1e-10 * Math.max(1, Math.abs(newLambda));
+      lambda = newLambda;
+      y = z;
+      if (settled) { converged = true; break; }
+    }
+    if (!converged) allConverged = false;
+    if (lambda <= 0 || !Number.isFinite(lambda)) { allConverged = false; continue; }
+    found.push(y);
+    lambdas.push(lambda);
+  }
+
+  // 5. Back-transform to physical mode shapes (φ = D·y), full-DOF, max-1.
+  const order = lambdas.map((l, i) => ({ l, i })).sort((p, q) => p.l - q.l);
+  const frequenciesHz: number[] = [];
+  const modeShapes: number[][] = [];
+  for (const { l, i } of order) {
+    frequenciesHz.push(Math.sqrt(l) / (2 * Math.PI));
+    const shape = new Array<number>(nDof).fill(0);
+    let maxAbs = 0;
+    for (let j = 0; j < m; j++) {
+      const v = D[j] * found[i][j];
+      shape[freeDofs[j]] = v;
+      if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+    }
+    if (maxAbs > 0) for (let j = 0; j < nDof; j++) shape[j] /= maxAbs;
+    modeShapes.push(shape);
+  }
+
+  return { frequenciesHz, modeShapes, converged: allConverged && frequenciesHz.length === want };
 }
