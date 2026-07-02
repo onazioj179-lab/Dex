@@ -15,6 +15,7 @@
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
+import { useInstalledAppsStore } from '../store/installedAppsStore';
 import { useRecentFiles } from '../store/useRecentFiles';
 
 import { useAppTransition } from '../utils/motionHooks';
@@ -1752,6 +1753,12 @@ export const AppManager: React.FC = () => {
     const onOpen = (event: Event) => {
       const appId = resolveRequestedAppId((event as CustomEvent).detail);
       if (!appId || appId === 'home') return;
+      // Central safety net: a removed app can't be launched from ANY surface
+      // (stale Home pin, dock, deep link). Reinstall from the Store first.
+      if (!useInstalledAppsStore.getState().isInstalled(appId)) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `${APP_DEFINITIONS[appId]?.name ?? appId} is removed — reinstall it from the Store.` } }));
+        return;
+      }
       const now = Date.now();
       const last = recentExternalOpenRef.current.get(appId) ?? 0;
       if (now - last < 300) return;

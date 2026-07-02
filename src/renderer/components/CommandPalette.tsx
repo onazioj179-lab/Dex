@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useInstalledAppsStore } from '../store/installedAppsStore';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { toggleTheme } from '../utils/theme';
@@ -181,12 +182,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   // (and, when a write landed during another component's render, triggered
   // React's "Cannot update CommandPalette while rendering AppManager" warning).
   const launchApp = useRunningApps(s => s.launchApp);
+  // Removed apps must not appear as launch commands, and must not launch even if
+  // a stale surface references them (defense in depth at the launch point).
+  const removedAppIds = useInstalledAppsStore(s => s.removedAppIds);
+  const removedAppSet = useMemo(() => new Set(removedAppIds), [removedAppIds]);
 
   // Helper: launch an app by id using the canonical APP_DEFINITIONS registry
   const openApp = useCallback((appId: string) => {
+    if (removedAppSet.has(appId)) return; // removed — reinstall from the Store first
     const def = APP_DEFINITIONS[appId];
     if (def) launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
-  }, [launchApp]);
+  }, [launchApp, removedAppSet]);
 
   // Saved workspace layouts ("workspace memory") — refreshed when the palette
   // opens and whenever a layout is saved/removed, so Restore commands stay live.
@@ -204,7 +210,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   const activeStageId = useStageStore((s) => s.activeStageId);
 
   // Build command list
-  const commands: Command[] = useMemo(() => [
+  const commands: Command[] = useMemo(() => ([
     // Apps — System
     { id: 'home', title: 'Go to Home', icon: Icons.home, category: 'app', action: () => openApp('home'), keywords: ['dashboard', 'main'] },
     { id: 'files', title: 'Open Files', icon: Icons.files, category: 'app', action: () => openApp('files'), keywords: ['folder', 'documents'] },
@@ -312,7 +318,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         keywords: c.keywords,
         shortcut: resolveShortcut(c, platform.isMac) || undefined,
       })),
-  ], [openApp, wsPresets, stages, activeStageId]);
+    // Drop launch commands for apps the user removed (protected apps are never
+    // in the removed set, so Home/Files/Settings stay).
+  ] as Command[]).filter(c => c.category !== 'app' || !removedAppSet.has(c.id)),
+  [openApp, wsPresets, stages, activeStageId, removedAppSet]);
 
   // Settings deep-links: one command per Settings page, dispatched only while
   // searching (kept out of the default/empty list so it stays uncluttered). The
