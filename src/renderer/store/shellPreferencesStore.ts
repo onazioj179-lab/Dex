@@ -223,14 +223,18 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   //   liquid   -> lighter fill floor + 32px blur with extra saturation
   const tint = `${r}, ${g}, ${b}`;
   if (effectiveMode === 'off') {
-    // Glass FULLY OFF (owner direction): every glass surface -- menus, panels,
-    // sidebars, toolbars, and the floating chrome (top bar, dock, orbs,
-    // spotlight, app menu) -- goes opaque TRUE BLACK, no blur. Pure #000 AMOLED.
-    root.style.setProperty('--dex-glass-bg', '#000000');
-    root.style.setProperty('--color-bg-glass', '#000000');
-    root.style.setProperty('--color-bg-glass-strong', '#000000');
+    // Glass OFF = "frosted ice fill" (owner direction, 2026-07): every glass
+    // surface -- menus, panels, sidebars, toolbars, and the floating chrome (top
+    // bar, dock, spotlight, app menu) -- is a SOLID, opaque, matte frosted fill
+    // (no see-through, no blur). Not pure #000 void: these sit a step ABOVE the
+    // near-black desktop so surfaces read as lifted frosted panels, using the
+    // design's own canonical solid values (same as the reduced-transparency
+    // fallback). Consistent "frost fill everywhere" without any glass/blur.
+    root.style.setProperty('--dex-glass-bg', '#141416');
+    root.style.setProperty('--color-bg-glass', '#161618');
+    root.style.setProperty('--color-bg-glass-strong', '#1a1a1e');
     root.style.setProperty('--dex-glass-blur', '0px');
-    root.style.setProperty('--glass-bg', '#000000');
+    root.style.setProperty('--glass-bg', '#141416');
     root.style.setProperty('--glass-blur', 'none');
   } else if (effectiveMode === 'reduced') {
     const op = Math.max(requestedOpacity, 0.92);

@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { AssistedTextarea } from './AssistedTextarea';
 import { useWidgetStore, WIDGET_TEMPLATES, type Widget, type WidgetType } from '../store/widgetStore';
 import { useRecentFiles, type RecentFile } from '../store/useRecentFiles';
 import { useNotesStore } from '../store/notesStore';
@@ -521,7 +522,7 @@ const NotesScratchpadWidget: React.FC<{ widgetId: string }> = ({ widgetId }) => 
   return (
     <div style={{ padding: 'var(--space-2)', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
-      <textarea
+      <AssistedTextarea
         value={text}
         onChange={e => save(e.target.value)}
         placeholder="Type here..."

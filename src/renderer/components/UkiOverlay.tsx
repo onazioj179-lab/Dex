@@ -12,6 +12,7 @@
  * screen reading, improved TTS/STT, and accessibility tools
  */
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { AssistedTextarea } from './AssistedTextarea';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
@@ -2310,7 +2311,7 @@ const UkiOverlay: React.FC = () => {
               </div>
             );
           })()}
-          <textarea
+          <AssistedTextarea
             ref={inputRef}
             value={inputText}
             onChange={e => {

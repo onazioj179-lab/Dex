@@ -14,6 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassCard } from '../../styles/glassMenu';
 import { formatRelativeTime } from '../../../shared/format/units';
@@ -147,7 +148,7 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
           maxLength={120}
           style={inputStyle}
         />
-        <textarea
+        <AssistedTextarea
           aria-label="Review text"
           value={body}
           onChange={e => setBody(e.target.value)}
