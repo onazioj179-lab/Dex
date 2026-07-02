@@ -10,6 +10,7 @@ import { DexLoader } from '../../components/LoadingStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { RewindViewErrorBoundary } from './RewindViewErrorBoundary';
 import { getBundledAppVersion } from '../../utils/appVersion';
+import { canvasColor } from '../../utils/canvasTheme';
 import DexIcon from '../../components/DexIcon';
 import { DexSearchInput } from '../../styles/components';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -817,7 +818,8 @@ const Rewind: React.FC = () => {
       const points = analytics?.focusHistory?.focusScoreTrend || [];
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (!points.length) return;
-      ctx.strokeStyle = 'var(--color-success)';
+      // Canvas 2D ignores var() colors — resolve the token to a literal
+      ctx.strokeStyle = canvasColor('--color-success');
       ctx.lineWidth = 2;
       ctx.beginPath();
       points.forEach((point: { score?: number }, i: number) => {

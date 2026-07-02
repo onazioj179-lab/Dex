@@ -24,6 +24,7 @@ import {
   mat4Multiply, vec3, vec3Normalize, vec3Sub, vec3Cross, vec3Dot,
   projectIsometric, stressColor,
 } from '../utils/math';
+import { canvasColor } from '../../../utils/canvasTheme';
 
 // ── Shader source ────────────────────────────────────────────────────────
 
@@ -1041,7 +1042,7 @@ export class AXLRenderer {
     const h = canvas.height;
     const cx = w / 2, cy = h / 2;
 
-    ctx.fillStyle = 'var(--color-bg-elevated)';
+    ctx.fillStyle = canvasColor('--color-bg-elevated');
     ctx.fillRect(0, 0, w, h);
 
     // Grid
@@ -1062,15 +1063,15 @@ export class AXLRenderer {
       }
       // Axes
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'var(--color-error)';
+      ctx.strokeStyle = canvasColor('--color-error');
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 80, cy); ctx.stroke();
-      ctx.fillStyle = 'var(--color-error)'; ctx.font = '10px system-ui'; ctx.fillText('X', cx + 84, cy + 4);
-      ctx.strokeStyle = 'var(--color-success)';
+      ctx.fillStyle = canvasColor('--color-error'); ctx.font = '10px system-ui'; ctx.fillText('X', cx + 84, cy + 4);
+      ctx.strokeStyle = canvasColor('--color-success');
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 80); ctx.stroke();
-      ctx.fillStyle = 'var(--color-success)'; ctx.fillText('Y', cx + 4, cy - 84);
-      ctx.strokeStyle = 'var(--color-accent)';
+      ctx.fillStyle = canvasColor('--color-success'); ctx.fillText('Y', cx + 4, cy - 84);
+      ctx.strokeStyle = canvasColor('--color-accent');
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 50, cy + 30); ctx.stroke();
-      ctx.fillStyle = 'var(--color-accent)'; ctx.fillText('Z', cx - 62, cy + 38);
+      ctx.fillStyle = canvasColor('--color-accent'); ctx.fillText('Z', cx - 62, cy + 38);
     }
 
     // Parts (simplified isometric)
@@ -1126,7 +1127,7 @@ export class AXLRenderer {
       }
 
       if (part.id === state.selectedPartId) {
-        ctx.strokeStyle = 'var(--color-accent)';
+        ctx.strokeStyle = canvasColor('--color-accent');
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.strokeRect(-30, -30, 60, 60);
@@ -1140,11 +1141,11 @@ export class AXLRenderer {
       if (m.points.length >= 2) {
         const p1 = { x: cx + m.points[0].x, y: cy - m.points[0].y };
         const p2 = { x: cx + m.points[1].x, y: cy - m.points[1].y };
-        ctx.strokeStyle = 'var(--color-warning)'; ctx.lineWidth = 1;
+        ctx.strokeStyle = canvasColor('--color-warning'); ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'var(--color-warning)'; ctx.font = '10px system-ui';
+        ctx.fillStyle = canvasColor('--color-warning'); ctx.font = '10px system-ui';
         ctx.fillText(m.label, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
       }
     });
@@ -1158,10 +1159,10 @@ export class AXLRenderer {
       const tw = ctx.measureText(frameText).width + 12;
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(apx + 15, apy - 18, tw, 18);
-      ctx.strokeStyle = 'var(--color-accent)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = canvasColor('--color-accent'); ctx.lineWidth = 1;
       ctx.strokeRect(apx + 15, apy - 18, tw, 18);
       ctx.beginPath(); ctx.moveTo(apx, apy); ctx.lineTo(apx + 15, apy - 9); ctx.stroke();
-      ctx.fillStyle = 'var(--color-accent)';
+      ctx.fillStyle = canvasColor('--color-accent');
       ctx.fillText(frameText, apx + 21, apy - 5);
     });
 

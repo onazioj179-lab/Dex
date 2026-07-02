@@ -16,6 +16,7 @@ import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import { formatClock } from '../../shared/format/units';
 import { loadAudioMetadata } from '../utils/id3Parser';
+import { canvasColor } from '../utils/canvasTheme';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
@@ -652,7 +653,8 @@ export const Audio: React.FC = () => {
         const bufLen = analyser.fftSize;
         const data = new Uint8Array(bufLen);
         analyser.getByteTimeDomainData(data);
-        ctx.strokeStyle = 'var(--color-accent)';
+        // Canvas 2D ignores var() colors — resolve the token to a literal
+        ctx.strokeStyle = canvasColor('--color-accent');
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (let i = 0; i < bufLen; i++) {

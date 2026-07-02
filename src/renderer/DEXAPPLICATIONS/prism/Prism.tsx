@@ -2366,7 +2366,9 @@ const Prism: React.FC = () => {
       patternCanvas.height = 20;
       const pCtx = patternCanvas.getContext('2d');
       if (pCtx) {
-        pCtx.fillStyle = 'var(--color-text-primary)';
+        // Image-space white (canvas ignores var() colors; the transparency
+        // checkerboard is canonically white/grey regardless of app theme)
+        pCtx.fillStyle = '#ffffff';
         pCtx.fillRect(0, 0, 10, 10);
         pCtx.fillRect(10, 10, 10, 10);
         pCtx.fillStyle = '#e0e0e0';
@@ -2507,7 +2509,9 @@ const Prism: React.FC = () => {
               // Light edge (top-left)
               ctx.save();
               ctx.globalAlpha = highlightAlpha;
-              ctx.strokeStyle = 'var(--color-text-primary)';
+              // Bevel highlight is image-space white (pairs with the #000000
+              // shadow edge below); canvas ignores var() colors anyway
+              ctx.strokeStyle = '#ffffff';
               ctx.lineWidth = bevelSize;
               ctx.beginPath();
               ctx.moveTo(layer.x, layer.y + layer.height);
@@ -2766,7 +2770,8 @@ const Prism: React.FC = () => {
         ctx.beginPath();
         ctx.arc(gradientPreview.from.x, gradientPreview.from.y, 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'var(--color-text-primary)';
+        // Image-space white end marker (start is #ff375f); canvas ignores var()
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(gradientPreview.to.x, gradientPreview.to.y, 4, 0, Math.PI * 2);
         ctx.fill();

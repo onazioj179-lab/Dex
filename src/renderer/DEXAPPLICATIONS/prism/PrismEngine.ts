@@ -262,7 +262,9 @@ export function drawMarchingAnts(
 ): void {
   // Find edge pixels (selected pixel adjacent to non-selected pixel)
   ctx.save();
-  ctx.strokeStyle = 'var(--color-text-primary)';
+  // Marching ants render over image content — literal white, not a theme
+  // token (canvas silently ignores var() colors regardless)
+  ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   ctx.lineDashOffset = -offset;
