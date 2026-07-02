@@ -16,6 +16,8 @@ import { Select } from '../components/Select';
 import DexIcon from '../components/DexIcon';
 import DOMPurify from 'dompurify';
 import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
+import { AdblockEngine } from '../DEXAPPLICATIONS/browser/adblockEngine';
+import { buildAdblockScript, ADBLOCK_CONSOLE_PREFIX } from '../DEXAPPLICATIONS/browser/adblockContentScript';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
@@ -118,6 +120,11 @@ const _de = (s: string): string => {
 // ===========================================================================
 
 const BLOCKED_DOMAINS = new Set(BLOCKED_DOMAIN_LIST);
+// Shared filter engine for navigation-level blocking (tested; adds label-safe
+// suffix matching + a per-site allowlist). Sub-resource blocking is handled by
+// the injected content script (buildAdblockScript) since <webview> exposes no
+// request-interception API.
+const adblockEngine = new AdblockEngine(BLOCKED_DOMAIN_LIST);
 
 // Privacy-mode User Agent
 const TOR_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0';
@@ -398,6 +405,12 @@ export const Browser: React.FC = () => {
   const [savePrompt, setSavePrompt] = useState<{ domain: string; username: string; password: string } | null>(null);
   // Tracks which webviews have already had autofill injected to avoid duplicates
   const autofillInjectedRef = useRef<Set<string>>(new Set());
+  // Live mirror of the block toggles so the per-page adblock injection (attached
+  // once on mount) always reflects the latest settings without re-binding.
+  const adblockSettingsRef = useRef({ blockAds: true, blockTrackers: true });
+  // Last per-page block count reported by each tab's injected script, so we can
+  // add deltas to the session total (the in-page counter resets per navigation).
+  const adblockCountsRef = useRef<Map<string, number>>(new Map());
   const keychainSaveRef = useRef<ReturnType<typeof setTimeout>>();
   // Per-session unguessable sentinel for credential detection (prevents spoofing)
   const credsSentinelRef = useRef('__DEX_CREDS_' + Math.random().toString(36).slice(2, 10) + '__');
@@ -1204,6 +1217,30 @@ export const Browser: React.FC = () => {
       injectAutofill(webview, tabId);
       // Apply remembered per-site zoom for this page's host
       applyZoomRef.current?.(webview, tabId);
+      // Ad-block: inject the sub-resource blocker (the <webview> has no request
+      // API, so blocking runs inside the page — overrides fetch/XHR/beacon and
+      // scrubs ad <script>/<img>/<iframe> as they insert). Read the settings
+      // through a ref so the injection reflects the latest toggles without
+      // re-attaching listeners.
+      const s = adblockSettingsRef.current;
+      if (s.blockAds || s.blockTrackers) {
+        try {
+          const script = buildAdblockScript(BLOCKED_DOMAIN_LIST, { blockAds: s.blockAds, blockTrackers: s.blockTrackers });
+          if (script && webview.executeJavaScript) webview.executeJavaScript(script).catch(() => { /* page may block eval */ });
+        } catch { /* never break navigation on adblock inject failure */ }
+      }
+      adblockCountsRef.current.set(tabId, 0); // fresh page — reset the delta base
+    });
+    // Tally sub-resource blocks the injected script reports via a console marker.
+    on('console-message', (e: any) => {
+      const msg: string = e?.message ?? '';
+      if (!msg.startsWith(ADBLOCK_CONSOLE_PREFIX)) return;
+      const n = parseInt(msg.slice(ADBLOCK_CONSOLE_PREFIX.length), 10);
+      if (!Number.isFinite(n)) return;
+      const last = adblockCountsRef.current.get(tabId) ?? 0;
+      const delta = n >= last ? n - last : n; // n<last => page reset its counter
+      adblockCountsRef.current.set(tabId, n);
+      if (delta > 0) setBlockedCount(c => c + delta);
     });
     on('enter-html-full-screen', () => {
       setFullscreenTabId(tabId);
@@ -1223,6 +1260,7 @@ export const Browser: React.FC = () => {
       }
     }
     webviewListenersRef.current.delete(tabId);
+    adblockCountsRef.current.delete(tabId);
   }, []);
 
   // Ref callback factory for webviews
@@ -1320,40 +1358,16 @@ export const Browser: React.FC = () => {
 
   const currentTab = useMemo(() => tabs.find(t => t.id === activeTab), [tabs, activeTab]);
 
-  // Silent blocking - optimized for performance
+  // Keep the adblock-injection ref current with the live settings.
+  adblockSettingsRef.current = { blockAds: browserSettings.blockAds, blockTrackers: browserSettings.blockTrackers };
+
+  // Navigation-level blocking via the shared AdblockEngine (tested: label-safe
+  // suffix matching + per-site allowlist). Sub-resource ads are stopped by the
+  // injected content script; this catches top-level ad/tracker navigations.
   const shouldBlock = useCallback((url: string): boolean => {
     if (!browserSettings.blockTrackers && !browserSettings.blockAds) return false;
-    try {
-      const hostname = new URL(url).hostname.toLowerCase();
-      
-      // Fast O(1) Set lookup - check if exact domain or parent domain is blocked
-      if (BLOCKED_DOMAINS.has(hostname)) {
-        setBlockedCount(c => c + 1);
-        return true;
-      }
-      
-      // Check parent domains (e.g., ads.example.com -> example.com)
-      const parts = hostname.split('.');
-      for (let i = 1; i < parts.length - 1; i++) {
-        const parentDomain = parts.slice(i).join('.');
-        if (BLOCKED_DOMAINS.has(parentDomain)) {
-          setBlockedCount(c => c + 1);
-          return true;
-        }
-      }
-      
-      // Block tracking patterns (only if tracker blocking enabled)
-      if (browserSettings.blockTrackers) {
-        const urlLower = url.toLowerCase();
-        // Only match genuinely tracking-specific patterns (avoid /tracking, /collect, /log? which break legit sites)
-        if (urlLower.includes('/beacon') || 
-            urlLower.includes('track.php') || 
-            urlLower.includes('&_ga=')) {
-          setBlockedCount(c => c + 1);
-          return true;
-        }
-      }
-    } catch { /* URL parse failed */ }
+    const res = adblockEngine.check(url, undefined, browserSettings.blockTrackers);
+    if (res.blocked) { setBlockedCount(c => c + 1); return true; }
     return false;
   }, [browserSettings.blockTrackers, browserSettings.blockAds]);
 
