@@ -969,6 +969,92 @@ fn audio_waveform(path: &str, buckets: usize) -> Value {
     }
 }
 
+/// Native beat/tempo/onset analysis (Smart Tempo). `opts` is an optional JSON
+/// object: { hop, minBpm, maxBpm, sensitivity } — any subset overrides defaults.
+fn audio_beats(path: &str, opts: &Value) -> Value {
+    let mut o = dex_audio::BeatOptions::default();
+    if let Some(h) = opts.get("hop").and_then(|v| v.as_u64()) {
+        o.hop = h as usize;
+    }
+    if let Some(v) = opts.get("minBpm").and_then(|v| v.as_f64()) {
+        o.min_bpm = v as f32;
+    }
+    if let Some(v) = opts.get("maxBpm").and_then(|v| v.as_f64()) {
+        o.max_bpm = v as f32;
+    }
+    if let Some(v) = opts.get("sensitivity").and_then(|v| v.as_f64()) {
+        o.sensitivity = v as f32;
+    }
+    match dex_audio::analyze_beats(path, o) {
+        Ok(a) => json!({
+            "success": true,
+            "bpm": a.bpm,
+            "confidence": a.confidence,
+            "onsets": a.onsets,
+            "hop": a.hop,
+            "sampleRate": a.sample_rate,
+        }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
+/// Native musical key/scale detection (chromagram + Krumhansl-Schmuckler).
+fn audio_key(path: &str) -> Value {
+    match dex_audio::detect_key(path) {
+        Ok(k) => json!({
+            "success": true,
+            "key": k.key,
+            "scale": k.scale,
+            "confidence": k.confidence,
+            "chroma": k.chroma,
+            "sampleRate": k.sample_rate,
+        }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
+/// Native silence detection + removal plan. `opts` is an optional JSON object:
+/// { thresholdDb, minSilenceSec, windowSec, paddingSec }.
+fn audio_silence(path: &str, opts: &Value) -> Value {
+    let mut o = dex_audio::SilenceOptions::default();
+    if let Some(v) = opts.get("thresholdDb").and_then(|v| v.as_f64()) {
+        o.threshold_db = v as f32;
+    }
+    if let Some(v) = opts.get("minSilenceSec").and_then(|v| v.as_f64()) {
+        o.min_silence_sec = v as f32;
+    }
+    if let Some(v) = opts.get("windowSec").and_then(|v| v.as_f64()) {
+        o.window_sec = v as f32;
+    }
+    if let Some(v) = opts.get("paddingSec").and_then(|v| v.as_f64()) {
+        o.padding_sec = v as f32;
+    }
+    match dex_audio::analyze_silence(path, o) {
+        Ok(p) => json!({
+            "success": true,
+            "keep": p.keep,
+            "remove": p.remove,
+            "removedSec": p.removed_sec,
+            "keptSec": p.kept_sec,
+            "originalSec": p.original_sec,
+        }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
+/// Native integrated loudness (BS.1770 LUFS) + sample peak.
+fn audio_loudness(path: &str) -> Value {
+    match dex_audio::analyze_loudness(path) {
+        Ok(l) => json!({
+            "success": true,
+            "lufs": l.lufs,
+            "peakDbfs": l.peak_dbfs,
+            "sampleRate": l.sample_rate,
+        }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
 // --- Native search index (Tantivy, GOAL-6A) --------------------------------
 /// Query the index; `None` when the index is empty so the caller falls back to
 /// the bounded filesystem walk.
@@ -1024,6 +1110,39 @@ fn index_stats(app: &tauri::AppHandle) -> Value {
         .and_then(|g| g.as_ref().map(|i| i.count()))
         .unwrap_or(0);
     json!({ "indexed": count, "shell": "tauri" })
+}
+
+/// Clone the managed search-index handle out of the lock (Arc-backed, so cheap),
+/// releasing the mutex before any indexing work. `None` when unavailable.
+fn index_handle(app: &tauri::AppHandle) -> Option<dex_search::SearchIndex> {
+    let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
+    let idx = state.lock().ok()?.as_ref()?.clone();
+    Some(idx)
+}
+
+/// Upsert an arbitrary content doc (note / clipboard / …) into the unified index
+/// so global search spans every kind of DEX content, not just files.
+fn search_upsert_doc(app: &tauri::AppHandle, id: &str, source: &str, title: &str, body: &str, modified: u64) -> Value {
+    let idx = match index_handle(app) {
+        Some(i) => i,
+        None => return json!({ "success": false, "error": "index unavailable" }),
+    };
+    match idx.upsert_doc(id, source, title, body, modified) {
+        Ok(()) => json!({ "success": true }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
+/// Remove a unified-index doc (any source) by its stable id.
+fn search_remove_doc(app: &tauri::AppHandle, id: &str) -> Value {
+    let idx = match index_handle(app) {
+        Some(i) => i,
+        None => return json!({ "success": false, "error": "index unavailable" }),
+    };
+    match idx.remove_doc(id) {
+        Ok(()) => json!({ "success": true }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
 }
 
 /// Incrementally re-sync the index against the user's folders WITHOUT a full
@@ -1995,11 +2114,36 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "search:rebuild" | "fileSearch:reindex" => index_rebuild(&app),
         "search:sync" | "fileSearch:sync" => index_sync(&app),
         "search:getStats" => index_stats(&app),
+        "search:upsertDoc" | "search:indexDoc" => search_upsert_doc(
+            &app,
+            &arg_str(0).unwrap_or_default(),
+            &arg_str(1).unwrap_or_else(|| "note".into()),
+            &arg_str(2).unwrap_or_default(),
+            &arg_str(3).unwrap_or_default(),
+            arg_u64(4).unwrap_or(0),
+        ),
+        "search:removeDoc" | "search:deleteDoc" => {
+            search_remove_doc(&app, &arg_str(0).unwrap_or_default())
+        }
 
         // --- Native audio analysis (GOAL-6C) -------------------------------
         "audio:getMetadata" | "audio:getInfo" => audio_metadata(&arg_str(0).unwrap_or_default()),
         "audio:getWaveform" | "audio:getPeaks" | "media:getWaveform" => {
             audio_waveform(&arg_str(0).unwrap_or_default(), arg_u64(1).unwrap_or(256) as usize)
+        }
+        "audio:analyzeBeats" | "audio:detectTempo" | "media:analyzeBeats" => {
+            let opts = args.get(1).cloned().unwrap_or_else(|| json!({}));
+            audio_beats(&arg_str(0).unwrap_or_default(), &opts)
+        }
+        "audio:detectKey" | "audio:analyzeKey" | "media:detectKey" => {
+            audio_key(&arg_str(0).unwrap_or_default())
+        }
+        "audio:analyzeSilence" | "audio:detectSilence" | "media:analyzeSilence" => {
+            let opts = args.get(1).cloned().unwrap_or_else(|| json!({}));
+            audio_silence(&arg_str(0).unwrap_or_default(), &opts)
+        }
+        "audio:loudness" | "audio:analyzeLoudness" | "media:loudness" => {
+            audio_loudness(&arg_str(0).unwrap_or_default())
         }
 
         // --- Native file scanner: duplicate detection (GOAL-6A) ------------

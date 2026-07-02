@@ -3241,9 +3241,51 @@ Renderer-feasible but larger (future batches):
 - Full automation graph point editing; MIDI Transform sets; multi-output instrument routing
 - Per-track latency compensation (reporting/PDC)
 
-Out of renderer scope (ML / native): Audio-to-MIDI, Stem Separation, true Smart Tempo audio onset
-detect, AI Drummer & Session Players, Dolby Atmos / spatial, true Flex Time engine, hardware MIDI
-scripting, native plugin sandboxing. These need DSP/ML or native hosting we don't fake.
+Out of renderer scope (ML / native): Audio-to-MIDI, Stem Separation, AI Drummer & Session Players,
+Dolby Atmos / spatial, true Flex Time engine, hardware MIDI scripting, native plugin sandboxing.
+These need DSP/ML or native hosting we don't fake.
+
+> **DONE — native Smart Tempo (beat/tempo/onset) engine.** `core/dex-audio` gained
+> `analyze_beats`/`analyze_pcm` (`BeatOptions`/`BeatAnalysis`): a real DSP port of `beatDetect.ts`
+> (RMS onset-flux envelope → autocorrelation for BPM + peak-pick for onsets) that runs over the
+> symphonia-decoded signal, so the heavy path is native instead of decoding the whole clip in JS. It
+> adds an **octave correction** the JS path lacks (autocorrelation peaks at every multiple of the true
+> period, so naive argmax reports half/third tempo). Wired through `dex_ipc`
+> (`audio:analyzeBeats` / `audio:detectTempo`) and consumed via the new
+> `services/media/analyzeBeats.ts` smart wrapper (native for real file paths, Web-Audio + TS engine
+> for blob URLs). Imosion's tempo/beat op now goes through it. 4 new cargo tests (click-track BPM
+> recovery, silence/empty guards, half/double-tempo band, WAV decode path) — `cd core && cargo test`
+> green.
+
+> **DONE — native key detection + silence/loudness + unified search index (the raw-core batch).**
+> (1) **Key/scale detection** in `dex-audio`: `detect_key`/`detect_key_pcm` — a 12-bin chromagram via
+> per-frame **Goertzel** (no FFT crate) + **Krumhansl-Schmuckler** profile correlation. (2)
+> **Silence + loudness** in `dex-audio`: `analyze_silence`/`plan_silence_removal` (native port of
+> silenceDetect.ts) and `analyze_loudness` — a genuine **BS.1770 integrated-LUFS** meter (per-fs
+> K-weighting biquads + 400 ms/75%-overlap block gating) plus sample peak. (3) **Unified index** in
+> `dex-search`: added `source`+`docid` fields and `upsert_doc`/`remove_doc`, so files, notes and
+> clipboard share ONE index (schema-mismatch auto-rebuilds the old cache). Wired through `dex_ipc`
+> (`audio:detectKey`, `audio:analyzeSilence`, `audio:loudness`, `search:upsertDoc`/`removeDoc`) and
+> the renderer: Imosion's detectTempoKey now reports native key too; **notes fold into the index on
+> save/delete** (notesStore → `search:upsertDoc`/`removeDoc`). +12 cargo tests. `cd core && cargo
+> test` green (dex-audio 16, dex-search 9); `cd src-tauri && cargo check` exit 0; `tsc` exit 0.
+
+> **DONE — engine consumers wired (clipboard index + Quick Look inspector).** (1) **Clipboard folds
+> into the unified index**: clipboardStore `add` → `search:upsertDoc('clip:…','clipboard',…)`, and
+> `remove`/`clearUnpinned`/`clearAll`/cap-eviction → `search:removeDoc` (text clips only; images
+> skipped). Global search now spans files + notes + clipboard. (2) **Quick Look audio inspector**:
+> `shell/QuickLook.tsx` audio preview now shows a native analysis strip — Tempo (native for paths,
+> Web-Audio engine for URLs), Key + Loudness (LUFS) + Peak (native-only, shown only for real file
+> paths, never faked for web URLs). Gives the key/loudness engines a real UI consumer. `tsc`
+> exit 0 (renderer-only; no Rust change).
+
+> **DONE — silence engine consumer + full 100% sweep.** Added `analyzeSilence` to the media wrapper
+> (native for file paths, TS `silenceDetect` fallback for blob/URL) and surfaced it in the Quick Look
+> audio inspector as a "Silence" metric (trimmable seconds · gap count). ALL FOUR audio engines —
+> tempo, key, loudness, silence — now have real UI consumers; files+notes+clipboard share ONE search
+> index. Honest scope: native **video** scene-cut/keyframe detection is NOT done — it needs a
+> video-decoder crate (same out-of-scope constraint as bundling ffmpeg); not faked. Full verification:
+> `cd core && cargo test` = **93 passed / 0 failed**; `cd src-tauri && cargo check` exit 0; `tsc` exit 0.
 
 ### Creative apps — pro-controls pass (applying Imosion's bar to the rest, one by one)
 > **DONE — Prism + global creative sliders.** (1) Prism `AdjustmentControls` native `<input

@@ -194,6 +194,32 @@ function enforceCap(entries: ClipEntry[]): ClipEntry[] {
 // Store
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Unified search index sync. Text clips are folded into the SAME native index
+// as files + notes (dex-search), so global search spans clipboard history too.
+// Fire-and-forget and desktop-only — a no-op in the browser preview. Images are
+// skipped (binary data URLs aren't useful full-text content).
+// ---------------------------------------------------------------------------
+type DexBridge = { invoke?: (channel: string, ...args: unknown[]) => Promise<unknown> };
+function dexBridge(): DexBridge | null {
+  const b = (window as unknown as { dex?: DexBridge }).dex;
+  return b && typeof b.invoke === 'function' ? b : null;
+}
+function indexClip(entry: ClipEntry): void {
+  if (entry.kind === 'image') return;
+  const b = dexBridge();
+  if (!b?.invoke) return;
+  const title = entry.preview || entry.kind;
+  void b
+    .invoke('search:upsertDoc', `clip:${entry.id}`, 'clipboard', title, entry.content, Math.floor(entry.timestamp / 1000))
+    .catch(() => { /* index sync is best-effort */ });
+}
+function unindexClip(id: string): void {
+  const b = dexBridge();
+  if (!b?.invoke) return;
+  void b.invoke('search:removeDoc', `clip:${id}`).catch(() => { /* best-effort */ });
+}
+
 export const useClipboardStore = create<ClipboardState>()(
   persist(
     (set, get) => ({
@@ -224,19 +250,37 @@ export const useClipboardStore = create<ClipboardState>()(
           charCount: content.length,
         };
         const rest = existing ? entries.filter(e => e.id !== existing.id) : entries;
-        set({ entries: enforceCap([entry, ...rest]) });
+        const next = enforceCap([entry, ...rest]);
+        set({ entries: next });
+        // Fold this clip into the unified native search index, and evict any
+        // entries the cap just dropped so the index stays in step with the store.
+        indexClip(entry);
+        for (const e of entries) {
+          if (!next.some(n => n.id === e.id)) unindexClip(e.id);
+        }
         return entry;
       },
 
-      remove: (id) => set(state => ({ entries: state.entries.filter(e => e.id !== id) })),
+      remove: (id) => {
+        unindexClip(id);
+        set(state => ({ entries: state.entries.filter(e => e.id !== id) }));
+      },
 
       togglePin: (id) => set(state => ({
         entries: state.entries.map(e => (e.id === id ? { ...e, pinned: !e.pinned } : e)),
       })),
 
-      clearUnpinned: () => set(state => ({ entries: state.entries.filter(e => e.pinned) })),
+      clearUnpinned: () => set(state => {
+        for (const e of state.entries) {
+          if (!e.pinned) unindexClip(e.id);
+        }
+        return { entries: state.entries.filter(e => e.pinned) };
+      }),
 
-      clearAll: () => set({ entries: [] }),
+      clearAll: () => set(state => {
+        for (const e of state.entries) unindexClip(e.id);
+        return { entries: [] };
+      }),
     }),
     {
       name: 'dex-clipboard-omni',

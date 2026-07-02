@@ -9,8 +9,8 @@ import { clampEventToViewport } from '../../utils/menuPosition';
 import { CreativeSlider, IconButton } from '../../components/controls';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
-import { detectTempo, detectOnsets } from '../../../shared/media/beatDetect';
-import { decodeAudioToMono } from '../../services/media/decodeAudio';
+import { detectOnsets } from '../../../shared/media/beatDetect';
+import { analyzeBeats, analyzeKey } from '../../services/media/analyzeBeats';
 import { useRunningApps } from '../../store/runningApps';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
@@ -2620,22 +2620,25 @@ const Imosion: React.FC = () => {
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
 
   // ROADMAP-600 #233/#241 — UKI creative-op handler. Tempo/beat detection runs
-  // for real: decode the selected track's clip audio and analyse it with the
-  // shared beatDetect engine (read-only). Other ops skip honestly.
+  // for real via `analyzeBeats`, which uses the native Rust engine when the clip
+  // is a real file path and the shared Web-Audio + beatDetect engine otherwise
+  // (blob clips). Read-only; other ops skip honestly.
   const handleImosionOp = useCallback(async (op: CreativeOp): Promise<OpApplyResult> => {
     if (op.op === 'detectTempoKey' || op.op === 'detectBeats') {
       const track = tracks.find(t => t.id === selectedTrack) ?? tracks[0];
       const clip = track?.clips?.find(c => c.url);
       if (!clip?.url) return { outcome: 'skipped', note: 'add or select an audio track with a clip first' };
-      const decoded = await decodeAudioToMono(clip.url);
-      if (!decoded) return { outcome: 'skipped', note: 'could not decode the track audio' };
+      const result = await analyzeBeats(clip.url);
+      if (!result) return { outcome: 'skipped', note: 'could not decode the track audio' };
       if (op.op === 'detectTempoKey') {
-        const { bpm, confidence } = detectTempo(decoded.pcm, decoded.sampleRate);
-        if (bpm <= 0) return { outcome: 'skipped', note: 'could not estimate a tempo from this audio' };
-        return { outcome: 'applied', note: `detected tempo ~${bpm} BPM (confidence ${Math.round(confidence * 100)}%)` };
+        if (result.bpm <= 0) return { outcome: 'skipped', note: 'could not estimate a tempo from this audio' };
+        // Key detection is native-only (chromagram) — reported when the clip is a
+        // real file path; blob clips get tempo alone, no faked key.
+        const key = await analyzeKey(clip.url);
+        const keyNote = key ? `, key ${key.key} ${key.scale}` : '';
+        return { outcome: 'applied', note: `detected tempo ~${result.bpm} BPM (confidence ${Math.round(result.confidence * 100)}%)${keyNote}` };
       }
-      const onsets = detectOnsets(decoded.pcm, decoded.sampleRate);
-      return { outcome: 'applied', note: `detected ${onsets.length} beats/onsets` };
+      return { outcome: 'applied', note: `detected ${result.onsets.length} beats/onsets` };
     }
     return enginePendingApplier('Imosion')(op);
   }, [tracks, selectedTrack]);
