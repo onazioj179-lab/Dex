@@ -5,6 +5,7 @@
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { CreativeSlider, IconButton } from '../../components/controls';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
@@ -9181,7 +9182,7 @@ const Imosion: React.FC = () => {
             {tracks.map(t => (
               <div key={t.id} style={{ marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{t.name}</span>
-                <textarea value={trackNotes[t.id] || ''} onChange={e => setTrackNotes(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Add notes..." rows={2} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, resize: 'vertical', boxSizing: 'border-box' }} />
+                <AssistedTextarea value={trackNotes[t.id] || ''} onChange={e => setTrackNotes(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Add notes..." rows={2} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
             ))}
           </div>
