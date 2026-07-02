@@ -35,6 +35,15 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Renderer checkpoint (2026-07-01, /goal session):** Stage Manager shipped — `shell/AppOverview.tsx`
+is now LIVE scaled windows (not canvas fakes), triggered by F3/Ctrl+Up, 3-finger swipe-up, the
+`dex-stage-toggle` event, and Home's "Stage (N)" pill; UKI gained a background-task ledger
+(`store/ukiTasksStore.ts` + agentRunner integration + Nexus panel section + `notes.enhance`
+agent action). The full owner mandate (speed, creative-app pass starting at AXL, browser
+ad-block-by-default, Store install/remove lifecycle, Nexus gauge probabilities) is decoded in
+docs/ROADMAP.md's top GOAL block — pick up track 4 (AXL) or track 2 (UKI task scheduling) next.
+tsc 0, new unit tests 7/7 green.
+
 **Status:** Electron is the shipping build (v5.0.1). Tauri shell boots and serves
 the same renderer; **232 namespaces are natively backed** after rounds 1-3. Round 3
 (2026-06-19) implemented the previously-skipped HEAVY channels across 122 modules —

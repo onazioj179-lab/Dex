@@ -836,6 +836,9 @@ export const AppManager: React.FC = () => {
 
   // -- Shell interaction layers --------------------------------------------
   const [showOverview, setShowOverview] = useState(false);
+  // Live mirror for event listeners registered once (dex-stage-toggle)
+  const showOverviewRef = useRef(showOverview);
+  showOverviewRef.current = showOverview;
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   // Transient banner stack only (top-right). History/center is now hub-backed.
   const bannerNotifications = useBannerNotifications();
@@ -2558,8 +2561,13 @@ export const AppManager: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'n') { e.preventDefault(); setCurrentApp('notes' as AppId); return; }
       // Ctrl+Shift+T -- quick-open Tasks app
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') { e.preventDefault(); setCurrentApp('tasks' as AppId); return; }
-      // F3 or Ctrl+Up -- App Overview (Mission Control)
-      if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp')) { e.preventDefault(); setShowOverview(p => !p); return; }
+      // F3 or Ctrl+Up -- Stage Manager (live App Overview); Home is the stage
+      if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp')) {
+        e.preventDefault();
+        if (!showOverview) setCurrentRunningApp('home' as AppId);
+        setShowOverview(!showOverview);
+        return;
+      }
 
       // Ctrl+Alt+Z -- open the FancyZones-style Zone Editor (custom snap zones).
       if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
@@ -3009,10 +3017,19 @@ export const AppManager: React.FC = () => {
       }
     };
     window.addEventListener('dex-gesture', handleGesture);
+
+    // Stage Manager toggle any surface can dispatch (Home's "Stage" button,
+    // the launcher, UKI actions). Keyboard F3/Ctrl+Up lives in keyHandlerRef.
+    const toggleStage = () => {
+      if (!showOverviewRef.current) setCurrentRunningApp('home' as AppId);
+      setShowOverview(!showOverviewRef.current);
+    };
+    window.addEventListener('dex-stage-toggle', toggleStage);
     return () => {
       gestureEngine.destroy();
       destroyVisualEffects();
       window.removeEventListener('dex-gesture', handleGesture);
+      window.removeEventListener('dex-stage-toggle', toggleStage);
       unsub3L(); unsub3R(); unsub3U(); unsubPinch(); unsubSpread();
       gestureRecognizer.detach();
     };
@@ -5091,12 +5108,15 @@ export const AppManager: React.FC = () => {
       {/* App Switcher HUD -- Ctrl+Tab visual overlay */}
       <AppSwitcher visible={switcherVisible} apps={runningApps} selectedIndex={switcherIndex} />
 
-      {/* App Overview (Mission Control) -- triggered by gesture or keyboard */}
+      {/* Stage Manager (App Overview) -- live scaled windows; triggered by
+          gesture, F3, or the `dex-stage-toggle` window event (Home button). */}
       <AppOverview
         visible={showOverview}
         apps={runningApps.map(a => ({
           id: a.id,
           name: a.name,
+          icon: a.icon,
+          color: a.color,
           element: contentRef.current?.querySelector(`[data-app-id="${a.id}"]`) as HTMLElement | null,
         }))}
         activeAppId={currentApp}

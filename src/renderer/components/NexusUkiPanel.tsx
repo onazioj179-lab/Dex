@@ -19,6 +19,7 @@
 
 import React, { useMemo } from 'react';
 import { useUkiStore, type UkiUIState } from '../store/ukiStore';
+import { useUkiTasks, type UkiTaskStatus } from '../store/ukiTasksStore';
 import { CollapsibleSection } from './CollapsibleSection';
 
 const STATE_LABEL: Record<UkiUIState, string> = {
@@ -68,12 +69,22 @@ const chip: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+const TASK_TONE: Record<UkiTaskStatus, string> = {
+  pending: 'var(--color-text-tertiary)',
+  running: 'var(--color-accent)',
+  stalled: 'var(--color-warning, #ff9f0a)',
+  done: 'var(--color-success, #32d74b)',
+  failed: 'var(--color-error, #ff453a)',
+};
+
 const NexusUkiPanel: React.FC = () => {
   const state = useUkiStore((s) => s.state);
   const memoryStats = useUkiStore((s) => s.memoryStats);
   const conversationHistory = useUkiStore((s) => s.conversationHistory);
   const thoughtTrail = useUkiStore((s) => s.thoughtTrail);
   const knowledgeNodes = useUkiStore((s) => s.knowledgeNodes);
+  const bgTasks = useUkiTasks((s) => s.tasks);
+  const clearFinished = useUkiTasks((s) => s.clearFinished);
 
   const recentTurns = useMemo(() => conversationHistory.slice(-3).reverse(), [conversationHistory]);
   const recentThoughts = useMemo(() => thoughtTrail.slice(-5).reverse(), [thoughtTrail]);
@@ -81,8 +92,14 @@ const NexusUkiPanel: React.FC = () => {
     () => [...knowledgeNodes].sort((a, b) => b.weight - a.weight).slice(0, 12),
     [knowledgeNodes],
   );
+  // Active work first, then most recent — capped for the panel.
+  const recentTasks = useMemo(() => {
+    const rank = (s: UkiTaskStatus) => (s === 'running' || s === 'stalled' ? 0 : s === 'pending' ? 1 : 2);
+    return [...bgTasks].sort((a, b) => rank(a.status) - rank(b.status) || b.updatedAt - a.updatedAt).slice(0, 6);
+  }, [bgTasks]);
+  const hasFinishedTasks = useMemo(() => bgTasks.some(t => t.status === 'done' || t.status === 'failed'), [bgTasks]);
 
-  const hasData = conversationHistory.length > 0 || thoughtTrail.length > 0 || knowledgeNodes.length > 0;
+  const hasData = conversationHistory.length > 0 || thoughtTrail.length > 0 || knowledgeNodes.length > 0 || bgTasks.length > 0;
 
   return (
     <CollapsibleSection
@@ -116,6 +133,45 @@ const NexusUkiPanel: React.FC = () => {
       {!hasData && (
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '6px 0' }}>
           UKI hasn't done anything yet this session. Ask her something and her reasoning, memory, and knowledge will show up here.
+        </div>
+      )}
+
+      {/* Background tasks — UKI's own work ledger (agent runs, automations) */}
+      {recentTasks.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Background Tasks</div>
+            {hasFinishedTasks && (
+              <button
+                onClick={clearFinished}
+                aria-label="Clear finished background tasks"
+                style={{
+                  marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontSize: 10.5, color: 'var(--color-text-tertiary)', padding: '1px 4px',
+                }}
+              >
+                Clear finished
+              </button>
+            )}
+          </div>
+          {recentTasks.map((t) => {
+            const lastStep = t.steps[t.steps.length - 1];
+            const detail = t.status === 'failed' ? (t.error || 'Failed')
+              : t.status === 'done' ? (t.result || 'Done')
+              : lastStep ? lastStep.label
+              : 'Waiting for first step';
+            return (
+              <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-md, 8px)', fontWeight: 400 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, flexShrink: 0, background: TASK_TONE[t.status] }} />
+                  <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TASK_TONE[t.status], textTransform: 'uppercase', flexShrink: 0 }}>{t.status}</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{timeAgo(t.updatedAt)}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, paddingLeft: 12, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' as any }}>{detail}</div>
+              </div>
+            );
+          })}
         </div>
       )}
 

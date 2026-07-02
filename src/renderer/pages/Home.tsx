@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
 import { sharedTick } from '../services/SharedTick';
-import { APP_DEFINITIONS } from '../store/runningApps';
+import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useLiveActivity, type LiveActivity, type ActivityType } from '../utils/liveActivity';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
 import { glassOverlay } from '../styles/glassMenu';
@@ -354,6 +354,7 @@ export const Home: React.FC = () => {
   const pinnedFiles = useHomePinnedFilesStore(s => s.pinnedFiles);
   const pinFile = useHomePinnedFilesStore(s => s.pinFile);
   const pinnedApps = useHomePinnedAppsStore(s => s.pinnedApps);
+  const runningCount = useRunningApps(s => s.runningApps.filter(a => a.id !== 'home').length);
 
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [appPickerPosition, setAppPickerPosition] = useState<{ x: number; y: number } | null>(null);
@@ -571,6 +572,51 @@ export const Home: React.FC = () => {
 
       {/* Sticky Home search removed -- search now lives on the floating dock. */}
 
+      {/* Stage Manager pill -- Home IS the stage: one click zooms out to every
+          running app as a live scaled window. Hidden when nothing is running. */}
+      {runningCount > 0 && (
+        <button
+          type="button"
+          aria-label={`Open Stage Manager (${runningCount} running)`}
+          title="Stage Manager — see all running apps (F3)"
+          onClick={() => window.dispatchEvent(new CustomEvent('dex-stage-toggle'))}
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 18,
+            zIndex: 5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '5px 12px',
+            borderRadius: 999,
+            background: 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.92)',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'pointer',
+            textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+            transition: 'background 0.15s ease, border-color 0.15s ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+        >
+          <DexIcon name="grid" size={13} color="currentColor" />
+          Stage
+          <span style={{
+            minWidth: 16,
+            padding: '0 4px',
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.14)',
+            fontSize: 10.5,
+            fontWeight: 600,
+            lineHeight: '16px',
+            textAlign: 'center',
+          }}>{runningCount}</span>
+        </button>
+      )}
+
       {/* Scrollable content */}
       <div
         ref={scrollRef}
@@ -687,6 +733,7 @@ export const Home: React.FC = () => {
             } as React.CSSProperties}
           >
             {[
+              { label: 'Stage Manager', icon: <DexIcon name="grid" size={14} />, action: () => { window.dispatchEvent(new CustomEvent('dex-stage-toggle')); setCtxMenu(null); } },
               { label: 'Change Wallpaper', icon: <DexIcon name="palette" size={14} />, action: () => { setShowWallpaperPicker(true); setCtxMenu(null); } },
               { label: 'Pin File Here...', icon: <DexIcon name="file-plus" size={14} />, action: () => { void pinFileFromDialog(ctxMenu); } },
               { label: 'Pin App Here...', icon: <DexIcon name="plus" size={14} />, action: () => { setAppPickerPosition(ctxMenu); setShowAppPicker(true); setCtxMenu(null); } },

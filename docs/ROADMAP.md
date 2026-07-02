@@ -1,5 +1,47 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-07-01) — Owner /goal: "60% smarter UKI, 80% faster shell, Stage Manager Home" (full mandate, decoded from voice).**
+> The owner's standing mandate, split into tracks. Items marked ✅ shipped this session; the rest is the backlog.
+> 1. **Stage Manager (✅ shipped).** Home IS the stage: zoom out to see EVERY running app as its LIVE window
+>    (real content, exact aspect — not snapshots), tap one to zoom it to the front. Rewrote `shell/AppOverview.tsx`
+>    from fake canvas thumbnails to live scaled windows (GPU `transform` set inline-`!important`, same trick as the
+>    window-drag path; styles snapshot/restored on exit, visibility re-asserted from `data-app-state`). Triggers:
+>    F3 / Ctrl+Up, 3-finger swipe-up + pinch-out (already wired), `dex-stage-toggle` window event, Home's new
+>    "Stage (N)" pill + desktop context-menu item. Escape/click-empty dismisses back to Home; typing filters.
+> 2. **UKI agentic upgrades (~60% capability lift) (✅ first slice).** Background-task ledger shipped:
+>    `store/ukiTasksStore.ts` (persisted; watchdog on SharedTick flags silent runs as *stalled*; interrupted tasks
+>    rehydrate as *failed* — crash honesty; >8s tasks notify on finish). Agent loop (`uki/agentRunner.ts`) now
+>    ledgers every tool-using run (lazily — pure Q&A stays out). Nexus "UKI Activity" panel gained a Background
+>    Tasks section (status chips, last step, Clear finished). New agent-callable `notes.enhance` app action
+>    (confirm-gated, append-only, degrades without a provider key). NEXT: task queue UKI can *schedule* (cron
+>    primitives exist in `shared/automation/`), self-re-check loops that retry stalled work, richer text assist
+>    across apps (Notes has it; extend to Mail-style surfaces), wiring `src-tauri/task_queue.rs` to the renderer.
+> 3. **Speed (~80% faster open/nav/drag) — mostly LANDED, keep tightening.** Audit confirmed: per-app lazy chunks
+>    + predictive prewarm, keep-alive (never remount on nav), rAF-batched drag with GPU transform + zero content
+>    repaint, SharedTick consolidation, FrameScheduler tiers. Remaining levers: measure real cold-open times per
+>    app (Axl/Imosion/Flux are the heavy chunks), trim `dex-app-core` eager chunk, first-frame paint of heavy apps.
+> 4. **Creative app pass — AXL FIRST, then Imosion, Vinx, Forge.** Owner: "each and every creative app… AXL
+>    needs to be better", UI/UX included. Also Nexus: gauge + probabilities (predictive load/idle stats on the
+>    donut gauge), app/flow tracking ("internal freeform to manage apps, track apps, flows").
+> 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
+>    popups only for necessary notices.
+> 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
+>    reinstall from Settings; "Reset DEX" restores the default app set; future: background download of app packs.
+> 7. **Longevity + hygiene.** No throttling by time/heat ("everything works, long-term"); crash recovery stays
+>    (boot-guard + per-app boundaries shipped earlier); dropdown/menu consistency (menus-as-data); dead-code
+>    sweeps; handle large data (TB-scale) with less energy — VirtualList everywhere a list can grow, native Rust
+>    for heavy lifting (audio DSP + search index precedent).
+>
+> **CHECKPOINT (2026-07-01, later) — Stage Manager + UKI background tasks shipped (this session).**
+> Verified live in the Vite preview (driven via `dex-stage-toggle`/F3/Escape events + computed transforms, per the
+> never-screenshot rule): 3 running apps fly into a centered grid at scale ~0.38 with aspect preserved, hit-target
+> overlay aligns to the fitted rects (+4px ring), Home dims `brightness(0.45)`, click-select restores styles and
+> brings the app forward, Escape restores everything. Unit-tested the task ledger (7 tests: lifecycle, stall sweep,
+> revive-on-step, eviction spares active tasks, crash-honest rehydrate). Gotchas hit: `runningApps` does NOT
+> include `home` (query the home container directly); a second `F3` handler already existed in `keyHandlerRef`
+> (don't add another — extend it); preview freezes CSS animation/transition clocks AND throttles page timers when
+> hidden, so verify via inline styles + `document.getAnimations().finish()`, not computed mid-transition values.
+
 > **CHECKPOINT (2026-07-01) — GLASS REMOVED: whole OS is now one consistent, solid, non-glass surface.**
 > Owner reversed the master-overhaul glass direction. Done + verified live in preview (computed `backdropFilter`,
 > per the never-screenshot rule):

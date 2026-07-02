@@ -33,6 +33,7 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 
 import { isKnownTool, createToolCatalog, type ToolName, type ToolCatalog } from '../../shared/uki/toolValidation';
 import { runnableActionToolSpecs, runUkiAction } from './appActionRegistry';
+import { useUkiTasks } from '../store/ukiTasksStore';
 
 /** Build the agent system protocol around a (core + dynamic) tool catalog. */
 function buildAgentProtocol(catalogPrompt: string): string {
@@ -168,6 +169,13 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   });
   let repairCount = 0; // consecutive invalid tool calls — bounds the repair loop
 
+  // Background-task ledger: created lazily on the FIRST real tool run (a pure
+  // Q&A turn stays out of the ledger), completed/failed with the outcome so
+  // the user can always see what UKI did in the background.
+  let taskId: string | null = null;
+  const tasks = useUkiTasks.getState();
+  const trackStep = (label: string) => { if (taskId) tasks.logTaskStep(taskId, label); };
+
   for (let step = 0; step < maxSteps; step++) {
     // Rebuild the catalog each step so the actions of an app UKI just opened
     // become callable within the same turn (core tools + running apps' actions).
@@ -178,10 +186,16 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
       history: messages,
       chatOptions: { temperature: 0.5, maxTokens: 700 },
     });
-    if (!reply) return null; // provider failure -> caller degrades
+    if (!reply) {
+      if (taskId) tasks.failTask(taskId, 'Provider unavailable mid-run');
+      return null; // provider failure -> caller degrades
+    }
 
     const call = parseToolDirective(reply, catalog);
-    if (!call) return reply; // no tool requested -> final answer
+    if (!call) {
+      if (taskId) tasks.completeTask(taskId, reply);
+      return reply; // no tool requested -> final answer
+    }
 
     // Record the model's tool request turn so it sees its own prior steps.
     messages.push({ role: 'user', content: userTurn });
@@ -218,20 +232,29 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
 
     const argPreview = Object.keys(call.args).length ? ` ${JSON.stringify(call.args).slice(0, 80)}` : '';
     pushStep(`Tool: ${call.name}${argPreview}`);
+    if (!taskId) taskId = tasks.startTask(opts.userText, 'uki-agent');
+    trackStep(`Tool: ${call.name}${argPreview}`);
     let result: string;
     try {
       result = await runTool(call.name, call.args);
     } catch (e) {
       result = `Tool error: ${(e as Error)?.message || 'failed'}`;
+      trackStep(result.slice(0, 120));
     }
     userTurn = `RESULT: ${result}`.slice(0, 4000);
   }
 
   // Step cap hit -- force a tool-free synthesis from everything gathered.
   pushStep('Max tool steps reached -- synthesising answer');
+  trackStep('Max tool steps reached — synthesising answer');
   const finalSys = `${opts.systemPrompt}\n\n${buildAgentProtocol(createToolCatalog(runnableActionToolSpecs()).prompt())}`;
-  return askConfiguredLLM('Give your best final answer now. Do NOT use any more tools.', finalSys, {
+  const final = await askConfiguredLLM('Give your best final answer now. Do NOT use any more tools.', finalSys, {
     history: messages,
     chatOptions: { temperature: 0.5, maxTokens: 700 },
   });
+  if (taskId) {
+    if (final) tasks.completeTask(taskId, final);
+    else tasks.failTask(taskId, 'Provider unavailable at synthesis');
+  }
+  return final;
 }

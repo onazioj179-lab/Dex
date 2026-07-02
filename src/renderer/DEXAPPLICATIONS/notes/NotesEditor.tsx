@@ -505,10 +505,21 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       const hits = searchLines(text, q, 25);
       return hits.length ? hits.map((h) => `${h.line}: ${h.text}`).join('\n') : `No lines match "${q}".`;
     });
+    // Enhance the open note with AI (mutating -> confirm-gated). Appends the
+    // result below the original text; never overwrites. Degrades to a clear
+    // message when no provider key is configured.
+    registerUkiAppAction('notes', {
+      id: 'notes.enhance',
+      description: 'enhance the open note with AI: rewrite, summarize, fix grammar, or follow a custom instruction. The result is appended below the original text.',
+      args: [{ name: 'instruction', type: 'string' }],
+      example: '{"instruction": "Summarize this note into 5 bullet points"}',
+      mutates: true,
+    }, (args) => enhanceRef.current(String(args.instruction ?? '')));
     return () => {
       unregisterUkiAppContext('notes');
       unregisterUkiAppAction('notes.getActiveNote');
       unregisterUkiAppAction('notes.search');
+      unregisterUkiAppAction('notes.enhance');
     };
   }, []);
 
@@ -722,6 +733,36 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     s?.removeAllRanges();
     s?.addRange(range);
   }, []);
+
+  // UKI agent-callable enhance: same provider + append-only discipline as the
+  // toolbar AI actions, but drivable from the agent loop ("enhance my note").
+  // Ref carries fresh closures so the one-time registration below never goes
+  // stale. Confirm-gating and audit come from the app-action registry.
+  const enhanceRef = useRef<(instruction: string) => Promise<string>>(async () => 'Notes is not ready.');
+  enhanceRef.current = async (instruction: string) => {
+    if (readOnly) return 'The open note is read-only.';
+    const fullText = (editorRef.current?.textContent || '').trim();
+    if (!fullText) return 'No note is open in Notes.';
+    if (!hasConfiguredProvider()) return 'No AI provider is configured — add a provider key in Settings to enhance notes.';
+    const ask = (instruction || 'Improve clarity, fix grammar, and tighten the writing.').trim();
+    let result: string | null = null;
+    try {
+      result = await askConfiguredLLM(
+        `${ask}\n\nTEXT:\n${fullText.slice(0, 6000)}`,
+        AI_SYSTEM,
+        { chatOptions: { temperature: 0.5, maxTokens: 900 } },
+      );
+    } catch {
+      result = null;
+    }
+    if (!result) return 'uki could not complete that — provider call failed.';
+    pushUndo();
+    editorRef.current?.focus();
+    setCaretToEnd();
+    document.execCommand('insertText', false, '\n\n' + result);
+    emitChange();
+    return `Enhanced the note — result appended below the original text (${result.length} chars).`;
+  };
 
   const runAiAction = useCallback(async (action: AiAction) => {
     if (readOnly || aiBusy) return;
