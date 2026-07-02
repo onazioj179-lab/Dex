@@ -50,6 +50,7 @@ import { startContextEngine } from './services/contextEngineWiring';
 import { initLearningWiring } from './services/learningWiring';
 import LearnOverlay from './components/LearnOverlay';
 import { registerBuiltinLearn } from './services/learnRegistry';
+import { scheduledTaskRunner } from './services/scheduledTaskRunner';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
@@ -247,6 +248,8 @@ export const App: React.FC = () => {
   // the moment the panel opens). Idempotent; runs once for the app's lifetime.
   // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
+  // Background scheduler: fire due recurring UKI tasks on the shared heartbeat.
+  useEffect(() => { scheduledTaskRunner.start(); return () => scheduledTaskRunner.stop(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();
