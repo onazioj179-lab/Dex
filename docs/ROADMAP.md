@@ -43,9 +43,17 @@
 >    underline that drew a stray line between the tab strip and apps (owner-reported); OS-wide sweep of the
 >    Canvas-2D var()-color bug (18 more sites: AXL Renderer class ×12, Audio waveform, Rewind trend, Prism ×4 —
 >    new shared `utils/canvasTheme.ts`); AXL Renderer.init now degrades to Canvas 2D instead of crashing to the
->    error boundary when GL setup throws (lost context / GPU reset / HMR remount). NEXT: Vinx/Forge pass;
->    Imosion deeper = sidechain wiring, reverb IR loading, recording monitor toggle, groove quantize;
->    deeper AXL = real eigen-FEA (mass matrix on the truss model), sketch-dim parameters.
+>    error boundary when GL setup throws (lost context / GPU reset / HMR remount).
+>    **Vinx + Forge pass ✅ (2026-07-02, later) — CREATIVE PASS ROUND 1 COMPLETE (AXL, Imosion, Vinx, Forge):**
+>    Vinx: LUTs real (store-driven `programLUT`, was an ephemeral element.style hack; Quick Export bakes the
+>    filter via ctx.filter so the WebM matches the monitor); trim undo is ONE step (was a TrimClipCommand per
+>    pointermove — hundreds of undo entries per gesture); mid-gesture unmount no longer strands window pointer
+>    listeners. Forge: "Merge to Single File" was a dead queued job with no source — now an instant lossless
+>    PCM→24-bit-WAV merge (batch-rename already flows into download names; 'unsupported' already has its own
+>    visual tier — explorer over-reported those). NEXT round (deeper): Vinx speed-ramp keyframing + command-based
+>    multicam/speed ops; Imosion sidechain wiring, reverb IR loading, groove quantize; Forge conditional rules
+>    evaluation; AXL eigen-FEA + sketch-dim parameters. Or switch to track 2 (UKI task scheduling) / track 5-6
+>    (browser ad-block, Store lifecycle).
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps
