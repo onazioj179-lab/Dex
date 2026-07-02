@@ -3926,26 +3926,15 @@ select:focus {
   transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Item 161: Enhanced tab indicator */
-
 /* -- Stage Manager -------------------------------------------------------- */
 [role="navigation"][aria-label="Stage Manager"]::-webkit-scrollbar { display: none; }
-.tab-active::after,
-[role="tab"][aria-selected="true"]::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-accent, #0a84ff);
-  border-radius: 1px;
-  animation: tabSlideIn 0.2s ease;
-}
-@keyframes tabSlideIn {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
+
+/* Item 161's blanket tab underline was REMOVED (owner request): it stamped a
+   2px accent ::after hanging 1px BELOW every [role="tab"][aria-selected] in
+   the OS — read as a stray line between the app tab strip and app content,
+   and double-indicated tabs that already style their own active state.
+   `.tab-active` was defined here but used nowhere. Components own their
+   active-tab visuals; seams between shell chrome and apps stay clean. */
 
 /* Item 162: Consistent scrollbar across pages */
 .page-content,
