@@ -415,11 +415,17 @@ const Forge: React.FC = () => {
   const [subBurnPosition, setSubBurnPosition] = useState<'Bottom' | 'Top' | 'Center'>('Bottom');
   const [subBurnStyle, setSubBurnStyle] = useState<'Outline' | 'Shadow' | 'Box'>('Outline');
   const [showConditionalRules, setShowConditionalRules] = useState(false);
-  const [conditionalRules, setConditionalRules] = useState<Array<{ condition: string; action: string; enabled: boolean }>>([
-    { condition: 'Resolution > 1080p', action: 'Downscale to 1080p', enabled: true },
-    { condition: 'Bitrate > 20 Mbps', action: 'Re-encode at 12 Mbps', enabled: false },
-    { condition: 'Audio channels > 2', action: 'Downmix to stereo', enabled: true },
+  // Auto rules are a FIXED catalog of conditions the browser pipeline can
+  // actually evaluate (the old list was free-text that nothing ever read —
+  // rules toggled but never fired). Each id is checked in processJob.
+  const [conditionalRules, setConditionalRules] = useState<Array<{ id: string; condition: string; action: string; enabled: boolean }>>([
+    { id: 'img-max-1920', condition: 'Image wider than 1920px', action: 'Downscale to 1920px wide', enabled: true },
+    { id: 'img-quality-large', condition: 'Image source over 10 MB', action: 'Cap quality at 80%', enabled: false },
+    { id: 'audio-16bit-large', condition: 'Audio source over 100 MB', action: 'Encode WAV at 16-bit', enabled: true },
   ]);
+  // Live mirror so processJob (registered once per queue run) reads current toggles.
+  const conditionalRulesRef = useRef(conditionalRules);
+  conditionalRulesRef.current = conditionalRules;
 
   // === NEW PRO FEATURES ===
   const [showToolsMenu, setShowToolsMenu] = useState(false);
@@ -637,7 +643,28 @@ const Forge: React.FC = () => {
         }
         // Quality: prefer an explicit per-job override (0-100), else default high.
         const rawQuality = jobAny?.imageQuality;
-        const quality = typeof rawQuality === 'number' ? rawQuality / 100 : 0.92;
+        let quality = typeof rawQuality === 'number' ? rawQuality / 100 : 0.92;
+
+        // Auto rules (evaluated for real — see conditionalRules catalog)
+        const rules = conditionalRulesRef.current;
+        const firedRules: string[] = [];
+        if (!width && rules.some(r => r.id === 'img-max-1920' && r.enabled)) {
+          try {
+            const bmp = await createImageBitmap(file);
+            if (bmp.width > 1920) {
+              width = 1920;
+              firedRules.push('downscaled to 1920px');
+            }
+            bmp.close();
+          } catch { /* not decodable here — the transcode will surface it */ }
+        }
+        if (rules.some(r => r.id === 'img-quality-large' && r.enabled) && file.size > 10 * 1024 * 1024) {
+          quality = Math.min(quality, 0.8);
+          firedRules.push('quality capped at 80%');
+        }
+        if (firedRules.length) {
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `Auto rule: ${firedRules.join(', ')} — ${file.name}` } }));
+        }
 
         const result = await transcodeImage(file, plan.imageTarget, {
           quality,
@@ -675,7 +702,14 @@ const Forge: React.FC = () => {
         const jobAny = job as any;
         // 24-bit if the preset/codec asks for it, else CD-quality 16-bit.
         const wantsHi = /24|pcm_s24/i.test(`${preset?.codec || ''} ${jobAny?.overrideAudioCodec || ''} ${preset?.name || ''}`);
-        const bitDepth: 16 | 24 = wantsHi ? 24 : 16;
+        let bitDepth: 16 | 24 = wantsHi ? 24 : 16;
+        // Auto rule: very large audio sources force 16-bit to keep output sane
+        if (bitDepth === 24
+          && conditionalRulesRef.current.some(r => r.id === 'audio-16bit-large' && r.enabled)
+          && file.size > 100 * 1024 * 1024) {
+          bitDepth = 16;
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `Auto rule: 16-bit WAV for large source — ${file.name}` } }));
+        }
         setJobs(prev => prev.map(j => j.id === jobId ? { ...j, progress: 30 } : j));
         // Honor any trim set in the Trim & Split panel (0..1 fractions on the job),
         // and apply loudness normalization when the user enabled it (real RMS gain
@@ -2241,8 +2275,7 @@ const Forge: React.FC = () => {
             <button aria-label="Close Conditional Rules" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConditionalRules(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <NativeEncoderNote>Rules are saved, but they are evaluated by the native encoder during a video encode (not in this build), so they do not change in-browser image/WAV jobs.</NativeEncoderNote>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>When input matches a condition, automatically apply the action</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>When input matches a condition, automatically apply the action. These rules fire on real in-browser image &amp; WAV jobs — a toast confirms each one.</div>
             {conditionalRules.map((rule, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                 <input type="checkbox" checked={rule.enabled} onChange={() => setConditionalRules(rules => rules.map((r, j) => j === i ? { ...r, enabled: !r.enabled } : r))} style={{ accentColor: 'var(--color-success)' }} />
@@ -2253,7 +2286,12 @@ const Forge: React.FC = () => {
                 <button aria-label={`Remove rule ${i + 1}`} onClick={() => setConditionalRules(rules => rules.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11 }}><DexIcon name="close" size={10} /></button>
               </div>
             ))}
-            <button aria-label="Add conditional encoding rule" onClick={() => setConditionalRules(rules => [...rules, { condition: 'New condition', action: 'New action', enabled: true }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed var(--color-border-subtle)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginTop: 6 }}>+ Add Rule</button>
+            {/* Fixed catalog: every rule above is genuinely evaluated during
+                encode (the old free-text "+ Add Rule" created rules nothing
+                could read). */}
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6, textAlign: 'center' }}>
+              Rules apply automatically while encoding — a toast confirms each one that fires.
+            </div>
           </div>
         </div>
       )}

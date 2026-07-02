@@ -57,6 +57,8 @@ import {
   generateMetronomeClick,
   scheduleMetronome,
   computeMeterLevel,
+  computeDuckingCurve,
+  applyGrooveToNotes,
   type AutomationLane,
   type AutomationPoint,
   getAutomationValue,
@@ -1776,6 +1778,56 @@ class AudioEngine {
   getAnalyser() { return this.analyser; }
   getSampleRate() { return this.ctx?.sampleRate || 96000; }
   getBitDepth() { return this.bitDepth; }
+}
+
+// ==================== ALGORITHMIC REVERB (export chains) ====================
+// Real convolution reverb for offline renders: a synthetic impulse response —
+// exponentially decaying noise shaped by roomSize (tail length), damping
+// (one-pole lowpass on the noise = darker tail), and predelay — mixed wet/dry
+// in parallel. Deterministic LCG noise so identical projects export
+// identically. The reverb plugin type previously rendered SILENT in exports
+// (only EQ/compressor had branches).
+function connectExportReverb(
+  ctx: BaseAudioContext,
+  input: AudioNode,
+  params: Record<string, number | undefined>,
+): AudioNode {
+  const roomSize = Math.max(0, Math.min(1, (params.roomSize ?? 50) / 100));
+  const damping = Math.max(0, Math.min(1, (params.damping ?? 50) / 100));
+  const wet = Math.max(0, Math.min(1, (params.wetDry ?? 30) / 100));
+  const predelayS = Math.max(0, (params.predelay ?? 0) / 1000);
+  const decayS = 0.2 + roomSize * 3.3; // 0.2s (booth) .. 3.5s (cathedral)
+
+  const irLength = Math.max(64, Math.ceil((predelayS + decayS) * ctx.sampleRate));
+  const ir = ctx.createBuffer(2, irLength, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = ir.getChannelData(ch);
+    const preN = Math.floor(predelayS * ctx.sampleRate);
+    const alpha = 1 - damping * 0.85; // more damping -> stronger HF rolloff
+    let lp = 0;
+    let seed = (1234567 + ch * 999331) >>> 0; // deterministic per channel
+    for (let i = preN; i < data.length; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const noise = (seed / 0xffffffff) * 2 - 1;
+      lp = lp + alpha * (noise - lp);
+      const t = (i - preN) / ctx.sampleRate;
+      data[i] = lp * Math.exp((-3 * t) / decayS); // ~-60dB at decayS
+    }
+  }
+
+  const convolver = ctx.createConvolver();
+  convolver.buffer = ir;
+  const wetGain = ctx.createGain();
+  wetGain.gain.value = wet;
+  const dryGain = ctx.createGain();
+  dryGain.gain.value = 1 - wet;
+  const mix = ctx.createGain();
+  input.connect(convolver);
+  convolver.connect(wetGain);
+  input.connect(dryGain);
+  wetGain.connect(mix);
+  dryGain.connect(mix);
+  return mix;
 }
 
 // ==================== WAV ENCODER ====================
@@ -4218,6 +4270,78 @@ const Imosion: React.FC = () => {
 
       setExportProgress(5);
 
+      // ── Sidechain ducking (export) ─────────────────────────────────────
+      // Live playback already routes sidechains through the audio engine,
+      // but keyed compressors rendered as PLAIN compressors offline — the
+      // ducking silently vanished from exports. Pre-pass: build each source
+      // track's peak envelope at coarse resolution, run the compressor law
+      // (computeDuckingCurve, pure + tested), and duck the target track's
+      // gain with a real setValueCurveAtTime automation curve.
+      const DUCK_BIN_HZ = 100;
+      const duckCurves = new Map<string, Float32Array>();
+      {
+        const routes: { targetId: string; source: AudioTrack; params: Record<string, number | undefined> }[] = [];
+        tracks.forEach(t => {
+          if (t.muted) return;
+          t.plugins.forEach(p => {
+            if (p.type !== 'compressor' || !p.enabled) return;
+            const srcIdx = (p.params.sidechainSource ?? -1) as number;
+            if (srcIdx >= 0 && srcIdx < tracks.length && tracks[srcIdx].id !== t.id) {
+              routes.push({ targetId: t.id, source: tracks[srcIdx], params: p.params });
+            }
+          });
+        });
+        if (routes.length > 0) {
+          const bins = Math.max(1, Math.ceil(totalDuration * DUCK_BIN_HZ));
+          const envCache = new Map<string, Float32Array>();
+          for (const route of routes) {
+            let env = envCache.get(route.source.id);
+            if (!env) {
+              env = new Float32Array(bins);
+              for (const clip of route.source.clips) {
+                if (!clip.url) continue;
+                try {
+                  const resp = await fetch(clip.url);
+                  const ab = await resp.arrayBuffer();
+                  if (ab.byteLength === 0) continue;
+                  const buf = await offlineCtx.decodeAudioData(ab);
+                  const data = buf.getChannelData(0);
+                  const offsetS = Math.max(0, Math.min(clip.trimStart || 0, buf.duration));
+                  const playDur = Math.max(0, Math.min(clip.duration, buf.duration - offsetS));
+                  const startBin = Math.floor(clip.startTime * DUCK_BIN_HZ);
+                  const nBins = Math.ceil(playDur * DUCK_BIN_HZ);
+                  const samplesPerBin = buf.sampleRate / DUCK_BIN_HZ;
+                  for (let b = 0; b < nBins; b++) {
+                    const s0 = Math.floor(offsetS * buf.sampleRate + b * samplesPerBin);
+                    const s1 = Math.min(data.length, Math.floor(s0 + samplesPerBin));
+                    let peak = 0;
+                    for (let i = s0; i < s1; i += 4) {
+                      const v = Math.abs(data[i]);
+                      if (v > peak) peak = v;
+                    }
+                    const bi = startBin + b;
+                    if (bi >= 0 && bi < bins) env[bi] = Math.max(env[bi], peak * (clip.gain ?? 1));
+                  }
+                } catch { /* undecodable source clip — contributes no envelope */ }
+              }
+              // Source track fader scales the key signal
+              for (let b = 0; b < bins; b++) env[b] *= route.source.volume ?? 1;
+              envCache.set(route.source.id, env);
+            }
+            const curve = computeDuckingCurve(env, {
+              thresholdDb: (route.params.threshold as number | undefined) ?? -24,
+              ratio: (route.params.ratio as number | undefined) ?? 4,
+              attackS: (route.params.attack as number | undefined) ?? 0.003,
+              releaseS: (route.params.release as number | undefined) ?? 0.25,
+            }, DUCK_BIN_HZ);
+            // Multiple routes onto one target multiply (both keys duck it)
+            const prev = duckCurves.get(route.targetId);
+            if (prev) for (let b = 0; b < bins; b++) prev[b] *= curve[b];
+            else duckCurves.set(route.targetId, curve);
+          }
+        }
+      }
+
       // Decode and schedule each clip
       let clipsProcessed = 0;
       let clipsAudible = 0;
@@ -4227,6 +4351,13 @@ const Imosion: React.FC = () => {
         if (track.muted) continue;
         const trackGain = offlineCtx.createGain();
         trackGain.gain.value = track.volume;
+        // Apply the sidechain ducking curve: gain follows volume × duck(t)
+        const duck = duckCurves.get(track.id);
+        if (duck && totalDuration > 0) {
+          const scaled = new Float32Array(duck.length);
+          for (let i = 0; i < duck.length; i++) scaled[i] = duck[i] * track.volume;
+          try { trackGain.gain.setValueCurveAtTime(scaled, 0, totalDuration); } catch { /* keep static gain */ }
+        }
         const trackPan = offlineCtx.createStereoPanner();
         trackPan.pan.value = track.pan;
 
@@ -4254,6 +4385,8 @@ const Imosion: React.FC = () => {
               comp.release.value = plugin.params.release ?? 0.25;
               chainTail.connect(comp);
               chainTail = comp;
+            } else if (plugin.type === 'reverb' && plugin.params) {
+              chainTail = connectExportReverb(offlineCtx, chainTail, plugin.params);
             }
           } catch (e) { console.warn('[Export] plugin error', plugin.type, e); }
         }
@@ -4513,6 +4646,8 @@ const Imosion: React.FC = () => {
               comp.release.value = plugin.params.release ?? 0.25;
               chainTail.connect(comp);
               chainTail = comp;
+            } else if (plugin.type === 'reverb' && plugin.params) {
+              chainTail = connectExportReverb(ctx, chainTail, plugin.params);
             }
           } catch (e) { console.warn('[Stems] plugin error', plugin.type, e); }
         }
@@ -8755,7 +8890,19 @@ const Imosion: React.FC = () => {
               <input type="range" min="0" max="100" value={grooveStrength} onChange={e => setGrooveStrength(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{grooveStrength}%</span>
             </div>
-            <button aria-label="Apply groove" onClick={() => { setShowGrooveQuant(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Groove</button>
+            <button aria-label="Apply groove" onClick={() => {
+              // Actually transform the notes (this button used to just close
+              // the panel): swing shift + push on offbeats, velocity accents,
+              // blended by strength — pure applyGrooveToNotes, unit-tested.
+              if (grooveTemplate === 'none') { setShowGrooveQuant(false); return; }
+              if (pianoRollNotes.length === 0) {
+                window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Add MIDI notes in the piano roll first' } }));
+                return;
+              }
+              setPianoRollNotes(prev => applyGrooveToNotes(prev, grooveTemplate, grooveStrength));
+              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Groove applied: ${grooveTemplate} at ${grooveStrength}%` } }));
+              setShowGrooveQuant(false);
+            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Groove</button>
           </div>
         </div>
       )}

@@ -50,10 +50,26 @@
 >    pointermove — hundreds of undo entries per gesture); mid-gesture unmount no longer strands window pointer
 >    listeners. Forge: "Merge to Single File" was a dead queued job with no source — now an instant lossless
 >    PCM→24-bit-WAV merge (batch-rename already flows into download names; 'unsupported' already has its own
->    visual tier — explorer over-reported those). NEXT round (deeper): Vinx speed-ramp keyframing + command-based
->    multicam/speed ops; Imosion sidechain wiring, reverb IR loading, groove quantize; Forge conditional rules
->    evaluation; AXL eigen-FEA + sketch-dim parameters. Or switch to track 2 (UKI task scheduling) / track 5-6
->    (browser ad-block, Store lifecycle).
+>    visual tier — explorer over-reported those).
+>    **CREATIVE ROUND 2 ✅ (2026-07-02, later):** AXL modal = REAL assembly eigen-FEA (`solveTrussModes`:
+>    K φ = ω²M φ on the static-FEA truss, lumped mass, inverse iteration + deflation; 0.1% vs analytical);
+>    Imosion exports now render sidechain ducking (`computeDuckingCurve` pre-pass → setValueCurveAtTime; live
+>    routing already existed, exports silently dropped it) AND reverb (synthetic-IR ConvolverNode — the plugin
+>    type was silent in exports; wired into master + stem chains); Forge auto rules actually EVALUATE (fixed
+>    catalog: img>1920px downscale, >10MB quality cap, audio>100MB 16-bit; free-text rules were read by nothing);
+>    Vinx speed ramps PLAY (pure `speedRampAt` per-tick in PlaybackEngine × clip.speed — both were stored and
+>    ignored; UKI op writes a real keyframed ramp). 46/46 tests, 17 new.
+>    **CREATIVE ROUND 3 ✅ (2026-07-02, later):** Imosion groove quantize ACTUALLY transforms notes
+>    (`applyGrooveToNotes` — swing shift + push + velocity accents per hardware template MPC60/SP1200/TR808/…,
+>    strength-blended; the Apply button used to just close the panel); AXL feature params take EXPRESSIONS
+>    (`FeatureExprInput` on all 8 extrude/revolve/chamfer/fillet/pattern/shell/draft inputs, evaluated vs the
+>    project parameter table — "width / 2" etc.); Forge auto-rules note fixed (it wrongly claimed rules don't
+>    affect in-browser jobs — they DO fire on real image/WAV encodes). 82/82 creative tests (14 new: groove 9,
+>    ducking already counted, plus expr coverage). tsc clean. NOTE: preview MCP was down this round → verified
+>    by unit tests + tsc, not live browser.
+>    REMAINING (round 4 candidates): Imosion recording monitor; Vinx command-based multicam/speed ops (undo) +
+>    real 3D-LUT color math; Forge WebCodecs video encode. Or track 2 (UKI task scheduling on shared/automation
+>    cron + src-tauri/task_queue.rs) / track 5-6 (browser ad-block default, Store lifecycle).
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
 > 6. **Store lifecycle.** Users install/remove DEX apps (e.g. skip the music/video creative apps); removed apps

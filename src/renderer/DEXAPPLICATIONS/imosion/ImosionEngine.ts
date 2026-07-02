@@ -5,6 +5,130 @@
  */
 
 // ===========================================================================
+// SIDECHAIN DUCKING CURVE (pure, unit-tested)
+// ===========================================================================
+
+export interface DuckingParams {
+  /** Compressor threshold in dBFS (e.g. -24). */
+  thresholdDb: number;
+  /** Compression ratio (>= 1). */
+  ratio: number;
+  /** Attack time in seconds. */
+  attackS: number;
+  /** Release time in seconds. */
+  releaseS: number;
+}
+
+/**
+ * Turn a source-signal peak envelope into a target GAIN-MULTIPLIER curve —
+ * classic sidechain ducking (kick ducks the bass/pads). Standard downward
+ * compressor law above threshold (overDb reduced by 1-1/ratio), smoothed by
+ * a one-pole attack/release so the curve pumps musically instead of stepping.
+ * Pure: powers the offline export render (live playback ducking is handled
+ * by the audio engine's own routing).
+ *
+ * @param envelope  Peak envelope of the SOURCE signal, linear 0..1, at binHz.
+ * @param params    Compressor parameters.
+ * @param binHz     Envelope resolution in bins per second.
+ * @returns         Gain multipliers 0..1 for the TARGET, same length as envelope.
+ */
+export function computeDuckingCurve(
+  envelope: Float32Array | number[],
+  params: DuckingParams,
+  binHz: number,
+): Float32Array {
+  const n = envelope.length;
+  const curve = new Float32Array(n);
+  const threshold = Math.pow(10, params.thresholdDb / 20);
+  const ratio = Math.max(1, params.ratio);
+  // One-pole smoothing coefficients (time constant ≈ attack/release)
+  const atkCoef = 1 - Math.exp(-1 / (Math.max(1e-4, params.attackS) * binHz));
+  const relCoef = 1 - Math.exp(-1 / (Math.max(1e-4, params.releaseS) * binHz));
+
+  let g = 1;
+  for (let i = 0; i < n; i++) {
+    const e = envelope[i];
+    let target = 1;
+    if (e > threshold && threshold > 0) {
+      const overDb = 20 * Math.log10(e / threshold);
+      const reductionDb = overDb * (1 - 1 / ratio);
+      target = Math.pow(10, -reductionDb / 20);
+    }
+    const coef = target < g ? atkCoef : relCoef;
+    g += (target - g) * coef;
+    curve[i] = g;
+  }
+  return curve;
+}
+
+// ===========================================================================
+// GROOVE QUANTIZE (pure, unit-tested)
+// ===========================================================================
+
+export interface GrooveTemplate {
+  /** Swing grid in beats: 0.25 = 16th swing, 0.5 = 8th swing. */
+  grid: number;
+  /** Swing ratio: 0.5 = straight, 0.58 = MPC feel, 0.66 = full triplet. */
+  ratio: number;
+  /** Constant push applied to off-beat notes, in beats (+late / -early). */
+  push: number;
+  /** Downbeat velocity accent 0..1 (downbeats up, offbeats down). */
+  accent: number;
+}
+
+/**
+ * Classic hardware groove characterizations. Timing math is real; the feel
+ * constants follow the machines' well-documented swing behavior (MPC-60
+ * ~58% 16th swing, SP-1200 lazier and later, TR-808 machine-tight with a
+ * hair-early offbeat, shuffle = full triplet 8ths, ...).
+ */
+export const GROOVE_TEMPLATES: Record<string, GrooveTemplate> = {
+  mpc60:    { grid: 0.25, ratio: 0.58, push: 0,      accent: 0.06 },
+  sp1200:   { grid: 0.25, ratio: 0.62, push: 0.01,   accent: 0.08 },
+  tr808:    { grid: 0.25, ratio: 0.5,  push: -0.015, accent: 0.10 },
+  linnDrum: { grid: 0.25, ratio: 0.54, push: 0.008,  accent: 0.05 },
+  motown:   { grid: 0.5,  ratio: 0.60, push: 0,      accent: 0.07 },
+  reggae:   { grid: 0.5,  ratio: 0.64, push: 0.012,  accent: -0.10 }, // offbeat-accented
+  shuffle:  { grid: 0.5,  ratio: 0.667, push: 0,     accent: 0.05 },
+};
+
+export interface GroovableNote {
+  startTime: number; // beats
+  velocity: number;  // 0-127
+}
+
+/**
+ * Apply a groove template to MIDI notes (pure — returns new objects).
+ * Off-grid-pair notes (odd grid indices) shift toward the swung position
+ * `pairStart + 2·grid·ratio` plus the template's constant push; downbeats
+ * get the velocity accent, offbeats its inverse. `strengthPct` (0-100)
+ * blends between straight and the full template.
+ */
+export function applyGrooveToNotes<T extends GroovableNote>(
+  notes: T[],
+  templateId: string,
+  strengthPct: number,
+): T[] {
+  const tpl = GROOVE_TEMPLATES[templateId];
+  const s = Math.max(0, Math.min(1, strengthPct / 100));
+  if (!tpl || s === 0) return notes.map(n => ({ ...n }));
+
+  return notes.map(n => {
+    const idx = Math.round(n.startTime / tpl.grid);
+    const isOffbeat = idx % 2 !== 0;
+    let startTime = n.startTime;
+    if (isOffbeat) {
+      // Swing shift: distance from the straight offbeat to the swung one.
+      const swingShift = tpl.grid * (2 * tpl.ratio - 1);
+      startTime = Math.max(0, n.startTime + s * (swingShift + tpl.push));
+    }
+    const accentMul = 1 + s * tpl.accent * (isOffbeat ? -1 : 1);
+    const velocity = Math.max(1, Math.min(127, Math.round(n.velocity * accentMul)));
+    return { ...n, startTime, velocity };
+  });
+}
+
+// ===========================================================================
 // REAL WAVEFORM FROM AUDIOBUFFER
 // ===========================================================================
 

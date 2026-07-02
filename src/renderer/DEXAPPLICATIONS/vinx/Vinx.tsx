@@ -458,8 +458,21 @@ const VinxEditor: React.FC = () => {
     const clipId = selectedClipIds[0];
     if (op.op === 'speedRamp') {
       if (!clipId) return { outcome: 'skipped', note: 'select a clip first' };
-      _updateClip(clipId, { speed: 0.5 });
-      return { outcome: 'applied', note: 'set clip to 0.5x slow-motion (constant; a true keyframed ramp needs the engine)' };
+      const clip = getClipById(clipId);
+      if (!clip) return { outcome: 'skipped', note: 'select a clip first' };
+      // Real keyframed ramp — the playback engine now evaluates speedRamp
+      // per tick: full speed in, slow-motion middle, full speed out.
+      const len = Math.max(2, clip.endFrame - clip.startFrame);
+      useVinxStore.getState().setClipSpeedRamp(clipId, {
+        enabled: true,
+        points: [
+          { frame: 0, speed: 1, easing: 'linear' },
+          { frame: Math.round(len * 0.3), speed: 0.5, easing: 'linear' },
+          { frame: Math.round(len * 0.7), speed: 0.5, easing: 'linear' },
+          { frame: len, speed: 1, easing: 'linear' },
+        ],
+      });
+      return { outcome: 'applied', note: 'keyframed slow-motion ramp: 1x → 0.5x through the middle → 1x' };
     }
     if (op.op === 'removeSilence' || op.op === 'smartCuts') {
       const clip = clipId ? getClipById(clipId) : null;
