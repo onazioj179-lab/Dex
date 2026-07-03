@@ -12,6 +12,54 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v6.1.0 — Hero identity, pro motion, and the everything-works pass (2026-07-03)
+
+DEX gets its signature look — Omnitrix green is now the system accent — plus a
+sharper, faster feel everywhere: unified animation timing, straightened-out
+layouts, and a deep cross-app pass that made every control do what it says.
+
+### New
+
+- **Omnitrix green is the DEX default.** The whole OS now accents in hero
+  green out of the box (deep green in light mode, contrast-tuned greens in
+  high-contrast modes). Your own accent picks are untouched.
+- **Hero Themes.** One-tap accent presets in Settings > Appearance — Dark
+  Knight (bat-signal yellow), Omnitrix (hero green), and Nanite (build
+  orange). Searchable from Settings search.
+- **MSI installer.** Releases now ship a proper all-in-one Windows MSI
+  alongside the setup.exe — with the WebView2 bootstrapper embedded.
+
+### Improved
+
+- **Snappier, unified motion.** Window open/close, minimize/restore, menus,
+  panels, and modals all run on the same pro motion curves — faster in, calm
+  out (open 300→220ms, close 200→160ms, minimize 250→200ms).
+- **Pro alignment.** Settings panels share one row rhythm (Permissions/Snap/
+  Creator rows matched to the rest), Task Manager detail panel normalized,
+  tightened selection glows.
+
+### Fixed
+
+- **Accent "default" that never came back.** Once you picked a custom accent,
+  the system-default swatch silently re-applied your override forever — and a
+  second boot-time theme path force-saved a hardcoded blue on every launch.
+  Both paths fixed with a one-time migration; deliberate picks survive.
+- **Scrolling.** Nine panes that grew instead of scrolling now scroll: Axl
+  parts library, Forge sidebar + render queue, assistant chat, Notes list +
+  outline, Prism filter gallery + asset library, Home wallpaper picker.
+- **Flux controls that did nothing now work.** Export FPS + codec selects,
+  Lottie optimize/minify, motion-path easing/orient/closed, null-object
+  parent + offsets (and a real null-object list), particle emitter shape +
+  birth-rate/lifetime/speed/spread sliders, shader color uniform, precompose
+  options, camera focus distance — all wired to real behavior; controls that
+  promised nonexistent engine features were removed instead of faked. Plus a
+  dead hardware-tier IPC call now resolves.
+- **On-state styling.** Seven React shorthand/longhand style conflicts that
+  randomly dropped active-tab underlines and button borders (Axl, Imosion,
+  MarkdownEditor, shared NumberInput).
+
+---
+
 ## v6.0.1 — Scale, traceability, and smarter recall (2026-06-30)
 
 A focused follow-up to 6.0.0: DEX stays smooth no matter how many apps are
