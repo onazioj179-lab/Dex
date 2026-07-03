@@ -109,6 +109,20 @@
 > everything and the removed app launches again. NEXT track-6: Settings "Apps" reinstall section; future
 > background app-pack download.
 >
+> **SWEEP PASS 2 — HERO THEMES + MOTION + REMAINING APPS ✅ (2026-07-02):** Owner asked for the rest of
+> the apps, pro arrangement, better animations, and a Batman/Ben 10/Generator Rex aesthetic. Shipped:
+> (1) Hero Theme accent presets in Settings > Appearance (Dark Knight #ffd60a, Omnitrix #32d74b, Nanite
+> #ff6b1a) — one tap re-tints the whole OS via the accent-family deriver; in settings search; swatch glow
+> tightened to 4px per the sharp rule. (2) FIXED a real accent bug: the "system default" swatch could
+> never restore the default once a custom accent was set (circular var(--color-accent) resolution in
+> accentFamily.ts). (3) Motion unification: window/app/panel/menu animations bound to the existing
+> --motion-*/--pg-curve-* tokens — open 300→220ms, close 200→160ms, minimize/restore 250→200/220ms,
+> ContextMenu on --ease-tahoe, dex-panel-in ×20 on --motion-panel-expand. (4) Remaining-apps audit:
+> 4 more scroll fixes (Notes list + outline, Prism filter gallery + asset library, Home wallpaper
+> picker); Settings row alignment (AccessPanels 10px→space-3, TaskManager detail panel). Audits
+> confirmed controls in browser/files/notes/productivity/rewind/system/polish/prism/vinx/creative are
+> wired and HomeWidgets drag is already rAF-batched. tsc 0; tests green; verified live.
+>
 > **CROSS-APP BUG + UI SWEEP ✅ (2026-07-02):** Four parallel audits (scroll/overflow, unwired controls,
 > layout/style bugs, logic bugs) over all 17 DEXAPPLICATIONS + pages/components, then fixes — no deferrals.
 > SCROLL: added the missing `minHeight: 0` to flex scroll containers in Axl parts library, Forge sidebar +

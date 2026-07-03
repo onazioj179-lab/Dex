@@ -35,6 +35,18 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Renderer checkpoint (2026-07-02, pass 2 — hero themes + motion):** Settings > Appearance
+gained Hero Theme accent presets (Dark Knight yellow / Omnitrix green / Nanite orange) through
+the accent-family deriver; FIXED the accent default-reset bug (self-referential
+var(--color-accent) sentinel resolved circularly in utils/accentFamily.ts — default was
+unreachable after any custom accent). Motion unification: app open/close + window
+minimize/restore bound to --motion-window-* tokens (snappier: 300→220, 250→200/220ms),
+ContextMenu on --ease-tahoe, 20 dex-panel-in inline strings on --motion-panel-expand,
+AppOverview/window-snap on shared curves. 4 more minHeight:0 scroll fixes (Notes ×2,
+Prism ×2, Home wallpaper picker) + Settings row-padding alignment (AccessPanels,
+TaskManager). HomeWidgets drag audit came back already rAF-batched — no change needed.
+tsc 0; accent+prism tests green; presets + reset verified live.
+
 **Renderer checkpoint (2026-07-02, bug/UI sweep):** Cross-app fix pass — scroll containers
 missing `minHeight: 0` (Axl parts library, Forge sidebar + queue, ChatPanel), 7 React
 shorthand+longhand style bugs (MarkdownEditor, Imosion ×2, NumberInput, Axl PropertiesPanel
