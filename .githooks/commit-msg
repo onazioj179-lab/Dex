@@ -1,0 +1,13 @@
+#!/bin/sh
+# DEX: strip AI attribution trailers from commit messages.
+# Removes Claude/Anthropic co-author lines and "Generated with" watermarks,
+# while preserving legitimate human Co-Authored-By trailers.
+#
+# Enable for this repo (covers all worktrees):  git config core.hooksPath .githooks
+sed -i -E \
+  -e '/noreply@anthropic\.com/d' \
+  -e '/^[[:space:]]*Co-[Aa]uthored-[Bb]y:[[:space:]]*Claude/d' \
+  -e '/Generated with \[?Claude Code\]?/d' \
+  -e '/🤖 Generated with/d' \
+  "$1"
+exit 0
