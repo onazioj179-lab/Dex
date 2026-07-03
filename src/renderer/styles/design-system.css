@@ -3,7 +3,7 @@
  * DEX Design System v7.0 -- Dark with Soul
  * ===========================================================================
  *
- * Single source of truth. #0C0C0E rich charcoal base, #4A9EFF accent glow.
+ * Single source of truth. #0C0C0E rich charcoal base, #32D74B Omnitrix-green accent.
  * 4px grid. Subtle accent glows. Deep shadows. Alive.
  *
  * @author     Onazi Treasure OJ
@@ -77,13 +77,13 @@
   --color-text-inverse: #000000;
   --color-text-code: #F0F0F2;
 
-  /* Accent -- Vivid Blue */
-  --color-accent: #4A9EFF;
-  --color-accent-hover: #6CB2FF;        /* lighter -- hover */
-  --color-accent-dark: #2E7DD6;         /* darker -- pressed/active, gradient ends */
-  --color-accent-light: rgba(74, 158, 255, 0.14);
-  --color-accent-soft: rgba(74, 158, 255, 0.08);
-  --color-accent-muted: rgba(74, 158, 255, 0.10);
+  /* Accent -- Omnitrix Green (hero default) */
+  --color-accent: #32D74B;
+  --color-accent-hover: #5FE073;        /* lighter -- hover */
+  --color-accent-dark: #27A83B;         /* darker -- pressed/active, gradient ends */
+  --color-accent-light: rgba(50, 215, 75, 0.14);
+  --color-accent-soft: rgba(50, 215, 75, 0.08);
+  --color-accent-muted: rgba(50, 215, 75, 0.10);
 
   /* Translucent neutral surfaces -- subtle fills that must stay see-through
      (so they sit on glass/wallpaper) and therefore can't map to the opaque
@@ -1508,13 +1508,13 @@ html[data-darkroom="on"] {
   --color-text-inverse: #FFFFFF;
   --color-text-code: #1D1D1F;
 
-  /* Accent -- deeper blue for light mode */
-  --color-accent: #0066CC;
-  --color-accent-hover: #0055B3;
-  --color-accent-dark: #004A99;         /* pressed/active in light mode */
-  --color-accent-light: rgba(0, 102, 204, 0.12);
-  --color-accent-soft: rgba(0, 102, 204, 0.08);
-  --color-accent-muted: rgba(0, 102, 204, 0.10);
+  /* Accent -- deeper green for light mode */
+  --color-accent: #1E8E3E;
+  --color-accent-hover: #197A35;
+  --color-accent-dark: #14672C;         /* pressed/active in light mode */
+  --color-accent-light: rgba(30, 142, 62, 0.12);
+  --color-accent-soft: rgba(30, 142, 62, 0.08);
+  --color-accent-muted: rgba(30, 142, 62, 0.10);
 
   /* Translucent neutral surfaces + scrim -- dark-on-light for light theme. */
   --color-surface-1: rgba(0, 0, 0, 0.03);
@@ -3629,13 +3629,13 @@ textarea:focus-visible {
   --color-text-inverse: #000000;
   --color-text-code: #FFFFFF;
 
-  --color-accent: #5AB0FF;
-  --color-accent-hover: #8CCBFF;
+  --color-accent: #5AE87A;
+  --color-accent-hover: #8CF2A3;
   --color-accent-text: #000000;
-  --color-accent-light: rgba(90, 176, 255, 0.30);
-  --color-accent-soft: rgba(90, 176, 255, 0.22);
-  --color-accent-muted: rgba(90, 176, 255, 0.26);
-  --color-accent-subtle: rgba(90, 176, 255, 0.30);
+  --color-accent-light: rgba(90, 232, 122, 0.30);
+  --color-accent-soft: rgba(90, 232, 122, 0.22);
+  --color-accent-muted: rgba(90, 232, 122, 0.26);
+  --color-accent-subtle: rgba(90, 232, 122, 0.30);
 
   --color-border: rgba(255, 255, 255, 0.40);
   --color-border-subtle: rgba(255, 255, 255, 0.40);
@@ -3671,13 +3671,13 @@ textarea:focus-visible {
   --color-text-inverse: #FFFFFF;
   --color-text-code: #000000;
 
-  --color-accent: #0040A0;
-  --color-accent-hover: #002F78;
+  --color-accent: #0A5C22;
+  --color-accent-hover: #084518;
   --color-accent-text: #FFFFFF;
-  --color-accent-light: rgba(0, 64, 160, 0.20);
-  --color-accent-soft: rgba(0, 64, 160, 0.14);
-  --color-accent-muted: rgba(0, 64, 160, 0.16);
-  --color-accent-subtle: rgba(0, 64, 160, 0.20);
+  --color-accent-light: rgba(10, 92, 34, 0.20);
+  --color-accent-soft: rgba(10, 92, 34, 0.14);
+  --color-accent-muted: rgba(10, 92, 34, 0.16);
+  --color-accent-subtle: rgba(10, 92, 34, 0.20);
 
   --color-border: rgba(0, 0, 0, 0.40);
   --color-border-subtle: rgba(0, 0, 0, 0.40);

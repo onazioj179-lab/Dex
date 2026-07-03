@@ -1231,7 +1231,7 @@ const DEFAULT_SETTINGS = {
   darkMode: true,
   reduceMotion: false,
   transparency: true,
-  accentColor: 'var(--color-accent)', // Apple System Blue (Tahoe)
+  accentColor: 'var(--color-accent)', // system default = stylesheet baseline (Omnitrix green)
   fontSize: 'medium',
   fontScale: 100,
   targetFPS: 120,

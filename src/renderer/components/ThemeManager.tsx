@@ -30,7 +30,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: 'dark-default',
     name: 'Dark Default',
     isDark: true,
-    accentColor: '#3b82f6',
+    accentColor: '', // empty = defer to the stylesheet baseline accent (Omnitrix green)
     bgPrimary: '#18181b',
     bgSecondary: '#111113',
     bgTertiary: '#27272a',
@@ -90,7 +90,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: 'light-default',
     name: 'Light Default',
     isDark: false,
-    accentColor: '#3b82f6',
+    accentColor: '', // empty = defer to the stylesheet baseline accent
     bgPrimary: '#ffffff',
     bgSecondary: '#f8fafc',
     bgTertiary: '#e2e8f0',
@@ -144,9 +144,12 @@ export const applyTheme = (preset: ThemePreset) => {
   
   // Expand the preset accent into the full coherent --color-accent-* family
   // (shared deriver) rather than only the base, so hover/dark/light/soft/muted
-  // track the chosen colour. Falls back to base-only if somehow unparseable.
-  if (!applyAccentFamily(preset.accentColor)) {
-    root.style.setProperty('--color-accent', preset.accentColor);
+  // track the chosen colour. An empty accent means "defer to the stylesheet
+  // baseline": clear any inline family instead of forcing a colour.
+  if (!preset.accentColor || !applyAccentFamily(preset.accentColor)) {
+    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted']) {
+      root.style.removeProperty(prop);
+    }
   }
   root.style.setProperty('--color-bg-primary', preset.bgPrimary);
   root.style.setProperty('--color-bg-secondary', preset.bgSecondary);
@@ -185,9 +188,10 @@ export const getCurrentTheme = (): ThemePreset => {
       if (preset) return preset;
     }
     
-    // Fall back to dark/light detection
+    // Fall back to dark/light detection. No stored accent = defer to the
+    // stylesheet baseline (empty), never force a hardcoded colour at boot.
     const isDark = localStorage.getItem('dex-dark-mode') !== 'false';
-    const accentColor = localStorage.getItem('dex-accent-color') || '#3b82f6';
+    const accentColor = localStorage.getItem('dex-accent-color') || '';
     
     const basePreset = isDark ? THEME_PRESETS[0] : THEME_PRESETS[5];
     return { ...basePreset, accentColor };
@@ -198,6 +202,18 @@ export const getCurrentTheme = (): ThemePreset => {
 
 // Initialize theme on app load
 export const initializeTheme = () => {
+  // One-time migration: the old applyTheme auto-saved the hardcoded '#3b82f6'
+  // default on every boot, so installs carry it without the user ever choosing
+  // it. Clear that stored value once so the stylesheet baseline (Omnitrix
+  // green) becomes the effective default; deliberate accent picks survive.
+  try {
+    if (!localStorage.getItem('dex-accent-omnitrix-migrated')) {
+      if (localStorage.getItem('dex-accent-color') === '#3b82f6') {
+        localStorage.removeItem('dex-accent-color');
+      }
+      localStorage.setItem('dex-accent-omnitrix-migrated', '1');
+    }
+  } catch { /* quota/unavailable */ }
   const theme = getCurrentTheme();
   applyTheme(theme);
 };
