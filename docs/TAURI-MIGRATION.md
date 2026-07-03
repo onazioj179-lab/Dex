@@ -35,6 +35,16 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Renderer checkpoint (2026-07-02, pass 3 — Omnitrix default):** Owner made Omnitrix green THE
+default: design-system.css accent baselines re-pointed (dark #32D74B family, light #1E8E3E,
+luminance-matched HC greens; colorblind palettes untouched). Killed the competing ThemeManager
+boot default ('#3b82f6' hardcoded + auto-saved to dex-accent-color every boot — it silently
+overrode the stylesheet baseline forever); empty preset accent now defers to baseline + one-time
+localStorage migration (dex-accent-omnitrix-migrated). Verified live: fresh boot = #32D74B, no
+inline override. NOTE for future accent work: there are TWO accent persistence paths — Settings
+(settings.accentColor sentinel) and ThemeManager (dex-accent-color) — both now defer to the
+stylesheet when unset.
+
 **Renderer checkpoint (2026-07-02, pass 2 — hero themes + motion):** Settings > Appearance
 gained Hero Theme accent presets (Dark Knight yellow / Omnitrix green / Nanite orange) through
 the accent-family deriver; FIXED the accent default-reset bug (self-referential

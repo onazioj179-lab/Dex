@@ -109,6 +109,13 @@
 > everything and the removed app launches again. NEXT track-6: Settings "Apps" reinstall section; future
 > background app-pack download.
 >
+> **OMNITRIX = DEFAULT ACCENT ✅ (2026-07-02, owner call):** Stylesheet accent baselines are now the
+> Omnitrix green family (dark #32D74B, light #1E8E3E, HC-matched greens; colorblind palettes kept).
+> Found + killed a silent competing default: ThemeManager hardcoded '#3b82f6' and auto-saved it to
+> localStorage on every boot, permanently masking the stylesheet baseline — empty preset accents now
+> defer to the baseline and a one-time migration clears the auto-saved blue (deliberate picks survive).
+> Verified live: fresh boot computes #32D74B with no inline override.
+>
 > **SWEEP PASS 2 — HERO THEMES + MOTION + REMAINING APPS ✅ (2026-07-02):** Owner asked for the rest of
 > the apps, pro arrangement, better animations, and a Batman/Ben 10/Generator Rex aesthetic. Shipped:
 > (1) Hero Theme accent presets in Settings > Appearance (Dark Knight #ffd60a, Omnitrix #32d74b, Nanite
