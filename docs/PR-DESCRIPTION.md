@@ -26,3 +26,4 @@ App marketplace, cross-device sync + handoff, real-time multiplayer / live co-ed
 
 Full per-wave detail is in `docs/ROADMAP.md`.
 
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

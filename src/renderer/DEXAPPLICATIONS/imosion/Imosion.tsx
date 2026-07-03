@@ -8230,7 +8230,7 @@ const Imosion: React.FC = () => {
                   {customMasteringPresets.map(preset => (
                     <div key={preset.id} style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
                       <button aria-label={`Apply preset ${preset.name}`} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '3px 0 0 3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--color-success)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'rgba(79, 138, 96,0.15)' : '#141417', color: selectedMasteringPreset === preset.id ? '#4ade80' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>{preset.name}</button>
-                      <button aria-label={`Delete preset ${preset.name}`} onClick={() => deleteCustomMasteringPreset(preset.id)} style={{ padding: '5px 6px', borderRadius: '0 3px 3px 0', border: '1px solid #27272a', borderLeft: 'none', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px' }}><DexIcon name="close" size={10} /></button>
+                      <button aria-label={`Delete preset ${preset.name}`} onClick={() => deleteCustomMasteringPreset(preset.id)} style={{ padding: '5px 6px', borderRadius: '0 3px 3px 0', borderTop: '1px solid #27272a', borderBottom: '1px solid #27272a', borderRight: '1px solid #27272a', borderLeft: 'none', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px' }}><DexIcon name="close" size={10} /></button>
                     </div>
                   ))}
                 </div>
@@ -9378,7 +9378,7 @@ const Imosion: React.FC = () => {
                   {/* Installed external plugins */}
                   {installedPlugins.length > 0 && (
                     <>
-                      <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 'var(--space-2)', borderTop: '1px solid #2a2a2e', paddingTop: 'var(--space-2)' }}>Third Party</div>
+                      <div style={{ paddingTop: 'var(--space-2)', paddingBottom: '4px', paddingLeft: 'var(--space-2)', paddingRight: 'var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 'var(--space-2)', borderTop: '1px solid #2a2a2e' }}>Third Party</div>
                       {installedPlugins.map(plugin => (
                         <div key={plugin.id} onClick={() => { setShowPluginBrowser(false); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer' }} className="dropdown-item">
                           <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: plugin.color, flexShrink: 0 }} />

@@ -35,6 +35,17 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Renderer checkpoint (2026-07-02, bug/UI sweep):** Cross-app fix pass — scroll containers
+missing `minHeight: 0` (Axl parts library, Forge sidebar + queue, ChatPanel), 7 React
+shorthand+longhand style bugs (MarkdownEditor, Imosion ×2, NumberInput, Axl PropertiesPanel
+tabs, Axl FeatureTree), and ~12 dead Flux controls wired for real (GIF FPS/codec, Lottie
+options, motion-path ease/orient/closed, null-object parent+offsets+list, particle emitter
+shape+sliders, shader u_color, precompose options, camera focus) + dead
+`resource-governor:getHardwareProfile` IPC → `getStatus`. Controls that promised
+nonexistent engine features (GIF Loop, Lottie Flatten, particle Sub-Emitters/Collision)
+were removed, not faked. tsc 0; 32 unit tests green; Flux verified live in preview.
+Full detail in ROADMAP's sweep block.
+
 **Renderer checkpoint (2026-07-01, /goal session):** Stage Manager shipped — `shell/AppOverview.tsx`
 is now LIVE scaled windows (not canvas fakes), triggered by F3/Ctrl+Up, 3-finger swipe-up, the
 `dex-stage-toggle` event, and Home's "Stage (N)" pill; UKI gained a background-task ledger

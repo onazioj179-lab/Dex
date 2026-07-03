@@ -109,6 +109,25 @@
 > everything and the removed app launches again. NEXT track-6: Settings "Apps" reinstall section; future
 > background app-pack download.
 >
+> **CROSS-APP BUG + UI SWEEP ✅ (2026-07-02):** Four parallel audits (scroll/overflow, unwired controls,
+> layout/style bugs, logic bugs) over all 17 DEXAPPLICATIONS + pages/components, then fixes — no deferrals.
+> SCROLL: added the missing `minHeight: 0` to flex scroll containers in Axl parts library, Forge sidebar +
+> job queue, and shared ChatPanel messages (the classic flex bug: pane grows instead of scrolling).
+> STYLE (the shorthand+longhand React gotcha — on-state borders/padding silently dropped): fixed
+> MarkdownEditor outline buttons, Imosion "Third Party" header + delete-preset button, NumberInput
+> (styles/components.tsx), Axl PropertiesPanel tab underline (both), Axl FeatureTree sidebarItemStyle;
+> Flux history list key={index} → stable key. CONTROLS (all in Flux; verified live in preview): GIF-export
+> FPS select + VP9/VP8 codec buttons now drive the WebM encode (removed the un-honorable Loop select);
+> Lottie Optimize/Minify wired into the JSON emit (removed no-op Flatten); motion-path ease buttons +
+> Orient (adds tangent rotation keyframes) + Closed wired into Apply; Null Objects parent select + offsets
+> wired into create + real null list (was hardcoded empty); Advanced Particles emitter shape + birth-rate/
+> lifetime/speed/spread sliders now edit the selected layer's real particleEmitter (DEFAULT_PARTICLE_EMITTER
+> hoisted; honest hint when no particle layer selected; removed fake Sub-Emitters/Collision boxes);
+> shader u_color uniform wired (hue-rotate delta in Compile & Apply); precompose checkboxes wired;
+> camera DOF focus-distance slider wired; dead IPC `resource-governor:getHardwareProfile` →
+> `getStatus.hardwareProfile.tier`. Logic audit came back clean (matches prior audits). tsc 0; 32 unit
+> tests green; Flux particles panel + GIF export verified live (shape click round-trips through layer state).
+>
 > **TRACK 2 — UKI BACKGROUND TASK SCHEDULING ✅ (2026-07-02):** Recurring background tasks that fire on the
 > shared heartbeat, self-recheck, and retry-with-backoff (mandate: "automate and work on tasks in the
 > background... rehook ourselves to check on tasks"). Built on the existing pure primitives (cron.ts,

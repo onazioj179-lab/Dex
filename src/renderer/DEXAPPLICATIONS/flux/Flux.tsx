@@ -389,6 +389,8 @@ interface ParticlePreset {
   emitter: ParticleEmitter;
 }
 
+const DEFAULT_PARTICLE_EMITTER: ParticleEmitter = { birthRate: 20, life: 60, lifeRange: 20, speed: 2, speedRange: 1, angle: 270, angleRange: 30, spin: 0, spinRange: 0, scale: 1, scaleRange: 0.5, color: 'var(--color-accent)', colorRange: 0, opacity: 1, shape: 'circle' };
+
 const PARTICLE_PRESETS: ParticlePreset[] = [
   { id: 'snow', name: 'Snow', category: 'nature', emitter: { birthRate: 50, life: 5, lifeRange: 2, speed: 30, speedRange: 10, angle: -90, angleRange: 20, spin: 0, spinRange: 1, scale: 0.3, scaleRange: 0.2, color: 'var(--color-text-primary)', colorRange: 0, opacity: 0.8, shape: 'circle' } },
   { id: 'rain', name: 'Rain', category: 'nature', emitter: { birthRate: 100, life: 2, lifeRange: 0.5, speed: 200, speedRange: 50, angle: -90, angleRange: 5, spin: 0, spinRange: 0, scale: 0.1, scaleRange: 0.05, color: '#87ceeb', colorRange: 0.1, opacity: 0.6, shape: 'line' } },
@@ -604,8 +606,13 @@ const Flux: React.FC = () => {
   const [expressionTarget, setExpressionTarget] = useState('opacity');
   // Null Objects
   const [showNullObjects, setShowNullObjects] = useState(false);
+  const [nullParentId, setNullParentId] = useState('');
+  const [nullOffsets, setNullOffsets] = useState({ x: 0, y: 0, rotation: 0, scale: 100 });
   // Motion Path
   const [showMotionPath, setShowMotionPath] = useState(false);
+  const [motionPathEase, setMotionPathEase] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
+  const [motionPathOrient, setMotionPathOrient] = useState(true);
+  const [motionPathClosed, setMotionPathClosed] = useState(false);
   // Mask System
   const [showMaskSystem, setShowMaskSystem] = useState(false);
   const [maskType, setMaskType] = useState<'add' | 'subtract' | 'intersect'>('add');
@@ -641,8 +648,12 @@ const Flux: React.FC = () => {
   const [showGifExport, setShowGifExport] = useState(false);
   const [gifPalette, setGifPalette] = useState(256);
   const [gifDither, setGifDither] = useState(true);
+  const [gifFps, setGifFps] = useState(10);
+  const [gifCodec, setGifCodec] = useState<'vp9' | 'vp8'>('vp9');
   // Lottie Export
   const [showLottieExport, setShowLottieExport] = useState(false);
+  const [lottieOptimize, setLottieOptimize] = useState(true);
+  const [lottieMinify, setLottieMinify] = useState(true);
   // Composition Templates
   const [showCompTemplates, setShowCompTemplates] = useState(false);
   const [compTemplateCategory, setCompTemplateCategory] = useState<'lower-thirds' | 'intros' | 'social' | 'titles'>('lower-thirds');
@@ -656,10 +667,12 @@ const Flux: React.FC = () => {
   const [maskExpansion, setMaskExpansion] = useState(0);
   const [maskOpacity, setMaskOpacity] = useState(100);
   const [shaderCode, setShaderCode] = useState(`precision mediump float;\nuniform float u_time;\nuniform vec2 u_resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / u_resolution;\n  vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0,2,4));\n  gl_FragColor = vec4(col, 1.0);\n}`);
-  const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25 });
+  const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' });
   // 2. Precompose
   const [showPrecompose, setShowPrecompose] = useState(false);
   const [precompName, setPrecompName] = useState('Pre-comp 1');
+  const [precompMoveAttrs, setPrecompMoveAttrs] = useState(true);
+  const [precompAdjustDuration, setPrecompAdjustDuration] = useState(false);
   // 3. Time Remap
   const [showTimeRemap, setShowTimeRemap] = useState(false);
   const [timeRemapSpeed, setTimeRemapSpeed] = useState(100);
@@ -685,6 +698,7 @@ const Flux: React.FC = () => {
   const [cameraRigType, setCameraRigType] = useState<'orbit' | 'twoNode' | 'poi'>('orbit');
   const [cameraFov, setCameraFov] = useState(50);
   const [cameraDof, setCameraDof] = useState(false);
+  const [cameraFocusDistance, setCameraFocusDistance] = useState(1000);
   // 9. Environment Map
   const [showEnvironment, setShowEnvironment] = useState(false);
   const [envMapPreset, setEnvMapPreset] = useState('studio');
@@ -735,8 +749,8 @@ const Flux: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const profile = await (window as any).electron?.invoke?.('resource-governor:getHardwareProfile');
-        if (mounted && profile?.tier) setHardwareTier(profile.tier);
+        const status = await (window as any).electron?.invoke?.('resource-governor:getStatus');
+        if (mounted && status?.hardwareProfile?.tier) setHardwareTier(status.hardwareProfile.tier);
       } catch { /* not in Electron or governor unavailable */ }
     })();
     return () => { mounted = false; };
@@ -1048,7 +1062,7 @@ const Flux: React.FC = () => {
     // Cache per-frame constants outside the layer loop
     const cachedTier = getPerfTier();
     const cachedMaxParticles = cachedTier === 'low' ? 60 : cachedTier === 'mid' ? 250 : cachedTier === 'high' ? 500 : 1000;
-    const defaultParticleEmitter = { birthRate: 20, life: 60, lifeRange: 20, speed: 2, speedRange: 1, angle: 270, angleRange: 30, spin: 0, spinRange: 0, scale: 1, scaleRange: 0.5, color: 'var(--color-accent)', colorRange: 0, opacity: 1, shape: 'circle' as const };
+    const defaultParticleEmitter = DEFAULT_PARTICLE_EMITTER;
     
     for (const layer of visibleLayers) {
       ctx.save();
@@ -3064,7 +3078,7 @@ const Flux: React.FC = () => {
                     ) : (
                       history.map((entry, index) => (
                         <div
-                          key={index}
+                          key={`${entry.timestamp}-${entry.description}`}
                           style={{ ...styles.behaviorItem, cursor: 'pointer' }}
                           onClick={() => restoreHistory(index)}
                         >
@@ -3529,8 +3543,8 @@ const Flux: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              {['WebM VP9', 'WebM VP8'].map(f => (
-                <button key={f} aria-label={`${f} export format`} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: f === 'WebM VP9' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: f === 'WebM VP9' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
+              {([['vp9', 'WebM VP9'], ['vp8', 'WebM VP8']] as const).map(([codec, f]) => (
+                <button key={f} aria-label={`${f} export format`} aria-pressed={gifCodec === codec} onClick={() => setGifCodec(codec)} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: gifCodec === codec ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: gifCodec === codec ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Palette Colors</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{gifPalette}</span></div>
@@ -3538,15 +3552,13 @@ const Flux: React.FC = () => {
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', marginBottom: 10 }}>
               <input type="checkbox" checked={gifDither} onChange={e => setGifDither(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} /> Floyd-Steinberg Dithering
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 10 }}>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>10</option><option>15</option><option>24</option><option>30</option></select></div>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Loop</div><select style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Forever</option><option>Once</option><option>3x</option></select></div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select value={gifFps} onChange={e => setGifFps(Number(e.target.value))} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option value={10}>10</option><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option></select>
             </div>
             <button aria-label="Export Animation" onClick={() => {
               const canvas = canvasRef.current;
               if (!canvas) return;
               const w = canvas.width, h = canvas.height;
-              const gifFps = 10;
               const totalFrames = Math.ceil(duration * gifFps / fps);
               // Use offscreen canvas + MediaRecorder to produce animated WebM
               const offscreen = document.createElement('canvas');
@@ -3555,8 +3567,8 @@ const Flux: React.FC = () => {
               if (!octx) return;
               const stream = (offscreen as any).captureStream(0) as MediaStream;
               const track = stream.getVideoTracks()[0];
-              const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-                ? 'video/webm;codecs=vp9' : 'video/webm';
+              const preferred = `video/webm;codecs=${gifCodec}`;
+              const mimeType = MediaRecorder.isTypeSupported(preferred) ? preferred : 'video/webm';
               const recorder = new MediaRecorder(stream, { mimeType });
               const chunks: Blob[] = [];
               recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -3609,9 +3621,9 @@ const Flux: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600 }}>Lottie JSON</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Web-optimized vector animation</div>
             </div>
-            {[{ label: 'Optimize', desc: 'Remove unused properties' }, { label: 'Flatten', desc: 'Merge nested transforms' }, { label: 'Minify', desc: 'Compress JSON output' }].map(opt => (
+            {[{ label: 'Optimize', desc: 'Round values to shrink output', checked: lottieOptimize, set: setLottieOptimize }, { label: 'Minify', desc: 'Compress JSON output', checked: lottieMinify, set: setLottieMinify }].map(opt => (
               <label key={opt.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: 'var(--color-warning)' }} />
+                <input type="checkbox" checked={opt.checked} onChange={e => opt.set(e.target.checked)} style={{ accentColor: 'var(--color-warning)' }} />
                 <div><div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{opt.label}</div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{opt.desc}</div></div>
               </label>
             ))}
@@ -3667,7 +3679,9 @@ const Flux: React.FC = () => {
                   return lottieLayer;
                 }),
               };
-              const json = JSON.stringify(lottieData, null, 2);
+              const roundDeep = (v: unknown): unknown => typeof v === 'number' ? Math.round(v * 1000) / 1000 : Array.isArray(v) ? v.map(roundDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, roundDeep(x)])) : v;
+              const exportData = lottieOptimize ? roundDeep(lottieData) : lottieData;
+              const json = lottieMinify ? JSON.stringify(exportData) : JSON.stringify(exportData, null, 2);
               const blob = new Blob([json], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
@@ -3721,25 +3735,30 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <button aria-label="Create null object" onClick={() => {
               const id = addLayer('shape');
-              setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, opacity: 0 } } : l));
+              const parent = layers.find(pl => pl.id === nullParentId);
+              setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, x: (parent ? parent.transform.x : l.transform.x) + nullOffsets.x, y: (parent ? parent.transform.y : l.transform.y) + nullOffsets.y, rotationZ: nullOffsets.rotation, scaleX: nullOffsets.scale / 100, scaleY: nullOffsets.scale / 100, opacity: 0 } } : l));
             }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
             <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Parent Layer</span>
-              <select style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
-                <option>None</option>
+              <select value={nullParentId} onChange={e => setNullParentId(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                <option value="">None</option>
                 {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Transform Offset</div>
-            {['Position X', 'Position Y', 'Rotation', 'Scale'].map(prop => (
+            {([['x', 'Position X'], ['y', 'Position Y'], ['rotation', 'Rotation'], ['scale', 'Scale']] as const).map(([key, prop]) => (
               <div key={prop} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 70 }}>{prop}</span>
-                <input type="number" defaultValue={prop === 'Scale' ? 100 : 0} style={{ width: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
+                <input type="number" value={nullOffsets[key]} onChange={e => setNullOffsets(prev => ({ ...prev, [key]: Number(e.target.value) }))} style={{ width: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
               </div>
             ))}
             <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Null Objects</div>
-              <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No null objects created yet</div>
+              {layers.filter(l => (l.type as any) === 'null').length === 0 ? (
+                <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No null objects created yet</div>
+              ) : layers.filter(l => (l.type as any) === 'null').map(n => (
+                <button key={n.id} onClick={() => setSelectedLayerId(n.id)} aria-label={`Select ${n.name}`} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid ' + (selectedLayerId === n.id ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'), background: selectedLayerId === n.id ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent', color: selectedLayerId === n.id ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 2 }}>{n.name}</button>
+              ))}
             </div>
           </div>
         </div>
@@ -3772,22 +3791,22 @@ const Flux: React.FC = () => {
             <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Ease Curve</span>
               <div style={{ display: 'flex', gap: 4 }}>
-                {['Linear', 'Ease In', 'Ease Out', 'Ease Both'].map(e => (
-                  <button key={e} aria-label={`${e} easing`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: e === 'Ease Both' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: e === 'Ease Both' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{e}</button>
+                {([['linear', 'Linear'], ['easeIn', 'Ease In'], ['easeOut', 'Ease Out'], ['easeInOut', 'Ease Both']] as const).map(([val, label]) => (
+                  <button key={val} aria-label={`${label} easing`} aria-pressed={motionPathEase === val} onClick={() => setMotionPathEase(val)} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: motionPathEase === val ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: motionPathEase === val ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
                 ))}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: '#bf5af2' }} />
+                <input type="checkbox" checked={motionPathOrient} onChange={e => setMotionPathOrient(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
                 Orient Along Path
               </label>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" style={{ accentColor: '#bf5af2' }} />
+                <input type="checkbox" checked={motionPathClosed} onChange={e => setMotionPathClosed(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: false }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: 'easeInOut' }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: 'easeInOut' }); } setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotation', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -3847,25 +3866,40 @@ const Flux: React.FC = () => {
             <button aria-label="Close Advanced Particles panel" onClick={() => setShowAdvancedParticles(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Emitter Shape</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['Point', 'Line', 'Circle', 'Rectangle', 'Sphere'].map(s => (
-                  <button key={s} aria-label={`${s} emitter shape`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: s === 'Point' ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: s === 'Point' ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{s}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 10 }}>
-              {[{ label: 'Birth Rate', val: '60/s' }, { label: 'Lifetime', val: '2.0s' }, { label: 'Speed', val: '150' }, { label: 'Spread', val: '45°' }].map(p => (
-                <div key={p.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.label}</span>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.val}</span>
+            {(() => {
+              const sel = layers.find(l => l.id === selectedLayerId);
+              const em = sel?.particleEmitter ?? (sel?.type === 'particle' ? DEFAULT_PARTICLE_EMITTER : undefined);
+              const patchEmitter = (p: Partial<ParticleEmitter>) => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, particleEmitter: { ...(l.particleEmitter ?? DEFAULT_PARTICLE_EMITTER), ...p } } : l));
+              if (!em) return <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11, marginBottom: 10 }}>Select a particle layer to edit its emitter</div>;
+              return (
+                <>
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Emitter Shape</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['point', 'line', 'circle', 'rectangle'] as const).map(s => (
+                        <button key={s} aria-label={`${s} emitter shape`} aria-pressed={em.shape === s} onClick={() => patchEmitter({ shape: s })} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: em.shape === s ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: em.shape === s ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{s}</button>
+                      ))}
+                    </div>
                   </div>
-                  <input type="range" min="0" max="100" defaultValue={50} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
-                </div>
-              ))}
-            </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 10 }}>
+                    {[
+                      { label: 'Birth Rate', val: `${em.birthRate}/s`, min: 1, max: 200, cur: em.birthRate, set: (n: number) => patchEmitter({ birthRate: n }) },
+                      { label: 'Lifetime', val: `${em.life}f`, min: 1, max: 120, cur: em.life, set: (n: number) => patchEmitter({ life: n }) },
+                      { label: 'Speed', val: `${em.speed}`, min: 0, max: 300, cur: em.speed, set: (n: number) => patchEmitter({ speed: n }) },
+                      { label: 'Spread', val: `${em.angleRange}°`, min: 0, max: 180, cur: em.angleRange, set: (n: number) => patchEmitter({ angleRange: n }) },
+                    ].map(p => (
+                      <div key={p.label}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.val}</span>
+                        </div>
+                        <input type="range" min={p.min} max={p.max} value={p.cur} onChange={e => p.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Physics</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -3876,16 +3910,6 @@ const Flux: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" style={{ accentColor: 'var(--color-warning)' }} />
-                Sub-Emitters
-              </label>
-              <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" style={{ accentColor: 'var(--color-warning)' }} />
-                Collision
-              </label>
             </div>
           </div>
         </div>
@@ -3947,16 +3971,16 @@ const Flux: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>
               <textarea value={shaderCode} onChange={e => setShaderCode(e.target.value)} style={{ width: '100%', height: 180, padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.4))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical', lineHeight: 1.5 }} />
-              <button aria-label="Compile and apply shader" onClick={() => { if (!selectedLayerId) return; const intensity = shaderUniforms.u_intensity / 50; const filterStr = `contrast(${1 + intensity * 0.2}) saturate(${1 + intensity * 0.3}) brightness(${1 + intensity * 0.1})`; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { sepia: shaderUniforms.u_speed, grayscale: 0, invert: 0, customFilter: filterStr } }] } : l)); }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
+              <button aria-label="Compile and apply shader" onClick={() => { if (!selectedLayerId) return; const intensity = shaderUniforms.u_intensity / 50; const hex = shaderUniforms.u_color; const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let hue = 0; if (mx !== mn) { const d = mx - mn; hue = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; } const hueDelta = Math.round(hue - 280); const filterStr = `contrast(${1 + intensity * 0.2}) saturate(${1 + intensity * 0.3}) brightness(${1 + intensity * 0.1}) hue-rotate(${hueDelta}deg)`; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { sepia: shaderUniforms.u_speed, grayscale: 0, invert: 0, customFilter: filterStr } }] } : l)); }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
             </div>
             {/* Uniforms & Presets */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, fontWeight: 600 }}>Uniforms</div>
-              {[{ name: 'u_time', val: shaderUniforms.u_time }, { name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: '#bf5af2' }].map(u => (
+              {[{ name: 'u_time', val: shaderUniforms.u_time }, { name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: shaderUniforms.u_color }].map(u => (
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
-                    <input type="color" defaultValue={u.val as string} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 3, cursor: 'pointer', marginTop: 2 }} />
+                    <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 3, cursor: 'pointer', marginTop: 2 }} />
                   ) : (
                     <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#bf5af2', marginTop: 2 }} />
                   )}
@@ -4010,11 +4034,11 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Composition Name</span>
             <input type="text" value={precompName} onChange={e => setPrecompName(e.target.value)} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#ccc', fontSize: 11, marginBottom: 10, boxSizing: 'border-box' }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
-              <input type="checkbox" defaultChecked style={{ accentColor: '#bf5af2' }} />
+              <input type="checkbox" checked={precompMoveAttrs} onChange={e => setPrecompMoveAttrs(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
               Move all attributes into new composition
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
-              <input type="checkbox" style={{ accentColor: '#bf5af2' }} />
+              <input type="checkbox" checked={precompAdjustDuration} onChange={e => setPrecompAdjustDuration(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
               Adjust composition duration to selected layers
             </label>
             <button aria-label="Create pre-composition" onClick={() => {
@@ -4022,15 +4046,16 @@ const Flux: React.FC = () => {
               const selected = layers.find(l => l.id === selectedLayerId);
               if (!selected) { setShowPrecompose(false); return; }
               // Create group layer containing selected layer
+              const compDuration = precompAdjustDuration ? selected.duration : duration;
               const groupLayer: Layer = {
                 id: `layer-comp-${Date.now()}`,
                 name: precompName || 'Pre-comp',
                 type: 'group',
                 visible: true, locked: false, solo: false,
-                startTime: selected.startTime, duration: selected.duration,
-                inPoint: selected.inPoint, outPoint: selected.outPoint,
-                transform: { ...selected.transform },
-                behaviors: [], filters: [], animations: [],
+                startTime: selected.startTime, duration: compDuration,
+                inPoint: precompAdjustDuration ? selected.inPoint : 0, outPoint: precompAdjustDuration ? selected.outPoint : compDuration,
+                transform: precompMoveAttrs ? { ...selected.transform } : { x: 0, y: 0, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 },
+                behaviors: [], filters: [], animations: precompMoveAttrs ? [...(selected.animations || [])] : [],
                 children: [selected],
               } as any;
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
@@ -4259,8 +4284,8 @@ const Flux: React.FC = () => {
             {cameraDof && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Focus D</span>
-                <input type="range" min="0" max="5000" defaultValue={1000} style={{ flex: 1, accentColor: '#bf5af2' }} />
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>1000</span>
+                <input type="range" min="0" max="5000" value={cameraFocusDistance} onChange={e => setCameraFocusDistance(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{cameraFocusDistance}</span>
               </div>
             )}
             <button aria-label="Create camera rig" onClick={() => {
@@ -4274,7 +4299,7 @@ const Flux: React.FC = () => {
               };
               setLayers(prev => [rigLayer, ...prev]);
               setSelectedLayerId(rigLayer.id);
-              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? ', DOF enabled' : ''})`, type: 'success' } }));
+              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? `, DOF @ ${cameraFocusDistance}` : ''})`, type: 'success' } }));
               setShowCameraRig(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>

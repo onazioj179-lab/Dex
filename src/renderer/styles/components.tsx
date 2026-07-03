@@ -4447,7 +4447,7 @@ export const DexNumberInput: React.FC<DexNumberInputProps> = ({ value, onChange,
   return (
     <div className={className} style={{ display: "inline-flex", alignItems: "center", ...style }}>
       <button onClick={dec} aria-label="Decrease value" disabled={disabled || (min !== undefined && value <= min)} style={{ ...btn, borderRadius: radius.md + " 0 0 " + radius.md }}>-</button>
-      <input type="number" value={value} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }} min={min} max={max} step={step} disabled={disabled} style={{ width: 60, height: h, padding: "0 " + space[2], backgroundColor: "var(--color-bg-input)", border: "1px solid var(--color-border)", borderLeft: "none", borderRight: "none", fontSize: fontSize.sm, color: "var(--color-text-primary)", textAlign: "center" }} />
+      <input type="number" value={value} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }} min={min} max={max} step={step} disabled={disabled} style={{ width: 60, height: h, padding: "0 " + space[2], backgroundColor: "var(--color-bg-input)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)", borderLeft: "none", borderRight: "none", fontSize: fontSize.sm, color: "var(--color-text-primary)", textAlign: "center" }} />
       <button onClick={inc} aria-label="Increase value" disabled={disabled || (max !== undefined && value >= max)} style={{ ...btn, borderRadius: "0 " + radius.md + " " + radius.md + " 0" }}>+</button>
     </div>
   );

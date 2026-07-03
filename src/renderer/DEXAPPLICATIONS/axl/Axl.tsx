@@ -2159,7 +2159,7 @@ const AXL: React.FC = () => {
               />
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px var(--space-2)' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px var(--space-2)' }}>
               {STD_PARTS_LIBRARY[libCategory]?.parts
                 .filter(p => !libSearch || p.name.toLowerCase().includes(libSearch.toLowerCase()))
                 .map(part => (

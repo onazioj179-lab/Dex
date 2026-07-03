@@ -510,7 +510,7 @@ const MarkdownEditor: React.FC = () => {
                 key={i}
                 onClick={() => jumpToHeading(h.index)}
                 title={h.text}
-                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 6px', paddingLeft: 6 + (h.level - 1) * 10, background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', paddingTop: 3, paddingBottom: 3, paddingRight: 6, paddingLeft: 6 + (h.level - 1) * 10, background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
               >
                 {h.text}
               </button>

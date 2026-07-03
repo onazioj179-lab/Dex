@@ -114,6 +114,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   messagesContainer: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     padding: `${space[4]}px 0`,
     display: 'flex',
