@@ -35,6 +35,13 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**RELEASED v6.1.0 (2026-07-03):** merged to main (fast-forward), bumped 4 version files +
+CHANGELOG, built MSI (`bundle.targets` now `["nsis","msi"]` — owner reversed the 6.0.1
+NSIS-only call and wants the MSI) and published: `v6.1.0` on Dex (MSI + setup.exe, Latest)
+and `dex-v6.1.0` on dex-updates (old dex-v6.0.1 target-deleted; other products untouched).
+Contents: cross-app control/scroll/style sweep, Hero Themes, Omnitrix-green default accent,
+motion-token unification. release.yml is still stale-Electron — released locally via gh.
+
 **Renderer checkpoint (2026-07-02, pass 3 — Omnitrix default):** Owner made Omnitrix green THE
 default: design-system.css accent baselines re-pointed (dark #32D74B family, light #1E8E3E,
 luminance-matched HC greens; colorblind palettes untouched). Killed the competing ThemeManager
