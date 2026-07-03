@@ -4216,7 +4216,7 @@ const Prism: React.FC = () => {
                 <button key={cat} onClick={() => setFilterGalleryCategory(cat)} aria-label={`${cat} filter category`} aria-pressed={filterGalleryCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: filterGalleryCategory === cat ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: filterGalleryCategory === cat ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat}</button>
               ))}
             </div>
-            <div style={{ flex: 1, padding: 'var(--space-3)', overflowY: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, padding: 'var(--space-3)', overflowY: 'auto' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
                 {[
                   ...(filterGalleryCategory === 'artistic' ? [{ name: 'Oil Paint', icon: 'O' }, { name: 'Watercolor', icon: 'W' }, { name: 'Fresco', icon: 'F' }, { name: 'Poster Edges', icon: 'P' }, { name: 'Cutout', icon: 'C' }, { name: 'Colored Pencil', icon: 'CP' }] : []),
@@ -4440,7 +4440,7 @@ const Prism: React.FC = () => {
               <button key={cat} onClick={() => setAssetCategory(cat)} aria-label={`Show ${cat} assets`} aria-pressed={assetCategory === cat} style={{ padding: '4px 10px', borderRadius: 9999, border: 'none', background: assetCategory === cat ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: assetCategory === cat ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
             ))}
           </div>
-          <div style={{ flex: 1, padding: 10, overflowY: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: 10, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               {(assetCategory === 'shapes' ? ['Rectangle', 'Circle', 'Triangle', 'Star', 'Arrow', 'Heart', 'Diamond', 'Pentagon'] :
                 assetCategory === 'patterns' ? ['Dots', 'Lines', 'Grid', 'Chevron', 'Waves', 'Crosses', 'Hexagons', 'Moire'] :

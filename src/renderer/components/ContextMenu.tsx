@@ -134,14 +134,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         padding: '5px 0',
         borderRadius: 12,
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px var(--color-border-subtle), var(--pg-gloss-top)',
-        animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+        animation: 'ctxFadeIn 0.16s var(--ease-tahoe, cubic-bezier(0.23, 1, 0.32, 1))',
       } as React.CSSProperties}
     >
       <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.96) translateY(-2px); } to { opacity:1; transform:scale(1) translateY(0); } }
-.dex-ctx-item { background: transparent; transition: all 0.1s ease; }
+.dex-ctx-item { background: transparent; transition: background 100ms var(--ease-out, ease-out), color 100ms var(--ease-out, ease-out); }
 .dex-ctx-item:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }
 .dex-ctx-item:active:not([aria-disabled="true"]) { background: var(--color-accent-muted, var(--color-accent-light)); }
-.dex-ctx-sub { background: transparent; transition: all 0.1s ease; }
+.dex-ctx-sub { background: transparent; transition: background 100ms var(--ease-out, ease-out), color 100ms var(--ease-out, ease-out); }
 .dex-ctx-sub:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }`}</style>
       {items.map((item, i) => {
         if (item.divider && !item.label) {

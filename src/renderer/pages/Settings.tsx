@@ -2798,9 +2798,35 @@ export const Settings: React.FC = () => {
             style={{
               width: '32px', height: '32px', borderRadius: '50%', background: color,
               border: settings.accentColor === color ? '3px solid var(--color-text-primary, #fff)' : '2px solid transparent',
-              cursor: 'pointer', boxShadow: settings.accentColor === color ? '0 0 10px ' + color : 'none'
+              cursor: 'pointer', boxShadow: settings.accentColor === color ? '0 0 4px ' + color : 'none'
             }}
           />
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+        {[
+          { id: '#ffd60a', name: 'Dark Knight', desc: 'Bat-signal yellow on true black' },
+          { id: '#32d74b', name: 'Omnitrix', desc: 'Hero-green energy' },
+          { id: '#ff6b1a', name: 'Nanite', desc: 'Rex build-orange' },
+        ].map(preset => (
+          <button
+            key={preset.id}
+            aria-label={`Apply ${preset.name} theme`}
+            aria-pressed={settings.accentColor === preset.id}
+            title={preset.desc}
+            onClick={() => setSettings(prev => ({ ...prev, accentColor: preset.id }))}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8,
+              border: settings.accentColor === preset.id ? `1px solid ${preset.id}` : '1px solid var(--color-border)',
+              background: settings.accentColor === preset.id ? `color-mix(in srgb, ${preset.id} 12%, transparent)` : 'var(--color-bg-surface)',
+              color: settings.accentColor === preset.id ? preset.id : 'var(--color-text-secondary)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: preset.id, transform: 'rotate(45deg)', flexShrink: 0 }} />
+            {preset.name}
+          </button>
         ))}
       </div>
       

@@ -837,11 +837,11 @@ button, a, input, select, textarea,
   100% { opacity: 0; transform: scale(0.96) translateY(4px); }
 }
 .dex-app-opening {
-  animation: dex-app-open 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: dex-app-open var(--motion-window-open, 220ms cubic-bezier(0.0, 0.0, 0.2, 1)) forwards;
   will-change: transform, opacity;
 }
 .dex-app-closing {
-  animation: dex-app-close 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: dex-app-close var(--motion-window-close, 160ms cubic-bezier(0.4, 0.0, 1, 1)) forwards;
   will-change: transform, opacity;
   pointer-events: none;
 }
@@ -4463,7 +4463,7 @@ textarea {
 [role="dialog"][style*="position:fixed"][style*="inset:0"],
 .modal-overlay[style*="position: fixed"][style*="inset: 0"],
 .modal-overlay[style*="position:fixed"][style*="inset:0"] {
-  animation: modalBackdropIn 0.18s ease-out both;
+  animation: modalBackdropIn 180ms var(--pg-curve-decelerate, ease-out) both;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -5928,11 +5928,11 @@ html[style*="font-size: 120"] * {
 }
 
 .dex-window-minimizing {
-  animation: dex-window-minimize 0.25s ease-in forwards;
+  animation: dex-window-minimize var(--motion-window-minimize, 200ms cubic-bezier(0.4, 0.0, 1, 1)) forwards;
 }
 
 .dex-window-restoring {
-  animation: dex-window-restore 0.25s ease-out forwards;
+  animation: dex-window-restore var(--motion-window-restore, 220ms cubic-bezier(0.0, 0.0, 0.2, 1)) forwards;
 }
 
 /* =============================================================================

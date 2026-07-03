@@ -1396,7 +1396,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
               >×</button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 0' }}>
               {headings.length === 0 ? (
                 <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--color-text-tertiary, #8a8a8a)', lineHeight: 1.4 }}>
                   No headings yet. Use H1/H2/H3 to build an outline.

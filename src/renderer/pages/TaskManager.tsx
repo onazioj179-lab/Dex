@@ -1447,7 +1447,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggleButton: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   toggleButtonActive: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' },
   iconAction: { display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0 },
-  detailPanel: { flexShrink: 0, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', padding: '10px var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 },
+  detailPanel: { flexShrink: 0, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 },
   detailHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   detailTitle: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   detailClose: { width: 22, height: 22, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 },

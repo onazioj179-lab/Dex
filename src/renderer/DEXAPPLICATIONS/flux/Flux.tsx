@@ -3232,7 +3232,7 @@ const Flux: React.FC = () => {
 
       {/* Text Animator Panel */}
       {showTextAnimator && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 80, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Text Animator</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTextAnimator(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3328,7 +3328,7 @@ const Flux: React.FC = () => {
           window.addEventListener('pointerup', onUp);
         };
         return (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 60, bottom: 0, right: 0, height: 200, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: 60, bottom: 0, right: 0, height: 200, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Graph Editor</span>
@@ -3391,7 +3391,7 @@ const Flux: React.FC = () => {
 
       {/* Expression Editor Panel */}
       {showExpressionEditor && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 340, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 80, width: 340, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Expression Engine</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => { setShowExpressionEditor(false); setExpressionError(null); }} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3487,7 +3487,7 @@ const Flux: React.FC = () => {
 
       {/* Repeater Panel */}
       {showRepeater && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Repeater / Replicator</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowRepeater(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3509,7 +3509,7 @@ const Flux: React.FC = () => {
 
       {/* 3D Text Panel */}
       {show3DText && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 100, width: 260, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 100, width: 260, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>3D Text</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShow3DText(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3536,7 +3536,7 @@ const Flux: React.FC = () => {
 
       {/* GIF/APNG Export Panel */}
       {showGifExport && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Animated Export (WebM)</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGifExport(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3610,7 +3610,7 @@ const Flux: React.FC = () => {
 
       {/* Lottie Export Panel */}
       {showLottieExport && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Lottie / JSON Export</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLottieExport(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3695,7 +3695,7 @@ const Flux: React.FC = () => {
 
       {/* Composition Templates */}
       {showCompTemplates && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Composition Templates</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowCompTemplates(false)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -3727,7 +3727,7 @@ const Flux: React.FC = () => {
 
       {/* Null Objects Panel */}
       {showNullObjects && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 120, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 120, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Null Objects</span>
             <button aria-label="Close Null Objects panel" onClick={() => setShowNullObjects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3766,7 +3766,7 @@ const Flux: React.FC = () => {
 
       {/* Motion Path Panel */}
       {showMotionPath && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 120, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: 20, top: 120, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Motion Path</span>
             <button aria-label="Close Motion Path panel" onClick={() => setShowMotionPath(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3813,7 +3813,7 @@ const Flux: React.FC = () => {
 
       {/* Mask System Panel */}
       {showMaskSystem && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 350, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 350, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Mask System</span>
             <button aria-label="Close Mask System panel" onClick={() => setShowMaskSystem(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3860,7 +3860,7 @@ const Flux: React.FC = () => {
 
       {/* Advanced Particles Panel */}
       {showAdvancedParticles && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(400px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(400px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Advanced Particles</span>
             <button aria-label="Close Advanced Particles panel" onClick={() => setShowAdvancedParticles(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3917,7 +3917,7 @@ const Flux: React.FC = () => {
 
       {/* Audio Reactive Panel */}
       {showAudioReactive && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 20, top: 350, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: 20, top: 350, width: 300, borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Reactive</span>
             <button aria-label="Close Audio Reactive panel" onClick={() => setShowAudioReactive(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
@@ -3961,7 +3961,7 @@ const Flux: React.FC = () => {
 
       {/* Shader Effects Panel */}
       {showShaderEffects && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shader Effects</span>
             <button aria-label="Close Shader Effects panel" onClick={() => setShowShaderEffects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>

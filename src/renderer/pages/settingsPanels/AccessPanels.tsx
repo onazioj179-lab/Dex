@@ -36,7 +36,7 @@ const ROW: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '10px 0',
+  padding: 'var(--space-3) 0',
   borderBottom: '1px solid var(--color-border-subtle)',
   gap: 'var(--space-3)',
 };

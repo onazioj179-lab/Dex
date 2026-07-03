@@ -826,7 +826,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
 
         {/* Scrollable preset grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)', scrollbarWidth: 'thin' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)', scrollbarWidth: 'thin' }}>
           {(() => {
             const imagePresets = WALLPAPER_PRESETS.filter(p => p.mode === 'image');
             const staticPresets = WALLPAPER_PRESETS.filter(p => p.mode !== 'live' && p.mode !== 'image' && !p.id.startsWith('crimson') && !p.id.startsWith('blood') && !p.id.startsWith('obsidian') && !p.id.startsWith('scarlet') && !p.id.startsWith('inferno'));

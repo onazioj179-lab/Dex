@@ -41,6 +41,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   // ---------------- Appearance ----------------
   { label: 'Appearance', section: 'appearance', desc: 'Switch between dark and light mode', keywords: 'theme dark light auto mode color scheme' },
   { label: 'Accent Color', section: 'appearance', desc: 'Pick the highlight color used across DEX', keywords: 'theme tint highlight color' },
+  { label: 'Hero Themes', section: 'appearance', desc: 'One-tap accent presets: Dark Knight, Omnitrix, Nanite', keywords: 'theme preset batman ben 10 generator rex yellow green orange accent hero' },
   { label: 'Font Scale', section: 'appearance', desc: 'Adjust text size across the app', keywords: 'text size zoom larger smaller font' },
   { label: 'Reduce Motion', section: 'appearance', desc: 'Minimize animated effects', keywords: 'animation accessibility' },
   { label: 'Glass', section: 'appearance', desc: 'Off, Reduced, Normal, or Liquid translucency', keywords: 'transparency blur liquid material glassmorphism' },

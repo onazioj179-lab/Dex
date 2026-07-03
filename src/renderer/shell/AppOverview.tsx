@@ -148,7 +148,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
 
       el.style.setProperty('transition', reduce
         ? 'none'
-        : `transform ${EXIT_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease`);
+        : `transform ${EXIT_MS}ms var(--ease-tahoe, cubic-bezier(0.23, 1, 0.32, 1)), opacity 180ms ease`);
       el.style.setProperty('transform-origin', '0 0');
       el.style.setProperty('transform',
         `translate3d(${x - rect.left}px, ${y - rect.top}px, 0) scale(${s})`, 'important');

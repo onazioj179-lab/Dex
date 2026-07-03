@@ -85,6 +85,10 @@ export function deriveAccentFamily(raw: string): AccentFamily | null {
 function resolveCssColor(raw: string): string {
   const s = String(raw).trim();
   const m = s.match(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/);
+  // Self-referential accent tokens are the "system default" sentinel: resolving
+  // them against the computed value would re-apply whatever override is live,
+  // making default unreachable. Fail the parse so the caller clears overrides.
+  if (m && (m[1] === '--color-accent' || m[1] === '--accent-color')) return '';
   if (m && typeof document !== 'undefined' && document.documentElement && typeof getComputedStyle === 'function') {
     const resolved = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
     if (resolved) return resolved;

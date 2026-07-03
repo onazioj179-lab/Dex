@@ -190,7 +190,7 @@ export const SnapPreview: React.FC<{ zone: SnapZone | null }> = ({ zone }) => {
         boxShadow: '0 0 24px rgba(74,158,255,0.15)',
         pointerEvents: 'none',
         zIndex: 'var(--z-modal)',
-        transition: isReduceMotion() ? 'none' : 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: isReduceMotion() ? 'none' : 'all 180ms var(--pg-curve-standard, cubic-bezier(0.4, 0, 0.2, 1))',
       }}
     />
   );

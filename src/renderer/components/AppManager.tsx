@@ -4832,7 +4832,7 @@ export const AppManager: React.FC = () => {
               borderRadius: 10,
               pointerEvents: 'none',
               zIndex: 4000,
-              transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'all 180ms var(--pg-curve-standard, cubic-bezier(0.4, 0, 0.2, 1))',
               boxShadow: '0 0 20px rgba(59,130,246,0.1)',
             }}
           />

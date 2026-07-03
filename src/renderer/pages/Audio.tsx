@@ -1418,7 +1418,7 @@ export const Audio: React.FC = () => {
 
         {/* 10-Band Equalizer */}
         {showEqualizer && (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Equalizer</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowEqualizer(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1444,7 +1444,7 @@ export const Audio: React.FC = () => {
 
         {/* Queue Management */}
         {showQueue && (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 60, width: 280, maxHeight: 400, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, top: 60, width: 280, maxHeight: 400, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Up Next</span>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -1489,7 +1489,7 @@ export const Audio: React.FC = () => {
 
         {/* Mini Player */}
         {showMiniPlayer && currentTrack && (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, bottom: 80, width: 260, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", right: 20, bottom: 80, width: 260, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: 'var(--space-3)', display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ width: 44, height: 44, borderRadius: 6, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
               <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -1513,7 +1513,7 @@ export const Audio: React.FC = () => {
 
         {/* Audio Visualizer */}
         {showVisualizer && (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: 100, transform: 'translateX(-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', top: 100, transform: 'translateX(-50%)', width: 'min(380px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Visualizer</span>
@@ -1531,7 +1531,7 @@ export const Audio: React.FC = () => {
 
         {/* Crossfade Settings */}
         {showCrossfadeSettings && (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', animation: "dex-panel-in var(--motion-panel-expand, 200ms ease-out)", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crossfade</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCrossfadeSettings(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1582,7 +1582,7 @@ export const Audio: React.FC = () => {
         {/* Metadata Editor */}
         {editingTrack && (
           <div style={{ position: 'fixed', inset: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.5))', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={() => setEditingTrack(null)}>
-            <div className="dex-liquid-glass-strong" style={{ width: 'min(340px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="dex-liquid-glass-strong" style={{ width: 'min(340px, calc(100vw - 48px))', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in var(--motion-panel-expand, 200ms ease-out)' }} onMouseDown={e => e.stopPropagation()}>
               <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Edit Track Info</span>
                 <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setEditingTrack(null)} aria-label="Close"><DexIcon name="close" size={14} /></button>

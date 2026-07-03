@@ -575,7 +575,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       </div>
 
       {/* Note list */}
-      <div className="dex-scroll-fade-y" style={{ flex: 1, overflow: 'auto', padding: '0 4px' }} onScroll={handleListScroll}>
+      <div className="dex-scroll-fade-y" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0 4px' }} onScroll={handleListScroll}>
         {favoriteNotes.length > 0 && (
           <>
             <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-2) 4px', display: 'flex', alignItems: 'center', gap: 5 }}>
