@@ -1721,6 +1721,77 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
 // UKI ARCHIVE STATS -- shows compression ratio and lets the user export/clear
 // the local UKI memory archive.
 // =============================================================================
+/** Saved UKI memory: view, delete one, export all. Reads the real encrypted store. */
+const UkiMemoryViewer: React.FC<{ styles: any }> = ({ styles }) => {
+  const toast = useToastHelpers();
+  const [turns, setTurns] = useState<Array<{ id: string; ts: number; user: string; ukiResponse: string }>>([]);
+  const [open, setOpen] = useState(false);
+  const refresh = useCallback(async () => {
+    try {
+      const mem = await import('../uki/memory');
+      setTurns((await mem.readTurns()).slice().reverse().slice(0, 100));
+    } catch { setTurns([]); }
+  }, []);
+  useEffect(() => { if (open) void refresh(); }, [open, refresh]);
+  useEffect(() => {
+    const h = () => { if (open) void refresh(); };
+    window.addEventListener('dex-uki-memory-changed', h);
+    return () => window.removeEventListener('dex-uki-memory-changed', h);
+  }, [open, refresh]);
+
+  const remove = async (id: string) => {
+    const mem = await import('../uki/memory');
+    await mem.deleteTurn(id);
+    void refresh();
+  };
+  const exportAll = async () => {
+    try {
+      const mem = await import('../uki/memory');
+      const data = await mem.exportUkiMemory();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `uki-memory-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Exported ${data.turns.length} remembered exchanges`);
+    } catch {
+      toast.error('Export failed');
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+        <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          {open ? 'Hide saved memory' : 'View saved memory'}
+        </button>
+        <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => void exportAll()}>Export memory (JSON)</button>
+      </div>
+      {open && (
+        <div role="list" aria-label="Saved UKI memory" style={{ maxHeight: 280, overflowY: 'auto', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md)' }}>
+          {turns.length === 0 ? (
+            <div style={{ padding: 12, fontSize: 12, color: 'var(--color-text-tertiary)' }}>Nothing saved. UKI only remembers while Memory Recording is on.</div>
+          ) : turns.map((t) => (
+            <div role="listitem" key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{new Date(t.ts).toLocaleString()}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.user}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.ukiResponse}</div>
+              </div>
+              <button
+                onClick={() => void remove(t.id)}
+                aria-label={`Forget: ${t.user.slice(0, 40)}`}
+                style={{ ...styles.secondaryBtn, padding: '2px 8px', fontSize: 11, flexShrink: 0 }}
+              >Forget</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
   const [stats, setStats] = useState<{ archiveCount: number; rawBytes: number; compressedBytes: number; ratio: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -4244,6 +4315,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
       <UkiArchiveStats styles={styles} />
+      <UkiMemoryViewer styles={styles} />
       <UkiKnowledgeFeed styles={styles} />
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
@@ -4265,15 +4337,14 @@ export const Settings: React.FC = () => {
         <button
           style={{ ...styles.dangerBtn, flex: 1 }}
           onClick={async () => {
-            if (!confirm('Clear all UKI memory? This cannot be undone.')) return;
+            if (!confirm('Clear all UKI memory (conversations, archives, transcript, reasoning trail)? Saved workflows are kept. This cannot be undone.')) return;
             try {
-              const dex = (window as any).dex;
-              if (dex?.uki?.memoryClear) {
-                await dex.uki.memoryClear();
-                toast.success('All UKI memory cleared');
-              } else {
-                toast.info('Memory clear not available — native engine required');
-              }
+              // This used to clear only the native archive, leaving the
+              // encrypted conversation store and transcript in place.
+              const { clearAllUkiMemory } = await import('../uki/memory');
+              const cleared = await clearAllUkiMemory();
+              window.dispatchEvent(new CustomEvent('dex-uki-memory-changed'));
+              toast.success(`Cleared: ${cleared.join(', ')}`);
             } catch {
               toast.error('Failed to clear memory');
             }
