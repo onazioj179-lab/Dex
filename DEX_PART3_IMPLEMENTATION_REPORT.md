@@ -54,3 +54,11 @@ See the test section of `DEX_RELEASE_NOTES.md` for the final run on this branch.
 | Radius sweep | Done: all 636 remaining in-app values snapped; guard now at **0** | Ratchet test; tsc |
 | Canvas boards + folders (IndexedDB) | Done | 5 unit tests incl. migration safety |
 | Form-control borders (>=3:1) | Done (PR #65) | Token contrast computed |
+
+## Apps follow the theme (branch `claude/dex-apps-theme-tokens`)
+
+| Item | Status | Verification |
+|---|---|---|
+| Green removed from switches OS-wide | Done: Settings (5 switches), global `.dex-toggle`, Quick Controls permissions, AppManager, Audio, Browser, Workflows now use the accent. Green stays only where it means "OK" (status dots, meters, "Included with DEX") | tsc; grep shows no green on/off switch left |
+| Imosion chrome on tokens | Done: ~230 lines. Borders, menus, hover/selection tints, tabs, export button and selected states moved from a private zinc + green palette to tokens/accent. Track, pad and preset colors untouched (content) | Preview: computed accent `#0A84FF` on primary/active buttons |
+| Imosion in light mode | Fixed: it was half light / half dark with invisible title and track names. Now pinned dark like other DAWs via `.dex-theme-dark`, which re-declares only neutral tokens (custom accent still flows) | Preview in light mode: root bg `#111214`, text `#F5F5F2`, no console errors; `theme-dark-pin.test.ts` (4) keeps it in sync with `:root` |

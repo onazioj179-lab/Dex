@@ -4568,7 +4568,7 @@ export const AppManager: React.FC = () => {
                     aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
                     style={{
                       width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: spatialAudioOn ? 'var(--color-success)' : 'var(--color-border)',
+                      background: spatialAudioOn ? 'var(--color-accent)' : 'var(--color-border)',
                       position: 'relative', transition: 'background 0.2s ease', padding: 0,
                     }}
                   >
@@ -4593,7 +4593,7 @@ export const AppManager: React.FC = () => {
                     aria-label="Toggle reduce motion"
                     style={{
                       width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: isReduceMotion() ? 'var(--color-success)' : 'var(--color-border)',
+                      background: isReduceMotion() ? 'var(--color-accent)' : 'var(--color-border)',
                       position: 'relative', transition: 'background 0.2s ease', padding: 0,
                     }}
                   >

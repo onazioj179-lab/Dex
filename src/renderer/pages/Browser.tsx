@@ -2356,7 +2356,7 @@ export const Browser: React.FC = () => {
                 <div
                   style={{
                     ...styles.toggleTrack,
-                    background: browserSettings[item.key] ? 'var(--color-success)' : 'var(--color-bg-hover)',
+                    background: browserSettings[item.key] ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                   }}
                   onClick={() => setBrowserSettings(s => ({ ...s, [item.key]: !s[item.key] }))}
                 >

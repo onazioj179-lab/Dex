@@ -741,7 +741,7 @@ const UpdateManagerSection: React.FC = () => {
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
     width: 44, height: 24, borderRadius: 10, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
-    background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+    background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
   const btnBase: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
@@ -3476,7 +3476,7 @@ export const Settings: React.FC = () => {
                   />
                   <span style={{
                     position: 'absolute', inset: 0, borderRadius: 10,
-                    background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
+                    background: entry.enabled ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
                     <span style={{
@@ -3639,7 +3639,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3938,7 +3938,7 @@ export const Settings: React.FC = () => {
                 />
                 <span style={{
                   position: 'absolute', inset: 0, borderRadius: 10,
-                  background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
+                  background: autoOpt ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
                   <span style={{
@@ -4433,7 +4433,7 @@ export const Settings: React.FC = () => {
               <button
                 style={{
                   ...styles.toggle,
-                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-accent)' : 'var(--color-bg-glass)',
                   border: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'none' : '1px solid var(--color-border)',
                 }}
                 onClick={() => setAppSetting(selectedCreativeApp, 'gpuAcceleration', !getAppSetting(selectedCreativeApp, 'gpuAcceleration', true))}

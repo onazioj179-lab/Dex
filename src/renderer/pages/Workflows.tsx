@@ -1878,7 +1878,7 @@ export const Workflows: React.FC = () => {
                           onClick={() => updateNodeBehavior(selectedNode.id, { continueOnError: !selectedNode.continueOnError })}
                           style={{
                             width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
-                            background: selectedNode.continueOnError ? 'var(--color-success, #30d158)' : 'var(--color-border)',
+                            background: selectedNode.continueOnError ? 'var(--color-accent)' : 'var(--color-border)',
                             display: 'flex', alignItems: 'center', justifyContent: selectedNode.continueOnError ? 'flex-end' : 'flex-start',
                           }}
                         >
