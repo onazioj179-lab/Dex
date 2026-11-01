@@ -12,6 +12,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react';
 import { useMediaQuery } from './motionHooks';
+import { notificationsAllowed } from './notificationsAllowed';
 
 // ---------------------------------------------------------------------------
 // useScrollDeceleration -- scroll deceleration curve presets
@@ -1169,7 +1170,7 @@ export function useNotification() {
     return perm;
   }, []);
   const notify = useCallback((title: string, options?: NotificationOptions) => {
-    if (permission === "granted") return new Notification(title, options);
+    if (permission === "granted" && notificationsAllowed()) return new Notification(title, options);
     return null;
   }, [permission]);
   return { permission, requestPermission, notify };

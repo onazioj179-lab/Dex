@@ -35,6 +35,7 @@ import {
 } from './transcode';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
+import { notificationsAllowed } from '../../utils/notificationsAllowed';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -681,7 +682,7 @@ const Forge: React.FC = () => {
           outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
         } : j));
         window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
-        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted' && notificationsAllowed()) {
           new Notification('FORGE — Image Encoded', { body: `${file.name} → ${result.ext.toUpperCase()}` });
         }
       } catch (err: any) {
@@ -732,7 +733,7 @@ const Forge: React.FC = () => {
           outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
         } : j));
         window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
-        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted' && notificationsAllowed()) {
           new Notification('FORGE — Audio Encoded', { body: `${file.name} → WAV ${bitDepth}-bit` });
         }
       } catch (err: any) {
@@ -780,7 +781,7 @@ const Forge: React.FC = () => {
           outputExt: result.ext, outputMime: result.mime, endTime: Date.now(),
         } : j));
         window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesConverted', amount: 1 } }));
-        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted') {
+        if (notifyOnComplete && 'Notification' in window && Notification.permission === 'granted' && notificationsAllowed()) {
           new Notification('FORGE — Video Encoded', { body: `${file.name} → WebM ${result.width}×${result.height}` });
         }
       } catch (err: any) {

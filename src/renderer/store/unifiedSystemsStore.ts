@@ -18,6 +18,7 @@ import {
   sortByPriority,
 } from '../../shared/notifications/group';
 import { readHubMeta } from '../services/notify';
+import { notificationsAllowed } from '../utils/notificationsAllowed';
 
 // ==========================================================================
 // IPC Helper
@@ -125,7 +126,7 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
   },
 
   sendNotification: async (app, title, body, action) => {
-    await invoke('notification-center:send', { app, title, body, action });
+    await invoke('notification-center:send', { app, title, body, action, osToast: notificationsAllowed() });
     await get().loadUnreadCount();
   },
 

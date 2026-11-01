@@ -383,6 +383,7 @@ import vinxIconPng from '../../../appicons/vinx.png';
 import imosionIconPng from '../../../appicons/imosion.png';
 import forgeIconPng from '../../../appicons/forge.png';
 import nexusIconPng from '../../../appicons/nexus.png';
+import { useDexSetting } from '../hooks/useDexSetting';
 
 const AppIconPngs: Record<string, string> = {
   videoeditor: vinxIconPng,
@@ -707,6 +708,7 @@ const getWindowControlStyle = (): 'system' | 'traffic' => {
 // MAIN COMPONENT
 // ==========================================================================
 export const AppManager: React.FC = () => {
+  const ukiEnabled = useDexSetting('ukiEnabled', true);
   // Mount guard for async operations
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
@@ -4841,8 +4843,8 @@ export const AppManager: React.FC = () => {
 
       {/* System Status Bar -- hidden by default for fullscreen experience */}
 
-      {/* UKI Voice Assistant Transcript Overlay */}
-      <UkiOverlay />
+      {/* UKI Voice Assistant Transcript Overlay (Settings > UKI > Enable UKI) */}
+      {ukiEnabled && <UkiOverlay />}
       <AskUkiSelection />
 
       {/* FancyZones-style custom snap-zone editor (opens on dex-open-zone-editor) */}

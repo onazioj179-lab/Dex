@@ -620,6 +620,11 @@ const CenterCard: React.FC<{
   return (
     <div
       onClick={() => onMarkAsRead?.(n.id)}
+      // Keyboard parity: reachable with Tab, Enter/Space marks it read.
+      role="button"
+      tabIndex={0}
+      aria-label={`${n.title}${n.read ? '' : ' (unread)'} — mark as read`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMarkAsRead?.(n.id); } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

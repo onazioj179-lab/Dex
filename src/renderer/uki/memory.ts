@@ -79,13 +79,41 @@ function enforceWorkflowCap(list: UkiWorkflowRecord[]): UkiWorkflowRecord[] {
 
 // ---------- turns ----------
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Settings > UKI & Memory, read live so a change applies to the very next turn.
+ * These toggles used to be read by nothing: turning "Memory Recording" off did
+ * not stop UKI (or the knowledge feeder) from storing conversations, and the
+ * retention period was never applied.
+ */
+export function ukiMemoryPrefs(): { record: boolean; retentionMs: number | null } {
+  try {
+    const s = JSON.parse(localStorage.getItem('dex-settings') || '{}');
+    const days = Number(s.ukiRetentionDays);
+    return {
+      record: s.ukiMemoryEnabled !== false,
+      retentionMs: s.ukiAutoCleanup === false ? null : (Number.isFinite(days) && days > 0 ? days : 30) * DAY_MS,
+    };
+  } catch {
+    return { record: true, retentionMs: 30 * DAY_MS };
+  }
+}
+
+/** Drop turns older than the retention window (null = keep everything). */
+export function applyRetention<T extends { ts: number }>(list: T[], retentionMs: number | null, now = Date.now()): T[] {
+  return retentionMs == null ? list : list.filter((t) => now - t.ts <= retentionMs);
+}
+
 export async function recordTurn(
   user: string,
   ukiResponse: string,
   extras: Partial<UkiTurnRecord> = {}
 ): Promise<UkiTurnRecord> {
   const turn = freshTurn(user, ukiResponse, extras);
-  const list = (await readTurns()).concat(turn).slice(-MAX_TURNS);
+  const prefs = ukiMemoryPrefs();
+  if (!prefs.record) return turn; // Memory Recording off: nothing is stored
+  const list = applyRetention((await readTurns()).concat(turn), prefs.retentionMs).slice(-MAX_TURNS);
   await cache.setAsync(TURNS_KEY, list, { encrypted: true });
   // Lazy cold-tier handoff: let ./compressedMemory evict older warm turns into
   // gzip archives once the rolling window is full enough. This is the single
@@ -99,7 +127,8 @@ export async function recordTurn(
 
 export async function readTurns(): Promise<UkiTurnRecord[]> {
   const raw = (await cache.getAsync<UkiTurnRecord[]>(TURNS_KEY)) ?? [];
-  return raw.map((r) => migrate(r));
+  // Expired turns are never recalled, even before the next write prunes them.
+  return applyRetention(raw.map((r) => migrate(r)), ukiMemoryPrefs().retentionMs);
 }
 
 export async function clearTurns(): Promise<void> {

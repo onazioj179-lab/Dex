@@ -2117,7 +2117,10 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                 if let Some(p) = args.get(0) {
                     let title = p.get("title").and_then(|v| v.as_str()).unwrap_or("");
                     let body = p.get("body").and_then(|v| v.as_str()).unwrap_or("");
-                    if !title.is_empty() || !body.is_empty() {
+                    // `osToast: false` = the user turned "Allow Notifications" off:
+                    // keep the record in the center, skip the Windows toast.
+                    let os_toast = p.get("osToast").and_then(|v| v.as_bool()).unwrap_or(true);
+                    if os_toast && (!title.is_empty() || !body.is_empty()) {
                         native_ops::notify(&app, title, body);
                     }
                 }
