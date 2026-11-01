@@ -229,7 +229,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 3,
+    borderRadius: 4,
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
@@ -1291,7 +1291,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               title="Editor font family"
               value={fontFamily}
               onChange={e => setEditorFont(e.target.value)}
-              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+              style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
             >
               {NOTE_FONTS.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
             </select>
@@ -1300,7 +1300,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               title="Font size"
               value={fontSize}
               onChange={e => setEditorSize(Number(e.target.value))}
-              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+              style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
             >
               {NOTE_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
             </select>

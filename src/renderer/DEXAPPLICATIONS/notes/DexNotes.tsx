@@ -981,7 +981,7 @@ const DexNotes: React.FC = () => {
                           style={{
                             display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
                             fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                            padding: '2px 8px', borderRadius: 8,
+                            padding: '2px 8px', borderRadius: 10,
                             border: `1px solid ${on ? '#64d2ff' : 'var(--color-border-subtle)'}`,
                             background: on ? 'rgba(100,210,255,0.18)' : 'transparent',
                             color: on ? '#64d2ff' : 'var(--color-text-tertiary)',
@@ -1260,7 +1260,7 @@ const DexNotes: React.FC = () => {
             style={{
               background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 3,
+              borderRadius: 4,
               color: 'var(--color-text-tertiary)',
               cursor: 'pointer',
               fontSize: 11,
@@ -1324,7 +1324,7 @@ const DexNotes: React.FC = () => {
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 'var(--z-notification)', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px var(--space-4)', borderRadius: 8,
+          padding: '10px var(--space-4)', borderRadius: 10,
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-panel)',

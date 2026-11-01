@@ -35,7 +35,7 @@ function whenLabel(ts: number | null | undefined): string {
 
 const chip: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px',
-  borderRadius: 999, fontSize: 11, fontWeight: 600,
+  borderRadius: 9999, fontSize: 11, fontWeight: 600,
   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
   color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
 };
@@ -137,7 +137,7 @@ const ScheduledTasksPanel: React.FC = () => {
         />
         <button
           onClick={submit} disabled={!canAdd} aria-label="Add scheduled task"
-          style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 999,
+          style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 9999,
             border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.35))',
             background: canAdd ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'var(--color-bg-hover)',
             color: canAdd ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
@@ -155,9 +155,9 @@ const ScheduledTasksPanel: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {sorted.map(t => (
-            <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '7px 10px', borderRadius: 8, fontWeight: 400 }}>
+            <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '7px 10px', borderRadius: 10, fontWeight: 400 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: 999, flexShrink: 0,
+                <span style={{ width: 6, height: 6, borderRadius: 9999, flexShrink: 0,
                   background: !t.enabled ? 'var(--color-text-tertiary)'
                     : t.lastOutcome === 'error' ? 'var(--color-error, #ff453a)'
                     : t.lastOutcome === 'ok' ? 'var(--color-success, #32d74b)'

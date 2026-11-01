@@ -207,7 +207,7 @@ const CardDetail: React.FC<{
           <label style={modalStyles.label}>Labels</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 'var(--space-2)' }}>
             {labels.map((l, i) => (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', borderRadius: 3, fontSize: 11, fontWeight: 600, background: `${l.color}20`, color: l.color }}>
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', borderRadius: 4, fontSize: 11, fontWeight: 600, background: `${l.color}20`, color: l.color }}>
                 {l.text}
                 <button style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }} onClick={() => setLabels(labels.filter((_, j) => j !== i))} aria-label={`Remove label ${l.text}`}>{Icons.x}</button>
               </span>
@@ -217,7 +217,7 @@ const CardDetail: React.FC<{
             <input style={{ ...modalStyles.input, flex: 1 }} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="New label" onKeyDown={e => e.key === 'Enter' && addLabel()} />
             <div style={{ display: 'flex', gap: 2 }}>
               {LABEL_COLORS.map(c => (
-                <button key={c} onClick={() => setLabelColor(c)} aria-label={`Select label color ${c}`} style={{ width: 20, height: 20, borderRadius: 3, border: labelColor === c ? '2px solid #fff' : '1px solid transparent', background: c, cursor: 'pointer' }} />
+                <button key={c} onClick={() => setLabelColor(c)} aria-label={`Select label color ${c}`} style={{ width: 20, height: 20, borderRadius: 4, border: labelColor === c ? '2px solid #fff' : '1px solid transparent', background: c, cursor: 'pointer' }} />
               ))}
             </div>
             <button className="kanban-btn" style={modalStyles.addBtn} onClick={addLabel} aria-label="Add label">Add</button>
@@ -251,7 +251,7 @@ const CardDetail: React.FC<{
 
 const modalStyles: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' },
-  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))' },
   headerTitle: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 4 },
@@ -705,7 +705,7 @@ const KanbanApp: React.FC = () => {
                         // Only hex colors can take an alpha suffix; var() tokens cannot.
                         const tint = pc.color.startsWith('#') ? `${pc.color}1f` : 'rgba(255,59,48,0.12)';
                         return (
-                          <span style={{ ...styles.priorityBadge, color: pc.color, ...(emphasized ? { background: tint, padding: '1px 6px', borderRadius: 999 } : null) }}>
+                          <span style={{ ...styles.priorityBadge, color: pc.color, ...(emphasized ? { background: tint, padding: '1px 6px', borderRadius: 9999 } : null) }}>
                             {Icons.flag} {pc.label}
                           </span>
                         );
@@ -818,11 +818,11 @@ const styles: Record<string, React.CSSProperties> = {
   controlHint: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', opacity: 0.7, marginLeft: 'auto' },
   dropLine: { height: 2, borderRadius: 2, margin: '1px 4px', background: 'var(--color-accent)', boxShadow: '0 0 6px var(--color-accent)' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
-  column: { minWidth: 300, maxWidth: 340, borderRadius: 12, display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0 },
+  column: { minWidth: 300, maxWidth: 340, borderRadius: 14, display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0 },
   colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', borderRadius: '12px 12px 0 0' },
   colDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
   colTitle: { fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', flex: 1 },
-  colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'var(--color-border-subtle)', minWidth: 18, textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
+  colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600, padding: '1px 7px', borderRadius: 9999, background: 'var(--color-border-subtle)', minWidth: 18, textAlign: 'center', fontVariantNumeric: 'tabular-nums' },
   colCountAtLimit: { color: 'var(--color-warning)', background: 'rgba(255,159,10,0.14)' },
   colCountOver: { color: 'var(--color-error)', background: 'rgba(255,59,48,0.14)' },
   wipFull: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px dashed var(--color-warning)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, background: 'rgba(255,159,10,0.06)', margin: 2 },

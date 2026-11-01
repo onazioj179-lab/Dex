@@ -578,7 +578,7 @@ const ScreenRecorder: React.FC = () => {
               <div style={{
                 position: 'absolute', top: 12, left: 12,
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '4px 10px', borderRadius: 999,
+                padding: '4px 10px', borderRadius: 9999,
                 background: 'rgba(255,69,58,0.18)', border: '1px solid rgba(255,69,58,0.4)',
               }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-error)' }} />

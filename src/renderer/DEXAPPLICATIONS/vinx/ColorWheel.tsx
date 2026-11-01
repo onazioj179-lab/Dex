@@ -61,7 +61,7 @@ const readoutStyle: React.CSSProperties = {
 const readoutInputStyle: React.CSSProperties = {
   width: '100%', minWidth: 0, boxSizing: 'border-box',
   background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)',
-  borderRadius: 3, color: 'var(--color-text-secondary)',
+  borderRadius: 4, color: 'var(--color-text-secondary)',
   fontSize: 9, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
   padding: '1px 3px', textAlign: 'right', outline: 'none',
 };

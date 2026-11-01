@@ -152,7 +152,7 @@ export const Skeleton = memo(function Skeleton({
         return {
           width: width ?? '100%',
           height: height ?? 14,
-          borderRadius: 3,
+          borderRadius: 4,
         };
     }
   };

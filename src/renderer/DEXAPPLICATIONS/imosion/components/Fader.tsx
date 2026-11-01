@@ -97,10 +97,10 @@ export const Fader: React.FC<FaderProps> = ({ value, min, max, onChange, height 
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${((unity - min) / span) * 100}%`, height: 1, background: 'rgba(255,255,255,0.2)' }} />
         )}
         {/* fill */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 0, width: 6, height: `${pct}%`, background: `linear-gradient(to top, ${color}99, ${color})`, borderRadius: 3 }} />
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 0, width: 6, height: `${pct}%`, background: `linear-gradient(to top, ${color}99, ${color})`, borderRadius: 4 }} />
         {/* cap -- console-style fader knob: bevelled body, two grip ridges, and a
             glowing centre indicator line */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: `calc(${pct}% - 7px)`, width: 24, height: 14, background: 'linear-gradient(180deg,#52525c,#34343c 45%,#1a1a20)', borderRadius: 3, border: '1px solid #050507', boxShadow: '0 3px 6px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: `calc(${pct}% - 7px)`, width: 24, height: 14, background: 'linear-gradient(180deg,#52525c,#34343c 45%,#1a1a20)', borderRadius: 4, border: '1px solid #050507', boxShadow: '0 3px 6px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
           <div style={{ position: 'absolute', left: 3, right: 3, top: 3, height: 1, background: 'rgba(255,255,255,0.10)' }} />
           <div style={{ position: 'absolute', left: 3, right: 3, bottom: 3, height: 1, background: 'rgba(0,0,0,0.4)' }} />
           <div style={{ position: 'absolute', left: 2, right: 2, top: '50%', transform: 'translateY(-50%)', height: 2, background: color, opacity: 0.95, borderRadius: 1, boxShadow: `0 0 3px ${color}` }} />
@@ -108,7 +108,7 @@ export const Fader: React.FC<FaderProps> = ({ value, min, max, onChange, height 
       </div>
       {/* meter — live level written straight to the DOM via data-imosion-meter */}
       {(meter !== undefined || meterId) && (
-        <div style={{ position: 'relative', width: 6, flexShrink: 0, background: '#0a0a0c', borderRadius: 3, overflow: 'hidden', border: '1px solid #050507' }}>
+        <div style={{ position: 'relative', width: 6, flexShrink: 0, background: '#0a0a0c', borderRadius: 4, overflow: 'hidden', border: '1px solid #050507' }}>
           <div data-imosion-meter={meterId} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${meterPct}%`, background: meterColor, transition: 'height 0.05s linear', willChange: 'height' }} />
         </div>
       )}

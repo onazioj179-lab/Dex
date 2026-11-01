@@ -133,7 +133,7 @@ const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, 
 const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ onNext, onSkip }) => (
   <div style={{ textAlign: 'center', padding: '48px 0' }}>
     <div style={{
-      width: 80, height: 80, borderRadius: 16, margin: '0 auto 28px',
+      width: 80, height: 80, borderRadius: 18, margin: '0 auto 28px',
       background: 'linear-gradient(135deg, var(--color-accent, #3b82f6) 0%, var(--color-app-vinx, #8b5cf6) 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '0 8px 32px rgba(59, 130, 246, 0.25)',
@@ -191,7 +191,7 @@ const PolicyAcceptanceScreen: React.FC<{
                   {policy.title}
                 </span>
                 <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                   background: 'var(--color-accent-subtle, rgba(74,158,255,0.12))', color: 'var(--color-accent, #4A9EFF)',
                   letterSpacing: '0.04em', textTransform: 'uppercase',
                 }}>
@@ -491,7 +491,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           width: 'min(320px, calc(100vw - 48px))',
           background: 'var(--color-bg-elevated, #111111)',
           border: '1px solid var(--color-border-subtle)',
-          borderRadius: 8,
+          borderRadius: 10,
           overflow: 'hidden',
           boxShadow: 'var(--pg-shadow-popover)',
         }}
@@ -521,7 +521,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           {global.map(s => (
             <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
             </div>
           ))}
           {appShortcuts.length > 0 && (
@@ -532,7 +532,7 @@ export const KeyboardShortcutsPanel: React.FC<{
               {appShortcuts.map(s => (
                 <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
                 </div>
               ))}
             </>

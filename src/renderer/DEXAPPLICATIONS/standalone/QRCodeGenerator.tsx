@@ -752,17 +752,17 @@ const s: Record<string, React.CSSProperties> = {
   },
   inputArea: {},
   textarea: {
-    width: '100%', minHeight: 80, padding: '10px var(--space-3)', borderRadius: 12,
+    width: '100%', minHeight: 80, padding: '10px var(--space-3)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 14, resize: 'vertical',
     outline: 'none', fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   input: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 14, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   select: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 14, cursor: 'pointer',
     outline: 'none', fontFamily: 'var(--font-family)',
   },
@@ -770,11 +770,11 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'center', padding: 'var(--space-4)',
   },
   canvas: {
-    width: 240, height: 240, borderRadius: 12,
+    width: 240, height: 240, borderRadius: 14,
     border: '1px solid var(--color-border-subtle)',
   },
   placeholder: {
-    width: 240, height: 240, borderRadius: 12,
+    width: 240, height: 240, borderRadius: 14,
     border: '2px dashed var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center',
@@ -785,7 +785,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   actionBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: 'var(--space-2) var(--space-4)', borderRadius: 12, border: 'none',
+    padding: 'var(--space-2) var(--space-4)', borderRadius: 14, border: 'none',
     color: 'var(--color-text-primary)',
     fontSize: 13, fontWeight: 500, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -824,7 +824,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', gap: 2, padding: 2, borderRadius: 10,
   },
   segment: {
-    flex: 1, padding: '6px 0', borderRadius: 8, border: 'none',
+    flex: 1, padding: '6px 0', borderRadius: 10, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -857,7 +857,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   historyBadge: {
-    flexShrink: 0, width: 18, height: 18, borderRadius: 8,
+    flexShrink: 0, width: 18, height: 18, borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'var(--color-accent-light)', color: 'var(--color-accent)',
     fontSize: 11, fontWeight: 700,

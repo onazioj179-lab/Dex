@@ -125,7 +125,7 @@ const SketchOverlay: React.FC<Props> = ({ units, onCommitMesh, onClose }) => {
 
   const toolBtn = (t: SketchTool, label: string, icon: React.ReactNode) => (
     <button key={t} onClick={() => setTool(t)} aria-label={label}
-      style={{ width: 28, height: 28, borderRadius: 8, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: tool === t ? 'var(--color-accent-light)' : 'var(--color-bg-hover)', color: tool === t ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+      style={{ width: 28, height: 28, borderRadius: 10, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: tool === t ? 'var(--color-accent-light)' : 'var(--color-bg-hover)', color: tool === t ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
       {icon}
     </button>
   );
@@ -136,7 +136,7 @@ const SketchOverlay: React.FC<Props> = ({ units, onCommitMesh, onClose }) => {
         style={{ width: '100%', height: '100%', display: 'block', cursor: 'crosshair', touchAction: 'none' }} />
 
       {/* Sketch toolbar */}
-      <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 12, zIndex: 401 }}>
+      <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 14, zIndex: 401 }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>SKETCH</span>
         <div style={{ display: 'flex', gap: 3 }}>
           {toolBtn('line', 'Line', <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="19" x2="19" y2="5" /></svg>)}
@@ -147,15 +147,15 @@ const SketchOverlay: React.FC<Props> = ({ units, onCommitMesh, onClose }) => {
         <label style={{ fontSize: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
           Depth
           <input type="number" value={depth} min={1} onChange={e => setDepth(Math.max(1, Number(e.target.value) || 1))}
-            style={{ width: 54, padding: '3px 6px', fontSize: 11, borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
+            style={{ width: 54, padding: '3px 6px', fontSize: 11, borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
           <span style={{ color: 'var(--color-text-tertiary)' }}>{units}</span>
         </label>
         <button onClick={() => commit('extrude')} disabled={!hasProfile}
-          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 700, borderRadius: 8, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-accent)', color: '#fff' }}>Extrude</button>
+          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 700, borderRadius: 10, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-accent)', color: '#fff' }}>Extrude</button>
         <button onClick={() => commit('revolve')} disabled={!hasProfile}
-          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }}>Revolve</button>
+          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }}>Revolve</button>
         <button onClick={() => { setEnts([]); setDraft(null); }} aria-label="Clear sketch"
-          style={{ padding: '5px 9px', fontSize: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)' }}>Clear</button>
+          style={{ padding: '5px 9px', fontSize: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)' }}>Clear</button>
         <button onClick={onClose} aria-label="Close sketch" className="axl-close">&times;</button>
       </div>
 

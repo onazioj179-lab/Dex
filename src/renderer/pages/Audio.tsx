@@ -1964,7 +1964,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minHeight: '360px',
     margin: 'var(--space-6)',
-    borderRadius: '12px',
+    borderRadius: '14px',
     border: '2px dashed var(--color-border)',
     background: 'var(--color-bg-secondary)',
     cursor: 'pointer',
@@ -1992,7 +1992,7 @@ const styles: Record<string, React.CSSProperties> = {
   dropZoneBorder: {
     position: 'absolute',
     inset: 0,
-    borderRadius: '12px',
+    borderRadius: '14px',
     pointerEvents: 'none',
   },
   trackItem: {

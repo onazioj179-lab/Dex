@@ -551,7 +551,7 @@ const WorkflowNodeCard: React.FC<{
             boxShadow: selected ? '0 0 0 2px var(--color-accent-muted, rgba(10,132,255,0.25))' : 'none',
           }}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
             {catIcon}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -2134,7 +2134,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 'var(--space-4)', alignContent: 'start',
   },
   workflowCard: {
-    borderRadius: '12px', padding: 'var(--space-5)',
+    borderRadius: '14px', padding: 'var(--space-5)',
     display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },

@@ -1935,7 +1935,7 @@ const AXL: React.FC = () => {
 
           {/* ── Object Info Overlay (Blender N-panel style) ──────────── */}
           {selectedPart && (
-            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, left: 10, borderRadius: 12, padding: 'var(--space-2) 10px', fontSize: 10, zIndex: 10, minWidth: 140 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, left: 10, borderRadius: 14, padding: 'var(--space-2) 10px', fontSize: 10, zIndex: 10, minWidth: 140 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: selectedPart.color }} />
                 <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{selectedPart.name}</span>
@@ -1951,7 +1951,7 @@ const AXL: React.FC = () => {
 
           {/* Simulation results overlay */}
           {simResults && ui.showSimulation && (
-            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 12, padding: 'var(--space-3)', fontSize: 11, maxWidth: 320 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 14, padding: 'var(--space-3)', fontSize: 11, maxWidth: 320 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 6 }}>
                 {simType === 'stress' ? 'STRESS ANALYSIS' : simType === 'thermal' ? 'THERMAL ANALYSIS' : simType === 'modal' ? 'MODAL ANALYSIS' : simType === 'buckling' ? 'BUCKLING ANALYSIS' : 'MOTION STUDY'}
               </div>
@@ -1988,7 +1988,7 @@ const AXL: React.FC = () => {
                 {simType === 'stress' && simResults.feaSolved ? ` | ${simResults.elementCount ?? 0} FE elements (direct stiffness)` : ''}
               </div>
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 60, height: 6, borderRadius: 3, background: 'linear-gradient(to right, rgb(0,255,40), rgb(255,255,40), rgb(255,0,40))' }} />
+                <div style={{ width: 60, height: 6, borderRadius: 4, background: 'linear-gradient(to right, rgb(0,255,40), rgb(255,255,40), rgb(255,0,40))' }} />
                 <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>Low \u2192 High</span>
               </div>
               {/* Per-part stress breakdown */}
@@ -2025,7 +2025,7 @@ const AXL: React.FC = () => {
 
           {/* Simulation controls */}
           {ui.showSimulation && !simResults && (
-            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 12, padding: 'var(--space-3)', fontSize: 11, width: 260 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: 10, borderRadius: 14, padding: 'var(--space-3)', fontSize: 11, width: 260 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 'var(--space-2)' }}>SIMULATION</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
@@ -2091,7 +2091,7 @@ const AXL: React.FC = () => {
 
           {/* Measurement Readout Panel */}
           {tool === 'measure' && project.measurements.length > 0 && (
-            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 250, borderRadius: 12, padding: 10, fontSize: 10, maxWidth: 220, maxHeight: 200, overflowY: 'auto', zIndex: 10 }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 250, borderRadius: 14, padding: 10, fontSize: 10, maxWidth: 220, maxHeight: 200, overflowY: 'auto', zIndex: 10 }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.8px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFD60A" strokeWidth="2"><path d="M2 12h5l2-9 4 18 3-9h6"/></svg>
                 MEASUREMENTS ({project.measurements.length})
@@ -2111,7 +2111,7 @@ const AXL: React.FC = () => {
 
           {/* Toast */}
           {ui.toastMsg && (
-            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', borderRadius: 12, padding: '6px var(--space-4)', fontSize: 11, color: 'var(--color-text-primary)', animation: 'dex-snap-in 0.2s ease-out' }}>
+            <div className="dex-axl-panel-strong" style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', borderRadius: 14, padding: '6px var(--space-4)', fontSize: 11, color: 'var(--color-text-primary)', animation: 'dex-snap-in 0.2s ease-out' }}>
               {ui.toastMsg}
             </div>
           )}
@@ -2407,7 +2407,7 @@ const AXL: React.FC = () => {
                   const pa = project.assembly.parts.find(p => p.id === c.partA);
                   const pb = project.assembly.parts.find(p => p.id === c.partB);
                   return (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px var(--space-2)', fontSize: 10, color: 'var(--color-text-secondary)', borderRadius: 8, background: 'var(--color-border-subtle)' }}>
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px var(--space-2)', fontSize: 10, color: 'var(--color-text-secondary)', borderRadius: 10, background: 'var(--color-border-subtle)' }}>
                       <span style={{ color: c.satisfied ? 'var(--color-success)' : 'var(--color-warning)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase' }}>{c.type}</span>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pa?.name || '?'} ↔ {pb?.name || '?'}{c.value ? ` (${c.value}${project.units})` : ''}</span>
                       <button aria-label={`Remove ${c.type} constraint`} onClick={() => pStore.removeConstraint(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
@@ -2437,7 +2437,7 @@ const AXL: React.FC = () => {
                 { id: 'section' as const, label: 'Section' },
               ]).map(t => (
                 <button key={t.id} onClick={() => ui.setInspectorTab(t.id)}
-                  style={{ flex: 1, padding: '4px 6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, transition: 'all 0.12s', background: ui.inspectorTab === t.id ? 'var(--color-accent-light)' : 'transparent', color: ui.inspectorTab === t.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
+                  style={{ flex: 1, padding: '4px 6px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, transition: 'all 0.12s', background: ui.inspectorTab === t.id ? 'var(--color-accent-light)' : 'transparent', color: ui.inspectorTab === t.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
                   {t.label}
                 </button>
               ))}
@@ -2453,14 +2453,14 @@ const AXL: React.FC = () => {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <input value={newConfigName} onChange={e => setNewConfigName(e.target.value)} placeholder="Configuration name"
                       onKeyDown={e => { if (e.key === 'Enter') saveCurrentConfig(); }}
-                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
-                    <button onClick={saveCurrentConfig} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Capture</button>
+                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
+                    <button onClick={saveCurrentConfig} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Capture</button>
                   </div>
                   {project.configurations.length === 0 && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No configurations yet</div>
                   )}
                   {project.configurations.map(cfg => (
-                    <div key={cfg.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 8, background: cfg.id === project.activeConfigId ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', border: cfg.id === project.activeConfigId ? '1px solid var(--color-accent-muted)' : '1px solid transparent' }}>
+                    <div key={cfg.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 10, background: cfg.id === project.activeConfigId ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', border: cfg.id === project.activeConfigId ? '1px solid var(--color-accent-muted)' : '1px solid transparent' }}>
                       <button onClick={() => pStore.applyConfiguration(cfg.id)} title="Apply configuration" style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {cfg.id === project.activeConfigId ? '● ' : ''}{cfg.name}
                         <span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>{cfg.parts.length} parts</span>
@@ -2482,14 +2482,14 @@ const AXL: React.FC = () => {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <input value={newViewName} onChange={e => setNewViewName(e.target.value)} placeholder="View name"
                       onKeyDown={e => { if (e.key === 'Enter') saveCurrentView(); }}
-                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
-                    <button onClick={saveCurrentView} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Save View</button>
+                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
+                    <button onClick={saveCurrentView} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Save View</button>
                   </div>
                   {project.namedViews.length === 0 && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No saved views yet</div>
                   )}
                   {project.namedViews.map(v => (
-                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 8, background: 'var(--color-border-subtle)' }}>
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 10, background: 'var(--color-border-subtle)' }}>
                       <button onClick={() => applyNamedView(v)} title="Go to view" style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {v.name}
                         <span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{v.viewMode} · Az {v.azimuth.toFixed(0)}° El {v.elevation.toFixed(0)}°</span>
@@ -2511,9 +2511,9 @@ const AXL: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <label style={{ fontSize: 10, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Min clearance</label>
                     <input type="number" value={clearanceGap} min={0} step={1} onChange={e => setClearanceGap(Math.max(0, Number(e.target.value) || 0))}
-                      style={{ width: 64, padding: '5px 6px', fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }} />
+                      style={{ width: 64, padding: '5px 6px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }} />
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{project.units}</span>
-                    <button onClick={runInterferenceCheck} style={{ marginLeft: 'auto', padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Run Check</button>
+                    <button onClick={runInterferenceCheck} style={{ marginLeft: 'auto', padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Run Check</button>
                   </div>
                   {interferenceResults === null && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>Run a check to see results</div>
@@ -2525,7 +2525,7 @@ const AXL: React.FC = () => {
                     const isHit = pair.status === 'interference';
                     const col = isHit ? 'var(--color-error)' : 'var(--color-warning)';
                     return (
-                      <div key={`${pair.partAId}-${pair.partBId}-${i}`} onClick={() => vStore.setSelectedPartId(pair.partAId)} style={{ cursor: 'pointer', padding: '6px var(--space-2)', borderRadius: 8, background: 'var(--color-border-subtle)', borderLeft: `2px solid ${col}` }}>
+                      <div key={`${pair.partAId}-${pair.partBId}-${i}`} onClick={() => vStore.setSelectedPartId(pair.partAId)} style={{ cursor: 'pointer', padding: '6px var(--space-2)', borderRadius: 10, background: 'var(--color-border-subtle)', borderLeft: `2px solid ${col}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: col }}>{isHit ? 'Interfere' : 'Clearance'}</span>
                           <span style={{ flex: 1, fontSize: 10, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pair.partAName} ↔ {pair.partBName}</span>
@@ -2556,7 +2556,7 @@ const AXL: React.FC = () => {
                     <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 36 }}>Axis</span>
                     {(['x', 'y', 'z'] as const).map(ax => (
                       <button key={ax} disabled={!section.enabled} onClick={() => setSection(s => ({ ...s, axis: ax }))}
-                        style={{ flex: 1, padding: '5px 0', borderRadius: 8, border: 'none', cursor: section.enabled ? 'pointer' : 'default', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', opacity: section.enabled ? 1 : 0.4, background: section.axis === ax ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: section.axis === ax ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{ax}</button>
+                        style={{ flex: 1, padding: '5px 0', borderRadius: 10, border: 'none', cursor: section.enabled ? 'pointer' : 'default', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', opacity: section.enabled ? 1 : 0.4, background: section.axis === ax ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: section.axis === ax ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{ax}</button>
                     ))}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2825,10 +2825,10 @@ const AXL: React.FC = () => {
         const left = Math.max(4, Math.min(ctxMenu.x, window.innerWidth - MENU_W - 4));
         const top = Math.max(4, Math.min(ctxMenu.y, window.innerHeight - estHeight - 4));
         return (
-          <div className="dex-axl-panel-strong" style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', width: MENU_W, borderRadius: 12, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-axl-panel-strong" style={{ position: 'fixed', left, top, zIndex: 'var(--z-max)', width: MENU_W, borderRadius: 14, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
-              : <div key={i} className="axl-ctx-item" onClick={() => { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); }} style={{ padding: '6px 14px', fontSize: 11, color: (item as any).danger ? 'var(--color-error)' : '#e0e0e0', cursor: 'pointer', borderRadius: 8, margin: '0 4px' }}>{item.label}</div>
+              : <div key={i} className="axl-ctx-item" onClick={() => { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); }} style={{ padding: '6px 14px', fontSize: 11, color: (item as any).danger ? 'var(--color-error)' : '#e0e0e0', cursor: 'pointer', borderRadius: 10, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

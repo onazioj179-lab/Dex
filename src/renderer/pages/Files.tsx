@@ -1985,8 +1985,8 @@ export const Files: React.FC = () => {
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
                   <div style={{ width: 28, height: 28, borderRadius: 4, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, height: 12, borderRadius: 3, background: 'var(--color-bg-hover)' }} />
-                  <div style={{ width: 60, height: 10, borderRadius: 3, background: 'var(--color-border-subtle)' }} />
+                  <div style={{ flex: 1, height: 12, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
+                  <div style={{ width: 60, height: 10, borderRadius: 4, background: 'var(--color-border-subtle)' }} />
                 </div>
               ))}
               <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
@@ -2066,7 +2066,7 @@ export const Files: React.FC = () => {
                           else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                         }}
                         aria-label={`Rename ${file.name}`}
-                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
+                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
                       />
                     ) : (
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={file.name}>{file.name}</span>
@@ -2207,7 +2207,7 @@ export const Files: React.FC = () => {
                         else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                       }}
                       aria-label={`Rename ${file.name}`}
-                      style={{ width: '90%', padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
+                      style={{ width: '90%', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
                     />
                   ) : (
                     <span style={styles.gridLabel}>{file.name}</span>
@@ -2590,7 +2590,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     padding: 'var(--space-2) var(--space-3)',
     width: '240px',
@@ -2606,7 +2606,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewToggle: {
     display: 'flex',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     padding: '2px',
   },
@@ -2766,7 +2766,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
     background: 'var(--color-bg-hover)',
     padding: '2px 6px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '10px',
     color: 'var(--color-text-secondary)',
   },

@@ -304,7 +304,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); retryTask(task.id); }}
               aria-label={`Retry task ${task.name}`}
-              style={{ background: 'none', border: '1px solid var(--color-error)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid var(--color-error)', borderRadius: '4px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Retry
             </button>
@@ -312,7 +312,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); cancelTask(task.id); }}
               aria-label={`Cancel task ${task.name}`}
-              style={{ background: 'none', border: '1px solid var(--color-border, #3a3a3c)', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid var(--color-border, #3a3a3c)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Cancel
             </button>

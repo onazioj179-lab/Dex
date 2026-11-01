@@ -318,7 +318,7 @@ const KeyboardShortcuts: React.FC = () => {
               Show on holding Ctrl
             </label>
             <span>
-              Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
+              Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
             </span>
           </div>
         )}

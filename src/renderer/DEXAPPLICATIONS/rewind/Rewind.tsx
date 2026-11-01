@@ -1484,7 +1484,7 @@ const Rewind: React.FC = () => {
           flexShrink: 0,
         }}>
           {/* Mini tab strip - iOS segmented control style */}
-          <div style={{ display: 'flex', gap: 1, background: 'var(--color-surface-1)', borderRadius: 3, padding: 2, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 1, background: 'var(--color-surface-1)', borderRadius: 4, padding: 2, flexShrink: 0 }}>
             {(['timeline', 'search'] as const).map(t => (
               <button
                 key={t}
@@ -1527,7 +1527,7 @@ const Rewind: React.FC = () => {
                   style={{
                     ...S.filterBtn,
                     padding: 'var(--space-2) 14px',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     fontSize: 12,
                     ...(filterType === t ? { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', color: 'var(--color-text-primary)' } : {}),
                   }}
@@ -1651,7 +1651,7 @@ const Rewind: React.FC = () => {
                       flex: '1 1 80px',
                       background: 'var(--bg-surface, #121215)',
                       border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
-                      borderRadius: 8,
+                      borderRadius: 10,
                       padding: '10px 14px',
                       minWidth: 80,
                     }}>
@@ -1664,7 +1664,7 @@ const Rewind: React.FC = () => {
                       flex: '1 1 80px',
                       background: 'var(--bg-surface, #121215)',
                       border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
-                      borderRadius: 8,
+                      borderRadius: 10,
                       padding: '10px 14px',
                       minWidth: 80,
                     }}>
@@ -2206,7 +2206,7 @@ const Rewind: React.FC = () => {
                 </span>
               )}
               <span style={{
-                fontSize: 10, padding: '2px 6px', borderRadius: 3,
+                fontSize: 10, padding: '2px 6px', borderRadius: 4,
                 background: `${moodInfo.color}18`, color: moodInfo.color, fontWeight: 500,
               }}>
                 {moodInfo.label}
@@ -2222,7 +2222,7 @@ const Rewind: React.FC = () => {
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                 {entry.tags.map(tag => (
                   <span key={tag} style={{
-                    fontSize: 10, padding: '2px 6px', borderRadius: 3,
+                    fontSize: 10, padding: '2px 6px', borderRadius: 4,
                     background: 'var(--color-surface-2)', color: 'var(--text-muted, #71717a)',
                   }}>
                     {tag}
@@ -2481,7 +2481,7 @@ const Rewind: React.FC = () => {
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{item.label}</div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {[preset.background, preset.surface, preset.accent, preset.text, preset.muted].map((c, i) => (
-                      <span key={i} style={{ width: 14, height: 14, borderRadius: 3, background: c, border: '1px solid rgba(0,0,0,0.2)' }} />
+                      <span key={i} style={{ width: 14, height: 14, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,0.2)' }} />
                     ))}
                   </div>
                 </button>
@@ -2760,7 +2760,7 @@ const Rewind: React.FC = () => {
               {auditLog.map((entry: { id?: string; action?: string; timestamp?: number; detail?: string; user?: string }, idx: number) => (
                 <div key={entry.id || idx} style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                  padding: '4px var(--space-2)', borderRadius: 3,
+                  padding: '4px var(--space-2)', borderRadius: 4,
                   background: 'var(--color-surface-1)',
                   fontSize: 11,
                 }}>
@@ -2805,7 +2805,7 @@ const Rewind: React.FC = () => {
 const statusCardStyle: React.CSSProperties = {
   background: 'var(--color-surface-1)',
   border: '1px solid var(--color-border)',
-  borderRadius: 8,
+  borderRadius: 10,
   padding: '14px var(--space-4)',
   display: 'flex',
   flexDirection: 'column',
@@ -2883,7 +2883,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   tabBtn: {
     padding: '4px 10px',
-    borderRadius: 3,
+    borderRadius: 4,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-tertiary)',
@@ -3080,7 +3080,7 @@ const S: Record<string, React.CSSProperties> = {
   filterBtn: {
     background: 'var(--color-surface-2)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     padding: '5px 10px',
@@ -3162,7 +3162,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'var(--color-surface-1)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 3,
+    borderRadius: 4,
     outline: 'none',
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
     fontSize: 12,
@@ -3171,7 +3171,7 @@ const S: Record<string, React.CSSProperties> = {
   searchBtn: {
     background: 'var(--color-accent-light, rgba(74,158,255,0.16))',
     border: '1px solid var(--color-accent-muted, rgba(74,158,255,0.38))',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))',
     cursor: 'pointer',
     padding: '6px 14px',
@@ -3183,7 +3183,7 @@ const S: Record<string, React.CSSProperties> = {
   headerBtn: {
     background: 'var(--color-surface-2)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
     cursor: 'pointer',
     padding: '3px 6px',

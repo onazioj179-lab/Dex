@@ -83,7 +83,7 @@ const AskUkiSelection: React.FC = () => {
       style={{
         position: 'fixed', left, top, zIndex: 2147483000,
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', borderRadius: 8,
+        padding: '6px 10px', borderRadius: 10,
         background: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer',
         fontSize: 12, fontWeight: 600, fontFamily: 'var(--dex-font-ui)',
         boxShadow: '0 6px 18px rgba(0,0,0,0.4)',

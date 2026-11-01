@@ -193,7 +193,7 @@ export function RecognitionPill({ publisher, compact }: { publisher?: PublisherP
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
         padding: compact ? '1px 6px' : '2px 8px',
-        borderRadius: 999, background: tint.bg, border: `1px solid ${tint.bd}`,
+        borderRadius: 9999, background: tint.bg, border: `1px solid ${tint.bd}`,
         color: tint.fg, fontSize: compact ? 10 : 11, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
       }}
     >
@@ -207,7 +207,7 @@ export function StateBadge({ kind }: { kind: 'installed' | 'soon' }): React.Reac
   const installed = kind === 'installed';
   return (
     <span style={{
-      padding: '2px 7px', borderRadius: 999, fontSize: 10.5, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
+      padding: '2px 7px', borderRadius: 9999, fontSize: 10.5, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
       background: installed ? 'rgba(48,209,88,0.12)' : 'rgba(10,132,255,0.12)',
       border: `1px solid ${installed ? 'rgba(48,209,88,0.28)' : 'rgba(10,132,255,0.28)'}`,
       color: installed ? 'var(--color-success)' : 'var(--color-accent)',

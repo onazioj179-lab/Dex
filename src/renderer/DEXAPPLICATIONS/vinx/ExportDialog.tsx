@@ -55,7 +55,7 @@ const presetGridStyle: React.CSSProperties = {
 };
 
 const presetCardStyle = (selected: boolean): React.CSSProperties => ({
-  padding: 'var(--space-2)', borderRadius: 3, cursor: 'pointer',
+  padding: 'var(--space-2)', borderRadius: 4, cursor: 'pointer',
   border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-bg-hover)'}`,
   background: selected ? 'rgba(74,158,255,0.08)' : 'var(--color-border-subtle)',
 });

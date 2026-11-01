@@ -433,7 +433,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'transparent',
     border: '1px solid var(--color-border, var(--color-text-tertiary))',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--color-text-secondary, #999)',
     cursor: 'pointer',
   },

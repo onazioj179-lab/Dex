@@ -54,7 +54,7 @@ const ProjectSpacesSection: React.FC<{ btn: React.CSSProperties }> = memo(({ btn
             key={s.id}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-              padding: '10px var(--space-3)', borderRadius: 8,
+              padding: '10px var(--space-3)', borderRadius: 10,
               background: 'var(--color-bg-hover)',
               border: `1px solid ${isActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
             }}
@@ -196,7 +196,7 @@ const WorkspacePresetsPanel: React.FC = () => {
               key={t.id}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-                padding: '10px var(--space-3)', borderRadius: 8,
+                padding: '10px var(--space-3)', borderRadius: 10,
                 background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               }}
             >
@@ -218,7 +218,7 @@ const WorkspacePresetsPanel: React.FC = () => {
                 key={p.id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-                  padding: '10px var(--space-3)', borderRadius: 8,
+                  padding: '10px var(--space-3)', borderRadius: 10,
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
                 }}
               >
@@ -255,7 +255,7 @@ const WorkspacePresetsPanel: React.FC = () => {
         </div>
 
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-          Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
+          Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
         </div>
       </div>
     </div>

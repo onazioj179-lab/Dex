@@ -220,7 +220,7 @@ const ZoneEditor: React.FC = () => {
   // minHeight/minWidth 24 keep every button a WCAG 2.2 SC 2.5.8 (>=24x24) target,
   // including the compact action buttons that override padding.
   const btn: React.CSSProperties = {
-    padding: '6px 10px', borderRadius: 8, border, background: 'var(--color-bg-hover, rgba(255,255,255,0.05))',
+    padding: '6px 10px', borderRadius: 10, border, background: 'var(--color-bg-hover, rgba(255,255,255,0.05))',
     color: textPrimary, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--dex-font-ui, inherit)',
     minHeight: 24, minWidth: 24, boxSizing: 'border-box',
   };
@@ -331,7 +331,7 @@ const ZoneEditor: React.FC = () => {
               )}
               {layouts.map(l => (
                 <div key={l.id} style={{
-                  border, borderRadius: 8, padding: 8,
+                  border, borderRadius: 10, padding: 8,
                   background: l.id === activeLayoutId ? 'rgba(74,158,255,0.12)' : 'transparent',
                 }}>
                   <div style={{ fontSize: 12, color: textPrimary, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -357,7 +357,7 @@ const ZoneEditor: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             placeholder="Layout name"
             style={{
-              flex: 1, padding: '7px 10px', borderRadius: 8, border,
+              flex: 1, padding: '7px 10px', borderRadius: 10, border,
               background: 'var(--color-bg-base, #0a0a0c)', color: textPrimary, fontSize: 13,
               fontFamily: 'var(--dex-font-ui, inherit)',
             }}

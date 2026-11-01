@@ -59,7 +59,7 @@ const listItemStyle = (selected: boolean): React.CSSProperties => ({
 const gridItemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 4, cursor: 'pointer',
   background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
-  borderRadius: 3, width: 80,
+  borderRadius: 4, width: 80,
 });
 
 const thumbnailStyle: React.CSSProperties = {
