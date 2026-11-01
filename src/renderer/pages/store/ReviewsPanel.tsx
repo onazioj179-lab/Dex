@@ -117,8 +117,8 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
               <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ width: 12, textAlign: 'right', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{r}</span>
                 <DexIcon name="star" size={11} color={STAR_GOLD} />
-                <span style={{ flex: 1, height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: STAR_GOLD, borderRadius: 999, transition: 'width 240ms ease' }} />
+                <span style={{ flex: 1, height: 7, borderRadius: 9999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: STAR_GOLD, borderRadius: 9999, transition: 'width 240ms ease' }} />
                 </span>
                 <span style={{ width: 24, textAlign: 'right', fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{c}</span>
               </div>

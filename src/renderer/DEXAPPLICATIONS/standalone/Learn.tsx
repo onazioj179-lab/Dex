@@ -335,7 +335,7 @@ const STAT_ROW: React.CSSProperties = {
 };
 const PEAK_PILL: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+  padding: '6px 12px', borderRadius: 10, fontSize: 13, fontWeight: 500,
   background: 'var(--color-accent-soft, rgba(94,92,230,0.18))',
   color: 'var(--color-accent)',
 };
@@ -755,7 +755,7 @@ const Learn: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 38, height: 38, borderRadius: 8,
+              width: 38, height: 38, borderRadius: 10,
               background: 'linear-gradient(135deg, #5e5ce6, #7d7aff)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -875,7 +875,7 @@ const Learn: React.FC = () => {
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</div>
                       <div style={{ fontSize: 11, opacity: 0.45 }}>{s.reason}</div>
                     </div>
-                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'var(--color-bg-hover, rgba(255,255,255,.04))', borderRadius: 3 }}>{s.type}</div>
+                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'var(--color-bg-hover, rgba(255,255,255,.04))', borderRadius: 4 }}>{s.type}</div>
                   </div>
                 ))}
               </div>
@@ -971,7 +971,7 @@ const Learn: React.FC = () => {
                             borderRadius: 'var(--radius-lg)', border: `1px solid ${mod.color}55`, background: `${mod.color}12`, color: 'inherit',
                           }}
                         >
-                          <div style={{ width: 34, height: 34, borderRadius: 8, background: `${mod.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: `${mod.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <DexIcon name="play" size={16} color={mod.color} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1019,8 +1019,8 @@ const Learn: React.FC = () => {
 
                       {/* Overall progress bar for the module */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--space-3)' }}>
-                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden' }}>
-                          <div style={{ width: `${mp.pct}%`, height: '100%', borderRadius: 3, background: mod.color, transition: 'width .25s ease' }} />
+                        <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden' }}>
+                          <div style={{ width: `${mp.pct}%`, height: '100%', borderRadius: 4, background: mod.color, transition: 'width .25s ease' }} />
                         </div>
                         <span style={{ fontSize: 11, opacity: 0.5, minWidth: 64, textAlign: 'right' as const }}>{mp.done}/{mp.total} · {mp.pct}%</span>
                       </div>
@@ -1255,7 +1255,7 @@ const Learn: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</span>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
                       <span style={{ fontSize: 10, opacity: 0.4, marginLeft: 'auto' }}>{Math.round(s.confidence * 100)}%</span>
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.5 }}>{s.reason}</div>

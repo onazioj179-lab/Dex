@@ -883,7 +883,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
                 <span
                   title={`Exit code ${badge}`}
                   style={{
-                    flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '0 6px', borderRadius: 8,
+                    flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '0 6px', borderRadius: 10,
                     background: badge === 0 ? 'rgba(61,166,106,0.18)' : 'rgba(255,95,95,0.18)',
                     color: badge === 0 ? '#5fd38a' : '#ff8a8a',
                     border: `1px solid ${badge === 0 ? 'rgba(61,166,106,0.4)' : 'rgba(255,95,95,0.4)'}`,

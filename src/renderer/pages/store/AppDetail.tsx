@@ -157,7 +157,7 @@ export default function AppDetail({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12.5, fontWeight: 700 }}>{cap.title}</span>
                     {cap.sensitive && (
-                      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', padding: '1px 6px', borderRadius: 999, color: STAR_AMBER, background: 'rgba(255,159,10,0.12)', border: '1px solid rgba(255,159,10,0.30)' }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', padding: '1px 6px', borderRadius: 9999, color: STAR_AMBER, background: 'rgba(255,159,10,0.12)', border: '1px solid rgba(255,159,10,0.30)' }}>
                         Sensitive
                       </span>
                     )}
@@ -318,7 +318,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   categoryPill: {
     padding: '4px 11px',
-    borderRadius: 999,
+    borderRadius: 9999,
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid var(--pg-border)',
     color: 'var(--color-text-secondary)',

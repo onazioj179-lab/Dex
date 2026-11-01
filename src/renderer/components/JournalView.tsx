@@ -212,7 +212,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 320,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 'var(--space-4)',
     zIndex: 100,
     boxShadow: 'var(--pg-shadow-popover)',
@@ -235,7 +235,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--color-text-primary)',
     outline: 'none',
   },
@@ -267,7 +267,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 3,
+    borderRadius: 4,
     color: 'var(--color-text-primary)',
     outline: 'none',
   },
@@ -651,7 +651,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       )}
 
       {lastResult && (
-        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 'var(--space-2)', padding: '4px var(--space-2)', background: 'var(--color-success-muted, rgba(48,209,88,0.08))', borderRadius: 3 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 'var(--space-2)', padding: '4px var(--space-2)', background: 'var(--color-success-muted, rgba(48,209,88,0.08))', borderRadius: 4 }}>
           {lastResult}
         </div>
       )}

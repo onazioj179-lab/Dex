@@ -1927,10 +1927,10 @@ const MixerChannel = memo<{
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 5px', borderRadius: 4, marginBottom: 2, background: p.enabled ? `${PLUGIN_LIBRARY[p.type].color}1f` : '#141417', opacity: p.enabled ? 1 : 0.45, cursor: 'grab' }}>
             <span style={{ color: 'var(--color-text-disabled)', fontSize: 8, lineHeight: 1 }}>⠿</span>
             <span style={{ fontSize: 8, color: PLUGIN_LIBRARY[p.type].color, fontWeight: 700, flex: 1 }}>{PLUGIN_LIBRARY[p.type].abbr}</span>
-            <button onClick={(e) => { e.stopPropagation(); onTogglePlugin(track.id, p.id); }} aria-label={p.enabled ? 'Bypass' : 'Enable'} style={{ width: 12, height: 12, borderRadius: 3, border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+            <button onClick={(e) => { e.stopPropagation(); onTogglePlugin(track.id, p.id); }} aria-label={p.enabled ? 'Bypass' : 'Enable'} style={{ width: 12, height: 12, borderRadius: 4, border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
           </div>
         ))}
-        <div onClick={(e) => { e.stopPropagation(); onOpenBrowser(track.id); }} style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center', cursor: 'pointer', padding: 1, borderRadius: 3, border: '1px dashed #2a2a30', marginTop: 2 }}>+ FX</div>
+        <div onClick={(e) => { e.stopPropagation(); onOpenBrowser(track.id); }} style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center', cursor: 'pointer', padding: 1, borderRadius: 4, border: '1px dashed #2a2a30', marginTop: 2 }}>+ FX</div>
       </div>
 
       {/* Fader + live meter */}
@@ -2050,7 +2050,7 @@ const ChannelRackRow = memo<{
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const msr = (active: boolean, onColor: string, onText: string): React.CSSProperties => ({ width: 22, height: 20, borderRadius: 4, border: '1px solid', borderColor: active ? onColor : '#3a3a44', background: active ? onColor : 'linear-gradient(180deg,#2c2c34,#1d1d23)', color: active ? onText : '#b6b6c0', cursor: 'pointer', fontSize: 9, fontWeight: 800, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.12s ease', boxShadow: active ? `0 0 4px ${onColor}, inset 0 1px 0 rgba(255,255,255,0.28)` : 'inset 0 1px 2px rgba(0,0,0,0.45)' });
   return (
-    <div onClick={() => onSelect(track.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, boxShadow: selected ? `0 0 0 1px ${track.color}33` : 'none' }}>
+    <div onClick={() => onSelect(track.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 10px', marginBottom: 4, borderRadius: 10, cursor: 'pointer', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)', border: `1px solid ${selected ? track.color + '66' : 'var(--color-border-subtle)'}`, boxShadow: selected ? `0 0 0 1px ${track.color}33` : 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span onClick={(e) => { stop(e); const i = COLORS.indexOf(track.color); onUpdate(track.id, { color: COLORS[(i + 1) % COLORS.length] }); }} style={{ width: 10, height: 10, borderRadius: '50%', background: track.color, flexShrink: 0, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)' }} />
       <span style={{ fontSize: 9, fontWeight: 700, color: track.color, opacity: 0.6, fontFamily: 'var(--font-mono)', width: 16, flexShrink: 0 }}>{(index + 1).toString().padStart(2, '0')}</span>
@@ -2069,7 +2069,7 @@ const ChannelRackRow = memo<{
         <Knob value={track.volume} min={0} max={1.5} defaultValue={1} size={34} color={track.color} label="Vol"
           valueLabel={`${dB > 0 ? '+' : ''}${dB.toFixed(0)}`}
           onChange={(v) => onUpdate(track.id, { volume: v })} />
-        <div style={{ width: 5, height: 34, background: '#0a0a0c', borderRadius: 3, overflow: 'hidden', border: '1px solid #050507', position: 'relative' }}>
+        <div style={{ width: 5, height: 34, background: '#0a0a0c', borderRadius: 4, overflow: 'hidden', border: '1px solid #050507', position: 'relative' }}>
           <div data-imosion-meter={track.id} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '0%', background: '#4f8a60', transition: 'height 0.05s linear', willChange: 'height' }} />
         </div>
       </div>
@@ -2109,7 +2109,7 @@ const ChannelRackRow = memo<{
               style={{
                 flex: 1, height: 16, minHeight: 0, padding: 0,
                 marginLeft: i % 4 === 0 && i !== 0 ? 4 : 0,
-                borderRadius: 3,
+                borderRadius: 4,
                 border: `1px solid ${on ? track.color : '#2a2a30'}`,
                 background: on ? track.color : (i % 4 === 0 ? '#1a1a1f' : '#121216'),
                 cursor: 'pointer',
@@ -6756,21 +6756,21 @@ const Imosion: React.FC = () => {
             <button aria-label="File menu" onClick={(e) => { e.stopPropagation(); setShowFileMenu(!showFileMenu); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>File {Icon.chevron}</button>
             {showFileMenu && (
               <div className="frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '180px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(360px, calc(100vh - 72px))', zIndex: 'var(--z-modal)', padding: '4px', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { applyTemplate(DEFAULT_TEMPLATES[3]); setShowFileMenu(false); }}>{Icon.plus} New Project</div>
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { saveProjectData(true); setShowFileMenu(false); }}>{Icon.save} Save</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { applyTemplate(DEFAULT_TEMPLATES[3]); setShowFileMenu(false); }}>{Icon.plus} New Project</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { saveProjectData(true); setShowFileMenu(false); }}>{Icon.save} Save</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { setShowTemplates(true); setShowFileMenu(false); }}>{Icon.template} Templates</div>
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { fileInputRef.current?.click(); setShowFileMenu(false); }}>{Icon.upload} Import Audio</div>
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { setShowExportModal(true); setShowFileMenu(false); }}>{Icon.download} Export</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { setShowTemplates(true); setShowFileMenu(false); }}>{Icon.template} Templates</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { fileInputRef.current?.click(); setShowFileMenu(false); }}>{Icon.upload} Import Audio</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { setShowExportModal(true); setShowFileMenu(false); }}>{Icon.download} Export</div>
                 <div style={{ padding: '7px var(--space-3)' }}><SendToMenu sourceApp="imosion" assetKind="audio" getAsset={() => {
                   const meta = JSON.stringify({ tracks: tracks.length, bpm, sampleRate: 44100 });
                   return { name: `Imosion Export.wav`, data: meta, mimeType: 'audio/wav', metadata: { bpm, tracks: tracks.length } };
                 }} /></div>
                 {collab.canShare && (
-                  <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-accent)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { collab.openShareDialog(); setShowFileMenu(false); }}><DexIcon name="user-plus" size={14} /> Share Project</div>
+                  <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-accent)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { collab.openShareDialog(); setShowFileMenu(false); }}><DexIcon name="user-plus" size={14} /> Share Project</div>
                 )}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { closeApp('imosion'); setShowFileMenu(false); }}>{Icon.close} Exit</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { closeApp('imosion'); setShowFileMenu(false); }}>{Icon.close} Exit</div>
               </div>
             )}
           </div>
@@ -6780,58 +6780,58 @@ const Imosion: React.FC = () => {
             {showToolsMenu && (
               <div className="frosted-dropdown cols" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', width: 'min(396px, calc(100vw - 24px))', maxHeight: 'min(460px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showEffectsRack ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEffectsRack(!showEffectsRack); setShowToolsMenu(false); }}>FX Rack {showEffectsRack && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showSidechainPanel ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowSidechainPanel(!showSidechainPanel); setShowToolsMenu(false); }}>Sidechain {showSidechainPanel && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showNoiseGate ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowNoiseGate(!showNoiseGate); setShowToolsMenu(false); }}>Noise Gate {showNoiseGate && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showDeEsser ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowDeEsser(!showDeEsser); setShowToolsMenu(false); }}>De-Esser {showDeEsser && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showVocalTuner ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowVocalTuner(!showVocalTuner); setShowToolsMenu(false); }}>Vocal Tuner {showVocalTuner && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showBusComp ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowBusComp(!showBusComp); setShowToolsMenu(false); }}>Bus Compressor {showBusComp && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showTapeEmu ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowTapeEmu(!showTapeEmu); setShowToolsMenu(false); }}>Tape Emulation {showTapeEmu && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showMidSide ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowMidSide(!showMidSide); setShowToolsMenu(false); }}>Mid/Side {showMidSide && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showEffectsRack ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEffectsRack(!showEffectsRack); setShowToolsMenu(false); }}>FX Rack {showEffectsRack && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showSidechainPanel ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowSidechainPanel(!showSidechainPanel); setShowToolsMenu(false); }}>Sidechain {showSidechainPanel && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showNoiseGate ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowNoiseGate(!showNoiseGate); setShowToolsMenu(false); }}>Noise Gate {showNoiseGate && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showDeEsser ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowDeEsser(!showDeEsser); setShowToolsMenu(false); }}>De-Esser {showDeEsser && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showVocalTuner ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowVocalTuner(!showVocalTuner); setShowToolsMenu(false); }}>Vocal Tuner {showVocalTuner && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showBusComp ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowBusComp(!showBusComp); setShowToolsMenu(false); }}>Bus Compressor {showBusComp && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showTapeEmu ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowTapeEmu(!showTapeEmu); setShowToolsMenu(false); }}>Tape Emulation {showTapeEmu && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showMidSide ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowMidSide(!showMidSide); setShowToolsMenu(false); }}>Mid/Side {showMidSide && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>METERING</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showLoudnessMeter ? 'var(--color-success)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowLoudnessMeter(!showLoudnessMeter); setShowToolsMenu(false); }}>Loudness (LUFS) {showLoudnessMeter && <span style={{ fontSize: '9px', color: 'var(--color-success)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showLoudPenalty ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowLoudPenalty(!showLoudPenalty); setShowToolsMenu(false); }}>Loudness Penalty {showLoudPenalty && <span style={{ fontSize: '9px', color: 'var(--color-error)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showLoudnessMeter ? 'var(--color-success)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowLoudnessMeter(!showLoudnessMeter); setShowToolsMenu(false); }}>Loudness (LUFS) {showLoudnessMeter && <span style={{ fontSize: '9px', color: 'var(--color-success)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showLoudPenalty ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowLoudPenalty(!showLoudPenalty); setShowToolsMenu(false); }}>Loudness Penalty {showLoudPenalty && <span style={{ fontSize: '9px', color: 'var(--color-error)' }}>ON</span>}</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>RECORDING</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: punchMode ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setPunchMode(!punchMode); setShowToolsMenu(false); }}>Punch Mode {punchMode && <span style={{ fontSize: '9px', color: 'var(--color-error)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: inputMonitoring ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setInputMonitoring(!inputMonitoring); setShowToolsMenu(false); }}>Input Monitoring {inputMonitoring && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: loopRecording ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setLoopRecording(!loopRecording); setShowToolsMenu(false); }}>Loop Recording {loopRecording && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showCompLanes ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowCompLanes(!showCompLanes); setShowToolsMenu(false); }}>Comp Lanes {showCompLanes && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: punchMode ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setPunchMode(!punchMode); setShowToolsMenu(false); }}>Punch Mode {punchMode && <span style={{ fontSize: '9px', color: 'var(--color-error)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: inputMonitoring ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setInputMonitoring(!inputMonitoring); setShowToolsMenu(false); }}>Input Monitoring {inputMonitoring && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: loopRecording ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setLoopRecording(!loopRecording); setShowToolsMenu(false); }}>Loop Recording {loopRecording && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showCompLanes ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowCompLanes(!showCompLanes); setShowToolsMenu(false); }}>Comp Lanes {showCompLanes && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EDITING</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowBatchFade(!showBatchFade); setShowToolsMenu(false); }}>Batch Fade</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTimeStretch(!showTimeStretch); setShowToolsMenu(false); }}>Time Stretch</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowPitchShift(!showPitchShift); setShowToolsMenu(false); }}>Pitch Shift</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowClipGainEnvelope(!showClipGainEnvelope); setShowToolsMenu(false); }}>Clip Gain Envelope</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowClipFx(!showClipFx); setShowToolsMenu(false); }}>Clip Effects</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowWarpMarkers(!showWarpMarkers); setShowToolsMenu(false); }}>Warp Markers</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowBatchFade(!showBatchFade); setShowToolsMenu(false); }}>Batch Fade</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTimeStretch(!showTimeStretch); setShowToolsMenu(false); }}>Time Stretch</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowPitchShift(!showPitchShift); setShowToolsMenu(false); }}>Pitch Shift</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowClipGainEnvelope(!showClipGainEnvelope); setShowToolsMenu(false); }}>Clip Gain Envelope</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowClipFx(!showClipFx); setShowToolsMenu(false); }}>Clip Effects</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowWarpMarkers(!showWarpMarkers); setShowToolsMenu(false); }}>Warp Markers</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIEW</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowRouting(!showRouting); setShowToolsMenu(false); }}>Routing</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowMarkerRegions(!showMarkerRegions); setShowToolsMenu(false); }}>Marker Regions</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTempoMap(!showTempoMap); setShowToolsMenu(false); }}>Tempo Map</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowGrooveQuant(!showGrooveQuant); setShowToolsMenu(false); }}>Groove Quantize</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackColor(!showTrackColor); setShowToolsMenu(false); }}>Track Color</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackGroup(!showTrackGroup); setShowToolsMenu(false); }}>Track Groups</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackFolderDialog(!showTrackFolderDialog); setShowToolsMenu(false); }}>Track Folders</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowReferenceTrack(!showReferenceTrack); setShowToolsMenu(false); }}>Reference Track</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowCollabMarkers(!showCollabMarkers); setShowToolsMenu(false); }}>Collaboration Notes</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowMidiPanel(!showMidiPanel); setShowToolsMenu(false); }}>MIDI Controller</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackNotes(!showTrackNotes); setShowToolsMenu(false); }}>Track Notes</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowRouting(!showRouting); setShowToolsMenu(false); }}>Routing</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowMarkerRegions(!showMarkerRegions); setShowToolsMenu(false); }}>Marker Regions</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTempoMap(!showTempoMap); setShowToolsMenu(false); }}>Tempo Map</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowGrooveQuant(!showGrooveQuant); setShowToolsMenu(false); }}>Groove Quantize</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTrackColor(!showTrackColor); setShowToolsMenu(false); }}>Track Color</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTrackGroup(!showTrackGroup); setShowToolsMenu(false); }}>Track Groups</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTrackFolderDialog(!showTrackFolderDialog); setShowToolsMenu(false); }}>Track Folders</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowReferenceTrack(!showReferenceTrack); setShowToolsMenu(false); }}>Reference Track</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowCollabMarkers(!showCollabMarkers); setShowToolsMenu(false); }}>Collaboration Notes</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowMidiPanel(!showMidiPanel); setShowToolsMenu(false); }}>MIDI Controller</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTrackNotes(!showTrackNotes); setShowToolsMenu(false); }}>Track Notes</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>WORKFLOW</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showMacros ? '#8a6a9c' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowMacros(true); setShowToolsMenu(false); }}>Smart Controls (Macros){macros.length > 0 && <span style={{ fontSize: '9px', color: '#8a6a9c' }}>{macros.length}</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowAlternatives(true); setShowToolsMenu(false); }}>Track Alternatives{snapshots.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{snapshots.length}</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowStripPresets(true); setShowToolsMenu(false); }}>Channel Strip Presets{stripPresets.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{stripPresets.length}</span>}</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEventList(true); setShowToolsMenu(false); }}>Event List Editor{pianoRollNotes.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{pianoRollNotes.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: showMacros ? '#8a6a9c' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowMacros(true); setShowToolsMenu(false); }}>Smart Controls (Macros){macros.length > 0 && <span style={{ fontSize: '9px', color: '#8a6a9c' }}>{macros.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowAlternatives(true); setShowToolsMenu(false); }}>Track Alternatives{snapshots.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{snapshots.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowStripPresets(true); setShowToolsMenu(false); }}>Channel Strip Presets{stripPresets.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{stripPresets.length}</span>}</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEventList(true); setShowToolsMenu(false); }}>Event List Editor{pianoRollNotes.length > 0 && <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{pianoRollNotes.length}</span>}</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowStemExport(!showStemExport); setShowToolsMenu(false); }}>Stem Export</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowSRConvert(!showSRConvert); setShowToolsMenu(false); }}>Sample Rate Convert</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowExportAdvanced(!showExportAdvanced); setShowToolsMenu(false); }}>Advanced Export</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowTrackTemplates(!showTrackTemplates); setShowToolsMenu(false); }}>Track Templates</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }} onClick={() => { setShowChainPreset(!showChainPreset); setShowToolsMenu(false); }}>Plugin Chain Presets</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowStemExport(!showStemExport); setShowToolsMenu(false); }}>Stem Export</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowSRConvert(!showSRConvert); setShowToolsMenu(false); }}>Sample Rate Convert</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowExportAdvanced(!showExportAdvanced); setShowToolsMenu(false); }}>Advanced Export</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTrackTemplates(!showTrackTemplates); setShowToolsMenu(false); }}>Track Templates</div>
+                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowChainPreset(!showChainPreset); setShowToolsMenu(false); }}>Plugin Chain Presets</div>
               </div>
             )}
           </div>
@@ -6846,7 +6846,7 @@ const Imosion: React.FC = () => {
         {/* Center: Transport + LCD */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {/* Transport Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#141417', borderRadius: '9px', padding: '3px', border: '1px solid #2c2c34' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#141417', borderRadius: '10px', padding: '3px', border: '1px solid #2c2c34' }}>
             <button aria-label="Rewind" onClick={() => setCurrentTime(0)} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.rewind}</button>
             <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} style={{ width: '42px', height: '28px', borderRadius: '6px', border: 'none', background: isPlaying ? 'var(--color-success)' : '#36363f', color: isPlaying ? '#04130a' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isPlaying ? '0 0 7px rgba(79, 138, 96,0.5)' : 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{isPlaying ? Icon.pause : Icon.play}</button>
             <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.stop}</button>
@@ -6888,11 +6888,11 @@ const Imosion: React.FC = () => {
             )}
             {/* Count-in countdown */}
             {isCountingIn && (
-              <span style={{ padding: '2px var(--space-2)', borderRadius: '3px', background: '#2a1840', color: '#8a6a9c', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono)', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
+              <span style={{ padding: '2px var(--space-2)', borderRadius: '4px', background: '#2a1840', color: '#8a6a9c', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono)', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
             )}
             {/* Recording elapsed timer */}
             {isRecording && (
-              <span style={{ padding: '2px 6px', borderRadius: '3px', background: '#3a1818', border: '1px solid #4a2020', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ padding: '2px 6px', borderRadius: '4px', background: '#3a1818', border: '1px solid #4a2020', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-error)', animation: 'pulse 1s ease-in-out infinite' }} />
                 {Math.floor(recordElapsed / 60).toString().padStart(2, '0')}:{Math.floor(recordElapsed % 60).toString().padStart(2, '0')}
               </span>
@@ -6900,7 +6900,7 @@ const Imosion: React.FC = () => {
           </div>
 
           {/* LCD Display -- recessed, backlit amber readout like a hardware unit */}
-          <div data-testid="imosion-transport" style={{ display: 'flex', alignItems: 'center', background: 'linear-gradient(180deg,#0a0c0b,#070807)', borderRadius: '8px', border: '1px solid #000', boxShadow: 'inset 0 1px 5px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+          <div data-testid="imosion-transport" style={{ display: 'flex', alignItems: 'center', background: 'linear-gradient(180deg,#0a0c0b,#070807)', borderRadius: '10px', border: '1px solid #000', boxShadow: 'inset 0 1px 5px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.05)', overflow: 'hidden' }}>
             <div onClick={() => setTimeDisplayMode(m => m === 'time' ? 'bars' : 'time')} style={{ padding: '4px 14px', cursor: 'pointer', borderRight: '1px solid var(--color-bg-hover)', minWidth: '110px', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>{timeDisplayMode === 'time' ? 'TIME' : 'BARS'}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 700, color: '#e9b06a', letterSpacing: '1px', textShadow: '0 0 4px rgba(233,176,106,0.45)' }}>{formatTime(currentTime)}</div>
@@ -6929,7 +6929,7 @@ const Imosion: React.FC = () => {
         {/* Right: View + Volume + Export */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           {/* View Mode Toggle - GarageBand segmented control */}
-          <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: '8px', padding: '2px', border: '1px solid var(--color-border-subtle)' }}>
+          <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: '10px', padding: '2px', border: '1px solid var(--color-border-subtle)' }}>
             {([
               { mode: 'arrange', icon: Icon.arrange, label: 'Arrange', testid: undefined },
               { mode: 'rack', icon: (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>), label: 'Channels', testid: 'imosion-rack' },
@@ -7086,7 +7086,7 @@ const Imosion: React.FC = () => {
                       value={track.inputSource || ''}
                       onChange={(e) => { e.stopPropagation(); updateTrack(track.id, { inputSource: e.target.value }); }}
                       onClick={(e) => e.stopPropagation()}
-                      style={{ width: '100%', padding: '3px 6px', fontSize: '8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-border-subtle)', borderRadius: '3px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                      style={{ width: '100%', padding: '3px 6px', fontSize: '8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                     >
                       <option value="">Default Input</option>
                       {audioDevices.filter(d => d.kind === 'audioinput').map(d => (
@@ -7114,7 +7114,7 @@ const Imosion: React.FC = () => {
                 <button aria-label="Zoom Out" onClick={() => setZoom(z => Math.max(10, z / 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }}>{Icon.zoomOut}</button>
                 <button aria-label="Reset Zoom" onClick={() => setZoom(40)} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px', fontSize: '9px', color: 'var(--color-text-muted)' }}>1:1</button>
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: '36px', background: 'var(--color-bg-tertiary)', padding: '4px var(--space-2)', borderRadius: '3px', textAlign: 'center' }}>{Math.round(zoom)}px</span>
+              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: '36px', background: 'var(--color-bg-tertiary)', padding: '4px var(--space-2)', borderRadius: '4px', textAlign: 'center' }}>{Math.round(zoom)}px</span>
               <div className="divider" />
               <button aria-label="Split" onClick={() => setClipEdit(e => ({ ...e, mode: e.mode === 'split' ? 'none' : 'split' }))} className={`btn ${clipEdit.mode === 'split' ? 'btn-active' : ''}`}>{Icon.scissors} Split</button>
             </div>
@@ -7126,9 +7126,9 @@ const Imosion: React.FC = () => {
               {/* Bus-creation actions collapsed into one dropdown. */}
               <details className="bus-add-dd" style={{ position: 'relative' }}>
                 <summary className="btn" style={{ listStyle: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{Icon.bus} Bus <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>
-                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <button aria-label="Add FX Bus" onClick={(e) => { addBus('fx'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.bus} FX Bus</button>
-                  <button aria-label="Add Group Bus" onClick={(e) => { addBus('group'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.route} Group Bus</button>
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <button aria-label="Add FX Bus" onClick={(e) => { addBus('fx'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.bus} FX Bus</button>
+                  <button aria-label="Add Group Bus" onClick={(e) => { addBus('group'); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'left', padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.route} Group Bus</button>
                 </div>
               </details>
               <div className="divider" />
@@ -7398,8 +7398,8 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: '9px', padding: '2px 6px', background: '#0d2847', borderRadius: '2px', color: 'var(--color-accent)' }}>{tracks.length} Channels</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                <button aria-label="Track" onClick={addTrack} style={{ padding: '4px 10px', background: '#0d2847', border: '1px solid #153d6b', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.plus} Track</button>
-                <button aria-label="Aux" onClick={() => addBus('fx')} style={{ padding: '4px 10px', background: '#1e3a28', border: '1px solid #2a5e3a', borderRadius: '3px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.bus} Aux</button>
+                <button aria-label="Track" onClick={addTrack} style={{ padding: '4px 10px', background: '#0d2847', border: '1px solid #153d6b', borderRadius: '4px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.plus} Track</button>
+                <button aria-label="Aux" onClick={() => addBus('fx')} style={{ padding: '4px 10px', background: '#1e3a28', border: '1px solid #2a5e3a', borderRadius: '4px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.bus} Aux</button>
                 <span style={{ color: 'var(--color-border-default)' }}>|</span>
                 <span>{tracks.length} Tracks</span>
                 <span style={{ color: 'var(--color-border-default)' }}>|</span>
@@ -7489,9 +7489,9 @@ const Imosion: React.FC = () => {
 
                   {/* Controls */}
                   <div style={{ padding: '6px', borderTop: '1px solid #1a1a1e', display: 'flex', justifyContent: 'center', gap: '4px' }}>
-                    <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); updateBus(bus.id, { muted: !bus.muted }); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid', borderColor: bus.muted ? 'var(--color-accent)' : 'var(--color-bg-hover)', background: bus.muted ? 'var(--color-accent)' : 'var(--color-bg-elevated)', color: bus.muted ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="volume-x" size={12} /></button>
-                    <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); updateBus(bus.id, { solo: !bus.solo }); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid', borderColor: bus.solo ? 'var(--color-warning)' : 'var(--color-bg-hover)', background: bus.solo ? 'var(--color-warning)' : 'var(--color-bg-elevated)', color: bus.solo ? '#000' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="headphones" size={12} /></button>
-                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteBus(bus.id); }} style={{ width: '26px', height: '22px', borderRadius: '3px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', cursor: 'pointer', fontSize: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.trash}</button>
+                    <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); updateBus(bus.id, { muted: !bus.muted }); }} style={{ width: '26px', height: '22px', borderRadius: '4px', border: '1px solid', borderColor: bus.muted ? 'var(--color-accent)' : 'var(--color-bg-hover)', background: bus.muted ? 'var(--color-accent)' : 'var(--color-bg-elevated)', color: bus.muted ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="volume-x" size={12} /></button>
+                    <button aria-label="Solo" onClick={(e) => { e.stopPropagation(); updateBus(bus.id, { solo: !bus.solo }); }} style={{ width: '26px', height: '22px', borderRadius: '4px', border: '1px solid', borderColor: bus.solo ? 'var(--color-warning)' : 'var(--color-bg-hover)', background: bus.solo ? 'var(--color-warning)' : 'var(--color-bg-elevated)', color: bus.solo ? '#000' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="headphones" size={12} /></button>
+                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteBus(bus.id); }} style={{ width: '26px', height: '22px', borderRadius: '4px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', cursor: 'pointer', fontSize: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.trash}</button>
                   </div>
                 </div>
               ))}
@@ -7516,7 +7516,7 @@ const Imosion: React.FC = () => {
 
                 {/* Master Controls */}
                 <div style={{ padding: 'var(--space-2)', borderTop: '1px solid #1a1a1e', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <button aria-label="Toggle Master Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ width: '100%', padding: '4px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? '#4a2020' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? '#3a1818' : 'var(--color-bg-elevated)', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 600 }}>LIMITER {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
+                  <button aria-label="Toggle Master Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ width: '100%', padding: '4px', borderRadius: '4px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? '#4a2020' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? '#3a1818' : 'var(--color-bg-elevated)', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '8px', fontWeight: 600 }}>LIMITER {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                     <Knob
                       value={masterSettings.limiterCeiling} min={-6} max={0} defaultValue={0} size={32}
@@ -7525,7 +7525,7 @@ const Imosion: React.FC = () => {
                       valueLabel={`${masterSettings.limiterCeiling.toFixed(1)}dB`}
                     />
                   </div>
-                  <button aria-label="MASTERING" onClick={() => setShowMasteringPanel(true)} style={{ width: '100%', padding: '4px 6px', borderRadius: '3px', border: '1px solid #3d2060', background: '#2a1840', color: '#8a6a9c', cursor: 'pointer', fontSize: '8px', fontWeight: 600, marginTop: '4px' }}>MASTERING</button>
+                  <button aria-label="MASTERING" onClick={() => setShowMasteringPanel(true)} style={{ width: '100%', padding: '4px 6px', borderRadius: '4px', border: '1px solid #3d2060', background: '#2a1840', color: '#8a6a9c', cursor: 'pointer', fontSize: '8px', fontWeight: 600, marginTop: '4px' }}>MASTERING</button>
                 </div>
               </div>
             </div>
@@ -7566,13 +7566,13 @@ const Imosion: React.FC = () => {
                     Pattern
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                   </summary>
-                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 60, minWidth: '150px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     {([
                       { label: 'Vary', title: 'Make a variation of the current pattern', fn: () => setBeatGrid(g => varyPattern(g, 0.5, Math.floor(Math.random() * 1e9))) },
                       { label: 'Randomize', title: 'Randomize the pattern', fn: randomizeBeatPattern },
                       { label: 'Clear', title: 'Clear the pattern', fn: clearBeatPattern },
                     ] as const).map(t => (
-                      <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
+                      <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
                     ))}
                   </div>
                 </details>
@@ -7592,8 +7592,8 @@ const Imosion: React.FC = () => {
                   return (
                     <div key={ri} style={{ height: 28, display: 'flex', alignItems: 'center', gap: 3, padding: '0 6px', borderBottom: '1px solid var(--color-border-subtle)', background: activePad === ri ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', opacity: dimmed ? 0.4 : 1 }}>
                       <span onClick={() => { setActivePad(ri === activePad ? -1 : ri); triggerDrumPad(pad, 1, ri); }} style={{ flex: 1, fontSize: '9px', fontWeight: 600, color: activePad === ri ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{pad}</span>
-                      <button aria-label={`Mute ${pad}`} onClick={() => setBeatMutes(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid', borderColor: muted ? 'var(--color-accent)' : '#3a3a44', background: muted ? 'var(--color-accent)' : '#222228', color: muted ? '#fff' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>M</button>
-                      <button aria-label={`Solo ${pad}`} onClick={() => setBeatSolos(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid', borderColor: soloed ? 'var(--color-warning)' : '#3a3a44', background: soloed ? 'var(--color-warning)' : '#222228', color: soloed ? '#000' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>S</button>
+                      <button aria-label={`Mute ${pad}`} onClick={() => setBeatMutes(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 4, border: '1px solid', borderColor: muted ? 'var(--color-accent)' : '#3a3a44', background: muted ? 'var(--color-accent)' : '#222228', color: muted ? '#fff' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>M</button>
+                      <button aria-label={`Solo ${pad}`} onClick={() => setBeatSolos(s => { const n = new Set(s); if (n.has(ri)) n.delete(ri); else n.add(ri); return n; })} style={{ width: 15, height: 15, borderRadius: 4, border: '1px solid', borderColor: soloed ? 'var(--color-warning)' : '#3a3a44', background: soloed ? 'var(--color-warning)' : '#222228', color: soloed ? '#000' : '#9a9aa4', fontSize: 8, fontWeight: 800, cursor: 'pointer', padding: 0 }}>S</button>
                     </div>
                   );
                 })}
@@ -7716,7 +7716,7 @@ const Imosion: React.FC = () => {
                       }}
                       onMouseUp={() => setActivePad(-1)}
                       style={{
-                        aspectRatio: '1', borderRadius: 8,
+                        aspectRatio: '1', borderRadius: 10,
                         background: activePad === i
                           ? `radial-gradient(circle at 50% 35%, ${color}, ${color}aa)`
                           : `linear-gradient(180deg, #24242b, #141418)`,
@@ -7749,7 +7749,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#8a6a9c' }}>Piano Roll</span>
                 <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
                   {(['select', 'draw', 'erase', 'stamp'] as const).map(tool => (
-                    <button key={tool} aria-label={tool} onClick={() => setPianoRollTool(tool)} style={{ padding: '4px 10px', borderRadius: '3px', border: 'none', background: pianoRollTool === tool ? 'rgba(138, 106, 156,0.25)' : 'transparent', color: pianoRollTool === tool ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{tool}</button>
+                    <button key={tool} aria-label={tool} onClick={() => setPianoRollTool(tool)} style={{ padding: '4px 10px', borderRadius: '4px', border: 'none', background: pianoRollTool === tool ? 'rgba(138, 106, 156,0.25)' : 'transparent', color: pianoRollTool === tool ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{tool}</button>
                   ))}
                 </div>
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
@@ -7762,15 +7762,15 @@ const Imosion: React.FC = () => {
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
                 {/* Horizontal zoom (time) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
-                  <button aria-label="Zoom out" onClick={() => setPianoRollZoom(z => Math.max(24, z - 16))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
+                  <button aria-label="Zoom out" onClick={() => setPianoRollZoom(z => Math.max(24, z - 16))} style={{ width: '20px', height: '18px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
-                  <button aria-label="Zoom in" onClick={() => setPianoRollZoom(z => Math.min(220, z + 16))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
+                  <button aria-label="Zoom in" onClick={() => setPianoRollZoom(z => Math.min(220, z + 16))} style={{ width: '20px', height: '18px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
                 </div>
                 {/* Vertical key zoom */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--color-border-subtle)', borderRadius: '4px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
-                  <button aria-label="Smaller keys" onClick={() => setPianoKeyHeight(h => Math.max(12, h - 2))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
+                  <button aria-label="Smaller keys" onClick={() => setPianoKeyHeight(h => Math.max(12, h - 2))} style={{ width: '20px', height: '18px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>-</button>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="6 8 12 3 18 8"/><polyline points="6 16 12 21 18 16"/></svg>
-                  <button aria-label="Taller keys" onClick={() => setPianoKeyHeight(h => Math.min(40, h + 2))} style={{ width: '20px', height: '18px', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
+                  <button aria-label="Taller keys" onClick={() => setPianoKeyHeight(h => Math.min(40, h + 2))} style={{ width: '20px', height: '18px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>+</button>
                 </div>
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
                 <select value={musicalKey} onChange={e => setMusicalKey(e.target.value)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', padding: '4px var(--space-2)', cursor: 'pointer' }}>
@@ -7781,14 +7781,14 @@ const Imosion: React.FC = () => {
                 </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                <button aria-label="Select All" onClick={() => setPianoRollSelectedNotes(new Set(pianoRollNotes.map(n => n.id)))} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Select All</button>
+                <button aria-label="Select All" onClick={() => setPianoRollSelectedNotes(new Set(pianoRollNotes.map(n => n.id)))} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Select All</button>
                 <select aria-label="Riff scale" value={riffScale} onChange={e => setRiffScale(e.target.value as RiffScale)} style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', padding: '4px var(--space-2)', cursor: 'pointer' }}>
                   {RIFF_SCALES.map(sc => <option key={sc} value={sc}>{sc}</option>)}
                 </select>
-                <button aria-label="Idea Forge — generate a riff" onClick={forgeRiff} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(79, 138, 96,0.25)', background: 'rgba(79, 138, 96,0.12)', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Idea Forge</button>
-                <button aria-label="Delete Selected" onClick={() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>Delete</button>
-                <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.1)', color: '#8a6a9c', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
-                <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid rgba(74, 120, 150,0.3)', background: showChordTrigger ? 'rgba(74, 120, 150,0.2)' : 'transparent', color: showChordTrigger ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
+                <button aria-label="Idea Forge — generate a riff" onClick={forgeRiff} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(79, 138, 96,0.25)', background: 'rgba(79, 138, 96,0.12)', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Idea Forge</button>
+                <button aria-label="Delete Selected" onClick={() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>Delete</button>
+                <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.1)', color: '#8a6a9c', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
+                <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(74, 120, 150,0.3)', background: showChordTrigger ? 'rgba(74, 120, 150,0.2)' : 'transparent', color: showChordTrigger ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
               </div>
             </div>
             {/* Creative Tools row (FL/Logic-inspired): legato, strum, flam, humanize, arp, note colors, typing keyboard */}
@@ -7796,12 +7796,12 @@ const Imosion: React.FC = () => {
               <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '0.6px' }}>TOOLS</span>
               {/* Note tools collapsed into one icon dropdown (was 7 text buttons). */}
               <details className="pr-tools-dd" style={{ position: 'relative' }}>
-                <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: '5px', border: '1px solid #2a2a30', background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <summary style={{ listStyle: 'none', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #2a2a30', background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                   Tools
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </summary>
-                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '172px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 60, minWidth: '172px', background: 'var(--color-bg-surface-solid, #1E1E22)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '4px', boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   {([
                     { label: 'Legato', title: 'Quick Legato — stretch notes to the next note', fn: applyLegato },
                     { label: 'Strum down', title: 'Strum down (high to low)', fn: () => applyStrum('down') },
@@ -7811,7 +7811,7 @@ const Imosion: React.FC = () => {
                     { label: 'Arpeggiate', title: 'Arpeggiate — spread chords into a run', fn: applyArpeggiate },
                     { label: 'Slide / glide', title: 'Toggle glide/slide (portamento) on selected notes', fn: toggleSlideSelected },
                   ] as const).map(t => (
-                    <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '5px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
+                    <button key={t.label} title={t.title} onClick={(e) => { t.fn(); const d = e.currentTarget.closest('details'); if (d) (d as HTMLDetailsElement).open = false; }} style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{t.label}</button>
                   ))}
                 </div>
               </details>
@@ -7822,7 +7822,7 @@ const Imosion: React.FC = () => {
               ))}
               <button aria-label="Clear note color" onClick={() => applyNoteColor('')} style={{ width: '11px', height: '11px', borderRadius: '50%', border: '1px solid #2a2a30', background: 'transparent', cursor: 'pointer', padding: 0 }} />
               <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
-              <button aria-label="Toggle typing keyboard" aria-pressed={typingKeyboard} onClick={() => setTypingKeyboard(v => !v)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid', borderColor: typingKeyboard ? 'rgba(79, 138, 96,0.4)' : '#2a2a30', background: typingKeyboard ? 'rgba(79, 138, 96,0.15)' : 'var(--color-bg-elevated)', color: typingKeyboard ? 'var(--color-success)' : 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <button aria-label="Toggle typing keyboard" aria-pressed={typingKeyboard} onClick={() => setTypingKeyboard(v => !v)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid', borderColor: typingKeyboard ? 'rgba(79, 138, 96,0.4)' : '#2a2a30', background: typingKeyboard ? 'rgba(79, 138, 96,0.15)' : 'var(--color-bg-elevated)', color: typingKeyboard ? 'var(--color-success)' : 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="10"/><line x1="10" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="14" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
                 Typing KB{typingKeyboard ? ` · C${typingOctave}` : ''}
               </button>
@@ -7941,7 +7941,7 @@ const Imosion: React.FC = () => {
                     const noteBg = isSelected ? 'rgba(255,149,0,0.85)' : note.color ? `${note.color}${aHex}` : note.slide ? `rgba(74, 120, 150,${velocityAlpha})` : `rgba(138, 106, 156,${velocityAlpha})`;
                     const noteBorder = isSelected ? '1px solid #a8744a' : note.color ? `1px solid ${note.color}` : note.slide ? '1px solid #4a7896' : '1px solid var(--color-border)';
                     return (
-                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: noteBg, borderRadius: '3px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: note.muted ? '1px dashed var(--color-text-tertiary)' : noteBorder, opacity: note.muted ? 0.35 : 1, boxShadow: `${note.slide ? '0 0 6px rgba(74, 120, 150,0.4), ' : isSelected ? '0 0 6px rgba(255,149,0,0.3), ' : ''}inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.22)`, transition: 'box-shadow 0.1s, opacity 0.1s' }}
+                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: noteBg, borderRadius: '4px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: note.muted ? '1px dashed var(--color-text-tertiary)' : noteBorder, opacity: note.muted ? 0.35 : 1, boxShadow: `${note.slide ? '0 0 6px rgba(74, 120, 150,0.4), ' : isSelected ? '0 0 6px rgba(255,149,0,0.3), ' : ''}inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.22)`, transition: 'box-shadow 0.1s, opacity 0.1s' }}
                         onMouseDown={e => { if (pianoRollTool === 'erase') { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); return; } if (pianoRollTool === 'select') startNoteMove(e, note); }}
                         onDoubleClick={e => { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); setPianoRollSelectedNotes(prev => { const s = new Set(prev); s.delete(note.id); return s; }); }}
                         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!pianoRollSelectedNotes.has(note.id)) setPianoRollSelectedNotes(new Set([note.id])); setPrMenu({ x: e.clientX, y: e.clientY }); }}
@@ -7962,7 +7962,7 @@ const Imosion: React.FC = () => {
             {prMenu && (
               <>
                 <div onClick={() => setPrMenu(null)} onContextMenu={e => { e.preventDefault(); setPrMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 6999 }} />
-                <div style={{ position: 'fixed', left: Math.min(prMenu.x, window.innerWidth - 184), top: Math.min(prMenu.y, window.innerHeight - 320), width: 172, background: '#16161b', border: '1px solid #2c2c34', borderRadius: 8, boxShadow: '0 16px 40px rgba(0,0,0,0.6)', zIndex: 7000, padding: 4, fontSize: 11 }}>
+                <div style={{ position: 'fixed', left: Math.min(prMenu.x, window.innerWidth - 184), top: Math.min(prMenu.y, window.innerHeight - 320), width: 172, background: '#16161b', border: '1px solid #2c2c34', borderRadius: 10, boxShadow: '0 16px 40px rgba(0,0,0,0.6)', zIndex: 7000, padding: 4, fontSize: 11 }}>
                   {([
                     { label: 'Copy', fn: prCopy, k: 'Ctrl C' },
                     { label: 'Paste', fn: prPaste, k: 'Ctrl V' },
@@ -7978,7 +7978,7 @@ const Imosion: React.FC = () => {
                     { label: 'Humanize', fn: applyHumanize, k: '' },
                     { label: 'Legato', fn: applyLegato, k: '' },
                   ] as const).map(it => (
-                    <div key={it.label} onClick={() => { it.fn(); setPrMenu(null); }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 5, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
+                    <div key={it.label} onClick={() => { it.fn(); setPrMenu(null); }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
                       <span>{it.label}</span>{it.k && <span style={{ color: 'var(--color-text-tertiary)', fontSize: 9, fontFamily: 'var(--font-mono)' }}>{it.k}</span>}
                     </div>
                   ))}
@@ -8067,10 +8067,10 @@ const Imosion: React.FC = () => {
                     <button aria-label="Close Chord Trigger" onClick={() => setShowChordTrigger(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}><DexIcon name="close" size={14} /></button>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
-                    <select value={musicalKey} onChange={e => setMusicalKey(e.target.value)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                    <select value={musicalKey} onChange={e => setMusicalKey(e.target.value)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
                       {NOTE_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
                     </select>
-                    <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: 3, padding: 1 }}>
+                    <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: 4, padding: 1 }}>
                       <button aria-label="Major" onClick={() => setChordTriggerMode('major')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'major' ? 'rgba(74, 120, 150,0.25)' : 'transparent', color: chordTriggerMode === 'major' ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Maj</button>
                       <button aria-label="Minor" onClick={() => setChordTriggerMode('minor')} style={{ padding: '3px var(--space-2)', borderRadius: 2, border: 'none', background: chordTriggerMode === 'minor' ? 'rgba(74, 120, 150,0.25)' : 'transparent', color: chordTriggerMode === 'minor' ? '#4a7896' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Min</button>
                     </div>
@@ -8087,7 +8087,7 @@ const Imosion: React.FC = () => {
                         onClick={() => playChord(c.pitches)}
                         onDoubleClick={() => { playChord(c.pitches); insertChord(c.pitches); }}
                         style={{
-                          padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)',
+                          padding: '6px 2px', borderRadius: 4, border: '1px solid #27272a', background: 'var(--color-bg-hover)',
                           color: c.quality === 'major' ? '#4a7896' : c.quality === 'minor' ? '#8a6a9c' : c.quality === 'diminished' ? 'var(--color-error)' : 'var(--color-warning)',
                           fontSize: 9, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                         }}
@@ -8171,10 +8171,10 @@ const Imosion: React.FC = () => {
                 <button aria-label="Close Chords and Scales" onClick={() => setShowChordsScales(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}><DexIcon name="close" size={14} /></button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
-                <select aria-label="Root note" value={chordsScalesRoot} onChange={e => setChordsScalesRoot(e.target.value as RootNote)} style={{ flex: '0 0 64px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                <select aria-label="Root note" value={chordsScalesRoot} onChange={e => setChordsScalesRoot(e.target.value as RootNote)} style={{ flex: '0 0 64px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
                   {CHROMATIC_NOTES.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
-                <select aria-label="Scale" value={chordsScalesScale} onChange={e => setChordsScalesScale(e.target.value as ScaleName)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                <select aria-label="Scale" value={chordsScalesScale} onChange={e => setChordsScalesScale(e.target.value as ScaleName)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
                   {SCALE_NAMES.map(s => <option key={s} value={s}>{SCALE_LABELS[s]}</option>)}
                 </select>
               </div>
@@ -8185,14 +8185,14 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 'var(--space-2)' }}>
                 {notes.map((n, i) => (
-                  <span key={`${n}-${i}`} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid #27272a', background: i === 0 ? 'rgba(255,107,53,0.14)' : 'var(--color-bg-hover)', color: i === 0 ? '#FF6B35' : 'var(--color-text-secondary)', fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{n}</span>
+                  <span key={`${n}-${i}`} style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid #27272a', background: i === 0 ? 'rgba(255,107,53,0.14)' : 'var(--color-bg-hover)', color: i === 0 ? '#FF6B35' : 'var(--color-text-secondary)', fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{n}</span>
                 ))}
               </div>
               {/* Diatonic chords */}
               <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>DIATONIC CHORDS</div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(chords.length, 7)}, 1fr)`, gap: 4 }}>
                 {chords.map((c, i) => (
-                  <div key={i} style={{ padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: qualityColor(c.quality), fontSize: 9, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div key={i} style={{ padding: '6px 2px', borderRadius: 4, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: qualityColor(c.quality), fontSize: 9, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                     <span>{c.numeral}</span>
                     <span style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{c.name}</span>
                   </div>
@@ -8210,22 +8210,22 @@ const Imosion: React.FC = () => {
               {/* Header */}
               <div style={{ padding: '14px var(--space-5)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <div style={{ width: '6px', height: '20px', background: 'linear-gradient(180deg, #8a6a9c, #8a6a9c)', borderRadius: '3px' }} />
+                  <div style={{ width: '6px', height: '20px', background: 'linear-gradient(180deg, #8a6a9c, #8a6a9c)', borderRadius: '4px' }} />
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Mastering Suite</span>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '3px' }}>Pro</span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '4px' }}>Pro</span>
                 </div>
-                <button aria-label="Close Mastering panel" onClick={() => setShowMasteringPanel(false)} style={{ width: '24px', height: '24px', borderRadius: '3px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={14} /></button>
+                <button aria-label="Close Mastering panel" onClick={() => setShowMasteringPanel(false)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={14} /></button>
               </div>
               
               {/* Presets Section */}
               <div style={{ padding: '14px var(--space-5)', borderBottom: '1px solid #1a1a1e', background: 'var(--color-bg-base)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' }}>Presets</span>
-                  <button aria-label="Save current mastering preset" onClick={() => { setShowSavePresetModal({ type: 'mastering' }); setNewPresetName(''); }} style={{ padding: '4px 10px', borderRadius: '3px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>+ Save Current</button>
+                  <button aria-label="Save current mastering preset" onClick={() => { setShowSavePresetModal({ type: 'mastering' }); setNewPresetName(''); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>+ Save Current</button>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                   {MASTERING_PRESETS.map(preset => (
-                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : '#141417', color: selectedMasteringPreset === preset.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
+                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} style={{ padding: '5px 10px', borderRadius: '4px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : '#141417', color: selectedMasteringPreset === preset.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
                   ))}
                   {customMasteringPresets.map(preset => (
                     <div key={preset.id} style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
@@ -8281,7 +8281,7 @@ const Imosion: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Target" min={-24} max={0} step={1} value={masterSettings.loudnessTarget} onChange={v => setMasterSettings(s => ({ ...s, loudnessTarget: v }))} accentColor="var(--color-error)" unit=" LUFS" />
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Ceiling" min={-6} max={0} step={0.1} value={masterSettings.limiterCeiling} onChange={v => setMasterSettings(s => ({ ...s, limiterCeiling: v }))} accentColor="var(--color-error)" format={v => `${v.toFixed(1)} dB`} />
-                    <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(158, 90, 85,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
+                    <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(158, 90, 85,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
                   </div>
                 </div>
                 
@@ -8289,8 +8289,8 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: '#8a6a9c', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Dithering</label><select value={masterSettings.dithering} onChange={e => setMasterSettings(s => ({ ...s, dithering: e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '3px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="none">None</option><option value="triangular">Triangular</option><option value="noise-shaped">Noise Shaped</option></select></div>
-                    <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Oversampling</label><select value={masterSettings.oversampling} onChange={e => setMasterSettings(s => ({ ...s, oversampling: +e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '3px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="1">1x (Off)</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option></select></div>
+                    <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Dithering</label><select value={masterSettings.dithering} onChange={e => setMasterSettings(s => ({ ...s, dithering: e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '4px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="none">None</option><option value="triangular">Triangular</option><option value="noise-shaped">Noise Shaped</option></select></div>
+                    <div><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: '4px' }}>Oversampling</label><select value={masterSettings.oversampling} onChange={e => setMasterSettings(s => ({ ...s, oversampling: +e.target.value as any }))} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '4px', background: 'var(--color-bg-base)', border: '1px solid #27272a', color: 'var(--color-text-primary)', fontSize: '10px' }}><option value="1">1x (Off)</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option></select></div>
                   </div>
                 </div>
               </div>
@@ -8310,7 +8310,7 @@ const Imosion: React.FC = () => {
         {/* Save Preset Modal */}
         {showSavePresetModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
-            <div style={{ width: 'min(340px, calc(100vw - 32px))', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid #27272a', overflow: 'hidden' }}>
+            <div style={{ width: 'min(340px, calc(100vw - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid #1f1f23' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Save Preset</span>
               </div>
@@ -8336,7 +8336,7 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
                 {(['subsynth', 'fmsynth', 'wavetable', 'sampler', 'drummachine'] as InstrumentType[]).map(type => (
-                  <div key={type} style={{ background: 'var(--color-border-subtle)', borderRadius: '8px', border: '1px solid #1f1f23', overflow: 'hidden' }}>
+                  <div key={type} style={{ background: 'var(--color-border-subtle)', borderRadius: '10px', border: '1px solid #1f1f23', overflow: 'hidden' }}>
                     <div style={{ padding: '10px var(--space-3)', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                       <div style={{ width: '24px', height: '24px', borderRadius: '4px', background: `${INSTRUMENT_COLORS[type]}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill={INSTRUMENT_COLORS[type]}>
@@ -8366,7 +8366,7 @@ const Imosion: React.FC = () => {
                           setInstrumentTracks(prev => [...prev, newTrack]);
                           setSelectedInstrument(newTrack.id);
                           setShowInstrumentBrowser(false);
-                        }} style={{ padding: '6px var(--space-2)', borderRadius: '3px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '10px', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}
+                        }} style={{ padding: '6px var(--space-2)', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '10px', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}
                           onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         >{preset.name}</button>
@@ -8502,7 +8502,7 @@ const Imosion: React.FC = () => {
                               <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>WAVEFORM</div>
                               <div style={{ display: 'flex', gap: 4 }}>
                                 {(['sawtooth', 'square', 'sine', 'triangle'] as SynthWaveform[]).map(w => (
-                                  <button key={w} aria-label={`Waveform ${w}`} onClick={() => updateBuiltinSynthParam(inst.id, { waveform: w })} style={{ flex: 1, padding: '5px 0', borderRadius: 3, border: '1px solid #27272a', background: sp.waveform === w ? 'rgba(138, 106, 156,0.2)' : '#18181b', color: sp.waveform === w ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{w === 'sawtooth' ? 'Saw' : w}</button>
+                                  <button key={w} aria-label={`Waveform ${w}`} onClick={() => updateBuiltinSynthParam(inst.id, { waveform: w })} style={{ flex: 1, padding: '5px 0', borderRadius: 4, border: '1px solid #27272a', background: sp.waveform === w ? 'rgba(138, 106, 156,0.2)' : '#18181b', color: sp.waveform === w ? '#8a6a9c' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{w === 'sawtooth' ? 'Saw' : w}</button>
                                 ))}
                               </div>
                             </div>
@@ -8597,8 +8597,8 @@ const Imosion: React.FC = () => {
                     <CreativeSlider layout="column" dense style={{ marginBottom: 0 }} label="Pan" min={-100} max={100} step={1} value={Math.round(inst.pan * 100)} onChange={v => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, pan: v / 100 } : t))} accentColor={INSTRUMENT_COLORS[inst.instrument.type]} format={v => v === 0 ? 'C' : v > 0 ? `R${v}` : `L${Math.abs(v)}`} />
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button aria-label="Mute instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, muted: !t.muted } : t))} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid #27272a', background: inst.muted ? 'rgba(10,132,255,0.2)' : '#18181b', color: inst.muted ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>M</button>
-                    <button aria-label="Solo instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, solo: !t.solo } : t))} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid #27272a', background: inst.solo ? 'rgba(255,149,0,0.2)' : '#18181b', color: inst.solo ? '#ff9500' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>S</button>
+                    <button aria-label="Mute instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, muted: !t.muted } : t))} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid #27272a', background: inst.muted ? 'rgba(10,132,255,0.2)' : '#18181b', color: inst.muted ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>M</button>
+                    <button aria-label="Solo instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, solo: !t.solo } : t))} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid #27272a', background: inst.solo ? 'rgba(255,149,0,0.2)' : '#18181b', color: inst.solo ? '#ff9500' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>S</button>
                   </div>
                   <button aria-label="Remove instrument track" onClick={() => { setInstrumentTracks(prev => prev.filter(t => t.id !== inst.id)); setShowInstrumentEditor(false); }} style={{ padding: '6px', borderRadius: 4, border: '1px solid rgba(160, 90, 104,0.2)', background: 'rgba(160, 90, 104,0.08)', color: '#a05a68', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Remove Track</button>
                 </div>
@@ -8625,7 +8625,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '10px var(--space-3)', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, #111114, #0d0d10)' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)' }}>{selectedTrackData.name}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', padding: '2px 6px', background: '#0f0f12', borderRadius: '3px' }}>{selectedTrackData.plugins.length}/{MAX_PLUGINS_PER_TRACK}</span>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', padding: '2px 6px', background: '#0f0f12', borderRadius: '4px' }}>{selectedTrackData.plugins.length}/{MAX_PLUGINS_PER_TRACK}</span>
                 <button aria-label="Collapse plugin chain panel" onClick={() => setPluginPanelCollapsed(true)} className="btn btn-icon" style={{ width: '20px', height: '20px', padding: '0' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
               </div>
             </div>
@@ -8689,7 +8689,7 @@ const Imosion: React.FC = () => {
                       {/* Preset Selector with Custom Presets */}
                       <div style={{ marginBottom: '6px' }}>
                         <div style={{ display: 'flex', gap: '4px' }}>
-                          <select onChange={e => { if (e.target.value) applyPluginPreset(selectedTrackData.id, plugin.id, e.target.value, plugin.type); }} style={{ flex: 1, padding: '4px 6px', borderRadius: '3px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-secondary)', fontSize: '9px', cursor: 'pointer' }} defaultValue="">
+                          <select onChange={e => { if (e.target.value) applyPluginPreset(selectedTrackData.id, plugin.id, e.target.value, plugin.type); }} style={{ flex: 1, padding: '4px 6px', borderRadius: '4px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-secondary)', fontSize: '9px', cursor: 'pointer' }} defaultValue="">
                             <option value="" disabled>Load Preset...</option>
                             <optgroup label="Factory">
                               {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -8700,7 +8700,7 @@ const Imosion: React.FC = () => {
                               </optgroup>
                             )}
                           </select>
-                          <button aria-label="Save preset" onClick={() => { setShowSavePresetModal({ type: 'plugin', pluginType: plugin.type, trackId: selectedTrackData.id, pluginId: plugin.id }); setNewPresetName(''); }} style={{ padding: '4px 6px', borderRadius: '3px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px' }}>+</button>
+                          <button aria-label="Save preset" onClick={() => { setShowSavePresetModal({ type: 'plugin', pluginType: plugin.type, trackId: selectedTrackData.id, pluginId: plugin.id }); setNewPresetName(''); }} style={{ padding: '4px 6px', borderRadius: '4px', background: 'var(--color-bg-base)', border: `1px solid ${lib.color}40`, color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px' }}>+</button>
                         </div>
                       </div>
                       {/* Pro Parametric EQ: drag the band nodes on the response curve */}
@@ -8773,7 +8773,7 @@ const Imosion: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Curve</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, marginBottom: 10 }}>
               {(['linear', 'exponential', 'sCurve', 'logarithmic'] as const).map(c => (
-                <button key={c} onClick={() => setBatchFadeCurve(c)} aria-label={`${c} fade curve`} style={{ padding: '4px 2px', borderRadius: 3, border: '1px solid ' + (batchFadeCurve === c ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: batchFadeCurve === c ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: batchFadeCurve === c ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{c}</button>
+                <button key={c} onClick={() => setBatchFadeCurve(c)} aria-label={`${c} fade curve`} style={{ padding: '4px 2px', borderRadius: 4, border: '1px solid ' + (batchFadeCurve === c ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: batchFadeCurve === c ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: batchFadeCurve === c ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{c}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -8798,12 +8798,12 @@ const Imosion: React.FC = () => {
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 28, textAlign: 'right' }}>{stretchRatio}%</span>
             </div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
-              {[50, 75, 100, 150, 200].map(r => <button key={r} onClick={() => setStretchRatio(r)} aria-label={`${r}% stretch`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (stretchRatio === r ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: stretchRatio === r ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: stretchRatio === r ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{r}%</button>)}
+              {[50, 75, 100, 150, 200].map(r => <button key={r} onClick={() => setStretchRatio(r)} aria-label={`${r}% stretch`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (stretchRatio === r ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: stretchRatio === r ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: stretchRatio === r ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{r}%</button>)}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Algorithm</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 'var(--space-2)' }}>
               {(['elastique', 'complex', 'speech', 'monophonic'] as const).map(a => (
-                <button key={a} onClick={() => setStretchAlgorithm(a)} aria-label={`${a} stretch algorithm`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (stretchAlgorithm === a ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: stretchAlgorithm === a ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: stretchAlgorithm === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{a}</button>
+                <button key={a} onClick={() => setStretchAlgorithm(a)} aria-label={`${a} stretch algorithm`} style={{ padding: '5px', borderRadius: 4, border: '1px solid ' + (stretchAlgorithm === a ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: stretchAlgorithm === a ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: stretchAlgorithm === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{a}</button>
               ))}
             </div>
             <button aria-label="Apply time stretch" onClick={() => { if (forgeClip) { const factor = stretchRatio / 100; updateClip(forgeClip.trackId, forgeClip.clip.id, { duration: forgeClip.clip.duration * factor }); } setShowTimeStretch(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Stretch</button>
@@ -8927,7 +8927,7 @@ const Imosion: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Groove Template</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[{ id: 'none', name: 'None' }, { id: 'mpc60', name: 'MPC 60' }, { id: 'sp1200', name: 'SP-1200' }, { id: 'tr808', name: 'TR-808' }, { id: 'linnDrum', name: 'LinnDrum' }, { id: 'motown', name: 'Motown' }, { id: 'reggae', name: 'Reggae' }, { id: 'shuffle', name: 'Shuffle' }].map(g => (
-                <button key={g.id} onClick={() => setGrooveTemplate(g.id)} aria-label={`${g.name} groove template`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (grooveTemplate === g.id ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: grooveTemplate === g.id ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: grooveTemplate === g.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{g.name}</button>
+                <button key={g.id} onClick={() => setGrooveTemplate(g.id)} aria-label={`${g.name} groove template`} style={{ padding: '5px', borderRadius: 4, border: '1px solid ' + (grooveTemplate === g.id ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: grooveTemplate === g.id ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: grooveTemplate === g.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{g.name}</button>
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
@@ -8965,7 +8965,7 @@ const Imosion: React.FC = () => {
                 <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Track: {tracks.find(t => t.id === selectedTrack)?.name || 'Unknown'}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, marginBottom: 10 }}>
                   {['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64D2FF', 'var(--color-accent)', '#8a6a9c', '#FF375F', '#AC8E68', 'var(--color-text-tertiary)', '#FF6482', '#32ADE6', '#66D4CF', '#FF9500', '#A2845E', 'var(--color-text-primary)'].map(c => (
-                    <button key={c} aria-label={`Set track color to ${c}`} onClick={() => { setTracks(prev => prev.map(t => t.id === selectedTrack ? { ...t, color: c } : t)); }} style={{ width: '100%', aspectRatio: '1', borderRadius: 3, background: c, border: '1px solid var(--color-border)', cursor: 'pointer' }} />
+                    <button key={c} aria-label={`Set track color to ${c}`} onClick={() => { setTracks(prev => prev.map(t => t.id === selectedTrack ? { ...t, color: c } : t)); }} style={{ width: '100%', aspectRatio: '1', borderRadius: 4, background: c, border: '1px solid var(--color-border)', cursor: 'pointer' }} />
                   ))}
                 </div>
                 <button aria-label="Random color" onClick={() => setTracks(prev => prev.map(t => t.id === selectedTrack ? { ...t, color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0') } : t))} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 10, cursor: 'pointer' }}>Random Color</button>
@@ -9002,7 +9002,7 @@ const Imosion: React.FC = () => {
                     case 'Phase Invert': updateClip(forgeClip.trackId, c.id, { waveform: wf.map(s => -s) }); break;
                     case 'Mono': updateClip(forgeClip.trackId, c.id, { waveform: wf.map(s => s) }); break;
                   }
-                }} style={{ padding: '6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>{fx}</button>
+                }} style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>{fx}</button>
               ))}
             </div>
           </div>
@@ -9058,7 +9058,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{p.val}{p.unit}</span>
               </div>
             ))}
-            <div style={{ height: 24, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', borderRadius: 3, marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ height: 24, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', borderRadius: 4, marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>GR: 0.0 dB</span>
             </div>
           </div>
@@ -9082,7 +9082,7 @@ const Imosion: React.FC = () => {
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginTop: 'var(--space-2)' }}>
               {[{ n: '15 ips', d: 30, w: 40 }, { n: '30 ips', d: 20, w: 55 }, { n: 'Cassette', d: 50, w: 30 }].map(p => (
-                <button key={p.n} aria-label={`${p.n} tape preset`} onClick={() => { setTapeDrive(p.d); setTapeWarmth(p.w); }} style={{ padding: '5px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{p.n}</button>
+                <button key={p.n} aria-label={`${p.n} tape preset`} onClick={() => { setTapeDrive(p.d); setTapeWarmth(p.w); }} style={{ padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{p.n}</button>
               ))}
             </div>
           </div>
@@ -9133,13 +9133,13 @@ const Imosion: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Target Sample Rate</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 10 }}>
               {[22050, 44100, 48000, 88200, 96000, 192000].map(sr => (
-                <button key={sr} onClick={() => setSampleRate(sr as any)} aria-label={`Set sample rate to ${sr}`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (sampleRate === sr ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: sampleRate === sr ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: sampleRate === sr ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
+                <button key={sr} onClick={() => setSampleRate(sr as any)} aria-label={`Set sample rate to ${sr}`} style={{ padding: '5px', borderRadius: 4, border: '1px solid ' + (sampleRate === sr ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: sampleRate === sr ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: sampleRate === sr ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
               ))}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Bit Depth</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[16, 24, 32].map(bd => (
-                <button key={bd} onClick={() => setBitDepth(bd as any)} aria-label={`${bd}-bit depth`} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid ' + (bitDepth === bd ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: bitDepth === bd ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: bitDepth === bd ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{bd}-bit</button>
+                <button key={bd} onClick={() => setBitDepth(bd as any)} aria-label={`${bd}-bit depth`} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid ' + (bitDepth === bd ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: bitDepth === bd ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: bitDepth === bd ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{bd}-bit</button>
               ))}
             </div>
             <button aria-label="Convert project sample rate" onClick={() => setShowSRConvert(false)} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Convert Project</button>
@@ -9164,7 +9164,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: 8, color: 'var(--color-success)', fontWeight: 600 }}>OK</span>
               </div>
             ))}
-            <div style={{ marginTop: 'var(--space-2)', padding: 6, borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', textAlign: 'center' }}>
+            <div style={{ marginTop: 'var(--space-2)', padding: 6, borderRadius: 4, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', textAlign: 'center' }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Integrated: -14.2 LUFS | True Peak: -1.0 dBTP</span>
             </div>
           </div>
@@ -9182,7 +9182,7 @@ const Imosion: React.FC = () => {
             {tracks.map(t => (
               <div key={t.id} style={{ marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{t.name}</span>
-                <AssistedTextarea value={trackNotes[t.id] || ''} onChange={e => setTrackNotes(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Add notes..." rows={2} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, resize: 'vertical', boxSizing: 'border-box' }} />
+                <AssistedTextarea value={trackNotes[t.id] || ''} onChange={e => setTrackNotes(prev => ({ ...prev, [t.id]: e.target.value }))} placeholder="Add notes..." rows={2} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
             ))}
           </div>
@@ -9242,7 +9242,7 @@ const Imosion: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Place warp markers to stretch specific sections of audio clips to align with the grid.</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['Beats', 'Tones', 'Texture', 'Re-Pitch', 'Complex'] as const).map(m => (
-                <button key={m} aria-label={`${m} warp mode`} onClick={() => setWarpMode(m)} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (warpMode === m ? 'rgba(168, 116, 74,0.3)' : 'var(--color-bg-hover)'), background: warpMode === m ? 'rgba(168, 116, 74,0.1)' : 'var(--color-border-subtle)', color: warpMode === m ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} warp mode`} onClick={() => setWarpMode(m)} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (warpMode === m ? 'rgba(168, 116, 74,0.3)' : 'var(--color-bg-hover)'), background: warpMode === m ? 'rgba(168, 116, 74,0.1)' : 'var(--color-border-subtle)', color: warpMode === m ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
             <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>{warpMarkers.length} marker{warpMarkers.length === 1 ? '' : 's'}</div>
@@ -9295,19 +9295,19 @@ const Imosion: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Format</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[{ id: 'wav', name: 'WAV' }, { id: 'flac', name: 'FLAC' }, { id: 'aiff', name: 'AIFF' }, { id: 'mp3', name: 'MP3' }, { id: 'ogg', name: 'OGG' }, { id: 'aac', name: 'AAC' }].map(f => (
-                <button key={f.id} onClick={() => setExportFormatAdv(f.id)} aria-label={`Export as ${f.name}`} style={{ padding: '5px', borderRadius: 3, border: '1px solid ' + (exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportFormatAdv === f.id ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{f.name}</button>
+                <button key={f.id} onClick={() => setExportFormatAdv(f.id)} aria-label={`Export as ${f.name}`} style={{ padding: '5px', borderRadius: 4, border: '1px solid ' + (exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportFormatAdv === f.id ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportFormatAdv === f.id ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{f.name}</button>
               ))}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Bit Depth</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[16, 24, 32].map(b => (
-                <button key={b} onClick={() => setExportBitDepth(b)} aria-label={`${b}-bit export`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (exportBitDepth === b ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportBitDepth === b ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportBitDepth === b ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{b}-bit</button>
+                <button key={b} onClick={() => setExportBitDepth(b)} aria-label={`${b}-bit export`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (exportBitDepth === b ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportBitDepth === b ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportBitDepth === b ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{b}-bit</button>
               ))}
             </div>
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Sample Rate</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
               {[44100, 48000, 88200, 96000, 176400, 192000].map(sr => (
-                <button key={sr} onClick={() => setExportSR(sr)} aria-label={`Export at ${sr}Hz`} style={{ padding: '4px', borderRadius: 3, border: '1px solid ' + (exportSR === sr ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportSR === sr ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportSR === sr ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
+                <button key={sr} onClick={() => setExportSR(sr)} aria-label={`Export at ${sr}Hz`} style={{ padding: '4px', borderRadius: 4, border: '1px solid ' + (exportSR === sr ? 'rgba(79, 138, 96,0.3)' : 'var(--color-bg-hover)'), background: exportSR === sr ? 'rgba(79, 138, 96,0.1)' : 'var(--color-border-subtle)', color: exportSR === sr ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>{sr >= 1000 ? sr / 1000 + 'k' : sr}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
@@ -9326,7 +9326,7 @@ const Imosion: React.FC = () => {
       {/* Plugin Browser Modal */}
       {showPluginBrowser && selectedTrackData && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowPluginBrowser(false)}>
-          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: '#1c1c20', borderRadius: '8px', border: '1px solid rgba(79, 138, 96,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(79, 138, 96,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: '#1c1c20', borderRadius: '10px', border: '1px solid rgba(79, 138, 96,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(79, 138, 96,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(79, 138, 96,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(79, 138, 96,0.08) 0%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4f8a60" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -9348,7 +9348,7 @@ const Imosion: React.FC = () => {
                   {/* EQ & Dynamics */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EQ & Dynamics</div>
                   {(['eq', 'compressor', 'limiter', 'gate', 'deesser'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
-                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
+                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '4px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
                       <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{lib.abbr}</span>
@@ -9358,7 +9358,7 @@ const Imosion: React.FC = () => {
                   {/* Modulation & Time */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>Modulation & Time</div>
                   {(['reverb', 'delay', 'chorus'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
-                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
+                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '4px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
                       <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{lib.abbr}</span>
@@ -9368,7 +9368,7 @@ const Imosion: React.FC = () => {
                   {/* Utility */}
                   <div style={{ padding: '4px var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>Utility</div>
                   {(['saturation', 'autotune'] as PluginType[]).filter(type => { const lib = PLUGIN_LIBRARY[type]; const q = pluginPickerQuery.trim().toLowerCase(); return !q || lib.name.toLowerCase().includes(q) || lib.abbr.toLowerCase().includes(q); }).map(type => { const lib = PLUGIN_LIBRARY[type]; return (
-                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
+                    <div key={type} draggable onDragStart={(e) => { e.dataTransfer.setData('application/x-imosion-plugin', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addPluginToTrack(selectedTrackData.id, type)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '4px', cursor: 'grab', transition: 'background 0.1s' }} className="dropdown-item">
                       <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: lib.color, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{lib.name}</span>
                       <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{lib.abbr}</span>
@@ -9380,7 +9380,7 @@ const Imosion: React.FC = () => {
                     <>
                       <div style={{ paddingTop: 'var(--space-2)', paddingBottom: '4px', paddingLeft: 'var(--space-2)', paddingRight: 'var(--space-2)', fontSize: '9px', fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 'var(--space-2)', borderTop: '1px solid #2a2a2e' }}>Third Party</div>
                       {installedPlugins.map(plugin => (
-                        <div key={plugin.id} onClick={() => { setShowPluginBrowser(false); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer' }} className="dropdown-item">
+                        <div key={plugin.id} onClick={() => { setShowPluginBrowser(false); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }} className="dropdown-item">
                           <div style={{ width: '6px', height: '6px', borderRadius: '2px', background: plugin.color, flexShrink: 0 }} />
                           <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{plugin.name}</span>
                           <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{plugin.vendor}</span>
@@ -9418,8 +9418,8 @@ const Imosion: React.FC = () => {
                       <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.name}</div>
                       <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{p.plugins.length} FX · vol {((p.volume - 1) * 60).toFixed(0)}dB</div>
                     </div>
-                    <button onClick={() => applyStripPreset(p)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Apply</button>
-                    <button aria-label="Delete preset" onClick={() => deleteStripPreset(p.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                    <button onClick={() => applyStripPreset(p)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+                    <button aria-label="Delete preset" onClick={() => deleteStripPreset(p.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
                   </div>
                 ))}
             </div>
@@ -9450,8 +9450,8 @@ const Imosion: React.FC = () => {
                       <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{s.name}</div>
                       <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{s.data.tracks.length} tracks · {s.data.pianoRollNotes.length} notes · {s.data.bpm} BPM</div>
                     </div>
-                    <button onClick={() => restoreSnapshot(s.id)} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Restore</button>
-                    <button aria-label="Delete snapshot" onClick={() => deleteSnapshot(s.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                    <button onClick={() => restoreSnapshot(s.id)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Restore</button>
+                    <button aria-label="Delete snapshot" onClick={() => deleteSnapshot(s.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
                   </div>
                 ))}
             </div>
@@ -9466,7 +9466,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>Smart Controls — Macros</span>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={addMacro} style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.12)', color: '#8a6a9c', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>+ Macro</button>
+                <button onClick={addMacro} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(138, 106, 156,0.3)', background: 'rgba(138, 106, 156,0.12)', color: '#8a6a9c', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>+ Macro</button>
                 <button aria-label="Close" onClick={() => setShowMacros(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
               </div>
             </div>
@@ -9475,12 +9475,12 @@ const Imosion: React.FC = () => {
                 macros.map(m => {
                   const formTrack = tracks.find(t => t.id === macroAssign.trackId);
                   return (
-                  <div key={m.id} style={{ padding: '10px', borderRadius: '8px', marginBottom: '8px', background: 'var(--color-bg-elevated)', border: '1px solid #232327' }}>
+                  <div key={m.id} style={{ padding: '10px', borderRadius: '10px', marginBottom: '8px', background: 'var(--color-bg-elevated)', border: '1px solid #232327' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <input value={m.name} onChange={e => setMacros(prev => prev.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))} style={{ flex: 1, padding: '4px 8px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '5px', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600 }} />
+                      <input value={m.name} onChange={e => setMacros(prev => prev.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))} style={{ flex: 1, padding: '4px 8px', background: 'var(--color-bg-base)', border: '1px solid #2a2a30', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600 }} />
                       <input type="range" min={0} max={1} step={0.01} value={m.value} onChange={e => setMacroValue(m.id, parseFloat(e.target.value))} style={{ width: '140px', accentColor: '#8a6a9c' }} />
                       <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', minWidth: '34px', textAlign: 'right' }}>{Math.round(m.value * 100)}%</span>
-                      <button aria-label="Delete macro" onClick={() => deleteMacro(m.id)} style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
+                      <button aria-label="Delete macro" onClick={() => deleteMacro(m.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #4a2020', background: '#3a1818', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>{Icon.trash}</button>
                     </div>
                     {m.targets.map((t, i) => {
                       const trk = tracks.find(x => x.id === t.trackId); const pl = trk?.plugins.find(p => p.id === t.pluginId);
@@ -9590,7 +9590,7 @@ const Imosion: React.FC = () => {
                         <button
                           aria-label={`Install ${plugin.name}`}
                           onClick={() => installPlugin(plugin)}
-                          style={{ width: '100%', padding: '6px', background: 'rgba(79, 138, 96,0.15)', border: '1px solid rgba(79, 138, 96,0.3)', borderRadius: '3px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                          style={{ width: '100%', padding: '6px', background: 'rgba(79, 138, 96,0.15)', border: '1px solid rgba(79, 138, 96,0.3)', borderRadius: '4px', color: 'var(--color-success)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                         >
                           {Icon.download} Install
                         </button>
@@ -9622,7 +9622,7 @@ const Imosion: React.FC = () => {
                           <button
                             aria-label={`Uninstall ${plugin.name}`}
                             onClick={() => uninstallPlugin(plugin.id)}
-                            style={{ width: '100%', padding: '6px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '10px' }}
+                            style={{ width: '100%', padding: '6px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '4px', color: 'var(--color-error)', cursor: 'pointer', fontSize: '10px' }}
                           >
                             Uninstall
                           </button>
@@ -9640,15 +9640,15 @@ const Imosion: React.FC = () => {
       {/* Templates Modal */}
       {showTemplates && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowTemplates(false)}>
-          <div className="modal-content" style={{ width: 'min(400px, calc(100vw - 48px))', maxHeight: '70vh', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(400px, calc(100vw - 48px))', maxHeight: '70vh', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-3) 14px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>Templates</span>
               <button aria-label="Close" onClick={() => setShowTemplates(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
             </div>
             <div style={{ padding: '10px', maxHeight: '350px', overflowY: 'auto' }}>
               <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                <input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="Template name..." style={{ flex: 1, padding: '6px 10px', background: '#0c0c0e', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-primary)', fontSize: '11px', outline: 'none' }} />
-                <button aria-label="Save" onClick={saveTemplate} style={{ padding: '6px var(--space-3)', background: 'var(--color-accent)', border: 'none', borderRadius: '3px', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.save} Save</button>
+                <input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="Template name..." style={{ flex: 1, padding: '6px 10px', background: '#0c0c0e', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '11px', outline: 'none' }} />
+                <button aria-label="Save" onClick={saveTemplate} style={{ padding: '6px var(--space-3)', background: 'var(--color-accent)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.save} Save</button>
               </div>
               {templates.map(tpl => (
                 <div key={tpl.id} onClick={() => applyTemplate(tpl)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 10px', background: '#0c0c0e', borderRadius: '4px', marginBottom: '4px', cursor: 'pointer', border: '1px solid #27272a', transition: 'all 0.15s' }}>
@@ -9657,7 +9657,7 @@ const Imosion: React.FC = () => {
                     <div style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>{tpl.tracks.length} tracks / {tpl.bpm} BPM / {tpl.sampleRate/1000}k</div>
                   </div>
                   {!DEFAULT_TEMPLATES.find(d => d.id === tpl.id) && (
-                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} style={{ padding: '3px 6px', background: 'rgba(158, 90, 85,0.1)', border: 'none', borderRadius: '3px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{Icon.trash}</button>
+                    <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} style={{ padding: '3px 6px', background: 'rgba(158, 90, 85,0.1)', border: 'none', borderRadius: '4px', color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{Icon.trash}</button>
                   )}
                 </div>
               ))}
@@ -9671,14 +9671,14 @@ const Imosion: React.FC = () => {
         <div className="tooltip" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, minWidth: '160px', background: 'var(--color-bg-base)', border: '1px solid #27272a', borderRadius: '6px', boxShadow: 'var(--pg-shadow-context)', zIndex: 6500, overflow: 'hidden', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
           {contextMenu.clipId ? (
             <>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { duplicateClip(contextMenu.trackId, contextMenu.clipId); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.copy} Duplicate</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) openForge(contextMenu.trackId, clip); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: '#a05a68', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Open in Forge</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) { setEditingClip({ trackId: contextMenu.trackId!, clip }); setShowClipEditor(true); } } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.mixer} Edit Clip</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { duplicateClip(contextMenu.trackId, contextMenu.clipId); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.copy} Duplicate</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) openForge(contextMenu.trackId, clip); } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: '#a05a68', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Open in Forge</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) { const track = tracks.find(t => t.id === contextMenu.trackId); const clip = track?.clips.find(c => c.id === contextMenu.clipId); if (clip) { setEditingClip({ trackId: contextMenu.trackId!, clip }); setShowClipEditor(true); } } setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.mixer} Edit Clip</div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
               {/* FL-style sample chop — slice into independent, rearrangeable clips */}
               <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--color-text-disabled)', padding: '3px 10px 1px', letterSpacing: 1 }}>CHOP SAMPLE</div>
               {([{ label: '4 slices', n: 4, m: 'even' }, { label: '8 slices', n: 8, m: 'even' }, { label: '16 slices', n: 16, m: 'even' }, { label: 'At transients', n: 0, m: 'transient' }] as const).map(o => (
-                <div key={o.label} className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) chopClip(contextMenu.trackId, contextMenu.clipId, o.n, o.m); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Chop — {o.label}</div>
+                <div key={o.label} className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) chopClip(contextMenu.trackId, contextMenu.clipId, o.n, o.m); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.waveform} Chop — {o.label}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
               {/* Tempo Lock Toggle */}
@@ -9693,11 +9693,11 @@ const Imosion: React.FC = () => {
                   }
                 }
                 setContextMenu({ ...contextMenu, visible: false }); 
-              }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.tempoLocked ? 'var(--color-success)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.tempoLocked ? 'var(--color-success)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 {tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.tempoLocked ? Icon.link : Icon.unlink}
                 {tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.tempoLocked ? 'Unlock from Tempo' : 'Lock to Tempo'}
               </div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) updateClip(contextMenu.trackId, contextMenu.clipId, { reverse: !tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.reverse }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.reverse} Reverse</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) updateClip(contextMenu.trackId, contextMenu.clipId, { reverse: !tracks.find(t => t.id === contextMenu.trackId)?.clips.find(c => c.id === contextMenu.clipId)?.reverse }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.reverse} Reverse</div>
               <div className="ctx-item" onClick={() => {
                 if (contextMenu.trackId && contextMenu.clipId) {
                   const track = tracks.find(t => t.id === contextMenu.trackId);
@@ -9709,26 +9709,26 @@ const Imosion: React.FC = () => {
                   }
                 }
                 setContextMenu({ ...contextMenu, visible: false });
-              }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.audio} Normalize</div>
+              }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.audio} Normalize</div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) setTracks(prev => prev.map(t => t.id === contextMenu.trackId ? { ...t, clips: t.clips.filter(c => c.id !== contextMenu.clipId) } : t)); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-error)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.trash} Delete</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId && contextMenu.clipId) setTracks(prev => prev.map(t => t.id === contextMenu.trackId ? { ...t, clips: t.clips.filter(c => c.id !== contextMenu.clipId) } : t)); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-error)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.trash} Delete</div>
             </>
           ) : contextMenu.trackId ? (
             <>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { armed: !tracks.find(t => t.id === contextMenu.trackId)?.armed }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.mic} Arm Recording</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { muted: !tracks.find(t => t.id === contextMenu.trackId)?.muted }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }}>Mute Track</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { solo: !tracks.find(t => t.id === contextMenu.trackId)?.solo }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px' }}>Solo Track</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { phase: !tracks.find(t => t.id === contextMenu.trackId)?.phase }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.phase} Phase Invert</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { armed: !tracks.find(t => t.id === contextMenu.trackId)?.armed }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.mic} Arm Recording</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { muted: !tracks.find(t => t.id === contextMenu.trackId)?.muted }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }}>Mute Track</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { solo: !tracks.find(t => t.id === contextMenu.trackId)?.solo }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }}>Solo Track</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) updateTrack(contextMenu.trackId, { phase: !tracks.find(t => t.id === contextMenu.trackId)?.phase }); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.phase} Phase Invert</div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
-              <div className="ctx-item" onClick={() => { setShowPluginBrowser(true); setSelectedTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plugin} Add Plugin</div>
+              <div className="ctx-item" onClick={() => { setShowPluginBrowser(true); setSelectedTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plugin} Add Plugin</div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) duplicateTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plus} Duplicate Track</div>
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) toggleFreeze(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: contextMenu.trackId && frozenTracks.has(contextMenu.trackId) ? '#4a7896' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) duplicateTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.plus} Duplicate Track</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) toggleFreeze(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: contextMenu.trackId && frozenTracks.has(contextMenu.trackId) ? '#4a7896' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
                 {contextMenu.trackId && frozenTracks.has(contextMenu.trackId) ? 'Unfreeze Track' : 'Freeze Track'}
               </div>
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 0' }} />
-              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) deleteTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-error)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.trash} Delete Track</div>
+              <div className="ctx-item" onClick={() => { if (contextMenu.trackId) deleteTrack(contextMenu.trackId); setContextMenu({ ...contextMenu, visible: false }); }} style={{ padding: 'var(--space-2) 10px', fontSize: '10px', color: 'var(--color-error)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.trash} Delete Track</div>
             </>
           ) : null}
         </div>
@@ -9758,7 +9758,7 @@ const Imosion: React.FC = () => {
                     <button 
                       aria-label="Detect clip key"
                       onClick={() => detectClipKey(editingClip.trackId, editingClip.clip.id)}
-                      style={{ padding: '4px var(--space-2)', background: 'rgba(138, 106, 156,0.2)', border: '1px solid rgba(138, 106, 156,0.3)', borderRadius: '3px', color: '#8a6a9c', cursor: 'pointer', fontSize: '9px', fontWeight: 600 }}
+                      style={{ padding: '4px var(--space-2)', background: 'rgba(138, 106, 156,0.2)', border: '1px solid rgba(138, 106, 156,0.3)', borderRadius: '4px', color: '#8a6a9c', cursor: 'pointer', fontSize: '9px', fontWeight: 600 }}
                     >
                       Detect Key
                     </button>
@@ -9771,7 +9771,7 @@ const Imosion: React.FC = () => {
                         background: editingClip.clip.keyLocked ? 'rgba(79, 138, 96,0.2)' : 'rgba(113,113,122,0.2)', 
                         border: '1px solid', 
                         borderColor: editingClip.clip.keyLocked ? 'rgba(79, 138, 96,0.3)' : '#3f3f46',
-                        borderRadius: '3px', 
+                        borderRadius: '4px', 
                         color: editingClip.clip.keyLocked ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                         cursor: editingClip.clip.detectedKey ? 'pointer' : 'not-allowed', 
                         fontSize: '9px',
@@ -9790,7 +9790,7 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Detected:</span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: editingClip.clip.detectedKey ? '#8a6a9c' : 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-elevated)', borderRadius: '3px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: editingClip.clip.detectedKey ? '#8a6a9c' : 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-elevated)', borderRadius: '4px' }}>
                       {editingClip.clip.detectedKey ? `${editingClip.clip.detectedKey} ${editingClip.clip.detectedScale}` : 'Not analyzed'}
                     </span>
                   </div>
@@ -9819,7 +9819,7 @@ const Imosion: React.FC = () => {
                       background: editingClip.clip.tempoLocked ? 'rgba(79, 138, 96,0.2)' : 'rgba(113,113,122,0.2)', 
                       border: '1px solid', 
                       borderColor: editingClip.clip.tempoLocked ? 'rgba(79, 138, 96,0.3)' : '#3f3f46',
-                      borderRadius: '3px', 
+                      borderRadius: '4px', 
                       color: editingClip.clip.tempoLocked ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                       cursor: 'pointer', 
                       fontSize: '9px',
@@ -9839,7 +9839,7 @@ const Imosion: React.FC = () => {
                     type="number" 
                     value={editingClip.clip.originalBPM || 120} 
                     onChange={(e) => setClipOriginalBPM(editingClip.trackId, editingClip.clip.id, Math.max(40, Math.min(300, parseInt(e.target.value) || 120)))}
-                    style={{ width: '60px', padding: '4px 6px', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-warning)', fontSize: '11px', fontWeight: 600, textAlign: 'center' }}
+                    style={{ width: '60px', padding: '4px 6px', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-warning)', fontSize: '11px', fontWeight: 600, textAlign: 'center' }}
                   />
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Project: {bpm} BPM</span>
                   {editingClip.clip.tempoLocked && <span style={{ fontSize: '9px', color: 'var(--color-success)', marginLeft: 'auto' }}>Auto-stretched</span>}
@@ -9863,7 +9863,7 @@ const Imosion: React.FC = () => {
                         background: editingClip.clip.warpMode === mode.value ? 'rgba(6,182,212,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
                         borderColor: editingClip.clip.warpMode === mode.value ? 'rgba(6,182,212,0.4)' : 'var(--color-bg-hover)', 
-                        borderRadius: '3px', 
+                        borderRadius: '4px', 
                         color: editingClip.clip.warpMode === mode.value ? '#4a7896' : 'var(--color-text-tertiary)', 
                         cursor: 'pointer', 
                         fontSize: '8px', 
@@ -9876,7 +9876,7 @@ const Imosion: React.FC = () => {
                 </div>
                 <div style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', marginTop: '6px' }}>{WARP_MODES.find(m => m.value === editingClip.clip.warpMode)?.desc}</div>
                 {/* Formant Preservation toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-2)', padding: '6px var(--space-2)', background: 'var(--color-bg-base)', borderRadius: '3px', border: '1px solid #1a1a1e' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-2)', padding: '6px var(--space-2)', background: 'var(--color-bg-base)', borderRadius: '4px', border: '1px solid #1a1a1e' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Formant Preservation</span>
                     <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)' }}>Keeps voice character when pitching</span>
@@ -9884,7 +9884,7 @@ const Imosion: React.FC = () => {
                   <button
                     aria-label="Toggle Formant Preservation"
                     onClick={() => updateClip(editingClip.trackId, editingClip.clip.id, { formantPreserve: !editingClip.clip.formantPreserve })}
-                    style={{ width: '36px', height: '18px', borderRadius: '8px', border: 'none', background: editingClip.clip.formantPreserve ? 'var(--color-success)' : '#3f3f46', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}
+                    style={{ width: '36px', height: '18px', borderRadius: '10px', border: 'none', background: editingClip.clip.formantPreserve ? 'var(--color-success)' : '#3f3f46', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}
                   >
                     <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: editingClip.clip.formantPreserve ? '20px' : '2px', transition: 'left 0.2s' }} />
                   </button>
@@ -9930,7 +9930,7 @@ const Imosion: React.FC = () => {
                         background: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(79, 138, 96,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
                         borderColor: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'rgba(79, 138, 96,0.4)' : 'var(--color-bg-hover)', 
-                        borderRadius: '3px', 
+                        borderRadius: '4px', 
                         color: (editingClip.clip.speedMultiplier || 1) === preset.value ? 'var(--color-success)' : 'var(--color-text-tertiary)', 
                         cursor: editingClip.clip.tempoLocked ? 'not-allowed' : 'pointer', 
                         fontSize: '9px', 
@@ -9981,7 +9981,7 @@ const Imosion: React.FC = () => {
                         background: editingClip.clip.pitch === preset.value ? 'rgba(168, 116, 74,0.2)' : 'var(--color-bg-elevated)', 
                         border: '1px solid', 
                         borderColor: editingClip.clip.pitch === preset.value ? 'rgba(168, 116, 74,0.4)' : 'var(--color-bg-hover)', 
-                        borderRadius: '3px', 
+                        borderRadius: '4px', 
                         color: editingClip.clip.pitch === preset.value ? 'var(--color-warning)' : 'var(--color-text-tertiary)', 
                         cursor: 'pointer', 
                         fontSize: '8px', 
@@ -10034,30 +10034,30 @@ const Imosion: React.FC = () => {
             {/* Forge Header */}
             <div style={{ padding: '10px var(--space-4)', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
-                <div style={{ width: '6px', height: '20px', background: '#a05a68', borderRadius: '3px' }} />
+                <div style={{ width: '6px', height: '20px', background: '#a05a68', borderRadius: '4px' }} />
                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#a05a68', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Audio Editor</span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '3px' }}>{forgeClip.clip.name}</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)', background: 'var(--color-bg-surface)', borderRadius: '4px' }}>{forgeClip.clip.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)' }}>{forgeClip.clip.duration.toFixed(2)}s | {forgeClip.clip.waveform.length} samples</span>
               </div>
-              <button aria-label="Close Forge editor" onClick={() => setShowForge(false)} style={{ width: '24px', height: '24px', borderRadius: '3px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={14} /></button>
+              <button aria-label="Close Forge editor" onClick={() => setShowForge(false)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={14} /></button>
             </div>
 
             {/* Forge Toolbar */}
             <div style={{ padding: '6px var(--space-3)', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-bg-base)', flexWrap: 'wrap' }}>
-              <button aria-label="Normalize audio" onClick={forgeNormalize} style={{ padding: '5px 10px', background: 'rgba(79, 138, 96,0.1)', border: '1px solid rgba(79, 138, 96,0.2)', borderRadius: '3px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Normalize</button>
-              <button aria-label={forgeClip.clip.reverse ? 'Un-reverse audio' : 'Reverse audio'} onClick={forgeReverse} style={{ padding: '5px 10px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>{forgeClip.clip.reverse ? 'Un-Reverse' : 'Reverse'}</button>
-              <button aria-label="Apply Fade In" onClick={forgeFadeIn} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '3px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade In</button>
-              <button aria-label="Apply Fade Out" onClick={forgeFadeOut} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '3px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade Out</button>
+              <button aria-label="Normalize audio" onClick={forgeNormalize} style={{ padding: '5px 10px', background: 'rgba(79, 138, 96,0.1)', border: '1px solid rgba(79, 138, 96,0.2)', borderRadius: '4px', color: 'var(--color-success)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Normalize</button>
+              <button aria-label={forgeClip.clip.reverse ? 'Un-reverse audio' : 'Reverse audio'} onClick={forgeReverse} style={{ padding: '5px 10px', background: 'rgba(158, 90, 85,0.1)', border: '1px solid rgba(158, 90, 85,0.2)', borderRadius: '4px', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>{forgeClip.clip.reverse ? 'Un-Reverse' : 'Reverse'}</button>
+              <button aria-label="Apply Fade In" onClick={forgeFadeIn} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '4px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade In</button>
+              <button aria-label="Apply Fade Out" onClick={forgeFadeOut} style={{ padding: '5px 10px', background: 'rgba(74, 120, 150,0.1)', border: '1px solid rgba(74, 120, 150,0.2)', borderRadius: '4px', color: '#4a7896', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Fade Out</button>
               <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-              <button aria-label="Silence selection" onClick={forgeSilence} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(168, 116, 74,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(168, 116, 74,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? 'var(--color-warning)' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Silence</button>
-              <button aria-label="Trim to selection" onClick={forgeTrim} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(138, 106, 156,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(138, 106, 156,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? '#8a6a9c' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Trim to Selection</button>
+              <button aria-label="Silence selection" onClick={forgeSilence} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(168, 116, 74,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(168, 116, 74,0.2)' : 'var(--color-bg-elevated)', borderRadius: '4px', color: forgeSelection ? 'var(--color-warning)' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Silence</button>
+              <button aria-label="Trim to selection" onClick={forgeTrim} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(138, 106, 156,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(138, 106, 156,0.2)' : 'var(--color-bg-elevated)', borderRadius: '4px', color: forgeSelection ? '#8a6a9c' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Trim to Selection</button>
               <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-              <button aria-label="Increase gain by 6dB" onClick={() => forgeGain(1.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain +6dB</button>
-              <button aria-label="Decrease gain by 6dB" onClick={() => forgeGain(0.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain -6dB</button>
+              <button aria-label="Increase gain by 6dB" onClick={() => forgeGain(1.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '4px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain +6dB</button>
+              <button aria-label="Decrease gain by 6dB" onClick={() => forgeGain(0.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '4px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain -6dB</button>
               <div style={{ flex: 1 }} />
               {forgeSelection && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>Selection: {(forgeSelection.start * 100).toFixed(1)}% - {(forgeSelection.end * 100).toFixed(1)}%</span>}
-              <button aria-label="Clear selection" onClick={() => setForgeSelection(null)} style={{ padding: '5px var(--space-2)', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-tertiary)', fontSize: '9px', cursor: 'pointer' }}>Clear Sel</button>
+              <button aria-label="Clear selection" onClick={() => setForgeSelection(null)} style={{ padding: '5px var(--space-2)', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-tertiary)', fontSize: '9px', cursor: 'pointer' }}>Clear Sel</button>
             </div>
 
             {/* Forge Waveform Display */}
@@ -10145,8 +10145,8 @@ const Imosion: React.FC = () => {
                 <span>Warp: <span style={{ color: '#8a6a9c' }}>{forgeClip.clip.warpMode}</span></span>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <button aria-label="Back to Clip Editor" onClick={() => { setEditingClip(forgeClip); setShowClipEditor(true); setShowForge(false); }} style={{ padding: '5px var(--space-3)', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '10px', cursor: 'pointer' }}>Clip Editor</button>
-                <button aria-label="Done editing in Forge" onClick={() => setShowForge(false)} style={{ padding: '5px 14px', background: '#a05a68', border: 'none', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Done</button>
+                <button aria-label="Back to Clip Editor" onClick={() => { setEditingClip(forgeClip); setShowClipEditor(true); setShowForge(false); }} style={{ padding: '5px var(--space-3)', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', cursor: 'pointer' }}>Clip Editor</button>
+                <button aria-label="Done editing in Forge" onClick={() => setShowForge(false)} style={{ padding: '5px 14px', background: '#a05a68', border: 'none', borderRadius: '4px', color: '#fff', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Done</button>
               </div>
             </div>
           </div>
@@ -10220,7 +10220,7 @@ const Imosion: React.FC = () => {
                     <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>{exportPhrase}...</span>
                     <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>{Math.round(exportProgress)}%</span>
                   </div>
-                  <div style={{ height: '6px', background: 'var(--color-bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', background: 'var(--color-bg-elevated)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${exportProgress}%`, background: 'linear-gradient(90deg, #4f8a60, #4f8a60)', transition: 'width 0.3s' }} />
                   </div>
                 </div>
@@ -10300,7 +10300,7 @@ const Imosion: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                       <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Session ID: {collaborationSession.id.substring(0, 20)}...</span>
-                      <button aria-label="Copy" onClick={() => navigator.clipboard.writeText(collaborationSession.id)} style={{ padding: '2px 6px', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '8px' }}>{Icon.copy} Copy</button>
+                      <button aria-label="Copy" onClick={() => navigator.clipboard.writeText(collaborationSession.id)} style={{ padding: '2px 6px', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '8px' }}>{Icon.copy} Copy</button>
                     </div>
                   </div>
 
@@ -10586,7 +10586,7 @@ const Imosion: React.FC = () => {
             ) : (
               <>
               {compLanes.map((lane, i) => (
-                <div key={lane.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-2)', borderRadius: 3, background: lane.active ? 'rgba(10,132,255,0.1)' : 'transparent', marginBottom: 2, cursor: 'pointer' }} onClick={() => setCompLanes(prev => prev.map((l, j) => ({ ...l, active: j === i })))}>
+                <div key={lane.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-2)', borderRadius: 4, background: lane.active ? 'rgba(10,132,255,0.1)' : 'transparent', marginBottom: 2, cursor: 'pointer' }} onClick={() => setCompLanes(prev => prev.map((l, j) => ({ ...l, active: j === i })))}>
                   <span style={{ fontSize: 9, color: lane.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontWeight: 600, width: 40 }}>Take {i + 1}</span>
                   <div style={{ flex: 1, height: 20, background: 'var(--color-border-subtle)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${lane.active ? 'rgba(10,132,255,0.2)' : 'var(--color-border-subtle)'} 0%, transparent 100%)` }} />
@@ -10595,7 +10595,7 @@ const Imosion: React.FC = () => {
                   <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)', width: 24 }}>{lane.active ? <DexIcon name="check" size={10} color="#4f8a60" /> : ''}</span>
                 </div>
               ))}
-              <button aria-label="Add New Take" onClick={() => setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: false }])} style={{ marginTop: 6, padding: '3px 10px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>+ New Take</button>
+              <button aria-label="Add New Take" onClick={() => setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: false }])} style={{ marginTop: 6, padding: '3px 10px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>+ New Take</button>
               </>
             )}
           </div>
@@ -10702,14 +10702,14 @@ const Imosion: React.FC = () => {
             ) : (
               midiInputs.map(inp => (
                 <div key={inp.id} onClick={() => setActiveMidiInput(inp.id)} style={{ padding: '6px var(--space-2)', borderRadius: 4, cursor: 'pointer', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', background: activeMidiInput === inp.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', border: `1px solid ${activeMidiInput === inp.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}` }}>
-                  <div style={{ width: 6, height: 6, borderRadius: 3, background: inp.connected ? 'var(--color-success)' : 'var(--color-error)' }} />
+                  <div style={{ width: 6, height: 6, borderRadius: 4, background: inp.connected ? 'var(--color-success)' : 'var(--color-error)' }} />
                   <span style={{ fontSize: 10, color: activeMidiInput === inp.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: activeMidiInput === inp.id ? 600 : 400 }}>{inp.name}</span>
                 </div>
               ))
             )}
             <div style={{ height: 1, background: 'var(--color-bg-hover)', margin: 'var(--space-2) 0' }} />
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6, letterSpacing: '0.5px' }}>KEYBOARD</div>
-            <div style={{ display: 'flex', height: 40, borderRadius: 3, overflow: 'hidden', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ display: 'flex', height: 40, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               {[60,61,62,63,64,65,66,67,68,69,70,71,72].map(note => {
                 const isBlack = [1,3,6,8,10].includes(note % 12);
                 const isActive = midiNotes.has(note);
@@ -10719,7 +10719,7 @@ const Imosion: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6, letterSpacing: '0.5px' }}>CC MAPPING</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {Object.entries(midiCCMap).map(([cc, target]) => (
-                <div key={cc} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 3, background: 'var(--color-border-subtle)' }}>
+                <div key={cc} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 4, background: 'var(--color-border-subtle)' }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>CC {cc}</span>
                   <span style={{ fontSize: 9, color: 'var(--color-accent)', fontWeight: 600 }}>{target}</span>
                 </div>
@@ -10829,7 +10829,7 @@ const Imosion: React.FC = () => {
               <div key={t.id} style={{ padding: 'var(--space-2)', borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 3 }}>
                 <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{t.name}</div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <select style={{ flex: 1, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                  <select style={{ flex: 1, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                     <option>Master Bus</option>
                     <option>Bus A</option>
                     <option>Bus B</option>
@@ -10844,7 +10844,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: 'var(--space-2)', borderRadius: 4, background: 'var(--color-border-subtle)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Input</span>
-                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                   <option>Default Input</option>
                   <option>Input 1-2</option>
                   <option>Input 3-4</option>
@@ -10852,7 +10852,7 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Output</span>
-                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                   <option>Default Output</option>
                   <option>Output 1-2</option>
                   <option>Output 3-4</option>

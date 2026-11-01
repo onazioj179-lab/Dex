@@ -248,7 +248,7 @@ const s: Record<string, React.CSSProperties> = {
   presetChip: {
     padding: '6px var(--space-4)', background: 'var(--color-bg-elevated)',
     color: 'var(--color-text-primary)', border: '1px solid var(--color-border)',
-    borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+    borderRadius: 9999, fontSize: 13, fontWeight: 500, cursor: 'pointer',
     fontFamily: 'var(--font-family)',
   },
   grid: {
@@ -257,7 +257,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   card: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)',
-    padding: 'var(--space-4)', borderRadius: 12,
+    padding: 'var(--space-4)', borderRadius: 14,
   },
   cardHeader: { display: 'flex', alignItems: 'center', width: '100%', gap: 'var(--space-2)' },
   labelBtn: {

@@ -69,7 +69,7 @@ export const ContextNowPanel: React.FC = () => {
     rowValue: { color: 'var(--color-text-primary)', wordBreak: 'break-word' },
     sectionTitle: { fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', margin: 'var(--space-3) 0 var(--space-2)' },
     chips: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-    chip: { padding: '3px 10px', borderRadius: '999px', fontSize: '12px', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)' },
+    chip: { padding: '3px 10px', borderRadius: '9999px', fontSize: '12px', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)' },
     activity: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 0', fontSize: '12px' },
     actKind: { fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-accent)', width: '54px', flexShrink: 0 },
     actTarget: { flex: 1, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },

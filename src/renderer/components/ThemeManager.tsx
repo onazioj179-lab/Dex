@@ -555,7 +555,7 @@ const styles: Record<string, React.CSSProperties> = {
   presetAccent: {
     width: '30px',
     height: '6px',
-    borderRadius: '3px',
+    borderRadius: '4px',
   },
   presetText: {
     width: '80%',

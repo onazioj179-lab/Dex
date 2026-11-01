@@ -822,7 +822,7 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     }
 
     return (
-      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 8, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 10, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <div style={{ fontSize: 14, fontWeight: 700 }}>View error in {this.props.viewName}</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>Something went wrong in this view. The issue was logged.</div>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>

@@ -144,7 +144,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             aria-label={`Toggle ${lvl} logs`}
             style={{
               padding: '2px 6px',
-              borderRadius: 3,
+              borderRadius: 4,
               border: '1px solid',
               borderColor: filter.has(lvl) ? LEVEL_COLORS[lvl] : 'transparent',
               background: filter.has(lvl) ? `${LEVEL_COLORS[lvl]}22` : 'transparent',
@@ -171,7 +171,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
           onClick={clear}
           aria-label="Clear log entries"
           title="Clear"
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 3, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px var(--space-2)', fontSize: 10, fontFamily: 'inherit' }}
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px var(--space-2)', fontSize: 10, fontFamily: 'inherit' }}
         >
           Clear
         </button>

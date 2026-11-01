@@ -110,7 +110,7 @@ const NexusUkiPanel: React.FC = () => {
       style={{ marginBottom: 'var(--space-3, 12px)' }}
       headerAccessory={
         <span style={{ ...chip, color: STATE_TONE[state], borderColor: 'var(--color-border-subtle)' }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: STATE_TONE[state] }} />
+          <span style={{ width: 6, height: 6, borderRadius: 9999, background: STATE_TONE[state] }} />
           {STATE_LABEL[state]}
         </span>
       }
@@ -165,7 +165,7 @@ const NexusUkiPanel: React.FC = () => {
             return (
               <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-md, 8px)', fontWeight: 400 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, flexShrink: 0, background: TASK_TONE[t.status] }} />
+                  <span style={{ width: 6, height: 6, borderRadius: 9999, flexShrink: 0, background: TASK_TONE[t.status] }} />
                   <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: TASK_TONE[t.status], textTransform: 'uppercase', flexShrink: 0 }}>{t.status}</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{timeAgo(t.updatedAt)}</span>
@@ -204,7 +204,7 @@ const NexusUkiPanel: React.FC = () => {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Reasoning</div>
           {recentThoughts.map((th) => (
             <div key={th.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-              <span style={{ width: 5, height: 5, borderRadius: 999, flexShrink: 0, background: th.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)' }} />
+              <span style={{ width: 5, height: 5, borderRadius: 9999, flexShrink: 0, background: th.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)' }} />
               <span style={{ color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={th.query}>{th.query}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{th.intent}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{Math.round(th.latencyMs)}ms</span>
@@ -220,7 +220,7 @@ const NexusUkiPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {topNodes.map((n) => (
               <span key={n.id} style={{ ...chip, borderColor: (n.color || 'var(--color-border-subtle)') }} title={`${n.category} · weight ${n.weight}`}>
-                <span style={{ width: 6, height: 6, borderRadius: 999, background: n.color || 'var(--color-accent)' }} />
+                <span style={{ width: 6, height: 6, borderRadius: 9999, background: n.color || 'var(--color-accent)' }} />
                 {n.label}
               </span>
             ))}

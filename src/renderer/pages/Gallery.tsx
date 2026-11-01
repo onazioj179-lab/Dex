@@ -1277,9 +1277,9 @@ export const Gallery: React.FC = () => {
           {loading ? (
             <div style={{ ...styles.grid, padding: 'var(--space-4)' }}>
               {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} style={{ ...styles.gridItem, background: 'var(--color-border-subtle)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
+                <div key={i} style={{ ...styles.gridItem, background: 'var(--color-border-subtle)', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
                   <div style={{ ...styles.thumbnail, background: 'var(--color-bg-hover)' }} />
-                  <span style={{ width: '60%', height: 10, borderRadius: 3, background: 'var(--color-bg-hover)', marginTop: 6, display: 'block' }} />
+                  <span style={{ width: '60%', height: 10, borderRadius: 4, background: 'var(--color-bg-hover)', marginTop: 6, display: 'block' }} />
                 </div>
               ))}
               <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
@@ -1607,7 +1607,7 @@ export const Gallery: React.FC = () => {
             {selectedMedia && (mediaTags[selectedMedia.id] || []).length > 0 ? (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {(mediaTags[selectedMedia.id] || []).map((tag, i) => (
-                  <span key={i} style={{ padding: '2px var(--space-2)', borderRadius: 8, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', color: 'var(--color-accent)', fontSize: 11 }}>
+                  <span key={i} style={{ padding: '2px var(--space-2)', borderRadius: 10, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', color: 'var(--color-accent)', fontSize: 11 }}>
                     {tag} <span style={{ cursor: 'pointer', marginLeft: 2, display: 'inline-flex', verticalAlign: 'middle' }} onClick={() => { if (selectedMedia) setMediaTags(t => ({ ...t, [selectedMedia.id]: (t[selectedMedia.id] || []).filter((_, j) => j !== i) })); }}><DexIcon name="close" size={9} /></span>
                   </span>
                 ))}
@@ -1841,7 +1841,7 @@ export const Gallery: React.FC = () => {
                 </span>
               )}
               {displayName(selectedMedia)}
-              {selectedMedia.type === 'video' && <span style={{ marginLeft: 'var(--space-2)', padding: '2px var(--space-2)', borderRadius: 3, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
+              {selectedMedia.type === 'video' && <span style={{ marginLeft: 'var(--space-2)', padding: '2px var(--space-2)', borderRadius: 4, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
             </span>
             <div style={styles.lightboxActions}>
               <button style={{...styles.lightboxBtn, color: favorites.includes(selectedMedia.id) ? 'var(--color-error)' : 'var(--color-text-secondary)'}} aria-label={favorites.includes(selectedMedia.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => toggleFavorite(selectedMedia.id)}>
@@ -2060,7 +2060,7 @@ export const Gallery: React.FC = () => {
                     <div style={{
                       position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
                       display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '6px 10px', borderRadius: 8,
+                      padding: '6px 10px', borderRadius: 10,
                       background: 'rgba(0,0,0,0.80)',
                       border: '1px solid var(--color-border)',
                     }}>
@@ -2087,7 +2087,7 @@ export const Gallery: React.FC = () => {
           </div>
 
           <div style={styles.lightboxFooter}>
-            <span style={{ padding: '2px var(--space-2)', borderRadius: 3, background: 'var(--color-border-subtle)', fontSize: 11, fontWeight: 500 }}>
+            <span style={{ padding: '2px var(--space-2)', borderRadius: 4, background: 'var(--color-border-subtle)', fontSize: 11, fontWeight: 500 }}>
               {getMediaFormat(selectedMedia)}
             </span>
             <span>{selectedMedia.type === 'video' ? 'Video' : 'Photo'}</span>
@@ -2209,7 +2209,7 @@ const styles: Record<string, React.CSSProperties> = {
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },
   viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 4, padding: 2 },
-  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 3, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
+  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 4, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
 
   // Content
   content: { flex: 1, overflow: 'auto', padding: 'var(--space-5)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
@@ -2224,7 +2224,7 @@ const styles: Record<string, React.CSSProperties> = {
   thumbnail: { aspectRatio: '1', borderRadius: 6, position: 'relative' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   videoOverlay: { position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: 6 },
   playBadge: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-primary)' },
-  durationBadge: { position: 'absolute' as const, bottom: 6, right: 6, padding: '2px 6px', borderRadius: 3, background: 'rgba(0,0,0,0.7)', color: 'var(--color-text-primary)', fontSize: 10, fontWeight: 500 },
+  durationBadge: { position: 'absolute' as const, bottom: 6, right: 6, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.7)', color: 'var(--color-text-primary)', fontSize: 10, fontWeight: 500 },
   favoriteIcon: { position: 'absolute' as const, top: 8, right: 8, color: 'var(--color-error)' },
   itemName: { fontSize: 12, color: 'var(--color-text-primary)', textAlign: 'center' as const, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
 

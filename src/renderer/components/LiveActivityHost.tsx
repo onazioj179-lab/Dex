@@ -126,18 +126,18 @@ const Card: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
             {indeterminate && !isDone && !isError ? '' : `${pct}%`}
           </span>
         </div>
-        <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: 8, borderRadius: 9999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden', position: 'relative' }}>
           {indeterminate && !isDone && !isError ? (
             <div
               style={{
-                position: 'absolute', top: 0, bottom: 0, width: '38%', borderRadius: 999,
+                position: 'absolute', top: 0, bottom: 0, width: '38%', borderRadius: 9999,
                 background: barColor, animation: 'dexIndeterminate 1.3s ease-in-out infinite',
               }}
             />
           ) : (
             <div
               style={{
-                height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, borderRadius: 999,
+                height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, borderRadius: 9999,
                 background: barColor, boxShadow: `0 0 12px ${isError ? 'rgba(255,69,58,0.5)' : 'rgba(74,158,255,0.5)'}`,
                 transition: 'width 0.3s ease',
               }}

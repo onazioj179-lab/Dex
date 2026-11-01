@@ -92,7 +92,7 @@ export const FlowSendMenu: React.FC = () => {
     preview: { fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
     kindTag: { display: 'inline-block', fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginRight: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' },
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: 'var(--space-3)' },
-    target: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: '8px', border: '1px solid var(--color-border-subtle)', background: 'transparent', cursor: 'pointer', textAlign: 'left' },
+    target: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: '10px', border: '1px solid var(--color-border-subtle)', background: 'transparent', cursor: 'pointer', textAlign: 'left' },
     swatch: { width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0 },
     targetName: { fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 },
     hint: { padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border)', fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center' },

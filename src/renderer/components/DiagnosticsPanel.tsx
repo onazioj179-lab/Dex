@@ -170,7 +170,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
                   display: 'flex', justifyContent: 'space-between',
                   fontSize: 11, fontVariantNumeric: 'tabular-nums',
                   color: p.durationMs > 500 ? 'var(--status-error, #ef4444)' : 'var(--pg-text-secondary, #9ca3af)',
-                  padding: '2px var(--space-2)', background: 'rgba(255,255,255,0.03)', borderRadius: 3,
+                  padding: '2px var(--space-2)', background: 'rgba(255,255,255,0.03)', borderRadius: 4,
                 }}>
                   <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.name}</span>
                   <span style={{ fontWeight: 600 }}>{p.durationMs} ms</span>
@@ -190,7 +190,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
               {crashes.slice(0, 20).map((c, i) => (
-                <div key={c.id || i} style={{ padding: '4px var(--space-2)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 3 }}>
+                <div key={c.id || i} style={{ padding: '4px var(--space-2)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: 11 }}>
                     <span style={{ fontWeight: 600, color: 'var(--status-error, #ef4444)' }}>{String(c.type || c.kind || c.reason || 'crash')}</span>
                     <span style={{ color: 'var(--pg-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{c.timestamp ? new Date(c.timestamp).toLocaleString() : String(c.time || '')}</span>

@@ -112,7 +112,7 @@ const styles = {
     flexDirection: 'column' as const,
     minWidth: 180,
     maxWidth: 'min(320px, calc(100vw - 48px))',
-    borderRadius: 12,
+    borderRadius: 14,
     boxShadow: 'var(--pg-shadow-popover)',
     overflow: 'hidden',
     outline: 'none',

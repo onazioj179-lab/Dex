@@ -443,7 +443,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -468,7 +468,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     height: '6px',
     background: 'var(--color-bg-surface)',
-    borderRadius: '3px',
+    borderRadius: '4px',
     overflow: 'hidden',
   },
   strengthFill: {
@@ -538,7 +538,7 @@ const styles: Record<string, React.CSSProperties> = {
   slider: {
     width: '100%',
     height: '6px',
-    borderRadius: '3px',
+    borderRadius: '4px',
     background: 'var(--color-bg-surface)',
     appearance: 'none',
     cursor: 'pointer',
@@ -584,7 +584,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggleKnob: {
     width: '18px',
     height: '18px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     background: 'var(--color-bg-elevated)',
     transition: 'transform 0.2s ease',
     boxShadow: 'var(--shadow-sm)',

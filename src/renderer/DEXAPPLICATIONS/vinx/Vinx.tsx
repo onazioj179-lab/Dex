@@ -133,7 +133,7 @@ const toolbarBtnActiveStyle: React.CSSProperties = {
 };
 
 const saveBadgeStyle = (dirty: boolean): React.CSSProperties => ({
-  width: 6, height: 6, borderRadius: 3, flexShrink: 0,
+  width: 6, height: 6, borderRadius: 4, flexShrink: 0,
   background: dirty ? 'var(--color-error)' : 'var(--color-success)',
 });
 
@@ -1404,7 +1404,7 @@ const VinxEditor: React.FC = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                <span style={{ width: 6, height: 6, borderRadius: 3, background: 'var(--color-error)' }} />
+                <span style={{ width: 6, height: 6, borderRadius: 4, background: 'var(--color-error)' }} />
                 Quick Export (WebM)
               </span>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -1725,7 +1725,7 @@ const VinxEditor: React.FC = () => {
                 { icon: 'MIC', name: 'Podcast Video', desc: '1920×1080 @ 30fps', cat: 'Web' },
                 { icon: 'AU', name: 'Podcast Audio', desc: 'Audio-only @ 48kHz', cat: 'Web' },
               ].map(t => (
-                <button key={t.name} aria-label={`Use ${t.name} template (${t.desc})`} onClick={() => { useVinxStore.getState().setProjectName(`${t.name} Project`); toggleTemplateDialog(); }} style={{ padding: '14px var(--space-4)', borderRadius: 8, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <button key={t.name} aria-label={`Use ${t.name} template (${t.desc})`} onClick={() => { useVinxStore.getState().setProjectName(`${t.name} Project`); toggleTemplateDialog(); }} style={{ padding: '14px var(--space-4)', borderRadius: 10, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
                   <span style={{ fontSize: 24 }}>{t.icon}</span>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>{t.name}</div>
@@ -1828,23 +1828,23 @@ const VinxEditor: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Compare current frame with a reference</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Ref Frame:</span>
-              <input type="number" value={referenceFrameNum} onChange={e => setReferenceFrame(parseInt(e.target.value) || 0)} style={{ width: 60, padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11 }} />
+              <input type="number" value={referenceFrameNum} onChange={e => setReferenceFrame(parseInt(e.target.value) || 0)} style={{ width: 60, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11 }} />
               <button style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 9999, padding: '3px var(--space-2)' }} onClick={() => setReferenceFrame(currentFrame)} aria-label="Set reference to current frame">Capture</button>
             </div>
             <div style={{ display: 'flex', gap: 6, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 'var(--space-2)' }}>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>REFERENCE</div>
-                <div style={{ height: 60, borderRadius: 3, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {referenceFrameNum}</div>
+                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {referenceFrameNum}</div>
               </div>
               <div style={{ width: 1, background: 'var(--color-border-subtle)' }} />
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>CURRENT</div>
-                <div style={{ height: 60, borderRadius: 3, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {currentFrame}</div>
+                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {currentFrame}</div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4, marginTop: 'var(--space-2)' }}>
               {['Side-by-Side', 'Overlay', 'Split', 'Difference'].map(mode => (
-                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${compareMode === mode ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
+                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${compareMode === mode ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
               ))}
             </div>
           </div>
@@ -1971,13 +1971,13 @@ const VinxEditor: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Offset audio relative to video for selected clip</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', marginBottom: 6 }}>J-Cut (audio leads)</div>
             {[15, 30, 60].map(f => (
-              <button key={`j-${f}`} aria-label={`Apply J-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'j-cut', f); }} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
+              <button key={`j-${f}`} aria-label={`Apply J-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'j-cut', f); }} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
                 {f} frames ({(f / project.frameRate).toFixed(1)}s)
               </button>
             ))}
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-success)', margin: 'var(--space-2) 0 6px' }}>L-Cut (audio trails)</div>
             {[15, 30, 60].map(f => (
-              <button key={`l-${f}`} aria-label={`Apply L-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'l-cut', f); }} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
+              <button key={`l-${f}`} aria-label={`Apply L-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'l-cut', f); }} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
                 {f} frames ({(f / project.frameRate).toFixed(1)}s)
               </button>
             ))}
@@ -2209,7 +2209,7 @@ const VinxEditor: React.FC = () => {
                 </div>
               ))}
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 4 }}>
-                <input type="color" defaultValue={clip.color} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 3, cursor: 'pointer' }} />
+                <input type="color" defaultValue={clip.color} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', alignSelf: 'center' }}>Clip Color Label</span>
               </div>
             </div>
@@ -2340,7 +2340,7 @@ const VinxEditor: React.FC = () => {
                   {group.shortcuts.map(([key, action]) => (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{action}</span>
-                      <kbd style={{ padding: '2px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>{key}</kbd>
+                      <kbd style={{ padding: '2px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                     </div>
                   ))}
                 </div>
@@ -2391,7 +2391,7 @@ const VinxEditor: React.FC = () => {
           <div className="dex-creative-panel" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, borderRadius: 'var(--radius-lg)', padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
-              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
+              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

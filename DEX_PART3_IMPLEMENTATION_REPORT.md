@@ -23,8 +23,8 @@ Part 3 started with the completion gate (`DEX_PART1_PART2_COMPLETION_AUDIT.md`).
 |---|---|---|
 | §6 Mobile | NOT APPLICABLE | No mobile target |
 | §7.1 Notes: Markdown, section links | Existing | Found in `DexNotes.tsx`/`NotesDocumentModel.ts` |
-| §7.1 Notes: drawing, handwritten signature | MISSING | Not started; needs a canvas layer in the editor |
-| §7.2 Whiteboards | MISSING (as "whiteboard") | `Canvas.tsx` exists; no folders/collab |
+| §7.1 Notes: drawing, handwritten signature | **DONE** | Sketch + signature pad (PR #65), verified in the packaged app with real pointer input; alt text states it is not a cryptographic signature. Also fixed: images inside paragraphs were dropped on save; Notes created a blank note on every first open |
+| §7.2 Whiteboards | **PARTIAL→DONE (local)** | Canvas now has multiple boards in folders, stored in IndexedDB (fixes drawings silently lost when they outgrew localStorage); old drawing migrated once, verified before the legacy copy is removed. Collaboration still MISSING (needs a sync service) |
 | §7.3 Weather error/loading states | Existing (alert handling present) | Not re-tested |
 | §7.4 Photos shared albums | MISSING | Requires sync backend |
 | §7.5 Podcasts | MISSING | No podcast app |
@@ -39,9 +39,18 @@ Part 3 started with the completion gate (`DEX_PART1_PART2_COMPLETION_AUDIT.md`).
 | §8.9 Host defects (BitLocker, VPN, RDP, Sandbox, updates) | Out of scope | Windows components; none reproduced in DEX |
 | §9 Linux | BLOCKED | `dex-os/` not built or booted |
 | §10 UKI | NOT APPLICABLE | GRUB + bzImage, no Unified Kernel Image |
-| §11 Shell modernization | PARTIAL | Settings cleaned and accurate; dock/taskbar not reworked |
+| §11 Shell modernization | PARTIAL | Settings cleaned and accurate; Windows toasts now hide content while DEX is locked; DEX Bar/tab bar keyboard access confirmed; dock/taskbar visuals not reworked |
 | §12 Modularity | PARTIAL | Visibility-level; download modules blocked on signing |
 
 ## Tests
 
 See the test section of `DEX_RELEASE_NOTES.md` for the final run on this branch.
+
+## Follow-up batch (branch `claude/dex-part3-features`)
+
+| Item | Status | Verification |
+|---|---|---|
+| Lock-screen privacy for Windows toasts | Done: generic "DEX / You have a new notification" while locked | Unit test (lock × setting matrix); cargo check |
+| Radius sweep | Done: all 636 remaining in-app values snapped; guard now at **0** | Ratchet test; tsc |
+| Canvas boards + folders (IndexedDB) | Done | 5 unit tests incl. migration safety |
+| Form-control borders (>=3:1) | Done (PR #65) | Token contrast computed |

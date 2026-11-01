@@ -2045,7 +2045,7 @@ const UkiOverlay: React.FC = () => {
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
                     lineHeight: 1.5, padding: '6px var(--space-2)', marginBottom: 6,
                     background: 'var(--color-bg-hover)', borderLeft: '2px solid var(--color-accent-light)',
-                    borderRadius: 3,
+                    borderRadius: 4,
                   }}>
                     {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2092,7 +2092,7 @@ const UkiOverlay: React.FC = () => {
               padding: '6px var(--space-2)', marginBottom: 'var(--space-2)',
               background: 'var(--color-accent-soft)',
               borderLeft: '2px solid var(--color-accent)',
-              borderRadius: 3,
+              borderRadius: 4,
             }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -2145,7 +2145,7 @@ const UkiOverlay: React.FC = () => {
             <div role="alert" style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
               padding: '6px var(--space-2)', background: 'var(--color-error-muted)',
-              borderRadius: 3, borderLeft: '2px solid var(--color-error)',
+              borderRadius: 4, borderLeft: '2px solid var(--color-error)',
             }}>
               {error}
             </div>
@@ -2299,7 +2299,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 8, padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 10, padding: 'var(--space-2) var(--space-3)',
               fontSize: 13, color: 'var(--color-text-primary)',
               outline: 'none',
               resize: 'none',
@@ -2318,7 +2318,7 @@ const UkiOverlay: React.FC = () => {
             onClick={() => handleSendText()}
             disabled={!inputText.trim() || isThinking || state === 'processing' || state === 'thinking'}
             style={{
-              width: 32, height: 32, borderRadius: 8,
+              width: 32, height: 32, borderRadius: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: (inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent',
               border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent'),

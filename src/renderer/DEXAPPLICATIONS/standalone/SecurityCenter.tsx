@@ -162,7 +162,7 @@ const SecurityCenter: React.FC = () => {
               }}>{OUTCOME_LABEL[e.outcome]}</span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ color: colors.text.primary, fontWeight: 600, fontFamily: fontStack.mono }}>{e.id}</span>
-                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 3, padding: '0 4px', textTransform: 'uppercase' }}>write</span>}
+                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 4, padding: '0 4px', textTransform: 'uppercase' }}>write</span>}
                 <span style={{ display: 'block', color: colors.text.secondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.result}</span>
               </span>
               <span style={{ color: colors.text.tertiary }}>{e.appId}</span>

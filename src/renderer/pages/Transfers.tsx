@@ -952,7 +952,7 @@ const Transfers: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{
-                        width: 40, height: 40, borderRadius: 8,
+                        width: 40, height: 40, borderRadius: 10,
                         background: 'rgba(100,210,255,0.1)', border: '1px solid rgba(100,210,255,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
                       }}>{getDeviceIcon(device.deviceType)}</div>
@@ -1167,8 +1167,8 @@ const Transfers: React.FC = () => {
                         <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>| Limit: {speedLimit} MB/s</span>
                       )}
                     </div>
-                    <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, Math.max(0, t.progress))}%`, height: '100%', borderRadius: 3, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
+                    <div style={{ width: '100%', height: 6, borderRadius: 4, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, Math.max(0, t.progress))}%`, height: '100%', borderRadius: 4, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>
@@ -1237,12 +1237,12 @@ const Transfers: React.FC = () => {
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Share files via HTTP link for browser access</div>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button onClick={httpShareFiles} disabled={busy} style={{
-                  padding: '7px var(--space-4)', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                  padding: '7px var(--space-4)', borderRadius: 10, border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
                   fontSize: 12, fontWeight: 500, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6,
                 }}>{Icons.file} Add Files</button>
                 <button onClick={httpServerRunning ? stopHttpServer : startHttpServer} disabled={busy} style={{
-                  padding: '7px var(--space-4)', borderRadius: 8, border: 'none', cursor: busy ? 'default' : 'pointer',
+                  padding: '7px var(--space-4)', borderRadius: 10, border: 'none', cursor: busy ? 'default' : 'pointer',
                   background: httpServerRunning ? 'rgba(255,69,58,0.15)' : 'rgba(48,209,88,0.15)',
                   color: httpServerRunning ? 'var(--color-error)' : 'var(--color-success)',
                   fontSize: 12, fontWeight: 600, opacity: busy ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6,
@@ -1459,8 +1459,8 @@ const Transfers: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Sound on complete</span>
               <div style={{ flex: 1 }} />
-              <div onClick={() => setSoundEnabled(p => !p)} role="switch" aria-checked={soundEnabled} aria-label="Sound on complete" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSoundEnabled(p => !p); } }} style={{ width: 32, height: 18, borderRadius: 9, background: soundEnabled ? 'rgba(48,209,88,0.3)' : 'var(--color-text-tertiary)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
-                <div style={{ width: 14, height: 14, borderRadius: 7, background: soundEnabled ? 'var(--color-success)' : 'var(--color-text-muted)', position: 'absolute', top: 2, transition: 'all 0.2s', ...(soundEnabled ? { right: 2 } : { left: 2 }) }} />
+              <div onClick={() => setSoundEnabled(p => !p)} role="switch" aria-checked={soundEnabled} aria-label="Sound on complete" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSoundEnabled(p => !p); } }} style={{ width: 32, height: 18, borderRadius: 10, background: soundEnabled ? 'rgba(48,209,88,0.3)' : 'var(--color-text-tertiary)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
+                <div style={{ width: 14, height: 14, borderRadius: 6, background: soundEnabled ? 'var(--color-success)' : 'var(--color-text-muted)', position: 'absolute', top: 2, transition: 'all 0.2s', ...(soundEnabled ? { right: 2 } : { left: 2 }) }} />
               </div>
             </div>
           </div>
