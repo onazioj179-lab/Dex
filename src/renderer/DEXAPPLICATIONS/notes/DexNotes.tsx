@@ -219,7 +219,7 @@ const DexNotes: React.FC = () => {
     selectedFolderId, selectedNoteId, searchQuery, searchResults,
     sortField, sortDirection, viewMode, editorMode, focusMode,
     sidebarCollapsed, listCollapsed, paneSize,
-    loading, saving, searching,
+    loading, saving, searching, initialized,
   } = store;
 
   // UKI app-action: create a note (mutating -> confirm-gated). A ref keeps the
@@ -318,7 +318,9 @@ const DexNotes: React.FC = () => {
   const createAttempted = useRef(false);
 
   useEffect(() => {
-    if (loading || initFailed) return;
+    // Wait for the first real load: before it, `notes` is [] and `loading` is
+    // still false, so this used to create a blank note on every first open.
+    if (loading || initFailed || !initialized) return;
     if (!activeNote) {
       if (notes.length > 0) {
         store.selectNote(notes[0].id);

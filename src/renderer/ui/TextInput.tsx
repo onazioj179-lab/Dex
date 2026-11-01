@@ -31,7 +31,7 @@ const sharedField = (size: InputSize, invalid: boolean): React.CSSProperties => 
   fontFamily: 'inherit',
   color: 'var(--color-text-primary, #fff)',
   background: 'var(--color-bg-inset, #101012)',
-  border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border, rgba(255,255,255,0.14))'}`,
+  border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border-control, #6B6D73)'}`,
   borderRadius: radius.md,
   outline: 'none',
   transition: FOCUS_TRANSITION,
@@ -47,7 +47,7 @@ const focusOn = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, in
 
 const focusOff = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {
   const el = e.currentTarget;
-  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border, rgba(255,255,255,0.14))';
+  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border-control, #6B6D73)';
   el.style.boxShadow = 'none';
 };
 
@@ -60,7 +60,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(({
         style={{
           display: 'flex', alignItems: 'center',
           background: 'var(--color-bg-inset, #101012)',
-          border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border, rgba(255,255,255,0.14))'}`,
+          border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border-control, #6B6D73)'}`,
           borderRadius: radius.md,
           height: inputTokens.height[inputSize],
           padding: '0 var(--space-2)',

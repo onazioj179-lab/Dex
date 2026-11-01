@@ -267,13 +267,46 @@ function parseChildren(el: Element | ChildNode): DocNode[] {
         nodes.push({ type: 'paragraph', text });
       }
     } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const parsed = parseElement(child as Element);
+      const elc = child as Element;
+      // contenteditable puts inserted/pasted images INSIDE the current <p>, but
+      // parseInline only keeps text, so those images were silently dropped on
+      // save. Split such paragraphs into text paragraphs + image blocks.
+      if ((elc.tagName === 'P' || elc.tagName === 'DIV') && elc.querySelector('img')) {
+        nodes.push(...splitParagraphImages(elc));
+        continue;
+      }
+      const parsed = parseElement(elc);
       if (parsed) {
         nodes.push(parsed);
       }
     }
   }
   return nodes;
+}
+
+/** A paragraph containing images -> [paragraph?, image, paragraph?, ...]. */
+function splitParagraphImages(el: Element): DocNode[] {
+  const out: DocNode[] = [];
+  let run = el.ownerDocument.createElement('p');
+  const flush = () => {
+    const content = parseInline(run);
+    if ((run.textContent || '').trim()) out.push({ type: 'paragraph', content });
+    run = el.ownerDocument.createElement('p');
+  };
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'IMG') {
+      flush();
+      const img = node as Element;
+      out.push({ type: 'image', attrs: { src: img.getAttribute('src') || '', alt: img.getAttribute('alt') || '' } });
+    } else if (node.nodeType === Node.ELEMENT_NODE && (node as Element).querySelector('img')) {
+      flush();
+      out.push(...splitParagraphImages(node as Element));
+    } else {
+      run.appendChild(node.cloneNode(true));
+    }
+  }
+  flush();
+  return out;
 }
 
 function parseElement(el: Element): DocNode | null {
