@@ -23,7 +23,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { APP_DEFINITIONS } from '../store/runningApps';
-import { useInstalledAppsStore, canRemoveApp } from '../store/installedAppsStore';
+import { useInstalledAppsStore, canRemoveApp, appTier, type AppTier } from '../store/installedAppsStore';
+
+const TIER_LABEL: Record<AppTier, string> = { core: 'Core', recommended: 'Recommended', optional: 'Optional' };
+const TIER_HINT: Record<AppTier, string> = {
+  core: 'Part of the DEX shell; always installed',
+  recommended: 'Included on new setups',
+  optional: 'Add it when you need it; not included on new setups',
+};
 
 // ---------------------------------------------------------------------------
 // Types + registry projection
@@ -440,6 +447,7 @@ export default function Store(): React.ReactElement {
               <h1 style={styles.detailName}>{selected.name}</h1>
               <div style={styles.detailMetaRow}>
                 <span style={styles.catChip}>{CATEGORY_LABELS[selected.category]}</span>
+                <span style={styles.metaDim} title={TIER_HINT[appTier(selected.id)]}>{TIER_LABEL[appTier(selected.id)]}</span>
                 {isRemoved(selected.id) ? (
                   <span style={{ ...styles.installedBadge, color: 'var(--color-text-tertiary)' }}><DexIcon name="download" size={12} /> Removed</span>
                 ) : (
@@ -479,6 +487,12 @@ export default function Store(): React.ReactElement {
                   </button>
                 )}
               </div>
+              {canRemoveApp(selected.id) && (
+                <div style={{ ...styles.metaDim, marginTop: 8 }}>
+                  Removing hides {selected.name} everywhere in DEX. Its data is kept, so reinstalling brings everything back.
+                  App code ships inside DEX, so removing doesn't free disk space.
+                </div>
+              )}
             </div>
           </div>
 

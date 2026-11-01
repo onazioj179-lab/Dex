@@ -28,6 +28,32 @@ export function canRemoveApp(appId: string): boolean {
   return !!appId && !PROTECTED_APP_IDS.has(appId);
 }
 
+// ---- App tiers -------------------------------------------------------------
+// core        — the shell itself; can't be removed (PROTECTED_APP_IDS).
+// recommended — everyday apps a new setup starts with.
+// optional    — specialist apps (creative suite, developer tools, niche
+//               utilities). New setups start without them; one click in the
+//               Store adds them. Existing users keep whatever they have.
+// Honest scope: every app's code ships inside DEX today, so removing one hides
+// it and frees no disk space; its data is kept so reinstalling restores it.
+export type AppTier = 'core' | 'recommended' | 'optional';
+
+export const RECOMMENDED_APP_IDS: ReadonlySet<string> = new Set([
+  'notes', 'tasks', 'calendar', 'calculator', 'weather', 'worldclock', 'timer',
+  'gallery', 'audio', 'transfers', 'security', 'backup', 'recyclebin', 'maps',
+  'pdfviewer', 'inbox',
+]);
+
+export function appTier(appId: string): AppTier {
+  if (PROTECTED_APP_IDS.has(appId)) return 'core';
+  return RECOMMENDED_APP_IDS.has(appId) ? 'recommended' : 'optional';
+}
+
+/** Removed set for the Essentials preset: every optional app in `allIds`. */
+export function essentialsRemovedSet(allIds: readonly string[]): string[] {
+  return allIds.filter(id => appTier(id) === 'optional');
+}
+
 // ---- Pure reducers (unit-tested independently of the store) ----------------
 
 /** Add appId to the removed set (no-op for protected apps or duplicates). */
@@ -70,6 +96,8 @@ interface InstalledAppsState {
   removeApp: (appId: string) => void;
   reinstallApp: (appId: string) => void;
   resetApps: () => void;
+  /** New setups only (called when onboarding finishes): keep core + recommended. */
+  applyEssentials: (allIds: readonly string[]) => void;
   isInstalled: (appId: string) => boolean;
 }
 
@@ -113,6 +141,13 @@ export const useInstalledAppsStore = create<InstalledAppsState>()((set, get) => 
     persistRemoved([]);
     set({ removedAppIds: [] });
     try { window.dispatchEvent(new CustomEvent('dex-apps-changed', { detail: { action: 'reset' } })); } catch { /* noop */ }
+  },
+
+  applyEssentials: (allIds) => {
+    const next = essentialsRemovedSet(allIds);
+    persistRemoved(next);
+    set({ removedAppIds: next });
+    try { window.dispatchEvent(new CustomEvent('dex-apps-changed', { detail: { action: 'essentials' } })); } catch { /* noop */ }
   },
 
   isInstalled: (appId) => isAppInstalled(get().removedAppIds, appId),

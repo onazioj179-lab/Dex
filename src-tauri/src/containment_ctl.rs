@@ -91,14 +91,6 @@ fn default_domain_status(domain: &str) -> Value {
     })
 }
 
-fn default_all_domain_status() -> Value {
-    let mut map = serde_json::Map::new();
-    for d in DOMAINS.iter() {
-        map.insert((*d).to_string(), default_domain_status(d));
-    }
-    Value::Object(map)
-}
-
 fn default_safe_mode() -> Value {
     json!({
         "active": false,

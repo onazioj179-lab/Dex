@@ -318,36 +318,6 @@ pub fn resource_hogs() -> Value {
     json!(collect_hogs(&sys, total).iter().map(hog_json).collect::<Vec<Value>>())
 }
 
-pub fn get_stats(app: &tauri::AppHandle) -> Value {
-    let profile = {
-        let st = lock_state(app);
-        let g = st.lock().unwrap_or_else(|e| e.into_inner());
-        g.current_profile.clone()
-    };
-    let sys = sampled_system();
-    let total = sys.total_memory();
-    let used = sys.used_memory();
-    let available = total.saturating_sub(used);
-    let percent = if total > 0 { ((used as f64 / total as f64) * 100.0).round() as i64 } else { 0 };
-    let cpu_usage = sys.global_cpu_info().cpu_usage().round() as i64;
-    let cores = sys.cpus().len().max(1);
-    let hogs = collect_hogs(&sys, total);
-
-    json!({
-        "profile": profile,
-        "cpu": { "usage": cpu_usage, "cores": cores },
-        "memory": { "total": total, "used": used, "available": available, "percent": percent },
-        "battery": {
-            "percent": 100,
-            "charging": false,
-            "timeRemaining": Value::Null,
-            "hasBattery": false,
-            "powerSource": "ac",
-        },
-        "topProcesses": hogs.iter().map(hog_json).collect::<Vec<Value>>(),
-    })
-}
-
 pub fn free_memory() -> Value {
     // No native working-set trim available without a new dependency; report a
     // best-effort success (Electron's path was largely a no-op too).
