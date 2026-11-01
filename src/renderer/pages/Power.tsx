@@ -590,7 +590,7 @@ export const Power: React.FC = () => {
               }}
             >
               {active && (
-                <span aria-hidden style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: 'var(--color-accent)', borderRadius: 2, boxShadow: '0 0 6px rgba(74,158,255,0.55)' }} />
+                <span aria-hidden style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: 'var(--color-accent-fill)', borderRadius: 2, boxShadow: '0 0 6px rgba(74,158,255,0.55)' }} />
               )}
               <span style={{ color: active ? 'var(--color-accent)' : 'currentColor', display: 'inline-flex' }}>{t.icon}</span>
               <span>{t.label}</span>

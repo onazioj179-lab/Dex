@@ -1866,7 +1866,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               position: 'absolute', left: 0, bottom: 0, height: 2, width: '100%',
               transformOrigin: 'left center',
-              background: 'var(--color-accent)', opacity: 0.5,
+              background: 'var(--color-accent-fill)', opacity: 0.5,
               animation: `ukiLinger ${sleepMs}ms linear forwards`,
               pointerEvents: 'none', zIndex: 1,
             }}
@@ -2100,7 +2100,7 @@ const UkiOverlay: React.FC = () => {
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--color-accent)',
+                  background: 'var(--color-accent-fill)',
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
                 <span style={{ transition: 'opacity 0.2s ease' }}>
@@ -2333,7 +2333,7 @@ const UkiOverlay: React.FC = () => {
             {isThinking ? (
               <span style={{
                 width: 8, height: 8, borderRadius: '50%',
-                background: 'var(--color-accent)',
+                background: 'var(--color-accent-fill)',
                 animation: 'ukiPulse 0.9s ease-in-out infinite',
               }} />
             ) : (

@@ -300,7 +300,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none',
   },
   doneBtn: {
-    marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent)',
+    marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },

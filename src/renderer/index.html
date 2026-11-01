@@ -55,21 +55,22 @@
          flashes the wrong look on every launch (--color-danger mirrors the
          dark-theme --color-error). Only --space-unit is boot-only. */
       :root {
-        --color-bg-base: #111214;
-        --color-bg-surface: #1B1D20;
-        --color-bg-elevated: #212327;
-        --color-bg-secondary: #16171A;
-        --color-bg-hover: #24262A;
-        --color-bg-glass: #1B1D20;
-        --color-text-primary: #F5F5F2;
-        --color-text-secondary: #B5B5AE;
+        --color-bg-base: #111215;
+        --color-bg-surface: #1C1C1E;
+        --color-bg-elevated: #2C2C2E;
+        --color-bg-secondary: #18181A;
+        --color-bg-hover: #2A2A2D;
+        --color-bg-glass: #1C1C1E;
+        --color-text-primary: #F5F5F7;
+        --color-text-secondary: #AEAEB2;
         --color-text-muted: #A0A0A5;
         --color-text-tertiary: #8E8E93;
         --color-accent: #0A84FF;
         --color-accent-text: #FFFFFF;
         --color-accent-hover: #409CFF;
+        --color-accent-fill: #0071E3;
         --color-accent-subtle: rgba(10, 132, 255, 0.12);
-        --color-border: rgba(255, 255, 255, 0.14);
+        --color-border: rgba(255, 255, 255, 0.16);
         --color-border-subtle: rgba(255, 255, 255, 0.08);
         --color-success: #34C759;
         --color-warning: #FF9F0A;
@@ -97,7 +98,7 @@
         font-family: var(--dex-font-ui);
         color: #FFFFFF;
       }
-      html { background: #111214; }
+      html { background: #111215; }
       body, #root { background: transparent; }
       /* Light mode */
       html[data-theme="light"] {
@@ -110,7 +111,7 @@
       }
       /* Dark mode (default) */
       html[data-theme="dark"] {
-        background: #111214 !important;
+        background: #111215 !important;
         color: #FFFFFF !important;
       }
       html[data-theme="dark"] body, html[data-theme="dark"] #root,

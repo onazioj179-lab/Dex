@@ -2125,7 +2125,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   createBtn: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: 'var(--space-2) var(--space-4)', borderRadius: '10px',
-    border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+    border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
   workflowGrid: {
@@ -2221,7 +2221,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   runEditorBtn: {
     padding: '6px 14px', borderRadius: '10px', border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
   },

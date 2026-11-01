@@ -47,7 +47,7 @@ const styles = {
     fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
   },
   addBtn: {
-    padding: '4px var(--space-3)', background: 'var(--color-accent)',
+    padding: '4px var(--space-3)', background: 'var(--color-accent-fill)',
     border: 'none', borderRadius: 9999, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
     cursor: 'pointer', fontWeight: 500, boxShadow: 'none',
   },

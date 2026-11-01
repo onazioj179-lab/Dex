@@ -121,7 +121,7 @@ const AiProviderSettings: React.FC = () => {
       </p>
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-6px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)', flexShrink: 0 }} />
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)', flexShrink: 0 }} />
         Running on {shellLabel()}
       </div>
 
@@ -273,7 +273,7 @@ const AiProviderSettings: React.FC = () => {
                 onClick={() => save(p.id)}
                 style={{
                   height: 32, padding: '0 14px', borderRadius: 6, fontSize: 13, fontWeight: 600,
-                  background: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer',
+                  background: 'var(--color-accent-fill)', color: '#fff', border: 'none', cursor: 'pointer',
                 }}
               >
                 {savedAt === p.id ? 'Saved' : 'Save'}

@@ -188,7 +188,7 @@ export const RangeSlider = forwardRef<HTMLDivElement, RangeSliderProps>(({
           style={{
             position: 'absolute', left: 0, top: 0, bottom: 0,
             width: `${percent}%`,
-            background: 'var(--color-accent, #4A9EFF)',
+            background: 'var(--color-accent-fill)',
             borderRadius: radius.full,
             transition: dragging ? 'none' : cssTransitions(['width'], 'micro'),
           }}

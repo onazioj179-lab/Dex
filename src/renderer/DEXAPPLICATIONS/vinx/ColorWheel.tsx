@@ -277,7 +277,7 @@ export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120
             style={{
               position: 'absolute', left: -2, right: -2,
               top: `calc(${masterRatio * 100}% - 1.5px)`,
-              height: 3, background: 'var(--color-accent)',
+              height: 3, background: 'var(--color-accent-fill)',
               boxShadow: '0 0 2px rgba(0,0,0,0.8)',
               pointerEvents: 'none',
             }}

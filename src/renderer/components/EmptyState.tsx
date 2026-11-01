@@ -109,7 +109,7 @@ function buttonStyle(variant: EmptyStateAction['variant']): React.CSSProperties 
   }
   return {
     ...buttonBase,
-    background: 'var(--color-accent, #4a8af4)',
+    background: 'var(--color-accent-fill)',
     color: '#ffffff',
   };
 }

@@ -333,7 +333,7 @@ class RootErrorBoundary extends React.Component<
             <button
               onClick={() => window.location.reload()}
               style={{
-                padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
+                padding: '10px 28px', background: 'var(--color-accent-fill)', color: '#fff',
                 border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
                 cursor: 'pointer',
                 boxShadow: '0 4px 16px rgba(10,132,255,0.35)',

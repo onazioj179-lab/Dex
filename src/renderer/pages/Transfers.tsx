@@ -1110,7 +1110,7 @@ const Transfers: React.FC = () => {
                       toast.success(`${result.filePaths.length} file(s) ready — select a device to send`);
                     }
                   } catch { /* dialog unavailable */ }
-                }} style={{ padding: '6px var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-accent, #0a84ff)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
+                }} style={{ padding: '6px var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1168,7 +1168,7 @@ const Transfers: React.FC = () => {
                       )}
                     </div>
                     <div style={{ width: '100%', height: 6, borderRadius: 4, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, Math.max(0, t.progress))}%`, height: '100%', borderRadius: 4, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
+                      <div style={{ width: `${Math.min(100, Math.max(0, t.progress))}%`, height: '100%', borderRadius: 4, background: 'var(--color-accent-fill)', transition: 'width 0.3s ease' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>

@@ -1875,7 +1875,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 32,
     height: 32,
     border: 'none',
-    background: 'var(--color-accent, #4a9eff)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-accent-text, #fff)',
     borderRadius: 10,
     cursor: 'pointer',

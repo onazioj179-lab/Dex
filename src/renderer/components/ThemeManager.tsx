@@ -31,12 +31,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: 'Dark Default',
     isDark: true,
     accentColor: '', // empty = defer to the stylesheet baseline accent (macOS system blue)
-    bgPrimary: '#1B1D20',
-    bgSecondary: '#111214',
-    bgTertiary: '#24262A',
-    textPrimary: '#F5F5F2',
-    textSecondary: '#B5B5AE',
-    border: '#2B2D31',
+    bgPrimary: '#1C1C1E',
+    bgSecondary: '#111215',
+    bgTertiary: '#2C2C2E',
+    textPrimary: '#F5F5F7',
+    textSecondary: '#AEAEB2',
+    border: '#38383A',
   },
   {
     id: 'dark-purple',
@@ -92,11 +92,11 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     accentColor: '', // empty = defer to the stylesheet baseline accent
     bgPrimary: '#FFFFFF',
-    bgSecondary: '#F8F8F6',
-    bgTertiary: '#ECECE8',
-    textPrimary: '#202124',
-    textSecondary: '#5F6368',
-    border: '#E2E2DD',
+    bgSecondary: '#F5F5F7',
+    bgTertiary: '#F2F2F7',
+    textPrimary: '#1D1D1F',
+    textSecondary: '#636366',
+    border: '#D1D1D6',
   },
   {
     id: 'light-warm',
@@ -147,7 +147,7 @@ export const applyTheme = (preset: ThemePreset) => {
   // track the chosen colour. An empty accent means "defer to the stylesheet
   // baseline": clear any inline family instead of forcing a colour.
   if (!preset.accentColor || !applyAccentFamily(preset.accentColor)) {
-    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted']) {
+    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted', '--color-accent-fill']) {
       root.style.removeProperty(prop);
     }
   }

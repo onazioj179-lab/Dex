@@ -342,7 +342,7 @@ export const DexSlider: React.FC<{
         width: `${percent}%`,
         height: 4,
         borderRadius: 2,
-        background: 'var(--color-accent)',
+        background: 'var(--color-accent-fill)',
       }} />
       {/* Thumb */}
       <div style={{
@@ -556,7 +556,7 @@ export const DexListItem: React.FC<{
           width: 2,
           height: '60%',
           borderRadius: 2,
-          background: 'var(--color-accent)',
+          background: 'var(--color-accent-fill)',
         }} />
       )}
       {children}
@@ -1028,7 +1028,7 @@ export function DexTabs<T extends string = string>({
               style={{
                 position: 'absolute', left: 8, right: 8, bottom: -1, height: 2,
                 borderRadius: 2,
-                background: 'var(--color-accent, #4a9eff)',
+                background: 'var(--color-accent-fill)',
                 transform: selected ? 'scaleX(1)' : 'scaleX(0)',
                 transformOrigin: 'center',
                 transition: isReduceMotion() ? 'none' : 'transform 0.18s cubic-bezier(0.4,0,0.2,1)',

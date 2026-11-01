@@ -93,7 +93,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                    background: 'var(--color-accent)', padding: '2px 4px', borderRadius: 2,
+                    background: 'var(--color-accent-fill)', padding: '2px 4px', borderRadius: 2,
                     color: '#FFFFFF',
                   }}>
                     ACTIVE

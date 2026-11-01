@@ -543,7 +543,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       transition: 'background 0.1s',
     },
     itemSelected: {
-      background: 'var(--color-accent)',
+      background: 'var(--color-accent-fill)',
     },
     itemIcon: {
       width: '32px',

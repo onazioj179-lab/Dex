@@ -239,7 +239,7 @@ export function storeButton(variant: 'accent' | 'muted' | 'danger'): React.CSSPr
     whiteSpace: 'nowrap',
     flexShrink: 0,
   };
-  if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
+  if (variant === 'accent') return { ...base, background: 'var(--color-accent-fill)', color: '#fff', borderColor: 'transparent' };
   if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.14)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.36)' };
   return base;
 }

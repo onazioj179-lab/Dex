@@ -1200,7 +1200,7 @@ export const DexSlider: React.FC<DexSliderProps> = ({
     left: 0,
     width: `${percent}%`,
     height: s.track,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     borderRadius: s.track / 2,
     transition: isDragging ? 'none' : `width ${transition.fast}`,
   };
@@ -1210,7 +1210,7 @@ export const DexSlider: React.FC<DexSliderProps> = ({
     left: `calc(${percent}% - ${s.thumb / 2}px)`,
     width: s.thumb,
     height: s.thumb,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     border: '3px solid #fff',
     borderRadius: '50%',
     boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
@@ -1437,7 +1437,7 @@ export const DexRadioGroup: React.FC<DexRadioGroupProps> = ({
   const dotStyle: React.CSSProperties = {
     width: radioSize * 0.5,
     height: radioSize * 0.5,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     borderRadius: '50%',
   };
 

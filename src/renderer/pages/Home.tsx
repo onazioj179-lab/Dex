@@ -857,7 +857,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       }}
                     >
                       {isActive && (
-                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 10, background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
+                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 10, background: 'var(--color-accent-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}

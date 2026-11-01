@@ -117,7 +117,7 @@ const Slider: React.FC<{
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress * 100}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress * 100}%`, background: 'var(--color-accent-fill)', borderRadius: 2 }} />
       <div style={{ position: 'absolute', top: '50%', left: `${progress * 100}%`, transform: 'translate(-50%,-50%)', width: 8, height: 8, borderRadius: 4, background: 'var(--color-text-primary)' }} />
     </div>
   );

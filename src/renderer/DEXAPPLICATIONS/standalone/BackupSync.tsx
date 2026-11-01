@@ -545,7 +545,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryBtn: {
     height: '34px',
     padding: '0 var(--space-4)',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
     border: 'none',
     borderRadius: 'var(--radius-sm)',
@@ -617,7 +617,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   segActive: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
     borderColor: 'var(--color-accent)',
     fontWeight: 600,

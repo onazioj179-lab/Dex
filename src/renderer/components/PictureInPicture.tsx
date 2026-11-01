@@ -494,7 +494,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
           <div style={{
             width: `${progress}%`,
             height: '100%',
-            background: 'var(--color-accent, #0A84FF)',
+            background: 'var(--color-accent-fill)',
             borderRadius: 2,
             transition: 'width 0.1s linear',
           }} />

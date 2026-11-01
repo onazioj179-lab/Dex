@@ -303,7 +303,7 @@ html, body, #root {
 .dex-btn { -webkit-tap-highlight-color: transparent; }
 
 .dex-btn[data-variant="primary"] {
-  background: var(--color-accent, #4a9eff);
+  background: var(--color-accent-fill);
   color: #fff;
   border: 1px solid transparent;
 }

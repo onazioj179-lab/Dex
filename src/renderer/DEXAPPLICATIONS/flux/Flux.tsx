@@ -3111,7 +3111,7 @@ const Flux: React.FC = () => {
               </button>
               <div style={styles.transportControls}>
                 <button style={styles.transportBtn} onClick={goToStart} aria-label="Skip to start">{Icons.skipBack}</button>
-                <button style={{ ...styles.transportBtn, ...(isPlaying ? { background: 'var(--color-accent)' } : {}) }} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
+                <button style={{ ...styles.transportBtn, ...(isPlaying ? { background: 'var(--color-accent-fill)' } : {}) }} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
                   {isPlaying ? Icons.pause : Icons.play}
                 </button>
                 <button style={styles.transportBtn} onClick={goToEnd} aria-label="Skip to end">{Icons.skipForward}</button>

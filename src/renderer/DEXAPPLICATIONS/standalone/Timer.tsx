@@ -240,7 +240,7 @@ const s: Record<string, React.CSSProperties> = {
   inputLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 },
   inputColon: { fontSize: 20, color: 'var(--color-text-tertiary)', marginBottom: 14 },
   addBtn: {
-    padding: '10px var(--space-5)', background: 'var(--color-accent)',
+    padding: '10px var(--space-5)', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
@@ -286,7 +286,7 @@ const s: Record<string, React.CSSProperties> = {
   cardControls: { display: 'flex', gap: 'var(--space-2)', alignItems: 'center', width: '100%' },
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    padding: '10px var(--space-4)', background: 'var(--color-accent)',
+    padding: '10px var(--space-4)', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },

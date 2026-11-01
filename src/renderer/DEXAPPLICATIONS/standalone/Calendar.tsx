@@ -1614,7 +1614,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   miniDayToday: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse)',
   },
   miniDaySelected: {
@@ -1865,7 +1865,7 @@ const styles: Record<string, React.CSSProperties> = {
   dayNumberToday: {
     color: 'var(--color-text-inverse)',
     fontWeight: 700,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     borderRadius: '50%',
     width: '22px',
     height: '22px',
@@ -1919,7 +1919,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
   },
   weekViewDayNumToday: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse)',
     width: '28px',
     height: '28px',

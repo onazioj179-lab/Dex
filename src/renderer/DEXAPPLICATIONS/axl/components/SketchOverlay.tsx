@@ -151,7 +151,7 @@ const SketchOverlay: React.FC<Props> = ({ units, onCommitMesh, onClose }) => {
           <span style={{ color: 'var(--color-text-tertiary)' }}>{units}</span>
         </label>
         <button onClick={() => commit('extrude')} disabled={!hasProfile}
-          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 700, borderRadius: 10, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-accent)', color: '#fff' }}>Extrude</button>
+          style={{ padding: '5px 11px', fontSize: 10, fontWeight: 700, borderRadius: 10, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-accent-fill)', color: '#fff' }}>Extrude</button>
         <button onClick={() => commit('revolve')} disabled={!hasProfile}
           style={{ padding: '5px 11px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: hasProfile ? 'pointer' : 'not-allowed', opacity: hasProfile ? 1 : 0.45, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }}>Revolve</button>
         <button onClick={() => { setEnts([]); setDraft(null); }} aria-label="Clear sketch"

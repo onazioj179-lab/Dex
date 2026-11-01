@@ -564,7 +564,7 @@ const EffectsTab: React.FC = memo(() => {
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
               >
-                <span style={{ width: 4, height: 4, borderRadius: 2, background: 'var(--color-accent)', flexShrink: 0 }} />
+                <span style={{ width: 4, height: 4, borderRadius: 2, background: 'var(--color-accent-fill)', flexShrink: 0 }} />
                 <span>{effect.name}</span>
               </div>
             ))}

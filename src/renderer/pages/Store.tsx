@@ -849,7 +849,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   catBtnActive: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     borderColor: 'var(--color-accent)',
     color: '#fff',
   },
@@ -1000,7 +1000,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 16px',
     borderRadius: 'var(--radius-lg)',
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
     fontSize: 13,
     fontWeight: 700,

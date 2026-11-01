@@ -792,11 +792,11 @@ const UpdateManagerSection: React.FC = () => {
           {info.status === 'idle' && info.updateAvailable && (
             <>
               <button onClick={skipVersion} aria-label="Skip this version" style={{ ...btnBase, background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)' }}>Skip</button>
-              <button onClick={downloadUpdate} aria-label="Download update" style={{ ...btnBase, background: 'var(--color-accent)', color: 'var(--color-text-primary)' }}>Download</button>
+              <button onClick={downloadUpdate} aria-label="Download update" style={{ ...btnBase, background: 'var(--color-accent-fill)', color: 'var(--color-text-primary)' }}>Download</button>
             </>
           )}
           {info.status === 'ready' && (
-            <button onClick={installUpdate} aria-label="Install update and restart" style={{ ...btnBase, background: 'var(--color-accent)', color: 'var(--color-text-primary)' }}>Install & Restart</button>
+            <button onClick={installUpdate} aria-label="Install update and restart" style={{ ...btnBase, background: 'var(--color-accent-fill)', color: 'var(--color-text-primary)' }}>Install & Restart</button>
           )}
         </div>
       </div>
@@ -805,7 +805,7 @@ const UpdateManagerSection: React.FC = () => {
       {info.status === 'downloading' && (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${Math.max(0, info.downloadProgress)}%` }} />
+            <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent-fill)', width: `${Math.max(0, info.downloadProgress)}%` }} />
           </div>
         </div>
       )}
@@ -1111,7 +1111,7 @@ const applySettings = (settings: Record<string, unknown>) => {
     // (the old path set --color-accent to a self-referential var, which broke it).
     const accentColor = String(settings.accentColor || '').trim();
     if (!applyAccentFamily(accentColor)) {
-      for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft']) {
+      for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-fill']) {
         root.style.removeProperty(prop);
       }
     }
@@ -1940,7 +1940,7 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
       </div>
       {status && (
         <div style={{ marginTop: 6, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }} aria-hidden>
-          <div style={{ width: `${utilPct}%`, height: '100%', background: 'var(--color-accent, #0A84FF)', transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
+          <div style={{ width: `${utilPct}%`, height: '100%', background: 'var(--color-accent-fill)', transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
         </div>
       )}
       {lastResult && (
@@ -2505,7 +2505,7 @@ export const Settings: React.FC = () => {
               <span 
                 style={{ 
                   width: 6, height: 6, borderRadius: '50%', 
-                  background: 'var(--color-accent)', 
+                  background: 'var(--color-accent-fill)', 
                   flexShrink: 0,
                 }} 
                 title="Changed from default"
@@ -4866,7 +4866,7 @@ export const Settings: React.FC = () => {
             fontSize: 10, color: 'var(--color-accent)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)' }} />
             {countChangedSettings(settings)} setting{countChangedSettings(settings) !== 1 ? 's' : ''} changed from default
           </div>
         )}
