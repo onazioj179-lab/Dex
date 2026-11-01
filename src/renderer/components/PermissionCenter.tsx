@@ -107,7 +107,7 @@ const PermissionCenter: React.FC = () => {
                 key={c.capability}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-                  padding: '10px var(--space-3)', borderRadius: 8,
+                  padding: '10px var(--space-3)', borderRadius: 10,
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
                 }}
               >
@@ -141,7 +141,7 @@ const PermissionCenter: React.FC = () => {
         </div>
 
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-          Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
+          Press <kbd style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)' }}>Esc</kbd> to close
         </div>
       </div>
     </div>

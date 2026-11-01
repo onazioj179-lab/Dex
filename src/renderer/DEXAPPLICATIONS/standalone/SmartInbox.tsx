@@ -841,7 +841,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
   },
   skeletonLines: { display: 'flex', flexDirection: 'column', gap: 7, flex: 1, paddingTop: 3 },
-  skeletonLine: { height: 9, borderRadius: 5, background: 'var(--color-bg-surface)' },
+  skeletonLine: { height: 9, borderRadius: 6, background: 'var(--color-bg-surface)' },
   section: { marginBottom: 'var(--space-4)' },
   sectionLabel: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
@@ -851,7 +851,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   sectionCount: {
     fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)',
-    background: 'var(--color-bg-surface)', borderRadius: 8, padding: '1px 7px',
+    background: 'var(--color-bg-surface)', borderRadius: 10, padding: '1px 7px',
     fontVariantNumeric: 'tabular-nums', letterSpacing: 0,
   },
   list: { display: 'flex', flexDirection: 'column', gap: 4 },

@@ -2399,8 +2399,15 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                     // `osToast: false` = the user turned "Allow Notifications" off:
                     // keep the record in the center, skip the Windows toast.
                     let os_toast = p.get("osToast").and_then(|v| v.as_bool()).unwrap_or(true);
+                    // `osToastPrivate: true` = DEX is locked. Windows toasts show
+                    // above the lock screen, so reveal nothing but the fact.
+                    let private = p.get("osToastPrivate").and_then(|v| v.as_bool()).unwrap_or(false);
                     if os_toast && (!title.is_empty() || !body.is_empty()) {
-                        native_ops::notify(&app, title, body);
+                        if private {
+                            native_ops::notify(&app, "DEX", "You have a new notification");
+                        } else {
+                            native_ops::notify(&app, title, body);
+                        }
                     }
                 }
                 // Electron also pushes the inserted record + the unread count

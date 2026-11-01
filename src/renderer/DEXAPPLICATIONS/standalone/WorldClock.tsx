@@ -768,7 +768,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
     color: 'var(--color-success, #30D158)',
     border: '1px solid var(--color-success, #30D158)',
-    borderRadius: 8, padding: '1px 5px',
+    borderRadius: 10, padding: '1px 5px',
   },
   emptyState: {
     flex: 1, display: 'flex', flexDirection: 'column' as const,

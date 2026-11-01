@@ -90,7 +90,7 @@ const ParamRowInput: React.FC<{
       onChange={e => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setDraft(null); }}
-      style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+      style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
     />
   );
 };
@@ -120,13 +120,13 @@ const ParamAddRow: React.FC<{
         type="text" placeholder="name" aria-label="New parameter name"
         value={name} onChange={e => setName(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') add(); }}
-        style={{ width: 64, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+        style={{ width: 64, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
       />
       <input
         type="text" placeholder="value or expression" aria-label="New parameter value or expression"
         value={expr} onChange={e => setExpr(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') add(); }}
-        style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
+        style={{ flex: 1, minWidth: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 9, padding: '3px 5px', outline: 'none' }}
       />
       <button onClick={add} disabled={!name.trim()} aria-label="Add parameter"
         style={{ fontSize: 9, fontWeight: 600, padding: '3px 8px', background: name.trim() ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: name.trim() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: name.trim() ? 'pointer' : 'default' }}>
@@ -238,7 +238,7 @@ const PropertiesPanel: React.FC = () => {
                         ariaLabel={`${selectedPart.name} ${key} ${axis}`}
                         onCommit={n => { pushUndo(); updatePartTransform(selectedPart.id, key, axis, n); }}
                         onError={msg => showToast(msg)}
-                        style={{ width: '100%', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid', borderColor: axis === 'x' ? 'rgba(255,69,58,0.25)' : axis === 'y' ? 'rgba(48,209,88,0.25)' : 'rgba(10,132,255,0.25)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 5px', outline: 'none', fontVariantNumeric: 'tabular-nums' }}
+                        style={{ width: '100%', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid', borderColor: axis === 'x' ? 'rgba(255,69,58,0.25)' : axis === 'y' ? 'rgba(48,209,88,0.25)' : 'rgba(10,132,255,0.25)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 5px', outline: 'none', fontVariantNumeric: 'tabular-nums' }}
                       />
                     </label>
                   ))}
@@ -346,13 +346,13 @@ const PropertiesPanel: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>ADD CONSTRAINT</div>
             <select value={constraintType} onChange={e => setConstraintType(e.target.value as ConstraintType)}
-              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
+              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
               {(['coincident', 'concentric', 'distance', 'parallel', 'perpendicular', 'tangent', 'angle', 'fixed'] as ConstraintType[]).map(t => (
                 <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
               ))}
             </select>
             <select value={constraintPartB} onChange={e => setConstraintPartB(e.target.value)}
-              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
+              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
               <option value="">Select part B...</option>
               {parts.filter(p => p.id !== selectedPartId).map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -361,7 +361,7 @@ const PropertiesPanel: React.FC = () => {
             {(constraintType === 'distance' || constraintType === 'angle') && (
               <input type="number" value={constraintValue} onChange={e => setConstraintValue(Number(e.target.value))}
                 placeholder={constraintType === 'angle' ? 'Angle (deg)' : 'Distance'}
-                style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
+                style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
             )}
             <button onClick={handleAddConstraint} disabled={!constraintPartB}
               style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: constraintPartB ? 'pointer' : 'default', boxShadow: 'none' }}>
@@ -372,7 +372,7 @@ const PropertiesPanel: React.FC = () => {
               <>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>ACTIVE CONSTRAINTS</div>
                 {project.assembly.constraints.filter(c => c.partA === selectedPartId || c.partB === selectedPartId).map(c => (
-                  <div key={c.id} style={{ fontSize: 10, padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div key={c.id} style={{ fontSize: 10, padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ color: c.satisfied ? 'var(--color-success)' : 'var(--color-error)' }}>{c.satisfied ? '\u2713' : '\u2717'}</span>
                     <span style={{ color: 'var(--color-text-secondary)' }}>{c.type}</span>
                     {c.value > 0 && <span style={{ color: 'var(--color-text-tertiary)' }}>({c.value})</span>}

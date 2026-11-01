@@ -8,10 +8,9 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Ratchet for the radius scale (0 · 4 · 6 · 10 · 14 · 18 · 24 · full). The shell
-// surfaces are on-scale; individual apps still carry legacy values. New
-// off-scale inline radii fail this test, and the baseline only goes DOWN:
-// fix some (node scripts/snap-radius-to-scale.mjs <path>) and lower it.
+// Guard for the radius scale (0 · 4 · 6 · 10 · 14 · 18 · 24 · full). Every inline
+// radius in the renderer is on the scale; any new off-scale value fails this
+// test. Fix with: node scripts/snap-radius-to-scale.mjs <path>.
 //
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -19,7 +18,7 @@ import path from 'node:path';
 // @ts-expect-error -- plain .mjs script without type declarations
 import { snapSource, snapRadius } from '../../scripts/snap-radius-to-scale.mjs';
 
-const BASELINE = 636; // 2026-11-01, Golden Modern scale, after snapping Settings/Store/shell/dock/launcher
+const BASELINE = 0; // 2026-11-01: every inline radius in the renderer is on the scale
 
 function walk(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

@@ -517,7 +517,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       gap: 4,
       padding: '2px var(--space-2)',
       background: 'var(--color-border-subtle)',
-      borderRadius: 3,
+      borderRadius: 4,
       fontSize: s.fontSize - 2,
       color: 'var(--color-text-primary, #f5f5f7)',
     },
@@ -578,7 +578,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     checkbox: {
       width: 16,
       height: 16,
-      borderRadius: 3,
+      borderRadius: 4,
       border: '2px solid var(--color-border)',
       display: 'flex',
       alignItems: 'center',

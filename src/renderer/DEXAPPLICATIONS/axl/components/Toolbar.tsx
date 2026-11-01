@@ -79,21 +79,21 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
   // ── Reusable menu trigger (icon + caret, active-aware) ──
   const trigStyle = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 2, height: 24, padding: '0 5px',
-    borderRadius: 7, border: 'none', cursor: 'pointer', flexShrink: 0,
+    borderRadius: 6, border: 'none', cursor: 'pointer', flexShrink: 0,
     background: active ? 'var(--color-accent-light)' : 'transparent',
     color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
     transition: 'background 0.12s, color 0.12s',
   });
 
   const menuPanelBase: React.CSSProperties = {
-    borderRadius: 12, padding: 5, minWidth: 168, maxWidth: 'calc(100vw - 24px)',
+    borderRadius: 14, padding: 5, minWidth: 168, maxWidth: 'calc(100vw - 24px)',
     maxHeight: 'min(360px, calc(100vh - 72px))', overflow: 'auto',
     boxShadow: 'var(--pg-shadow-popover)',
   };
 
   const itemStyle = (active = false): React.CSSProperties => ({
     display: 'flex', width: '100%', alignItems: 'center', gap: 9, textAlign: 'left',
-    padding: '7px 9px', fontSize: 11, fontWeight: 500, borderRadius: 9, cursor: 'pointer',
+    padding: '7px 9px', fontSize: 11, fontWeight: 500, borderRadius: 10, cursor: 'pointer',
     border: 'none', background: active ? 'var(--color-accent-light)' : 'transparent',
     color: active ? 'var(--color-accent)' : 'var(--color-text-primary)',
   });
@@ -172,7 +172,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
             {PRIMITIVES.map(p => (
               <button key={p.type} role="menuitem" className="dex-hover-bg" aria-label={`Add ${p.label}`}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px', borderRadius: 9, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
                 onClick={() => { addPrimitive(p.type); close(); }}>
                 {p.icon}
                 <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{p.label}</span>

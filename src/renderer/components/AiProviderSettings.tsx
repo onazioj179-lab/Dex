@@ -101,7 +101,7 @@ const AiProviderSettings: React.FC = () => {
       <div
         data-testid="active-model-banner"
         style={{
-          padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 8, fontSize: 13,
+          padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 10, fontSize: 13,
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           background: routedTop ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'var(--pg-surface)',
           border: `1px solid ${routedTop ? 'var(--color-success)' : 'var(--pg-border)'}`,
@@ -129,7 +129,7 @@ const AiProviderSettings: React.FC = () => {
 
       <div
         style={{
-          padding: '10px 14px', marginBottom: 'var(--space-4)', borderRadius: 8,
+          padding: '10px 14px', marginBottom: 'var(--space-4)', borderRadius: 10,
           background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         }}

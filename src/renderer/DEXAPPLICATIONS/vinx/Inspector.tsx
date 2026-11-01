@@ -788,7 +788,7 @@ const CurvesEditor: React.FC<{
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          style={{ width: '100%', maxWidth: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none', display: 'block' }}
+          style={{ width: '100%', maxWidth: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none', display: 'block' }}
           onPointerDown={handleSvgPointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -984,7 +984,7 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 3, border: '1px solid var(--color-border-subtle)', display: 'block' }}
+      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'block' }}
     />
   );
 });

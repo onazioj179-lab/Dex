@@ -416,9 +416,9 @@ const Calculator: React.FC = () => {
             onKeyDown={e => { if (e.key === 'Enter') runNatural(); }}
             placeholder="Try: 5 km in mi · 20% of 80 · sqrt(2)"
             aria-label="Natural calculation input"
-            style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 12, color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
+            style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 14, color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
           />
-          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
+          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
         </div>
         {/* Display */}
         <div className="dex-liquid-glass-strong" style={styles.displayArea}>
@@ -531,7 +531,7 @@ const styles: Record<string, React.CSSProperties> = {
   modeBtn: {
     padding: 'var(--space-2) var(--space-4)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     background: 'transparent',
     color: 'var(--color-text-muted)',
     fontSize: '11px',
@@ -572,7 +572,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     justifyContent: 'flex-end',
     position: 'relative',
-    borderRadius: '12px',
+    borderRadius: '14px',
     marginBottom: '10px',
   },
   expression: {
@@ -601,7 +601,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent-light)',
     color: 'var(--color-accent)',
     padding: '4px 10px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '10px',
     fontWeight: 700,
     letterSpacing: '0.5px',
@@ -638,7 +638,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     padding: '4px var(--space-2)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     transition: 'all 0.2s ease',
     letterSpacing: '0.3px',
   },

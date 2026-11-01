@@ -745,7 +745,7 @@ const PresentationBuilder: React.FC = () => {
                 background: dragOverIdx === idx ? 'var(--color-bg-hover)' : 'transparent',
               }}
             >
-              <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 3 }}>
+              <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
                 {renderSlide(s, 0.18)}
               </div>
               <div style={{

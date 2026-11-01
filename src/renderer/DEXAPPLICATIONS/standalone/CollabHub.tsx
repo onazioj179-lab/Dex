@@ -1832,7 +1832,7 @@ const CollabHub: React.FC = () => {
                           {livePeers.map(p => (
                             <div key={p.sessionId} style={{
                               display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '5px 10px 5px 5px', borderRadius: 20,
+                              padding: '5px 10px 5px 5px', borderRadius: 18,
                               background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
                               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
                             }}>
@@ -1900,7 +1900,7 @@ const CollabHub: React.FC = () => {
                                     {msg.userName?.[0]?.toUpperCase() || '?'}
                                   </span>
                                   <div style={{
-                                    fontSize: 12, lineHeight: 1.4, padding: '6px 10px', borderRadius: 9,
+                                    fontSize: 12, lineHeight: 1.4, padding: '6px 10px', borderRadius: 10,
                                     maxWidth: '75%', wordBreak: 'break-word',
                                     color: 'var(--color-text-primary, #fff)',
                                     background: mine

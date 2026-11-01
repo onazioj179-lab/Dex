@@ -235,7 +235,7 @@ const styles: Record<string, React.CSSProperties> = {
   closeBtn: { width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--pg-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0 },
   body: { padding: 'var(--space-4)', overflowY: 'auto', minHeight: 0 },
   stepTitle: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 6 },
-  stepNum: { width: 20, height: 20, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--color-accent)', background: 'rgba(10,132,255,0.16)', border: '1px solid rgba(10,132,255,0.30)' },
+  stepNum: { width: 20, height: 20, borderRadius: 9999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--color-accent)', background: 'rgba(10,132,255,0.16)', border: '1px solid rgba(10,132,255,0.30)' },
   help: { margin: '0 0 10px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--color-text-tertiary)' },
   code: { fontFamily: 'var(--font-mono, monospace)', fontSize: 11, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--pg-border)' },
   fieldRow: { display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' },

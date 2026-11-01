@@ -784,7 +784,7 @@ export const Power: React.FC = () => {
                   { key: 'performance', label: 'Performance', color: 'var(--color-warning)' },
                 ] as { key: PowerMode; label: string; color: string }[]).map(m => (
                   <button key={m.key} onClick={() => setPowerMode(m.key)} aria-pressed={powerMode === m.key} style={{
-                    flex: 1, padding: '8px var(--space-3)', borderRadius: 8, cursor: 'pointer',
+                    flex: 1, padding: '8px var(--space-3)', borderRadius: 10, cursor: 'pointer',
                     border: powerMode === m.key ? `1px solid ${m.color}` : '1px solid var(--color-border-subtle)',
                     background: powerMode === m.key ? `${m.color}1f` : 'var(--color-bg-elevated)',
                     color: powerMode === m.key ? m.color : 'var(--color-text-secondary)',
@@ -814,7 +814,7 @@ export const Power: React.FC = () => {
                   const active = keepAwakeUntil > Date.now() && keepAwakeMinutes === min;
                   return (
                     <button key={min} onClick={() => startKeepAwake(min)} aria-pressed={active} style={{
-                      flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                      flex: 1, padding: '7px', borderRadius: 10, cursor: 'pointer',
                       border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                       background: active ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'var(--color-bg-elevated)',
                       color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -1196,7 +1196,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
                 <WarningIcon size={14} color={score >= 3 ? 'var(--color-error)' : 'var(--color-warning)'} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{p.name}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PID {p.pid}</span>
-                <span style={{ fontSize: 10, padding: '2px var(--space-2)', borderRadius: 8, fontWeight: 600,
+                <span style={{ fontSize: 10, padding: '2px var(--space-2)', borderRadius: 10, fontWeight: 600,
                   background: score >= 3 ? 'rgba(255,69,58,0.15)' : 'rgba(255,159,10,0.15)',
                   color: score >= 3 ? 'var(--color-error)' : 'var(--color-warning)' }}>
                   Score {score}
@@ -1204,7 +1204,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                 {reasons.map(r => (
-                  <span key={r.label} style={{ fontSize: 10, padding: '2px var(--space-2)', borderRadius: 8, background: `${SEV_COLOR[r.severity]}18`, color: SEV_COLOR[r.severity], border: `1px solid ${SEV_COLOR[r.severity]}30` }}>
+                  <span key={r.label} style={{ fontSize: 10, padding: '2px var(--space-2)', borderRadius: 10, background: `${SEV_COLOR[r.severity]}18`, color: SEV_COLOR[r.severity], border: `1px solid ${SEV_COLOR[r.severity]}30` }}>
                     {r.label}
                   </span>
                 ))}

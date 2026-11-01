@@ -26,7 +26,7 @@ function fmt(t: number): string {
 
 const iconBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 28, height: 28, borderRadius: 8,
+  width: 28, height: 28, borderRadius: 10,
   background: 'transparent', border: 'none', cursor: 'pointer',
   color: 'var(--color-text-secondary)', flexShrink: 0,
   transition: 'background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out)',

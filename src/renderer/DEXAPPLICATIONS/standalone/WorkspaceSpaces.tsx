@@ -557,7 +557,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '4px 9px',
     background: 'var(--color-bg-primary)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 999,
+    borderRadius: 9999,
     maxWidth: 160,
   },
   appDot: {

@@ -213,7 +213,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   kbd: {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    minWidth: 18, height: 18, padding: '0 5px', borderRadius: 5,
+    minWidth: 18, height: 18, padding: '0 5px', borderRadius: 6,
     background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
     fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)',
     color: 'var(--color-text-secondary)',

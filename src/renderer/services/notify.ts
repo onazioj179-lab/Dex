@@ -33,7 +33,7 @@ import {
   resolveExpiry, urgencyToPriority, persistsUntilDismissed,
   type Urgency, type Scenario,
 } from '../../shared/notifications/actionable';
-import { notificationsAllowed } from '../utils/notificationsAllowed';
+import { notificationsAllowed, osToastFlags } from '../utils/notificationsAllowed';
 
 export type NotificationIcon = 'info' | 'success' | 'warning' | 'error';
 
@@ -244,7 +244,7 @@ export async function persistToHub(
       title: input.title,
       body: input.body || '',
       action,
-      osToast: notificationsAllowed(),
+      ...osToastFlags(),
     });
     // Ask the center/bell to refresh (covers the panel-closed case where the
     // hub's own `:new` broadcast is not wired through this preload's allowlist).

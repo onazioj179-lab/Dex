@@ -215,7 +215,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
         style={{
           width: 32,
           height: 32,
-          borderRadius: 16,
+          borderRadius: 18,
           border: `1px solid ${COLOR_BORDER}`,
           background: hasUpdate ? COLOR_ACCENT : COLOR_BG,
           color: COLOR_TEXT,

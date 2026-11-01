@@ -737,7 +737,7 @@ export default function Uki(): React.ReactElement {
                 padding: '0 10px', flexShrink: 0, cursor: 'pointer',
                 background: lookAtScreen ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
                 color: lookAtScreen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                border: '1px solid var(--color-border)', borderRadius: 8,
+                border: '1px solid var(--color-border)', borderRadius: 10,
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

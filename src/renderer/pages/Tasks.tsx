@@ -1654,7 +1654,7 @@ export const Tasks: React.FC = () => {
           {isLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-4) 0' }}>
               {[1,2,3].map(i => (
-                <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} style={{ height: 48, borderRadius: 10, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (

@@ -531,7 +531,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
               style={{
                 width: 24,
                 height: 24,
-                borderRadius: 12,
+                borderRadius: 14,
                 background: 'transparent',
                 border: 'none',
                 color: 'rgba(255,255,255,0.7)',

@@ -10,7 +10,8 @@
 //
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { notificationsAllowed } from '../../src/renderer/utils/notificationsAllowed';
+import { notificationsAllowed, osToastFlags } from '../../src/renderer/utils/notificationsAllowed';
+import { useAuthStore } from '../../src/renderer/store/useAuthStore';
 import { readDexSetting, useDexSetting } from '../../src/renderer/hooks/useDexSetting';
 
 const save = (s: Record<string, unknown>) => {
@@ -41,5 +42,20 @@ describe('readDexSetting / useDexSetting', () => {
     expect(result.current).toBe(true);
     act(() => save({ ukiShowTranscript: false }));
     expect(result.current).toBe(false);
+  });
+});
+
+describe('OS toasts while DEX is locked', () => {
+  beforeEach(() => localStorage.clear());
+  it('are private only when a lock is enabled AND active', () => {
+    useAuthStore.setState({ isLocked: false, isEnabled: true });
+    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: false });
+    useAuthStore.setState({ isLocked: true, isEnabled: true });
+    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: true });
+    useAuthStore.setState({ isLocked: true, isEnabled: false });
+    expect(osToastFlags().osToastPrivate).toBe(false);
+    save({ enableNotifications: false });
+    expect(osToastFlags().osToast).toBe(false);
+    useAuthStore.setState({ isLocked: false });
   });
 });

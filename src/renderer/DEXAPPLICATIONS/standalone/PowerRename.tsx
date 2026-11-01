@@ -32,7 +32,7 @@ interface SourceItem {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff',
+  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff',
   fontSize: 13, outline: 'none',
 };
 const labelStyle: React.CSSProperties = {
@@ -45,7 +45,7 @@ const Toggle: React.FC<{ on: boolean; onClick: () => void; label: string }> = ({
     onClick={onClick}
     aria-pressed={on}
     style={{
-      padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+      padding: '6px 11px', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
       border: `1px solid ${on ? 'var(--color-accent, #0A84FF)' : 'rgba(255,255,255,0.14)'}`,
       background: on ? 'rgba(10,132,255,0.18)' : 'rgba(255,255,255,0.04)',
       color: on ? 'var(--color-accent, #4A9EFF)' : 'rgba(255,255,255,0.75)',
@@ -149,7 +149,7 @@ const PowerRename: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg, #0a0a0c)', color: '#fff', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #FF375F, #FF6482)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #FF375F, #FF6482)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <DexIcon name="wand" size={18} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -303,7 +303,7 @@ const PowerRename: React.FC = () => {
                 onClick={apply}
                 disabled={!canApply}
                 style={{
-                  padding: '9px 18px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                  padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                   border: 'none', cursor: canApply ? 'pointer' : 'not-allowed',
                   background: canApply ? 'linear-gradient(135deg, #FF375F, #FF6482)' : 'rgba(255,255,255,0.08)',
                   color: canApply ? '#fff' : 'rgba(255,255,255,0.35)', transition: 'all 0.12s ease',

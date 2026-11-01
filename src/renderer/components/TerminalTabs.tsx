@@ -168,7 +168,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               title="Double-click to rename"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '3px 8px', borderRadius: 5, cursor: 'pointer',
+                padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                 color: active ? 'var(--color-text-primary, #e0e0e0)' : 'var(--color-text-tertiary, #8a8a8a)',
                 background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
@@ -192,7 +192,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                   aria-label={`Rename ${label}`}
                   style={{
                     width: 96, background: '#141414', color: '#e0e0e0',
-                    border: '1px solid rgba(255,255,255,0.18)', borderRadius: 3, outline: 'none',
+                    border: '1px solid rgba(255,255,255,0.18)', borderRadius: 4, outline: 'none',
                     fontFamily: 'inherit', fontSize: 11, fontWeight: 600, padding: '0 4px',
                   }}
                 />
@@ -206,7 +206,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                 title="Close tab"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 14, height: 14, flexShrink: 0, padding: 0, borderRadius: 3,
+                  width: 14, height: 14, flexShrink: 0, padding: 0, borderRadius: 4,
                   background: 'transparent', border: 'none', cursor: 'pointer',
                   color: 'inherit', opacity: 0.7, lineHeight: 1,
                 }}
@@ -227,7 +227,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
           title="New terminal"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, flexShrink: 0, marginLeft: 2, borderRadius: 5,
+            width: 22, flexShrink: 0, marginLeft: 2, borderRadius: 6,
             background: 'transparent', border: 'none', cursor: 'pointer',
             color: 'var(--color-text-tertiary, #8a8a8a)', fontSize: 14,
           }}
