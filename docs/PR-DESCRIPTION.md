@@ -25,5 +25,3 @@ Drives the v6.0.4 program from the backlog MDs (`docs/DEX-BACKLOG-smallapps.md`,
 App marketplace, cross-device sync + handoff, real-time multiplayer / live co-editing, offline-first + E2E-encrypted sync, pluggable cloud storage, bundled local offline-AI model. These need a server / CRDT transport / native model that doesn't exist in a renderer-only build; their local-first foundations are in place.
 
 Full per-wave detail is in `docs/ROADMAP.md`.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
