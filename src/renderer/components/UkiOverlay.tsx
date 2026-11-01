@@ -463,46 +463,11 @@ function getEmpathyPrefix(emotion: EmotionType): string {
 // FREE AI FALLBACK — HuggingFace Inference API (no API key needed for public models)
 // ===========================================================================
 
-async function queryHuggingFaceFallback(userText: string): Promise<string | null> {
-  try {
-    let foregroundAppId: string | null = null;
-    let openAppIds: string[] = [];
-    let online = true;
-    try {
-      const ra = useRunningApps.getState();
-      foregroundAppId = ra.currentAppId ?? null;
-      openAppIds = (ra.runningApps ?? []).map(a => a.id);
-      online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
-    } catch { /* best-effort context */ }
-    const systemContext = buildSystemPrompt({
-      foregroundAppId,
-      openAppIds,
-      online,
-      localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
-    const prompt = `${systemContext}\n\nUser: ${userText}\nUKI:`;
-    
-    const res = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: prompt, parameters: { max_new_tokens: 120, temperature: 0.7 } }),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const generated: string = data?.[0]?.generated_text || '';
-    // Extract just the UKI response after the prompt
-    const ukiMarker = 'UKI:';
-    const idx = generated.lastIndexOf(ukiMarker);
-    if (idx !== -1) {
-      const reply = generated.slice(idx + ukiMarker.length).trim().split('\n')[0].trim();
-      if (reply.length > 4) return reply;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+// queryHuggingFaceFallback was removed (2026-11): when no AI provider was
+// configured it silently POSTed the user's message plus context (foreground
+// app, open apps, local time) to Hugging Face's keyless inference API, a third
+// party the user never chose. That endpoint no longer resolves, so it never
+// answered anyway. Remote AI now only runs through a provider the user adds.
 
 // ===========================================================================
 // ACCESSIBILITY TOOLS
@@ -1757,11 +1722,10 @@ const UkiOverlay: React.FC = () => {
           const withEmpathy = empathyPrefix + finalResp;
           streamResponse(withEmpathy, 'ai', text, false);
         } else {
-          pushStep('Local AI empty -- trying remote inference');
-          const hfReply = await queryHuggingFaceFallback(normalized);
-          const fallback = hfReply ? empathyPrefix + hfReply : empathyPrefix + "I'm not sure about that. Try asking differently, or use /help to see commands!";
-          if (hfReply) pushStep('Remote inference returned a response');
-          else pushStep('Remote inference empty -- using safe fallback');
+          // No silent remote fallback: without a provider the user configured,
+          // nothing leaves the device (see the note on the removed HF fallback).
+          pushStep('Local AI empty -- using safe fallback');
+          const fallback = empathyPrefix + "I'm not sure about that. Try asking differently, add an AI provider in Settings, or use /help to see commands!";
           streamResponse(fallback, 'fallback', text, false);
         }
       } catch {
@@ -1770,17 +1734,10 @@ const UkiOverlay: React.FC = () => {
         useUkiStore.getState().setError('Failed to process query');
       }
     } else {
-      // No Electron AI backend -- try HuggingFace free inference, then contextual fallback
-      pushStep('No AI bridge -- trying remote inference directly');
-      const hfReply = await queryHuggingFaceFallback(normalized);
-      if (hfReply) {
-        pushStep('Remote inference returned a response');
-        streamResponse(empathyPrefix + hfReply, 'hf-fallback', text, false);
-      } else {
-        pushStep('Remote empty -- using safe fallback');
-        const fallback = empathyPrefix + "I can hear you! Try 'open notes', 'what time is it', math like '5 + 3', or /help for all commands.";
-        streamResponse(fallback, 'fallback', text, false);
-      }
+      // No AI bridge and no configured provider: answer locally only.
+      pushStep('No AI bridge -- using safe fallback');
+      const fallback = empathyPrefix + "I can hear you! Try 'open notes', 'what time is it', math like '5 + 3', or /help for all commands.";
+      streamResponse(fallback, 'fallback', text, false);
     }
   }, [inputText, streamResponse, commitTurn]);
 

@@ -13,6 +13,7 @@
 
 mod activity_feed;
 mod webview2;
+mod storage_ctl;
 mod git;
 mod env_manager;
 mod ssh;
@@ -1154,6 +1155,38 @@ fn search_remove_doc(app: &tauri::AppHandle, id: &str) -> Value {
 /// Guard: a first run (empty baseline) or an unusually large diff falls back to a
 /// full clear+rebuild, because `upsert_file` commits per file and thousands of
 /// commits would be pathological — incremental is for the small steady-state diff.
+/// The last-synced `{path -> stamp}` snapshot, persisted INSIDE the index dir so
+/// the two can never drift apart (wipe the index and its snapshot goes too).
+/// Without it every launch started from an empty snapshot, and the launch-time
+/// `search:sync` took the "initial build" path: clear + re-index every file in
+/// Documents/Desktop/Downloads (measured ~80 CPU-seconds per launch).
+fn snapshot_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    app.path().app_data_dir().unwrap_or_default().join("search-index").join("dex-snapshot.json")
+}
+
+/// Load the persisted snapshot, but only when the index actually holds
+/// documents — an empty/new index must be built, not diffed.
+fn load_snapshot(app: &tauri::AppHandle, index: Option<&dex_search::SearchIndex>) -> dex_scanner::Snapshot {
+    if index.map(|i| i.count()).unwrap_or(0) == 0 {
+        return dex_scanner::Snapshot::new();
+    }
+    std::fs::read(snapshot_path(app))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+fn save_snapshot(app: &tauri::AppHandle, snap: &dex_scanner::Snapshot) {
+    if let Ok(bytes) = serde_json::to_vec(snap) {
+        let path = snapshot_path(app);
+        let tmp = path.with_extension("json.tmp");
+        // write-then-rename so a crash mid-write never leaves a torn snapshot
+        if std::fs::write(&tmp, bytes).is_ok() {
+            let _ = std::fs::rename(&tmp, &path);
+        }
+    }
+}
+
 fn index_sync(app: &tauri::AppHandle) -> Value {
     // Clone the (Arc-backed) index handle and release the search lock immediately.
     let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
@@ -1182,6 +1215,9 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
         Err(_) => return json!({ "success": false, "error": "snapshot busy" }),
     };
 
+    if prev.is_empty() {
+        *prev = load_snapshot(app, Some(&idx));
+    }
     let mut new_snapshot: dex_scanner::Snapshot = dex_scanner::Snapshot::new();
     for dir in &dirs {
         new_snapshot.extend(dex_scanner::scan_snapshot(dir, 20000));
@@ -1201,22 +1237,22 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
             }
         }
         *prev = new_snapshot;
+        save_snapshot(app, &prev);
         return json!({ "success": true, "mode": "rebuilt", "indexed": total });
     }
 
-    let mut upserted = 0usize;
-    for path in diff.added.iter().chain(diff.modified.iter()) {
-        if idx.upsert_file(std::path::Path::new(path)).unwrap_or(false) {
-            upserted += 1;
-        }
-    }
-    let mut removed = 0usize;
-    for path in &diff.removed {
-        if idx.remove_path(std::path::Path::new(path)).is_ok() {
-            removed += 1;
-        }
-    }
+    // One commit for the whole diff (was one writer + commit per file).
+    let upserts: Vec<std::path::PathBuf> = diff.added.iter().chain(diff.modified.iter()).map(std::path::PathBuf::from).collect();
+    let removals: Vec<std::path::PathBuf> = diff.removed.iter().map(std::path::PathBuf::from).collect();
+    let (upserted, removed) = match idx.apply_file_changes(&upserts, &removals) {
+        Ok(n) => (n, removals.len()),
+        Err(_) => (0, 0),
+    };
+    let changed = !diff.is_empty();
     *prev = new_snapshot;
+    if changed {
+        save_snapshot(app, &prev); // unchanged tree: skip the multi-MB rewrite
+    }
 
     json!({
         "success": true,
@@ -1235,6 +1271,45 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
 /// metadata-only events down to the minimal set of upserts/removals. The watcher
 /// is owned by its debounce thread for the app's lifetime; if setup fails it
 /// degrades silently (on-demand `search:sync` / `search:rebuild` still work).
+/// What one debounced burst of watcher events asks the index to do.
+enum IndexWork {
+    /// Upsert/remove exactly these paths (no directory walk).
+    Paths(std::collections::HashSet<std::path::PathBuf>),
+    /// Directory-level change, watcher overflow or a huge burst: full sync.
+    Full,
+}
+
+/// Apply changed paths straight to the index. Returns false when the batch
+/// needs a full sync instead (a directory appeared/vanished: its children
+/// can't be known from the event alone).
+fn index_apply_paths(app: &tauri::AppHandle, paths: &std::collections::HashSet<std::path::PathBuf>) -> bool {
+    let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
+    let idx = match search_state.lock() {
+        Ok(g) => match g.as_ref() {
+            Some(i) => i.clone(),
+            None => return true, // no index: nothing to keep fresh
+        },
+        Err(_) => return true,
+    };
+    let (mut upserts, mut removals) = (Vec::new(), Vec::new());
+    for p in paths {
+        if p.is_dir() {
+            return false;
+        }
+        if p.is_file() {
+            upserts.push(p.clone());
+        } else if p.extension().is_none() {
+            // Gone and extension-less: may have been a folder of indexed files.
+            return false;
+        } else {
+            removals.push(p.clone());
+        }
+    }
+    // One commit for the whole burst (was one writer + commit per file).
+    let _ = idx.apply_file_changes(&upserts, &removals);
+    true
+}
+
 fn start_index_watcher(app: tauri::AppHandle) {
     use notify::Watcher;
     let dirs: Vec<std::path::PathBuf> = {
@@ -1247,16 +1322,41 @@ fn start_index_watcher(app: tauri::AppHandle) {
     if dirs.is_empty() {
         return;
     }
-    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    // None = the watcher lost events (overflow) and asks for a rescan.
+    let (tx, rx) = std::sync::mpsc::channel::<Option<Vec<std::path::PathBuf>>>();
+    let roots = dirs.clone();
+    // An event matters only if it can change the index: paths inside dirs the
+    // scanner never walks (node_modules, target, .git, dist, ...) cannot. Without
+    // this filter a build churning under Documents re-triggered a full walk of
+    // all three folders every ~1.5 s (measured: up to ~70% of a core at "idle").
+    let relevant = move |p: &std::path::Path| match roots.iter().find(|r| p.starts_with(r)) {
+        Some(root) => !dex_scanner::is_ignored_under(root, p),
+        None => true,
+    };
     let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(event) = res {
+            if event.need_rescan() {
+                let _ = tx.send(None);
+                return;
+            }
             if matches!(
                 event.kind,
                 notify::EventKind::Create(_)
                     | notify::EventKind::Modify(_)
                     | notify::EventKind::Remove(_)
             ) {
-                let _ = tx.send(());
+                // A folder's own data/metadata "modify" just echoes changes to its
+                // children (which arrive as their own events); only a folder being
+                // created, removed or renamed needs the full sync it would trigger.
+                let echo = matches!(event.kind, notify::EventKind::Modify(k) if !matches!(k, notify::event::ModifyKind::Name(_)));
+                let paths: Vec<_> = event
+                    .paths
+                    .into_iter()
+                    .filter(|p| relevant(p) && !(echo && p.is_dir()))
+                    .collect();
+                if !paths.is_empty() {
+                    let _ = tx.send(Some(paths));
+                }
             }
         }
     }) {
@@ -1266,22 +1366,53 @@ fn start_index_watcher(app: tauri::AppHandle) {
     for dir in &dirs {
         let _ = watcher.watch(dir.as_path(), notify::RecursiveMode::Recursive);
     }
+    // Normal edits are applied per path (no walk). A FULL sync walks all three
+    // folders — and with an empty in-memory snapshot (every launch) it rebuilds
+    // the whole index, ~30+ CPU-seconds measured — so it is reserved for
+    // directory-level changes/overflow and spaced at least MIN_FULL_GAP apart.
+    const MIN_FULL_GAP: std::time::Duration = std::time::Duration::from_secs(30);
+    const MAX_BATCH: usize = 200;
     std::thread::spawn(move || {
         let _keep_alive = watcher; // own the watcher so it stays active
+        let mut last_full: Option<std::time::Instant> = None;
+        let add = |work: &mut IndexWork, msg: Option<Vec<std::path::PathBuf>>| match (msg, &mut *work) {
+            (Some(paths), IndexWork::Paths(set)) => {
+                set.extend(paths);
+                if set.len() > MAX_BATCH {
+                    *work = IndexWork::Full;
+                }
+            }
+            (None, _) => *work = IndexWork::Full,
+            (Some(_), IndexWork::Full) => {}
+        };
         loop {
             // Block until the first change in a quiet period.
-            if rx.recv().is_err() {
-                break;
-            }
-            // Coalesce the burst: drain until ~1.5s of quiet, then sync once.
+            let first = match rx.recv() {
+                Ok(m) => m,
+                Err(_) => break,
+            };
+            let mut work = IndexWork::Paths(Default::default());
+            add(&mut work, first);
+            // Coalesce the burst: drain until ~1.5s of quiet.
             loop {
                 match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
-                    Ok(()) => continue,
+                    Ok(m) => add(&mut work, m),
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
             }
-            let _ = index_sync(&app);
+            let full = match &work {
+                IndexWork::Paths(set) => !index_apply_paths(&app, set),
+                IndexWork::Full => true,
+            };
+            if full {
+                if let Some(wait) = last_full.and_then(|t| MIN_FULL_GAP.checked_sub(t.elapsed())) {
+                    std::thread::sleep(wait);
+                    while rx.try_recv().is_ok() {} // the full sync covers these too
+                }
+                let _ = index_sync(&app);
+                last_full = Some(std::time::Instant::now());
+            }
         }
     });
 }
@@ -2096,6 +2227,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         }
         "diagnostics:getSystemInfo" => system_status(),
         "diagnostics:getWebView2" => webview2::status_json(),
+        ch @ ("storage:getUsage" | "storage:clearCaches") => storage_ctl::dispatch(&app, ch),
 
         // --- Batch 5: App data locations -----------------------------------
         "app:getPath" | "data:getLocations" => app_paths(&app),
@@ -2406,6 +2538,8 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 
 fn main() {
     webview2::install_panic_logger();
+    // Must run before WebView2 opens its cache files (see storage_ctl.rs).
+    storage_ctl::run_pending_cache_clear();
     // Fail loudly and helpfully when no WebView2 runtime exists, instead of
     // letting webview creation fail with no window and no message.
     if !webview2::preflight() {
@@ -2446,8 +2580,8 @@ fn main() {
                 dex_search::SearchIndex::open_or_create(&index_dir).ok(),
             ));
             // Previous file snapshot for incremental `search:sync` (size+mtime per
-            // path). Starts empty: the first sync does a full build, then each later
-            // sync only diffs + upserts what changed.
+            // path). Starts empty; the first sync restores it from disk (kept off
+            // the startup path) so a relaunch diffs instead of rebuilding.
             app.manage(std::sync::Mutex::new(dex_scanner::Snapshot::new()));
             // Notification center — persists under the app data dir, mirroring
             // Electron's userData/notifications.

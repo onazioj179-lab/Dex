@@ -218,6 +218,44 @@ export const initializeTheme = () => {
   applyTheme(theme);
 };
 
+/**
+ * Keep the colour preset consistent with the light/dark scheme. Presets write
+ * text/background/border colours INLINE on <html>; the other scheme switches
+ * (Settings > Appearance > Dark Mode, useStore.setTheme/toggleTheme) only
+ * flipped `data-theme`, so switching to light kept the dark preset's #fafafa
+ * text over a light background (measured 1.00:1 contrast). When the active
+ * preset belongs to the other scheme, move to that scheme's default preset,
+ * keeping the user's accent, exactly as toggleTheme() does.
+ */
+export const syncPresetToScheme = (theme: 'dark' | 'light') => {
+  const current = getCurrentTheme();
+  if (current.isDark === (theme === 'dark')) return;
+  const target = THEME_PRESETS.find(p => p.id === (theme === 'dark' ? 'dark-default' : 'light-default'));
+  if (target) applyTheme({ ...target, accentColor: current.accentColor });
+};
+
+let schemeObserver: MutationObserver | null = null;
+
+/**
+ * Keep the preset in step with <html data-theme> no matter WHO sets it. Six
+ * code paths write data-theme (the pre-paint script in index.html, App.tsx,
+ * utils/theme incl. OS-follow, useStore, Settings, the command palette) and at
+ * boot they run in an order that can leave the light preset's dark text on the
+ * dark scheme (measured 1.34:1) or the dark preset's light text on the light
+ * scheme (1.00:1). Observing the attribute fixes every path in one place.
+ * applyTheme() re-sets the same value, so the observer settles immediately.
+ */
+export const installSchemePresetSync = () => {
+  if (schemeObserver || typeof MutationObserver === 'undefined') return;
+  const sync = () => {
+    const t = document.documentElement.getAttribute('data-theme');
+    if (t === 'dark' || t === 'light') syncPresetToScheme(t);
+  };
+  schemeObserver = new MutationObserver(sync);
+  schemeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  sync();
+};
+
 // Toggle between dark and light theme
 export const toggleTheme = () => {
   const current = getCurrentTheme();

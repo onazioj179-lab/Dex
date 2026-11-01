@@ -100,6 +100,15 @@ function saveList<T>(key: string, list: T[]): void {
   try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* quota / disabled -- ignore */ }
 }
 
+/** Settings > Privacy & Security > Location Services (default off). */
+export function locationServicesEnabled(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem('dex-settings') || '{}').locationServices === true;
+  } catch {
+    return false;
+  }
+}
+
 function toast(type: 'success' | 'error' | 'info', message: string): void {
   try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
 }
@@ -463,6 +472,12 @@ const DexMaps: React.FC = () => {
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) return;
+    // Honor Settings > Privacy & Security > Location Services (off by default).
+    // It used to be ignored: "My location" read the position regardless.
+    if (!locationServicesEnabled()) {
+      toast('info', 'Location Services is off. Turn it on in Settings > Privacy & Security to use My location.');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => goTo(pos.coords.latitude, pos.coords.longitude, 'My location', 14),
       (err) => console.warn('[Maps] geolocation denied:', err.message),

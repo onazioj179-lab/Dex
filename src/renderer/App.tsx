@@ -152,17 +152,6 @@ const initializeTheme = () => {
   }
 })();
 
-// Item 139: DNS prefetch for common resources loaded during session
-if (typeof document !== 'undefined') {
-  const prefetchOrigins = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
-  for (const origin of prefetchOrigins) {
-    const link = document.createElement('link');
-    link.rel = 'dns-prefetch';
-    link.href = origin;
-    document.head.appendChild(link);
-  }
-}
-
 // Startup budget enforcement (item 152): track first paint + interactive milestones
 const STARTUP_MARK = performance.now();
 

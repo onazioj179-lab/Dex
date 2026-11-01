@@ -43,6 +43,7 @@ import PolicyViewer from '../components/PolicyViewer';
 import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import DeveloperSection from './settingsPanels/DeveloperSection';
+import StoragePanel from './settingsPanels/StoragePanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
@@ -301,7 +302,7 @@ const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: str
   },
   keyboard: { defaultKeys: ['enableGlobalShortcuts', 'cmdPaletteShortcut', 'quickSearchShortcut', 'screenshotShortcut'] },
   files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'defaultView', 'sortBy', 'indexFolders', 'watchForChanges', 'thumbnailSize', 'maxStorageGB'] },
-  storage: { defaultKeys: ['cacheSizeGB', 'autoCleanCache', 'cacheCleanIntervalDays', 'compressOldFiles', 'encryptData'] },
+  storage: { defaultKeys: [] },
   browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'doNotTrack', 'clearOnExit', 'blockThirdPartyCookies', 'enableTorMode', 'defaultSearchEngine', 'maxDownloadSpeed', 'parallelDownloads'] },
   uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiWakeWordEnabled', 'ukiWakePhrase', 'ukiRecallMode', 'ukiRetentionDays', 'ukiCacheSizeGB', 'ukiAutoCleanup', 'ukiShowTranscript', 'ukiPersonality'] },
 };
@@ -1079,7 +1080,14 @@ const applySettings = (settings: Record<string, unknown>) => {
       body.classList.remove('dark-mode');
       root.classList.remove('dark-mode');
     }
-    localStorage.setItem('darkMode', String(settings.darkMode !== false));
+    // When the user actually changes Dark Mode, pin it: utils/theme's boot code
+    // otherwise ignores `darkMode` and follows the OS scheme, so a Light choice
+    // was undone on restart.
+    const nextDark = String(settings.darkMode !== false);
+    if (nextDark !== (localStorage.getItem('darkMode') ?? 'true')) {
+      localStorage.setItem('dex-theme-source', 'user');
+    }
+    localStorage.setItem('darkMode', nextDark);
 
     // Apply locale to document.lang and dir (RTL for Arabic/Hebrew/Persian/Urdu)
     try {
@@ -3307,8 +3315,6 @@ export const Settings: React.FC = () => {
         />
       </div>
       
-      {renderToggle('requireAuthOnWake', 'Require on Wake', 'Ask for authentication when computer wakes from sleep')}
-      
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
         <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
@@ -3350,38 +3356,44 @@ export const Settings: React.FC = () => {
       
       <h3 style={styles.sectionTitle}>Privacy</h3>
       {renderToggle('locationServices', 'Location Services', 'Allow DEX to access your location')}
-      {renderToggle('crashReports', 'Crash Reports', 'Send crash reports to help fix issues')}
-      
-      <h3 style={styles.sectionTitle}>Security Protection</h3>
-      {renderToggle('antiHacker', 'Anti-Hacker Protection', 'Block intrusion attempts and unauthorized access')}
-      {renderToggle('firewallEnabled', 'Built-in Firewall', 'Monitor and block suspicious network activity')}
-      {renderToggle('blockMalware', 'Malware Protection', 'Scan and block malicious files and scripts')}
-      {renderToggle('sandboxApps', 'Sandbox Applications', 'Run apps in isolated environment for safety')}
-      
-      <h3 style={styles.sectionTitle}>Data Protection</h3>
-      {renderToggle('encryptData', 'Protect Stored Data', 'Keep saved data protected on this device')}
-      {renderToggle('vpnProtection', 'VPN Protection', 'Route traffic through secure tunnel')}
-      
-      <h3 style={styles.sectionTitle}>Security Status</h3>
-      <div style={styles.aboutDetails}>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Firewall</span>
-          <span style={{ color: settings.firewallEnabled ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>{settings.firewallEnabled ? 'Active' : 'Disabled'}</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Anti-Hacker</span>
-          <span style={{ color: settings.antiHacker ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>{settings.antiHacker ? 'Protected' : 'Vulnerable'}</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Stored Data</span>
-          <span style={{ color: settings.encryptData ? 'var(--color-success, #30d158)' : 'var(--color-warning, #ff9f0a)' }}>{settings.encryptData ? 'Protected' : 'Standard'}</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Threats Blocked</span>
-          <span style={styles.aboutValue}>Active monitoring</span>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Crash reports</span>
+          <span style={styles.settingDesc}>Kept on this device for diagnostics. DEX does not send crash reports, analytics or usage data anywhere.</span>
         </div>
       </div>
       
+      {/* Fake protection toggles (firewall / anti-hacker / malware / sandbox /
+          VPN / "protect stored data") and a status panel that reported them as
+          "Active" / "Protected" were removed: nothing implemented them. This block
+          states what actually protects the user. */}
+      <h3 style={styles.sectionTitle}>How DEX protects you</h3>
+      <div style={styles.aboutDetails}>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Lock screen</span>
+          <span style={styles.aboutValue}>{settings.pinEnabled || settings.passwordEnabled ? 'PIN/password set (stored as an Argon2id hash)' : 'Not set: add a PIN or password above'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Password Vault</span>
+          <span style={styles.aboutValue}>AES-256-GCM; key derived from your master password, never stored</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Malware &amp; firewall</span>
+          <span style={styles.aboutValue}>Provided by Windows Security, not by DEX</span>
+        </div>
+      </div>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Windows Security</span>
+          <span style={styles.settingDesc}>Check Microsoft Defender Antivirus and Windows Firewall status</span>
+        </div>
+        <button
+          type="button"
+          style={styles.manageBtn}
+          onClick={() => { void (window as any).electron?.invoke?.('shell:openExternal', 'windowsdefender:'); }}
+        >Open</button>
+      </div>
+
       <h3 style={styles.sectionTitle}>UKI Memory Privacy</h3>
       <div style={styles.aboutDetails}>
         <div style={styles.aboutRow}>
@@ -4104,9 +4116,6 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>DNS & Security</h3>
       {renderToggle('dnsOverHttps', 'DNS over HTTPS', 'Encrypt DNS queries for privacy')}
-      {renderToggle('wifiProtection', 'Wi-Fi Protection', 'Warn about insecure Wi-Fi networks')}
-      {renderToggle('blockTrackerDomains', 'Block Tracker Domains', 'Block known tracking and advertising domains')}
-      {renderToggle('strictSecurity', 'Strict Security', 'Enforce strict TLS and certificate validation')}
 
       <h3 style={styles.sectionTitle}>Bandwidth</h3>
       {renderToggle('bandwidthOptimization', 'Bandwidth Optimization', 'Optimize network usage for better performance')}
@@ -4259,30 +4268,7 @@ export const Settings: React.FC = () => {
   // ===========================================================================
   const renderStorageSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Cache</h3>
-      {renderSlider('cacheSizeGB', 'Cache Size', 'Maximum disk space for application cache', 1, 32, ' GB')}
-      {renderToggle('autoCleanCache', 'Auto-Clean Cache', 'Automatically clear old cache files periodically')}
-      {renderSlider('cacheCleanIntervalDays', 'Clean Interval', 'Days between automatic cache cleanups', 1, 30, ' days')}
-
-      <h3 style={styles.sectionTitle}>Data Management</h3>
-      {renderToggle('compressOldFiles', 'Compress Old Files', 'Automatically compress files that haven\'t been accessed recently')}
-      {renderSlider('maxStorageGB', 'Storage Limit', 'Maximum storage DEX can use for local data', 10, 100000, ' GB')}
-      {renderToggle('encryptData', 'Protect Stored Data', 'Keep saved data protected on this device')}
-
-      <h3 style={styles.sectionTitle}>Clear Data</h3>
-      <button
-        style={styles.dangerBtn}
-        onClick={() => {
-          if (confirm('Clear all cached data? This may slow down apps temporarily.')) {
-            try {
-              localStorage.removeItem('dex-cache');
-              toast.success('Cache cleared successfully');
-            } catch {
-              toast.error('Failed to clear cache');
-            }
-          }
-        }}
-      >Clear Cache</button>
+      <StoragePanel styles={styles} />
 
       <h3 style={styles.sectionTitle}>UKI Memory Archive</h3>
       <div style={styles.aboutDetails}>
@@ -4299,10 +4285,6 @@ export const Settings: React.FC = () => {
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Size Limit</span>
           <span style={styles.aboutValue}>{settings.ukiCacheSizeGB || 3} GB</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Protection</span>
-          <span style={{ color: 'var(--color-success, #30d158)' }}>Enabled</span>
         </div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>

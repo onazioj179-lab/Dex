@@ -16,14 +16,18 @@
          logs "IPC custom protocol failed" ONCE and falls back to postMessage.
          Measured in the packaged app (same page, A/B, 2026-11): postMessage is
          ~5x faster on WebView2 — 0.3 ms vs 1.7 ms p50 per call, 1.7 vs 3.6 ms
-         for a 100 KB payload. Allowing the protocol would slow every IPC call. -->
+         for a 100 KB payload. Allowing the protocol would slow every IPC call.
+         Every host below is one the code actually fetches, and nothing else:
+         worldtimeapi / dictionaryapi / er-api = UKI's keyless answers (were
+         CSP-blocked, so those answers silently returned nothing); arcgisonline /
+         opentopomap = the Maps app's Satellite and Topo styles (rendered blank). -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval';
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: file: https://tiles.openfreemap.org;
+      img-src 'self' data: blob: file: https://tiles.openfreemap.org https://server.arcgisonline.com https://*.tile.opentopomap.org;
       font-src 'self' data:;
-      connect-src 'self' ws://localhost:* http://localhost:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://tiles.openfreemap.org https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api-inference.huggingface.co https://api.duckduckgo.com https://en.wikipedia.org;
+      connect-src 'self' ws://localhost:* http://localhost:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://tiles.openfreemap.org https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.duckduckgo.com https://en.wikipedia.org https://worldtimeapi.org https://api.dictionaryapi.dev https://open.er-api.com https://server.arcgisonline.com https://*.tile.opentopomap.org;
       media-src 'self' blob: file:;
       frame-src https: http:;
       child-src https: http:;

@@ -92,16 +92,12 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'PIN Code', section: 'privacy', desc: 'Use a 4-8 digit PIN to unlock', keywords: 'passcode lock authentication' },
   { label: 'Password', section: 'privacy', desc: 'Use a password to unlock', keywords: 'authentication lock credential' },
   { label: 'Auto-Lock Timer', section: 'privacy', desc: 'Lock DEX after inactivity', keywords: 'idle lock timeout security' },
-  { label: 'Require on Wake', section: 'privacy', desc: 'Ask for authentication when computer wakes', keywords: 'sleep wake lock' },
   { label: 'Recovery Codes', section: 'privacy', desc: 'Backup codes if you forget PIN or password', keywords: 'backup recovery codes' },
   { label: 'Location Services', section: 'privacy', desc: 'Allow DEX to access your location', keywords: 'gps location privacy' },
-  { label: 'Crash Reports', section: 'privacy', desc: 'Send crash reports to help fix issues', keywords: 'diagnostics telemetry' },
-  { label: 'Anti-Hacker Protection', section: 'privacy', desc: 'Block intrusion attempts and unauthorized access', keywords: 'security intrusion hacker' },
-  { label: 'Built-in Firewall', section: 'privacy', desc: 'Monitor and block suspicious network activity', keywords: 'firewall network security' },
-  { label: 'Malware Protection', section: 'privacy', desc: 'Scan and block malicious files and scripts', keywords: 'antivirus malware virus security' },
-  { label: 'Sandbox Applications', section: 'privacy', desc: 'Run apps in isolated environment for safety', keywords: 'isolation sandbox security' },
-  { label: 'Protect Stored Data', section: 'privacy', desc: 'Keep saved data protected on this device', keywords: 'encryption encrypt security' },
-  { label: 'VPN Protection', section: 'privacy', desc: 'Route traffic through secure tunnel', keywords: 'vpn tunnel privacy network' },
+  { label: 'How DEX protects you', section: 'privacy', desc: 'Lock screen, vault encryption and Windows Security', keywords: 'security firewall antivirus malware defender protection vault encryption' },
+  { label: 'Crash reports', section: 'privacy', desc: 'Kept on this device; nothing is sent', keywords: 'crash telemetry analytics diagnostics data' },
+  { label: 'Storage used by DEX', section: 'storage', desc: 'Measured disk usage by category', keywords: 'disk space usage size data storage' },
+  { label: 'Clear caches', section: 'storage', desc: 'Free web engine cache and logs; your data is kept', keywords: 'cache clear cleanup free space storage' },
   { label: 'Clear All Data', section: 'privacy', desc: 'Delete all your data', keywords: 'wipe erase reset danger' },
 
   // ---------------- Network ----------------
@@ -116,9 +112,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'IPv6', section: 'network', desc: 'Enable IPv6 networking', keywords: 'ip address protocol' },
   { label: 'Network Monitor', section: 'network', desc: 'Track real-time network activity', keywords: 'bandwidth traffic monitor' },
   { label: 'DNS over HTTPS', section: 'network', desc: 'Encrypt DNS queries for privacy', keywords: 'doh dns privacy security' },
-  { label: 'Wi-Fi Protection', section: 'network', desc: 'Warn about insecure Wi-Fi networks', keywords: 'wifi security warning' },
-  { label: 'Block Tracker Domains', section: 'network', desc: 'Block known tracking and advertising domains', keywords: 'ads trackers privacy' },
-  { label: 'Strict Security', section: 'network', desc: 'Enforce strict TLS and certificate validation', keywords: 'tls ssl certificate security' },
   { label: 'Bandwidth Optimization', section: 'network', desc: 'Optimize network usage for better performance', keywords: 'data saver bandwidth' },
   { label: 'Allow WebGL', section: 'network', desc: 'Enable GPU-accelerated graphics in web content', keywords: 'webgl gpu graphics web' },
   { label: 'Allow JavaScript', section: 'network', desc: 'Enable JavaScript execution in web content', keywords: 'javascript js web scripting' },
@@ -131,7 +124,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Low Power Mode', section: 'performance', desc: 'Reduce animations and background activity to save battery', keywords: 'battery power saver' },
   { label: 'CPU Priority', section: 'performance', desc: 'Process priority for DEX', keywords: 'cpu priority performance' },
   { label: 'Memory Optimization', section: 'performance', desc: 'Automatically free unused memory', keywords: 'ram memory cleanup' },
-  { label: 'Cache Size', section: 'performance', desc: 'Maximum disk cache for app data', keywords: 'cache storage disk' },
   { label: 'RAM Limit', section: 'performance', desc: 'Maximum RAM usage', keywords: 'memory ram limit' },
   { label: 'Preload Apps', section: 'performance', desc: 'Pre-load frequently used apps for faster launch', keywords: 'startup preload speed' },
   { label: 'Background Boost', section: 'performance', desc: 'Allow background apps extra resources when idle', keywords: 'background performance' },
@@ -187,13 +179,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Max Storage', section: 'files', desc: 'Maximum storage DEX can use for cache and data', keywords: 'storage limit disk files' },
 
   // ---------------- Storage & Data ----------------
-  { label: 'Cache Size', section: 'storage', desc: 'Maximum disk space for application cache', keywords: 'cache storage disk' },
-  { label: 'Auto-Clean Cache', section: 'storage', desc: 'Automatically clear old cache files periodically', keywords: 'cache cleanup storage' },
-  { label: 'Clean Interval', section: 'storage', desc: 'Days between automatic cache cleanups', keywords: 'cache cleanup interval' },
-  { label: 'Compress Old Files', section: 'storage', desc: 'Automatically compress rarely-accessed files', keywords: 'compress storage disk' },
-  { label: 'Storage Limit', section: 'storage', desc: 'Maximum storage DEX can use for local data', keywords: 'storage limit disk' },
-  { label: 'Protect Stored Data', section: 'storage', desc: 'Keep saved data protected on this device', keywords: 'encrypt storage security' },
-  { label: 'Clear Cache', section: 'storage', desc: 'Clear all cached data', keywords: 'cache clear storage' },
 
   // ---------------- Browser ----------------
   { label: 'Block Trackers', section: 'browser', desc: 'Block cross-site trackers and fingerprinting', keywords: 'privacy trackers browser' },

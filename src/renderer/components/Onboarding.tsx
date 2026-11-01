@@ -16,6 +16,8 @@ import { POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../sh
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { platform } from '../utils';
 import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
+import { useInstalledAppsStore } from '../store/installedAppsStore';
+import { APP_DEFINITIONS } from '../store/runningApps';
 import { Button, IconButton } from '../ui';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
@@ -323,6 +325,10 @@ export const OnboardingWizard: React.FC<{
     } catch {
       // storage unavailable
     }
+    // New setups start with the essentials (core + recommended apps); optional
+    // apps are one click away in the Store. Only first-run onboarding reaches
+    // here, so existing users' app lists are never changed.
+    useInstalledAppsStore.getState().applyEssentials(Object.keys(APP_DEFINITIONS));
     // Wire crash reporting and auto-update toggles to their respective controllers
     try {
       const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> }; updates?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;

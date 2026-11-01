@@ -100,7 +100,9 @@ initCompositorHealth();
 
 // Theme: respect user choice or follow OS prefers-color-scheme live
 import { initTheme } from './utils/theme';
+import { installSchemePresetSync } from './components/ThemeManager';
 initTheme();
+installSchemePresetSync();
 
 import { initIdleContinuity } from './services/IdleContinuity';
 initIdleContinuity();

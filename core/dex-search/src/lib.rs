@@ -60,6 +60,10 @@ pub struct SearchIndex {
     /// write means a cached result can never be stale; it only saves repeat-query
     /// Tantivy work between mutations. Bounded (LRU) so it can't grow unbounded.
     query_cache: std::sync::Arc<std::sync::Mutex<dex_cache::Cache<String, Vec<FileHit>>>>,
+    /// ONE long-lived reader (manual reload after our own commits). Building a
+    /// reader per search/count re-read meta.json, re-parsed the schema and
+    /// spawned a meta.json watcher thread every call — visible in idle profiles.
+    reader: tantivy::IndexReader,
 }
 
 /// Text-ish extensions whose contents we full-text index (bounded size).
@@ -165,7 +169,13 @@ impl SearchIndex {
         .filter(LowerCaser)
         .build();
         index.tokenizers().register("dex_prefix", tokenizer);
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .map_err(|e: tantivy::TantivyError| e.to_string())?;
         Ok(Self {
+            reader,
             index,
             f_path,
             f_name,
@@ -179,6 +189,31 @@ impl SearchIndex {
         })
     }
 
+    /// After any commit: point the shared reader at the new segments and drop
+    /// cached query results (invalidate-on-write).
+    fn after_write(&self) {
+        let _ = self.reader.reload();
+        self.invalidate_cache();
+    }
+
+    /// The single IndexWriter, retrying briefly while another write (e.g. a
+    /// background batch finishing its merges) holds the index lock, instead of
+    /// failing a concurrent note/clipboard upsert outright.
+    fn acquire_writer(&self, heap: usize) -> Result<IndexWriter, String> {
+        let mut last = String::new();
+        for _ in 0..50 {
+            match self.index.writer(heap) {
+                Ok(w) => return Ok(w),
+                Err(tantivy::TantivyError::LockFailure(..)) => {
+                    last = "index busy".into();
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                Err(e) => return Err(e.to_string()),
+            }
+        }
+        Err(last)
+    }
+
     /// Drop every cached query result. Called after any write so the next search
     /// recomputes against the current index (invalidate-on-write).
     fn invalidate_cache(&self) {
@@ -189,24 +224,21 @@ impl SearchIndex {
 
     /// Number of indexed documents.
     pub fn count(&self) -> u64 {
-        match self.index.reader() {
-            Ok(r) => r.searcher().num_docs(),
-            Err(_) => 0,
-        }
+        self.reader.searcher().num_docs()
     }
 
     /// Remove every document.
     pub fn clear(&self) -> Result<(), String> {
-        let mut writer: IndexWriter = self.index.writer(50_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(50_000_000)?;
         writer.delete_all_documents().map_err(|e| e.to_string())?;
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        self.after_write();
         Ok(())
     }
 
     /// Walk `root` (bounded) and index every file. Returns the count indexed.
     pub fn index_path(&self, root: &Path, max: usize) -> Result<usize, String> {
-        let mut writer: IndexWriter = self.index.writer(50_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(50_000_000)?;
         // Read file contents (the I/O-bound part) in parallel, then feed the
         // single IndexWriter sequentially (the writer isn't Sync for concurrent
         // adds). Preserves the same documents, just overlaps the per-file reads.
@@ -242,7 +274,50 @@ impl SearchIndex {
                 .map_err(|e| e.to_string())?;
         }
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        // Let the merges this big commit triggers finish now (we're on a
+        // background thread) instead of being abandoned at exit and redone.
+        let _ = writer.wait_merging_threads();
+        self.after_write();
+        Ok(n)
+    }
+
+    /// Apply a batch of file changes in ONE commit: upsert every indexable path in
+    /// `upserts`, delete every path in `removals`. One commit per burst instead of
+    /// one per file keeps the segment count (and merge work) down. Returns the
+    /// number of files (re)indexed.
+    pub fn apply_file_changes(&self, upserts: &[PathBuf], removals: &[PathBuf]) -> Result<usize, String> {
+        if upserts.is_empty() && removals.is_empty() {
+            return Ok(0);
+        }
+        let mut writer: IndexWriter = self.acquire_writer(15_000_000)?;
+        for p in removals {
+            writer.delete_term(Term::from_field_text(self.f_path, &p.to_string_lossy()));
+        }
+        let mut n = 0usize;
+        for p in upserts {
+            let Some((path_str, name, ext, modified, size, content)) = file_record(p) else {
+                // Not (or no longer) an indexable file: make sure it isn't indexed.
+                writer.delete_term(Term::from_field_text(self.f_path, &p.to_string_lossy()));
+                continue;
+            };
+            writer.delete_term(Term::from_field_text(self.f_path, &path_str));
+            writer
+                .add_document(doc!(
+                    self.f_path => path_str.clone(),
+                    self.f_name => name,
+                    self.f_ext => ext,
+                    self.f_content => content,
+                    self.f_modified => modified,
+                    self.f_size => size,
+                    self.f_source => "file",
+                    self.f_id => path_str,
+                ))
+                .map_err(|e| e.to_string())?;
+            n += 1;
+        }
+        writer.commit().map_err(|e| e.to_string())?;
+        let _ = writer.wait_merging_threads();
+        self.after_write();
         Ok(n)
     }
 
@@ -256,7 +331,7 @@ impl SearchIndex {
             Some(rec) => rec,
             None => return Ok(false),
         };
-        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(15_000_000)?;
         // delete-then-add in one commit: the new doc has a higher opstamp than the
         // delete, so it survives while the previous version (older opstamp) is removed.
         writer.delete_term(Term::from_field_text(self.f_path, &path_str));
@@ -273,7 +348,7 @@ impl SearchIndex {
             ))
             .map_err(|e| e.to_string())?;
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        self.after_write();
         Ok(true)
     }
 
@@ -294,7 +369,7 @@ impl SearchIndex {
         if id.is_empty() {
             return Err("doc id must not be empty".into());
         }
-        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(15_000_000)?;
         writer.delete_term(Term::from_field_text(self.f_id, id));
         writer
             .add_document(doc!(
@@ -309,26 +384,26 @@ impl SearchIndex {
             ))
             .map_err(|e| e.to_string())?;
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        self.after_write();
         Ok(())
     }
 
     /// Remove any document (of any source) by its stable id. No-op if absent.
     pub fn remove_doc(&self, id: &str) -> Result<(), String> {
-        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(15_000_000)?;
         writer.delete_term(Term::from_field_text(self.f_id, id));
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        self.after_write();
         Ok(())
     }
 
     /// Remove a single file from the index by exact path. A no-op (still `Ok`) if
     /// the path was never indexed -- safe to call on any delete event.
     pub fn remove_path(&self, path: &Path) -> Result<(), String> {
-        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        let mut writer: IndexWriter = self.acquire_writer(15_000_000)?;
         writer.delete_term(Term::from_field_text(self.f_path, &path.to_string_lossy()));
         writer.commit().map_err(|e| e.to_string())?;
-        self.invalidate_cache();
+        self.after_write();
         Ok(())
     }
 
@@ -346,11 +421,7 @@ impl SearchIndex {
                 return hits.clone();
             }
         }
-        let reader = match self.index.reader() {
-            Ok(r) => r,
-            Err(_) => return Vec::new(),
-        };
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
         let parser = QueryParser::for_index(&self.index, vec![self.f_name, self.f_content, self.f_path]);
         // The edge-ngram tokenizer on `name` handles prefix matching, so the raw
         // query is enough — "budg" tokenizes to prefixes that match "budget".
@@ -451,6 +522,34 @@ fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_file_changes_batches_upserts_and_removals_in_one_commit() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let a = data.path().join("alpha_plan.txt");
+        let b = data.path().join("beta_notes.txt");
+        std::fs::write(&a, b"quarterly zebra roadmap").unwrap();
+        std::fs::write(&b, b"meeting notes").unwrap();
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+
+        assert_eq!(idx.apply_file_changes(&[a.clone(), b.clone()], &[]).unwrap(), 2);
+        // The shared reader sees the commit immediately (reloaded after write).
+        assert_eq!(idx.count(), 2);
+        assert!(idx.search("zebra", 10).iter().any(|h| h.name == "alpha_plan.txt"));
+
+        // Re-upserting a changed file doesn't duplicate it; removal drops it.
+        std::fs::write(&a, b"quarterly giraffe roadmap").unwrap();
+        assert_eq!(idx.apply_file_changes(&[a.clone()], &[b.clone()]).unwrap(), 1);
+        assert_eq!(idx.count(), 1);
+        assert!(idx.search("giraffe", 10).iter().any(|h| h.name == "alpha_plan.txt"));
+        assert!(idx.search("zebra", 10).is_empty());
+
+        // A path that vanished before the batch ran is treated as a removal.
+        std::fs::remove_file(&a).unwrap();
+        assert_eq!(idx.apply_file_changes(&[a], &[]).unwrap(), 0);
+        assert_eq!(idx.count(), 0);
+    }
 
     #[test]
     fn index_and_search_files() {

@@ -121,3 +121,43 @@ describe('full lifecycle (reduce over actions)', () => {
     expect(isAppInstalled(removed, 'axl')).toBe(true);
   });
 });
+
+describe('app tiers + essentials preset', () => {
+  it('classifies core, recommended and optional apps', async () => {
+    const { appTier } = await import('../../src/renderer/store/installedAppsStore');
+    expect(appTier('settings')).toBe('core');
+    expect(appTier('notes')).toBe('recommended');
+    expect(appTier('axl')).toBe('optional');
+  });
+
+  it('essentials removes only optional apps, never core or recommended', async () => {
+    const { essentialsRemovedSet } = await import('../../src/renderer/store/installedAppsStore');
+    const removed = essentialsRemovedSet(['home', 'settings', 'notes', 'calendar', 'axl', 'prism', 'git']);
+    expect(removed).toEqual(['axl', 'prism', 'git']);
+  });
+});
+
+describe('Maps honors Location Services (default off)', () => {
+  it('is off unless the user turned it on', async () => {
+    const { locationServicesEnabled } = await import('../../src/renderer/DEXAPPLICATIONS/standalone/Maps');
+    localStorage.removeItem('dex-settings');
+    expect(locationServicesEnabled()).toBe(false);
+    localStorage.setItem('dex-settings', JSON.stringify({ locationServices: false }));
+    expect(locationServicesEnabled()).toBe(false);
+    localStorage.setItem('dex-settings', JSON.stringify({ locationServices: true }));
+    expect(locationServicesEnabled()).toBe(true);
+    localStorage.setItem('dex-settings', '{corrupt');
+    expect(locationServicesEnabled()).toBe(false);
+    localStorage.removeItem('dex-settings');
+  });
+});
+
+describe('Storage panel formatBytes', () => {
+  it('formats measured sizes', async () => {
+    const { formatBytes } = await import('../../src/renderer/pages/settingsPanels/StoragePanel');
+    expect(formatBytes(0)).toBe('0 KB');
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(1536)).toBe('1.5 KB');
+    expect(formatBytes(175_331_123)).toBe('167 MB');
+  });
+});

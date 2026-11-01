@@ -29,6 +29,28 @@ const SKIP_DIRS: &[&str] = &[
     "coverage", "vendor", "__pycache__",
 ];
 
+/// True when `path` sits inside a directory the walk never descends into
+/// (a SKIP_DIRS entry or a dot-dir), judged only by the components BELOW
+/// `root` — so a user whose home folder happens to be called "build" is not
+/// ignored wholesale. Paths outside `root` are never ignored. Live watchers use
+/// this to drop events (e.g. a cargo/npm build churning `target/` or
+/// `node_modules/` under Documents) that could never change the index.
+pub fn is_ignored_under(root: &Path, path: &Path) -> bool {
+    let rel = match path.strip_prefix(root) {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    // Every component except the last is a directory on the way to the entry;
+    // the last is the entry itself, which may also be an ignored directory.
+    rel.components().any(|c| match c {
+        std::path::Component::Normal(name) => {
+            let name = name.to_string_lossy().to_lowercase();
+            name.starts_with('.') || SKIP_DIRS.contains(&name.as_str())
+        }
+        _ => false,
+    })
+}
+
 /// Bounded depth-first walk returning (path, size, modified_secs) for files.
 /// The mtime is carried so change-detection snapshots can reuse the one walk.
 fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64, u64)> {
@@ -186,7 +208,7 @@ pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
 
 /// A lightweight per-file fingerprint: byte size + mtime (seconds). A change to
 /// either marks the file modified — cheap and avoids hashing on every poll.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct FileStamp {
     pub size: u64,
     pub modified: u64,
@@ -245,6 +267,26 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> SnapshotDiff {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignored_under_skips_build_dirs_and_dot_dirs_below_root() {
+        let root = Path::new("C:/Users/u/Documents");
+        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/app/node_modules/x/i.js")));
+        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/rs/target/release/a.o")));
+        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/repo/.git/index")));
+        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/web/Dist/main.js")));
+        assert!(!is_ignored_under(root, Path::new("C:/Users/u/Documents/notes/todo.txt")));
+        assert!(!is_ignored_under(root, Path::new("C:/Users/u/Documents/targets.txt")));
+    }
+
+    #[test]
+    fn ignored_under_judges_only_components_below_root() {
+        // A home folder literally named "build" must not hide everything.
+        let root = Path::new("C:/Users/build/Documents");
+        assert!(!is_ignored_under(root, Path::new("C:/Users/build/Documents/report.docx")));
+        // Outside the root: never ignored.
+        assert!(!is_ignored_under(root, Path::new("D:/elsewhere/node_modules/a.js")));
+    }
 
     #[test]
     fn categorizes_by_extension() {

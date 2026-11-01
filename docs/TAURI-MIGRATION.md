@@ -9,6 +9,23 @@
 
 ---
 
+## PART 2 — idle CPU, privacy honesty, storage, tiers (2026-11-01)
+
+Full write-up: `DEX_TAURI_PART2_IMPROVEMENT_REPORT.md`. Resume facts:
+- **Idle CPU 50-100% of a core -> ~1-2%:** tantivy was rebuilt every launch (snapshot only in
+  memory) and fragmented by per-file commits. Now: snapshot persisted in
+  `search-index/dex-snapshot.json`, ONE shared `IndexReader` (manual reload), batch
+  `apply_file_changes` (one commit, waits for merges), watcher ignores `node_modules`/`target`/
+  dot-dirs (`dex_scanner::is_ignored_under`) and applies changed paths directly.
+- **Storage:** `storage:getUsage` / `storage:clearCaches` (`storage_ctl.rs`); web-cache removal runs
+  at next launch before WebView2 starts, rename-first so in-use dirs are never touched.
+- **Privacy:** removed fake security toggles + the silent Hugging Face UKI fallback; Maps honors
+  Location Services; `docs/privacy/DATA_FLOWS.md` = factual inventory. PRIVACY.md NOT yet
+  corrected (needs owner approval / version bump).
+- **Theme:** `installSchemePresetSync()` (main.tsx) keeps the inline preset in step with
+  `data-theme` — light mode was unreadable (1.00:1).
+- **Apps:** tiers in `installedAppsStore` (core/recommended/optional); onboarding applies Essentials.
+
 ## STARTUP REPAIR — "WebView2 not found" root-caused + fixed (2026-11-01)
 
 Full write-up: `DEX_TUARI_SYSTEM_AUDIT_REPORT.md` (repo root). Key facts for resuming:
