@@ -1559,7 +1559,7 @@ export const Audio: React.FC = () => {
                   aria-label={gaplessMode ? 'Disable gapless playback' : 'Enable gapless playback'}
                   style={{
                     width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: gaplessMode ? 'var(--color-success)' : 'var(--color-border)',
+                    background: gaplessMode ? 'var(--color-accent)' : 'var(--color-border)',
                     position: 'relative', transition: 'background 0.2s ease', padding: 0,
                   }}
                 >

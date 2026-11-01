@@ -12,7 +12,7 @@
 | 6 | Signed updates + downloadable apps | BLOCKED | Medium | Needs signing key + hosting | Updater, Store | Owner creates key; choose hosting | High | Owner | P1 |
 | 7 | Terms of Service legal review | PARTIAL | Medium | Not a legal reviewer | `TERMS.md` | Legal review | Low | Legal | P2 |
 | 8 | App-level radius sweep | DONE | — | All snapped; guard at 0 | — | — | — | — | — |
-| 9 | App-level color sweep | PARTIAL | Low | Not started | `DEXAPPLICATIONS/*` | Replace hardcoded hex with tokens | Medium | — | P2 |
+| 9 | App-level color sweep | PARTIAL | Low | Imosion done (chrome on tokens, green accent → system accent, pinned dark via `.dex-theme-dark`); every green on/off switch OS-wide now uses the accent. Remaining literals are mostly content (track/brush/palette colors) | `DEXAPPLICATIONS/*` (Prism, Flux, CollabHub, Rewind next) | Same treatment per app: chrome → tokens, leave content colors | Medium | — | P2 |
 | 10 | Control border contrast | DONE (shared TextInput/Select) | Low | App-local inputs not swept | inputs in apps | Use `--color-border-control` | Low | — | P3 |
 | 11 | Notes drawing + handwritten signature | DONE (PR #65) | — | — | — | — | — | — | — |
 | 12 | Podcasts, shared albums, captions | MISSING | Low | Need backends/services | New apps | Product decision first | High | Services | P3 |
