@@ -146,6 +146,9 @@
   --color-border-subtle: rgba(255, 255, 255, 0.08);
   --color-border-default: rgba(255, 255, 255, 0.14);
   --color-border-strong: rgba(255, 255, 255, 0.22);
+  /* Form-control boundaries (inputs, selects): >=3:1 on every surface for
+     WCAG 1.4.11. --color-border stays the subtle decorative divider. */
+  --color-border-control: #6B6D73;
   --color-border-glass: rgba(255, 255, 255, 0.16);
   --color-border-highlight: rgba(255, 255, 255, 0.18);
 
@@ -1546,6 +1549,7 @@ html[data-darkroom="on"] {
 
   /* Borders -- visible on light */
   --color-border: #C6C6C8;
+  --color-border-control: #7E7E83;  /* >=3.5:1 on light surfaces */
   --color-border-subtle: #D4D4D6;
   --color-border-default: #C6C6C8;
   --color-border-strong: #AEAEB2;
