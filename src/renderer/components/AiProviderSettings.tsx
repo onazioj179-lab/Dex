@@ -177,7 +177,7 @@ const AiProviderSettings: React.FC = () => {
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{processingModeHint(mode)}</span>
         {mode === 'manual' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <label htmlFor="manual-model" style={{ fontSize: 12, color: 'var(--color-text-secondary)', minWidth: 120 }}>Model</label>
+            <label htmlFor="manual-model" style={{ fontSize: 12, color: 'var(--color-text-secondary)', minWidth: 120 }}>Pinned model</label>
             <select
               id="manual-model"
               value={manualModel}
