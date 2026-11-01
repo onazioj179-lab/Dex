@@ -35,6 +35,21 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Security checkpoint (2026-11-01 — shell open hardening):** `shell_open` used to forward ANY
+string to `open::that` (ShellExecuteW), so the renderer/an XSS could launch executables. Split
+into `shell_open_external` + `shell_open_path` in src-tauri/src/main.rs. `shell:openExternal`
+only opens `http(s)` (host required) / `mailto` / `windowsdefender` / `ms-settings` URIs. `shell:openPath`
+(+ `fileIntel:openFile`, `media:openWithSystem`) resolves aliases via `resolve_path` (so
+Gallery's `"pictures"`/`"videos"` button now works), then requires an absolute, existing, local
+path: no UNC/device paths, no NTFS alternate streams, no `://`, and no executable/script/
+shortcut/installer extension (`BLOCKED_OPEN_EXTENSIONS`, checked on the given AND canonical
+name, Windows trailing dots/spaces stripped; unix also refuses exec-bit files). Refusals return
+`{ success:false, error }`. Renderer callers fixed: Workflows "Open URL" now uses
+openExternal (was openPath), "Open App" uses `launcher:quick` (installed-apps index);
+Files double-click toasts the refusal; account card honours `success:false`. Tests:
+`cargo test --release --bin dex-tauri shell_open_policy`. Still open (not this pass):
+`launcher:launchPath` spawns any path it's given — same class of hole.
+
 **RELEASED v6.1.0 (2026-07-03):** merged to main (fast-forward), bumped 4 version files +
 CHANGELOG, built MSI (`bundle.targets` now `["nsis","msi"]` — owner reversed the 6.0.1
 NSIS-only call and wants the MSI) and published: `v6.1.0` on Dex (MSI + setup.exe, Latest)
