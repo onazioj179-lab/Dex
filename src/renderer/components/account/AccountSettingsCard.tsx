@@ -30,8 +30,8 @@ async function openExternalUrl(url: string): Promise<boolean> {
   try {
     const w: any = typeof window !== 'undefined' ? window : null;
     if (w?.electron?.invoke) {
-      await w.electron.invoke('shell:openExternal', url);
-      return true;
+      const res = await w.electron.invoke('shell:openExternal', url);
+      return res?.success !== false;
     }
     if (typeof window !== 'undefined' && window.open) {
       window.open(url, '_blank', 'noopener,noreferrer');

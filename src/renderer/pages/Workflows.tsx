@@ -1029,14 +1029,16 @@ export const Workflows: React.FC = () => {
             case 'a36': { // Open File with default app (config: path)
               const path = node.config.path || context.files?.[0]?.path;
               if (path && window.electron?.invoke) {
-                await window.electron.invoke('shell:openPath', path);
+                // Refused targets (executables, scripts, missing paths) come
+                // back as { success:false, error } -- surface them as the result.
+                context.result = await window.electron.invoke('shell:openPath', path);
               }
               break;
             }
             case 'a35': { // Open URL (config: url)
               const url = node.config.url || '';
               if (url && window.electron?.invoke) {
-                await window.electron.invoke('shell:openPath', url);
+                context.result = await window.electron.invoke('shell:openExternal', url);
               }
               break;
             }
@@ -1052,7 +1054,8 @@ export const Workflows: React.FC = () => {
             case 'a8': { // Open App (config: appName)
               const app = node.config.appName || '';
               if (app && window.electron?.invoke) {
-                await window.electron.invoke('shell:openPath', app);
+                // Launch via the installed-apps index (shell:openPath refuses executables).
+                context.result = await window.electron.invoke('launcher:quick', app);
               }
               break;
             }

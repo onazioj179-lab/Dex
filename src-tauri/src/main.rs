@@ -635,11 +635,289 @@ fn system_kill(pid: u32) -> Value {
     }
 }
 
-/// `shell:openPath` / `shell:openExternal` — open with the OS default handler.
-fn shell_open(target: &str) -> Value {
+// --- Shell open policy -------------------------------------------------------
+// `open::that` hands its argument to the OS opener (ShellExecuteW on Windows),
+// which will happily launch executables, scripts, installers and arbitrary URI
+// handlers. The renderer (or an XSS in it) must not be able to reach that, so
+// both open channels validate the target first.
+
+/// URI schemes `shell:openExternal` may open. Built from real renderer usage:
+/// http/https (Settings repository/issues links, account checkout + billing
+/// portal, UKI `ui.openLink`, Workflows "Open URL"), mailto (account payment
+/// methods), windowsdefender (Settings > Privacy "Open Windows Security"),
+/// ms-settings (Settings buttons that jump to Windows display/sound/Bluetooth/
+/// network pages). Both Windows schemes only open system settings UI.
+const OPEN_EXTERNAL_SCHEMES: &[&str] =
+    &["http", "https", "mailto", "windowsdefender", "ms-settings"];
+
+/// Extensions `shell:openPath` refuses: anything the OS opener would execute,
+/// install, or follow to another target (Windows PATHEXT + Microsoft's
+/// "unsafe file types" list, shortcuts, and the macOS/Linux equivalents).
+/// Launching apps goes through `launcher:*`, which only runs scanned apps.
+const BLOCKED_OPEN_EXTENSIONS: &[&str] = &[
+    // Windows executables / installers / libraries
+    "exe", "com", "scr", "pif", "cpl", "msc", "msi", "msp", "mst", "msix", "msixbundle",
+    "appx", "appxbundle", "application", "appref-ms", "gadget", "dll", "ocx", "sys", "drv",
+    "xll", "xbap", "diagcab", "diagcfg", "diagpkg",
+    // Windows scripts / script hosts
+    "bat", "cmd", "ps1", "psm1", "psd1", "ps1xml", "psc1", "pssc", "vb", "vbs", "vbe", "js",
+    "jse", "wsf", "wsh", "wsc", "ws", "hta", "sct", "shb", "shs", "msh", "msh1", "msh2",
+    "mshxml", "msh1xml", "msh2xml", "reg", "inf", "scf", "jar",
+    // Shortcuts / redirectors that resolve to another (possibly executable) target
+    "lnk", "url", "website", "settingcontent-ms", "library-ms", "searchconnector-ms",
+    // Cross-platform script interpreters
+    "py", "pyw", "pyc", "pyz", "pl", "rb", "php", "sh", "bash", "zsh", "csh", "ksh", "fish",
+    // macOS / Linux launchers and installers
+    "app", "command", "tool", "workflow", "terminal", "pkg", "mpkg", "desktop", "appimage",
+    "run", "deb", "rpm",
+];
+
+/// Validate a `shell:openExternal` target: a well-formed URI whose scheme is
+/// on [`OPEN_EXTERNAL_SCHEMES`]. Web URLs must carry a host.
+fn check_external_url(target: &str) -> Result<(), String> {
+    let t = target.trim();
+    if t.is_empty() {
+        return Err("empty URL".into());
+    }
+    if t.chars().any(|c| c.is_control()) {
+        return Err("URL contains control characters".into());
+    }
+    let (scheme, rest) = t
+        .split_once(':')
+        .ok_or_else(|| "not a URL (missing scheme)".to_string())?;
+    let valid_scheme = scheme.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+        && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
+    if !valid_scheme {
+        return Err("not a URL (invalid scheme)".into());
+    }
+    let scheme = scheme.to_ascii_lowercase();
+    if !OPEN_EXTERNAL_SCHEMES.contains(&scheme.as_str()) {
+        return Err(format!("URL scheme '{scheme}:' is not allowed"));
+    }
+    if scheme == "http" || scheme == "https" {
+        let host = rest
+            .strip_prefix("//")
+            .ok_or_else(|| "web URL must start with //".to_string())?
+            .split(['/', '?', '#'])
+            .next()
+            .unwrap_or("");
+        if host.rsplit('@').next().unwrap_or("").is_empty() {
+            return Err("web URL has no host".into());
+        }
+    }
+    Ok(())
+}
+
+/// Lowercased extension of a file name, ignoring the trailing dots/spaces that
+/// Windows silently strips ("evil.exe. " opens as "evil.exe").
+fn effective_extension(path: &std::path::Path) -> Option<String> {
+    let name = path.file_name()?.to_string_lossy();
+    let name = name.trim_end_matches(['.', ' ']);
+    let (_, ext) = name.rsplit_once('.')?;
+    Some(ext.to_ascii_lowercase())
+}
+
+/// Validate a resolved `shell:openPath` target: an absolute, local, existing
+/// file or folder that is not an executable/script/shortcut.
+fn check_open_path(path: &std::path::Path) -> Result<(), String> {
+    let raw = path.to_string_lossy();
+    if raw.trim().is_empty() {
+        return Err("empty path".into());
+    }
+    if raw.chars().any(|c| c.is_control()) {
+        return Err("path contains control characters".into());
+    }
+    if raw.contains("://") {
+        return Err("URLs must be opened with shell:openExternal".into());
+    }
+    // UNC / device paths: opening them can leak NTLM credentials to a remote
+    // host or reach \\?\ and \\.\ device namespaces.
+    if raw.starts_with("\\\\") || raw.starts_with("//") {
+        return Err("network and device paths are not allowed".into());
+    }
+    if !path.is_absolute() {
+        return Err("path must be absolute".into());
+    }
+    // NTFS alternate data streams ("notes.txt:payload.exe"): the only colon a
+    // Windows path may carry is the drive letter's.
+    #[cfg(windows)]
+    if raw.char_indices().any(|(i, c)| c == ':' && i != 1) {
+        return Err("alternate data streams are not allowed".into());
+    }
+    let meta = std::fs::metadata(path).map_err(|e| format!("path not found: {e}"))?;
+    // Check both the name as given and the real target (symlinks/junctions,
+    // 8.3 names and case are resolved by canonicalize).
+    let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    for p in [path, canonical.as_path()] {
+        if let Some(ext) = effective_extension(p) {
+            if BLOCKED_OPEN_EXTENSIONS.contains(&ext.as_str()) {
+                return Err(format!("refusing to open executable or script (.{ext})"));
+            }
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
+            return Err("refusing to open an executable file".into());
+        }
+    }
+    let _ = meta;
+    Ok(())
+}
+
+fn open_with_os(target: &str) -> Value {
     match open::that(target) {
         Ok(()) => json!({ "success": true }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
+    }
+}
+
+/// `shell:openExternal` — open an allow-listed URI with the OS default handler.
+fn shell_open_external(target: &str) -> Value {
+    match check_external_url(target) {
+        Ok(()) => open_with_os(target.trim()),
+        Err(error) => json!({ "success": false, "error": error }),
+    }
+}
+
+/// `shell:openPath` / `fileIntel:openFile` / `media:openWithSystem` — open an
+/// existing, non-executable file or folder (aliases like "pictures" resolve).
+fn shell_open_path(app: &tauri::AppHandle, target: &str) -> Value {
+    let resolved = resolve_path(app, target);
+    match check_open_path(&resolved) {
+        Ok(()) => open_with_os(&resolved.to_string_lossy()),
+        Err(error) => json!({ "success": false, "error": error }),
+    }
+}
+
+#[cfg(test)]
+mod shell_open_policy_tests {
+    use super::{check_external_url, check_open_path, effective_extension};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn external_allows_web_mail_and_windows_security() {
+        for ok in [
+            "https://github.com/dex/dex/issues",
+            "HTTP://example.com",
+            "https://user@example.com:8443/a?b=c#d",
+            "  https://example.com/padded  ",
+            "mailto:billing@example.com?subject=Hi",
+            "windowsdefender:",
+            "windowsdefender://threat",
+            "ms-settings:display",
+            "MS-SETTINGS:sound",
+            "ms-settings:bluetooth",
+            "ms-settings:network",
+        ] {
+            assert!(check_external_url(ok).is_ok(), "{ok} should be allowed");
+        }
+    }
+
+    #[test]
+    fn external_refuses_files_executables_and_other_schemes() {
+        for bad in [
+            "",
+            "   ",
+            "C:\\Windows\\System32\\calc.exe",
+            "calc.exe",
+            "/usr/bin/xterm",
+            "file:///C:/Windows/System32/cmd.exe",
+            "javascript:alert(1)",
+            "vbscript:msgbox",
+            "ms-msdt:/id PCWDiagnostic",
+            "search-ms:query=x&crumb=location:\\\\evil\\share",
+            "ms-officecmd:{}",
+            "ms-settings-evil:display",
+            "ms-setting:display",
+            "\\\\evil-host\\share\\payload.exe",
+            "https:example.com",
+            "https://",
+            "https://@/",
+            "https://example.com/\nmalicious",
+            "1http://example.com",
+        ] {
+            assert!(check_external_url(bad).is_err(), "{bad:?} should be refused");
+        }
+    }
+
+    #[test]
+    fn extension_ignores_windows_trailing_dots_and_spaces() {
+        assert_eq!(effective_extension(Path::new("evil.EXE")).as_deref(), Some("exe"));
+        assert_eq!(effective_extension(Path::new("evil.exe. .")).as_deref(), Some("exe"));
+        assert_eq!(effective_extension(Path::new("README")), None);
+    }
+
+    fn scratch_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("dex-shell-open-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn path_allows_existing_documents_and_folders() {
+        let dir = scratch_dir("allow");
+        for name in ["report.pdf", "photo.JPG", "notes.txt", "Makefile"] {
+            let f = dir.join(name);
+            std::fs::write(&f, b"x").unwrap();
+            assert!(check_open_path(&f).is_ok(), "{name} should be allowed");
+        }
+        assert!(check_open_path(&dir).is_ok(), "folders open in the file manager");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn path_refuses_executables_scripts_and_shortcuts() {
+        let dir = scratch_dir("refuse");
+        for name in [
+            "setup.exe", "run.BAT", "x.cmd", "x.ps1", "x.vbs", "x.js", "pkg.msi", "app.lnk",
+            "screen.scr", "site.url", "page.hta", "tool.jar", "x.py", "x.sh", "x.reg",
+        ] {
+            let f = dir.join(name);
+            std::fs::write(&f, b"x").unwrap();
+            let err = check_open_path(&f).expect_err(name);
+            assert!(err.contains("executable"), "{name}: {err}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn path_refuses_missing_relative_network_and_url_targets() {
+        let dir = scratch_dir("misc");
+        assert!(check_open_path(&dir.join("missing.pdf")).is_err());
+        assert!(check_open_path(Path::new("relative/notes.txt")).is_err());
+        assert!(check_open_path(Path::new("\\\\evil-host\\share\\doc.pdf")).is_err());
+        assert!(check_open_path(Path::new("//evil-host/share/doc.pdf")).is_err());
+        assert!(check_open_path(Path::new("https://example.com")).is_err());
+        assert!(check_open_path(Path::new("")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn path_refuses_alternate_data_streams_and_device_paths() {
+        let dir = scratch_dir("ads");
+        let f = dir.join("notes.txt");
+        std::fs::write(&f, b"x").unwrap();
+        let ads = PathBuf::from(format!("{}:payload.exe", f.display()));
+        assert!(check_open_path(&ads).is_err());
+        assert!(check_open_path(Path::new("\\\\?\\C:\\Windows\\System32\\calc.exe")).is_err());
+        assert!(check_open_path(Path::new("\\\\.\\PhysicalDrive0")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_refuses_extensionless_executables() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch_dir("exec");
+        let f = dir.join("payload");
+        std::fs::write(&f, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(check_open_path(&f).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 
@@ -2070,7 +2348,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
 
         // --- Shell ----------------------------------------------------------
-        "shell:openExternal" | "shell:openPath" => shell_open(&arg_str(0).unwrap_or_default()),
+        "shell:openExternal" => shell_open_external(&arg_str(0).unwrap_or_default()),
+        "shell:openPath" => shell_open_path(&app, &arg_str(0).unwrap_or_default()),
 
         // --- OS theme accent ------------------------------------------------
         // Read the live OS accent color (#RRGGBB) so the UI can match the system.
@@ -2219,7 +2498,9 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "fileIntel:revealInExplorer" | "shell:showItemInFolder" => {
             reveal_in_explorer(&arg_str(0).unwrap_or_default())
         }
-        "fileIntel:openFile" | "media:openWithSystem" => shell_open(&arg_str(0).unwrap_or_default()),
+        "fileIntel:openFile" | "media:openWithSystem" => {
+            shell_open_path(&app, &arg_str(0).unwrap_or_default())
+        }
 
         // --- Batch 4: Health / diagnostics ---------------------------------
         "health:check" | "health:getStatus" | "watchdog:health" => {

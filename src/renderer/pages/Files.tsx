@@ -788,7 +788,10 @@ export const Files: React.FC = () => {
       addRecent({ path: file.path, name: file.name, appId: 'files' });
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesOpened', amount: 1 } }));
       if (window.electron?.invoke) {
-        await window.electron.invoke('shell:openPath', file.path);
+        const res = await window.electron.invoke('shell:openPath', file.path);
+        if (res && res.success === false) {
+          toast.error(res.error ? `Can't open ${file.name}: ${res.error}` : `Can't open ${file.name}`);
+        }
       }
     }
   };
