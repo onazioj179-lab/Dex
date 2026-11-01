@@ -29,6 +29,7 @@ import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '.
 import { useSpinnerVerb } from '../uki/spinnerVerbs';
 import { computeLingerMs } from '../uki/sleepTiming';
 import { useSmoothDrag } from '../hooks/useSmoothDrag';
+import { useDexSetting } from '../hooks/useDexSetting';
 
 // Mutating UKI app-actions (e.g. tasks.addTask) never run without the user's
 // approval. Wire the confirm surface once so the agent's action registry can
@@ -1232,7 +1233,9 @@ const UkiOverlay: React.FC = () => {
   const waveThrottleRef = useRef(0);
 
   const isActive = state === 'listening' || state === 'processing' || state === 'thinking' || state === 'speaking';
-  const isVisible = isActive || showPanel || (showTranscript && (transcript || response));
+  // Settings > UKI > "Show Transcript": the after-conversation bubble.
+  const transcriptPref = useDexSetting('ukiShowTranscript', true);
+  const isVisible = isActive || showPanel || (transcriptPref && showTranscript && (transcript || response));
 
   // Esc closes the overlay. The textarea swallows Escape (blur only) so a key
   // pressed inside the input never reaches here; this captures Escape from

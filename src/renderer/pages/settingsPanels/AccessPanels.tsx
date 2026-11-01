@@ -441,7 +441,7 @@ export const SnapLayoutsPanel: React.FC = () => {
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               padding: '3px var(--space-2)',
-              borderRadius: 3,
+              borderRadius: 4,
               background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
             }}>{s.keys}</kbd>
@@ -561,7 +561,7 @@ export const CreatorAccessPanel: React.FC = () => {
             </div>
           </div>
           <span style={{
-            fontSize: 11, padding: '3px 10px', borderRadius: 999,
+            fontSize: 11, padding: '3px 10px', borderRadius: 9999,
             background: keyState?.configured ? 'var(--color-success-muted, rgba(48,209,88,0.15))' : 'var(--color-warning-muted, rgba(255,159,10,0.15))',
             color: keyState?.configured ? 'var(--color-success)' : 'var(--color-warning)',
           }}>{keyState?.configured ? 'Ready' : 'Not provisioned'}</span>
@@ -592,7 +592,7 @@ export const CreatorAccessPanel: React.FC = () => {
             </div>
           </div>
           <span style={{
-            fontSize: 11, padding: '3px 10px', borderRadius: 999,
+            fontSize: 11, padding: '3px 10px', borderRadius: 9999,
             background: planTier === 'power' ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
             color: planTier === 'power' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
           }}>{planTier === 'power' ? 'Power' : 'Free'}</span>

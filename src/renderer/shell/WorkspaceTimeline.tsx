@@ -89,18 +89,18 @@ export const WorkspaceTimeline: React.FC = () => {
               No snapshots yet. Open a few windows — DEX captures your layout automatically, or use “Snapshot now”.
             </div>
           ) : snaps.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, transition: 'background 0.1s' }}
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, transition: 'background 0.1s' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.05))'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-              <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 8, flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{relativeTime(s.createdAt, now)} · {s.windows.length} window{s.windows.length === 1 ? '' : 's'}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{appNames(s)}</div>
               </div>
-              <button onClick={() => restore(s.id)} style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--color-border)', background: 'var(--color-bg-glass, rgba(255,255,255,0.06))', color: 'var(--color-text-primary)' }}>Restore</button>
-              <button onClick={() => remove(s.id)} aria-label="Delete snapshot" style={{ width: 28, height: 28, borderRadius: 7, cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => restore(s.id)} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--color-border)', background: 'var(--color-bg-glass, rgba(255,255,255,0.06))', color: 'var(--color-text-primary)' }}>Restore</button>
+              <button onClick={() => remove(s.id)} aria-label="Delete snapshot" style={{ width: 28, height: 28, borderRadius: 6, cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>
               </button>
             </div>

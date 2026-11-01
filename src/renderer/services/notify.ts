@@ -33,6 +33,7 @@ import {
   resolveExpiry, urgencyToPriority, persistsUntilDismissed,
   type Urgency, type Scenario,
 } from '../../shared/notifications/actionable';
+import { notificationsAllowed } from '../utils/notificationsAllowed';
 
 export type NotificationIcon = 'info' | 'success' | 'warning' | 'error';
 
@@ -243,6 +244,7 @@ export async function persistToHub(
       title: input.title,
       body: input.body || '',
       action,
+      osToast: notificationsAllowed(),
     });
     // Ask the center/bell to refresh (covers the panel-closed case where the
     // hub's own `:new` broadcast is not wired through this preload's allowlist).
@@ -286,7 +288,8 @@ export async function notify(input: NotifyInput): Promise<number> {
   }
 
   // `silent` notifications go straight to the center with no popup banner.
-  if (!resolved.silent) emitBanner(resolved, icon, priority);
+  // "Allow Notifications" off: no popup, but still recorded in the center.
+  if (!resolved.silent && notificationsAllowed()) emitBanner(resolved, icon, priority);
 
   if (resolved.transientOnly) return -1;
   return persistToHub(resolved, icon, priority);

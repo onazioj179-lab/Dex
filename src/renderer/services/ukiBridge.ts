@@ -13,6 +13,7 @@ import { useUkiStore } from '../store/ukiStore';
 import type { UkiUIState } from '../store/ukiStore';
 import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
 import { useRunningApps } from '../store/runningApps';
+import { readDexSetting } from '../hooks/useDexSetting';
 
 let initialized = false;
 let recognition: any = null;
@@ -46,6 +47,14 @@ function startSpeechRecognition(ipc: any, dex: any): void {
   const store = useUkiStore;
   const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
 
+  // Settings > UKI > "Enable UKI" off: the voice assistant never opens the mic.
+  if (!readDexSetting('ukiEnabled', true)) {
+    store.getState().setError('UKI is turned off. Turn it on in Settings > UKI & Memory.');
+    store.getState().stopListening();
+    shouldKeepListening = false;
+    recognition = null;
+    return;
+  }
   if (!checkPermissionAccess('microphone', 'uki')) {
     store.getState().setError('Microphone is off. Turn on the mic permission pill, then try voice again.');
     store.getState().stopListening();

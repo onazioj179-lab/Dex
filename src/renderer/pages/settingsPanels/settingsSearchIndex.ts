@@ -58,33 +58,12 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Mode', section: 'shell', desc: 'How transparent shell windows and overlays are', keywords: 'liquid glass transparency dock' },
 
   // ---------------- Sound ----------------
-  { label: 'Master Volume', section: 'sound', desc: 'System-wide volume level', keywords: 'audio loudness' },
-  { label: 'Alert Volume', section: 'sound', desc: 'Volume for system alerts and notifications', keywords: 'audio notification' },
-  { label: 'Balance', section: 'sound', desc: 'Left/Right audio balance', keywords: 'audio stereo pan' },
-  { label: 'Output Device', section: 'sound', desc: 'Sound output device', keywords: 'speakers headphones bluetooth audio' },
-  { label: 'Input Device', section: 'sound', desc: 'Sound input device', keywords: 'microphone mic audio' },
-  { label: 'Spatial Audio', section: 'sound', desc: 'Enable immersive 3D audio experience', keywords: '3d surround dolby' },
-  { label: 'Profile', section: 'sound', desc: 'Spatial audio tracking mode', keywords: 'head tracking spatial audio' },
-  { label: 'Enhanced Dialogue', section: 'sound', desc: 'Boost voice clarity in media', keywords: 'voice speech clarity' },
-  { label: 'Bypass Audio Effects', section: 'sound', desc: 'Creative apps get raw unprocessed audio', keywords: 'axl vinx imosion flux raw' },
-  { label: 'Auto-Play Media', section: 'sound', desc: 'Automatically play media in apps', keywords: 'autoplay video' },
 
   // ---------------- Display ----------------
-  { label: 'Resolution', section: 'display', desc: 'Display resolution', keywords: 'screen 4k qhd hd pixels' },
-  { label: 'UI Scaling', section: 'display', desc: 'Scale interface elements', keywords: 'dpi zoom scale display' },
-  { label: 'Blur Intensity', section: 'display', desc: 'Background blur strength for glass effects', keywords: 'glass material' },
-  { label: 'Glass Opacity', section: 'display', desc: 'Transparency level of glass surfaces', keywords: 'transparency material' },
-  { label: 'Adaptive Brightness', section: 'display', desc: 'Adjust brightness based on ambient light', keywords: 'auto brightness ambient' },
-  { label: 'True Tone', section: 'display', desc: 'Adjust display warmth to ambient lighting', keywords: 'truetone color temperature' },
-  { label: 'Night Shift', section: 'display', desc: 'Reduce blue light in the evening', keywords: 'blue light warmth sleep night mode' },
-  { label: 'Warmth', section: 'display', desc: 'Color temperature for Night Shift', keywords: 'night shift temperature' },
-  { label: 'Refresh Rate', section: 'display', desc: 'Display update frequency', keywords: 'hz promotion adaptive 120 60' },
-  { label: 'HDR Content', section: 'display', desc: 'Enable High Dynamic Range when available', keywords: 'high dynamic range' },
 
   // ---------------- Notifications ----------------
   { label: 'Allow Notifications', section: 'notifications', desc: 'Show notifications from DEX', keywords: 'alerts banners' },
   { label: 'Sound', section: 'notifications', desc: 'Play sound for notifications', keywords: 'audio chime' },
-  { label: 'Badge App Icon', section: 'notifications', desc: 'Show notification count on dock icon', keywords: 'badge count dock' },
   { label: 'Do Not Disturb', section: 'notifications', desc: 'Silence all notifications', keywords: 'dnd focus quiet mute' },
 
   // ---------------- Privacy & Security ----------------
@@ -102,19 +81,9 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
 
   // ---------------- Network ----------------
   { label: 'Network Mode', section: 'network', desc: 'Full, local-only, or disabled networking', keywords: 'offline local online connectivity' },
-  { label: 'Wi-Fi', section: 'network', desc: 'Connect to wireless networks', keywords: 'wifi wireless network' },
-  { label: 'Preferred Network', section: 'network', desc: 'Default network to connect to', keywords: 'wifi ssid' },
-  { label: 'Frequency Band', section: 'network', desc: 'Preferred Wi-Fi frequency', keywords: 'wifi 2.4ghz 5ghz 6ghz band' },
-  { label: 'Bluetooth', section: 'network', desc: 'Enable Bluetooth connectivity', keywords: 'bluetooth wireless pairing' },
-  { label: 'Bluetooth Mode', section: 'network', desc: 'Bluetooth power/range mode', keywords: 'ble classic bluetooth' },
-  { label: 'Discoverable', section: 'network', desc: 'Allow other devices to find this computer', keywords: 'bluetooth visibility' },
-  { label: 'Network Access', section: 'network', desc: 'Allow DEX to access the internet', keywords: 'internet online connectivity' },
-  { label: 'IPv6', section: 'network', desc: 'Enable IPv6 networking', keywords: 'ip address protocol' },
-  { label: 'Network Monitor', section: 'network', desc: 'Track real-time network activity', keywords: 'bandwidth traffic monitor' },
-  { label: 'DNS over HTTPS', section: 'network', desc: 'Encrypt DNS queries for privacy', keywords: 'doh dns privacy security' },
-  { label: 'Bandwidth Optimization', section: 'network', desc: 'Optimize network usage for better performance', keywords: 'data saver bandwidth' },
-  { label: 'Allow WebGL', section: 'network', desc: 'Enable GPU-accelerated graphics in web content', keywords: 'webgl gpu graphics web' },
-  { label: 'Allow JavaScript', section: 'network', desc: 'Enable JavaScript execution in web content', keywords: 'javascript js web scripting' },
+  { label: 'Wi-Fi & Bluetooth', section: 'network', desc: 'Open Windows Wi-Fi and Bluetooth settings', keywords: 'wifi wireless bluetooth pair network dns ipv6' },
+  { label: 'Sound devices & volume', section: 'sound', desc: 'Open Windows sound settings', keywords: 'audio volume speakers headphones microphone balance spatial' },
+  { label: 'Display & resolution', section: 'display', desc: 'Open Windows display settings', keywords: 'screen resolution scaling brightness refresh hdr night light' },
 
   // ---------------- Performance ----------------
   { label: 'Daily Auto-Optimize', section: 'performance', desc: 'Re-detect hardware and optimize each day', keywords: 'tier hardware optimize performance' },
@@ -122,11 +91,8 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'GPU Rendering', section: 'performance', desc: 'Offload UI rendering to the graphics card', keywords: 'gpu graphics performance' },
   { label: 'Performance Mode', section: 'performance', desc: 'System-wide performance tier', keywords: 'power balanced battery performance' },
   { label: 'Low Power Mode', section: 'performance', desc: 'Reduce animations and background activity to save battery', keywords: 'battery power saver' },
-  { label: 'CPU Priority', section: 'performance', desc: 'Process priority for DEX', keywords: 'cpu priority performance' },
   { label: 'Memory Optimization', section: 'performance', desc: 'Automatically free unused memory', keywords: 'ram memory cleanup' },
-  { label: 'RAM Limit', section: 'performance', desc: 'Maximum RAM usage', keywords: 'memory ram limit' },
   { label: 'Preload Apps', section: 'performance', desc: 'Pre-load frequently used apps for faster launch', keywords: 'startup preload speed' },
-  { label: 'Background Boost', section: 'performance', desc: 'Allow background apps extra resources when idle', keywords: 'background performance' },
   { label: 'Predictive Pre-warm', section: 'performance', desc: 'Pre-warm the next likely app while idle', keywords: 'prewarm predictive performance' },
 
   // ---------------- System Monitor ----------------
@@ -143,14 +109,8 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Reduce Motion', section: 'accessibility', desc: 'Minimize animations and motion effects', keywords: 'animation accessibility' },
 
   // ---------------- Window Management ----------------
-  { label: 'Snap Windows', section: 'window', desc: 'Snap windows to screen edges and zones when dragging', keywords: 'snapping tiling layout window' },
-  { label: 'Animate Resizing', section: 'window', desc: 'Smooth animation when resizing or snapping windows', keywords: 'animation window' },
-  { label: 'Remember Positions', section: 'window', desc: 'Restore window positions when reopening apps', keywords: 'restore window position' },
-  { label: 'Window Shadows', section: 'window', desc: 'Show drop shadows behind floating windows', keywords: 'shadow window' },
   { label: 'App Tab Bar', section: 'window', desc: 'Show running app tabs above the content area', keywords: 'tabs window' },
-  { label: 'Double-Click Title Bar', section: 'window', desc: 'Action when double-clicking a window title bar', keywords: 'titlebar maximize minimize window' },
   { label: 'Window Button Style', section: 'window', desc: 'Choose the style of window control buttons', keywords: 'controls traffic lights window' },
-  { label: 'Max Floating Windows', section: 'window', desc: 'Maximum number of floating windows at once', keywords: 'limit window floating' },
 
   // ---------------- Frame Snapping ----------------
   { label: 'Frame Snapping', section: 'snap', desc: 'Drag-snap toggle, gutter, and layout zones', keywords: 'snap layout tiling zones gutter window' },
@@ -163,20 +123,15 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Creator Access', section: 'creator', desc: 'Owner-only Creative Full Access unlock', keywords: 'owner creator unlock signature' },
 
   // ---------------- Keyboard Shortcuts ----------------
-  { label: 'Enable Global Shortcuts', section: 'keyboard', desc: 'Allow keyboard shortcuts throughout the app', keywords: 'hotkeys keybindings shortcuts' },
-  { label: 'Command Palette', section: 'keyboard', desc: 'Open the command palette', keywords: 'shortcut hotkey palette' },
-  { label: 'Quick Search', section: 'keyboard', desc: 'Focus the search bar', keywords: 'shortcut hotkey search' },
-  { label: 'Screenshot', section: 'keyboard', desc: 'Capture a screenshot', keywords: 'shortcut hotkey capture' },
+  { label: 'Command palette shortcut', section: 'keyboard', desc: 'Ctrl+K opens the command palette', keywords: 'shortcut hotkey palette ctrl k' },
+  { label: 'Search everything shortcut', section: 'keyboard', desc: 'Ctrl+Shift+F searches everything', keywords: 'shortcut hotkey search find' },
+  { label: 'Window tiling shortcuts', section: 'keyboard', desc: 'Snap, maximize and arrange windows', keywords: 'shortcut hotkey snap tile window layout' },
 
   // ---------------- Files ----------------
   { label: 'Show Hidden Files', section: 'files', desc: 'Display hidden files and folders', keywords: 'dotfiles hidden files' },
   { label: 'Confirm Delete', section: 'files', desc: 'Ask for confirmation before deleting files', keywords: 'trash delete files' },
-  { label: 'Default View', section: 'files', desc: 'Default file view mode', keywords: 'list grid column files' },
   { label: 'Sort By', section: 'files', desc: 'Default file sort order', keywords: 'sort name date size type files' },
   { label: 'Thumbnail Size', section: 'files', desc: 'Size of file thumbnails in grid view', keywords: 'thumbnail preview files' },
-  { label: 'Index Folders', section: 'files', desc: 'Index folder contents for faster search', keywords: 'index search files' },
-  { label: 'Watch for Changes', section: 'files', desc: 'Automatically detect file changes on disk', keywords: 'watch monitor files' },
-  { label: 'Max Storage', section: 'files', desc: 'Maximum storage DEX can use for cache and data', keywords: 'storage limit disk files' },
 
   // ---------------- Storage & Data ----------------
 
@@ -190,19 +145,12 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Clear on Exit', section: 'browser', desc: 'Clear browsing data when DEX closes', keywords: 'history privacy browser' },
   { label: 'Tor Mode', section: 'browser', desc: 'Route traffic through the Tor network for privacy', keywords: 'tor anonymity privacy browser' },
   { label: 'Search Engine', section: 'browser', desc: 'Default search engine for the browser', keywords: 'duckduckgo google bing brave search browser' },
-  { label: 'Download Speed Limit', section: 'browser', desc: 'Maximum download speed', keywords: 'download bandwidth browser' },
-  { label: 'Parallel Downloads', section: 'browser', desc: 'Maximum simultaneous download connections', keywords: 'download connections browser' },
 
   // ---------------- UKI & Memory ----------------
   { label: 'Enable UKI', section: 'uki', desc: 'Activate the UKI voice assistant', keywords: 'assistant ai voice uki' },
   { label: 'Show Transcript', section: 'uki', desc: 'Display speech transcription during conversations', keywords: 'transcript uki voice' },
-  { label: 'Personality', section: 'uki', desc: "UKI's conversational style", keywords: 'tone casual formal uki ai' },
-  { label: 'Wake Word Detection', section: 'uki', desc: 'Activate UKI by saying the wake phrase', keywords: 'wake word hands-free uki voice' },
-  { label: 'Wake Phrase', section: 'uki', desc: 'The phrase to activate UKI hands-free', keywords: 'wake word uki voice' },
   { label: 'Memory Recording', section: 'uki', desc: 'Allow UKI to remember conversations and learn', keywords: 'memory ai uki recall privacy' },
-  { label: 'Recall Mode', section: 'uki', desc: 'How UKI uses stored memories', keywords: 'memory recall uki ai' },
   { label: 'Retention Period', section: 'uki', desc: 'How long to keep memory records', keywords: 'memory retention uki' },
-  { label: 'Archive Size Limit', section: 'uki', desc: 'Maximum disk space for the memory archive', keywords: 'memory storage uki' },
   { label: 'Auto Cleanup', section: 'uki', desc: 'Automatically remove expired memory records', keywords: 'memory cleanup uki' },
 
   // ---------------- AI Providers ----------------

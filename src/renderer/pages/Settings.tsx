@@ -739,7 +739,7 @@ const UpdateManagerSection: React.FC = () => {
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 24, borderRadius: 12, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
+    width: 44, height: 24, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
@@ -760,7 +760,7 @@ const UpdateManagerSection: React.FC = () => {
     <div style={{ flex: 1, padding: '0 var(--space-6) var(--space-6)', overflowY: 'auto' as const }}>
       {/* Status Banner */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 10,
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 8,
         background: info.updateAvailable ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'var(--color-success-muted, rgba(48,209,88,0.08))',
         border: `1px solid ${info.updateAvailable ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'var(--color-success-muted, rgba(48,209,88,0.2))'}`,
         marginBottom: 'var(--space-5)',
@@ -978,6 +978,8 @@ const loadSettingsFromBackend = async (): Promise<Record<string, unknown> | null
 
 const saveSettings = (settings: Record<string, unknown>) => {
   localStorage.setItem('dex-settings', JSON.stringify(settings));
+  // Let live consumers (useDexSetting) pick the change up immediately.
+  try { window.dispatchEvent(new CustomEvent('dex-settings-changed')); } catch { /* noop */ }
   // Also save to backend
   saveSettingsToBackend(settings);
   // Apply settings immediately
@@ -2413,6 +2415,22 @@ export const Settings: React.FC = () => {
     });
   };
 
+  /** A row that opens the matching Windows Settings page (ms-settings: URI). */
+  const renderWindowsLink = (label: string, desc: string, uri: string) => (
+    <div style={styles.settingRow} key={uri}>
+      <div style={styles.settingInfo}>
+        <span style={styles.settingLabel}>{label}</span>
+        <span style={styles.settingDesc}>{desc}</span>
+      </div>
+      <button
+        type="button"
+        style={styles.manageBtn}
+        aria-label={`Open Windows settings: ${label}`}
+        onClick={() => { void (window as any).electron?.invoke?.('shell:openExternal', uri); }}
+      >Open in Windows</button>
+    </div>
+  );
+
   const renderToggle = (key: keyof typeof DEFAULT_SETTINGS, label: string, description: string) => {
     const changed = isSettingChanged(key, settings[key]);
     return (
@@ -2919,7 +2937,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 8,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -2976,7 +2994,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 8,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -3088,7 +3106,6 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitleFirst}>Notifications</h3>
       {renderToggle('enableNotifications', 'Allow Notifications', 'Show notifications from DEX')}
       {renderToggle('soundEnabled', 'Sound', 'Play sound for notifications')}
-      {renderToggle('badgeEnabled', 'Badge App Icon', 'Show notification count on dock icon')}
       {renderToggle('doNotDisturb', 'Do Not Disturb', 'Silence all notifications')}
     </div>
   );
@@ -3463,7 +3480,7 @@ export const Settings: React.FC = () => {
                     aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
                   />
                   <span style={{
-                    position: 'absolute', inset: 0, borderRadius: 10,
+                    position: 'absolute', inset: 0, borderRadius: 8,
                     background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
@@ -3518,7 +3535,7 @@ export const Settings: React.FC = () => {
       
       {/* Creator Watermark */}
       <div style={{
-        padding: 'var(--space-5)', borderRadius: '10px', marginBottom: 'var(--space-5)',
+        padding: 'var(--space-5)', borderRadius: '8px', marginBottom: 'var(--space-5)',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
         border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
         position: 'relative', overflow: 'hidden',
@@ -3627,7 +3644,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 8, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3799,82 +3816,45 @@ export const Settings: React.FC = () => {
   // =========================================================================
   // SOUND SETTINGS
   // =========================================================================
+  // Sound devices, volume, balance and spatial audio belong to Windows. The
+  // previous controls here (volume, balance, device pickers with invented
+  // "Built-in Speakers" entries, spatial profile, dialogue boost, creative
+  // bypass, autoplay) were saved but read by nothing.
   const renderSoundSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Output</h3>
-      {renderSlider('masterVolume', 'Master Volume', 'System-wide volume level', 0, 100, '%')}
-      {renderSlider('alertVolume', 'Alert Volume', 'Volume for system alerts and notifications', 0, 100, '%')}
-      {renderSlider('audioBalance', 'Balance', 'Left/Right audio balance', 0, 100, '', 1)}
-      {renderSelect('outputDevice', 'Output Device', 'Sound output device', [
-        { value: 'built-in', label: 'Built-in Speakers' },
-        { value: 'headphones', label: 'Headphones' },
-        { value: 'bluetooth', label: 'Bluetooth Audio' },
-      ])}
-
-      <h3 style={styles.sectionTitle}>Input</h3>
-      {renderSelect('inputDevice', 'Input Device', 'Sound input device', [
-        { value: 'built-in', label: 'Built-in Microphone' },
-        { value: 'external', label: 'External Microphone' },
-        { value: 'bluetooth', label: 'Bluetooth Microphone' },
-      ])}
-
-      <h3 style={styles.sectionTitle}>Spatial Audio</h3>
-      {renderToggle('spatialAudio', 'Spatial Audio', 'Enable immersive 3D audio experience')}
-      {renderSelect('spatialAudioProfile', 'Profile', 'Spatial audio tracking mode', [
-        { value: 'fixed', label: 'Fixed' },
-        { value: 'head-tracked', label: 'Head Tracked' },
-        { value: 'off', label: 'Off' },
-      ])}
-      {renderToggle('enhancedDialogue', 'Enhanced Dialogue', 'Boost voice clarity in media')}
-
-      <h3 style={styles.sectionTitle}>Creative Apps</h3>
-      {renderToggle('creativeAppAudioBypass', 'Bypass Audio Effects', 'AXL, VINX, Imosion, and Flux get raw unprocessed audio')}
-
-      <h3 style={styles.sectionTitle}>Media</h3>
-      {renderToggle('mediaAutoPlay', 'Auto-Play Media', 'Automatically play media in apps')}
+      <h3 style={styles.sectionTitleFirst}>Sound</h3>
+      {renderWindowsLink('Output, input & volume', 'Speakers, headphones, microphones, balance and spatial sound are managed by Windows.', 'ms-settings:sound')}
+      {renderWindowsLink('App volume', "Set DEX's volume relative to other apps.", 'ms-settings:apps-volume')}
     </div>
   );
 
   // =========================================================================
   // DISPLAY SETTINGS
   // =========================================================================
+  // Resolution, scaling, brightness, refresh rate and HDR are Windows display
+  // settings that DEX cannot change; those controls were saved but read by
+  // nothing. Night Shift and glass have real controls elsewhere (linked).
   const renderDisplaySettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Resolution & Scaling</h3>
-      {renderSelect('displayResolution', 'Resolution', 'Display resolution', [
-        { value: 'native', label: 'Native (Recommended)' },
-        { value: '3840x2160', label: '3840 × 2160 (4K)' },
-        { value: '2560x1440', label: '2560 × 1440 (QHD)' },
-        { value: '1920x1080', label: '1920 × 1080 (Full HD)' },
-        { value: '1366x768', label: '1366 × 768' },
-      ])}
-      {renderSelect('displayScaling', 'UI Scaling', 'Scale interface elements', [
-        { value: '100', label: '100%' },
-        { value: '125', label: '125%' },
-        { value: '150', label: '150% (Recommended)' },
-        { value: '175', label: '175%' },
-        { value: '200', label: '200%' },
-      ])}
+      <h3 style={styles.sectionTitleFirst}>Display</h3>
+      {renderWindowsLink('Resolution, scale & refresh rate', 'Resolution, scaling, brightness, refresh rate and HDR are managed by Windows.', 'ms-settings:display')}
+      {renderWindowsLink('Night light (Windows)', 'System-wide blue-light reduction for all apps.', 'ms-settings:nightlight')}
 
-      <h3 style={styles.sectionTitle}>Glass & Material</h3>
-      {renderSlider('blurIntensity', 'Blur Intensity', 'Background blur strength for glass effects', 0, 40, 'px')}
-      {renderSlider('glassOpacity', 'Glass Opacity', 'Transparency level of glass surfaces', 0, 100, '%')}
-
-      <h3 style={styles.sectionTitle}>Brightness</h3>
-      {renderToggle('adaptiveBrightness', 'Adaptive Brightness', 'Automatically adjust brightness based on ambient light')}
-      {renderToggle('truetoneBrightness', 'True Tone', 'Adjust display warmth to match ambient lighting')}
-
-      <h3 style={styles.sectionTitle}>Night Shift</h3>
-      {renderToggle('nightShift', 'Night Shift', 'Reduce blue light in the evening for better sleep')}
-      {renderSlider('nightShiftWarmth', 'Warmth', 'Color temperature adjustment for Night Shift', 0, 100, '%')}
-
-      <h3 style={styles.sectionTitle}>Advanced</h3>
-      {renderSelect('displayRefreshRate', 'Refresh Rate', 'Display update frequency', [
-        { value: '60', label: '60 Hz' },
-        { value: '120', label: '120 Hz' },
-        { value: 'adaptive', label: 'Adaptive (ProMotion)' },
-      ])}
-      {renderToggle('hdrContent', 'HDR Content', 'Enable High Dynamic Range when available')}
+      <h3 style={styles.sectionTitle}>In DEX</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Night Shift</span>
+          <span style={styles.settingDesc}>DEX's warm color filter and its intensity.</span>
+        </div>
+        <button type="button" style={styles.manageBtn} onClick={() => setActiveSection('shell')}>Shell &amp; Dock</button>
+      </div>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Glass &amp; blur</span>
+          <span style={styles.settingDesc}>Blur intensity and glass opacity.</span>
+        </div>
+        <button type="button" style={styles.manageBtn} onClick={() => setActiveSection('appearance')}>Appearance</button>
+      </div>
     </div>
   );
 
@@ -3962,7 +3942,7 @@ export const Settings: React.FC = () => {
                   style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
                 />
                 <span style={{
-                  position: 'absolute', inset: 0, borderRadius: 10,
+                  position: 'absolute', inset: 0, borderRadius: 8,
                   background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
@@ -3990,20 +3970,12 @@ export const Settings: React.FC = () => {
         { value: 'performance', label: 'High Performance' },
       ])}
       {renderToggle('lowPowerMode', 'Low Power Mode', 'Reduce animations and background activity to save battery')}
-      {renderSelect('cpuPriority', 'CPU Priority', 'Process priority for DEX', [
-        { value: 'low', label: 'Low' },
-        { value: 'normal', label: 'Normal' },
-        { value: 'high', label: 'High' },
-      ])}
 
       <h3 style={styles.sectionTitle}>Memory</h3>
       {renderToggle('memoryOptimization', 'Memory Optimization', 'Automatically free unused memory')}
-      {renderSlider('cacheSizeGB', 'Cache Size', 'Maximum disk cache for app data', 1, 32, ' GB')}
-      {renderSlider('maxRamGB', 'RAM Limit', 'Maximum RAM usage (0 = auto)', 0, 32, ' GB')}
 
       <h3 style={styles.sectionTitle}>Startup</h3>
       {renderToggle('preloadApps', 'Preload Apps', 'Pre-load frequently used apps for faster launch')}
-      {renderToggle('backgroundBoost', 'Background Boost', 'Allow background apps to use extra resources when idle')}
 
       <h3 style={styles.sectionTitle}>Resource Reservation</h3>
       {renderToggle(
@@ -4085,44 +4057,13 @@ export const Settings: React.FC = () => {
         })}
       </div>
 
-      <h3 style={styles.sectionTitle}>Wi-Fi</h3>
-      {renderToggle('wifiEnabled', 'Wi-Fi', 'Connect to wireless networks')}
-      {renderSelect('preferredNetwork', 'Preferred Network', 'Default network to connect to', [
-        { value: 'auto', label: 'Auto (strongest signal)' },
-        { value: 'home', label: 'Home Network' },
-        { value: 'office', label: 'Office Network' },
-        { value: 'mobile', label: 'Mobile Hotspot' },
-      ])}
-      {renderSelect('wifiBand', 'Frequency Band', 'Preferred Wi-Fi frequency', [
-        { value: 'auto', label: 'Auto' },
-        { value: '2.4ghz', label: '2.4 GHz (longer range)' },
-        { value: '5ghz', label: '5 GHz (faster speed)' },
-        { value: '6ghz', label: '6 GHz (Wi-Fi 6E)' },
-      ])}
-
-      <h3 style={styles.sectionTitle}>Bluetooth</h3>
-      {renderToggle('bluetoothEnabled', 'Bluetooth', 'Enable Bluetooth connectivity')}
-      {renderSelect('bluetoothMode', 'Bluetooth Mode', 'Bluetooth power/range mode', [
-        { value: 'auto', label: 'Auto' },
-        { value: 'low-energy', label: 'Low Energy (BLE)' },
-        { value: 'classic', label: 'Classic (higher range)' },
-      ])}
-      {renderToggle('bluetoothDiscoverable', 'Discoverable', 'Allow other devices to find this computer')}
-
-      <h3 style={styles.sectionTitle}>Connection</h3>
-      {renderToggle('networkOptIn', 'Network Access', 'Allow DEX to access the internet')}
-      {renderToggle('ipv6Enabled', 'IPv6', 'Enable IPv6 networking')}
-      {renderToggle('networkMonitor', 'Network Monitor', 'Track real-time network activity')}
-
-      <h3 style={styles.sectionTitle}>DNS & Security</h3>
-      {renderToggle('dnsOverHttps', 'DNS over HTTPS', 'Encrypt DNS queries for privacy')}
-
-      <h3 style={styles.sectionTitle}>Bandwidth</h3>
-      {renderToggle('bandwidthOptimization', 'Bandwidth Optimization', 'Optimize network usage for better performance')}
-
-      <h3 style={styles.sectionTitle}>Content</h3>
-      {renderToggle('allowWebGL', 'Allow WebGL', 'Enable GPU-accelerated graphics in web content')}
-      {renderToggle('allowJavaScript', 'Allow JavaScript', 'Enable JavaScript execution in web content')}
+      {/* Wi-Fi, Bluetooth, IPv6, DNS-over-HTTPS, bandwidth and web-content
+          toggles were removed: none was read by anything. Network Mode above is
+          real; the rest is Windows' job. */}
+      <h3 style={styles.sectionTitle}>Connections</h3>
+      {renderWindowsLink('Wi-Fi', 'Networks, frequency band and hotspots are managed by Windows.', 'ms-settings:network-wifi')}
+      {renderWindowsLink('Bluetooth & devices', 'Pairing, discoverability and device modes.', 'ms-settings:bluetooth')}
+      {renderWindowsLink('Network & internet', 'IP settings, DNS (including DNS over HTTPS) and proxies.', 'ms-settings:network')}
     </div>
     );
   };
@@ -4135,11 +4076,6 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitleFirst}>File Browsing</h3>
       {renderToggle('showHiddenFiles', 'Show Hidden Files', 'Display hidden files and folders')}
       {renderToggle('confirmDelete', 'Confirm Delete', 'Ask for confirmation before deleting files')}
-      {renderSelect('defaultView', 'Default View', 'Default file view mode', [
-        { value: 'list', label: 'List' },
-        { value: 'grid', label: 'Grid' },
-        { value: 'column', label: 'Column' },
-      ])}
       {renderSelect('sortBy', 'Sort By', 'Default file sort order', [
         { value: 'name', label: 'Name' },
         { value: 'date', label: 'Date Modified' },
@@ -4151,13 +4087,6 @@ export const Settings: React.FC = () => {
         { value: 'medium', label: 'Medium' },
         { value: 'large', label: 'Large' },
       ])}
-
-      <h3 style={styles.sectionTitle}>Indexing</h3>
-      {renderToggle('indexFolders', 'Index Folders', 'Index folder contents for faster search')}
-      {renderToggle('watchForChanges', 'Watch for Changes', 'Automatically detect file changes on disk')}
-
-      <h3 style={styles.sectionTitle}>Storage</h3>
-      {renderSlider('maxStorageGB', 'Max Storage', 'Maximum storage DEX can use for cache and data', 1, 100000, ' GB', 100)}
     </div>
   );
 
@@ -4185,13 +4114,6 @@ export const Settings: React.FC = () => {
         { value: 'bing', label: 'Bing' },
         { value: 'brave', label: 'Brave Search' },
       ])}
-      {renderSelect('maxDownloadSpeed', 'Download Speed Limit', 'Maximum download speed', [
-        { value: 'unlimited', label: 'Unlimited' },
-        { value: '10', label: '10 MB/s' },
-        { value: '50', label: '50 MB/s' },
-        { value: '100', label: '100 MB/s' },
-      ])}
-      {renderSlider('parallelDownloads', 'Parallel Downloads', 'Maximum simultaneous download connections', 1, 16, '')}
     </div>
   );
 
@@ -4201,67 +4123,78 @@ export const Settings: React.FC = () => {
   const renderWindowSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Snapping & Layout</h3>
-      {renderToggle('snapWindows', 'Snap Windows', 'Snap windows to screen edges and zones when dragging')}
-      {renderToggle('animateWindowResize', 'Animate Resizing', 'Smooth animation when resizing or snapping windows')}
-      {renderToggle('rememberWindowPositions', 'Remember Positions', 'Restore window positions when reopening apps')}
-      {renderToggle('showWindowShadows', 'Window Shadows', 'Show drop shadows behind floating windows')}
       {renderToggle('stageManager', 'Stage Manager', 'Organize open apps on the side for quick switching')}
       {renderToggle('showAppTabBar', 'App Tab Bar', 'Show running app tabs above the content area')}
 
       <h3 style={styles.sectionTitle}>Title Bar</h3>
-      {renderSelect('doubleClickTitlebar', 'Double-Click Title Bar', 'Action when double-clicking a window title bar', [
-        { value: 'maximize', label: 'Maximize' },
-        { value: 'minimize', label: 'Minimize' },
-        { value: 'none', label: 'Do Nothing' },
-      ])}
       {renderSelect('windowControls', 'Window Button Style', 'Choose the style of window control buttons', [
         { value: 'system', label: 'System Default' },
         { value: 'traffic', label: 'macOS Traffic Lights' },
       ])}
-
-      <h3 style={styles.sectionTitle}>Limits</h3>
-      {renderSlider('maxFloatingWindows', 'Max Floating Windows', 'Maximum number of floating windows allowed at once', 1, 20, '')}
     </div>
   );
 
   // ===========================================================================
   // KEYBOARD SHORTCUTS SETTINGS
   // ===========================================================================
+  // The real global shortcuts, read from their handlers: CommandPalette.tsx
+  // (Ctrl+K), UnifiedSystems.tsx (Ctrl+Shift+F) and AppManager.tsx's keydown
+  // handler (everything else). This page used to list three bindings that were
+  // all wrong (Ctrl+Shift+P did nothing; Ctrl+Shift+S is split view, not a
+  // screenshot) and pointed to a customization screen that does not exist.
+  // Keep this list in sync when a handler changes.
   const renderKeyboardSettings = () => {
-    const shortcuts = [
-      { key: 'cmdPaletteShortcut' as const, label: 'Command Palette', desc: 'Open the command palette' },
-      { key: 'quickSearchShortcut' as const, label: 'Quick Search', desc: 'Focus the search bar' },
-      { key: 'screenshotShortcut' as const, label: 'Screenshot', desc: 'Capture a screenshot' },
+    const groups: { title: string; rows: [string, string][] }[] = [
+      { title: 'Everywhere', rows: [
+        [`${_M}+K`, 'Command palette'],
+        [`${_M}+Shift+F`, 'Search everything'],
+        [`${_M}+1 … ${_M}+9`, 'Open Home, Settings, Files, Notes, Tasks, Browser, Gallery, Calendar, Kanban'],
+        [`${_M}+Alt+1 … 9`, 'Switch to Project Space 1–9'],
+        [`${_M}+Tab / ${_M}+Shift+Tab`, 'App switcher'],
+      ] },
+      { title: 'Apps & windows', rows: [
+        [`${_M}+W`, 'Close the current app'],
+        [`${_M}+Shift+W`, 'Close all apps'],
+        [`${_M}+Shift+E`, 'Float / re-dock the current app'],
+        [`${_M}+${String.fromCharCode(92)}`, 'Immersive focus (Esc to leave)'],
+        [`${_M}+Shift+S`, 'Leave split view, or open the app menu'],
+      ] },
+      { title: 'Tiling', rows: [
+        ['Win+Left / Right', 'Snap to the left / right half'],
+        ['Win+Up / Down', 'Maximize / minimize'],
+        ['Alt+Shift+Arrows', 'Top / bottom half, top quadrants'],
+        ['Alt+Shift+1 … 6', 'Arrange all windows with a layout'],
+        ['Win+` or Ctrl+Alt+`', 'Cycle floating windows'],
+      ] },
     ];
-
+    const keyStyle: React.CSSProperties = {
+      padding: '4px var(--space-3)', borderRadius: 4, whiteSpace: 'nowrap',
+      background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+      fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
+      fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
+    };
     return (
       <div style={styles.settingsContent}>
-        <h3 style={styles.sectionTitleFirst}>Global Shortcuts</h3>
-        {renderToggle('enableGlobalShortcuts', 'Enable Global Shortcuts', 'Allow keyboard shortcuts throughout the app')}
-
-        <h3 style={styles.sectionTitle}>Shortcut Bindings</h3>
-        {shortcuts.map(sc => (
-          <div key={sc.key} style={styles.settingRow}>
-            <div style={styles.settingInfo}>
-              <span style={styles.settingLabel}>{sc.label}</span>
-              <span style={styles.settingDesc}>{sc.desc}</span>
-            </div>
-            <div style={{
-              padding: '4px var(--space-3)', borderRadius: 4,
-              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
-            }}>
-              {settings[sc.key]}
-            </div>
-          </div>
+        {groups.map((g, gi) => (
+          <React.Fragment key={g.title}>
+            <h3 style={gi === 0 ? styles.sectionTitleFirst : styles.sectionTitle}>{g.title}</h3>
+            {g.rows.map(([keys, action]) => (
+              <div key={keys} style={styles.settingRow}>
+                <div style={styles.settingInfo}>
+                  <span style={styles.settingLabel}>{action}</span>
+                </div>
+                <kbd style={keyStyle}>{keys}</kbd>
+              </div>
+            ))}
+          </React.Fragment>
         ))}
-        <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
-          Keyboard shortcut customization is available in the Command Palette ({_M}+Shift+P → "Keyboard Shortcuts").
+        <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)' }}>
+          Shortcuts can't be changed yet.
         </div>
       </div>
     );
   };
+
 
   // ===========================================================================
   // STORAGE & DATA SETTINGS
@@ -4301,10 +4234,6 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitleFirst}>UKI Voice Assistant</h3>
       {renderToggle('ukiEnabled', 'Enable UKI', 'Activate the UKI voice assistant')}
       {renderToggle('ukiShowTranscript', 'Show Transcript', 'Display speech transcription bubble during conversations')}
-      {renderSelect('ukiPersonality', 'Personality', 'UKI\'s conversational style', [
-        { value: 'casual', label: 'Casual' },
-        { value: 'formal', label: 'Formal' },
-      ])}
 
       <UkiVoiceSection
         styles={styles}
@@ -4313,32 +4242,9 @@ export const Settings: React.FC = () => {
         renderSelect={renderSelect}
       />
 
-      <h3 style={styles.sectionTitle}>Wake Word</h3>
-      {renderToggle('ukiWakeWordEnabled', 'Wake Word Detection', 'Activate UKI by saying the wake phrase')}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Wake Phrase</span>
-          <span style={styles.settingDesc}>The phrase to activate UKI hands-free</span>
-        </div>
-        <div style={{
-          padding: '4px var(--space-3)', borderRadius: 4,
-          background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-          fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          {settings.ukiWakePhrase}
-        </div>
-      </div>
-
       <h3 style={styles.sectionTitle}>Memory & Context</h3>
       {renderToggle('ukiMemoryEnabled', 'Memory Recording', 'Allow UKI to remember conversations and learn from interactions')}
-      {renderSelect('ukiRecallMode', 'Recall Mode', 'How UKI uses stored memories during conversations', [
-        { value: 'hybrid', label: 'Hybrid — Auto-inject recent, ask for older' },
-        { value: 'auto', label: 'Auto — Always use available memory' },
-        { value: 'explicit', label: 'Explicit — Only recall when asked' },
-      ])}
       {renderSlider('ukiRetentionDays', 'Retention Period', 'How long to keep memory records before cleanup', 1, 365, ' days')}
-      {renderSlider('ukiCacheSizeGB', 'Archive Size Limit', 'Maximum disk space for the memory archive', 1, 32, ' GB')}
       {renderToggle('ukiAutoCleanup', 'Auto Cleanup', 'Automatically remove expired memory records')}
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
@@ -4428,7 +4334,7 @@ export const Settings: React.FC = () => {
                 onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
+                  padding: '14px var(--space-2)', borderRadius: 8, cursor: 'pointer',
                   background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
                   border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
                   transition: 'all 0.15s ease',
@@ -4456,13 +4362,13 @@ export const Settings: React.FC = () => {
         {/* Detail Panel */}
         {detail && selectedCreativeApp && (
           <div style={{
-            background: 'var(--color-bg-surface)', borderRadius: 10,
+            background: 'var(--color-bg-surface)', borderRadius: 8,
             border: `1px solid ${detail.color}33`, padding: 'var(--space-4)',
           }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 10,
+                width: 48, height: 48, borderRadius: 8,
                 background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
@@ -4837,7 +4743,7 @@ export const Settings: React.FC = () => {
                         display: 'inline-block', marginTop: 3, fontSize: 9.5, fontWeight: 600,
                         textTransform: 'uppercase' as const, letterSpacing: '0.04em',
                         color: 'var(--color-text-tertiary)',
-                        padding: '1px 6px', borderRadius: 3,
+                        padding: '1px 6px', borderRadius: 4,
                         background: 'var(--color-bg-hover)',
                       }}>{r.section?.name || r.entry.section}</span>
                     </span>
@@ -5202,7 +5108,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggle: {
     width: '44px',
     height: '24px',
-    borderRadius: '12px',
+    borderRadius: '11px',
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
@@ -5293,7 +5199,7 @@ const styles: Record<string, React.CSSProperties> = {
   aboutDetails: {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     padding: '4px var(--space-4)',
     marginBottom: 'var(--space-6)',
   },

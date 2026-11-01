@@ -832,10 +832,7 @@ const SETTINGS_INDEX: SettingDef[] = [
   // Hidden settings (no UI section but still searchable)
   { id: 'general:downloadLocation', label: 'Download Location', section: 'general', keywords: ['download', 'save', 'folder', 'directory', 'location', 'path'] },
   { id: 'appearance:targetFPS', label: 'Target FPS', section: 'appearance', keywords: ['fps', 'frame rate', 'performance', 'refresh'] },
-  { id: 'sound:masterVolume', label: 'Master Volume', section: 'general', keywords: ['volume', 'sound', 'audio', 'master'] },
-  { id: 'sound:spatialAudio', label: 'Spatial Audio', section: 'general', keywords: ['spatial', 'surround', '3d audio', 'immersive'] },
   { id: 'display:nightShift', label: 'Night Shift', section: 'appearance', keywords: ['night shift', 'blue light', 'warmth', 'eye strain', 'night'] },
-  { id: 'display:hdr', label: 'HDR Content', section: 'appearance', keywords: ['hdr', 'high dynamic range', 'display'] },
   { id: 'performance:hardwareAcceleration', label: 'Hardware Acceleration', section: 'general', keywords: ['hardware', 'acceleration', 'gpu', 'performance'] },
   { id: 'performance:lowPower', label: 'Low Power Mode', section: 'general', keywords: ['low power', 'battery', 'energy', 'power saving'] },
   { id: 'performance:memoryOptimization', label: 'Memory Optimization', section: 'general', keywords: ['memory', 'ram', 'optimization', 'performance'] },

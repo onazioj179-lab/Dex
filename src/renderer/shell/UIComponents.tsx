@@ -365,7 +365,7 @@ export const DexSlider: React.FC<{
             left: '50%',
             transform: 'translateX(-50%)',
             padding: '2px 6px',
-            borderRadius: 3,
+            borderRadius: 4,
             background: 'rgba(0,0,0,0.75)',
             color: '#fff',
             fontSize: 10,
@@ -523,6 +523,11 @@ export const DexListItem: React.FC<{
   return (
     <div
       onClick={onClick}
+      // Keyboard parity: focusable + Enter/Space when the row is actionable.
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-selected={onClick ? selected : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

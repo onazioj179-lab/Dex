@@ -33,6 +33,7 @@
 
 import ActionBus from './ActionBus';
 import ContextBus from './ContextBus';
+import { notificationsAllowed } from '../utils/notificationsAllowed';
 
 interface DexBridge {
   clipboard?: { writeText?: (t: string) => Promise<void> | void; readText?: () => Promise<string> | string };
@@ -89,6 +90,7 @@ export function registerUkiActionHandlers(): () => void {
     const title = asString(p?.title, 'DEX');
     const body = asString(p?.body);
     const b = bridge();
+    if (!notificationsAllowed()) return { delivered: 'suppressed' };
     if (b.notifications?.show) { await b.notifications.show(title, body); return { delivered: 'bridge' }; }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       // eslint-disable-next-line no-new

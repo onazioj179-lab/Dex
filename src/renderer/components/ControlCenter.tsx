@@ -542,7 +542,7 @@ const ControlCenter: React.FC = () => {
         >
           {battery.supported ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ position: 'relative', width: 36, height: 16, borderRadius: 3, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: 1.5 }}>
+              <div style={{ position: 'relative', width: 36, height: 16, borderRadius: 4, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: 1.5 }}>
                 <div style={{ height: '100%', width: `${battery.level}%`, borderRadius: 1.5, background: battery.level > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
                 <div style={{ position: 'absolute', right: -3, top: '50%', transform: 'translateY(-50%)', width: 2, height: 6, borderRadius: '0 1px 1px 0', background: 'var(--color-text-tertiary)' }} />
               </div>

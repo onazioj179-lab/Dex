@@ -620,6 +620,11 @@ const CenterCard: React.FC<{
   return (
     <div
       onClick={() => onMarkAsRead?.(n.id)}
+      // Keyboard parity: reachable with Tab, Enter/Space marks it read.
+      role="button"
+      tabIndex={0}
+      aria-label={`${n.title}${n.read ? '' : ' (unread)'} — mark as read`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMarkAsRead?.(n.id); } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -782,7 +787,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('timeline')}
                 style={{
-                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
                   background: viewMode === 'timeline' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'timeline' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -794,7 +799,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('grouped')}
                 style={{
-                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
                   background: viewMode === 'grouped' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'grouped' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',

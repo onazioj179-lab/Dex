@@ -184,7 +184,7 @@ export const SnapPreview: React.FC<{ zone: SnapZone | null }> = ({ zone }) => {
         top: bounds.y + 6,
         width: bounds.width - 12,
         height: bounds.height - 12,
-        borderRadius: 10,
+        borderRadius: 8,
         border: '2px solid var(--color-accent)',
         background: 'rgba(74,158,255,0.08)',
         boxShadow: '0 0 24px rgba(74,158,255,0.15)',

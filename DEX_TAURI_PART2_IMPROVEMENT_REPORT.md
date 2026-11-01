@@ -178,3 +178,40 @@ Bundle: exe 37.9 MB, NSIS 14.1 MB, MSI 17.7 MB (unchanged vs Part 1).
 | 4 | Keyboard + screen-reader audit of Settings, Store, dock | Medium | Medium | Low |
 | 5 | Signed module hosting → real on-demand apps + updater | High | High | Medium |
 | 6 | Hardcoded radius/color sweep with a lint guard | Medium | Medium | Low |
+
+---
+
+## Follow-up (after PR #60 was opened)
+
+### Approved actions, done
+| Action | Result |
+|---|---|
+| Install the fixed build over 6.0.1 | Installed 6.1.0 (silent NSIS, exit 0). The installed exe imports 31 DLLs, **no `WebView2Loader.dll`**, and starts in 1.3 s with WebView2 156 detected. It used to die with `0xC0000135`. |
+| `cargo clean` main-checkout build caches | `src-tauri/target` 17.7 GB, `native/target` 3.0 GB, `core/target` 2.8 GB → **0** (23.5 GB freed on disk; cargo reports 26 GiB logical) |
+| `npm cache clean --force` | 11.2 GB → 1.1 GB (~10.1 GB freed; the rest is npx/log folders the command doesn't touch) |
+| PRIVACY.md rewrite | **Not approved, not done** |
+
+### Consent settings that now actually work
+- **UKI "Memory Recording" off** → nothing is stored. Both UKI chat and the knowledge feeder go through `recordTurn()`, which is now gated. **Retention days / Auto Cleanup** are applied on write and on read, so expired turns are never recalled.
+- **"Allow Notifications" off** → no in-app banners, no Windows toasts (`osToast: false` on `notification-center:send`) and no web `Notification`s at any of the six direct call sites. Notifications still land quietly in the center.
+- **"Enable UKI" off** → the voice mic is blocked at its single entry point (`startSpeechRecognition`) and the voice overlay is hidden. **"Show Transcript"** gates the transcript bubble. These are live via `useDexSetting` + a `dex-settings-changed` event.
+
+### No-op controls removed or replaced (verified in the packaged app)
+- **Sound:** every control was fake (volume, balance, device pickers with invented entries, spatial, dialogue, creative bypass, autoplay) → links to Windows sound settings.
+- **Display:** resolution/scaling/brightness/True Tone/refresh/HDR, plus a Night Shift toggle disconnected from the real one → Windows display/night-light links, and pointers to the real Night Shift and glass controls.
+- **Network:** Wi-Fi/Bluetooth/IPv6/DNS-over-HTTPS/bandwidth/web-content toggles → Windows links. The real Network Mode is kept.
+- **Other sections:** CPU priority, RAM/cache limits, background boost, six window-behavior toggles, file view/index/watch/storage limit, download limits, the global-shortcuts toggle, UKI personality/recall mode/wake word/archive size.
+- **Keyboard:** every listed binding was wrong (Ctrl+Shift+P did nothing; Ctrl+Shift+S is split view, not a screenshot) and it pointed to a customization screen that doesn't exist. It now shows the real shortcuts, read from their handlers.
+- 58 stale Settings search entries and 3 Spotlight entries were removed.
+
+### Keyboard accessibility
+Static scan of Settings, Store, dock/launcher, Control Center and `shell/` for mouse-only clickable elements: 6 hits, 4 of them backdrops (Escape covers those). Fixed the 2 real gaps, notification-center items and `DexListItem`, with focus + Enter/Space. Both get the global `[role="button"]:focus-visible` ring. A full screen-reader pass was **still not run**.
+
+### Radius scale
+`scripts/snap-radius-to-scale.mjs` snaps inline radii to the tighter scale step (keeps 0–2 px hairlines, circles and pills). Applied to the shell surfaces (56 values). **888 off-scale values remain inside individual apps.** `tests/unit/radius-scale-ratchet.test.ts` fails on any increase, so the count only goes down.
+
+### Still open
+1. PRIVACY.md correction (needs your approval).
+2. Signed module hosting / updater (needs a signing key).
+3. The `shell:openExternal` allowlist (running in a separate session, asked to permit `ms-settings:`).
+4. App-level radius cleanup (888), and border contrast on form controls (`--color-border` ~1.3:1 where it's the only boundary).

@@ -11,6 +11,7 @@
 // ===========================================================================
 
 import { useState, useEffect } from 'react';
+import { notificationsAllowed } from './notificationsAllowed';
 
 // ===========================================================================
 // TYPES
@@ -216,7 +217,7 @@ function setupStabilityListeners(): void {
 function showStabilityNotification(event: StabilityEvent): void {
   // Show a non-intrusive notification for critical events
   // This could be replaced with a toast or notification component
-  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && notificationsAllowed()) {
     new Notification('Dex Stability Alert', {
       body: event.message,
       icon: '/icon.png',
