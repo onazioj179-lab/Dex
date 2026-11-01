@@ -7,9 +7,57 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import type { Plugin } from 'vite';
+
+/**
+ * Fail the build when two output chunks statically import each other.
+ * A chunk cycle means one side evaluates before the other's bindings are
+ * initialized, which in the packaged app is a boot-time TDZ ReferenceError
+ * ("Cannot access 'X' before initialization") and a blank window. The dev
+ * server serves unbundled ESM, so it never shows up there — this has bitten
+ * react-vendor, zustand, axl and notes. Catch it at build time instead.
+ */
+function noChunkCycles(): Plugin {
+  return {
+    name: 'dex-no-chunk-cycles',
+    apply: 'build',
+    generateBundle(_opts, bundle) {
+      const graph = new Map<string, string[]>();
+      for (const [file, out] of Object.entries(bundle)) {
+        if (out.type === 'chunk') graph.set(file, out.imports);
+      }
+      const state = new Map<string, 1 | 2>(); // 1 = on stack, 2 = done
+      const stack: string[] = [];
+      const visit = (f: string): string[] | null => {
+        state.set(f, 1);
+        stack.push(f);
+        for (const dep of graph.get(f) ?? []) {
+          if (state.get(dep) === 1) return [...stack.slice(stack.indexOf(dep)), dep];
+          if (!state.has(dep)) {
+            const cycle = visit(dep);
+            if (cycle) return cycle;
+          }
+        }
+        stack.pop();
+        state.set(f, 2);
+        return null;
+      };
+      for (const f of graph.keys()) {
+        const cycle = !state.has(f) && visit(f);
+        if (cycle) {
+          this.error(
+            `Static import cycle between chunks: ${cycle.join(' -> ')}
+` +
+              'Pin the shared module into one chunk in manualChunks (see the notes there).',
+          );
+        }
+      }
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), noChunkCycles()],
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.0'),
   },
@@ -91,6 +139,12 @@ export default defineConfig({
           // Otherwise it lands in app-notes and the noteTemplates -> app-notes ->
           // dex-app-core cycle force-eagers the whole Notes app at startup.
           if (id.includes('DEXAPPLICATIONS/notes/NotesDocumentModel')) return 'dex-app-core';
+          // Same story for WordSuggestions: the shared AssistedTextarea (in
+          // components/) imports it, so leaving it in app-notes made
+          // dex-app-core -> app-notes -> dex-app-core a cycle. The packaged build
+          // then threw "Cannot access '<x>' before initialization" from
+          // app-notes at boot and rendered a blank window.
+          if (id.includes('DEXAPPLICATIONS/notes/WordSuggestions')) return 'dex-app-core';
           // Standalone apps (Calculator, Calendar, Nexus, DexCode, …) are each
           // lazy-imported separately by AppManager, but were all collapsed into one
           // ~370K `app-standalone` chunk — so opening any one downloaded all of them.

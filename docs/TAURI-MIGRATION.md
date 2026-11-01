@@ -9,6 +9,26 @@
 
 ---
 
+## STARTUP REPAIR — "WebView2 not found" root-caused + fixed (2026-11-01)
+
+Full write-up: `DEX_TUARI_SYSTEM_AUDIT_REPORT.md` (repo root). Key facts for resuming:
+- **Root cause:** v6.0.x was built with the GNU toolchain -> exe imports
+  `WebView2Loader.dll` (static loader is MSVC-only) -> bundler doesn't ship it ->
+  installed app dies `0xC0000135` before any DEX code. `build.rs` now refuses GNU
+  release builds; `npm run build:tauri` runs `scripts/verify-tauri-bundle.js`
+  (PE-import gate + current-version NSIS/MSI present).
+- **Packaged boot crash:** `dex-app-core <-> app-notes` chunk cycle (TDZ). Fixed in
+  `manualChunks`; the `dex-no-chunk-cycles` Vite plugin now fails any build with a cycle.
+- **`src-tauri/src/webview2.rs`:** loader-API preflight + consent dialog, fatal dialog
+  instead of `.expect`, panic log, 30 s page-load watchdog, `diagnostics:getWebView2`.
+  `tauri-plugin-single-instance` registered first. Log: `%LOCALAPPDATA%/com.onazioj.dex/logs/startup.log`.
+- **Routing fix:** `dexnotes:pick-attachment-file` / `pick-import-file` -> native picker.
+- **Measured, kept:** CSP blocks `http://ipc.localhost` on purpose — postMessage IPC is
+  ~5x faster on WebView2 (0.3 vs 1.7 ms p50). The one boot warning is expected.
+- Open: in-app updater is still a stub (needs a signing key decision).
+
+---
+
 ## LIVE RUN — degrade report captured + cleared (2026-06-22)
 
 Ran `npm run dev:tauri` on the owner's Windows machine. Build clean (5m18s, 9

@@ -34,9 +34,16 @@ flate2 = "1"        # zlib deflate/inflate (Node zlib parity for snapshot/archiv
 base64 = "0.22"     # Node Buffer base64 parity (session-replay states, binary-over-bridge standard)
 tauri-plugin-dialog = "2"        # native file/folder pickers (dialog:showOpenDialog, files:openDialog) — replaces Electron dialog.showOpenDialog
 tauri-plugin-notification = "2"  # OS notification toasts (notification-center:send) — replaces Electron Notification
+tauri-plugin-single-instance = "2"  # second launch focuses the running window instead of a duplicate shell (see main())
 ureq = { version = "2", features = ["tls"] }  # tiny blocking HTTP client for link-preview metadata fetch
 notify = "6"        # live filesystem watching (file-watcher:newFile auto-import/notify) — replaces Electron fs.watch
 tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link download + upload) — replaces Electron http.createServer
+
+# WebView2 preflight (src/webview2.rs). Same versions wry already pulls in, so
+# these add no new crates to the build — they just make the loader API callable.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows-core = "0.61"
 
 [features]
 # Tauri's default release feature for the embedded asset protocol.

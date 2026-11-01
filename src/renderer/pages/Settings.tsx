@@ -3658,11 +3658,10 @@ export const Settings: React.FC = () => {
             alignItems: 'center',
             gap: 'var(--space-2)',
           }}
-          onClick={() => {
+          onClick={async () => {
             const diag: string[] = [];
             diag.push('=== DEX Diagnostic Report ===');
             diag.push('Version: ' + appVersion);
-            diag.push('Build: 2026.03.09');
             diag.push('Platform: ' + navigator.platform);
             diag.push('User Agent: ' + navigator.userAgent);
             diag.push('Language: ' + navigator.language);
@@ -3672,6 +3671,20 @@ export const Settings: React.FC = () => {
             diag.push('Online: ' + (navigator.onLine ? 'Yes' : 'No'));
             diag.push('Color Scheme: ' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'Dark' : 'Light'));
             diag.push('Timestamp: ' + new Date().toISOString());
+            // Native WebView2 detection (desktop shell only) — the first thing
+            // support needs when the app fails to start or renders blank.
+            try {
+              const wv = await (window as any).electron?.invoke?.('diagnostics:getWebView2');
+              if (wv) {
+                diag.push('');
+                diag.push('=== WebView2 ===');
+                diag.push('Runtime: ' + (wv.installed ? wv.version : 'NOT FOUND (' + (wv.error || 'unknown') + ')'));
+                diag.push('Loader: ' + wv.linkage + ' | Process arch: ' + wv.processArch + ' | OS arch: ' + wv.osArch);
+                if (wv.envOverride) diag.push('WEBVIEW2_BROWSER_EXECUTABLE_FOLDER: ' + wv.envOverride);
+                diag.push('Registry: ' + JSON.stringify(wv.registry));
+                diag.push('Startup log: ' + wv.startupLog);
+              }
+            } catch (e) { console.warn('[DEX]', e); }
             try {
               const eng = localStorage.getItem('dex-engagement-state');
               if (eng) {

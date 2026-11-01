@@ -12,6 +12,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod activity_feed;
+mod webview2;
 mod git;
 mod env_manager;
 mod ssh;
@@ -1952,6 +1953,10 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // (project-archiver:* and media-library:* run their fs work inside
         // their db modules, which receive the app data dir via db_dispatch.)
         "changelog:export" => native_ops::changelog_export(&app, &args),
+        // Native picker -> { filePath } | null. Must sit above the db-backed
+        // `dexnotes:` prefix route below, which has no picker arm (these used to
+        // fall through to it and return null, so Notes' Attach/Import did nothing).
+        "dexnotes:pick-attachment-file" | "dexnotes:pick-import-file" => native_ops::note_pick_file(&app),
         "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
         "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),
@@ -2090,6 +2095,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             json!({ "healthy": true, "shell": "tauri" })
         }
         "diagnostics:getSystemInfo" => system_status(),
+        "diagnostics:getWebView2" => webview2::status_json(),
 
         // --- Batch 5: App data locations -----------------------------------
         "app:getPath" | "data:getLocations" => app_paths(&app),
@@ -2399,7 +2405,26 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 }
 
 fn main() {
-    tauri::Builder::default()
+    webview2::install_panic_logger();
+    // Fail loudly and helpfully when no WebView2 runtime exists, instead of
+    // letting webview creation fail with no window and no message.
+    if !webview2::preflight() {
+        std::process::exit(1);
+    }
+    webview2::start_load_watchdog(std::time::Duration::from_secs(30));
+    let result = tauri::Builder::default()
+        // MUST be the first plugin. A second launch focuses the running window
+        // and exits instead of starting a duplicate shell: a duplicate would
+        // double-run the reminder/autobackup schedulers and file watchers on the
+        // same dex.db, and if launched with different WebView2 options it hangs
+        // with an empty window (the profile is locked by the first instance).
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -2477,8 +2502,12 @@ fn main() {
             native_ops::start_autobackup_scheduler(app.handle().clone());
             Ok(())
         })
+        .on_page_load(|_webview, _payload| webview2::mark_page_loaded())
         .invoke_handler(tauri::generate_handler![smart_router_route, dex_ipc])
-        .run(tauri::generate_context!())
-        .expect("error while running the DEX Tauri shell");
+        .run(tauri::generate_context!());
+    if let Err(e) = result {
+        webview2::fatal("The DEX window could not be created", &e.to_string());
+        std::process::exit(1);
+    }
 }
 
