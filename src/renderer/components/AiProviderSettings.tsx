@@ -13,10 +13,18 @@
  */
 
 import React, { useState } from 'react';
-import { allProviders, findModel, getProvider } from '../uki/providers/registry';
+import { allProviders, allModels, findModel, getProvider } from '../uki/providers/registry';
 import { getApiKey, setApiKey, removeApiKey, configuredProviders } from '../uki/keystore';
-import { getPreferredModel, setPreferredModel, getRoutingGoal, setRoutingGoal } from '../uki/providers/modelPrefs';
-import { routeConfiguredModels } from '../uki/providers/connect';
+import {
+  getPreferredModel, setPreferredModel, getRoutingGoal, setRoutingGoal,
+  getProcessingMode, setProcessingMode, getManualModel, setManualModel,
+  getReasoningPreference, setReasoningPreference,
+} from '../uki/providers/modelPrefs';
+import { routeConfiguredModels, applyProcessingMode } from '../uki/providers/connect';
+import {
+  PROCESSING_MODES, processingModeLabel, processingModeHint, REASONING_PREFERENCES,
+  type ProcessingMode, type ReasoningPreference,
+} from '../../shared/uki/assistantPolicy';
 import { ROUTING_GOALS, routingGoalLabel, type RoutingGoal } from '../../shared/uki/smartRouter';
 import { getCapabilities } from '../services/platform';
 
@@ -36,6 +44,22 @@ const GOAL_HINTS: Record<RoutingGoal, string> = {
   offline: 'Uses only on-device (Ollama) models.',
 };
 
+const REASONING_LABEL: Record<ReasoningPreference, string> = {
+  auto: 'Automatic', fast: 'Fast', balanced: 'Balanced', deep: 'Deep',
+};
+const REASONING_HINT: Record<ReasoningPreference, string> = {
+  auto: 'Fast for quick commands, Deep for engineering, research and planning, Balanced otherwise.',
+  fast: 'Up to 2 tool steps, short answers.',
+  balanced: 'Up to 5 tool steps.',
+  deep: 'Up to 10 tool steps and longer answers (uses more of your provider quota).',
+};
+
+const selectStyle: React.CSSProperties = {
+  height: 28, padding: '0 var(--space-2)', borderRadius: 'var(--radius-sm)', fontSize: 12,
+  background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
+  border: '1px solid var(--color-border-control)',
+};
+
 const AiProviderSettings: React.FC = () => {
   const providers = allProviders();
   const [keys, setKeys] = useState<Record<string, string>>(() => {
@@ -50,6 +74,9 @@ const AiProviderSettings: React.FC = () => {
   });
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [goal, setGoal] = useState<RoutingGoal>(() => getRoutingGoal());
+  const [mode, setMode] = useState<ProcessingMode>(() => getProcessingMode());
+  const [manualModel, setManual] = useState<string>(() => getManualModel() ?? '');
+  const [reasoning, setReasoning] = useState<ReasoningPreference>(() => getReasoningPreference());
 
   const chooseModel = (id: string, modelId: string) => {
     setModels((m) => ({ ...m, [id]: modelId }));
@@ -79,7 +106,7 @@ const AiProviderSettings: React.FC = () => {
   // the live keystore + goal). Recomputed each render — save/remove/goal-change
   // all trigger a re-render.
   const hasAnyKey = configuredProviders().length > 0;
-  const routedTopId = routeConfiguredModels(goal, '')[0] ?? null;
+  const routedTopId = applyProcessingMode(routeConfiguredModels(mode === 'local-only' ? 'offline' : goal, ''), mode, manualModel || null)[0] ?? null;
   const routedTop = routedTopId ? findModel(routedTopId) : null;
   const routedProviderLabel = routedTop ? getProvider(routedTop.provider)?.label : null;
 
@@ -125,6 +152,59 @@ const AiProviderSettings: React.FC = () => {
             No AI provider connected — paste a key below to enable AI replies. (Structured commands still work without a key.)
           </span>
         )}
+      </div>
+
+      <div
+        style={{
+          padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)',
+          background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label htmlFor="processing-mode" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 120 }}>
+            Processing
+          </label>
+          <select
+            id="processing-mode"
+            value={mode}
+            onChange={(e) => { const m = e.target.value as ProcessingMode; setMode(m); setProcessingMode(m); }}
+            style={selectStyle}
+          >
+            {PROCESSING_MODES.map((m) => <option key={m} value={m}>{processingModeLabel(m)}</option>)}
+          </select>
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{processingModeHint(mode)}</span>
+        {mode === 'manual' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <label htmlFor="manual-model" style={{ fontSize: 12, color: 'var(--color-text-secondary)', minWidth: 120 }}>Model</label>
+            <select
+              id="manual-model"
+              value={manualModel}
+              onChange={(e) => { setManual(e.target.value); setManualModel(e.target.value); }}
+              style={selectStyle}
+            >
+              <option value="">Choose a model</option>
+              {allModels().map((m) => (
+                <option key={m.id} value={m.id}>{m.label} · {getProvider(m.provider)?.label ?? m.provider}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label htmlFor="reasoning-pref" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 120 }}>
+            Reasoning effort
+          </label>
+          <select
+            id="reasoning-pref"
+            value={reasoning}
+            onChange={(e) => { const r = e.target.value as ReasoningPreference; setReasoning(r); setReasoningPreference(r); }}
+            style={selectStyle}
+          >
+            {REASONING_PREFERENCES.map((r) => <option key={r} value={r}>{REASONING_LABEL[r]}</option>)}
+          </select>
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{REASONING_HINT[reasoning]}</span>
       </div>
 
       <div

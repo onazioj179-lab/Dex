@@ -14,9 +14,10 @@
  */
 
 import { getProvider, providerForModel, allModels, allProviders } from './registry';
-import { chatWithFallback, type FetchLike, type ChatOptions } from './orchestrator';
+import { chatWithFallback, assertModelAllowed, type FetchLike, type ChatOptions } from './orchestrator';
 import { createStreamParser, type StreamFormat } from './stream';
-import { getPreferredModel, getRoutingGoal } from './modelPrefs';
+import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } from './modelPrefs';
+import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 import { configuredProviders, getApiKey } from '../keystore';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
@@ -55,6 +56,23 @@ export function pickConfiguredModelId(
 /** True when at least one usable provider is configured (a key is present). */
 export function hasConfiguredProvider(): boolean {
   return pickConfiguredModelId(configuredProviders()) !== null;
+}
+
+/**
+ * Apply the user's processing mode (privacy boundary) to an ordered model list.
+ * Local only keeps on-device endpoints, Cloud only drops them, Manual keeps the
+ * pinned model alone. Exported for tests and the Settings status line.
+ */
+export function applyProcessingMode(
+  modelIds: readonly string[],
+  mode: ProcessingMode = getProcessingMode(),
+  manualModel: string | null = getManualModel(),
+  baseUrl?: string,
+): string[] {
+  return filterModelsForMode(mode, modelIds, (id) => {
+    const p = providerForModel(id);
+    return p ? { providerId: p.id, requiresKey: p.requiresKey, baseUrl } : null;
+  }, manualModel);
 }
 
 /**
@@ -113,6 +131,8 @@ export interface AskOptions {
   chatOptions?: ChatOptions;
   /** Injectable fetch for tests. */
   fetchImpl?: FetchLike;
+  /** Abort the request (the agent's Cancel control). */
+  signal?: AbortSignal;
   /** Override the model id (skips the Smart Router and uses exactly this model). */
   modelId?: string;
   /** Override the routing goal (else the stored goal, defaulting to 'auto'). */
@@ -149,13 +169,17 @@ export async function askConfiguredLLM(
   // turn (so a cheap/fast first pick degrades to the next on failure). An
   // explicit modelId override pins exactly one model.
   const goal = opts.goal ?? getRoutingGoal();
-  let modelIds = opts.modelId ? [opts.modelId] : routeConfiguredModels(goal, userText);
+  const mode = getProcessingMode();
+  // Local only routes among on-device models only, whatever the stored goal.
+  const routeGoal = mode === 'local-only' ? 'offline' : goal;
+  let modelIds = opts.modelId ? [opts.modelId] : routeConfiguredModels(routeGoal, userText);
+  modelIds = applyProcessingMode(modelIds, mode, getManualModel(), opts.chatOptions?.baseUrl);
   // With image attachments, only vision-capable models can answer; degrade (null)
   // when none is configured rather than sending images a text model will drop.
   if (opts.images && opts.images.length) {
-    const vision = visionModelIds(goal);
+    const vision = visionModelIds(routeGoal);
     const visionFirst = modelIds.filter((id) => vision.has(id));
-    modelIds = visionFirst.length ? visionFirst : [...vision];
+    modelIds = applyProcessingMode(visionFirst.length ? visionFirst : [...vision], mode, getManualModel(), opts.chatOptions?.baseUrl);
   }
   if (modelIds.length === 0) return null;
 
@@ -169,7 +193,7 @@ export async function askConfiguredLLM(
     const res = await chatWithFallback(
       modelIds,
       messages,
-      opts.chatOptions ?? { temperature: 0.7, maxTokens: 600 },
+      { ...(opts.chatOptions ?? { temperature: 0.7, maxTokens: 600 }), processingMode: mode, ...(opts.signal ? { signal: opts.signal } : {}) },
       opts.fetchImpl,
     );
     const text = res.content?.trim();
@@ -248,20 +272,31 @@ export async function streamConfiguredLLM(
   // Streaming commits tokens as they arrive, so it can't fall back mid-reply —
   // it streams from the Smart Router's top pick (or an explicit override).
   const goal = opts.goal ?? getRoutingGoal();
-  let modelId = opts.modelId
-    ?? routeConfiguredModels(goal, userText)[0]
-    ?? pickConfiguredModelId(configuredProviders());
+  const mode = getProcessingMode();
+  const routeGoal = mode === 'local-only' ? 'offline' : goal;
+  // The processing mode filters BEFORE the "first configured provider" fallback,
+  // which used to pick a cloud model even when the user chose Offline.
+  const allowed = (ids: string[]) => applyProcessingMode(ids, mode, getManualModel(), opts.chatOptions?.baseUrl);
+  let modelId: string | null = opts.modelId
+    ?? allowed(routeConfiguredModels(routeGoal, userText))[0]
+    ?? allowed([pickConfiguredModelId(configuredProviders())].filter((x): x is string => !!x))[0]
+    ?? null;
   // With image attachments, pin a vision-capable model; degrade (null) if the
   // chosen model can't see images and no vision model is configured.
   if (opts.images && opts.images.length) {
-    const vision = visionModelIds(goal);
+    const vision = visionModelIds(routeGoal);
     if (!modelId || !vision.has(modelId)) {
-      modelId = routeConfiguredModels(goal, userText).find((id) => vision.has(id)) ?? [...vision][0] ?? null;
+      modelId = allowed(routeConfiguredModels(routeGoal, userText)).find((id) => vision.has(id)) ?? allowed([...vision])[0] ?? null;
     }
   }
   if (!modelId) return null;
   const provider = providerForModel(modelId);
   if (!provider) return null;
+  try {
+    assertModelAllowed(modelId, provider, { processingMode: mode, baseUrl: opts.chatOptions?.baseUrl });
+  } catch {
+    return null; // blocked by the processing mode: nothing is sent
+  }
 
   const apiKey = provider.requiresKey ? getApiKey(provider.id) ?? '' : undefined;
   if (provider.requiresKey && !apiKey) return null;

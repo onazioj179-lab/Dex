@@ -15,11 +15,43 @@
 import { providerForModel } from './registry';
 import { getApiKey } from '../keystore';
 import type { ChatMessage, ChatResponse } from './types';
+import { getProcessingMode, getManualModel } from './modelPrefs';
+import { endpointAllowed, processingModeLabel, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 
 export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   baseUrl?: string;
+  /** Privacy boundary for this call; defaults to the user's stored mode. */
+  processingMode?: ProcessingMode;
+  /** Pinned model for 'manual' mode; defaults to the stored manual model. */
+  manualModel?: string | null;
+  /** Abort the in-flight request (the agent's Cancel control). */
+  signal?: AbortSignal;
+}
+
+/**
+ * Throws when `modelId` may not be used under the processing mode. This is the
+ * last line of defence: every non-streaming request passes through `chat()`, so
+ * a pinned model or a fallback chain can never reach a cloud provider while the
+ * user chose Local only (or any model other than the pinned one in Manual).
+ */
+export function assertModelAllowed(
+  modelId: string,
+  provider: { id: string; label: string; requiresKey: boolean },
+  opts: Pick<ChatOptions, 'processingMode' | 'manualModel' | 'baseUrl'> = {},
+): void {
+  const mode = opts.processingMode ?? getProcessingMode();
+  if (mode === 'manual') {
+    const pinned = opts.manualModel !== undefined ? opts.manualModel : getManualModel();
+    if (!pinned || pinned !== modelId) {
+      throw new Error(`Manual mode allows only the pinned model${pinned ? ` (${pinned})` : ''}; ${modelId} was not sent anything.`);
+    }
+    return;
+  }
+  if (!endpointAllowed(mode, { providerId: provider.id, requiresKey: provider.requiresKey, baseUrl: opts.baseUrl })) {
+    throw new Error(`${processingModeLabel(mode)} mode blocks ${provider.label}; nothing was sent.`);
+  }
 }
 
 export interface FetchResponse {
@@ -28,7 +60,7 @@ export interface FetchResponse {
   json(): Promise<unknown>;
   text(): Promise<string>;
 }
-export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<FetchResponse>;
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<FetchResponse>;
 
 /** Send a chat completion for `modelId`. Throws on unknown model / missing key / HTTP error. */
 export async function chat(
@@ -39,6 +71,7 @@ export async function chat(
 ): Promise<ChatResponse> {
   const provider = providerForModel(modelId);
   if (!provider) throw new Error(`Unknown model: ${modelId}`);
+  assertModelAllowed(modelId, provider, opts);
 
   const apiKey = provider.requiresKey ? getApiKey(provider.id) ?? '' : undefined;
   if (provider.requiresKey && !apiKey) {
@@ -53,7 +86,7 @@ export async function chat(
   const doFetch = fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
   if (!doFetch) throw new Error('No fetch implementation available');
 
-  const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body });
+  const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body, ...(opts.signal ? { signal: opts.signal } : {}) });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new Error(`${provider.label} request failed (${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
@@ -74,6 +107,7 @@ export async function chatWithFallback(
       return await chat(id, messages, opts, fetchImpl);
     } catch (err) {
       lastError = err;
+      if (opts.signal?.aborted) break; // cancelled: don't fall through to the next model
     }
   }
   throw lastError instanceof Error ? lastError : new Error('All models failed');
