@@ -20,7 +20,7 @@
 //   launcher:favorites -> InstalledApp[]                 (favorite, by name)
 //   launcher:byCategory-> InstalledApp[]                 (category, by useCount)
 //   launcher:launch    -> { success, pid?, error? }      (std::process spawn)
-//   launcher:launchPath-> { success, pid?, error? }      (std::process spawn)
+//   launcher:launchPath-> { success, pid?, error? }      (indexed apps only)
 //   launcher:quick     -> { success, pid?, error? }      (top search hit launch)
 //   launcher:favorite  -> { success }                    (apps.json mutation)
 //   launcher:hide      -> { success }                    (apps.json mutation)
@@ -365,9 +365,64 @@ fn spawn_detached(path: &str, args: &[String]) -> Result<Option<u32>, String> {
     }
 }
 
-// launchByPath(appPath, args): open shortcuts/urls with the OS handler; spawn
-// executables detached. Returns { success, pid?, error? }.
+// --- launch policy ----------------------------------------------------------
+// The renderer must not be able to run arbitrary programs (an XSS would turn
+// that into code execution). So launches only run apps from the scanned index
+// (apps.json), and renderer-supplied arguments may only be existing, local,
+// non-executable documents (the same rule `shell:openPath` applies) -- that
+// keeps "open this file with <app>" working while refusing `pwsh -c ...`.
+
+// Compare app paths the way the OS does: Windows paths are case- and
+// separator-insensitive.
+fn normalize_app_path(p: &str) -> String {
+    let t = p.trim();
+    if cfg!(windows) {
+        t.replace('/', r"\").trim_end_matches('\\').to_lowercase()
+    } else {
+        t.trim_end_matches('/').to_string()
+    }
+}
+
+// The id of the indexed app whose path is `path`, or why it is refused.
+fn resolve_indexed_path(apps: &[Value], path: &str) -> Result<String, String> {
+    let wanted = normalize_app_path(path);
+    if wanted.is_empty() {
+        return Err("Empty path".into());
+    }
+    apps.iter()
+        .find(|a| !app_path(a).is_empty() && normalize_app_path(app_path(a)) == wanted)
+        .map(|a| app_id(a).to_string())
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| {
+            "Not an installed app: launcher:launchPath only runs apps from the launcher index"
+                .to_string()
+        })
+}
+
+// Every launch argument must be a document the app can open, never a flag,
+// command string, or executable.
+fn check_launch_args(args: &[String]) -> Result<(), String> {
+    for arg in args {
+        crate::check_open_path(Path::new(arg))
+            .map_err(|e| format!("Refused launch argument {arg:?}: {e}"))?;
+    }
+    Ok(())
+}
+
+// launchByPath(appPath, args): only for a path that is already in the launcher
+// index -- it then launches (and tracks) that app exactly like launcher:launch.
+// Returns { success, pid?, error? }.
 fn launch_by_path(app: &tauri::AppHandle, path: &str, args: &[String]) -> Value {
+    match resolve_indexed_path(&read_apps(app), path) {
+        Ok(id) => launch_app(app, &id, args),
+        Err(error) => json!({ "success": false, "error": error }),
+    }
+}
+
+// Run an indexed app's path: open shortcuts/urls with the OS handler; spawn
+// executables detached. Callers must have resolved `path` from apps.json and
+// vetted `args` with check_launch_args.
+fn spawn_indexed_app(app: &tauri::AppHandle, path: &str, args: &[String]) -> Value {
     if path.is_empty() {
         return json!({ "success": false, "error": "Empty path" });
     }
@@ -434,7 +489,10 @@ fn launch_app(app: &tauri::AppHandle, id: &str, args: &[String]) -> Value {
         Some(t) => t,
         None => return json!({ "success": false, "error": "App not found" }),
     };
-    let res = launch_by_path(app, app_path(&target), args);
+    if let Err(error) = check_launch_args(args) {
+        return json!({ "success": false, "error": error });
+    }
+    let res = spawn_indexed_app(app, app_path(&target), args);
     if res.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
         record_use(app, id);
     }
@@ -979,5 +1037,80 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "launcher:setConfig" => set_config(app, args.get(0).unwrap_or(&Value::Null)),
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod launch_policy_tests {
+    use super::{check_launch_args, normalize_app_path, resolve_indexed_path};
+    use serde_json::{json, Value};
+
+    fn index() -> Vec<Value> {
+        vec![
+            json!({ "id": "vlc", "path": r"C:\Program Files\VideoLAN\VLC\vlc.exe" }),
+            json!({ "id": "notes", "path": "/opt/notes/notes" }),
+            json!({ "id": "", "path": r"C:\orphan.exe" }),
+            json!({ "id": "nopath" }),
+        ]
+    }
+
+    #[test]
+    fn launch_path_runs_only_indexed_apps() {
+        let apps = index();
+        assert_eq!(
+            resolve_indexed_path(&apps, r"C:\Program Files\VideoLAN\VLC\vlc.exe").as_deref(),
+            Ok("vlc")
+        );
+        assert_eq!(resolve_indexed_path(&apps, "/opt/notes/notes").as_deref(), Ok("notes"));
+        for bad in [
+            "",
+            "   ",
+            r"C:\Windows\System32\cmd.exe",
+            r"C:\Users\me\Downloads\payload.exe",
+            r"C:\Program Files\VideoLAN\VLC\vlc.exe.bak",
+            r"C:\orphan.exe",
+            "vlc",
+        ] {
+            assert!(resolve_indexed_path(&apps, bad).is_err(), "{bad:?} should be refused");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn indexed_match_is_case_and_separator_insensitive_on_windows() {
+        let apps = index();
+        assert_eq!(
+            resolve_indexed_path(&apps, "c:/program files/videolan/vlc/VLC.EXE").as_deref(),
+            Ok("vlc")
+        );
+        assert_eq!(normalize_app_path(" C:/A/B/ "), r"c:\a\b");
+    }
+
+    #[test]
+    fn launch_args_must_be_existing_documents() {
+        let dir = std::env::temp_dir().join(format!("dex-launch-args-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let doc = dir.join("movie.mp4");
+        std::fs::write(&doc, b"x").unwrap();
+        let script = dir.join("evil.ps1");
+        std::fs::write(&script, b"x").unwrap();
+
+        assert!(check_launch_args(&[]).is_ok());
+        assert!(check_launch_args(&[doc.to_string_lossy().into_owned()]).is_ok());
+        for bad in [
+            "-c".to_string(),
+            "/c calc".to_string(),
+            "--remote-debugging-port=9222".to_string(),
+            "https://example.com".to_string(),
+            script.to_string_lossy().into_owned(),
+            dir.join("missing.mp4").to_string_lossy().into_owned(),
+        ] {
+            assert!(
+                check_launch_args(&[doc.to_string_lossy().into_owned(), bad.clone()]).is_err(),
+                "{bad:?} should be refused"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
