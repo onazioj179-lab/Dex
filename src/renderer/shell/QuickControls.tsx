@@ -188,7 +188,7 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
         zIndex: 'var(--z-popover, 9000)' as React.CSSProperties['zIndex'],
         background: 'var(--color-bg-elevated, #111111)',
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 8,
+        borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 10,
         animation: 'qcPop 0.12s ease-out',
@@ -340,7 +340,7 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
           {busy ? 'Checking...' : enabled ? 'Granted' : 'Not granted'}
         </span>
         <span style={{
-          width: 28, height: 16, borderRadius: 8,
+          width: 28, height: 16, borderRadius: 10,
           background: enabled ? 'var(--color-success, #3DA66A)' : 'var(--color-border)',
           position: 'relative', transition: 'background 0.15s',
         }}>

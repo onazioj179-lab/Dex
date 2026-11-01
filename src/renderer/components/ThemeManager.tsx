@@ -30,13 +30,13 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: 'dark-default',
     name: 'Dark Default',
     isDark: true,
-    accentColor: '', // empty = defer to the stylesheet baseline accent (Omnitrix green)
-    bgPrimary: '#18181b',
-    bgSecondary: '#111113',
-    bgTertiary: '#27272a',
-    textPrimary: '#fafafa',
-    textSecondary: '#a1a1aa',
-    border: '#27272a',
+    accentColor: '', // empty = defer to the stylesheet baseline accent (macOS system blue)
+    bgPrimary: '#1B1D20',
+    bgSecondary: '#111214',
+    bgTertiary: '#24262A',
+    textPrimary: '#F5F5F2',
+    textSecondary: '#B5B5AE',
+    border: '#2B2D31',
   },
   {
     id: 'dark-purple',
@@ -91,12 +91,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: 'Light Default',
     isDark: false,
     accentColor: '', // empty = defer to the stylesheet baseline accent
-    bgPrimary: '#ffffff',
-    bgSecondary: '#f8fafc',
-    bgTertiary: '#e2e8f0',
-    textPrimary: '#1e293b',
-    textSecondary: '#64748b',
-    border: '#e2e8f0',
+    bgPrimary: '#FFFFFF',
+    bgSecondary: '#F8F8F6',
+    bgTertiary: '#ECECE8',
+    textPrimary: '#202124',
+    textSecondary: '#5F6368',
+    border: '#E2E2DD',
   },
   {
     id: 'light-warm',
@@ -206,6 +206,25 @@ export const initializeTheme = () => {
   // default on every boot, so installs carry it without the user ever choosing
   // it. Clear that stored value once so the stylesheet baseline (Omnitrix
   // green) becomes the effective default; deliberate accent picks survive.
+  // One-time: the owner retired the green accent. Installs still carrying the
+  // old Omnitrix-green default (stored here or in Settings) move to the
+  // stylesheet baseline (macOS blue).
+  try {
+    if (!localStorage.getItem('dex-accent-macos-migrated')) {
+      if ((localStorage.getItem('dex-accent-color') || '').toLowerCase() === '#32d74b') {
+        localStorage.removeItem('dex-accent-color');
+      }
+      const raw = localStorage.getItem('dex-settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.accentColor === 'string' && s.accentColor.toLowerCase() === '#32d74b') {
+          s.accentColor = 'var(--color-accent)';
+          localStorage.setItem('dex-settings', JSON.stringify(s));
+        }
+      }
+      localStorage.setItem('dex-accent-macos-migrated', '1');
+    }
+  } catch { /* quota/unavailable/corrupt settings */ }
   try {
     if (!localStorage.getItem('dex-accent-omnitrix-migrated')) {
       if (localStorage.getItem('dex-accent-color') === '#3b82f6') {

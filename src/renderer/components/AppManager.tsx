@@ -576,7 +576,7 @@ const errorBoundaryContainer: React.CSSProperties = {
   animation: 'fadeIn 0.25s var(--ease-out)',
 };
 const errorBoundaryIcon: React.CSSProperties = {
-  width: 52, height: 52, borderRadius: 8,
+  width: 52, height: 52, borderRadius: 10,
   background: 'rgba(255,69,58,0.1)', border: '0.5px solid rgba(255,69,58,0.2)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 };
@@ -584,7 +584,7 @@ const errorBoundaryTitle: React.CSSProperties = { fontSize: 14, fontWeight: 500,
 const errorBoundaryMsg: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 320, textAlign: 'center', lineHeight: 1.5 };
 const errorBoundaryBtn: React.CSSProperties = {
   padding: 'var(--space-2) 22px', background: 'var(--color-accent)', color: '#fff',
-  border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500,
+  border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500,
   cursor: 'pointer', marginTop: 4, letterSpacing: '-0.01em',
   transition: 'opacity 0.15s ease, transform 0.12s ease',
 };
@@ -4237,7 +4237,7 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 12px', height: 26, borderRadius: 11, /* pill-shaped tabs (owner request) */
+                padding: '0 12px', height: 26, borderRadius: 10, /* pill-shaped tabs (owner request) */
                 background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'var(--color-bg-elevated, #1C1C20)' : 'transparent',
                 border: isDragging ? '1px solid var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
@@ -4478,7 +4478,7 @@ export const AppManager: React.FC = () => {
                   background: 'var(--glass-bg, rgba(12,12,12,0.85))',
                   backdropFilter: 'var(--glass-blur, blur(20px))',
                   WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
-                  borderRadius: 8, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
+                  borderRadius: 10, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
                   boxShadow: 'var(--pg-shadow-modal)',
                   animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
@@ -4524,7 +4524,7 @@ export const AppManager: React.FC = () => {
                   {hubUnreadCount > 0 && (
                     <span style={{
                       fontSize: 10, fontWeight: 700, color: '#fff',
-                      background: 'var(--color-error)', borderRadius: 8,
+                      background: 'var(--color-error)', borderRadius: 10,
                       minWidth: 16, height: 16, padding: '0 5px',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       lineHeight: 1,
@@ -4567,7 +4567,7 @@ export const AppManager: React.FC = () => {
                     onClick={() => setSpatialAudioOn(p => !p)}
                     aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
                     style={{
-                      width: 32, height: 18, borderRadius: 8, border: 'none', cursor: 'pointer',
+                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
                       background: spatialAudioOn ? 'var(--color-success)' : 'var(--color-border)',
                       position: 'relative', transition: 'background 0.2s ease', padding: 0,
                     }}
@@ -4592,7 +4592,7 @@ export const AppManager: React.FC = () => {
                     }}
                     aria-label="Toggle reduce motion"
                     style={{
-                      width: 32, height: 18, borderRadius: 8, border: 'none', cursor: 'pointer',
+                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
                       background: isReduceMotion() ? 'var(--color-success)' : 'var(--color-border)',
                       position: 'relative', transition: 'background 0.2s ease', padding: 0,
                     }}
@@ -4831,7 +4831,7 @@ export const AppManager: React.FC = () => {
               position: 'fixed', left: originX + z.x, top: originY + z.y, width: z.w, height: z.h,
               background: 'rgba(59,130,246,0.08)',
               border: '2.5px solid rgba(59,130,246,0.35)',
-              borderRadius: 8,
+              borderRadius: 10,
               pointerEvents: 'none',
               zIndex: 4000,
               transition: 'all 180ms var(--pg-curve-standard, cubic-bezier(0.4, 0, 0.2, 1))',
@@ -4953,7 +4953,7 @@ export const AppManager: React.FC = () => {
                     onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'var(--color-bg-hover)' : 'transparent'; }}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      padding: '8px 4px', borderRadius: 8, width: '100%',
+                      padding: '8px 4px', borderRadius: 10, width: '100%',
                       background: isActive ? 'var(--color-bg-hover)' : 'transparent',
                       border: 'none', cursor: 'pointer',
                       transition: 'background 0.12s ease',
@@ -4963,7 +4963,7 @@ export const AppManager: React.FC = () => {
                       color: app.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: 40, height: 40,
-                      borderRadius: 8,
+                      borderRadius: 10,
                       background: 'transparent',
                       border: 'none',
                       boxShadow: isActive ? `0 0 0 1.5px ${app.color}66` : 'none',
@@ -5071,7 +5071,7 @@ export const AppManager: React.FC = () => {
               // .dex-surface-overlay class — the canonical overlay surface for
               // context menus. Blur is perf-tier/thermal gated automatically.
               zIndex: 9801, minWidth: 180,
-              borderRadius: 8, padding: 4,
+              borderRadius: 10, padding: 4,
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >

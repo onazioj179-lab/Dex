@@ -303,7 +303,7 @@ const QuickTile = ({
       style={{
         width: 30,
         height: 30,
-        borderRadius: 8,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

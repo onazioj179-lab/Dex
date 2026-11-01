@@ -8,7 +8,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Ratchet for the radius scale (0 · 4 · 6 · 8 · 11 · 14 · 18 · full). The shell
+// Ratchet for the radius scale (0 · 4 · 6 · 10 · 14 · 18 · 24 · full). The shell
 // surfaces are on-scale; individual apps still carry legacy values. New
 // off-scale inline radii fail this test, and the baseline only goes DOWN:
 // fix some (node scripts/snap-radius-to-scale.mjs <path>) and lower it.
@@ -19,7 +19,7 @@ import path from 'node:path';
 // @ts-expect-error -- plain .mjs script without type declarations
 import { snapSource, snapRadius } from '../../scripts/snap-radius-to-scale.mjs';
 
-const BASELINE = 888; // 2026-11-01, after snapping Settings/Store/shell/dock/launcher
+const BASELINE = 636; // 2026-11-01, Golden Modern scale, after snapping Settings/Store/shell/dock/launcher
 
 function walk(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -29,8 +29,8 @@ function walk(dir: string): string[] {
 }
 
 describe('radius scale', () => {
-  it('snaps toward the tighter step and keeps hairlines, circles and pills', () => {
-    expect([3, 5, 7, 9, 10, 12, 16, 24].map(snapRadius)).toEqual([4, 4, 6, 8, 8, 11, 14, 18]);
+  it('snaps to the nearest step and keeps hairlines, circles and pills', () => {
+    expect([3, 5, 7, 8, 9, 11, 12, 16, 20, 30].map(snapRadius)).toEqual([4, 6, 6, 10, 10, 10, 14, 18, 18, 24]);
     expect([0, 1, 2, 4, 50, 999, 9999].map(snapRadius)).toEqual([0, 1, 2, 4, 50, 9999, 9999]);
   });
 
@@ -38,5 +38,5 @@ describe('radius scale', () => {
     const root = path.resolve(__dirname, '../../src/renderer');
     const offScale = walk(root).reduce((n, f) => n + snapSource(fs.readFileSync(f, 'utf8')).changes, 0);
     expect(offScale, 'off-scale borderRadius count rose; use a scale value').toBeLessThanOrEqual(BASELINE);
-  });
+  }, 60_000); // scans every renderer source file; generous budget for loaded CI/dev machines
 });

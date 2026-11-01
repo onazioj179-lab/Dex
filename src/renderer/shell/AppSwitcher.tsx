@@ -40,7 +40,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
         alignItems: 'center',
         gap: 6,
         padding: '14px 18px',
-        borderRadius: 8,
+        borderRadius: 10,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
         boxShadow: 'var(--pg-shadow-popover)',
@@ -66,7 +66,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
               alignItems: 'center',
               gap: 4,
               padding: 'var(--space-2) 10px',
-              borderRadius: 8,
+              borderRadius: 10,
               // Calm, clear selection: subtle fill + accent ring (not a colored glow).
               background: isSelected ? 'var(--color-bg-hover)' : 'transparent',
               border: isSelected ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
@@ -75,7 +75,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
             }}
           >
             <div style={{
-              width: 40, height: 40, borderRadius: 8,
+              width: 40, height: 40, borderRadius: 10,
               background: color,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: 'var(--pg-shadow-card)',
