@@ -19,6 +19,8 @@
 // Types
 // ---------------------------------------------------------------------------
 
+import { applyMotionDurations } from '../styles/motionDurations';
+
 export type DeviceTier = 'low' | 'mid' | 'high' | 'ultra';
 
 export interface TierPresets {
@@ -261,16 +263,9 @@ export function applyTierPresets(tier: DeviceTier): void {
   root.style.setProperty('--blur-intensity', `${presets.blurIntensity}px`);
   root.style.setProperty('--glass-opacity', String(presets.glassOpacity / 100));
 
-  if (presets.reduceMotion) {
-    root.style.setProperty('--duration-fast', '0ms');
-    root.style.setProperty('--duration-normal', '0ms');
-    root.style.setProperty('--duration-slow', '0ms');
-  } else {
-    const scale = presets.animationDurationScale;
-    root.style.setProperty('--duration-fast', `${Math.round(100 * scale)}ms`);
-    root.style.setProperty('--duration-normal', `${Math.round(200 * scale)}ms`);
-    root.style.setProperty('--duration-slow', `${Math.round(400 * scale)}ms`);
-  }
+  // One source of truth for durations (was 100/200/400 ms here, conflicting
+  // with the stylesheet and Settings).
+  applyMotionDurations(root, { reduce: presets.reduceMotion, scale: presets.animationDurationScale });
 
   // Persist
   try {

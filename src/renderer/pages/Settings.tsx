@@ -47,6 +47,7 @@ import StoragePanel from './settingsPanels/StoragePanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
+import { applyMotionDurations } from '../styles/motionDurations';
 
 // ===========================================================================
 // TYPES
@@ -472,23 +473,23 @@ const SystemMonitorPanel: React.FC = () => {
 
       {/* Live stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CPU</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? 'var(--color-error)' : totalCpu > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.cpu?.cores || '?'} cores</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Memory</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? 'var(--color-error)' : totalMem > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{memUsedGB} / {memTotalGB} GB</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Processes</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{processes.length}</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{filtered.length} shown</div>
         </div>
         {status.battery && (
-          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
+          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Battery</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{status.battery.percent}%</div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.battery.charging ? 'Charging' : 'On battery'}</div>
@@ -527,7 +528,7 @@ const SystemMonitorPanel: React.FC = () => {
 
       {/* Process table */}
       <div style={{
-        border: '1px solid var(--color-border-subtle)', borderRadius: 8, overflow: 'hidden',
+        border: '1px solid var(--color-border-subtle)', borderRadius: 10, overflow: 'hidden',
         background: 'var(--color-bg-base, #0e0e11)',
       }}>
         <div style={{ maxHeight: 520, overflowY: 'auto' }}>
@@ -739,7 +740,7 @@ const UpdateManagerSection: React.FC = () => {
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 24, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
+    width: 44, height: 24, borderRadius: 10, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
@@ -760,12 +761,12 @@ const UpdateManagerSection: React.FC = () => {
     <div style={{ flex: 1, padding: '0 var(--space-6) var(--space-6)', overflowY: 'auto' as const }}>
       {/* Status Banner */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 8,
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 10,
         background: info.updateAvailable ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'var(--color-success-muted, rgba(48,209,88,0.08))',
         border: `1px solid ${info.updateAvailable ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'var(--color-success-muted, rgba(48,209,88,0.2))'}`,
         marginBottom: 'var(--space-5)',
       }}>
-        <div style={{ width: 40, height: 40, borderRadius: 8, background: info.updateAvailable ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-success-muted, rgba(48,209,88,0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: info.updateAvailable ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-success-muted, rgba(48,209,88,0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {info.updateAvailable ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           ) : (
@@ -819,7 +820,7 @@ const UpdateManagerSection: React.FC = () => {
         <>
           <div style={heading}>Release Notes</div>
           <div style={{
-            padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
+            padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
             border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
             lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' as const, marginBottom: 'var(--space-3)', whiteSpace: 'pre-wrap' as const,
           }}>
@@ -882,7 +883,7 @@ const UpdateManagerSection: React.FC = () => {
       </button>
       {showChangelog && changelog && (
         <div style={{
-          padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
+          padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
           lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' as const, marginBottom: 'var(--space-3)', whiteSpace: 'pre-wrap' as const,
         }}>
@@ -1159,19 +1160,10 @@ const applySettings = (settings: Record<string, unknown>) => {
     }
     
     // Apply reduce motion
-    if (settings.reduceMotion) {
-      root.style.setProperty('--duration-fast', '0ms');
-      root.style.setProperty('--duration-normal', '0ms');
-      root.style.setProperty('--duration-slow', '0ms');
-      root.style.setProperty('--duration-theme', '0ms');
-      root.style.setProperty('--animation-duration', '0ms');
-    } else {
-      root.style.setProperty('--duration-fast', '80ms');
-      root.style.setProperty('--duration-normal', '150ms');
-      root.style.setProperty('--duration-slow', '250ms');
-      root.style.setProperty('--duration-theme', '300ms');
-      root.style.setProperty('--animation-duration', '200ms');
-    }
+    // Shared duration source (was 80/150/250/300 ms here, conflicting with
+    // the stylesheet and TierManager).
+    applyMotionDurations(root, { reduce: Boolean(settings.reduceMotion) });
+    root.style.setProperty('--animation-duration', settings.reduceMotion ? '0ms' : '200ms');
 
     // Sync App Tab Bar visibility to localStorage + notify AppManager
     const tabBarVal = settings.showAppTabBar !== false;
@@ -1241,7 +1233,7 @@ const DEFAULT_SETTINGS = {
   darkMode: true,
   reduceMotion: false,
   transparency: true,
-  accentColor: 'var(--color-accent)', // system default = stylesheet baseline (Omnitrix green)
+  accentColor: 'var(--color-accent)', // system default = stylesheet baseline (macOS system blue)
   fontSize: 'medium',
   fontScale: 100,
   targetFPS: 120,
@@ -2454,7 +2446,9 @@ export const Settings: React.FC = () => {
         <button
           style={{
             ...styles.toggle,
-            background: settings[key] ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+            // macOS-style: "on" uses the accent (was system green); the knob uses
+            // --color-accent-text (white) so it stays >=3:1 against the blue track.
+            background: settings[key] ? 'var(--color-accent)' : 'var(--color-bg-glass)',
             border: settings[key] ? 'none' : '1px solid var(--color-border)',
           }}
           onClick={() => toggleSetting(key)}
@@ -2464,6 +2458,7 @@ export const Settings: React.FC = () => {
         >
           <div style={{
             ...styles.toggleKnob,
+            ...(settings[key] ? { background: 'var(--color-accent-text)' } : null),
             transform: settings[key] ? 'translate(20px, -50%)' : 'translate(0, -50%)',
           }} />
         </button>
@@ -2832,8 +2827,8 @@ export const Settings: React.FC = () => {
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
         {[
+          { id: 'var(--color-accent)', name: 'macOS Blue', desc: 'System blue (DEX default)' },
           { id: '#ffd60a', name: 'Dark Knight', desc: 'Bat-signal yellow on true black' },
-          { id: '#32d74b', name: 'Omnitrix', desc: 'Hero-green energy' },
           { id: '#ff6b1a', name: 'Nanite', desc: 'Rex build-orange' },
         ].map(preset => (
           <button
@@ -2843,7 +2838,7 @@ export const Settings: React.FC = () => {
             title={preset.desc}
             onClick={() => setSettings(prev => ({ ...prev, accentColor: preset.id }))}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 10,
               border: settings.accentColor === preset.id ? `1px solid ${preset.id}` : '1px solid var(--color-border)',
               background: settings.accentColor === preset.id ? `color-mix(in srgb, ${preset.id} 12%, transparent)` : 'var(--color-bg-surface)',
               color: settings.accentColor === preset.id ? preset.id : 'var(--color-text-secondary)',
@@ -2937,7 +2932,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 8,
+        padding: 'var(--space-4)', borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -2994,7 +2989,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 8,
+        padding: 'var(--space-4)', borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -3480,7 +3475,7 @@ export const Settings: React.FC = () => {
                     aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
                   />
                   <span style={{
-                    position: 'absolute', inset: 0, borderRadius: 8,
+                    position: 'absolute', inset: 0, borderRadius: 10,
                     background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
@@ -3535,7 +3530,7 @@ export const Settings: React.FC = () => {
       
       {/* Creator Watermark */}
       <div style={{
-        padding: 'var(--space-5)', borderRadius: '8px', marginBottom: 'var(--space-5)',
+        padding: 'var(--space-5)', borderRadius: '10px', marginBottom: 'var(--space-5)',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
         border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
         position: 'relative', overflow: 'hidden',
@@ -3586,7 +3581,7 @@ export const Settings: React.FC = () => {
             { title: 'Always improving', body: 'Free updates roll in automatically. New features show up here, with the changelog one click away.' },
           ].map(card => (
             <div key={card.title} style={{
-              padding: 'var(--space-3) 14px', borderRadius: 8,
+              padding: 'var(--space-3) 14px', borderRadius: 10,
               border: '1px solid var(--color-border-subtle)',
               background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
             }}>
@@ -3644,7 +3639,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 8, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3882,7 +3877,7 @@ export const Settings: React.FC = () => {
               {hw.weakGPU ? ' (weak GPU)' : ''}
             </div>
             {/* 5-segment tier selector */}
-            <div style={{ display: 'flex', gap: 2, marginBottom: 'var(--space-2)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 'var(--space-2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
               {ALL_TIERS.map((tier) => {
                 const active = tier === currentTier;
                 return (
@@ -3942,7 +3937,7 @@ export const Settings: React.FC = () => {
                   style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
                 />
                 <span style={{
-                  position: 'absolute', inset: 0, borderRadius: 8,
+                  position: 'absolute', inset: 0, borderRadius: 10,
                   background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
@@ -4334,14 +4329,14 @@ export const Settings: React.FC = () => {
                 onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px var(--space-2)', borderRadius: 8, cursor: 'pointer',
+                  padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
                   background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
                   border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
                   transition: 'all 0.15s ease',
                 }}
               >
                 <div style={{
-                  width: 36, height: 36, borderRadius: 8,
+                  width: 36, height: 36, borderRadius: 10,
                   background: `linear-gradient(135deg, ${app.color}44, ${app.color}22)`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 700, color: app.color,
@@ -4362,13 +4357,13 @@ export const Settings: React.FC = () => {
         {/* Detail Panel */}
         {detail && selectedCreativeApp && (
           <div style={{
-            background: 'var(--color-bg-surface)', borderRadius: 8,
+            background: 'var(--color-bg-surface)', borderRadius: 10,
             border: `1px solid ${detail.color}33`, padding: 'var(--space-4)',
           }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 8,
+                width: 48, height: 48, borderRadius: 10,
                 background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
@@ -5108,7 +5103,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggle: {
     width: '44px',
     height: '24px',
-    borderRadius: '11px',
+    borderRadius: '10px',
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
@@ -5199,7 +5194,7 @@ const styles: Record<string, React.CSSProperties> = {
   aboutDetails: {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     padding: '4px var(--space-4)',
     marginBottom: 'var(--space-6)',
   },

@@ -46,7 +46,7 @@ const TITLE: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginTop: '
 const SECTION: React.CSSProperties = {
   background: 'var(--color-bg-elevated)',
   border: '1px solid var(--color-border-subtle)',
-  borderRadius: 8,
+  borderRadius: 10,
   padding: '4px 14px',
 };
 const BTN: React.CSSProperties = {

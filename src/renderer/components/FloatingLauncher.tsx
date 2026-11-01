@@ -278,7 +278,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
   const ctrlBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 8, border: 'none', padding: 0,
+    width: 32, height: 32, borderRadius: 10, border: 'none', padding: 0,
     background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer',
     transition: 'background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease',
   };
@@ -444,7 +444,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
               <button
                 type="button" aria-label="Open Music" onClick={() => openApp('audio')}
                 style={{
-                  width: 42, height: 42, flexShrink: 0, borderRadius: 8, padding: 0, cursor: 'pointer',
+                  width: 42, height: 42, flexShrink: 0, borderRadius: 10, padding: 0, cursor: 'pointer',
                   border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
                   background: track?.artwork ? `center/cover no-repeat url(${JSON.stringify(track.artwork)})` : 'var(--color-bg-inset, #101012)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
@@ -470,7 +470,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
               </button>
               <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={toggle} disabled={!track}
-                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 8, background: track ? 'var(--color-accent, #4a9eff)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
+                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent, #4a9eff)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
                 {isPlaying
                   ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
                   : <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>}
@@ -542,7 +542,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                 onClick={() => openRecent(app.id)}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, flexShrink: 0, borderRadius: 8, padding: 0,
+                  width: 32, height: 32, flexShrink: 0, borderRadius: 10, padding: 0,
                   border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
                   background: 'var(--color-bg-inset, #101012)', cursor: 'pointer',
                   color: app.color && app.color.startsWith('var(') ? app.color : (app.color || 'var(--color-text-secondary)'),

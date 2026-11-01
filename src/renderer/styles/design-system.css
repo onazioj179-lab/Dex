@@ -3,7 +3,8 @@
  * DEX Design System v7.0 -- Dark with Soul
  * ===========================================================================
  *
- * Single source of truth. #0C0C0E rich charcoal base, #32D74B Omnitrix-green accent.
+ * Single source of truth. macOS-style: #111214 graphite base, #0A84FF system-blue accent
+ * (#0066CC in light mode for AA contrast). Every text/accent pair is contrast-checked.
  * 4px grid. Subtle accent glows. Deep shadows. Alive.
  *
  * @author     Onazi Treasure OJ
@@ -33,26 +34,26 @@
   --font-scale: 1;
   --density-scale: 1;
 
-  /* Backgrounds -- Rich Charcoal (lifted from true black for depth) */
-  --color-bg-base: #0C0C0E;
-  --color-bg-surface: #161618;
-  --color-bg-surface-solid: #161618;
-  --color-bg-inset: #101012;
-  --color-bg-hover: #1E1E22;
-  --color-bg-active: #252528;
-  --color-bg-overlay: #0E0E10;
+  /* Backgrounds -- Golden Modern graphite (neutral, slightly cool) */
+  --color-bg-base: #111214;
+  --color-bg-surface: #1B1D20;
+  --color-bg-surface-solid: #1B1D20;
+  --color-bg-inset: #151619;
+  --color-bg-hover: #24262A;
+  --color-bg-active: #2B2D31;
+  --color-bg-overlay: #141518;
   /* "Glass" fills (master overhaul: real liquid glass again). Translucent
      surfaces paired with the adaptive backdrop blur in glassMenu.ts, so every
      menu / dropdown / popover / sidebar / toolbar / panel that consumes these
      reads as one consistent frosted material. ~hundreds of consumers re-glass
      with no per-site edits. Conservative alphas keep text readable; weak GPUs
      (perf-tier "low") and reduced-transparency fall back to solid below. */
-  --color-bg-glass: rgba(22, 22, 26, 0.74);
-  --color-bg-glass-strong: rgba(16, 16, 20, 0.86);
-  --color-bg-blur: #121214;
-  --color-bg-secondary: #121214;
-  --color-bg-elevated: #1A1A1E;
-  --color-bg-tertiary: #1E1E22;
+  --color-bg-glass: rgba(27, 29, 32, 0.74);
+  --color-bg-glass-strong: rgba(20, 21, 24, 0.86);
+  --color-bg-blur: #16171A;
+  --color-bg-secondary: #16171A;
+  --color-bg-elevated: #212327;
+  --color-bg-tertiary: #24262A;
 
   /* Home desktop surface -- unified workspace legibility (v5.5 Desktop initiative).
      The Home is one desktop surface, not a stack of opaque cards. Content sits on
@@ -63,27 +64,28 @@
   /* SOLID desktop (owner killed the wallpaper): the home widgets must be opaque
      cards or they vanish against the flat background, so the scrim is now a solid
      surface, not a translucent tint over a wallpaper. */
-  --dex-desktop-scrim: var(--color-bg-surface, #161618);
-  --dex-desktop-scrim-hover: var(--color-bg-hover, #1e1e22);
+  --dex-desktop-scrim: var(--color-bg-surface, #1B1D20);
+  --dex-desktop-scrim-hover: var(--color-bg-hover, #24262A);
   --dex-desktop-text-shadow: none;
   --dex-desktop-object-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 
-  /* Text -- Crisp whites with visible secondary */
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #B8B8BD;
+  /* Text -- warm off-white (17:1 on base) with visible secondary (9:1) */
+  --color-text-primary: #F5F5F2;
+  --color-text-secondary: #B5B5AE;
   --color-text-tertiary: #8E8E93;
   --color-text-muted: #A0A0A5;
   --color-text-disabled: #58585D;
   --color-text-inverse: #000000;
   --color-text-code: #F0F0F2;
 
-  /* Accent -- Omnitrix Green (hero default) */
-  --color-accent: #32D74B;
-  --color-accent-hover: #5FE073;        /* lighter -- hover */
-  --color-accent-dark: #27A83B;         /* darker -- pressed/active, gradient ends */
-  --color-accent-light: rgba(50, 215, 75, 0.14);
-  --color-accent-soft: rgba(50, 215, 75, 0.08);
-  --color-accent-muted: rgba(50, 215, 75, 0.10);
+  /* Accent -- macOS system blue (dark appearance): 5.1:1 on base, 4.6:1 on
+     surface. Focus, selection, toggles and primary actions only. */
+  --color-accent: #0A84FF;
+  --color-accent-hover: #409CFF;        /* lighter -- hover */
+  --color-accent-dark: #0071E3;         /* darker -- pressed/active, gradient ends */
+  --color-accent-light: rgba(10, 132, 255, 0.14);
+  --color-accent-soft: rgba(10, 132, 255, 0.08);
+  --color-accent-muted: rgba(10, 132, 255, 0.10);
 
   /* Translucent neutral surfaces -- subtle fills that must stay see-through
      (so they sit on glass/wallpaper) and therefore can't map to the opaque
@@ -107,6 +109,9 @@
      index.html boot block, which runtime components depended on — now owned
      here (the boot block mirrors these values). Shadow alphas carry the
      GOAL-6D intensity -40% pass. */
+  /* Text ON the accent (filled buttons, toggle knobs): white, 3.65:1 on
+     #0A84FF (meets 3:1 for controls; small labels on blue fills should prefer
+     --color-accent-dark, 4.7:1). White on the previous green was ~1.9:1. */
   --color-accent-text: #FFFFFF;
   /* Alias: some surfaces (e.g. Audio.tsx) reference --color-text-on-accent.
      The canonical name is --color-accent-text; this alias makes those
@@ -372,16 +377,16 @@
      Border Radius
      ───────────────────────────────────────────────────────────────────────── */
   
-  /* Apple-scale rounding: the old 2-10px scale read as boxy. Bumped up across
-     the board so cards, panels, menus, inputs, and buttons feel soft and modern.
-     `--radius-full` stays a pill. One scale, so everything rounds together. */
+  /* Golden Modern scale (owner-specified): XS 4 / SM 6 / MD 10 / LG 14 /
+     XL 18 / XXL 24 / Full. One scale, so everything rounds together; inline
+     values are held to it by tests/unit/radius-scale-ratchet.test.ts. */
   --radius-none: 0;
   --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 11px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -415,13 +420,18 @@
   --saturate: saturate(180%);
   
   /* ─────────────────────────────────────────────────────────────────────────
-     Motion — ≤120ms, interruptible
+     Motion — Golden Modern ranges (owner-specified), interruptible:
+       feedback 80-120 · hover/press 120-180 · standard 180-260 ·
+       panel 220-320 · major 280-420. Reduced motion (OS setting or
+       Settings > Accessibility) zeroes these via the rules further down.
      ───────────────────────────────────────────────────────────────────────── */
   
   --duration-instant: 0ms;
-  --duration-fast: 40ms;
-  --duration-normal: 80ms;
-  --duration-slow: 120ms;
+  --duration-fast: 100ms;     /* immediate feedback */
+  --duration-normal: 150ms;   /* hover / press */
+  --duration-slow: 220ms;     /* standard transition */
+  --duration-panel: 260ms;    /* panels, sheets, drawers */
+  --duration-major: 340ms;    /* major layout / workspace changes */
   --duration-theme: 150ms;
   
   --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -469,7 +479,7 @@
   --motion-dock-hover: 120ms var(--ease-out);
   --motion-dock-drag: 90ms var(--ease-out);
   /* Panel motion — expand / collapse / reorganise */
-  --motion-panel-expand: 200ms var(--pg-curve-decelerate);
+  --motion-panel-expand: 240ms var(--pg-curve-decelerate);
   --motion-panel-collapse: 160ms var(--pg-curve-accelerate);
   --motion-panel-reorganize: 240ms var(--ease-spring);
 
@@ -1483,24 +1493,24 @@ html[data-darkroom="on"] {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 [data-theme="light"], .light-mode {
-  /* Backgrounds -- warmer light grays */
-  --color-bg-base: #FAFAFA;
-  --color-bg-surface: #F2F2F4;
-  --color-bg-surface-solid: #F2F2F4;
-  --color-bg-inset: #EAEAEC;
-  --color-bg-hover: #E2E2E5;
-  --color-bg-active: #D8D8DC;
-  --color-bg-overlay: #F7F7F9;
+  /* Backgrounds -- Golden Modern warm paper */
+  --color-bg-base: #F8F8F6;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-solid: #FFFFFF;
+  --color-bg-inset: #EFEFEC;
+  --color-bg-hover: #ECECE8;
+  --color-bg-active: #E2E2DD;
+  --color-bg-overlay: #FBFBF9;
   /* DEX Sharp full-flat (light theme): opaque solid surfaces. */
-  --color-bg-glass: #F5F5F8;
-  --color-bg-glass-strong: #F0F0F3;
-  --color-bg-blur: #F2F2F4;
-  --color-bg-secondary: #EDEDED;
+  --color-bg-glass: #FFFFFF;
+  --color-bg-glass-strong: #F8F8F6;
+  --color-bg-blur: #F4F4F1;
+  --color-bg-secondary: #F1F1EE;
   --color-bg-elevated: #FFFFFF;
-  --color-bg-tertiary: #E5E5E8;
+  --color-bg-tertiary: #E8E8E4;
 
-  /* Text -- stronger contrast */
-  --color-text-primary: #000000;
+  /* Text -- graphite ink (15:1 on base) */
+  --color-text-primary: #202124;
   --color-text-secondary: #3C3C43;
   --color-text-tertiary: #636366;
   /* was #8E8E93 = 2.9-3.3:1 on the light surfaces (fails WCAG AA for body
@@ -1510,13 +1520,15 @@ html[data-darkroom="on"] {
   --color-text-inverse: #FFFFFF;
   --color-text-code: #1D1D1F;
 
-  /* Accent -- deeper green for light mode */
-  --color-accent: #1E8E3E;
-  --color-accent-hover: #197A35;
-  --color-accent-dark: #14672C;         /* pressed/active in light mode */
-  --color-accent-light: rgba(30, 142, 62, 0.12);
-  --color-accent-soft: rgba(30, 142, 62, 0.08);
-  --color-accent-muted: rgba(30, 142, 62, 0.10);
+  /* Accent -- system blue for light mode. macOS #007AFF is only 3.8:1 on the
+     light base, so DEX uses #0066CC: 5.2-5.6:1, white text on it 5.6:1. */
+  --color-accent: #0066CC;
+  --color-accent-hover: #0058B0;
+  --color-accent-dark: #004A94;         /* pressed/active in light mode */
+  --color-accent-light: rgba(0, 102, 204, 0.12);
+  --color-accent-soft: rgba(0, 102, 204, 0.08);
+  --color-accent-muted: rgba(0, 102, 204, 0.10);
+  --color-accent-text: #FFFFFF;
 
   /* Translucent neutral surfaces + scrim -- dark-on-light for light theme. */
   --color-surface-1: rgba(0, 0, 0, 0.03);
