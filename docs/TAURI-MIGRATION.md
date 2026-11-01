@@ -84,8 +84,16 @@ name, Windows trailing dots/spaces stripped; unix also refuses exec-bit files). 
 `{ success:false, error }`. Renderer callers fixed: Workflows "Open URL" now uses
 openExternal (was openPath), "Open App" uses `launcher:quick` (installed-apps index);
 Files double-click toasts the refusal; account card honours `success:false`. Tests:
-`cargo test --release --bin dex-tauri shell_open_policy`. Still open (not this pass):
-`launcher:launchPath` spawns any path it's given — same class of hole.
+`cargo test --release --bin dex-tauri shell_open_policy`.
+**Launcher follow-up (same day):** `launcher:launchPath` used to spawn any path, and
+`launcher:launch` forwarded renderer args verbatim (Program Files is scanned, so
+`launch("pwsh", ["-c", …])` worked). Now in src-tauri/src/launcher_ctl.rs `launchPath` only
+runs a path already in the launcher index (apps.json; Windows match is case/separator-
+insensitive) and then goes through `launch_app` (records use). Every launch arg must pass
+`check_open_path` (existing local non-executable document), so "open file with app" still
+works but flags/command strings are refused. No renderer code calls `launchPath` or passes
+args. Tests: `launch_policy_tests`. Residual: `launcher:setConfig` `customPaths` lets the
+renderer add scan roots, so a payload already on disk could be indexed and then launched.
 
 **RELEASED v6.1.0 (2026-07-03):** merged to main (fast-forward), bumped 4 version files +
 CHANGELOG, built MSI (`bundle.targets` now `["nsis","msi"]` — owner reversed the 6.0.1
