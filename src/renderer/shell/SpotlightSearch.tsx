@@ -675,7 +675,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
               WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
               border: '1px solid var(--color-border)',
-              borderRadius: 10,
+              borderRadius: 8,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
@@ -751,7 +751,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           backdropFilter: 'var(--glass-blur, blur(24px))',
           WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
           border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-          borderRadius: 10,
+          borderRadius: 8,
           boxShadow: 'var(--pg-shadow-modal)',
           overflow: 'hidden',
         }}
@@ -890,7 +890,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
                   padding: '1px 5px', fontSize: 10,
                   background: 'var(--color-bg-hover)',
                   border: '1px solid var(--color-border-subtle)',
-                  borderRadius: 3, color: 'var(--color-text-tertiary)',
+                  borderRadius: 4, color: 'var(--color-text-tertiary)',
                   fontFamily: 'var(--font-family)',
                   lineHeight: '14px',
                 }}>{k}</kbd>

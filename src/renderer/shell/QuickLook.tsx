@@ -114,7 +114,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
         style={{
           width: 'min(720px, 85vw)',
           maxHeight: '80vh',
-          borderRadius: 10,
+          borderRadius: 8,
           background: 'var(--color-bg-elevated)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-popover)',

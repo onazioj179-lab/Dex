@@ -739,7 +739,7 @@ const UpdateManagerSection: React.FC = () => {
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 24, borderRadius: 12, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
+    width: 44, height: 24, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
@@ -760,7 +760,7 @@ const UpdateManagerSection: React.FC = () => {
     <div style={{ flex: 1, padding: '0 var(--space-6) var(--space-6)', overflowY: 'auto' as const }}>
       {/* Status Banner */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 10,
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 8,
         background: info.updateAvailable ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'var(--color-success-muted, rgba(48,209,88,0.08))',
         border: `1px solid ${info.updateAvailable ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'var(--color-success-muted, rgba(48,209,88,0.2))'}`,
         marginBottom: 'var(--space-5)',
@@ -2937,7 +2937,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 8,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -2994,7 +2994,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
       <div style={{
-        padding: 'var(--space-4)', borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 8,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -3480,7 +3480,7 @@ export const Settings: React.FC = () => {
                     aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
                   />
                   <span style={{
-                    position: 'absolute', inset: 0, borderRadius: 10,
+                    position: 'absolute', inset: 0, borderRadius: 8,
                     background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
@@ -3535,7 +3535,7 @@ export const Settings: React.FC = () => {
       
       {/* Creator Watermark */}
       <div style={{
-        padding: 'var(--space-5)', borderRadius: '10px', marginBottom: 'var(--space-5)',
+        padding: 'var(--space-5)', borderRadius: '8px', marginBottom: 'var(--space-5)',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
         border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
         position: 'relative', overflow: 'hidden',
@@ -3644,7 +3644,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 8, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3942,7 +3942,7 @@ export const Settings: React.FC = () => {
                   style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
                 />
                 <span style={{
-                  position: 'absolute', inset: 0, borderRadius: 10,
+                  position: 'absolute', inset: 0, borderRadius: 8,
                   background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
@@ -4137,38 +4137,64 @@ export const Settings: React.FC = () => {
   // ===========================================================================
   // KEYBOARD SHORTCUTS SETTINGS
   // ===========================================================================
+  // The real global shortcuts, read from their handlers: CommandPalette.tsx
+  // (Ctrl+K), UnifiedSystems.tsx (Ctrl+Shift+F) and AppManager.tsx's keydown
+  // handler (everything else). This page used to list three bindings that were
+  // all wrong (Ctrl+Shift+P did nothing; Ctrl+Shift+S is split view, not a
+  // screenshot) and pointed to a customization screen that does not exist.
+  // Keep this list in sync when a handler changes.
   const renderKeyboardSettings = () => {
-    const shortcuts = [
-      { key: 'cmdPaletteShortcut' as const, label: 'Command Palette', desc: 'Open the command palette' },
-      { key: 'quickSearchShortcut' as const, label: 'Quick Search', desc: 'Focus the search bar' },
-      { key: 'screenshotShortcut' as const, label: 'Screenshot', desc: 'Capture a screenshot' },
+    const groups: { title: string; rows: [string, string][] }[] = [
+      { title: 'Everywhere', rows: [
+        [`${_M}+K`, 'Command palette'],
+        [`${_M}+Shift+F`, 'Search everything'],
+        [`${_M}+1 … ${_M}+9`, 'Open Home, Settings, Files, Notes, Tasks, Browser, Gallery, Calendar, Kanban'],
+        [`${_M}+Alt+1 … 9`, 'Switch to Project Space 1–9'],
+        [`${_M}+Tab / ${_M}+Shift+Tab`, 'App switcher'],
+      ] },
+      { title: 'Apps & windows', rows: [
+        [`${_M}+W`, 'Close the current app'],
+        [`${_M}+Shift+W`, 'Close all apps'],
+        [`${_M}+Shift+E`, 'Float / re-dock the current app'],
+        [`${_M}+${String.fromCharCode(92)}`, 'Immersive focus (Esc to leave)'],
+        [`${_M}+Shift+S`, 'Leave split view, or open the app menu'],
+      ] },
+      { title: 'Tiling', rows: [
+        ['Win+Left / Right', 'Snap to the left / right half'],
+        ['Win+Up / Down', 'Maximize / minimize'],
+        ['Alt+Shift+Arrows', 'Top / bottom half, top quadrants'],
+        ['Alt+Shift+1 … 6', 'Arrange all windows with a layout'],
+        ['Win+` or Ctrl+Alt+`', 'Cycle floating windows'],
+      ] },
     ];
-
+    const keyStyle: React.CSSProperties = {
+      padding: '4px var(--space-3)', borderRadius: 4, whiteSpace: 'nowrap',
+      background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+      fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
+      fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
+    };
     return (
       <div style={styles.settingsContent}>
-        <h3 style={styles.sectionTitleFirst}>Shortcut Bindings</h3>
-        {shortcuts.map(sc => (
-          <div key={sc.key} style={styles.settingRow}>
-            <div style={styles.settingInfo}>
-              <span style={styles.settingLabel}>{sc.label}</span>
-              <span style={styles.settingDesc}>{sc.desc}</span>
-            </div>
-            <div style={{
-              padding: '4px var(--space-3)', borderRadius: 4,
-              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
-            }}>
-              {settings[sc.key]}
-            </div>
-          </div>
+        {groups.map((g, gi) => (
+          <React.Fragment key={g.title}>
+            <h3 style={gi === 0 ? styles.sectionTitleFirst : styles.sectionTitle}>{g.title}</h3>
+            {g.rows.map(([keys, action]) => (
+              <div key={keys} style={styles.settingRow}>
+                <div style={styles.settingInfo}>
+                  <span style={styles.settingLabel}>{action}</span>
+                </div>
+                <kbd style={keyStyle}>{keys}</kbd>
+              </div>
+            ))}
+          </React.Fragment>
         ))}
-        <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
-          Keyboard shortcut customization is available in the Command Palette ({_M}+Shift+P → "Keyboard Shortcuts").
+        <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)' }}>
+          Shortcuts can't be changed yet.
         </div>
       </div>
     );
   };
+
 
   // ===========================================================================
   // STORAGE & DATA SETTINGS
@@ -4308,7 +4334,7 @@ export const Settings: React.FC = () => {
                 onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
+                  padding: '14px var(--space-2)', borderRadius: 8, cursor: 'pointer',
                   background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
                   border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
                   transition: 'all 0.15s ease',
@@ -4336,13 +4362,13 @@ export const Settings: React.FC = () => {
         {/* Detail Panel */}
         {detail && selectedCreativeApp && (
           <div style={{
-            background: 'var(--color-bg-surface)', borderRadius: 10,
+            background: 'var(--color-bg-surface)', borderRadius: 8,
             border: `1px solid ${detail.color}33`, padding: 'var(--space-4)',
           }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 10,
+                width: 48, height: 48, borderRadius: 8,
                 background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
@@ -4717,7 +4743,7 @@ export const Settings: React.FC = () => {
                         display: 'inline-block', marginTop: 3, fontSize: 9.5, fontWeight: 600,
                         textTransform: 'uppercase' as const, letterSpacing: '0.04em',
                         color: 'var(--color-text-tertiary)',
-                        padding: '1px 6px', borderRadius: 3,
+                        padding: '1px 6px', borderRadius: 4,
                         background: 'var(--color-bg-hover)',
                       }}>{r.section?.name || r.entry.section}</span>
                     </span>
@@ -5082,7 +5108,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggle: {
     width: '44px',
     height: '24px',
-    borderRadius: '12px',
+    borderRadius: '11px',
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
@@ -5173,7 +5199,7 @@ const styles: Record<string, React.CSSProperties> = {
   aboutDetails: {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     padding: '4px var(--space-4)',
     marginBottom: 'var(--space-6)',
   },

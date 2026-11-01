@@ -361,7 +361,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
               left: 0, top: 0,
               width: rect.w + 8,
               height: rect.h + 8,
-              borderRadius: 15,
+              borderRadius: 14,
               border: isHovered
                 ? '2px solid var(--color-accent)'
                 : app.id === activeAppId
@@ -378,7 +378,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 left: 4, top: 4,
                 width: rect.w,
                 height: rect.h,
-                borderRadius: 12,
+                borderRadius: 11,
                 background: 'var(--color-bg-surface)',
                 border: '1px solid var(--color-border-subtle)',
                 display: 'flex',
@@ -389,7 +389,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
               }}>
                 <div style={{
                   width: 44, height: 44,
-                  borderRadius: 10,
+                  borderRadius: 8,
                   background: app.color || 'var(--color-bg-hover)',
                   display: 'flex',
                   alignItems: 'center',

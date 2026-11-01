@@ -123,9 +123,9 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Creator Access', section: 'creator', desc: 'Owner-only Creative Full Access unlock', keywords: 'owner creator unlock signature' },
 
   // ---------------- Keyboard Shortcuts ----------------
-  { label: 'Command Palette', section: 'keyboard', desc: 'Open the command palette', keywords: 'shortcut hotkey palette' },
-  { label: 'Quick Search', section: 'keyboard', desc: 'Focus the search bar', keywords: 'shortcut hotkey search' },
-  { label: 'Screenshot', section: 'keyboard', desc: 'Capture a screenshot', keywords: 'shortcut hotkey capture' },
+  { label: 'Command palette shortcut', section: 'keyboard', desc: 'Ctrl+K opens the command palette', keywords: 'shortcut hotkey palette ctrl k' },
+  { label: 'Search everything shortcut', section: 'keyboard', desc: 'Ctrl+Shift+F searches everything', keywords: 'shortcut hotkey search find' },
+  { label: 'Window tiling shortcuts', section: 'keyboard', desc: 'Snap, maximize and arrange windows', keywords: 'shortcut hotkey snap tile window layout' },
 
   // ---------------- Files ----------------
   { label: 'Show Hidden Files', section: 'files', desc: 'Display hidden files and folders', keywords: 'dotfiles hidden files' },

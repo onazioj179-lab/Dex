@@ -188,7 +188,7 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
         zIndex: 'var(--z-popover, 9000)' as React.CSSProperties['zIndex'],
         background: 'var(--color-bg-elevated, #111111)',
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 10,
+        borderRadius: 8,
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 10,
         animation: 'qcPop 0.12s ease-out',

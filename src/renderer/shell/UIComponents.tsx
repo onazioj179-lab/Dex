@@ -365,7 +365,7 @@ export const DexSlider: React.FC<{
             left: '50%',
             transform: 'translateX(-50%)',
             padding: '2px 6px',
-            borderRadius: 3,
+            borderRadius: 4,
             background: 'rgba(0,0,0,0.75)',
             color: '#fff',
             fontSize: 10,

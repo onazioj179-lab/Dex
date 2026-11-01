@@ -278,7 +278,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
   const ctrlBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 10, border: 'none', padding: 0,
+    width: 32, height: 32, borderRadius: 8, border: 'none', padding: 0,
     background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer',
     transition: 'background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease',
   };
@@ -566,7 +566,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
             title="Hide the DEX Bar (re-enable in Settings > Shell & Dock)"
             aria-label="Hide DEX Bar"
             style={{
-              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 7,
+              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 6,
               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
               background: 'transparent', cursor: 'pointer', fontSize: 11,
               color: 'var(--color-text-secondary)', transition: 'background 0.12s ease',

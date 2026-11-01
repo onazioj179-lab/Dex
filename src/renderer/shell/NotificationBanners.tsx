@@ -787,7 +787,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('timeline')}
                 style={{
-                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
                   background: viewMode === 'timeline' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'timeline' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -799,7 +799,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('grouped')}
                 style={{
-                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
                   background: viewMode === 'grouped' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'grouped' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
