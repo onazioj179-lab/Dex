@@ -26,7 +26,7 @@ function fmt(t: number): string {
 
 const iconBtn: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 28, height: 28, borderRadius: 8,
+  width: 28, height: 28, borderRadius: 10,
   background: 'transparent', border: 'none', cursor: 'pointer',
   color: 'var(--color-text-secondary)', flexShrink: 0,
   transition: 'background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out)',
@@ -130,7 +130,7 @@ export const MiniPlayer: React.FC = () => {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
         </button>
         <button
-          style={{ ...iconBtn, width: 34, height: 34, background: 'var(--color-accent)', color: 'var(--color-accent-text)' }}
+          style={{ ...iconBtn, width: 34, height: 34, background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)' }}
           onClick={toggle} aria-label={isPlaying ? 'Pause' : 'Play'}>
           {isPlaying ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
@@ -162,7 +162,7 @@ export const MiniPlayer: React.FC = () => {
           onClick={onSeek}
           style={{ flex: 1, height: 4, borderRadius: 'var(--radius-full)', background: 'var(--color-bg-hover)', cursor: 'pointer', position: 'relative' }}
         >
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'var(--color-accent)', borderRadius: 'var(--radius-full)' }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'var(--color-accent-fill)', borderRadius: 'var(--radius-full)' }} />
         </div>
         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', width: 30 }}>{fmt(duration)}</span>
       </div>

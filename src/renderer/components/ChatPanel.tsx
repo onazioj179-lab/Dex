@@ -247,7 +247,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 36,
     height: 36,
     borderRadius: '50%',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     border: 'none',
     display: 'flex',
     alignItems: 'center',

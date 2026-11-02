@@ -724,7 +724,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     duration: 4000,
     layers: [
       { id: 'l1', name: 'Bell', type: 'shape', animations: ['pop-in', 'shake'], properties: { icon: 'bell' } },
-      { id: 'l2', name: 'Subscribe Button', type: 'shape', animations: ['slide-in-left', 'pulse'], properties: { width: 120, height: 40, color: '#ff0000', borderRadius: 3 } },
+      { id: 'l2', name: 'Subscribe Button', type: 'shape', animations: ['slide-in-left', 'pulse'], properties: { width: 120, height: 40, color: '#ff0000', borderRadius: 4 } },
       { id: 'l3', name: 'Text', type: 'text', animations: ['fade-in'], properties: { text: 'SUBSCRIBE', fontSize: 14, fontWeight: 600, color: '#ffffff' } },
     ],
     editableFields: [

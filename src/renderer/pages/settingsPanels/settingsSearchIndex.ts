@@ -109,6 +109,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Reduce Motion', section: 'accessibility', desc: 'Minimize animations and motion effects', keywords: 'animation accessibility' },
 
   // ---------------- Window Management ----------------
+  { label: 'Spatial Desktop', section: 'window', desc: 'Infinite canvas: pan, zoom, group and arrange windows', keywords: 'canvas zoom pan infinite workspace minimap groups arrange spatial' },
   { label: 'App Tab Bar', section: 'window', desc: 'Show running app tabs above the content area', keywords: 'tabs window' },
   { label: 'Window Button Style', section: 'window', desc: 'Choose the style of window control buttons', keywords: 'controls traffic lights window' },
 

@@ -885,7 +885,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   savePresetBtn: {
     padding: '6px var(--space-4)', borderRadius: 10, border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetChips: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' },

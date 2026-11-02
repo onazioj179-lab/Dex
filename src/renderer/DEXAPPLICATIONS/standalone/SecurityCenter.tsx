@@ -13,6 +13,7 @@ import { AppShell } from '../../components/appShell';
 import type { MenuGroup } from '../../components/appShell/menuTypes';
 import {
   getUkiActionAudit,
+  clearUkiActionAudit,
   registerUkiAppAction,
   unregisterUkiAppAction,
   type UkiActionAuditEntry,
@@ -26,9 +27,10 @@ const OUTCOME_COLOR: Record<UkiActionOutcome, string> = {
   denied: colors.semantic.warning,
   failed: colors.semantic.error,
   blocked: colors.text.tertiary,
+  cancelled: colors.text.tertiary,
 };
 const OUTCOME_LABEL: Record<UkiActionOutcome, string> = {
-  ran: 'Ran', denied: 'Denied', failed: 'Failed', blocked: 'Blocked',
+  ran: 'Ran', denied: 'Denied', failed: 'Failed', blocked: 'Blocked', cancelled: 'Cancelled',
 };
 
 type Filter = 'all' | 'mutations' | UkiActionOutcome;
@@ -139,6 +141,16 @@ const SecurityCenter: React.FC = () => {
               color: filter === f.id ? colors.accent.default : colors.text.secondary,
             }}>{f.label}</button>
           ))}
+          {stats.total > 0 && (
+            <button
+              onClick={() => { if (window.confirm('Clear the UKI activity log? This cannot be undone.')) clearUkiActionAudit(); }}
+              aria-label="Clear UKI activity log"
+              style={{
+                marginLeft: 'auto', height: 26, padding: '0 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: radius.md,
+                border: '1px solid var(--color-border-control)', background: 'transparent', color: colors.text.secondary,
+              }}
+            >Clear log</button>
+          )}
         </div>
 
         {/* Audit list */}
@@ -162,7 +174,7 @@ const SecurityCenter: React.FC = () => {
               }}>{OUTCOME_LABEL[e.outcome]}</span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ color: colors.text.primary, fontWeight: 600, fontFamily: fontStack.mono }}>{e.id}</span>
-                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 3, padding: '0 4px', textTransform: 'uppercase' }}>write</span>}
+                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 4, padding: '0 4px', textTransform: 'uppercase' }}>write</span>}
                 <span style={{ display: 'block', color: colors.text.secondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.result}</span>
               </span>
               <span style={{ color: colors.text.tertiary }}>{e.appId}</span>

@@ -61,7 +61,7 @@ const readoutStyle: React.CSSProperties = {
 const readoutInputStyle: React.CSSProperties = {
   width: '100%', minWidth: 0, boxSizing: 'border-box',
   background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)',
-  borderRadius: 3, color: 'var(--color-text-secondary)',
+  borderRadius: 4, color: 'var(--color-text-secondary)',
   fontSize: 9, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
   padding: '1px 3px', textAlign: 'right', outline: 'none',
 };
@@ -277,7 +277,7 @@ export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120
             style={{
               position: 'absolute', left: -2, right: -2,
               top: `calc(${masterRatio * 100}% - 1.5px)`,
-              height: 3, background: 'var(--color-accent)',
+              height: 3, background: 'var(--color-accent-fill)',
               boxShadow: '0 0 2px rgba(0,0,0,0.8)',
               pointerEvents: 'none',
             }}

@@ -79,7 +79,7 @@ const actionButton = (disabled: boolean): React.CSSProperties => ({
   padding: '6px 14px',
   fontSize: 12,
   fontWeight: 600,
-  borderRadius: 9,
+  borderRadius: 10,
   background: G_PANEL2,
   border: `1px solid ${G_BORDER}`,
   color: '#f1ece5',
@@ -294,7 +294,7 @@ export default function Games(): React.ReactElement {
           {totalPlaySec >= 60 && (
             <section style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
-              padding: 18, marginBottom: 'var(--space-4)', borderRadius: 16,
+              padding: 18, marginBottom: 'var(--space-4)', borderRadius: 18,
               background: G_PANEL, border: `1px solid ${G_BORDER}`,
             }}>
               <div>
@@ -306,7 +306,7 @@ export default function Games(): React.ReactElement {
                 <div style={{ display: 'flex', gap: 10 }}>
                   {topGames.map(({ g, sec }) => (
                     <div key={g.id} title={`${g.title} — ${formatHours(sec)}`} style={{
-                      textAlign: 'center', minWidth: 84, padding: '11px 9px', borderRadius: 13,
+                      textAlign: 'center', minWidth: 84, padding: '11px 9px', borderRadius: 14,
                       background: G_PANEL2, border: `1px solid ${G_BORDER}`,
                     }}>
                       <div style={{

@@ -701,7 +701,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     width: 28, height: 28, borderRadius: 10, border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 16, cursor: 'pointer',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', fontSize: 16, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   addPanel: {
@@ -768,7 +768,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
     color: 'var(--color-success, #30D158)',
     border: '1px solid var(--color-success, #30D158)',
-    borderRadius: 8, padding: '1px 5px',
+    borderRadius: 10, padding: '1px 5px',
   },
   emptyState: {
     flex: 1, display: 'flex', flexDirection: 'column' as const,
@@ -779,7 +779,7 @@ const s: Record<string, React.CSSProperties> = {
   emptyHint: { fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 260 },
   emptyCta: {
     marginTop: 'var(--space-2)', padding: '7px 16px', borderRadius: 10,
-    border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
+    border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
     fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
 };

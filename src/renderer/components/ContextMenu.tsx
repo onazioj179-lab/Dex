@@ -132,7 +132,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         maxHeight: 'calc(100vh - 32px)',
         overflowY: 'auto',
         padding: '5px 0',
-        borderRadius: 12,
+        borderRadius: 14,
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px var(--color-border-subtle), var(--pg-gloss-top)',
         animation: 'ctxFadeIn 0.16s var(--ease-tahoe, cubic-bezier(0.23, 1, 0.32, 1))',
       } as React.CSSProperties}
@@ -216,7 +216,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                   left: subDir === 'right' ? '100%' : undefined,
                   right: subDir === 'left' ? '100%' : undefined,
                   minWidth: 160, maxWidth: 'min(220px, calc(100vw - 16px))', maxHeight: 320, overflowY: 'auto',
-                  padding: '5px 0', borderRadius: 12,
+                  padding: '5px 0', borderRadius: 14,
                   // Liquid glass, matching the parent .dex-liquid-glass menu so a
                   // submenu reads as the same material rather than a solid slab.
                   background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',

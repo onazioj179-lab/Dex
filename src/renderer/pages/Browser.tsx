@@ -2356,7 +2356,7 @@ export const Browser: React.FC = () => {
                 <div
                   style={{
                     ...styles.toggleTrack,
-                    background: browserSettings[item.key] ? 'var(--color-success)' : 'var(--color-bg-hover)',
+                    background: browserSettings[item.key] ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                   }}
                   onClick={() => setBrowserSettings(s => ({ ...s, [item.key]: !s[item.key] }))}
                 >
@@ -2500,7 +2500,7 @@ export const Browser: React.FC = () => {
                     <input name="expiry" required placeholder="MM/YY" autoComplete="off" maxLength={5}
                       style={{ padding: '6px var(--space-2)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                       <button type="button" aria-label="Cancel adding card" onClick={() => setShowAddCard(false)} style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                     </div>
                   </form>
@@ -2539,7 +2539,7 @@ export const Browser: React.FC = () => {
           <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px' }}>Username: {savePrompt.username}</div>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button onClick={() => { savePassword(savePrompt.domain, savePrompt.username, savePrompt.password); setSavePrompt(null); }}
-              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
             <button onClick={() => setSavePrompt(null)}
               style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Never</button>
           </div>
@@ -2777,7 +2777,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '5px',
     height: '5px',
     borderRadius: '50%',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     flexShrink: 0,
   },
   loadingDot: {
@@ -2848,7 +2848,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '5px',
     height: '5px',
     borderRadius: '50%',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
   },
 
   // --- Address bar (Safari-style toolbar) ---
@@ -2938,7 +2938,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '320px',
     maxHeight: '420px',
-    borderRadius: '12px',
+    borderRadius: '14px',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 9999,
     overflow: 'hidden',
@@ -3027,7 +3027,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: '76px',
     right: '12px',
     width: '280px',
-    borderRadius: '12px',
+    borderRadius: '14px',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 100,
     overflow: 'hidden',
@@ -3120,7 +3120,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '280px',
     maxHeight: '460px',
-    borderRadius: '12px',
+    borderRadius: '14px',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 200,
     overflow: 'hidden',
@@ -3300,7 +3300,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   errorBtn: {
     padding: '9px 22px',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     border: 'none',
     borderRadius: '10px',
     color: 'var(--color-accent-text)',

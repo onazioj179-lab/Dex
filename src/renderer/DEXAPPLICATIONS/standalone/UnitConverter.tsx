@@ -355,7 +355,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) var(--space-4) 0', flexShrink: 0,
   },
   search: {
-    width: '100%', padding: '8px var(--space-3)', borderRadius: 12,
+    width: '100%', padding: '8px var(--space-3)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
@@ -392,12 +392,12 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
   },
   select: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 12,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
     cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
   },
   input: {
-    width: '100%', padding: '14px var(--space-4)', borderRadius: 12,
+    width: '100%', padding: '14px var(--space-4)', borderRadius: 14,
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 300,
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
@@ -406,7 +406,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', alignItems: 'stretch', gap: 'var(--space-2)',
   },
   resultDisplay: {
-    flex: 1, padding: '14px var(--space-4)', borderRadius: 12,
+    flex: 1, padding: '14px var(--space-4)', borderRadius: 14,
     background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
@@ -414,7 +414,7 @@ const s: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   copyBtn: {
-    width: 44, borderRadius: 12, flexShrink: 0,
+    width: 44, borderRadius: 14, flexShrink: 0,
     color: 'var(--color-text-secondary)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.15s ease',

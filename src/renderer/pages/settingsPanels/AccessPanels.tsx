@@ -46,7 +46,7 @@ const TITLE: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginTop: '
 const SECTION: React.CSSProperties = {
   background: 'var(--color-bg-elevated)',
   border: '1px solid var(--color-border-subtle)',
-  borderRadius: 8,
+  borderRadius: 10,
   padding: '4px 14px',
 };
 const BTN: React.CSSProperties = {
@@ -65,7 +65,7 @@ const BTN_DANGER: React.CSSProperties = {
 };
 const BTN_PRIMARY: React.CSSProperties = {
   ...BTN,
-  background: 'var(--color-accent)',
+  background: 'var(--color-accent-fill)',
   color: 'var(--color-accent-text)',
   border: 'none',
 };
@@ -347,24 +347,27 @@ interface SnapPrefs {
 function loadSnapPrefs(): SnapPrefs {
   try {
     const raw = localStorage.getItem(SNAP_PREFS_KEY);
-    if (raw) return { enabled: true, gutter: 8, cycleOnRepeat: true, ...JSON.parse(raw) };
+    if (raw) return { enabled: true, gutter: 6, cycleOnRepeat: true, ...JSON.parse(raw) };
   } catch { /* ignore */ }
-  return { enabled: true, gutter: 8, cycleOnRepeat: true };
+  return { enabled: true, gutter: 6, cycleOnRepeat: true };
 }
 
 function saveSnapPrefs(p: SnapPrefs): void {
   try { localStorage.setItem(SNAP_PREFS_KEY, JSON.stringify(p)); } catch { /* ignore */ }
 }
 
+// The real bindings (AppManager.tsx keydown handler + detectDragSnapZone).
 const SHORTCUTS: { keys: string; label: string }[] = [
-  { keys: 'Ctrl + Alt + ←', label: 'Snap to left half (repeat for thirds)' },
-  { keys: 'Ctrl + Alt + →', label: 'Snap to right half (repeat for thirds)' },
-  { keys: 'Ctrl + Alt + ↑', label: 'Maximize' },
-  { keys: 'Ctrl + Alt + ↓', label: 'Restore / center' },
-  { keys: 'Ctrl + Alt + 1..4', label: 'Snap to corner quadrant' },
-  { keys: 'Drag to top edge', label: 'Maximize' },
-  { keys: 'Drag to side edge', label: 'Snap to half' },
-  { keys: 'Drag to corner', label: 'Snap to quadrant' },
+  { keys: 'Ctrl + Alt + ← / Win + ←', label: 'Snap to the left half (repeat: two-thirds, then one-third)' },
+  { keys: 'Ctrl + Alt + → / Win + →', label: 'Snap to the right half (repeat: two-thirds, then one-third)' },
+  { keys: 'Win + ↑', label: 'Maximize' },
+  { keys: 'Ctrl + Alt + ↓ / Win + ↓', label: 'Minimize / restore' },
+  { keys: 'Alt + Shift + ↑ / ↓', label: 'Top / bottom half' },
+  { keys: 'Alt + Shift + ← / →', label: 'Top-left / top-right quadrant' },
+  { keys: 'Double-click the title bar', label: 'Maximize / restore' },
+  { keys: 'Drag to the top or bottom edge', label: 'Top / bottom half' },
+  { keys: 'Drag to a side edge', label: 'Left / right half' },
+  { keys: 'Drag to a corner', label: 'Quadrant' },
 ];
 
 export const SnapLayoutsPanel: React.FC = () => {
@@ -407,7 +410,7 @@ export const SnapLayoutsPanel: React.FC = () => {
         <div style={ROW}>
           <div>
             <div style={LABEL}>Cycle on repeat</div>
-            <div style={DESC}>Press the same shortcut again to cycle half → third → two-thirds.</div>
+            <div style={DESC}>Press the same side shortcut again to cycle half → two-thirds → one-third.</div>
           </div>
           <input
             type="checkbox"

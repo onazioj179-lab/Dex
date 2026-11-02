@@ -117,7 +117,7 @@ const Slider: React.FC<{
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress * 100}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress * 100}%`, background: 'var(--color-accent-fill)', borderRadius: 2 }} />
       <div style={{ position: 'absolute', top: '50%', left: `${progress * 100}%`, transform: 'translate(-50%,-50%)', width: 8, height: 8, borderRadius: 4, background: 'var(--color-text-primary)' }} />
     </div>
   );
@@ -788,7 +788,7 @@ const CurvesEditor: React.FC<{
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          style={{ width: '100%', maxWidth: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none', display: 'block' }}
+          style={{ width: '100%', maxWidth: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none', display: 'block' }}
           onPointerDown={handleSvgPointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -984,7 +984,7 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 3, border: '1px solid var(--color-border-subtle)', display: 'block' }}
+      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'block' }}
     />
   );
 });

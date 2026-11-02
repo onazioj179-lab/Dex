@@ -3,7 +3,8 @@
  * DEX Design System v7.0 -- Dark with Soul
  * ===========================================================================
  *
- * Single source of truth. #0C0C0E rich charcoal base, #32D74B Omnitrix-green accent.
+ * Single source of truth. macOS-style: #111215 graphite base, #0A84FF system-blue accent
+ * (#0066CC in light mode for AA contrast). Every text/accent pair is contrast-checked.
  * 4px grid. Subtle accent glows. Deep shadows. Alive.
  *
  * @author     Onazi Treasure OJ
@@ -33,26 +34,26 @@
   --font-scale: 1;
   --density-scale: 1;
 
-  /* Backgrounds -- Rich Charcoal (lifted from true black for depth) */
-  --color-bg-base: #0C0C0E;
-  --color-bg-surface: #161618;
-  --color-bg-surface-solid: #161618;
-  --color-bg-inset: #101012;
-  --color-bg-hover: #1E1E22;
-  --color-bg-active: #252528;
-  --color-bg-overlay: #0E0E10;
+  /* Backgrounds -- Golden Modern graphite (neutral, slightly cool) */
+  --color-bg-base: #111215;
+  --color-bg-surface: #1C1C1E;
+  --color-bg-surface-solid: #1C1C1E;
+  --color-bg-inset: #161618;
+  --color-bg-hover: #2A2A2D;
+  --color-bg-active: #333336;
+  --color-bg-overlay: #151517;
   /* "Glass" fills (master overhaul: real liquid glass again). Translucent
      surfaces paired with the adaptive backdrop blur in glassMenu.ts, so every
      menu / dropdown / popover / sidebar / toolbar / panel that consumes these
      reads as one consistent frosted material. ~hundreds of consumers re-glass
      with no per-site edits. Conservative alphas keep text readable; weak GPUs
      (perf-tier "low") and reduced-transparency fall back to solid below. */
-  --color-bg-glass: rgba(22, 22, 26, 0.74);
-  --color-bg-glass-strong: rgba(16, 16, 20, 0.86);
-  --color-bg-blur: #121214;
-  --color-bg-secondary: #121214;
-  --color-bg-elevated: #1A1A1E;
-  --color-bg-tertiary: #1E1E22;
+  --color-bg-glass: rgba(28, 28, 30, 0.74);
+  --color-bg-glass-strong: rgba(21, 21, 23, 0.86);
+  --color-bg-blur: #18181A;
+  --color-bg-secondary: #18181A;
+  --color-bg-elevated: #2C2C2E;
+  --color-bg-tertiary: #2C2C2E;
 
   /* Home desktop surface -- unified workspace legibility (v5.5 Desktop initiative).
      The Home is one desktop surface, not a stack of opaque cards. Content sits on
@@ -63,27 +64,32 @@
   /* SOLID desktop (owner killed the wallpaper): the home widgets must be opaque
      cards or they vanish against the flat background, so the scrim is now a solid
      surface, not a translucent tint over a wallpaper. */
-  --dex-desktop-scrim: var(--color-bg-surface, #161618);
-  --dex-desktop-scrim-hover: var(--color-bg-hover, #1e1e22);
+  --dex-desktop-scrim: var(--color-bg-surface, #1C1C1E);
+  --dex-desktop-scrim-hover: var(--color-bg-hover, #2A2A2D);
   --dex-desktop-text-shadow: none;
   --dex-desktop-object-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 
-  /* Text -- Crisp whites with visible secondary */
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #B8B8BD;
+  /* Text -- warm off-white (17:1 on base) with visible secondary (9:1) */
+  --color-text-primary: #F5F5F7;
+  --color-text-secondary: #AEAEB2;
   --color-text-tertiary: #8E8E93;
   --color-text-muted: #A0A0A5;
   --color-text-disabled: #58585D;
   --color-text-inverse: #000000;
   --color-text-code: #F0F0F2;
 
-  /* Accent -- Omnitrix Green (hero default) */
-  --color-accent: #32D74B;
-  --color-accent-hover: #5FE073;        /* lighter -- hover */
-  --color-accent-dark: #27A83B;         /* darker -- pressed/active, gradient ends */
-  --color-accent-light: rgba(50, 215, 75, 0.14);
-  --color-accent-soft: rgba(50, 215, 75, 0.08);
-  --color-accent-muted: rgba(50, 215, 75, 0.10);
+  /* Accent -- macOS system blue (dark appearance): 5.1:1 on base, 4.6:1 on
+     surface. Focus, selection, toggles and primary actions only. */
+  --color-accent: #0A84FF;
+  --color-accent-hover: #409CFF;        /* lighter -- hover */
+  --color-accent-dark: #0071E3;         /* darker -- pressed/active, gradient ends */
+  /* Filled surfaces with white text (buttons, toggles, selected chips): #0A84FF
+     with white text is 3.65:1 (fails AA); #0071E3 is 4.70:1. Text/links/focus
+     keep --color-accent. */
+  --color-accent-fill: #0071E3;
+  --color-accent-light: rgba(10, 132, 255, 0.14);
+  --color-accent-soft: rgba(10, 132, 255, 0.08);
+  --color-accent-muted: rgba(10, 132, 255, 0.10);
 
   /* Translucent neutral surfaces -- subtle fills that must stay see-through
      (so they sit on glass/wallpaper) and therefore can't map to the opaque
@@ -107,6 +113,9 @@
      index.html boot block, which runtime components depended on — now owned
      here (the boot block mirrors these values). Shadow alphas carry the
      GOAL-6D intensity -40% pass. */
+  /* Text ON the accent (filled buttons, toggle knobs): white, 3.65:1 on
+     #0A84FF (meets 3:1 for controls; small labels on blue fills should prefer
+     --color-accent-dark, 4.7:1). White on the previous green was ~1.9:1. */
   --color-accent-text: #FFFFFF;
   /* Alias: some surfaces (e.g. Audio.tsx) reference --color-text-on-accent.
      The canonical name is --color-accent-text; this alias makes those
@@ -137,10 +146,13 @@
   --color-app-maps: #0A84FF;
 
   /* Borders -- Visible on charcoal */
-  --color-border: rgba(255, 255, 255, 0.14);
+  --color-border: rgba(255, 255, 255, 0.16);  /* ~#38383A on base */
   --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-border-default: rgba(255, 255, 255, 0.14);
+  --color-border-default: rgba(255, 255, 255, 0.16);
   --color-border-strong: rgba(255, 255, 255, 0.22);
+  /* Form-control boundaries (inputs, selects): >=3:1 on every surface for
+     WCAG 1.4.11. --color-border stays the subtle decorative divider. */
+  --color-border-control: #6B6D73;
   --color-border-glass: rgba(255, 255, 255, 0.16);
   --color-border-highlight: rgba(255, 255, 255, 0.18);
 
@@ -372,16 +384,16 @@
      Border Radius
      ───────────────────────────────────────────────────────────────────────── */
   
-  /* Apple-scale rounding: the old 2-10px scale read as boxy. Bumped up across
-     the board so cards, panels, menus, inputs, and buttons feel soft and modern.
-     `--radius-full` stays a pill. One scale, so everything rounds together. */
+  /* Golden Modern scale (owner-specified): XS 4 / SM 6 / MD 10 / LG 14 /
+     XL 18 / XXL 24 / Full. One scale, so everything rounds together; inline
+     values are held to it by tests/unit/radius-scale-ratchet.test.ts. */
   --radius-none: 0;
   --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 11px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -415,13 +427,18 @@
   --saturate: saturate(180%);
   
   /* ─────────────────────────────────────────────────────────────────────────
-     Motion — ≤120ms, interruptible
+     Motion — Golden Modern ranges (owner-specified), interruptible:
+       feedback 80-120 · hover/press 120-180 · standard 180-260 ·
+       panel 220-320 · major 280-420. Reduced motion (OS setting or
+       Settings > Accessibility) zeroes these via the rules further down.
      ───────────────────────────────────────────────────────────────────────── */
   
   --duration-instant: 0ms;
-  --duration-fast: 40ms;
-  --duration-normal: 80ms;
-  --duration-slow: 120ms;
+  --duration-fast: 100ms;     /* immediate feedback */
+  --duration-normal: 150ms;   /* hover / press */
+  --duration-slow: 220ms;     /* standard transition */
+  --duration-panel: 260ms;    /* panels, sheets, drawers */
+  --duration-major: 340ms;    /* major layout / workspace changes */
   --duration-theme: 150ms;
   
   --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -469,7 +486,7 @@
   --motion-dock-hover: 120ms var(--ease-out);
   --motion-dock-drag: 90ms var(--ease-out);
   /* Panel motion — expand / collapse / reorganise */
-  --motion-panel-expand: 200ms var(--pg-curve-decelerate);
+  --motion-panel-expand: 240ms var(--pg-curve-decelerate);
   --motion-panel-collapse: 160ms var(--pg-curve-accelerate);
   --motion-panel-reorganize: 240ms var(--ease-spring);
 
@@ -594,6 +611,76 @@
 /* Dark theme aliases -- :root is already Tahoe dark, these selectors just mirror it */
 [data-theme="dark"], .dark-mode, :root.dark-mode {
   /* Tahoe dark is the default -- no overrides required */
+}
+
+/* Always-dark subtree (pro creative apps, e.g. Imosion -- DAWs stay dark like
+   Ableton / FL / Pro Tools). Re-declares ONLY the neutral surface, text, border
+   and status tokens with their :root (dark) values, so a light-mode <html>
+   cannot leak light surfaces into it. Accent is deliberately not pinned: a
+   custom accent is set inline on <html> and must flow through. Kept in sync
+   with :root by tests/unit/theme-dark-pin.test.ts. */
+.dex-theme-dark {
+  color-scheme: dark;
+  --color-bg-active: #333336;
+  --color-bg-base: #111215;
+  --color-bg-blur: #18181A;
+  --color-bg-elevated: #2C2C2E;
+  --color-bg-glass: rgba(28, 28, 30, 0.74);
+  --color-bg-glass-strong: rgba(21, 21, 23, 0.86);
+  --color-bg-hover: #2A2A2D;
+  --color-bg-inset: #161618;
+  --color-bg-overlay: #151517;
+  --color-bg-secondary: #18181A;
+  --color-bg-surface: #1C1C1E;
+  --color-bg-surface-solid: #1C1C1E;
+  --color-bg-tertiary: #2C2C2E;
+  --color-border: rgba(255, 255, 255, 0.16);
+  --color-border-control: #6B6D73;
+  --color-border-default: rgba(255, 255, 255, 0.16);
+  --color-border-glass: rgba(255, 255, 255, 0.16);
+  --color-border-highlight: rgba(255, 255, 255, 0.18);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-error: #FF453A;
+  --color-error-muted: rgba(255, 69, 58, 0.14);
+  --color-scrim: rgba(0, 0, 0, 0.55);
+  --color-success: #34C759;
+  --color-success-muted: rgba(52, 199, 89, 0.14);
+  --color-surface-1: rgba(255, 255, 255, 0.03);
+  --color-surface-2: rgba(255, 255, 255, 0.06);
+  --color-surface-3: rgba(255, 255, 255, 0.09);
+  --color-text-code: #F0F0F2;
+  --color-text-disabled: #58585D;
+  --color-text-inverse: #000000;
+  --color-text-muted: #A0A0A5;
+  --color-text-primary: #F5F5F7;
+  --color-text-secondary: #AEAEB2;
+  --color-text-tertiary: #8E8E93;
+  --color-warning: #FF9F0A;
+  --color-warning-muted: rgba(255, 159, 10, 0.14);
+  color: var(--color-text-primary);
+}
+/* Spatial desktop. A window culled off-screen skips rendering its contents
+   (the app keeps running; DOM and state are untouched). At low zoom the deep
+   window shadows are dropped -- with dozens of windows they dominate paint. */
+[data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
+[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
+.dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
+.dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
+.dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* The default (non-custom) light accent #0066CC is tuned for light surfaces;
+   on the pinned-dark subtree use the dark-scheme default instead. Skipped when
+   the user picked a custom accent (applyAccentFamily marks <html> with
+   data-dex-custom-accent when it writes the accent inline). */
+:root[data-theme="light"]:not([data-dex-custom-accent]) .dex-theme-dark {
+  --color-accent: #0A84FF;
+  --color-accent-fill: #0071E3;
+  --color-accent-hover: #409CFF;
+  --color-accent-dark: #0071E3;
+  --color-accent-light: rgba(10, 132, 255, 0.14);
+  --color-accent-soft: rgba(10, 132, 255, 0.08);
+  --color-accent-muted: rgba(10, 132, 255, 0.10);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1497,26 +1584,26 @@ html[data-darkroom="on"] {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 [data-theme="light"], .light-mode {
-  /* Backgrounds -- warmer light grays */
-  --color-bg-base: #FAFAFA;
-  --color-bg-surface: #F2F2F4;
-  --color-bg-surface-solid: #F2F2F4;
-  --color-bg-inset: #EAEAEC;
-  --color-bg-hover: #E2E2E5;
-  --color-bg-active: #D8D8DC;
-  --color-bg-overlay: #F7F7F9;
+  /* Backgrounds -- Golden Modern warm paper */
+  --color-bg-base: #F5F5F7;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-solid: #FFFFFF;
+  --color-bg-inset: #EDEDF0;
+  --color-bg-hover: #E9E9ED;
+  --color-bg-active: #DFDFE4;
+  --color-bg-overlay: #FAFAFC;
   /* DEX Sharp full-flat (light theme): opaque solid surfaces. */
-  --color-bg-glass: #F5F5F8;
-  --color-bg-glass-strong: #F0F0F3;
-  --color-bg-blur: #F2F2F4;
-  --color-bg-secondary: #EDEDED;
+  --color-bg-glass: #FFFFFF;
+  --color-bg-glass-strong: #F5F5F7;
+  --color-bg-blur: #F2F2F7;
+  --color-bg-secondary: #F2F2F7;
   --color-bg-elevated: #FFFFFF;
-  --color-bg-tertiary: #E5E5E8;
+  --color-bg-tertiary: #E5E5EA;
 
-  /* Text -- stronger contrast */
-  --color-text-primary: #000000;
-  --color-text-secondary: #3C3C43;
-  --color-text-tertiary: #636366;
+  /* Text -- graphite ink (15:1 on base) */
+  --color-text-primary: #1D1D1F;
+  --color-text-secondary: #636366;
+  --color-text-tertiary: #6C6C70;
   /* was #8E8E93 = 2.9-3.3:1 on the light surfaces (fails WCAG AA for body
      text); #6C6C70 = 4.7-5.2:1 and still lighter than tertiary. */
   --color-text-muted: #6C6C70;
@@ -1524,13 +1611,16 @@ html[data-darkroom="on"] {
   --color-text-inverse: #FFFFFF;
   --color-text-code: #1D1D1F;
 
-  /* Accent -- deeper green for light mode */
-  --color-accent: #1E8E3E;
-  --color-accent-hover: #197A35;
-  --color-accent-dark: #14672C;         /* pressed/active in light mode */
-  --color-accent-light: rgba(30, 142, 62, 0.12);
-  --color-accent-soft: rgba(30, 142, 62, 0.08);
-  --color-accent-muted: rgba(30, 142, 62, 0.10);
+  /* Accent -- system blue for light mode. macOS #007AFF is only 3.8:1 on the
+     light base, so DEX uses #0066CC: 5.2-5.6:1, white text on it 5.6:1. */
+  --color-accent: #0066CC;
+  --color-accent-hover: #0058B0;
+  --color-accent-dark: #004A94;         /* pressed/active in light mode */
+  --color-accent-light: rgba(0, 102, 204, 0.12);
+  --color-accent-soft: rgba(0, 102, 204, 0.08);
+  --color-accent-muted: rgba(0, 102, 204, 0.10);
+  --color-accent-text: #FFFFFF;
+  --color-accent-fill: #0066CC;
 
   /* Translucent neutral surfaces + scrim -- dark-on-light for light theme. */
   --color-surface-1: rgba(0, 0, 0, 0.03);
@@ -1547,11 +1637,12 @@ html[data-darkroom="on"] {
   --color-error-muted: rgba(215, 0, 21, 0.12);
 
   /* Borders -- visible on light */
-  --color-border: #C6C6C8;
-  --color-border-subtle: #D4D4D6;
-  --color-border-default: #C6C6C8;
+  --color-border: #D1D1D6;
+  --color-border-control: #7E7E83;  /* >=3.5:1 on light surfaces */
+  --color-border-subtle: #DCDCE0;
+  --color-border-default: #D1D1D6;
   --color-border-strong: #AEAEB2;
-  --color-border-glass: #C6C6C8;
+  --color-border-glass: #D1D1D6;
   --color-border-highlight: #D0D0D3;
 
   /* Shadows (lighter for white backgrounds) */
@@ -1595,7 +1686,7 @@ html[data-darkroom="on"] {
   width: auto;
   height: auto;
   padding: 8px 20px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
   border-radius: var(--radius-lg);
   font-size: 13px;
@@ -1876,7 +1967,7 @@ img, svg {
   width: 16px;
   height: 2px;
   border-radius: var(--radius-full);
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
 }
 
 .bottomnav-label {
@@ -1946,7 +2037,7 @@ img, svg {
 
 /* Button Variants -- flat, professional */
 .btn-primary {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: var(--color-text-inverse);
   border: 1px solid var(--color-accent);
   box-shadow: none;
@@ -2093,7 +2184,7 @@ img, svg {
 }
 
 .toggle.on {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
 }
 
 .toggle-knob {
@@ -2444,7 +2535,7 @@ img, svg {
 }
 
 .checkbox.checked {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-color: var(--color-accent);
   color: white;
 }
@@ -2497,7 +2588,7 @@ img, svg {
 
 .progress-bar {
   height: 100%;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-radius: var(--radius-full);
   transition: width var(--duration-normal) var(--ease-out);
 }
@@ -3172,7 +3263,7 @@ body,
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   opacity: 0.04;
   pointer-events: none;
   border-radius: inherit;
@@ -3183,7 +3274,7 @@ body,
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   opacity: 0.04;
   pointer-events: none;
   border-radius: inherit;
@@ -3307,7 +3398,7 @@ html[data-perf-tier="low"] *::after {
 .bg-inset { background: var(--color-bg-inset) !important; }
 .bg-hover { background: var(--color-bg-hover) !important; }
 .bg-overlay { background: var(--color-bg-overlay) !important; }
-.bg-accent { background: var(--color-accent) !important; }
+.bg-accent { background: var(--color-accent-fill) !important; }
 .bg-accent-light { background: var(--color-accent-light) !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3353,7 +3444,7 @@ html[data-perf-tier="low"] *::after {
   left: 25%;
   right: 25%;
   height: 2px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-radius: 1px;
   opacity: 0.6;
 }
@@ -3393,7 +3484,7 @@ html[data-perf-tier="low"] *::after {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   box-shadow: 0 0 6px rgba(74, 158, 255, 0.4);
 }
 
@@ -3542,7 +3633,7 @@ html[data-perf-tier="low"] *::after {
   align-items: center;
   gap: var(--space-2);
   padding: 8px 20px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: var(--color-text-inverse);
   font-weight: var(--weight-medium);
   border-radius: var(--radius-md);
@@ -3945,7 +4036,7 @@ button[aria-disabled="true"],
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
 }
 
 /* --- Tahoe Slider --- */
@@ -4017,7 +4108,7 @@ button[aria-disabled="true"],
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-default);
 }
-.tahoe-context-menu-item:hover { background: var(--color-accent); color: white; }
+.tahoe-context-menu-item:hover { background: var(--color-accent-fill); color: white; }
 .tahoe-context-menu-divider {
   height: 0.5px;
   background: var(--color-border-subtle);
@@ -4043,7 +4134,7 @@ button[aria-disabled="true"],
 }
 .tahoe-calendar-day:hover { background: var(--color-bg-hover); }
 .tahoe-calendar-day.today {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: white;
   font-weight: var(--weight-semibold);
 }
@@ -4159,7 +4250,7 @@ button[aria-disabled="true"],
 
 .source-list-item[aria-selected="true"],
 .source-list-item.active {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
 }
 
@@ -4280,7 +4371,7 @@ button[aria-disabled="true"],
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-default);
 }
-.tahoe-select-option:hover { background: var(--color-accent); color: white; }
+.tahoe-select-option:hover { background: var(--color-accent-fill); color: white; }
 .tahoe-select-option.selected::after {
   content: '\2713';
   font-size: 12px;
@@ -4380,7 +4471,7 @@ button[aria-disabled="true"],
 }
 .tahoe-checkbox:hover { border-color: var(--color-text-tertiary); }
 .tahoe-checkbox.checked {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-color: var(--color-accent);
 }
 .tahoe-checkbox.checked::after {
@@ -4504,7 +4595,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .tahoe-progress-fill {
   height: 100%;
   border-radius: var(--radius-xs);
-  background: var(--color-accent, #4a9eff);
+  background: var(--color-accent-fill);
   transition: width 0.3s ease;
 }
 
@@ -4650,7 +4741,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 }
 
 .tahoe-date-picker-cell.selected {
-  background: var(--color-accent, #0a84ff);
+  background: var(--color-accent-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -5027,7 +5118,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
 .status-dot-success { background: var(--color-success); box-shadow: 0 0 6px var(--color-success-muted); }
 .status-dot-warning { background: var(--color-warning); box-shadow: 0 0 6px var(--color-warning-muted); }
 .status-dot-error { background: var(--color-error); box-shadow: 0 0 6px var(--color-error-muted); }
-.status-dot-info { background: var(--color-accent); box-shadow: 0 0 6px var(--color-accent-light); }
+.status-dot-info { background: var(--color-accent-fill); box-shadow: 0 0 6px var(--color-accent-light); }
 
 /* Drag handle */
 .drag-handle { cursor: grab; color: var(--color-text-muted); transition: color var(--transition-fast); }
@@ -5199,7 +5290,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
 /* Tab sliding indicator */
 .tab-indicator {
   position: absolute; bottom: 0; height: 2px;
-  background: var(--color-accent); border-radius: 1px;
+  background: var(--color-accent-fill); border-radius: 1px;
   transition: transform 0.1s var(--ease-tahoe), width 0.1s var(--ease-tahoe);
   will-change: transform;
 }
@@ -5614,7 +5705,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 .tahoe-pill.active,
 .tahoe-pill[data-active="true"] {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
   border-color: transparent;
   box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
@@ -5782,7 +5873,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   transition: background 0.1s ease;
 }
 .tahoe-menu-item:hover {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
 }
 .tahoe-menu-separator {
@@ -5982,7 +6073,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border: 2px solid var(--color-bg-base);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   cursor: grab;
@@ -6317,7 +6408,7 @@ html, body {
 .text-secondary { color: var(--color-text-secondary); }
 .text-tertiary { color: var(--color-text-tertiary); }
 
-.bg-accent { background-color: var(--color-accent); }
+.bg-accent { background-color: var(--color-accent-fill); }
 .bg-accent-muted { background-color: var(--color-accent-muted); }
 .bg-success { background-color: var(--color-success); }
 .bg-success-muted { background-color: var(--color-success-muted); }
@@ -6657,7 +6748,7 @@ html, body {
 .tour-progress-dot.active {
   width: 18px;
   border-radius: var(--radius-xs);
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
 }
 
 /* Onboarding checklist */
@@ -7032,7 +7123,7 @@ html, body {
 .creative-scrubber {
   width: 12px;
   height: 20px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-radius: var(--radius-xs);
   cursor: ew-resize;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -7155,7 +7246,7 @@ html, body {
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
   padding: 8px 16px;
   z-index: var(--z-max);
@@ -7379,7 +7470,7 @@ body.modal-open {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #fff;
   border: none;
   border-radius: var(--radius-lg);
@@ -7414,7 +7505,7 @@ input[type="range"] {
 input[type="range"]:hover { filter: brightness(1.08); }
 input[type="range"]::-moz-range-thumb {
   width: 14px; height: 14px; border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border: 2px solid var(--color-bg-base, #0C0C0E);
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
   cursor: grab;
@@ -7446,7 +7537,7 @@ input[type="checkbox"] {
 }
 input[type="checkbox"]:hover { border-color: rgba(10,132,255,0.55); }
 input[type="checkbox"]:checked {
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-color: var(--color-accent);
 }
 input[type="checkbox"]:checked::after {
@@ -7490,7 +7581,7 @@ input[type="checkbox"][data-toggle]::after {
 }
 .dex-toggle:checked,
 input[type="checkbox"][data-toggle]:checked {
-  background: #30D158;
+  background: var(--color-accent);
 }
 .dex-toggle:checked::after,
 input[type="checkbox"][data-toggle]:checked::after {
@@ -7498,7 +7589,7 @@ input[type="checkbox"][data-toggle]:checked::after {
 }
 .dex-toggle:focus-visible,
 input[type="checkbox"][data-toggle]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(48,209,88,0.30);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 /* Native select polish */
@@ -7886,7 +7977,7 @@ input[type="search"]:focus-visible {
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   transform-origin: left;
   z-index: var(--z-notification);
   animation: loading-progress 2s ease-in-out infinite;
@@ -7904,7 +7995,7 @@ input[type="search"]:focus-visible {
   bottom: 0;
   left: 0;
   height: 3px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   animation: toast-countdown var(--toast-duration, 4s) linear forwards;
 }
@@ -8427,7 +8518,7 @@ input[type="search"]:focus-visible {
 /* Progress complete celebration */
 @keyframes progressComplete {
   0% { 
-    background: var(--color-accent);
+    background: var(--color-accent-fill);
   }
   50% { 
     background: var(--color-success);

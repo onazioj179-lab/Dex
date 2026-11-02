@@ -443,7 +443,7 @@ const btn: React.CSSProperties = {
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
 const btnPrimary: React.CSSProperties = {
-  ...btn, background: 'var(--color-accent)', color: '#fff', border: 'none',
+  ...btn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none',
 };
 
 export default memo(PDFViewer);

@@ -131,6 +131,10 @@ interface UkiStoreState {
   recordThought: (step: UkiThoughtStep) => void;
   /** Wipe the thought trail (privacy / fresh-start). */
   clearThoughtTrail: () => void;
+  /** Forget the persisted transcript (Settings > Clear All Memory). */
+  clearConversationHistory: () => void;
+  /** Forget one transcript turn by id. */
+  removeConversationTurn: (id: string) => void;
   /**
    * Replay a previous turn: returns the original query so the caller can
    * resubmit it through the existing UKI dispatch path. Returns null when
@@ -157,8 +161,14 @@ function loadPersistedHistory(): UkiConversationTurn[] {
   } catch { return []; }
 }
 
+function memoryRecordingOn(): boolean {
+  try { return JSON.parse(localStorage.getItem('dex-settings') || '{}').ukiMemoryEnabled !== false; } catch { return true; }
+}
+
 function persistHistory(history: UkiConversationTurn[]): void {
   try {
+    // Memory Recording off: the transcript stays in this session only.
+    if (!memoryRecordingOn()) { localStorage.removeItem('dex:uki:history'); return; }
     localStorage.setItem('dex:uki:history', JSON.stringify(history.slice(-30)));
   } catch { /* quota exceeded — silently drop */ }
 }
@@ -234,6 +244,15 @@ export const useUkiStore = create<UkiStoreState>((set, get) => ({
     const next = [...prev.thoughtTrail.slice(-(MAX_THOUGHTS - 1)), step];
     persistThoughtTrail(next);
     return { thoughtTrail: next };
+  }),
+  clearConversationHistory: () => {
+    try { localStorage.removeItem('dex:uki:history'); } catch { /* unavailable */ }
+    set({ conversationHistory: [] });
+  },
+  removeConversationTurn: (id) => set((prev) => {
+    const next = prev.conversationHistory.filter((t) => t.id !== id);
+    persistHistory(next);
+    return { conversationHistory: next };
   }),
   clearThoughtTrail: () => {
     persistThoughtTrail([]);

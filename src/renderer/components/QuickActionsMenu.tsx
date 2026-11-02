@@ -103,12 +103,12 @@ export const QuickActionsMenu: React.FC = () => {
 
   const styles: Record<string, React.CSSProperties> = {
     overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20vh' },
-    panel: { width: '100%', maxWidth: '360px', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden' },
+    panel: { width: '100%', maxWidth: '360px', borderRadius: '14px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden' },
     head: { padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-border)' },
     title: { fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' },
     preview: { fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' },
     list: { padding: 'var(--space-2)' },
-    item: { display: 'block', width: '100%', textAlign: 'left', padding: 'var(--space-2) var(--space-3)', borderRadius: '8px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', cursor: 'pointer' },
+    item: { display: 'block', width: '100%', textAlign: 'left', padding: 'var(--space-2) var(--space-3)', borderRadius: '10px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', cursor: 'pointer' },
     hint: { padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border)', fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center' },
   };
 

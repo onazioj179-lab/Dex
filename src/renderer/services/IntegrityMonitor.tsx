@@ -774,7 +774,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 2,
     padding: '6px var(--space-2)',
-    borderRadius: 3,
+    borderRadius: 4,
     background: 'var(--color-bg-inset)',
     borderLeft: '2px solid',
   },

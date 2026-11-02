@@ -278,7 +278,7 @@ const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties =
     color: 'var(--color-text-primary)',
     whiteSpace: 'nowrap', flexShrink: 0,
   };
-  if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
+  if (variant === 'accent') return { ...base, background: 'var(--color-accent-fill)', color: '#fff', borderColor: 'transparent' };
   if (variant === 'danger') return { ...base, background: 'var(--color-error-muted, rgba(255,69,58,0.16))', color: 'var(--color-error, #ff8a82)', borderColor: 'var(--color-error, rgba(255,69,58,0.4))' };
   return { ...base, background: 'var(--color-bg-hover, rgba(255,255,255,0.04))' };
 };

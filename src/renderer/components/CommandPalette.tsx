@@ -506,7 +506,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       maxWidth: 'min(560px, calc(100vw - 48px))',
       // background + border come from the .dex-liquid-glass class (real frosted
       // glass, lite-mode-aware). Keep radius/clip/elevation inline.
-      borderRadius: '12px',
+      borderRadius: '14px',
       boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
       overflow: 'hidden',
     },
@@ -520,7 +520,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     shortcut: {
       padding: '4px var(--space-2)',
       background: 'var(--color-bg-glass)',
-      borderRadius: '3px',
+      borderRadius: '4px',
       fontSize: '11px',
       color: 'var(--color-text-muted)',
       fontFamily: 'monospace',
@@ -543,7 +543,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       transition: 'background 0.1s',
     },
     itemSelected: {
-      background: 'var(--color-accent)',
+      background: 'var(--color-accent-fill)',
     },
     itemIcon: {
       width: '32px',
@@ -574,7 +574,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       fontFamily: 'monospace',
       padding: '2px 6px',
       background: 'var(--color-bg-glass)',
-      borderRadius: '3px',
+      borderRadius: '4px',
     },
     empty: {
       padding: 'var(--space-8)',

@@ -14,13 +14,13 @@ powers the home page search bar.
 
 ## CommandPalette
 
-Bound by the `useCommandPalette` hook in [src/renderer/App.tsx](src/renderer/App.tsx).
-Lives in [src/renderer/components/CommandPalette.tsx](src/renderer/components/CommandPalette.tsx).
+Bound by the `useCommandPalette` hook in [src/renderer/App.tsx](../src/renderer/App.tsx).
+Lives in [src/renderer/components/CommandPalette.tsx](../src/renderer/components/CommandPalette.tsx).
 
 ## UKI overlay
 
-Lives in [src/renderer/components/UkiOverlay.tsx](src/renderer/components/UkiOverlay.tsx).
-The hotkey is wired in [src/renderer/components/AppManager.tsx](src/renderer/components/AppManager.tsx)
+Lives in [src/renderer/components/UkiOverlay.tsx](../src/renderer/components/UkiOverlay.tsx).
+The hotkey is wired in [src/renderer/components/AppManager.tsx](../src/renderer/components/AppManager.tsx)
 via `useUkiStore.getState().togglePanel()`.
 
 ### Slash commands

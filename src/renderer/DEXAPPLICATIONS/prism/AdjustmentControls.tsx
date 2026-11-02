@@ -59,7 +59,7 @@ function Slider({ label, value, min, max, step = 1, def, fmt, onInput }: {
         style={{ flex: 1, position: 'relative', height: 18, cursor: 'ew-resize', touchAction: 'none', display: 'flex', alignItems: 'center' }}
       >
         <div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: 'linear-gradient(180deg,#0a0a0c,#1a1a1e)', border: '1px solid #050507' }} />
-        <div style={{ position: 'absolute', height: 4, borderRadius: 2, background: 'var(--color-accent, #4a9eff)', left: `${Math.min(norm, zeroNorm) * 100}%`, width: `${Math.abs(norm - zeroNorm) * 100}%` }} />
+        <div style={{ position: 'absolute', height: 4, borderRadius: 2, background: 'var(--color-accent-fill)', left: `${Math.min(norm, zeroNorm) * 100}%`, width: `${Math.abs(norm - zeroNorm) * 100}%` }} />
         <div style={{ position: 'absolute', left: `${norm * 100}%`, transform: 'translateX(-50%)', width: 13, height: 13, borderRadius: '50%', background: 'linear-gradient(180deg,#52525c,#1a1a20)', border: '1px solid #050507', boxShadow: '0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.25)', pointerEvents: 'none' }} />
       </div>
       <span style={valStyle}>{fmt ? fmt(value) : value}</span>

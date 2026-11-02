@@ -36,7 +36,7 @@ The returned strings are reduce-motion-safe.
 
 ## Spring presets
 
-See `SPRING_PRESETS` in [src/renderer/utils/MotionController.ts](src/renderer/utils/MotionController.ts).
+See `SPRING_PRESETS` in [src/renderer/utils/MotionController.ts](../src/renderer/utils/MotionController.ts).
 The canonical layout spring is `gentle`; window snap uses `responsive`; drag
 release uses `loose`.
 

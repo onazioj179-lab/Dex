@@ -285,7 +285,7 @@ html.dex-no-blur *::after {
   left: 16px;
   z-index: var(--z-emergency);
   padding: 8px 18px;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: #000;
   font-size: 12px;
   font-weight: 600;
@@ -1143,7 +1143,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   top: 50%;
   width: 3px;
   height: 0;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   border-radius: var(--radius-xs);
   transform: translateY(-50%);
   transition: height 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -4155,7 +4155,7 @@ mark {
   left: 16px;
   z-index: var(--z-emergency, 50000);
   padding: 8px 16px;
-  background: var(--color-accent, #0a84ff);
+  background: var(--color-accent-fill);
   color: #fff;
   border-radius: var(--radius-lg);
   font-size: 13px;
@@ -5160,7 +5160,7 @@ html.focus-mode,
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--color-accent);
+  background: var(--color-accent-fill);
   color: white;
   padding: 8px 16px;
   z-index: 100000;
@@ -5223,10 +5223,11 @@ html.focus-mode,
   }
 }
 
-/* Large text mode - triggered via UKI voice command */
-html[style*="font-size: 110"] *,
-html[style*="font-size: 115"] *,
-html[style*="font-size: 120"] * {
+/* Large text mode - triggered via UKI voice command (UkiOverlay sets the
+   attribute alongside the root font size). Never match on html[style*=...]:
+   a [style] test on an ANCESTOR makes Blink recompute the whole subtree of ANY
+   element whose inline style changes (window drags, the spatial camera...). */
+html[data-dex-large-text] * {
   line-height: 1.6 !important;
   letter-spacing: 0.01em !important;
 }
@@ -6064,16 +6065,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 /* =============================================================================
    PHASE 15 — SHELL APPEARANCE BUS
-   These rules consume the --dex-* tokens written by appearanceToCssVars()
+   These rules consume the appearance tokens written by appearanceToCssVars()
    so that toggling Settings -> Appearance immediately changes shell behavior
-   without requiring per-component code changes.
+   without requiring per-component code changes. They match the mirrored
+   data-dex-* attributes on <html>, NOT :root[style*="--dex-..."]: an ancestor
+   [style] selector made every inline-style write anywhere in DEX recompute the
+   whole subtree under the written element (measured: 3 s per spatial-camera
+   frame with 58 windows open, 37 ms after this change).
    ============================================================================= */
 
 /* Transparency master switch: when off, force solid surfaces everywhere. */
-:root[style*="--dex-transparency: 0"] .dex-glass,
-:root[style*="--dex-transparency: 0"] [data-glass],
-:root[style*="--dex-transparency: 0"] .dex-blur,
-:root[style*="--dex-transparency: 0"] [data-blur] {
+:root[data-dex-transparency="0"] .dex-glass,
+:root[data-dex-transparency="0"] [data-glass],
+:root[data-dex-transparency="0"] .dex-blur,
+:root[data-dex-transparency="0"] [data-blur] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background-color: var(--color-bg, #0f1115) !important;
@@ -6081,18 +6086,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 /* Blur tier — caps the maximum blur radius regardless of per-surface CSS. */
-:root[style*="--dex-blur-tier: off"] .dex-glass,
-:root[style*="--dex-blur-tier: off"] [data-glass] {
+:root[data-dex-blur-tier="off"] .dex-glass,
+:root[data-dex-blur-tier="off"] [data-glass] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-:root[style*="--dex-blur-tier: eco"] .dex-glass,
-:root[style*="--dex-blur-tier: eco"] [data-glass] {
+:root[data-dex-blur-tier="eco"] .dex-glass,
+:root[data-dex-blur-tier="eco"] [data-glass] {
   backdrop-filter: var(--blur-sm) saturate(1.05) !important;
   -webkit-backdrop-filter: var(--blur-sm) saturate(1.05) !important;
 }
-:root[style*="--dex-blur-tier: standard"] .dex-glass,
-:root[style*="--dex-blur-tier: standard"] [data-glass] {
+:root[data-dex-blur-tier="standard"] .dex-glass,
+:root[data-dex-blur-tier="standard"] [data-glass] {
   backdrop-filter: var(--blur-md) saturate(1.15) !important;
   -webkit-backdrop-filter: var(--blur-md) saturate(1.15) !important;
 }
@@ -6100,9 +6105,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 /* Motion master switch — mirrors the .reduce-motion class above so that
    either trigger flattens animations to zero. */
-:root[style*="--dex-motion: off"] *,
-:root[style*="--dex-motion: off"] *::before,
-:root[style*="--dex-motion: off"] *::after {
+:root[data-dex-motion="off"] *,
+:root[data-dex-motion="off"] *::before,
+:root[data-dex-motion="off"] *::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
@@ -6110,28 +6115,28 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 /* Density — adjusts the global UI scale for compact / comfortable layouts. */
-:root[style*="--dex-density: compact"] {
+:root[data-dex-density="compact"] {
   --dex-row-height: 28px;
   --dex-button-height: 28px;
   --dex-pad: 6px;
 }
-:root[style*="--dex-density: regular"] {
+:root[data-dex-density="regular"] {
   --dex-row-height: 36px;
   --dex-button-height: 32px;
   --dex-pad: 10px;
 }
-:root[style*="--dex-density: comfortable"] {
+:root[data-dex-density="comfortable"] {
   --dex-row-height: 44px;
   --dex-button-height: 40px;
   --dex-pad: 14px;
 }
 
 /* Contrast — escalate borders and outlines when high contrast is active. */
-:root[style*="--dex-contrast: high"] {
+:root[data-dex-contrast="high"] {
   --color-border: rgba(255, 255, 255, 0.65) !important;
   --color-border-strong: rgba(255, 255, 255, 0.85) !important;
 }
-:root[style*="--dex-contrast: high"] :focus-visible {
+:root[data-dex-contrast="high"] :focus-visible {
   outline: 3px solid #ffd400 !important;
   outline-offset: 2px !important;
 }

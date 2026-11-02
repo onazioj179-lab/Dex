@@ -11,6 +11,8 @@
 // quietly in the notification center so nothing is lost.
 //
 
+import { useAuthStore } from '../store/useAuthStore';
+
 /** True unless the user turned "Allow Notifications" off (default on). */
 export function notificationsAllowed(): boolean {
   try {
@@ -18,4 +20,19 @@ export function notificationsAllowed(): boolean {
   } catch {
     return true;
   }
+}
+
+/**
+ * Flags for `notification-center:send`. Windows toasts appear on the desktop
+ * ABOVE DEX's lock screen, so while DEX is locked they must not reveal the
+ * notification's content: the native side then shows a generic "DEX / You
+ * have a new notification". The full text stays in the notification center.
+ */
+export function osToastFlags(): { osToast: boolean; osToastPrivate: boolean } {
+  let locked = false;
+  try {
+    const a = useAuthStore.getState();
+    locked = Boolean(a.isLocked && a.isEnabled);
+  } catch { /* store unavailable: treat as unlocked */ }
+  return { osToast: notificationsAllowed(), osToastPrivate: locked };
 }

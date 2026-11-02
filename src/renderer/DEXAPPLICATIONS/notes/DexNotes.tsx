@@ -219,7 +219,7 @@ const DexNotes: React.FC = () => {
     selectedFolderId, selectedNoteId, searchQuery, searchResults,
     sortField, sortDirection, viewMode, editorMode, focusMode,
     sidebarCollapsed, listCollapsed, paneSize,
-    loading, saving, searching,
+    loading, saving, searching, initialized,
   } = store;
 
   // UKI app-action: create a note (mutating -> confirm-gated). A ref keeps the
@@ -318,7 +318,9 @@ const DexNotes: React.FC = () => {
   const createAttempted = useRef(false);
 
   useEffect(() => {
-    if (loading || initFailed) return;
+    // Wait for the first real load: before it, `notes` is [] and `loading` is
+    // still false, so this used to create a blank note on every first open.
+    if (loading || initFailed || !initialized) return;
     if (!activeNote) {
       if (notes.length > 0) {
         store.selectNote(notes[0].id);
@@ -979,7 +981,7 @@ const DexNotes: React.FC = () => {
                           style={{
                             display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
                             fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                            padding: '2px 8px', borderRadius: 8,
+                            padding: '2px 8px', borderRadius: 10,
                             border: `1px solid ${on ? '#64d2ff' : 'var(--color-border-subtle)'}`,
                             background: on ? 'rgba(100,210,255,0.18)' : 'transparent',
                             color: on ? '#64d2ff' : 'var(--color-text-tertiary)',
@@ -1258,7 +1260,7 @@ const DexNotes: React.FC = () => {
             style={{
               background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 3,
+              borderRadius: 4,
               color: 'var(--color-text-tertiary)',
               cursor: 'pointer',
               fontSize: 11,
@@ -1322,7 +1324,7 @@ const DexNotes: React.FC = () => {
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 'var(--z-notification)', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px var(--space-4)', borderRadius: 8,
+          padding: '10px var(--space-4)', borderRadius: 10,
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-panel)',

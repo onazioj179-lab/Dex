@@ -281,7 +281,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
         padding: 'var(--space-2) var(--space-4)',
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: 8,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--space-2)',
@@ -378,7 +378,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 left: 4, top: 4,
                 width: rect.w,
                 height: rect.h,
-                borderRadius: 11,
+                borderRadius: 10,
                 background: 'var(--color-bg-surface)',
                 border: '1px solid var(--color-border-subtle)',
                 display: 'flex',
@@ -389,7 +389,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
               }}>
                 <div style={{
                   width: 44, height: 44,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   background: app.color || 'var(--color-bg-hover)',
                   display: 'flex',
                   alignItems: 'center',

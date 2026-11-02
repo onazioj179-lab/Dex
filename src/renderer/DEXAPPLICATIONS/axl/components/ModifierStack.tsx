@@ -47,7 +47,7 @@ const styles = {
     fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
   },
   addBtn: {
-    padding: '4px var(--space-3)', background: 'var(--color-accent)',
+    padding: '4px var(--space-3)', background: 'var(--color-accent-fill)',
     border: 'none', borderRadius: 9999, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
     cursor: 'pointer', fontWeight: 500, boxShadow: 'none',
   },
@@ -71,7 +71,7 @@ const styles = {
     display: 'flex', gap: 4,
   },
   iconBtn: {
-    width: 22, height: 22, border: 'none', borderRadius: 3,
+    width: 22, height: 22, border: 'none', borderRadius: 4,
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 12, transition: 'all 0.15s',
@@ -87,12 +87,12 @@ const styles = {
   },
   input: {
     flex: 1, padding: '4px var(--space-2)', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
   select: {
     flex: 1, padding: '4px var(--space-2)', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
   checkbox: {
@@ -103,7 +103,7 @@ const styles = {
   },
   vec3Input: {
     width: 50, padding: '4px 6px', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
     color: 'var(--color-text-primary)', fontSize: 11, outline: 'none',
     textAlign: 'center' as const,
   },

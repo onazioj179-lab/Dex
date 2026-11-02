@@ -253,7 +253,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 var(--space-5) var(--space-5)', flexShrink: 0,
   },
   primaryBtn: {
-    minWidth: 140, height: 52, borderRadius: 26, border: 'none',
+    minWidth: 140, height: 52, borderRadius: 24, border: 'none',
     color: 'var(--color-text-inverse, #fff)', fontSize: 16, fontWeight: 600, cursor: 'pointer',
     transition: 'transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease', fontFamily: 'var(--font-family)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 22px',
@@ -300,7 +300,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none',
   },
   doneBtn: {
-    marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent)',
+    marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },

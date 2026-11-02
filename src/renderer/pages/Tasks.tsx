@@ -1654,7 +1654,7 @@ export const Tasks: React.FC = () => {
           {isLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-4) 0' }}>
               {[1,2,3].map(i => (
-                <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} style={{ height: 48, borderRadius: 10, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (
@@ -2115,7 +2115,7 @@ export const Tasks: React.FC = () => {
                 }}
                 style={{
                   marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', borderRadius: 'var(--radius-lg, 10px)',
-                  background: 'var(--color-accent, #0a84ff)', color: 'var(--color-accent-text, #fff)',
+                  background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -2300,7 +2300,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '32px',
     borderRadius: '10px',
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-accent-text)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',

@@ -1385,7 +1385,7 @@ const DexCode: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* Language toggle: real DexScript vs plain-English-via-UKI. */}
-            <div role="tablist" aria-label="Editor language" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 8, padding: 2, gap: 2 }}>
+            <div role="tablist" aria-label="Editor language" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
               {(['dexscript', 'plain'] as const).map(m => (
                 <button
                   key={m}
@@ -1403,7 +1403,7 @@ const DexCode: React.FC = () => {
             </div>
             {/* In plain mode, choose whether UKI writes code or just acts. */}
             {langMode === 'plain' && (
-              <div role="tablist" aria-label="Plain-English behaviour" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 8, padding: 2, gap: 2 }}>
+              <div role="tablist" aria-label="Plain-English behaviour" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
                 {(['code', 'doit'] as const).map(m => (
                   <button
                     key={m}
@@ -1781,7 +1781,7 @@ const DexCode: React.FC = () => {
               background: terminalOpen ? 'var(--color-accent, #4A9EFF)' : 'transparent',
               color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
               border: '1px solid var(--color-border)',
-              borderRadius: 3,
+              borderRadius: 4,
               padding: '2px var(--space-2)',
               fontSize: 10,
               fontWeight: 600,
@@ -1875,7 +1875,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 32,
     height: 32,
     border: 'none',
-    background: 'var(--color-accent, #4a9eff)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-accent-text, #fff)',
     borderRadius: 10,
     cursor: 'pointer',
@@ -1973,7 +1973,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     padding: '5px var(--space-2)',
-    borderRadius: 3,
+    borderRadius: 4,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-tertiary)',
@@ -1986,7 +1986,7 @@ const S: Record<string, React.CSSProperties> = {
   refCode: {
     fontSize: 10,
     padding: '1px 5px',
-    borderRadius: 3,
+    borderRadius: 4,
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
     fontFamily: 'var(--font-mono)',
@@ -2215,7 +2215,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 22,
     height: 22,
-    borderRadius: 3,
+    borderRadius: 4,
     border: '1px solid var(--color-border)',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -2235,7 +2235,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'var(--color-bg-base, #0C0C0E)',
     border: '1px solid var(--color-border)',
-    borderRadius: 3,
+    borderRadius: 4,
     padding: '3px var(--space-2)',
     color: 'var(--color-text-primary)',
     fontSize: 12,
@@ -2249,7 +2249,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 22,
     height: 22,
-    borderRadius: 3,
+    borderRadius: 4,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',

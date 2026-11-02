@@ -849,7 +849,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   catBtnActive: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     borderColor: 'var(--color-accent)',
     color: '#fff',
   },
@@ -900,7 +900,7 @@ const styles: Record<string, React.CSSProperties> = {
   appIcon: {
     width: 46,
     height: 46,
-    borderRadius: 8,
+    borderRadius: 10,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -974,7 +974,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-secondary)',
     textAlign: 'center',
     border: '1px dashed var(--pg-border)',
-    borderRadius: 8,
+    borderRadius: 10,
   },
   // Detail view
   detailScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' },
@@ -1000,7 +1000,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 16px',
     borderRadius: 'var(--radius-lg)',
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
     fontSize: 13,
     fontWeight: 700,

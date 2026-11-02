@@ -822,7 +822,7 @@ const TaskManager: React.FC = () => {
             title={health.issues.join(' · ') || 'All systems nominal'}
             style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '14' }}
           >
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: healthTone, display: 'inline-block' }} />
+            <span style={{ width: 7, height: 7, borderRadius: 9999, background: healthTone, display: 'inline-block' }} />
             {healthPillText}
           </span>
         </div>
@@ -971,7 +971,7 @@ const TaskManager: React.FC = () => {
         <div className="dex-liquid-glass-strong" style={styles.focusCard}>
           <div style={styles.focusTop}>
             <span style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '18', margin: 0 }}>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: healthTone, display: 'inline-block' }} />
+              <span style={{ width: 7, height: 7, borderRadius: 9999, background: healthTone, display: 'inline-block' }} />
               {healthLabel}
             </span>
             <span style={styles.focusUptime}>{formatUptime(uptimeSeconds)} up</span>
@@ -1063,7 +1063,7 @@ const TaskManager: React.FC = () => {
                 <div
                   key={stage.id}
                   style={{
-                    flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 8,
+                    flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 10,
                     border: '1px solid ' + (isActive ? 'rgba(74,158,255,0.42)' : 'var(--color-border-subtle)'),
                     background: isActive ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.03)',
                   }}
@@ -1109,7 +1109,7 @@ const TaskManager: React.FC = () => {
             ) : workflows.map(wf => (
               <div
                 key={wf.id || wf.name}
-                style={{ flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.03)' }}
+                style={{ flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.03)' }}
               >
                 <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wf.name}</div>
                 <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
@@ -1355,16 +1355,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' },
   titleWrap: { display: 'flex', alignItems: 'center', gap: 10 },
-  titleIcon: { width: 34, height: 34, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
+  titleIcon: { width: 34, height: 34, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent-fill)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
   title: { margin: 0, fontSize: 18, fontWeight: 750, letterSpacing: 0 },
   subtitle: { fontSize: 12, color: 'var(--color-text-secondary)' },
   headerControls: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
-  segGroup: { display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
+  segGroup: { display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
   segButton: { height: 26, padding: '0 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' },
-  segButtonActive: { background: 'var(--color-accent)', color: '#fff' },
+  segButtonActive: { background: 'var(--color-accent-fill)', color: '#fff' },
   refreshButton: { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', cursor: 'pointer' },
-  healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
-  healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 8, border: '1px solid' },
+  healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 9999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
+  healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 10, border: '1px solid' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-2)' },
   statCard: { padding: 11, borderRadius: 'var(--radius-lg, 12px)', display: 'flex', flexDirection: 'column', gap: 3 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
@@ -1377,7 +1377,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroLeft: { display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 },
   heroTopRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 'var(--space-3)' },
   heroBigCard: { position: 'relative', padding: '16px 18px', borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 4, minHeight: 132, justifyContent: 'flex-end', overflow: 'hidden' },
-  heroIconTile: { position: 'absolute', top: 16, left: 18, width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', boxShadow: '0 10px 26px rgba(10,132,255,0.30)' },
+  heroIconTile: { position: 'absolute', top: 16, left: 18, width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'var(--color-accent-fill)', border: '1px solid rgba(255,255,255,0.20)', boxShadow: '0 10px 26px rgba(10,132,255,0.30)' },
   heroBigValue: { display: 'flex', alignItems: 'baseline', gap: 2, fontSize: 38, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' },
   heroBigPlus: { fontSize: 22, fontWeight: 700, color: 'var(--color-accent)' },
   heroBigLabel: { fontSize: 13, fontWeight: 650, color: 'var(--color-text-primary)' },
@@ -1390,7 +1390,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroDonutFoot: { fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' },
   heroAssetRow: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-3)' },
   assetTile: { display: 'flex', alignItems: 'center', gap: 11, padding: '13px 14px', borderRadius: 14 },
-  assetGlyph: { width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center', border: '1px solid', flexShrink: 0 },
+  assetGlyph: { width: 38, height: 38, borderRadius: 10, display: 'grid', placeItems: 'center', border: '1px solid', flexShrink: 0 },
   assetValue: { fontSize: 18, fontWeight: 750, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' },
   assetLabel: { fontSize: 11.5, color: 'var(--color-text-tertiary)', fontWeight: 600 },
   assetDetail: { marginLeft: 'auto', fontSize: 10.5, color: 'var(--color-text-tertiary)', textAlign: 'right', maxWidth: 96, lineHeight: 1.25 },
@@ -1399,7 +1399,7 @@ const styles: Record<string, React.CSSProperties> = {
   chartTitle: { fontSize: 14, fontWeight: 720, letterSpacing: '-0.01em' },
   chartSub: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   chartRangePills: { display: 'flex', alignItems: 'center', gap: 6 },
-  chartPill: { padding: '3px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 650, background: 'rgba(123,92,255,0.18)', color: '#B7A4FF', border: '1px solid rgba(123,92,255,0.30)' },
+  chartPill: { padding: '3px 9px', borderRadius: 9999, fontSize: 10.5, fontWeight: 650, background: 'rgba(123,92,255,0.18)', color: '#B7A4FF', border: '1px solid rgba(123,92,255,0.30)' },
   chartPillMuted: { background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border-subtle)' },
   focusCard: { position: 'relative', padding: 18, borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 9, overflow: 'hidden', background: 'linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-bg-glass-strong)' },
   focusTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -1407,20 +1407,20 @@ const styles: Record<string, React.CSSProperties> = {
   focusHeading: { marginTop: 4, fontSize: 20, fontWeight: 760, letterSpacing: '-0.02em', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   focusKicker: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
   focusProgressRow: { marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, fontWeight: 650, color: 'var(--color-text-secondary)' },
-  focusProgressTrack: { height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  focusProgressFill: { height: '100%', borderRadius: 999, transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)' },
+  focusProgressTrack: { height: 7, borderRadius: 9999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
+  focusProgressFill: { height: '100%', borderRadius: 9999, transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)' },
   focusAvatars: { marginTop: 8, display: 'flex', alignItems: 'center' },
-  focusAvatar: { width: 28, height: 28, borderRadius: 999, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '2px solid var(--color-bg-glass-strong, #111)', boxShadow: '0 4px 12px rgba(0,0,0,0.35)' },
+  focusAvatar: { width: 28, height: 28, borderRadius: 9999, display: 'grid', placeItems: 'center', background: 'var(--color-accent-fill)', border: '2px solid var(--color-bg-glass-strong, #111)', boxShadow: '0 4px 12px rgba(0,0,0,0.35)' },
   focusAvatarsLabel: { marginLeft: 10, fontSize: 11, color: 'var(--color-text-tertiary)' },
-  focusAction: { marginTop: 'auto', height: 34, borderRadius: 9, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.12)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer', fontWeight: 650, fontSize: 12.5 },
+  focusAction: { marginTop: 'auto', height: 34, borderRadius: 10, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.12)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer', fontWeight: 650, fontSize: 12.5 },
 
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 'var(--space-3)' },
   panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-lg, 12px)', overflow: 'hidden' },
   panelHeader: { height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
-  countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
+  countPill: { padding: '2px 7px', borderRadius: 9999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' },
-  appRow: { display: 'flex', alignItems: 'center', gap: 9, padding: 9, borderRadius: 8, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border-subtle)' },
-  appGlyph: { width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', color: '#fff', flexShrink: 0, boxShadow: '0 6px 18px rgba(10,132,255,0.24)' },
+  appRow: { display: 'flex', alignItems: 'center', gap: 9, padding: 9, borderRadius: 10, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border-subtle)' },
+  appGlyph: { width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent-fill)', color: '#fff', flexShrink: 0, boxShadow: '0 6px 18px rgba(10,132,255,0.24)' },
   appMeta: { flex: 1, minWidth: 0 },
   appName: { fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
@@ -1443,9 +1443,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-primary)', cursor: 'pointer', fontWeight: 700,
   },
   groupName: { display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  groupCount: { padding: '1px 6px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600 },
+  groupCount: { padding: '1px 6px', borderRadius: 9999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600 },
   toggleButton: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
-  toggleButtonActive: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' },
+  toggleButtonActive: { background: 'var(--color-accent-fill)', borderColor: 'var(--color-accent)', color: '#fff' },
   iconAction: { display: 'inline-grid', placeItems: 'center', width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0 },
   detailPanel: { flexShrink: 0, borderRadius: 0, borderTop: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 8 },
   detailHeader: { display: 'flex', alignItems: 'center', gap: 8 },

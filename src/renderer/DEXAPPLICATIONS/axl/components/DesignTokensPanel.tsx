@@ -177,7 +177,7 @@ const DesignTokensPanel: React.FC = () => {
 
   // ─── Shared inline styles (flat surfaces, hairline borders, DEX accent) ──
   const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4, letterSpacing: '0.5px' };
-  const inputStyle: React.CSSProperties = { background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none', minWidth: 0 };
+  const inputStyle: React.CSSProperties = { background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none', minWidth: 0 };
   const iconBtn: React.CSSProperties = { fontSize: 9, padding: '3px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 9999, color: 'var(--color-text-secondary)', cursor: 'pointer' };
 
   const renderColorRow = (tok: ColorToken) => {
@@ -189,7 +189,7 @@ const DesignTokensPanel: React.FC = () => {
           value={swatch}
           onChange={e => updateColorValue(tok.id, e.target.value)}
           aria-label={`${tok.name} color`}
-          style={{ width: 18, height: 18, padding: 0, border: '1px solid var(--color-border)', borderRadius: 3, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
+          style={{ width: 18, height: 18, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
         />
         <input
           value={tok.name}
@@ -256,7 +256,7 @@ const DesignTokensPanel: React.FC = () => {
       {newKind === 'color' ? (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <input type="color" value={normalizeHex(newColor) ?? '#4a90d9'} onChange={e => setNewColor(e.target.value)} aria-label="New token color"
-            style={{ width: 28, height: 26, padding: 0, border: '1px solid var(--color-border)', borderRadius: 3, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
+            style={{ width: 28, height: 26, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
           <input value={newColor} onChange={e => setNewColor(e.target.value)} placeholder="#4a90d9" aria-label="New token hex" style={{ ...inputStyle, flex: 1, fontVariantNumeric: 'tabular-nums' }} />
         </div>
       ) : (

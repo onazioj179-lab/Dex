@@ -802,7 +802,7 @@
 > Ran a 16-slice parallel audit of the whole renderer with adversarial per-finding
 > verification (false positives are common here, so every claim was re-checked by an
 > independent skeptic). Result: 47 REAL, headless-fixable defects — full triaged
-> backlog in `docs/AUDIT-BRUTAL-COMPLETION.md` (fix-now / fix-careful / remove,
+> backlog in `docs/AUDIT-BRUTAL-COMPLETION.md` (retired 2026-11-01; open items moved to `DEX_REMAINING_WORK.md`) (fix-now / fix-careful / remove,
 > ranked by value-minus-risk). **Fixed this pass (5 highest-value, lowest-risk
 > user-facing controls):** (1) Home Music-Controls widget was bound to dead
 > `dex-now-playing`/`dex-media-control` events (display stuck, transport buttons
@@ -1057,7 +1057,7 @@
 > (renderer + main), renderer build green.
 > **P3 CONFORMANCE SWEEP DONE (every app, nothing skipped):** ran the 8-point
 > checklist across all ~50 surfaces (utilities, creative suite, shell/pages) via
-> 3 parallel audits; full matrix written to `docs/V6-CONFORMANCE.md`. Codebase is
+> 3 parallel audits; full matrix written to `docs/V6-CONFORMANCE.md` (retired 2026-11-01; open items moved to `DEX_REMAINING_WORK.md`). Codebase is
 > mature -> nearly all PASS. GENUINE fails fixed: PomodoroTimer stray `longBreak`
 > color -> token; Imosion level-meter gradient + 6x muted menu/transport text ->
 > semantic tokens; Kanban CardDetail modal got an Escape-to-close handler. FALSE
@@ -2258,6 +2258,12 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-01 (Part 4: assistant)
+
+- UKI safety layer shipped on `claude/dex-part4`: enforced processing modes (`shared/uki/assistantPolicy.ts`, checked in `orchestrator.chat()` + stream), Fast/Balanced/Deep budgets, scoped file tools (`uki/fileTools.ts`, Recycle Bin only), pause/resume/cancel, persistent audit, DPAPI key store (`src-tauri/src/secrets_ctl.rs`), Ollama installed-model discovery, system-picker screen capture.
+- Palette = Part 4 table; `--color-accent-fill` for filled surfaces (AA). Radius ratchet at 0.
+- Active backlog: `DEX_REMAINING_WORK.md`. Evidence: `docs/reports/`.
+
 ## Where DEX is
 
 - **Shipping build:** Electron (v5.0.1). It remains the product until the Tauri
@@ -3078,7 +3084,7 @@ REMAINING (lower leverage / deferred):
 > created folder; sparkline needs accrued history) verify in the packaged app.
 
 > **DONE — Backlog sweep: real features across the whole app roster + Creative suite.**
-> Pulled from docs/DEX-BACKLOG-smallapps.md (the ~522-item per-app catalog) and the
+> Pulled from docs/DEX-BACKLOG-smallapps.md (retired 2026-11-01; the ~522-item per-app catalog) and the
 > v6.0.4 Creative initiative, building REAL working features (no stubs, no fakes) app
 > by app. Small/utility/system/media/dev apps: Calculator (copy/send-to-Notes, unit-
 > aware input), Unit Converter (swap + recents), Color Picker (multi-format copy +
@@ -3238,7 +3244,7 @@ REMAINING (lower leverage / deferred):
 > (Ollama in the provider router). Two new apps registered (backup, extensions). tsc 0, watermark lint 0
 > (2161). The ONLY genuinely-remaining piece is the hosted network layer — a sync/relay server + a public
 > marketplace registry — which can't exist in a renderer-only repo; the local-first foundations above are
-> ready for it (see docs/NEXT-STAGE.md).
+> ready for it (see docs/NEXT-STAGE.md (retired 2026-11-01; open items moved to `DEX_REMAINING_WORK.md`)).
 
 > **DONE — "Agentic DEX: AI everywhere" (AI track).** UKI now knows what the user is looking at
 > across the app and can be asked about any selection. (1) Extended the UKI app-context registry

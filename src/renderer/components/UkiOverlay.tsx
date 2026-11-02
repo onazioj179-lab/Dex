@@ -486,6 +486,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Make text larger',
     execute: () => {
       document.documentElement.style.fontSize = '110%';
+      document.documentElement.setAttribute('data-dex-large-text', '');
       localStorage.setItem('dex:a11y:fontSize', '110');
       return 'Text size increased. Say "reset text size" to restore.';
     }
@@ -495,6 +496,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Make text smaller',
     execute: () => {
       document.documentElement.style.fontSize = '90%';
+      document.documentElement.removeAttribute('data-dex-large-text');
       localStorage.setItem('dex:a11y:fontSize', '90');
       return 'Text size decreased. Say "reset text size" to restore.';
     }
@@ -504,6 +506,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Reset text to normal size',
     execute: () => {
       document.documentElement.style.fontSize = '';
+      document.documentElement.removeAttribute('data-dex-large-text');
       localStorage.removeItem('dex:a11y:fontSize');
       return 'Text size reset to normal.';
     }
@@ -602,7 +605,10 @@ function tryAccessibilityCommand(text: string): string | null {
 function loadA11yPreferences(): void {
   try {
     const fontSize = localStorage.getItem('dex:a11y:fontSize');
-    if (fontSize) document.documentElement.style.fontSize = `${fontSize}%`;
+    if (fontSize) {
+      document.documentElement.style.fontSize = `${fontSize}%`;
+      if (Number(fontSize) >= 110) document.documentElement.setAttribute('data-dex-large-text', '');
+    }
     
     if (localStorage.getItem('dex:a11y:highContrast') === 'true') {
       document.documentElement.classList.add('high-contrast');
@@ -1866,7 +1872,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               position: 'absolute', left: 0, bottom: 0, height: 2, width: '100%',
               transformOrigin: 'left center',
-              background: 'var(--color-accent)', opacity: 0.5,
+              background: 'var(--color-accent-fill)', opacity: 0.5,
               animation: `ukiLinger ${sleepMs}ms linear forwards`,
               pointerEvents: 'none', zIndex: 1,
             }}
@@ -2045,7 +2051,7 @@ const UkiOverlay: React.FC = () => {
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
                     lineHeight: 1.5, padding: '6px var(--space-2)', marginBottom: 6,
                     background: 'var(--color-bg-hover)', borderLeft: '2px solid var(--color-accent-light)',
-                    borderRadius: 3,
+                    borderRadius: 4,
                   }}>
                     {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2092,7 +2098,7 @@ const UkiOverlay: React.FC = () => {
               padding: '6px var(--space-2)', marginBottom: 'var(--space-2)',
               background: 'var(--color-accent-soft)',
               borderLeft: '2px solid var(--color-accent)',
-              borderRadius: 3,
+              borderRadius: 4,
             }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -2100,7 +2106,7 @@ const UkiOverlay: React.FC = () => {
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--color-accent)',
+                  background: 'var(--color-accent-fill)',
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
                 <span style={{ transition: 'opacity 0.2s ease' }}>
@@ -2145,7 +2151,7 @@ const UkiOverlay: React.FC = () => {
             <div role="alert" style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
               padding: '6px var(--space-2)', background: 'var(--color-error-muted)',
-              borderRadius: 3, borderLeft: '2px solid var(--color-error)',
+              borderRadius: 4, borderLeft: '2px solid var(--color-error)',
             }}>
               {error}
             </div>
@@ -2299,7 +2305,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 8, padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 10, padding: 'var(--space-2) var(--space-3)',
               fontSize: 13, color: 'var(--color-text-primary)',
               outline: 'none',
               resize: 'none',
@@ -2318,7 +2324,7 @@ const UkiOverlay: React.FC = () => {
             onClick={() => handleSendText()}
             disabled={!inputText.trim() || isThinking || state === 'processing' || state === 'thinking'}
             style={{
-              width: 32, height: 32, borderRadius: 8,
+              width: 32, height: 32, borderRadius: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: (inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent',
               border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent'),
@@ -2333,7 +2339,7 @@ const UkiOverlay: React.FC = () => {
             {isThinking ? (
               <span style={{
                 width: 8, height: 8, borderRadius: '50%',
-                background: 'var(--color-accent)',
+                background: 'var(--color-accent-fill)',
                 animation: 'ukiPulse 0.9s ease-in-out infinite',
               }} />
             ) : (

@@ -30,13 +30,13 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: 'dark-default',
     name: 'Dark Default',
     isDark: true,
-    accentColor: '', // empty = defer to the stylesheet baseline accent (Omnitrix green)
-    bgPrimary: '#18181b',
-    bgSecondary: '#111113',
-    bgTertiary: '#27272a',
-    textPrimary: '#fafafa',
-    textSecondary: '#a1a1aa',
-    border: '#27272a',
+    accentColor: '', // empty = defer to the stylesheet baseline accent (macOS system blue)
+    bgPrimary: '#1C1C1E',
+    bgSecondary: '#111215',
+    bgTertiary: '#2C2C2E',
+    textPrimary: '#F5F5F7',
+    textSecondary: '#AEAEB2',
+    border: '#38383A',
   },
   {
     id: 'dark-purple',
@@ -91,12 +91,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: 'Light Default',
     isDark: false,
     accentColor: '', // empty = defer to the stylesheet baseline accent
-    bgPrimary: '#ffffff',
-    bgSecondary: '#f8fafc',
-    bgTertiary: '#e2e8f0',
-    textPrimary: '#1e293b',
-    textSecondary: '#64748b',
-    border: '#e2e8f0',
+    bgPrimary: '#FFFFFF',
+    bgSecondary: '#F5F5F7',
+    bgTertiary: '#F2F2F7',
+    textPrimary: '#1D1D1F',
+    textSecondary: '#636366',
+    border: '#D1D1D6',
   },
   {
     id: 'light-warm',
@@ -147,9 +147,10 @@ export const applyTheme = (preset: ThemePreset) => {
   // track the chosen colour. An empty accent means "defer to the stylesheet
   // baseline": clear any inline family instead of forcing a colour.
   if (!preset.accentColor || !applyAccentFamily(preset.accentColor)) {
-    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted']) {
+    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted', '--color-accent-fill']) {
       root.style.removeProperty(prop);
     }
+    root.removeAttribute('data-dex-custom-accent');
   }
   root.style.setProperty('--color-bg-primary', preset.bgPrimary);
   root.style.setProperty('--color-bg-secondary', preset.bgSecondary);
@@ -206,6 +207,25 @@ export const initializeTheme = () => {
   // default on every boot, so installs carry it without the user ever choosing
   // it. Clear that stored value once so the stylesheet baseline (Omnitrix
   // green) becomes the effective default; deliberate accent picks survive.
+  // One-time: the owner retired the green accent. Installs still carrying the
+  // old Omnitrix-green default (stored here or in Settings) move to the
+  // stylesheet baseline (macOS blue).
+  try {
+    if (!localStorage.getItem('dex-accent-macos-migrated')) {
+      if ((localStorage.getItem('dex-accent-color') || '').toLowerCase() === '#32d74b') {
+        localStorage.removeItem('dex-accent-color');
+      }
+      const raw = localStorage.getItem('dex-settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.accentColor === 'string' && s.accentColor.toLowerCase() === '#32d74b') {
+          s.accentColor = 'var(--color-accent)';
+          localStorage.setItem('dex-settings', JSON.stringify(s));
+        }
+      }
+      localStorage.setItem('dex-accent-macos-migrated', '1');
+    }
+  } catch { /* quota/unavailable/corrupt settings */ }
   try {
     if (!localStorage.getItem('dex-accent-omnitrix-migrated')) {
       if (localStorage.getItem('dex-accent-color') === '#3b82f6') {
@@ -536,7 +556,7 @@ const styles: Record<string, React.CSSProperties> = {
   presetAccent: {
     width: '30px',
     height: '6px',
-    borderRadius: '3px',
+    borderRadius: '4px',
   },
   presetText: {
     width: '80%',

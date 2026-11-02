@@ -62,7 +62,7 @@ function Dot({ color }: { color: string }) {
     <span
       aria-hidden
       style={{
-        display: 'inline-block', width: 8, height: 8, borderRadius: 999,
+        display: 'inline-block', width: 8, height: 8, borderRadius: 9999,
         background: color, flex: '0 0 auto', marginTop: 5,
       }}
     />
@@ -157,7 +157,7 @@ export default function CreativeCommandBar({
               onClick={() => { setInput(ex); void plan(ex); }}
               style={{
                 background: 'transparent', color: C.textDim, border: C.border,
-                borderRadius: 999, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+                borderRadius: 9999, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
               }}
             >
               {ex}

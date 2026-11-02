@@ -75,7 +75,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
               <div
                 style={{
                   width: '100%', aspectRatio: '16 / 9', background: bg,
-                  borderRadius: 3, position: 'relative', overflow: 'hidden',
+                  borderRadius: 4, position: 'relative', overflow: 'hidden',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'rgba(255,255,255,0.4)', fontSize: 22, fontWeight: 700,
                 }}
@@ -93,7 +93,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                    background: 'var(--color-accent)', padding: '2px 4px', borderRadius: 2,
+                    background: 'var(--color-accent-fill)', padding: '2px 4px', borderRadius: 2,
                     color: '#FFFFFF',
                   }}>
                     ACTIVE

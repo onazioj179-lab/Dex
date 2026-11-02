@@ -45,7 +45,7 @@ export function setUkiActionConfirmHandler(fn: ActionConfirmHandler | null): voi
 // Bounded ring buffer + a `dex-uki-action-audit` event per entry.
 // ---------------------------------------------------------------------------
 
-export type UkiActionOutcome = 'ran' | 'denied' | 'failed' | 'blocked';
+export type UkiActionOutcome = 'ran' | 'denied' | 'failed' | 'blocked' | 'cancelled';
 
 export interface UkiActionAuditEntry {
   id: string;
@@ -55,10 +55,36 @@ export interface UkiActionAuditEntry {
   outcome: UkiActionOutcome;
   result: string;
   ts: number;
+  /** Risk level from the assistant policy (core tools); absent on old entries. */
+  risk?: 'low' | 'medium' | 'high';
 }
 
 const AUDIT_MAX = 500;
-const auditLog: UkiActionAuditEntry[] = [];
+// Persisted (bounded) so the trail survives a restart: "what did the assistant
+// do yesterday" must be answerable. Args are already truncated by redactArgs.
+const AUDIT_KEY = 'dex-uki-audit';
+const AUDIT_PERSIST_MAX = 300;
+
+function loadPersistedAudit(): UkiActionAuditEntry[] {
+  try {
+    const raw = localStorage.getItem(AUDIT_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.slice(-AUDIT_PERSIST_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+function schedulePersist(): void {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try { localStorage.setItem(AUDIT_KEY, JSON.stringify(auditLog.slice(-AUDIT_PERSIST_MAX))); } catch { /* quota/unavailable */ }
+  }, 500);
+}
+
+const auditLog: UkiActionAuditEntry[] = loadPersistedAudit();
 
 /** Truncate string args so the audit never stores unbounded/sensitive payloads. */
 function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
@@ -73,6 +99,7 @@ function recordAudit(e: Omit<UkiActionAuditEntry, 'ts'>): void {
   const entry: UkiActionAuditEntry = { ...e, ts: Date.now() };
   auditLog.push(entry);
   if (auditLog.length > AUDIT_MAX) auditLog.shift();
+  schedulePersist();
   try {
     window.dispatchEvent(new CustomEvent('dex-uki-action-audit', { detail: entry }));
   } catch {
@@ -83,6 +110,25 @@ function recordAudit(e: Omit<UkiActionAuditEntry, 'ts'>): void {
 /** The UKI action audit trail (oldest first, most recent last). */
 export function getUkiActionAudit(): readonly UkiActionAuditEntry[] {
   return auditLog;
+}
+
+/** Record a core-tool call (open_app, read_file, ...) in the same audit trail. */
+export function recordUkiToolAudit(e: {
+  tool: string;
+  args: Record<string, unknown>;
+  outcome: UkiActionOutcome;
+  result: string;
+  risk: 'low' | 'medium' | 'high';
+  mutates: boolean;
+}): void {
+  recordAudit({ id: e.tool, appId: 'uki', mutates: e.mutates, args: redactArgs(e.args), outcome: e.outcome, result: e.result.slice(0, 300), risk: e.risk });
+}
+
+/** Clear the audit trail (user control in Security Center). */
+export function clearUkiActionAudit(): void {
+  auditLog.length = 0;
+  try { localStorage.removeItem(AUDIT_KEY); } catch { /* unavailable */ }
+  try { window.dispatchEvent(new CustomEvent('dex-uki-action-audit', { detail: null })); } catch { /* non-DOM */ }
 }
 
 /** Register (or replace) an action for an app. Call from the component's effect. */

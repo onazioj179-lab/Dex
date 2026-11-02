@@ -80,7 +80,7 @@ export const WorkspaceTimeline: React.FC = () => {
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>Workspace Time Machine</div>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Restore your desktop layout to an earlier moment</div>
           </div>
-          <button onClick={snapshotNow} style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--color-accent, #0A84FF)', background: 'rgba(10,132,255,0.15)', color: 'var(--color-accent, #4A9EFF)' }}>Snapshot now</button>
+          <button onClick={snapshotNow} style={{ padding: '7px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--color-accent, #0A84FF)', background: 'rgba(10,132,255,0.15)', color: 'var(--color-accent, #4A9EFF)' }}>Snapshot now</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
@@ -89,10 +89,10 @@ export const WorkspaceTimeline: React.FC = () => {
               No snapshots yet. Open a few windows — DEX captures your layout automatically, or use “Snapshot now”.
             </div>
           ) : snaps.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, transition: 'background 0.1s' }}
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, transition: 'background 0.1s' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.05))'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-              <div style={{ width: 38, height: 38, borderRadius: 8, flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

@@ -730,7 +730,7 @@ const s: Record<string, React.CSSProperties> = {
     overflowX: 'auto' as const, paddingBottom: 2,
   },
   quickChip: {
-    padding: '4px 12px', borderRadius: 999, border: 'none', cursor: 'pointer',
+    padding: '4px 12px', borderRadius: 9999, border: 'none', cursor: 'pointer',
     fontSize: 12, fontFamily: 'var(--font-family)', whiteSpace: 'nowrap' as const, flexShrink: 0,
   },
   addWrap: {
@@ -746,7 +746,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     padding: 'var(--space-2) var(--space-4)', borderRadius: 10, border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   suggestList: {
@@ -794,7 +794,7 @@ const s: Record<string, React.CSSProperties> = {
   heroDot: { opacity: 0.6 },
   heroDetailItem: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: 'var(--space-2)', borderRadius: 12,
+    padding: 'var(--space-2)', borderRadius: 14,
     background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.08)',
   },
   heroDetailLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 2 },
@@ -873,11 +873,11 @@ const s: Record<string, React.CSSProperties> = {
   forecastLow: { fontSize: 14, color: 'var(--color-text-secondary)', width: 34, textAlign: 'right' as const, flexShrink: 0 },
   rangeTrack: {
     position: 'relative' as const, flex: 1, height: 5, minWidth: 40,
-    borderRadius: 999, background: 'var(--color-border-subtle)', overflow: 'hidden',
+    borderRadius: 9999, background: 'var(--color-border-subtle)', overflow: 'hidden',
   },
   rangeFill: {
     position: 'absolute' as const, top: 0, bottom: 0,
-    borderRadius: 999,
+    borderRadius: 9999,
     background: 'linear-gradient(90deg, #5ac8fa 0%, #ffd60a 55%, #ff9f0a 100%)',
   },
   dayDetail: {

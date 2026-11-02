@@ -325,7 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: { fontSize: '11px', color: 'var(--color-text-tertiary)' },
   primaryBtn: {
     padding: '8px 14px',
-    background: 'var(--color-accent, #0a84ff)',
+    background: 'var(--color-accent-fill)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 'var(--radius-sm)',
     color: '#fff',

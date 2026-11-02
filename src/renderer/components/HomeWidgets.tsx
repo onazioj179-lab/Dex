@@ -287,7 +287,7 @@ const CalendarWidget: React.FC = () => {
           const isToday = isCurrentMonth && d === today;
           return (
             <div key={i} style={{
-              padding: 3, borderRadius: 3, color: isToday ? '#000' : d ? '#fff' : 'transparent',
+              padding: 3, borderRadius: 4, color: isToday ? '#000' : d ? '#fff' : 'transparent',
               background: isToday ? 'var(--color-accent)' : 'transparent', fontWeight: isToday ? 600 : 400,
             }}>
               {d ?? ''}
@@ -360,7 +360,7 @@ const QuickActionsWidget: React.FC = () => {
           key={a.appId} 
           onClick={() => openApp(a.appId)}
           style={{ 
-            padding: '10px 6px', borderRadius: 8, 
+            padding: '10px 6px', borderRadius: 10, 
             background: `${a.color}20`, border: 'none', 
             color: a.color, fontSize: 11, fontWeight: 600, 
             cursor: 'pointer', transition: 'background 0.15s, transform 0.1s' 
@@ -764,7 +764,7 @@ const StorageWidget: React.FC = () => {
         <span style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatBytes(storage.free)}</span>
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>free of {formatBytes(storage.total)}</span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'var(--color-border)', overflow: 'hidden' }}>
+      <div style={{ height: 6, borderRadius: 4, background: 'var(--color-border)', overflow: 'hidden' }}>
         <div style={{ width: `${usedPercent}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.5s' }} />
       </div>
       <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{usedPercent}% used</div>
@@ -799,7 +799,7 @@ const MusicControlsWidget: React.FC = () => {
           onClick={() => toggle()}
           style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: 'var(--color-accent)', border: 'none',
+            background: 'var(--color-accent-fill)', border: 'none',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
           aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -1077,7 +1077,7 @@ const DraggableWidget: React.FC<{
         top: widget.y,
         width: widget.width,
         height: widget.height,
-        borderRadius: 12,
+        borderRadius: 14,
         // Unified desktop surface (v5.5 Desktop initiative): the widget is a
         // desktop object sitting on the wallpaper, not an opaque card. At rest it
         // has no fill or border. An inherited text-shadow plus an object drop-shadow
@@ -1139,7 +1139,7 @@ const DraggableWidget: React.FC<{
           style={{
             position: 'absolute', bottom: 2, right: 2,
             width: 16, height: 16, cursor: 'nwse-resize',
-            background: 'var(--color-accent, rgba(10,132,255,0.6))', opacity: 0.55, borderRadius: 3,
+            background: 'var(--color-accent, rgba(10,132,255,0.6))', opacity: 0.55, borderRadius: 4,
             touchAction: 'none',
           }}
         />
@@ -1698,7 +1698,7 @@ const RewindSummaryWidget: React.FC = () => {
                   <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
                     <span style={{ width: 56, height: 4, borderRadius: 2, background: 'var(--color-bg-hover, rgba(255,255,255,0.08))', overflow: 'hidden', flexShrink: 0 }}>
-                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 2 }} />
+                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent-fill)', borderRadius: 2 }} />
                     </span>
                   </div>
                 );
@@ -1815,13 +1815,13 @@ const PinnedAppsWidget: React.FC = () => {
               title={def.name}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                padding: 'var(--space-2) 2px', border: 'none', borderRadius: 8,
+                padding: 'var(--space-2) 2px', border: 'none', borderRadius: 10,
                 background: 'transparent', cursor: 'pointer',
                 color: 'var(--color-text-secondary)',
               }}
             >
               <span style={{
-                width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                width: 34, height: 34, borderRadius: 10, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: tinted ? `${def.color}22` : 'var(--color-bg-hover, rgba(255,255,255,0.08))',
                 color: tinted ? def.color : 'var(--color-accent)',
@@ -1844,12 +1844,12 @@ const PinnedAppsWidget: React.FC = () => {
           title="Add app to Home"
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-            padding: 'var(--space-2) 2px', border: 'none', borderRadius: 8,
+            padding: 'var(--space-2) 2px', border: 'none', borderRadius: 10,
             background: 'transparent', cursor: 'pointer', color: 'var(--color-text-tertiary)',
           }}
         >
           <span style={{
-            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'var(--color-bg-inset)', border: '1px dashed var(--color-border)',
           }}>

@@ -734,7 +734,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: 44,
     borderRadius: radius.xl,
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-text-primary)',
     fontSize: 15,
     fontWeight: fontWeight.semibold,

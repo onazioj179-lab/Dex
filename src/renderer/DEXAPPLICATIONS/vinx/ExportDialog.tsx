@@ -55,7 +55,7 @@ const presetGridStyle: React.CSSProperties = {
 };
 
 const presetCardStyle = (selected: boolean): React.CSSProperties => ({
-  padding: 'var(--space-2)', borderRadius: 3, cursor: 'pointer',
+  padding: 'var(--space-2)', borderRadius: 4, cursor: 'pointer',
   border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-bg-hover)'}`,
   background: selected ? 'rgba(74,158,255,0.08)' : 'var(--color-border-subtle)',
 });
@@ -83,7 +83,7 @@ const selectStyle: React.CSSProperties = {
 
 const btnPrimaryStyle: React.CSSProperties = {
   padding: '6px var(--space-5)', fontSize: 11, fontWeight: 600, border: 'none',
-  borderRadius: 9999, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
+  borderRadius: 9999, background: 'var(--color-accent-fill)', color: '#000000', cursor: 'pointer',
 };
 
 const btnSecondaryStyle: React.CSSProperties = {
@@ -519,7 +519,7 @@ export const ExportDialog: React.FC = memo(() => {
                       }}>
                         <div style={{
                           height: '100%', width: `${job.progress}%`,
-                          background: 'var(--color-accent)', borderRadius: 2,
+                          background: 'var(--color-accent-fill)', borderRadius: 2,
                         }} />
                       </div>
                       <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', textAlign: 'right', fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>

@@ -20,12 +20,72 @@ const MODELS: ModelInfo[] = [
   { id: 'mistral',   label: 'Mistral',    contextWindow: 32768,  capabilities: { streaming: true } },
 ];
 
+// Models actually installed in the local Ollama (from /api/tags). null = not
+// checked yet (fall back to the suggested list above); [] = Ollama is running
+// but has no models, so nothing local can answer and the UI says so.
+let installed: ModelInfo[] | null = null;
+
+const VISION_RE = /llava|vision|bakllava|moondream|gemma3|qwen2\.5vl|minicpm-v/i;
+
+/** Parse an Ollama /api/tags response into ModelInfo entries. */
+export function parseOllamaTags(json: unknown): ModelInfo[] {
+  const models = (json as { models?: Array<{ name?: unknown; model?: unknown }> })?.models;
+  if (!Array.isArray(models)) return [];
+  return models
+    .map((m) => String(m?.name ?? m?.model ?? '').trim())
+    .filter((name) => name.length > 0 && name.length <= 120)
+    .map((name) => ({
+      id: name,
+      label: name,
+      // Ollama does not report the context window here; 8K is its default.
+      contextWindow: 8192,
+      capabilities: { streaming: true, ...(VISION_RE.test(name) ? { vision: true } : {}) },
+    }));
+}
+
+/**
+ * Ask the local Ollama which models are installed (localhost only, 2 s timeout).
+ * Returns the list, or null if Ollama is not reachable (list left unchanged).
+ */
+export async function refreshOllamaModels(
+  fetchImpl: (url: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; json(): Promise<unknown> }> = (u, i) => fetch(u, i),
+  base = DEFAULT_BASE,
+): Promise<ModelInfo[] | null> {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 2000) : null;
+  try {
+    const res = await fetchImpl(`${base.replace(/\/$/, '')}/api/tags`, ctrl ? { signal: ctrl.signal } : undefined);
+    if (!res.ok) return null;
+    installed = parseOllamaTags(await res.json());
+    return installed;
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Installed local models (null until Ollama has been checked). */
+export function ollamaInstalledModels(): ModelInfo[] | null {
+  return installed;
+}
+
+/** True once Ollama answered and reported zero installed models. */
+export function ollamaHasNoModels(): boolean {
+  return installed !== null && installed.length === 0;
+}
+
+/** Test hook. */
+export function _setInstalledOllamaModels(list: ModelInfo[] | null): void {
+  installed = list;
+}
+
 export const ollamaProvider: LLMProvider = {
   id: 'ollama',
   label: 'Ollama (local)',
   requiresKey: false,
 
-  listModels: () => MODELS,
+  listModels: () => installed ?? MODELS,
 
   buildChatRequest(req: ChatRequest, config: ProviderConfig): HttpRequest {
     const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');

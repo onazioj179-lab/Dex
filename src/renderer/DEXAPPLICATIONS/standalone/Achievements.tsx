@@ -173,7 +173,7 @@ const Achievements: React.FC = () => {
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              width: 44, height: 44, borderRadius: 14, flexShrink: 0,
               background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -186,20 +186,20 @@ const Achievements: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {engagement.stats.currentStreak > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 11, background: PANEL, border: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 10, background: PANEL, border: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600 }}>
                 <DexIcon name="flame" size={15} color={GOLD} />
                 {engagement.stats.currentStreak}d streak
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 11, background: PANEL, border: `1px solid ${BORDER}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 10, background: PANEL, border: `1px solid ${BORDER}` }}>
               <DexIcon name={rank.icon} size={16} color={GOLD} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{rank.title}</span>
-              <div style={{ width: 52, height: 4, borderRadius: 3, background: '#2a2a30', overflow: 'hidden' }}>
+              <div style={{ width: 52, height: 4, borderRadius: 4, background: '#2a2a30', overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', background: GOLD }} />
               </div>
             </div>
             <button onClick={shareProgress} title="Copy progress summary" style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 11,
+              display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
               background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`, color: '#1a0f08',
             }}>
@@ -229,7 +229,7 @@ const Achievements: React.FC = () => {
             {categoryProgress.map(c => {
               const done = c.total > 0 && c.got >= c.total;
               return (
-                <div key={c.key} className="tr-card" style={{ padding: 15, borderRadius: 15, background: PANEL, border: `1px solid ${BORDER}` }}>
+                <div key={c.key} className="tr-card" style={{ padding: 15, borderRadius: 14, background: PANEL, border: `1px solid ${BORDER}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
                     <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: `${c.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <DexIcon name={c.icon} size={18} color={c.color} />
@@ -259,8 +259,8 @@ const Achievements: React.FC = () => {
               {almostThere.map(({ ach, cur, tgt, pct }) => {
                 const meta = RARITY_META[ach.rarity];
                 return (
-                  <div key={ach.id} className="tr-card" title={ach.description} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 15, background: PANEL, border: `1px solid ${BORDER}` }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: `${meta.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div key={ach.id} className="tr-card" title={ach.description} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, background: PANEL, border: `1px solid ${BORDER}` }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0, background: `${meta.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <DexIcon name={ach.icon} size={20} color={meta.color} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -269,8 +269,8 @@ const Achievements: React.FC = () => {
                         <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, flexShrink: 0 }}>{Math.round(pct)}%</span>
                       </div>
                       <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: '#1f1f24', overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+                        <div style={{ flex: 1, height: 5, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
                         </div>
                         <span style={{ fontSize: 10, color: TXT_DIM, flexShrink: 0 }}>{cur.toLocaleString()}/{tgt.toLocaleString()}</span>
                       </div>
@@ -290,8 +290,8 @@ const Achievements: React.FC = () => {
               {recentUnlocks.map(({ ach, ts }) => {
                 const meta = RARITY_META[ach.rarity];
                 return (
-                  <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 15, background: PANEL_2, border: `1px solid ${meta.color}33` }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 9, background: `${meta.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 14, background: PANEL_2, border: `1px solid ${meta.color}33` }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, marginBottom: 9, background: `${meta.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <DexIcon name={ach.icon} size={20} color={meta.color} />
                     </div>
                     <div style={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.title}</div>
@@ -346,12 +346,12 @@ const HeroSpotlight: React.FC<{
       </div>
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1a0f08', background: GOLD, padding: '4px 9px', borderRadius: 7 }}>Spotlight</span>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: meta.color, background: `${meta.color}1f`, padding: '4px 9px', borderRadius: 7 }}>{ach.rarity}</span>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1a0f08', background: GOLD, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: meta.color, background: `${meta.color}1f`, padding: '4px 9px', borderRadius: 6 }}>{ach.rarity}</span>
           <span style={{ fontSize: 11, color: TXT_DIM }}>{isUnlocked ? `Unlocked ${relTime(ts)}` : 'Next up'}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0, background: `${meta.color}1f`, border: `1px solid ${meta.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 18, flexShrink: 0, background: `${meta.color}1f`, border: `1px solid ${meta.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <DexIcon name={isUnlocked ? ach.icon : 'lock'} size={28} color={meta.color} />
           </div>
           <div style={{ minWidth: 0 }}>
@@ -414,7 +414,7 @@ const StatsRing: React.FC<{
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 9 }}>
         {tiles.map(t => (
-          <div key={t.label} style={{ padding: '10px 8px', borderRadius: 12, textAlign: 'center', background: PANEL_2, border: `1px solid ${BORDER}` }}>
+          <div key={t.label} style={{ padding: '10px 8px', borderRadius: 14, textAlign: 'center', background: PANEL_2, border: `1px solid ${BORDER}` }}>
             <DexIcon name={t.icon} size={15} color={GOLD} />
             <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{t.value}</div>
             <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.label}</div>
@@ -433,7 +433,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
   if (!today.length) return null;
 
   return (
-    <div style={{ padding: '13px 16px', borderRadius: 16, border: `1px solid ${BORDER}`, background: PANEL, display: 'flex', alignItems: 'center', gap: 18 }}>
+    <div style={{ padding: '13px 16px', borderRadius: 18, border: `1px solid ${BORDER}`, background: PANEL, display: 'flex', alignItems: 'center', gap: 18 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 96 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
@@ -466,7 +466,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
           const threshold = ch.condition?.threshold || 0;
           const pct = threshold > 0 ? Math.min(100, (ch.progress / threshold) * 100) : 0;
           return (
-            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 11, background: ch.completed ? 'rgba(48,209,88,0.12)' : PANEL_2, border: `1px solid ${ch.completed ? 'rgba(48,209,88,0.3)' : BORDER}` }}>
+            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 10, background: ch.completed ? 'rgba(48,209,88,0.12)' : PANEL_2, border: `1px solid ${ch.completed ? 'rgba(48,209,88,0.3)' : BORDER}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
                   <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? '#30d158' : GOLD} />

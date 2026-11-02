@@ -804,7 +804,7 @@ const PixelArt: React.FC = () => {
             title={`Import an image and downscale it into the ${size}x${size} grid`}
           >Import</button>
           <button onClick={clearFrame} style={toolBtn}>Clear</button>
-          <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Export PNG</button>
+          <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Export PNG</button>
           <button onClick={exportSheet} disabled={frames.length < 2} style={{ ...toolBtn, ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} title={frames.length < 2 ? 'Add a second frame to export a sprite sheet' : 'Export all frames as one sprite-sheet PNG'}>Export Sheet</button>
         </div>
       </div>
@@ -822,7 +822,7 @@ const PixelArt: React.FC = () => {
                 key={c}
                 onClick={() => setColor(c)}
                 style={{
-                  width: 28, height: 28, borderRadius: 3,
+                  width: 28, height: 28, borderRadius: 4,
                   background: c, cursor: 'pointer',
                   border: c === color ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
                   padding: 0,
@@ -854,7 +854,7 @@ const PixelArt: React.FC = () => {
                       key={`${c}-${i}`}
                       onClick={() => setColor(c)}
                       style={{
-                        width: 28, height: 28, borderRadius: 3,
+                        width: 28, height: 28, borderRadius: 4,
                         background: c, cursor: 'pointer',
                         border: c === drawColor ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
                         padding: 0,
@@ -880,7 +880,7 @@ const PixelArt: React.FC = () => {
             height={canvasPx}
             style={{
               imageRendering: 'pixelated', cursor: playing ? 'default' : 'crosshair',
-              boxShadow: 'var(--pg-shadow-context)', borderRadius: 3,
+              boxShadow: 'var(--pg-shadow-context)', borderRadius: 4,
             }}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
@@ -894,7 +894,7 @@ const PixelArt: React.FC = () => {
                 width={tilePx}
                 height={tilePx}
                 style={{
-                  imageRendering: 'pixelated', borderRadius: 3,
+                  imageRendering: 'pixelated', borderRadius: 4,
                   boxShadow: 'var(--pg-shadow-context)',
                 }}
                 title="3x3 tile preview - check that edges line up seamlessly"
@@ -917,7 +917,7 @@ const PixelArt: React.FC = () => {
               <button
                 onClick={() => { setCurrentFrame(i); setPlaying(false); }}
                 style={{
-                  width: 56, height: 56, padding: 0, borderRadius: 3,
+                  width: 56, height: 56, padding: 0, borderRadius: 4,
                   background: 'var(--color-bg-base, #1a1a1f)', cursor: 'pointer',
                   border: i === currentFrame
                     ? '2px solid var(--color-accent)'
@@ -972,7 +972,7 @@ const PixelArt: React.FC = () => {
             />
             {fps} fps
           </label>
-          <span style={{ width: 18, height: 18, borderRadius: 3, background: color, border: '1px solid var(--color-border-subtle)' }} />
+          <span style={{ width: 18, height: 18, borderRadius: 4, background: color, border: '1px solid var(--color-border-subtle)' }} />
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{color}</span>
         </div>
       </div>

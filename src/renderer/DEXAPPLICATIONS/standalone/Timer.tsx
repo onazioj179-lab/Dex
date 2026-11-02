@@ -240,7 +240,7 @@ const s: Record<string, React.CSSProperties> = {
   inputLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 },
   inputColon: { fontSize: 20, color: 'var(--color-text-tertiary)', marginBottom: 14 },
   addBtn: {
-    padding: '10px var(--space-5)', background: 'var(--color-accent)',
+    padding: '10px var(--space-5)', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
@@ -248,7 +248,7 @@ const s: Record<string, React.CSSProperties> = {
   presetChip: {
     padding: '6px var(--space-4)', background: 'var(--color-bg-elevated)',
     color: 'var(--color-text-primary)', border: '1px solid var(--color-border)',
-    borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+    borderRadius: 9999, fontSize: 13, fontWeight: 500, cursor: 'pointer',
     fontFamily: 'var(--font-family)',
   },
   grid: {
@@ -257,7 +257,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   card: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)',
-    padding: 'var(--space-4)', borderRadius: 12,
+    padding: 'var(--space-4)', borderRadius: 14,
   },
   cardHeader: { display: 'flex', alignItems: 'center', width: '100%', gap: 'var(--space-2)' },
   labelBtn: {
@@ -286,7 +286,7 @@ const s: Record<string, React.CSSProperties> = {
   cardControls: { display: 'flex', gap: 'var(--space-2)', alignItems: 'center', width: '100%' },
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    padding: '10px var(--space-4)', background: 'var(--color-accent)',
+    padding: '10px var(--space-4)', background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },

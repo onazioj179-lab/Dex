@@ -4,7 +4,7 @@ Thank you for your interest in contributing to DEX! This document provides guide
 
 ## Pick Up Where Someone Left Off
 
-DEX is built in **independent tracks** (A–P). Each track is self-contained: a focused area of work with its own files, verification gates, and a `docs/handoff/<track>.md` doc that any contributor can read in under five minutes to resume mid-flight. Read [docs/handoff/INDEX.md](handoff/INDEX.md) for the current state of every track.
+DEX is built in **independent tracks** (A–P). Each track is self-contained: a focused area of work with its own files, verification gates, and a `docs/handoff/<track>.md` doc that any contributor can read in under five minutes to resume mid-flight. Read docs/handoff/INDEX.md (retired; see ROADMAP.md and TAURI-MIGRATION.md) for the current state of every track.
 
 **To resume a track:**
 1. Read `docs/handoff/<track>.md` — has scope, files touched, what's done, what's next, blockers.

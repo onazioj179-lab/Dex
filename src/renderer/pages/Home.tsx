@@ -275,7 +275,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
   return (
     <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
       <div onMouseDown={e => e.stopPropagation()} className="dex-liquid-glass-strong" style={{
-        borderRadius: 16,
+        borderRadius: 18,
         width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(72vh, calc(100vh - 32px))',
         overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
       }}>
@@ -306,7 +306,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   aria-label={pinned ? `${def.name} already pinned` : `Pin ${def.name}`}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                    padding: '10px 6px', borderRadius: 12,
+                    padding: '10px 6px', borderRadius: 14,
                     background: 'transparent',
                     border: '1px solid transparent',
                     color: 'var(--color-text-primary)', fontSize: 11,
@@ -589,7 +589,7 @@ export const Home: React.FC = () => {
             alignItems: 'center',
             gap: 7,
             padding: '5px 12px',
-            borderRadius: 999,
+            borderRadius: 9999,
             background: 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))',
             border: '1px solid rgba(255,255,255,0.12)',
             color: 'rgba(255,255,255,0.92)',
@@ -607,7 +607,7 @@ export const Home: React.FC = () => {
           <span style={{
             minWidth: 16,
             padding: '0 4px',
-            borderRadius: 999,
+            borderRadius: 9999,
             background: 'rgba(255,255,255,0.14)',
             fontSize: 10.5,
             fontWeight: 600,
@@ -727,7 +727,7 @@ export const Home: React.FC = () => {
             style={{
               position: 'fixed', left: ctxMenu.x, top: ctxMenu.y,
               zIndex: Z_CONTEXT_MENU, minWidth: 200, padding: '5px 0',
-              borderRadius: 12,
+              borderRadius: 14,
               boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
@@ -808,7 +808,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
   return (
     <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
       <div onMouseDown={e => e.stopPropagation()} className="dex-liquid-glass-strong" style={{
-        borderRadius: 16,
+        borderRadius: 18,
         width: 'min(580px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', overflow: 'hidden', padding: 0,
         display: 'flex', flexDirection: 'column',
       }}>
@@ -857,12 +857,12 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       }}
                     >
                       {isActive && (
-                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 8, background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
+                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 10, background: 'var(--color-accent-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}
                       {p.mode === 'live' && (
-                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
+                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
                       )}
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 'var(--space-3) 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}

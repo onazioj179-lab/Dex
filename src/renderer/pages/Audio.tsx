@@ -1325,7 +1325,7 @@ export const Audio: React.FC = () => {
                     ? 'Heart songs to add them to favorites'
                     : 'or click to browse — MP3, WAV, FLAC, OGG, AAC, M4A'}
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); handleBrowseFiles(); }} aria-label="Browse for audio files" style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-5)', borderRadius: 10, background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Browse Files</button>
+                <button onClick={(e) => { e.stopPropagation(); handleBrowseFiles(); }} aria-label="Browse for audio files" style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-5)', borderRadius: 10, background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Browse Files</button>
                 <div style={styles.dropZoneBorder} />
               </div>
             ) : filteredTracks.map((track, index) => (
@@ -1500,7 +1500,7 @@ export const Audio: React.FC = () => {
             </div>
             <div style={{ padding: '0 var(--space-3) 6px', display: 'flex', gap: 4, alignItems: 'center' }}>
               <div style={{ flex: 1, height: 3, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${progress}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
+                <div style={{ height: '100%', width: `${progress}%`, background: 'var(--color-accent-fill)', borderRadius: 2 }} />
               </div>
             </div>
             <div style={{ padding: '0 var(--space-3) 10px', display: 'flex', justifyContent: 'center', gap: 'var(--space-3)' }}>
@@ -1559,7 +1559,7 @@ export const Audio: React.FC = () => {
                   aria-label={gaplessMode ? 'Disable gapless playback' : 'Enable gapless playback'}
                   style={{
                     width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: gaplessMode ? 'var(--color-success)' : 'var(--color-border)',
+                    background: gaplessMode ? 'var(--color-accent)' : 'var(--color-border)',
                     position: 'relative', transition: 'background 0.2s ease', padding: 0,
                   }}
                 >
@@ -1607,7 +1607,7 @@ export const Audio: React.FC = () => {
                     />
                   </div>
                 ))}
-                <button onClick={saveMetadata} style={{ marginTop: 4, padding: 'var(--space-2) 0', borderRadius: 10, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
+                <button onClick={saveMetadata} style={{ marginTop: 4, padding: 'var(--space-2) 0', borderRadius: 10, border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
               </div>
             </div>
           </div>
@@ -1783,7 +1783,7 @@ export const Audio: React.FC = () => {
             </button>
             <div style={styles.volumeBar}>
               <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${volume}%`, ...styles.volumeFill, background: 'var(--color-accent, #0a84ff)' }} />
+              <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${volume}%`, ...styles.volumeFill, background: 'var(--color-accent-fill)' }} />
               <input
                 type="range"
                 min="0"
@@ -1964,7 +1964,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minHeight: '360px',
     margin: 'var(--space-6)',
-    borderRadius: '12px',
+    borderRadius: '14px',
     border: '2px dashed var(--color-border)',
     background: 'var(--color-bg-secondary)',
     cursor: 'pointer',
@@ -1992,7 +1992,7 @@ const styles: Record<string, React.CSSProperties> = {
   dropZoneBorder: {
     position: 'absolute',
     inset: 0,
-    borderRadius: '12px',
+    borderRadius: '14px',
     pointerEvents: 'none',
   },
   trackItem: {
@@ -2134,7 +2134,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '42px',
     borderRadius: '50%',
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-text-on-accent, #fff)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',

@@ -31,6 +31,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActio
 import { searchLines } from '../../../shared/search/textSearch';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
+import SketchPad, { type SketchMode } from './SketchPad';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -108,6 +109,8 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
   ],
   [
     { id: 'table', label: 'Insert Table', icon: 'TBL', glyph: 'grid', command: 'table' },
+    { id: 'sketch', label: 'Insert Sketch', icon: 'Drw', glyph: 'pen-tool', command: 'sketch' },
+    { id: 'signature', label: 'Insert Handwritten Signature', icon: 'Sig', glyph: 'feather', command: 'signature' },
     { id: 'columns', label: 'Two Columns', icon: 'Col', command: 'columns' },
     { id: 'callout-note', label: 'Callout: Note', icon: 'Note', glyph: 'info', command: 'callout', arg: 'note' },
     { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', glyph: 'alert-triangle', command: 'callout', arg: 'warning' },
@@ -226,7 +229,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 3,
+    borderRadius: 4,
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
@@ -398,6 +401,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // stripping all formatting (the normal paste keeps rich HTML when available).
   const forcePlainRef = useRef(false);
   const [isEmpty, setIsEmpty] = useState(true);
+  const [sketchMode, setSketchMode] = useState<SketchMode | null>(null);
+  const sketchRangeRef = useRef<Range | null>(null);
   const [charCount, setCharCount] = useState(0);
   const [wdCount, setWdCount] = useState(0);
   const [sentenceCount, setSentenceCount] = useState(0);
@@ -954,11 +959,40 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       case 'formatBlock':
         exec(action.command, action.arg);
         break;
+      case 'sketch':
+      case 'signature': {
+        // Remember the caret so the drawing lands where the user was typing
+        // (the dialog steals focus and the selection).
+        const sel = window.getSelection();
+        sketchRangeRef.current = sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)
+          ? sel.getRangeAt(0).cloneRange()
+          : null;
+        setSketchMode(action.command as SketchMode);
+        break;
+      }
       default:
         exec(action.command, action.arg);
         break;
     }
   }, [readOnly, exec, pushUndo, emitChange]);
+
+  const insertSketch = useCallback((dataUrl: string, alt: string) => {
+    setSketchMode(null);
+    const editor = editorRef.current;
+    if (!editor) return;
+    pushUndo();
+    editor.focus();
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      if (sketchRangeRef.current) sel.addRange(sketchRangeRef.current);
+      else { const r = document.createRange(); r.selectNodeContents(editor); r.collapse(false); sel.addRange(r); }
+    }
+    // An ordinary image block: htmlToDoc/docToHTML already round-trip <img>.
+    const safeAlt = alt.replace(/"/g, '&quot;');
+    document.execCommand('insertHTML', false, `<p><img src="${dataUrl}" alt="${safeAlt}" /></p><p><br></p>`);
+    emitChange();
+  }, [pushUndo, emitChange]);
 
   // -- Keyboard Shortcuts ------------------------------------------------
 
@@ -1223,6 +1257,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
   return (
     <div style={styles.container}>
+      {sketchMode && (
+        <SketchPad mode={sketchMode} onInsert={insertSketch} onCancel={() => setSketchMode(null)} />
+      )}
       {/* Toolbar */}
       {!readOnly && editorMode !== 'preview' && (
         <div style={styles.toolbar}>
@@ -1254,7 +1291,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               title="Editor font family"
               value={fontFamily}
               onChange={e => setEditorFont(e.target.value)}
-              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+              style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
             >
               {NOTE_FONTS.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
             </select>
@@ -1263,7 +1300,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               title="Font size"
               value={fontSize}
               onChange={e => setEditorSize(Number(e.target.value))}
-              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+              style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
             >
               {NOTE_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
             </select>

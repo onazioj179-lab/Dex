@@ -104,6 +104,14 @@ import { installSchemePresetSync } from './components/ThemeManager';
 initTheme();
 installSchemePresetSync();
 
+// AI provider keys: load from the native DPAPI store and migrate legacy
+// localStorage copies (no-op in the web preview).
+import { hydrateKeystore } from './uki/keystore';
+void hydrateKeystore();
+// Discover the models installed in a local Ollama (localhost only, 2 s timeout).
+import { refreshOllamaModels } from './uki/providers/ollama';
+void refreshOllamaModels();
+
 import { initIdleContinuity } from './services/IdleContinuity';
 initIdleContinuity();
 
@@ -319,7 +327,7 @@ class RootErrorBoundary extends React.Component<
           height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'var(--dex-font-ui)', gap: 'var(--space-4)',
         }}>
           <div style={{
-            width: 64, height: 64, borderRadius: 12,
+            width: 64, height: 64, borderRadius: 14,
             background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
@@ -333,8 +341,8 @@ class RootErrorBoundary extends React.Component<
             <button
               onClick={() => window.location.reload()}
               style={{
-                padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
-                border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                padding: '10px 28px', background: 'var(--color-accent-fill)', color: '#fff',
+                border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
                 cursor: 'pointer',
                 boxShadow: '0 4px 16px rgba(10,132,255,0.35)',
               }}
@@ -351,7 +359,7 @@ class RootErrorBoundary extends React.Component<
               }}
               style={{
                 padding: '10px 24px', background: 'transparent', color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border, rgba(255,255,255,0.2))', borderRadius: 8,
+                border: '1px solid var(--color-border, rgba(255,255,255,0.2))', borderRadius: 10,
                 fontSize: 13, cursor: 'pointer',
               }}
             >Reset &amp; reload</button>

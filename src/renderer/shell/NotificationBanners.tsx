@@ -628,7 +628,7 @@ const CenterCard: React.FC<{
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 6,
+        padding: '10px var(--space-3)', borderRadius: 10, marginBottom: 6,
         background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
         border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
         cursor: 'pointer',
@@ -771,8 +771,8 @@ export const NotificationCenter: React.FC<{
             {unreadCount > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-accent-text, #fff)',
-                background: 'var(--color-accent)',
-                padding: '2px 6px', borderRadius: 8,
+                background: 'var(--color-accent-fill)',
+                padding: '2px 6px', borderRadius: 10,
               }}>
                 {unreadCount}
               </span>

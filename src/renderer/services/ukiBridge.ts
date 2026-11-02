@@ -394,8 +394,13 @@ export function initUkiRendererBridge(): void {
         dex?.navigate?.('files');
         break;
       case 'delete':
-        if (typeof c.target === 'string' && c.target.length <= 500) {
-          dex?.files?.delete?.(c.target).catch(() => notify('File delete failed'));
+        // Never a permanent delete from an assistant command: Recycle Bin only,
+        // and only after the user confirms the exact path.
+        if (typeof c.target === 'string' && c.target.length <= 500
+          && window.confirm(`Move this to the Recycle Bin?
+
+${c.target}`)) {
+          Promise.resolve(dex?.invoke?.('files:trash', c.target)).catch(() => notify('Move to Recycle Bin failed'));
         }
         break;
       case 'rename':

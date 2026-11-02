@@ -412,6 +412,8 @@ export interface NotesStoreState {
 
   // Loading
   loading: boolean;
+  /** True once initialize() has loaded the note list at least once. */
+  initialized: boolean;
   saving: boolean;
   searching: boolean;
 
@@ -516,6 +518,7 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   paneSize: { folders_width: 220, list_width: 320 },
 
   loading: false,
+  initialized: false,
   saving: false,
   searching: false,
 
@@ -533,7 +536,7 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
         get().loadPaneSize(),
       ]);
     } finally {
-      set({ loading: false });
+      set({ loading: false, initialized: true });
     }
   },
 

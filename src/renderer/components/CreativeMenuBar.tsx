@@ -96,7 +96,7 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
         position: 'fixed', left: pos.left, top: pos.top, minWidth: MENU_WIDTH,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 12, padding: 4,
+        borderRadius: 14, padding: 4,
         boxShadow: 'var(--pg-shadow-popover, 0 12px 32px rgba(0,0,0,0.45))',
         zIndex: 'var(--z-modal)' as unknown as number,
         animation: 'dex-panel-in 120ms ease-out',

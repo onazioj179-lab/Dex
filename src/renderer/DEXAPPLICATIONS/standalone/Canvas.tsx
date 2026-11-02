@@ -5,6 +5,11 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import {
+  type BoardsIndex, type BoardPayload, UNFILED,
+  loadIndex, saveIndex, loadBoard, saveBoard, deleteBoardData,
+  addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
+} from './canvasBoards';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -58,7 +63,6 @@ const BRUSH_SIZES = [2, 4, 8, 12, 20, 32];
 const CANVAS_W = 1600;
 const CANVAS_H = 1000;
 
-const STORAGE_KEY = 'dex-canvas-art-v2';
 const MAX_HISTORY = 60;
 
 let layerSeq = 0;
@@ -293,73 +297,140 @@ const Canvas: React.FC = () => {
   // -------------------------------------------------------------------------
   // Persistence: serialize each layer's pixels as a PNG data URL.
   // -------------------------------------------------------------------------
-  const persist = useCallback(() => {
-    try {
-      const payload = {
-        layers: layersRef.current.map(l => ({
-          id: l.id,
-          name: l.name,
-          visible: l.visible,
-          opacity: l.opacity,
-          data: l.canvas.toDataURL('image/png'),
-        })),
-        activeLayerId: activeIdRef.current,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      /* storage may be full / unavailable */
-    }
-  }, []);
+  // Boards (whiteboards in folders) live in IndexedDB -- see canvasBoards.ts.
+  // localStorage (~5 MB) silently failed for big drawings, losing them.
+  const [boards, setBoards] = useState<BoardsIndex | null>(null);
+  const boardsRef = useRef<BoardsIndex | null>(null);
+  boardsRef.current = boards;
+  const [boardEdit, setBoardEdit] = useState<null | { kind: 'rename' | 'folder'; value: string }>(null);
 
-  // Initial load (once). Falls back to a fresh single layer.
+  const snapshot = useCallback((): BoardPayload => ({
+    layers: layersRef.current.map(l => ({
+      id: l.id,
+      name: l.name,
+      visible: l.visible,
+      opacity: l.opacity,
+      data: l.canvas.toDataURL('image/png'),
+    })),
+    activeLayerId: activeIdRef.current,
+  }), []);
+
+  const persist = useCallback(() => {
+    const idx = boardsRef.current;
+    if (!idx || !idx.activeId) return;
+    const payload = snapshot();
+    const next = touchBoard(idx, idx.activeId);
+    boardsRef.current = next;
+    setBoards(next);
+    void saveBoard(idx.activeId, payload);
+    void saveIndex(next);
+  }, [snapshot]);
+
+  // Replace the layer stack with a stored board (or one blank layer).
+  const restorePayload = useCallback((payload: BoardPayload | undefined) => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    if (!payload || !Array.isArray(payload.layers) || payload.layers.length === 0) {
+      const fresh = createLayer('Layer 1');
+      setLayers([fresh]);
+      setActiveLayerId(fresh.id);
+      return;
+    }
+    const restoredLayers: Layer[] = payload.layers.map(pl => {
+      const canvas = makeLayerCanvas();
+      const img = new Image();
+      img.onload = () => {
+        try {
+          canvas.getContext('2d')?.drawImage(img, 0, 0);
+          composite();
+        } catch {
+          /* ignore */
+        }
+      };
+      img.src = pl.data;
+      return {
+        id: pl.id,
+        name: pl.name,
+        visible: pl.visible !== false,
+        opacity: typeof pl.opacity === 'number' ? pl.opacity : 1,
+        canvas,
+      };
+    });
+    setLayers(restoredLayers);
+    setActiveLayerId(payload.activeLayerId && restoredLayers.some(l => l.id === payload.activeLayerId)
+      ? payload.activeLayerId
+      : restoredLayers[restoredLayers.length - 1].id);
+  }, [composite]);
+
+  // Initial load (once): board index (migrating the old single drawing) + active board.
   const loadedRef = useRef(false);
   useEffect(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
-    let restored = false;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as {
-          layers?: Array<{ id: string; name: string; visible: boolean; opacity: number; data: string }>;
-          activeLayerId?: string;
-        };
-        if (parsed.layers && parsed.layers.length > 0) {
-          const restoredLayers: Layer[] = parsed.layers.map(pl => {
-            const canvas = makeLayerCanvas();
-            const img = new Image();
-            img.onload = () => {
-              try {
-                canvas.getContext('2d')?.drawImage(img, 0, 0);
-                composite();
-              } catch {
-                /* ignore */
-              }
-            };
-            img.src = pl.data;
-            return {
-              id: pl.id,
-              name: pl.name,
-              visible: pl.visible !== false,
-              opacity: typeof pl.opacity === 'number' ? pl.opacity : 1,
-              canvas,
-            };
-          });
-          setLayers(restoredLayers);
-          setActiveLayerId(parsed.activeLayerId && restoredLayers.some(l => l.id === parsed.activeLayerId)
-            ? parsed.activeLayerId
-            : restoredLayers[restoredLayers.length - 1].id);
-          restored = true;
-        }
+    void (async () => {
+      try {
+        const idx = await loadIndex();
+        boardsRef.current = idx;
+        setBoards(idx);
+        restorePayload(await loadBoard(idx.activeId));
+      } catch {
+        setActiveLayerId(prev => prev || layersRef.current[0]?.id || '');
       }
-    } catch {
-      /* corrupt store -> fresh */
-    }
-    if (!restored) {
-      setActiveLayerId(prev => prev || layersRef.current[0]?.id || '');
-    }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const switchBoard = useCallback(async (id: string) => {
+    const idx = boardsRef.current;
+    if (!idx || id === idx.activeId) return;
+    persist(); // save the board we're leaving
+    const next = { ...(boardsRef.current ?? idx), activeId: id };
+    boardsRef.current = next;
+    setBoards(next);
+    await saveIndex(next);
+    restorePayload(await loadBoard(id));
+    syncHistoryFlags();
+  }, [persist, restorePayload, syncHistoryFlags]);
+
+  const newBoard = useCallback(async () => {
+    const idx = boardsRef.current;
+    if (!idx) return;
+    persist();
+    const current = idx.boards.find(b => b.id === idx.activeId);
+    const next = addBoard(boardsRef.current ?? idx, `Board ${idx.boards.length + 1}`, current?.folder ?? UNFILED);
+    boardsRef.current = next;
+    setBoards(next);
+    await saveIndex(next);
+    restorePayload(undefined);
+    syncHistoryFlags();
+  }, [persist, restorePayload, syncHistoryFlags]);
+
+  const commitBoardEdit = useCallback(async () => {
+    const idx = boardsRef.current;
+    if (!idx || !boardEdit) return;
+    const next = boardEdit.kind === 'rename'
+      ? renameBoard(idx, idx.activeId, boardEdit.value)
+      : moveBoard(idx, idx.activeId, boardEdit.value);
+    boardsRef.current = next;
+    setBoards(next);
+    setBoardEdit(null);
+    await saveIndex(next);
+  }, [boardEdit]);
+
+  const deleteActiveBoard = useCallback(async () => {
+    const idx = boardsRef.current;
+    if (!idx) return;
+    const current = idx.boards.find(b => b.id === idx.activeId);
+    if (!current || !window.confirm(`Delete board "${current.name}"? This can't be undone.`)) return;
+    let next = removeBoard(idx, current.id);
+    if (next.boards.length === 0) next = addBoard(next, 'My canvas');
+    boardsRef.current = next;
+    setBoards(next);
+    await deleteBoardData(current.id);
+    await saveIndex(next);
+    restorePayload(await loadBoard(next.activeId));
+    syncHistoryFlags();
+  }, [restorePayload, syncHistoryFlags]);
 
   // Ensure there's always a valid active layer.
   useEffect(() => {
@@ -1084,6 +1155,49 @@ const Canvas: React.FC = () => {
 
         {/* Layers panel */}
         <div className="dex-liquid-glass" style={s.layersPanel}>
+          {/* Boards: many whiteboards, grouped by folder */}
+          <div style={s.layersHeader}>
+            <span style={s.layersTitle}>Boards</span>
+            <button style={s.smallBtn} onClick={() => void newBoard()} title="New board" aria-label="New board">
+              <DexIcon name="plus" size={14} />
+            </button>
+          </div>
+          {boards && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 8px 8px' }}>
+              <select
+                aria-label="Board"
+                value={boards.activeId}
+                onChange={e => void switchBoard(e.target.value)}
+                style={{ width: '100%', padding: '4px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-control)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12 }}
+              >
+                {groupByFolder(boards).map(g => (
+                  <optgroup key={g.folder || '(unfiled)'} label={g.folder || 'No folder'}>
+                    {g.boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              {boardEdit ? (
+                <form style={{ display: 'flex', gap: 4 }} onSubmit={e => { e.preventDefault(); void commitBoardEdit(); }}>
+                  <input
+                    autoFocus
+                    aria-label={boardEdit.kind === 'rename' ? 'Board name' : 'Folder name (empty for none)'}
+                    placeholder={boardEdit.kind === 'rename' ? 'Board name' : 'Folder (empty = none)'}
+                    value={boardEdit.value}
+                    onChange={e => setBoardEdit({ ...boardEdit, value: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Escape') setBoardEdit(null); }}
+                    style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-control)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12 }}
+                  />
+                  <button type="submit" style={s.textBtn} aria-label="Save">OK</button>
+                </form>
+              ) : (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'rename', value: boards.boards.find(b => b.id === boards.activeId)?.name ?? '' })} aria-label="Rename board" title="Rename board">Rename</button>
+                  <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'folder', value: boards.boards.find(b => b.id === boards.activeId)?.folder ?? '' })} aria-label="Move board to folder" title="Move to folder">Folder</button>
+                  <button style={s.textBtn} onClick={() => void deleteActiveBoard()} aria-label="Delete board" title="Delete board">Delete</button>
+                </div>
+              )}
+            </div>
+          )}
           <div style={s.layersHeader}>
             <span style={s.layersTitle}>Layers</span>
             <button style={s.smallBtn} onClick={addLayer} title="Add layer" aria-label="Add layer">
@@ -1199,7 +1313,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   toolBtnActive: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
   },
   divider: {
@@ -1217,7 +1331,7 @@ const s: Record<string, React.CSSProperties> = {
   colorBtn: {
     width: 20,
     height: 20,
-    borderRadius: 3,
+    borderRadius: 4,
     cursor: 'pointer',
     transition: 'transform 0.1s ease',
   },
@@ -1300,7 +1414,7 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'not-allowed',
   },
   saveBtn: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
   },
   body: {
@@ -1341,6 +1455,19 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
+  },
+  // Text buttons in the Boards row (smallBtn is a fixed 24px icon button).
+  textBtn: {
+    flex: 1,
+    height: 24,
+    padding: '0 8px',
+    background: 'transparent',
+    border: '1px solid var(--color-border-control)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-secondary)',
+    fontSize: 11,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   smallBtn: {
     width: 24,

@@ -152,7 +152,7 @@ export const Skeleton = memo(function Skeleton({
         return {
           width: width ?? '100%',
           height: height ?? 14,
-          borderRadius: 3,
+          borderRadius: 4,
         };
     }
   };
@@ -251,7 +251,7 @@ export const PremiumButton = memo(function PremiumButton({
 
   const variantStyles: Record<string, React.CSSProperties> = {
     primary: {
-      background: 'var(--color-accent)',
+      background: 'var(--color-accent-fill)',
       color: '#FFFFFF',
       boxShadow: 'var(--shadow-premium-sm)',
     },

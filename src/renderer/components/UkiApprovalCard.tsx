@@ -39,7 +39,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
       style={{
         margin: 'var(--space-2) 0',
         padding: 'var(--space-3)',
-        borderRadius: 8,
+        borderRadius: 10,
         background: 'rgba(248, 81, 73, 0.08)',
         border: `1px solid ${riskColor[plan.risk] || '#666'}`,
         color: 'inherit',

@@ -551,7 +551,7 @@ const WorkflowNodeCard: React.FC<{
             boxShadow: selected ? '0 0 0 2px var(--color-accent-muted, rgba(10,132,255,0.25))' : 'none',
           }}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
             {catIcon}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1881,7 +1881,7 @@ export const Workflows: React.FC = () => {
                           onClick={() => updateNodeBehavior(selectedNode.id, { continueOnError: !selectedNode.continueOnError })}
                           style={{
                             width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
-                            background: selectedNode.continueOnError ? 'var(--color-success, #30d158)' : 'var(--color-border)',
+                            background: selectedNode.continueOnError ? 'var(--color-accent)' : 'var(--color-border)',
                             display: 'flex', alignItems: 'center', justifyContent: selectedNode.continueOnError ? 'flex-end' : 'flex-start',
                           }}
                         >
@@ -2125,7 +2125,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   createBtn: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: 'var(--space-2) var(--space-4)', borderRadius: '10px',
-    border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+    border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
   workflowGrid: {
@@ -2134,7 +2134,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 'var(--space-4)', alignContent: 'start',
   },
   workflowCard: {
-    borderRadius: '12px', padding: 'var(--space-5)',
+    borderRadius: '14px', padding: 'var(--space-5)',
     display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -2221,7 +2221,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   runEditorBtn: {
     padding: '6px 14px', borderRadius: '10px', border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
   },

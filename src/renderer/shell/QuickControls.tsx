@@ -188,7 +188,7 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
         zIndex: 'var(--z-popover, 9000)' as React.CSSProperties['zIndex'],
         background: 'var(--color-bg-elevated, #111111)',
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 8,
+        borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 10,
         animation: 'qcPop 0.12s ease-out',
@@ -327,8 +327,8 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', padding: 'var(--space-2) 10px',
-          background: enabled ? 'var(--color-success-muted, rgba(61,166,106,0.10))' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
-          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-success, #3DA66A) 30%, transparent)' : 'var(--color-border)'}`,
+          background: enabled ? 'var(--color-accent-light)' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
+          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border)'}`,
           borderRadius: 4, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
           marginBottom: 'var(--space-2)',
@@ -340,8 +340,8 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
           {busy ? 'Checking...' : enabled ? 'Granted' : 'Not granted'}
         </span>
         <span style={{
-          width: 28, height: 16, borderRadius: 8,
-          background: enabled ? 'var(--color-success, #3DA66A)' : 'var(--color-border)',
+          width: 28, height: 16, borderRadius: 10,
+          background: enabled ? 'var(--color-accent)' : 'var(--color-border)',
           position: 'relative', transition: 'background 0.15s',
         }}>
           <span style={{

@@ -19,7 +19,7 @@
 
 import React, { useMemo } from 'react';
 import { useUkiStore, type UkiUIState } from '../store/ukiStore';
-import { useUkiTasks, type UkiTaskStatus } from '../store/ukiTasksStore';
+import { useUkiTasks, isTaskControllable, FINISHED_STATUSES, type UkiTaskStatus } from '../store/ukiTasksStore';
 import { CollapsibleSection } from './CollapsibleSection';
 
 const STATE_LABEL: Record<UkiUIState, string> = {
@@ -72,9 +72,17 @@ const chip: React.CSSProperties = {
 const TASK_TONE: Record<UkiTaskStatus, string> = {
   pending: 'var(--color-text-tertiary)',
   running: 'var(--color-accent)',
-  stalled: 'var(--color-warning, #ff9f0a)',
-  done: 'var(--color-success, #32d74b)',
-  failed: 'var(--color-error, #ff453a)',
+  paused: 'var(--color-text-secondary)',
+  stalled: 'var(--color-warning)',
+  done: 'var(--color-success)',
+  failed: 'var(--color-error)',
+  cancelled: 'var(--color-text-tertiary)',
+};
+
+const taskBtn: React.CSSProperties = {
+  background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--color-border-control)',
+  borderRadius: 'var(--radius-xs)', cursor: 'pointer', fontSize: 10.5, padding: '1px 6px',
+  color: 'var(--color-text-secondary)', flexShrink: 0,
 };
 
 const NexusUkiPanel: React.FC = () => {
@@ -85,6 +93,9 @@ const NexusUkiPanel: React.FC = () => {
   const knowledgeNodes = useUkiStore((s) => s.knowledgeNodes);
   const bgTasks = useUkiTasks((s) => s.tasks);
   const clearFinished = useUkiTasks((s) => s.clearFinished);
+  const pauseTask = useUkiTasks((s) => s.pauseTask);
+  const resumeTask = useUkiTasks((s) => s.resumeTask);
+  const cancelTask = useUkiTasks((s) => s.cancelTask);
 
   // Full history (newest first), capped for perf. Nexus "houses UKI histories":
   // the user scrolls this to see past turns / what was worked on over time.
@@ -96,10 +107,10 @@ const NexusUkiPanel: React.FC = () => {
   );
   // Active work first, then most recent — capped for the panel.
   const recentTasks = useMemo(() => {
-    const rank = (s: UkiTaskStatus) => (s === 'running' || s === 'stalled' ? 0 : s === 'pending' ? 1 : 2);
+    const rank = (s: UkiTaskStatus) => (s === 'running' || s === 'stalled' || s === 'paused' ? 0 : s === 'pending' ? 1 : 2);
     return [...bgTasks].sort((a, b) => rank(a.status) - rank(b.status) || b.updatedAt - a.updatedAt).slice(0, 6);
   }, [bgTasks]);
-  const hasFinishedTasks = useMemo(() => bgTasks.some(t => t.status === 'done' || t.status === 'failed'), [bgTasks]);
+  const hasFinishedTasks = useMemo(() => bgTasks.some(t => FINISHED_STATUSES.has(t.status)), [bgTasks]);
 
   const hasData = conversationHistory.length > 0 || thoughtTrail.length > 0 || knowledgeNodes.length > 0 || bgTasks.length > 0;
 
@@ -110,7 +121,7 @@ const NexusUkiPanel: React.FC = () => {
       style={{ marginBottom: 'var(--space-3, 12px)' }}
       headerAccessory={
         <span style={{ ...chip, color: STATE_TONE[state], borderColor: 'var(--color-border-subtle)' }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: STATE_TONE[state] }} />
+          <span style={{ width: 6, height: 6, borderRadius: 9999, background: STATE_TONE[state] }} />
           {STATE_LABEL[state]}
         </span>
       }
@@ -158,17 +169,25 @@ const NexusUkiPanel: React.FC = () => {
           </div>
           {recentTasks.map((t) => {
             const lastStep = t.steps[t.steps.length - 1];
-            const detail = t.status === 'failed' ? (t.error || 'Failed')
+            const detail = t.status === 'failed' || t.status === 'cancelled' ? (t.error || 'Failed')
               : t.status === 'done' ? (t.result || 'Done')
               : lastStep ? lastStep.label
               : 'Waiting for first step';
             return (
               <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-md, 8px)', fontWeight: 400 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, flexShrink: 0, background: TASK_TONE[t.status] }} />
+                  <span style={{ width: 6, height: 6, borderRadius: 9999, flexShrink: 0, background: TASK_TONE[t.status] }} />
                   <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: TASK_TONE[t.status], textTransform: 'uppercase', flexShrink: 0 }}>{t.status}</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{timeAgo(t.updatedAt)}</span>
+                  {!FINISHED_STATUSES.has(t.status) && isTaskControllable(t.id) && (
+                    <>
+                      {t.status === 'paused'
+                        ? <button style={taskBtn} onClick={() => resumeTask(t.id)} aria-label={`Resume task: ${t.title}`}>Resume</button>
+                        : <button style={taskBtn} onClick={() => pauseTask(t.id)} aria-label={`Pause task: ${t.title}`}>Pause</button>}
+                      <button style={taskBtn} onClick={() => cancelTask(t.id)} aria-label={`Cancel task: ${t.title}`}>Cancel</button>
+                    </>
+                  )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, paddingLeft: 12, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' as any }}>{detail}</div>
               </div>
@@ -204,7 +223,7 @@ const NexusUkiPanel: React.FC = () => {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Reasoning</div>
           {recentThoughts.map((th) => (
             <div key={th.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-              <span style={{ width: 5, height: 5, borderRadius: 999, flexShrink: 0, background: th.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)' }} />
+              <span style={{ width: 5, height: 5, borderRadius: 9999, flexShrink: 0, background: th.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)' }} />
               <span style={{ color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={th.query}>{th.query}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{th.intent}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{Math.round(th.latencyMs)}ms</span>
@@ -220,7 +239,7 @@ const NexusUkiPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {topNodes.map((n) => (
               <span key={n.id} style={{ ...chip, borderColor: (n.color || 'var(--color-border-subtle)') }} title={`${n.category} · weight ${n.weight}`}>
-                <span style={{ width: 6, height: 6, borderRadius: 999, background: n.color || 'var(--color-accent)' }} />
+                <span style={{ width: 6, height: 6, borderRadius: 9999, background: n.color || 'var(--color-accent)' }} />
                 {n.label}
               </span>
             ))}

@@ -27,6 +27,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 
 // ===========================================================================
 // TYPES
@@ -40,7 +41,12 @@ interface FileItem {
   modified: Date;
   extension: string;
   category?: string;
+  /** Dotfile or Windows HIDDEN/SYSTEM attribute (from files:list). */
+  hidden?: boolean;
 }
+
+/** Settings > Files > Thumbnail Size -> grid tile width. */
+const THUMB_TILE: Record<string, number> = { small: 110, medium: 140, large: 190 };
 
 interface QuickAccessItem {
   id: string;
@@ -376,7 +382,9 @@ export const Files: React.FC = () => {
   // localStorage so the chosen ordering survives reloads, consistent with the
   // page's other dex-* prefs (tags, smart folders).
   const [filters, setFilters] = useState<SearchFilters>(() => {
-    let sortBy: SearchFilters['sortBy'] = 'name';
+    const settingSort = readDexSetting<string>('sortBy', 'name');
+    let sortBy: SearchFilters['sortBy'] = (['name', 'date', 'size', 'type'] as const).includes(settingSort as SearchFilters['sortBy'])
+      ? settingSort as SearchFilters['sortBy'] : 'name';
     let sortDir: SearchFilters['sortDir'] = 'asc';
     try {
       const saved = JSON.parse(localStorage.getItem('dex-files-sort') || '{}');
@@ -392,6 +400,21 @@ export const Files: React.FC = () => {
       sortDir,
     };
   });
+
+  // Settings > Files. Read live so changing them in Settings applies at once.
+  const showHiddenFiles = useDexSetting<boolean>('showHiddenFiles', false);
+  const confirmDeleteSetting = useDexSetting<boolean>('confirmDelete', true);
+  const thumbnailSize = useDexSetting<string>('thumbnailSize', 'medium');
+  const settingSortBy = useDexSetting<string>('sortBy', 'name');
+  const firstSortSync = useRef(true);
+  useEffect(() => {
+    // Changing "Sort By" in Settings re-sorts Files; the initial value is
+    // already applied above (without overriding a sort picked in Files).
+    if (firstSortSync.current) { firstSortSync.current = false; return; }
+    if ((['name', 'date', 'size', 'type'] as const).includes(settingSortBy as SearchFilters['sortBy'])) {
+      setFilters(f => ({ ...f, sortBy: settingSortBy as SearchFilters['sortBy'] }));
+    }
+  }, [settingSortBy]);
 
   // Persist sort preference whenever it changes.
   useEffect(() => {
@@ -872,7 +895,7 @@ export const Files: React.FC = () => {
 
   const handleDeleteFile = async (file: FileItem) => {
     setContextMenu(null);
-    const confirmed = await confirm({
+    const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move to Trash?',
       message: `"${file.name}" will be moved to the recycle bin.`,
       confirmLabel: 'Move to Trash',
@@ -935,7 +958,7 @@ export const Files: React.FC = () => {
   const handleBatchDelete = useCallback(async () => {
     if (selectedFiles.size === 0) return;
     const count = selectedFiles.size;
-    const confirmed = await confirm({
+    const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move selected to Trash?',
       message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
       confirmLabel: 'Move to Trash',
@@ -966,7 +989,7 @@ export const Files: React.FC = () => {
     loadFiles(currentPath);
     if (done > 0) toast.success(`Deleted ${done} item${done === 1 ? '' : 's'}`);
     if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
-  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm]);
+  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm, confirmDeleteSetting]);
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
@@ -1264,7 +1287,7 @@ export const Files: React.FC = () => {
 
   // Smart filtering with multiple criteria
   const filteredFiles = useMemo(() => {
-    let result = [...files];
+    let result = showHiddenFiles ? [...files] : files.filter(f => !f.hidden && !f.name.startsWith('.'));
 
     // If viewing a smart collection, filter by category
     if (activeCollection) {
@@ -1358,7 +1381,7 @@ export const Files: React.FC = () => {
     });
 
     return result;
-  }, [files, filters, activeCollection, recentFiles, activeTagFilter, fileTags]);
+  }, [files, filters, activeCollection, recentFiles, activeTagFilter, fileTags, showHiddenFiles]);
 
   // Keep the render-order path list current for Shift+click range selection.
   useEffect(() => { orderedPathsRef.current = filteredFiles.map(f => f.path); }, [filteredFiles]);
@@ -1978,15 +2001,15 @@ export const Files: React.FC = () => {
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>Failed to load files</span>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{loadError}</span>
-              <button onClick={() => loadFiles(currentPath || selectedLocation)} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+              <button onClick={() => loadFiles(currentPath || selectedLocation)} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
             </div>
           ) : loading ? (
             <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
                   <div style={{ width: 28, height: 28, borderRadius: 4, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, height: 12, borderRadius: 3, background: 'var(--color-bg-hover)' }} />
-                  <div style={{ width: 60, height: 10, borderRadius: 3, background: 'var(--color-border-subtle)' }} />
+                  <div style={{ flex: 1, height: 12, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
+                  <div style={{ width: 60, height: 10, borderRadius: 4, background: 'var(--color-border-subtle)' }} />
                 </div>
               ))}
               <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
@@ -2010,7 +2033,7 @@ export const Files: React.FC = () => {
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>No matches</span>
                     <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{filters.query ? `No files match "${filters.query}" in this folder.` : 'No files match the current filters.'}</span>
-                    <button onClick={clearFilters} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
+                    <button onClick={clearFilters} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
@@ -2018,7 +2041,7 @@ export const Files: React.FC = () => {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
@@ -2066,7 +2089,7 @@ export const Files: React.FC = () => {
                           else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                         }}
                         aria-label={`Rename ${file.name}`}
-                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
+                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
                       />
                     ) : (
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={file.name}>{file.name}</span>
@@ -2143,7 +2166,7 @@ export const Files: React.FC = () => {
               })}
             </div>
           ) : (
-            <div style={styles.gridContainer} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
+            <div style={{ ...styles.gridContainer, gridTemplateColumns: `repeat(auto-fill, minmax(${THUMB_TILE[thumbnailSize] ?? 140}px, 1fr))` }} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
               {filteredFiles.length === 0 ? (
                 hasActiveFilter ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>
@@ -2152,7 +2175,7 @@ export const Files: React.FC = () => {
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>No matches</span>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 240 }}>{filters.query ? `No files match "${filters.query}".` : 'No files match the current filters.'}</span>
-                    <button onClick={clearFilters} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
+                    <button onClick={clearFilters} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>
@@ -2160,7 +2183,7 @@ export const Files: React.FC = () => {
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
@@ -2207,7 +2230,7 @@ export const Files: React.FC = () => {
                         else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                       }}
                       aria-label={`Rename ${file.name}`}
-                      style={{ width: '90%', padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
+                      style={{ width: '90%', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
                     />
                   ) : (
                     <span style={styles.gridLabel}>{file.name}</span>
@@ -2437,7 +2460,7 @@ export const Files: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4) var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
               <button onClick={() => handleCopyPath(propertiesFile)} style={{ padding: '5px var(--space-3)', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Path</button>
-              <button onClick={() => setPropertiesFile(null)} style={{ padding: '5px var(--space-4)', borderRadius: 4, background: 'var(--color-accent)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Done</button>
+              <button onClick={() => setPropertiesFile(null)} style={{ padding: '5px var(--space-4)', borderRadius: 4, background: 'var(--color-accent-fill)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Done</button>
             </div>
           </div>
         </div>
@@ -2590,7 +2613,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     padding: 'var(--space-2) var(--space-3)',
     width: '240px',
@@ -2606,7 +2629,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewToggle: {
     display: 'flex',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     padding: '2px',
   },
@@ -2766,7 +2789,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
     background: 'var(--color-bg-hover)',
     padding: '2px 6px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '10px',
     color: 'var(--color-text-secondary)',
   },

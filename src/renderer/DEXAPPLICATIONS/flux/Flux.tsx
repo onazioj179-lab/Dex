@@ -2374,12 +2374,12 @@ const Flux: React.FC = () => {
     trackClip: { position: 'absolute', top: '3px', height: '22px', background: '#bf5af2', borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
     playhead: { position: 'absolute', top: 0, width: '1px', background: 'var(--color-error)', zIndex: 50 },
     ruler: { height: '20px', background: 'var(--color-bg-inset)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end' },
-    behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '10px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' },
     statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     libraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' },
-    libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '10px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
   }), [showTimeline, timelineHeight, isTimelineResizing]);
 
   // Standardized menu bar — organizes Flux's long feature span into File / Insert
@@ -2596,7 +2596,7 @@ const Flux: React.FC = () => {
                       left: '100%',
                       top: 0,
                       marginLeft: 4,
-                      borderRadius: 12,
+                      borderRadius: 14,
                       padding: 4,
                       boxShadow: 'var(--pg-shadow-context)',
                       zIndex: 'var(--z-modal)',
@@ -2698,7 +2698,7 @@ const Flux: React.FC = () => {
                 </div>
               )}
               {/* Overlay UI - Canvas Zoom Controls */}
-              <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '8px', padding: '6px var(--space-3)' }}>
+              <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '10px', padding: '6px var(--space-3)' }}>
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <input 
                   type="range" 
@@ -3004,7 +3004,7 @@ const Flux: React.FC = () => {
                       <span style={{ color: 'var(--color-text-muted)' }}>{showEasingPopover ? Icons.chevronUp : Icons.chevronDown}</span>
                     </button>
                     {showEasingPopover && (
-                      <div style={{ padding: '10px', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)', borderRadius: '8px', marginBottom: 'var(--space-2)' }}>
+                      <div style={{ padding: '10px', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)', borderRadius: '10px', marginBottom: 'var(--space-2)' }}>
                         <EasingCurveEditor
                           value={selectedLayer.easing || { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 }}
                           onChange={updateLayerEasing}
@@ -3111,7 +3111,7 @@ const Flux: React.FC = () => {
               </button>
               <div style={styles.transportControls}>
                 <button style={styles.transportBtn} onClick={goToStart} aria-label="Skip to start">{Icons.skipBack}</button>
-                <button style={{ ...styles.transportBtn, ...(isPlaying ? { background: 'var(--color-accent)' } : {}) }} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
+                <button style={{ ...styles.transportBtn, ...(isPlaying ? { background: 'var(--color-accent-fill)' } : {}) }} onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"}>
                   {isPlaying ? Icons.pause : Icons.play}
                 </button>
                 <button style={styles.transportBtn} onClick={goToEnd} aria-label="Skip to end">{Icons.skipForward}</button>
@@ -3266,7 +3266,7 @@ const Flux: React.FC = () => {
                   behaviors: [...l.behaviors, { id: `beh-${Date.now()}`, type: 'textAnim' as any, enabled: true, settings: { preset: p, mode: textAnimMode, cascade: textAnimCascade } }],
                 } as any : l));
                 setShowTextAnimator(false);
-              }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>{p}</button>
+              }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>{p}</button>
             ))}
           </div>
         </div>
@@ -3332,7 +3332,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Graph Editor</span>
-              <select value={graphProperty} onChange={e => setGraphProperty(e.target.value)} aria-label="Graph property" style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
+              <select value={graphProperty} onChange={e => setGraphProperty(e.target.value)} aria-label="Graph property" style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
                 {props.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               {selLayer && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{selLayer.name} — {kfs.length} keyframe{kfs.length !== 1 ? 's' : ''}</span>}
@@ -3349,7 +3349,7 @@ const Flux: React.FC = () => {
                     return { ...l, animations: anims };
                   }));
                   e.target.value = '';
-                }} style={{ padding: '2px 4px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, maxWidth: 100 }}>
+                }} style={{ padding: '2px 4px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, maxWidth: 100 }}>
                   <option value="">Easing...</option>
                   {(['basic', 'power', 'elastic', 'bounce', 'back', 'custom'] as const).map(cat => (
                     <optgroup key={cat} label={cat.charAt(0).toUpperCase() + cat.slice(1)}>
@@ -3399,7 +3399,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Target</span>
-              <select value={expressionTarget} onChange={e => setExpressionTarget(e.target.value)} aria-label="Expression target property" style={{ flex: 1, padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
+              <select value={expressionTarget} onChange={e => setExpressionTarget(e.target.value)} aria-label="Expression target property" style={{ flex: 1, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
                 {['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'z', 'scaleZ', 'rotationX', 'rotationY'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
@@ -3477,7 +3477,7 @@ const Flux: React.FC = () => {
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
-              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
+              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: '#bf5af2', fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
               </button>
             ))}
@@ -3553,7 +3553,7 @@ const Flux: React.FC = () => {
               <input type="checkbox" checked={gifDither} onChange={e => setGifDither(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} /> Floyd-Steinberg Dithering
             </label>
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select value={gifFps} onChange={e => setGifFps(Number(e.target.value))} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option value={10}>10</option><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option></select>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select value={gifFps} onChange={e => setGifFps(Number(e.target.value))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option value={10}>10</option><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option></select>
             </div>
             <button aria-label="Export Animation" onClick={() => {
               const canvas = canvasRef.current;
@@ -3713,7 +3713,7 @@ const Flux: React.FC = () => {
                   compTemplateCategory === 'social' ? ['Instagram Post', 'Story 9:16', 'YouTube End Card', 'TikTok', 'Twitter Banner', 'Facebook Cover'] :
                   ['Title Card', 'Chapter', 'Credit Roll', 'Subtitle', 'Quote', 'Name Plate']).map(t => (
                   <button key={t} aria-label={`Apply ${t} template`} onClick={() => { const templateLayers = [{ id: `layer_${Date.now()}`, name: t, type: 'shape' as const, visible: true, locked: false, solo: false, startTime: 0, duration: compTemplateCategory === 'intros' ? 150 : 90, inPoint: 0, outPoint: compTemplateCategory === 'intros' ? 150 : 90, transform: { x: canvasSize.width / 2 - 200, y: canvasSize.height / 2 - 50, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 }, behaviors: [], filters: [], animations: [{ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' as const }, { time: 15, value: 100, easing: 'easeOut' as const }] }] }]; setLayers(prev => [...templateLayers, ...prev]); setSelectedLayerId(templateLayers[0].id); setShowCompTemplates(false); }} style={{ padding: 'var(--space-3)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
-                    <div style={{ height: 50, borderRadius: 3, background: 'var(--color-border-subtle)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ height: 50, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: 18 }}>*</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{t}</div>
@@ -3749,7 +3749,7 @@ const Flux: React.FC = () => {
             {([['x', 'Position X'], ['y', 'Position Y'], ['rotation', 'Rotation'], ['scale', 'Scale']] as const).map(([key, prop]) => (
               <div key={prop} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 70 }}>{prop}</span>
-                <input type="number" value={nullOffsets[key]} onChange={e => setNullOffsets(prev => ({ ...prev, [key]: Number(e.target.value) }))} style={{ width: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
+                <input type="number" value={nullOffsets[key]} onChange={e => setNullOffsets(prev => ({ ...prev, [key]: Number(e.target.value) }))} style={{ width: 60, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
               </div>
             ))}
             <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
@@ -3906,7 +3906,7 @@ const Flux: React.FC = () => {
               {[{ label: 'Gravity', val: particleGravity, set: setParticleGravity }, { label: 'Wind X', val: particleWindX, set: setParticleWindX }, { label: 'Turbulence', val: particleTurbulence, set: setParticleTurbulence }, { label: 'Friction', val: particleFriction, set: setParticleFriction }].map(p => (
                   <div key={p.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.label}</span>
-                    <input type="number" value={p.val} step={0.1} onChange={e => p.set(Number(e.target.value))} style={{ width: 50, padding: '2px 4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
+                    <input type="number" value={p.val} step={0.1} onChange={e => p.set(Number(e.target.value))} style={{ width: 50, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
                   </div>
                 ))}
               </div>
@@ -3980,7 +3980,7 @@ const Flux: React.FC = () => {
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
-                    <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 3, cursor: 'pointer', marginTop: 2 }} />
+                    <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
                   ) : (
                     <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#bf5af2', marginTop: 2 }} />
                   )}
@@ -4631,7 +4631,7 @@ const Flux: React.FC = () => {
               <input type="range" min="0" max="720" value={motionBlurShutter} onChange={e => setMotionBlurShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{motionBlurShutter}°</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>180° = standard film.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 4, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>180° = standard film.</div>
           </div>
         </div>
       )}
@@ -4685,10 +4685,10 @@ const Flux: React.FC = () => {
           { label: 'Delete Layer', fn: () => deleteLayer(ctxLayer.id), disabled: layers.length <= 1, danger: true },
         ];
         return (
-          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, borderRadius: 12, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, borderRadius: 14, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
-              : <div key={i} className="flux-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
+              : <div key={i} className="flux-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );
@@ -4706,7 +4706,7 @@ const Flux: React.FC = () => {
           <div
             onClick={e => e.stopPropagation()}
             className="dex-liquid-glass-strong"
-            style={{ width: 420, padding: 'var(--space-4)', borderRadius: 12, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
+            style={{ width: 420, padding: 'var(--space-4)', borderRadius: 14, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <strong style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>Morph to target SVG path</strong>

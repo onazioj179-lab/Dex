@@ -127,7 +127,7 @@ export const NexusBiometrics: React.FC = () => {
               <div style={metaStyle}>provider: {cap.provider}{cap.notes ? ` — ${cap.notes}` : ''}</div>
             </div>
             <span style={{
-              fontSize: 10.5, padding: '2px var(--space-2)', borderRadius: 999,
+              fontSize: 10.5, padding: '2px var(--space-2)', borderRadius: 9999,
               background: cap.available ? 'rgba(52,199,89,0.15)' : 'rgba(255,255,255,0.04)',
               color: cap.available ? '#5cd17a' : 'var(--color-text-tertiary)',
               border: cap.available ? '1px solid rgba(52,199,89,0.3)' : '1px solid var(--pg-border)',
@@ -201,7 +201,7 @@ const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties =
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
   };
-  if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
+  if (variant === 'accent') return { ...base, background: 'var(--color-accent-fill)', color: '#fff', borderColor: 'transparent' };
   if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.16)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.4)' };
   return { ...base, background: 'rgba(255,255,255,0.04)' };
 };
