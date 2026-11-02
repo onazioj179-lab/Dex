@@ -1312,16 +1312,16 @@ export const Browser: React.FC = () => {
           updateActivity(actId, pct);
         }
       } else if (tracked.has(d.id)) {
-        // Reached a terminal state (completed / error) — close the card.
+        // Reached a terminal state — close the card as done or failed.
         tracked.delete(d.id);
-        completeActivity(actId);
+        completeActivity(actId, d.status === 'error');
       }
     });
     // A download item removed from the list while still in flight — close it too.
     tracked.forEach((_pct, id) => {
       if (!seen.has(id)) {
         tracked.delete(id);
-        completeActivity(`browser-${id}`);
+        completeActivity(`browser-${id}`, true);
       }
     });
   }, [downloads]);

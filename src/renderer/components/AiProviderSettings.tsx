@@ -21,7 +21,7 @@ import {
   getReasoningPreference, setReasoningPreference,
 } from '../uki/providers/modelPrefs';
 import { routeConfiguredModels, applyProcessingMode } from '../uki/providers/connect';
-import { ollamaHasNoModels } from '../uki/providers/ollama';
+import { ollamaHasNoModels, isLocalAiEnabled, setLocalAiEnabled } from '../uki/providers/ollama';
 import { readUsage, getDailyTokenCap, setDailyTokenCap } from '../uki/providers/usage';
 import {
   PROCESSING_MODES, processingModeLabel, processingModeHint, REASONING_PREFERENCES,
@@ -80,6 +80,19 @@ const AiProviderSettings: React.FC = () => {
   const [manualModel, setManual] = useState<string>(() => getManualModel() ?? '');
   const [reasoning, setReasoning] = useState<ReasoningPreference>(() => getReasoningPreference());
   const [cap, setCap] = useState<number>(() => getDailyTokenCap());
+  const [localAi, setLocalAi] = useState<boolean>(() => isLocalAiEnabled());
+  const [localStatus, setLocalStatus] = useState<string>('');
+  const toggleLocalAi = async (on: boolean) => {
+    setLocalAi(on);
+    setLocalStatus(on ? 'Checking http://localhost:11434…' : 'Disconnected. DEX will not contact a local AI service.');
+    const found = await setLocalAiEnabled(on);
+    if (!on) return;
+    setLocalStatus(found === null
+      ? 'No local AI service answered on http://localhost:11434. Start it, then toggle this again.'
+      : found.length === 0
+        ? 'Connected, but no model is installed.'
+        : `Connected: ${found.length} model${found.length === 1 ? '' : 's'} available.`);
+  };
   const usage = readUsage();
   const usageRows = Object.entries(usage.byProvider);
 
@@ -122,8 +135,28 @@ const AiProviderSettings: React.FC = () => {
         Connect a provider to power UKI. {isSecureKeystore()
           ? 'Keys are encrypted with Windows DPAPI for your user account and never leave this device except to the provider itself.'
           : 'Secure key storage is not available here, so keys are only obfuscated in local storage (not encrypted).'}{' '}
-        Ollama runs locally and needs no key.
       </p>
+
+      <div style={{
+        padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)',
+        background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+      }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={localAi}
+            onChange={(e) => { void toggleLocalAi(e.target.checked); }}
+            aria-label="Connect to a local AI service"
+            style={{ accentColor: 'var(--color-accent)', width: 16, height: 16 }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Connect to a local AI service (Ollama)</span>
+        </label>
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          Off by default. DEX does not install or start any AI runtime. If you already run Ollama on this PC, turn this on to use it: requests stay on this machine (localhost only).
+        </span>
+        {localStatus && <span role="status" style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{localStatus}</span>}
+      </div>
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-6px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)', flexShrink: 0 }} />
@@ -152,7 +185,7 @@ const AiProviderSettings: React.FC = () => {
           <span style={{ color: 'var(--color-text-secondary)' }}>
             {ollamaHasNoModels()
               ? 'Local only is on and Ollama is running, but no model is installed. Install one (for example: ollama pull llama3.2) and reopen this page.'
-              : 'Local only is on, but no on-device (Ollama) model is reachable. Start Ollama, or choose another processing mode.'}
+              : (localAi ? 'Local only is on, but no on-device (Ollama) model is reachable. Start Ollama, or choose another processing mode.' : 'Local only is on, but the local AI connection is off. Turn it on above, or choose another processing mode.')}
           </span>
         ) : (
           <span style={{ color: 'var(--color-text-secondary)' }}>

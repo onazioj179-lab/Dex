@@ -19,7 +19,7 @@ import { createStreamParser, type StreamFormat } from './stream';
 import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } from './modelPrefs';
 import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 import { configuredProviders, getApiKey } from '../keystore';
-import { ollamaInstalledModels, nativeOllamaFetch } from './ollama';
+import { ollamaInstalledModels, nativeOllamaFetch, isLocalAiEnabled } from './ollama';
 import { assertWithinCap, recordUsage, estimateTokens } from './usage';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
@@ -85,13 +85,14 @@ export function applyProcessingMode(
  * (Tauri) `smart_router_route` command — see services/platform.
  */
 export function configuredCandidates(goal: RoutingGoal): RouteCandidate[] {
+  const localOn = isLocalAiEnabled();
   const providerIds = new Set<string>(
     goal === 'offline'
-      ? allProviders().filter((p) => !p.requiresKey).map((p) => p.id)
+      ? allProviders().filter((p) => !p.requiresKey && (p.id !== 'ollama' || localOn)).map((p) => p.id)
       : configuredProviders().filter((pid) => getProvider(pid as ProviderId)),
   );
-  // A local Ollama with installed models is usable without any "key".
-  if ((ollamaInstalledModels()?.length ?? 0) > 0) providerIds.add('ollama');
+  // A local Ollama the user connected, with installed models, needs no "key".
+  if (localOn && (ollamaInstalledModels()?.length ?? 0) > 0) providerIds.add('ollama');
   return allModels()
     .filter((m) => providerIds.has(m.provider))
     .map((m) => ({

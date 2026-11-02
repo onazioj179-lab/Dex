@@ -473,7 +473,7 @@ const Transfers: React.FC = () => {
       if (!done) {
         if (!tracked.has(t.transferId)) {
           tracked.set(t.transferId, pct);
-          dispatchActivity({ id: actId, type: 'transfer', label: `Sending ${formatSize(t.totalBytes)}`, progress: pct, app: 'transfers' });
+          dispatchActivity({ id: actId, type: 'transfer', label: `Sending ${formatSize(t.totalBytes)}`, progress: pct, app: 'transfers', cancel: () => cancelTransfer(t.transferId) });
         } else if (tracked.get(t.transferId) !== pct) {
           tracked.set(t.transferId, pct);
           updateActivity(actId, pct);
@@ -488,7 +488,7 @@ const Transfers: React.FC = () => {
     tracked.forEach((_, transferId) => {
       if (!activeTransfers.some(t => t.transferId === transferId)) {
         tracked.delete(transferId);
-        completeActivity(`transfers-${transferId}`);
+        completeActivity(`transfers-${transferId}`, true);
       }
     });
   }, [activeTransfers]);

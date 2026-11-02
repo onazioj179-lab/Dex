@@ -2793,8 +2793,8 @@ const Rewind: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div style={{ fontSize: 10, opacity: 0.3, textAlign: 'center' as const, paddingBottom: 'var(--space-4)' }}>
-          All data stays on this machine. No cloud. No accounts. AI runs locally via Ollama.
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' as const, paddingBottom: 'var(--space-4)' }}>
+          All data stays on this machine. No cloud. No accounts.
         </div>
       </div>
     );

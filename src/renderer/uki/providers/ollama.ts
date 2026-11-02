@@ -112,6 +112,31 @@ export async function refreshOllamaModels(
   }
 }
 
+// ---- explicit opt-in ----------------------------------------------------------
+// DEX never contacts a local AI service on its own: no probe at startup and no
+// silent routing to it. The user turns it on in Settings > AI Providers. Older
+// installs that had already chosen local processing count as opted in.
+
+const LOCAL_AI_KEY = 'dex-uki-local-ai-enabled';
+
+export function isLocalAiEnabled(): boolean {
+  try {
+    const v = localStorage.getItem(LOCAL_AI_KEY);
+    if (v !== null) return v === '1';
+    return localStorage.getItem('dex-uki-processing-mode') === 'local-only'
+      || localStorage.getItem('dex-uki-routing-goal') === 'offline';
+  } catch {
+    return false;
+  }
+}
+
+/** Turn the local AI connection on (checks installed models) or off (forgets them). */
+export async function setLocalAiEnabled(on: boolean): Promise<ModelInfo[] | null> {
+  try { localStorage.setItem(LOCAL_AI_KEY, on ? '1' : '0'); } catch { /* storage unavailable */ }
+  if (!on) { installed = null; return null; }
+  return refreshOllamaModels();
+}
+
 /** Installed local models (null until Ollama has been checked). */
 export function ollamaInstalledModels(): ModelInfo[] | null {
   return installed;

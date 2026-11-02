@@ -5,10 +5,12 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * LIVE ACTIVITY -- Real-time activity feed for Home screen
- * Apps dispatch events; Home renders inline cards that auto-dismiss on complete.
+ * LIVE ACTIVITY -- id-based helpers for long operations (downloads, encodes,
+ * transfers). They write to the one system-wide store (store/liveActivityStore),
+ * so every long task shows in the same place (LiveActivityHost) instead of a
+ * second, Home-only list.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLiveActivityStore } from '../store/liveActivityStore';
 
 export type ActivityType = 'download' | 'encode' | 'transfer' | 'task' | 'sync' | 'build';
 
@@ -20,72 +22,31 @@ export interface LiveActivity {
   progress: number;
   app: string;
   startedAt: number;
-  /** Set when complete -- triggers fade-out after 3s */
+  /** Set when complete */
   completedAt?: number;
 }
 
-// -- Dispatch helpers -- call from any app ---------------------------------
-export function dispatchActivity(act: Omit<LiveActivity, 'startedAt'>) {
-  window.dispatchEvent(new CustomEvent('dex-activity-start', { detail: { ...act, startedAt: Date.now() } }));
+const ICON: Record<ActivityType, string> = {
+  download: 'download', encode: 'video', transfer: 'repeat', task: 'check-square', sync: 'refresh', build: 'zap',
+};
+
+const toFraction = (progress: number): number | null => (progress < 0 ? null : Math.max(0, Math.min(1, progress / 100)));
+
+/** Start (or refresh) an activity. `cancel` adds a Cancel button when the task supports it. */
+export function dispatchActivity(act: Omit<LiveActivity, 'startedAt'> & { cancel?: () => void }) {
+  useLiveActivityStore.getState().upsert(act.id, {
+    title: act.label,
+    icon: ICON[act.type] ?? 'refresh',
+    badge: act.type.toUpperCase(),
+    progress: toFraction(act.progress),
+    cancel: act.cancel,
+  });
 }
 
 export function updateActivity(id: string, progress: number, label?: string) {
-  window.dispatchEvent(new CustomEvent('dex-activity-progress', { detail: { id, progress, label } }));
+  useLiveActivityStore.getState().update(id, { progress: toFraction(progress), ...(label ? { title: label } : {}) });
 }
 
-export function completeActivity(id: string) {
-  window.dispatchEvent(new CustomEvent('dex-activity-complete', { detail: { id } }));
-}
-
-// -- Hook -- consumed by Home ----------------------------------------------
-export function useLiveActivity() {
-  const [activities, setActivities] = useState<Map<string, LiveActivity>>(new Map());
-  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  const cleanup = useCallback((id: string) => {
-    const t = timers.current.get(id);
-    if (t) { clearTimeout(t); timers.current.delete(id); }
-    setActivities(prev => { const m = new Map(prev); m.delete(id); return m; });
-  }, []);
-
-  useEffect(() => {
-    const onStart = (e: Event) => {
-      const act = (e as CustomEvent).detail as LiveActivity;
-      setActivities(prev => new Map(prev).set(act.id, act));
-    };
-
-    const onProgress = (e: Event) => {
-      const { id, progress, label } = (e as CustomEvent).detail;
-      setActivities(prev => {
-        const m = new Map(prev);
-        const existing = m.get(id);
-        if (existing) m.set(id, { ...existing, progress, ...(label ? { label } : {}) });
-        return m;
-      });
-    };
-
-    const onComplete = (e: Event) => {
-      const { id } = (e as CustomEvent).detail;
-      setActivities(prev => {
-        const m = new Map(prev);
-        const existing = m.get(id);
-        if (existing) m.set(id, { ...existing, progress: 100, completedAt: Date.now() });
-        return m;
-      });
-      // Auto-remove after 3s
-      timers.current.set(id, setTimeout(() => cleanup(id), 3000));
-    };
-
-    window.addEventListener('dex-activity-start', onStart);
-    window.addEventListener('dex-activity-progress', onProgress);
-    window.addEventListener('dex-activity-complete', onComplete);
-    return () => {
-      window.removeEventListener('dex-activity-start', onStart);
-      window.removeEventListener('dex-activity-progress', onProgress);
-      window.removeEventListener('dex-activity-complete', onComplete);
-      timers.current.forEach(t => clearTimeout(t));
-    };
-  }, [cleanup]);
-
-  return { activities: Array.from(activities.values()), cleanup };
+export function completeActivity(id: string, failed = false) {
+  useLiveActivityStore.getState().complete(id, { status: failed ? 'error' : 'success' });
 }

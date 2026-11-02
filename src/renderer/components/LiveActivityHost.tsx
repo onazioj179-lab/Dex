@@ -7,164 +7,132 @@
 /**
  * DEX Live Activity Host
  * -----------------------------------------------------------------------------
- * Renders the system-wide live activities (store/liveActivityStore) as premium
- * glass progress cards near the top-centre of the screen -- the DEX loading
- * language for file copy/move/share, creative export, and other long tasks.
- * Non-blocking: the host catches no pointer events; only the cards do.
+ * Renders the system-wide live activities (store/liveActivityStore) as compact
+ * progress cards in the top-right corner, under the top bar: downloads, file
+ * copy/move, creative exports, transfers. Non-blocking: the host catches no
+ * pointer events; only the cards do. Shows real progress only (indeterminate
+ * when the task can't measure it), Cancel when the task supports it.
  *
- * Material: the shared `.dex-liquid-glass` (borderless frosted glass) with a
- * faint DEX-blue wash and a blue (`--color-accent`) progress bar, so every long
- * operation reads the same and matches the rest of the shell.
+ * Material: theme tokens on the shared glass surface, so it follows Interface
+ * Transparency and reads correctly in light and dark mode.
  */
 
 import React from 'react';
 import { useLiveActivityStore, type LiveActivity } from '../store/liveActivityStore';
 import DexIcon from './DexIcon';
 
-const ACCENT = 'var(--color-accent, #4A9EFF)';
+const MAX_VISIBLE = 3;
 
 const Card: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
   const dismiss = useLiveActivityStore((s) => s.dismiss);
-  const indeterminate = activity.progress == null;
-  const pct = Math.round(((activity.progress ?? 0) * 100));
+  const complete = useLiveActivityStore((s) => s.complete);
   const isError = activity.status === 'error';
   const isDone = activity.status === 'success';
+  const running = !isDone && !isError;
+  const indeterminate = activity.progress == null && running;
+  const pct = Math.round((activity.progress ?? 0) * 100);
+  const barColor = isError ? 'var(--color-error)' : 'var(--color-accent)';
+  const cancelled = isError && activity.subtitle === 'Cancelled';
+  const status = cancelled ? 'Cancelled' : isError ? 'Failed' : isDone ? 'Done' : indeterminate ? 'Working' : `${pct}%`;
 
-  const label = isError ? 'Failed' : isDone ? 'Complete' : (activity.subtitle && /\bof\b/.test(activity.subtitle) ? 'Working' : 'Working');
-  const barColor = isError ? 'var(--color-error, #ff453a)' : ACCENT;
+  const onCancel = () => {
+    try { activity.cancel?.(); } catch { /* the task's own cancel must not break the card */ }
+    complete(activity.id, { status: 'error', subtitle: 'Cancelled' });
+  };
 
   return (
     <div
-      className="dex-liquid-glass dex-live-activity-in"
+      className="dex-live-activity dex-live-activity-in"
       role="status"
       aria-live="polite"
-      style={{
-        pointerEvents: 'auto',
-        width: 'min(420px, calc(100vw - 32px))',
-        padding: 16,
-        borderRadius: 'var(--radius-2xl, 18px)',
-        // Faint DEX-blue wash layered over the glass for the reference look.
-        backgroundImage:
-          'linear-gradient(180deg, rgba(74,158,255,0.10), rgba(74,158,255,0.02)), linear-gradient(180deg, rgba(44,44,54,0.28), rgba(14,14,20,0.42))',
-        position: 'relative',
-      }}
+      aria-label={`${activity.title}: ${status}`}
     >
-      <button
-        type="button"
-        aria-label="Dismiss"
-        onClick={() => dismiss(activity.id)}
-        style={{
-          position: 'absolute', top: 12, right: 12, width: 24, height: 24,
-          borderRadius: '50%', border: 'none', cursor: 'pointer',
-          background: 'rgba(255,255,255,0.10)', color: 'var(--color-text-secondary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 0.12s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; }}
-      >
-        <DexIcon name="close" size={12} color="currentColor" />
-      </button>
-
-      {/* Header: icon tile (+ badge) and the title/subtitle. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 28 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'relative', width: 54, height: 54, flexShrink: 0,
-            borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(160deg, rgba(74,158,255,0.30), rgba(74,158,255,0.12))',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
-            color: ACCENT,
-          }}
-        >
-          <DexIcon name={activity.icon || 'files'} size={26} color="currentColor" />
-          {activity.badge && (
-            <span
-              style={{
-                position: 'absolute', bottom: -6, left: -6,
-                fontSize: 8, fontWeight: 800, letterSpacing: '0.06em',
-                padding: '2px 5px', borderRadius: 6, color: '#fff',
-                background: 'rgba(20,22,30,0.72)', border: '1px solid rgba(255,255,255,0.14)',
-              }}
-            >
-              {activity.badge}
-            </span>
-          )}
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {activity.title}
-          </div>
-          {activity.subtitle && (
-            <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-              {activity.subtitle}
-            </div>
-          )}
-        </div>
+      <div className="dex-live-activity__icon" aria-hidden="true">
+        <DexIcon name={activity.icon || 'files'} size={16} color="currentColor" />
       </div>
-
-      {/* Progress row inside a recessed track, like the reference. */}
-      <div
-        style={{
-          marginTop: 14, padding: '12px 14px', borderRadius: 14,
-          background: 'rgba(0,0,0,0.22)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            {!isDone && !isError && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2.5" strokeLinecap="round"
-                style={{ animation: 'dexSpin 0.9s linear infinite' }} aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-6.2-8.6" />
-              </svg>
-            )}
-            {isDone && <DexIcon name="check" size={14} color={ACCENT} />}
-            {label}
-          </span>
-          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary, #fff)', letterSpacing: '-0.01em' }}>
-            {indeterminate && !isDone && !isError ? '' : `${pct}%`}
-          </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+          <span className="dex-live-activity__title">{activity.title}</span>
+          <span className="dex-live-activity__status" style={isError ? { color: 'var(--color-error)' } : undefined}>{status}</span>
         </div>
-        <div style={{ height: 8, borderRadius: 9999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden', position: 'relative' }}>
-          {indeterminate && !isDone && !isError ? (
-            <div
-              style={{
-                position: 'absolute', top: 0, bottom: 0, width: '38%', borderRadius: 9999,
-                background: barColor, animation: 'dexIndeterminate 1.3s ease-in-out infinite',
-              }}
-            />
+        {activity.subtitle && !cancelled && <div className="dex-live-activity__subtitle">{activity.subtitle}</div>}
+        <div className="dex-live-activity__track" aria-hidden="true">
+          {indeterminate ? (
+            <div className="dex-live-activity__bar is-indeterminate" style={{ background: barColor }} />
           ) : (
-            <div
-              style={{
-                height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, borderRadius: 9999,
-                background: barColor, boxShadow: `0 0 12px ${isError ? 'rgba(255,69,58,0.5)' : 'rgba(74,158,255,0.5)'}`,
-                transition: 'width 0.3s ease',
-              }}
-            />
+            <div className="dex-live-activity__bar" style={{ width: `${Math.max(0, Math.min(100, isDone ? 100 : pct))}%`, background: barColor }} />
           )}
         </div>
       </div>
+      {running && activity.cancel ? (
+        <button type="button" className="dex-live-activity__btn" onClick={onCancel} aria-label={`Cancel ${activity.title}`}>Cancel</button>
+      ) : (
+        <button type="button" className="dex-live-activity__close" onClick={() => dismiss(activity.id)} aria-label="Dismiss">
+          <DexIcon name="close" size={11} color="currentColor" />
+        </button>
+      )}
     </div>
   );
 };
 
+const HOST_CSS = `
+.dex-live-activity {
+  pointer-events: auto; display: flex; align-items: center; gap: var(--space-3);
+  width: min(340px, calc(100vw - 32px)); padding: 10px 12px; box-sizing: border-box;
+  border-radius: var(--radius-lg, 14px); border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-glass-strong); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-md); color: var(--color-text-primary);
+}
+.dex-live-activity__icon {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: var(--radius-md, 10px);
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);
+}
+.dex-live-activity__title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dex-live-activity__status { font-size: 11px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.dex-live-activity__subtitle { font-size: 11px; color: var(--color-text-tertiary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dex-live-activity__track { position: relative; height: 4px; margin-top: 6px; border-radius: 9999px; overflow: hidden; background: var(--color-bg-hover); }
+.dex-live-activity__bar { height: 100%; border-radius: 9999px; transition: width 0.3s ease; }
+.dex-live-activity__bar.is-indeterminate { position: absolute; top: 0; bottom: 0; width: 38%; animation: dexIndeterminate 1.3s ease-in-out infinite; }
+.dex-live-activity__btn {
+  flex-shrink: 0; height: 26px; padding: 0 10px; border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface); color: var(--color-text-primary);
+  font: 500 12px var(--dex-font-ui); cursor: pointer;
+}
+.dex-live-activity__btn:hover, .dex-live-activity__close:hover { background: var(--color-bg-hover); }
+.dex-live-activity__close {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 9999px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; background: transparent; color: var(--color-text-secondary);
+}
+.dex-live-activity__btn:focus-visible, .dex-live-activity__close:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .dex-live-activity__bar { transition: none; }
+  .dex-live-activity__bar.is-indeterminate { animation-duration: 2.6s; }
+}
+`;
+
 export const LiveActivityHost: React.FC = () => {
   const activities = useLiveActivityStore((s) => s.activities);
   if (activities.length === 0) return null;
+  const visible = activities.slice(-MAX_VISIBLE);
+  const hidden = activities.length - visible.length;
   return (
     <div
       aria-label="Live activities"
       style={{
-        position: 'fixed', top: 44, left: '50%', transform: 'translateX(-50%)',
+        position: 'fixed', top: 40, right: 12,
         zIndex: 'var(--z-notification, 9000)' as unknown as number,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-        pointerEvents: 'none', maxWidth: '100vw',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+        pointerEvents: 'none',
       }}
     >
-      {activities.map((a) => (
+      <style>{HOST_CSS}</style>
+      {visible.map((a) => (
         <Card key={a.id} activity={a} />
       ))}
+      {hidden > 0 && (
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }}>+{hidden} more</span>
+      )}
     </div>
   );
 };

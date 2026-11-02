@@ -33,7 +33,8 @@ describe('local Ollama model discovery', () => {
     expect(ollamaProvider.listModels().length).toBeGreaterThan(0); // suggested defaults
   });
 
-  it('an installed local model becomes a routing candidate without any key', () => {
+  it('once the user connects local AI, an installed model is a candidate without any key', () => {
+    localStorage.setItem('dex-uki-local-ai-enabled', '1');
     _setInstalledOllamaModels(parseOllamaTags({ models: [{ name: 'llama3.2:3b' }] }));
     expect(configuredCandidates('auto').map((c) => c.id)).toContain('llama3.2:3b');
   });

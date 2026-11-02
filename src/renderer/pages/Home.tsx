@@ -14,7 +14,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from '
 import { clampEventToViewport } from '../utils/menuPosition';
 import { sharedTick } from '../services/SharedTick';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
-import { useLiveActivity, type LiveActivity, type ActivityType } from '../utils/liveActivity';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
 import { glassOverlay } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
@@ -42,18 +41,6 @@ const APP_ICON_PNGS: Record<string, string> = {
 };
 
 
-
-// ======================================================================
-// ACTIVITY ICONS
-// ======================================================================
-const ACTIVITY_ICONS: Record<ActivityType, JSX.Element> = {
-  download: <DexIcon name="download" size={14} />,
-  encode: <DexIcon name="video" size={14} />,
-  transfer: <DexIcon name="repeat" size={14} />,
-  task: <DexIcon name="check-square" size={14} />,
-  sync: <DexIcon name="refresh" size={14} />,
-  build: <DexIcon name="zap" size={14} />,
-};
 
 function fileNameFromPath(path: string): string {
   const normalized = path.replace(/\\/g, '/');
@@ -344,7 +331,6 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
 // COMPONENT
 // ======================================================================
 export const Home: React.FC = () => {
-  const { activities } = useLiveActivity();
   const recentFiles = useRecentFiles(s => s.recentFiles);
   const wpMode = useWallpaperStore(s => s.mode);
   const wpValue = useWallpaperStore(s => s.value);
@@ -646,23 +632,7 @@ export const Home: React.FC = () => {
             keeps the dashboard off the very top edge. */}
         <div style={{ height: 28 }} />
 
-        {/* Live Activity - inline row */}
-        {activities.length > 0 && (
-          <div style={{
-            marginTop: 'var(--space-3)',
-            padding: '0 var(--space-6)',
-            animation: 'fadeIn 0.35s ease-out 0.3s both',
-          }}>
-            <div className="dex-label-caps" style={{ marginBottom: 6 }}>
-              Activity
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {activities.slice(0, 3).map(act => (
-                <ActivityCard key={act.id} activity={act} />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Long-running tasks show system-wide in LiveActivityHost, not here. */}
 
         {/* Quick Access Apps removed -- launch apps from dock or apps menu (Ctrl+Space). */}
 
@@ -929,48 +899,6 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
   );
 };
 
-
-// ======================================================================
-// ACTIVITY CARD
-// ======================================================================
-const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
-  const done = activity.completedAt != null;
-  const color = done ? 'var(--color-success)' : 'var(--color-accent)';
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      padding: '10px 14px', borderRadius: 10,
-      // Unified desktop surface: a soft scrim region, not a bordered glass card.
-      background: 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))',
-      border: '1px solid transparent',
-      boxShadow: 'none',
-      textShadow: 'var(--dex-desktop-text-shadow)',
-      opacity: done ? 0.6 : 1,
-      cursor: 'default',
-      transition: 'opacity 0.18s ease, transform 0.18s ease, background 0.15s ease',
-      animation: done ? 'activityDone 0.5s ease-out' : 'fadeIn 0.2s ease-out',
-      transform: done ? 'scale(0.97)' : 'scale(1)',
-    }}>
-      <div style={{ color, display: 'flex', alignItems: 'center' }}>
-        {ACTIVITY_ICONS[activity.type] || ACTIVITY_ICONS.sync}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: '#fff', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {activity.label}
-        </div>
-        {activity.progress >= 0 && !done && (
-          <div style={{ height: 3, borderRadius: 2, background: 'var(--color-bg-hover)', marginTop: 5, overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 2, background: color, width: `${activity.progress}%`, transition: 'width 0.3s ease' }} />
-          </div>
-        )}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
-        {done ? 'Done' : activity.progress >= 0 ? `${activity.progress}%` : ''}
-      </div>
-    </div>
-  );
-};
 
 Home.displayName = 'Home';
 export default memo(Home);

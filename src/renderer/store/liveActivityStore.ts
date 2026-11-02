@@ -34,6 +34,8 @@ export interface LiveActivity {
   progress: number | null;
   status: LiveActivityStatus;
   createdAt: number;
+  /** Present when the task can be cancelled; the card shows a Cancel button. */
+  cancel?: () => void;
 }
 
 interface LiveActivityState {
@@ -45,7 +47,17 @@ interface LiveActivityState {
     icon?: string;
     badge?: string;
     progress?: number | null;
+    cancel?: () => void;
   }) => string;
+  /** Start an activity under a caller-chosen id, or refresh it if it exists. */
+  upsert: (id: string, input: {
+    title: string;
+    subtitle?: string;
+    icon?: string;
+    badge?: string;
+    progress?: number | null;
+    cancel?: () => void;
+  }) => void;
   /** Patch an in-flight activity (progress, subtitle, title). */
   update: (id: string, patch: Partial<Omit<LiveActivity, 'id' | 'createdAt'>>) => void;
   /** Mark finished (success fills the bar) and auto-dismiss after a short hold. */
@@ -76,9 +88,32 @@ export const useLiveActivityStore = create<LiveActivityState>((set, get) => ({
       progress: input.progress ?? null,
       status: 'active',
       createdAt: Date.now(),
+      cancel: input.cancel,
     };
     set((s) => ({ activities: [...s.activities, activity] }));
     return id;
+  },
+
+  upsert: (id, input) => {
+    set((s) => {
+      const existing = s.activities.find((a) => a.id === id);
+      if (existing) {
+        return { activities: s.activities.map((a) => (a.id === id ? { ...a, ...input, status: 'active' as const, progress: input.progress ?? a.progress } : a)) };
+      }
+      return {
+        activities: [...s.activities, {
+          id,
+          title: input.title,
+          subtitle: input.subtitle,
+          icon: input.icon ?? 'files',
+          badge: input.badge,
+          progress: input.progress ?? null,
+          status: 'active' as const,
+          createdAt: Date.now(),
+          cancel: input.cancel,
+        }],
+      };
+    });
   },
 
   update: (id, patch) => {
@@ -98,6 +133,7 @@ export const useLiveActivityStore = create<LiveActivityState>((set, get) => ({
               title: patch?.title ?? a.title,
               subtitle: patch?.subtitle ?? a.subtitle,
               progress: status === 'success' ? 1 : a.progress,
+              cancel: undefined,
             }
           : a,
       ),
