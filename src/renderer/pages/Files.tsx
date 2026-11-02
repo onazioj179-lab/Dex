@@ -1083,7 +1083,6 @@ export const Files: React.FC = () => {
           try { localStorage.setItem(PINNED_FOLDERS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
           return next;
         });
-        toast.info(`Unpinned ${name}`);
       } else {
         pinFolder(path, name);
         setLocalPins(prev => {
@@ -1092,7 +1091,6 @@ export const Files: React.FC = () => {
           try { localStorage.setItem(PINNED_FOLDERS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
           return next;
         });
-        toast.success(`Pinned ${name}`);
       }
     } catch (err) {
       console.error('Pin toggle failed:', err);
@@ -1923,10 +1921,8 @@ export const Files: React.FC = () => {
                   onClick={() => {
                     if (isPinned && matchingPin) {
                       unpinRegistry(matchingPin.id);
-                      toast.info(`Unpinned ${folderName}`);
                     } else {
                       pinFolder(currentPath, folderName);
-                      toast.success(`Pinned ${folderName}`);
                     }
                   }}
                   aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}

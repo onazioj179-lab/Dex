@@ -34,7 +34,7 @@ I make no claim that the profile reduced size. Startup, memory and idle CPU were
 | `shellPreferences`, `calc-provider` | Pass (29 tests across the three files above) |
 | `radius-scale-ratchet` | Was failing on import on Windows (CRLF shebang); fixed via `.gitattributes`. It then caught one off-scale radius from main (`SpatialHud.tsx`), also fixed. Passes (2/2) |
 | Watermark gate (`add-watermarks.js --check`) | Pass, 2276 files |
-| Full `vitest run` suite | **Not run** in this pass |
+| Full `vitest run` suite | 516 of 520 files pass (5,423 tests). 4 failures: 3 `v6-performance-guards` budgets (pass when the file runs alone; they fail under load) and 1 `auto-save-manager` test that broke on the DST-change day (now-24h is still today); the test now uses calendar arithmetic and passes |
 | Playwright e2e | Not run |
 
 ## Live checks (Vite preview, the app's own store instance)

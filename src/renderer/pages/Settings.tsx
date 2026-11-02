@@ -2968,7 +2968,6 @@ export const Settings: React.FC = () => {
               reader.onload = () => {
                 const dataUrl = reader.result as string;
                 useWallpaperStore.getState().setCustomImage(dataUrl);
-                toast.success('Custom wallpaper applied');
               };
               reader.readAsDataURL(file);
             };
