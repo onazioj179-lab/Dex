@@ -507,12 +507,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--dex-font-ui)',
   },
   generateBtn: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'var(--color-accent-fill)',
+    color: 'var(--color-accent-text)',
     border: 'none',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.4)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
   },
   copiedBtn: {
-    background: 'linear-gradient(180deg, var(--color-success) 0%, #1fa848 100%)',
+    background: 'var(--color-success)',
+    color: 'var(--color-text-inverse)',
     border: 'none',
     boxShadow: '0 2px 8px rgba(48,209,88,0.4)',
   },

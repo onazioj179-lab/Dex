@@ -142,7 +142,7 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
         style={{
           background: open ? 'var(--color-border)' : 'transparent',
           border: '1px solid var(--color-border-subtle)',
-          color: '#aaa',
+          color: 'var(--color-text-tertiary)',
           fontSize: '11px',
           padding: '4px 10px',
           borderRadius: '4px',

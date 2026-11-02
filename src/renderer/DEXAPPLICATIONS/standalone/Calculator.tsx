@@ -349,9 +349,9 @@ const Calculator: React.FC = () => {
         border: '1px solid var(--color-border-subtle)',
       },
       op: {
-        background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
-        color: 'var(--color-text-inverse)',
-        boxShadow: '0 2px 12px rgba(10,132,255,0.4)',
+        background: 'var(--color-accent-fill)',
+        color: 'var(--color-accent-text)',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
         border: 'none',
       },
       func: { 
@@ -360,7 +360,7 @@ const Calculator: React.FC = () => {
         border: '1px solid var(--color-border-default)',
       },
       equal: { 
-        background: 'linear-gradient(180deg, var(--color-success) 0%, #1fa848 100%)', 
+        background: 'var(--color-success)', 
         color: 'var(--color-text-inverse)',
         boxShadow: '0 2px 12px rgba(48,209,88,0.4)',
         border: 'none',
@@ -542,9 +542,9 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
   },
   modeBtnActive: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
-    color: 'var(--color-text-inverse)',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.4)',
+    background: 'var(--color-accent-fill)',
+    color: 'var(--color-accent-text)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
   },
   historyBtn: {
     color: 'var(--color-text-muted)',

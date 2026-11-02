@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|---|
 | 1 | Merge this branch (`claude/dex-part4`) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
 | 2 | Accurate Privacy Policy | **BLOCKED** | Owner has not approved the rewrite | `PRIVACY.md`, `src/shared/policies.ts` | Approve a rewrite from `docs/privacy/DATA_FLOWS.md` + `docs/reports/DEX_AI_PRIVACY.md` (must disclose Web Speech cloud recognition, provider data flow, Ollama check) | Owner / legal | P0 |
-| 3 | Local AI measured end to end | BLOCKED | Ollama is installed with 0 models; pulling one is a multi-GB download | Ollama | Approve `ollama pull llama3.2:3b`, then measure first token and tokens/s | Owner approval | P1 |
+| 3 | Local AI measured end to end | DEFERRED (owner) | Owner parked Ollama work until further notice | Ollama | None until the owner reopens it | Owner | — |
 | 4 | Cloud AI measured end to end | NOT TESTED | No provider key here | Providers | Add a key; run a scripted agent session (web search + file read) | Owner key | P1 |
 | 5 | Screen sharing in the packaged app | NOT TESTED | The system picker needs a human to choose a window | `uki/screenCapture.ts` | Click "look at my screen", pick a window, confirm one frame is sent and the indicator clears | Tester | P1 |
 | 6 | Clean-machine install test | NOT TESTED | No VM | NSIS/MSI, WebView2 bootstrapper | Install on a VM without WebView2 | VM | P1 |
@@ -21,7 +21,7 @@
 | 15 | Live boot image root device | BLOCKED (boot-critical) | Live `grub.cfg` uses `root=/dev/sda2` | `dex-os/boot/grub.cfg` | Use `root=LABEL=DEX_ROOT` (see `docs/reports/DEX_UKI_INTEGRATION.md`) | Owner approval + VM | P2 |
 | 16 | Unified Kernel Image, Secure Boot, rollback | MISSING | GRUB + bzImage today; no signing, no previous-kernel entry | `dex-os/` | Design decision; owner-held keys | Owner | P3 |
 | 17 | DEX OS image build + boot test | BLOCKED | No Buildroot toolchain/VM here | `dex-os/` | Build in CI, boot in QEMU | VM | P2 |
-| 18 | App-level colour sweep | PARTIAL | 1,143 hex values in apps, 573 in shell (many legitimately canvas/editor colours) | `DEXAPPLICATIONS/*`, shell | Replace UI-chrome hex with tokens | — | P2 |
+| 18 | App-level colour sweep | PARTIAL | Shell + standalone apps: dark-only chrome fixed (window title bar, Mini Player, Notes dialog title, Home dropdown, Achievements tracks), off-brand blue/green buttons moved to tokens; ratchet `ui-color-ratchet.test.ts` at 284 (mostly white text on coloured fills + content palettes). Creative suite (Imosion/Prism/Flux/Forge, ~570) excluded: studio palettes need a design pass | Creative apps | Dedicated creative-suite colour pass with light/dark review | Owner design call | P2 |
 | 19 | Terms of Service legal review | PARTIAL | Not a legal reviewer | `TERMS.md` | Legal review | Legal | P2 |
 | 20 | Podcasts, shared albums, live captions | MISSING | Need backends/services | New apps | Product decision first | Services | P3 |
 | 21 | Multi-monitor test | NOT TESTED | Single display | Window manager | Test on two displays | Hardware | P3 |

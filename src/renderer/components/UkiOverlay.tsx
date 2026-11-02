@@ -1476,7 +1476,7 @@ const UkiOverlay: React.FC = () => {
         id: `uki-${Date.now()}`,
         label: userText.slice(0, 48),
         weight: 1,
-        color: '#0A84FF',
+        color: 'var(--color-accent)',
         category: intent,
         timestamp: Date.now(),
       };

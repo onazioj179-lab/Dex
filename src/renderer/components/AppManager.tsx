@@ -3200,7 +3200,7 @@ export const AppManager: React.FC = () => {
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
                 // Subtle top-lit gradient + hairline highlight gives the title bar real
                 // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
-                background: 'linear-gradient(180deg, #26262B 0%, #1C1C20 100%)',
+                background: 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-surface) 100%)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
                 justifyContent: 'center',

@@ -86,7 +86,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           onClick={onApprove}
           style={{
             padding: '4px var(--space-3)', borderRadius: 4,
-            border: 'none', background: '#238636', color: '#fff', cursor: 'pointer',
+            border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', cursor: 'pointer',
             fontWeight: 600,
           }}
         >
