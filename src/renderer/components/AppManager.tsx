@@ -749,7 +749,6 @@ export const AppManager: React.FC = () => {
   showAppMenuRef.current = showAppMenu;
   // Shared Spotlight search overlay (the dock Search button opens this). One
   // search surface, used everywhere -- real results, keyboard nav, categories.
-  const [showSpotlight, setShowSpotlight] = useState(false);
   const [appMenuSearch, setAppMenuSearch] = useState('');
   const appMenuSearchRef = useRef<HTMLInputElement>(null);
   // Immersive focus: hide the top bar so an open
@@ -1262,14 +1261,6 @@ export const AppManager: React.FC = () => {
     }
   }, [runningApps, currentAppId, setCurrentRunningApp]);
 
-  // -- Status row: clock ---------------------------------------------------
-  // Battery is not shown in the top bar; Control Center reads it on demand.
-  const [clockStr, setClockStr] = useState(() => {
-    const now = new Date();
-    const d = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const t = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    return `${d}  ${t}`;
-  });
   const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
 
   // -- CalmFocusEngine: record input activity so the engine can decide whether
@@ -1452,27 +1443,6 @@ export const AppManager: React.FC = () => {
   // moves away from the bottom edge. This was the main "moves on contact"
   // behaviour -- the dock now simply stays put.
 
-  // Clock for status row
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      const d = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const t = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      setClockStr(`${d}  ${t}`);
-    };
-    updateClock();
-    // Align to minute boundary then tick every 60s (was 1s — eliminates 59 repaints/min)
-    const msToNextMinute = 60000 - (Date.now() % 60000);
-    let clockIntervalId: ReturnType<typeof setInterval> | undefined;
-    const alignTimeoutId = setTimeout(() => {
-      updateClock();
-      clockIntervalId = setInterval(updateClock, 60_000);
-    }, msToNextMinute);
-    return () => {
-      clearTimeout(alignTimeoutId);
-      if (clockIntervalId) clearInterval(clockIntervalId);
-    };
-  }, []);
 
   // Keep-alive: track which apps have been mounted
   const mountedAppsRef = useRef<Set<AppId>>(new Set(['home']));
