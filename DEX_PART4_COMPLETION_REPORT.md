@@ -56,7 +56,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Screen understanding (user-authorised, one frame) | PARTIAL | System-picker capture added (Tauri had no capture handler); unit-tested; needs a human run (#5) |
 | Camera understanding | MISSING | #13 |
 | Cross-device continuity | MISSING | No sync service (#12) |
-| Cost controls | PARTIAL | Local only / Cheapest / effort caps; no spend limit (#10) |
+| Cost controls | VERIFIED COMPLETE (tokens) / PARTIAL (money) | Daily usage totals + optional daily cloud token cap that blocks before sending and falls back to local (`ai-usage-cap.test.ts`); no currency budget (#10) |
 | UKI boot integration | NOT APPLICABLE / BLOCKED | No UKI in `dex-os/`; assistant is never a boot dependency |
 | macOS Blue Modern UI + motion | VERIFIED COMPLETE (tokens) | `DEX_UI_UX_FINAL_AUDIT.md` |
 | Accessibility (new controls labelled, keyboard reachable) | PARTIAL | Screen reader not run (#7) |

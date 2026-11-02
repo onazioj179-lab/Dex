@@ -22,6 +22,7 @@ import {
 } from '../uki/providers/modelPrefs';
 import { routeConfiguredModels, applyProcessingMode } from '../uki/providers/connect';
 import { ollamaHasNoModels } from '../uki/providers/ollama';
+import { readUsage, getDailyTokenCap, setDailyTokenCap } from '../uki/providers/usage';
 import {
   PROCESSING_MODES, processingModeLabel, processingModeHint, REASONING_PREFERENCES,
   type ProcessingMode, type ReasoningPreference,
@@ -78,6 +79,9 @@ const AiProviderSettings: React.FC = () => {
   const [mode, setMode] = useState<ProcessingMode>(() => getProcessingMode());
   const [manualModel, setManual] = useState<string>(() => getManualModel() ?? '');
   const [reasoning, setReasoning] = useState<ReasoningPreference>(() => getReasoningPreference());
+  const [cap, setCap] = useState<number>(() => getDailyTokenCap());
+  const usage = readUsage();
+  const usageRows = Object.entries(usage.byProvider);
 
   const chooseModel = (id: string, modelId: string) => {
     setModels((m) => ({ ...m, [id]: modelId }));
@@ -210,6 +214,31 @@ const AiProviderSettings: React.FC = () => {
           </select>
         </div>
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{REASONING_HINT[reasoning]}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label htmlFor="daily-token-cap" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 120 }}>
+            Daily cloud limit
+          </label>
+          <input
+            id="daily-token-cap"
+            type="number"
+            min={0}
+            step={10000}
+            value={cap || ''}
+            placeholder="No limit"
+            onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setCap(v); setDailyTokenCap(v); }}
+            style={{ ...selectStyle, width: 140 }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>tokens per day · local models are never limited</span>
+        </div>
+        <div data-testid="ai-usage-today" style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          {usageRows.length === 0
+            ? 'No AI usage recorded today.'
+            : <>Today: {usageRows.map(([id, u]) => (
+                <span key={id} style={{ marginRight: 10 }}>
+                  {getProvider(id as never)?.label ?? id} {(u.prompt + u.completion).toLocaleString()} tokens / {u.calls} call{u.calls === 1 ? '' : 's'}{u.estimated > 0 ? ' (partly estimated)' : ''}
+                </span>
+              ))}</>}
+        </div>
       </div>
 
       <div

@@ -12,7 +12,10 @@
  * part is the live send the user enables by adding a key).
  */
 
-import { providerForModel } from './registry';
+import { providerForModel, getProvider } from './registry';
+import { assertWithinCap, recordUsage, estimateTokens } from './usage';
+
+const isCloudProvider = (id: string) => !!getProvider(id as never)?.requiresKey;
 import { getApiKey } from '../keystore';
 import type { ChatMessage, ChatResponse } from './types';
 import { getProcessingMode, getManualModel } from './modelPrefs';
@@ -72,6 +75,7 @@ export async function chat(
   const provider = providerForModel(modelId);
   if (!provider) throw new Error(`Unknown model: ${modelId}`);
   assertModelAllowed(modelId, provider, opts);
+  assertWithinCap(provider.label, provider.requiresKey, isCloudProvider);
 
   const apiKey = provider.requiresKey ? getApiKey(provider.id) ?? '' : undefined;
   if (provider.requiresKey && !apiKey) {
@@ -91,7 +95,17 @@ export async function chat(
     const detail = await res.text().catch(() => '');
     throw new Error(`${provider.label} request failed (${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
   }
-  return provider.parseChatResponse(await res.json());
+  const parsed = provider.parseChatResponse(await res.json());
+  const promptTok = parsed.usage?.promptTokens;
+  const completionTok = parsed.usage?.completionTokens;
+  const estimated = promptTok === undefined || completionTok === undefined;
+  recordUsage(
+    provider.id,
+    promptTok ?? estimateTokens(messages.map((m) => m.content).join(' ')),
+    completionTok ?? estimateTokens(parsed.content),
+    estimated,
+  );
+  return parsed;
 }
 
 /** Try each model in order, returning the first success (degrade to a free/local model). */

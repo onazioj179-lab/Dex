@@ -20,6 +20,7 @@ import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } 
 import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 import { configuredProviders, getApiKey } from '../keystore';
 import { ollamaInstalledModels } from './ollama';
+import { assertWithinCap, recordUsage, estimateTokens } from './usage';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
 import type { ChatMessage, ProviderId } from './types';
@@ -297,8 +298,9 @@ export async function streamConfiguredLLM(
   if (!provider) return null;
   try {
     assertModelAllowed(modelId, provider, { processingMode: mode, baseUrl: opts.chatOptions?.baseUrl });
+    assertWithinCap(provider.label, provider.requiresKey, (id) => !!getProvider(id as ProviderId)?.requiresKey);
   } catch {
-    return null; // blocked by the processing mode: nothing is sent
+    return null; // blocked by the processing mode or the daily cloud limit: nothing is sent
   }
 
   const apiKey = provider.requiresKey ? getApiKey(provider.id) ?? '' : undefined;
@@ -340,6 +342,8 @@ export async function streamConfiguredLLM(
       onToken(tok, full);
     }
     const trimmed = full.trim();
+    // Streams carry no usage counts: record an estimate, flagged as such.
+    recordUsage(provider.id, estimateTokens(messages.map((m) => m.content).join(' ')), estimateTokens(full), true);
     return trimmed.length > 0 ? trimmed : null;
   } catch {
     return null;

@@ -12,6 +12,7 @@
 - **Memory you control:** view what UKI remembers, forget single items, export it all as JSON, or clear everything.
 - **Your AI keys are encrypted** with Windows DPAPI. Keys saved by older versions are moved into secure storage automatically.
 - **Local AI:** DEX finds the models installed in Ollama and uses them without any key.
+- **See and limit AI usage:** today's tokens per provider, plus an optional daily limit for cloud AI. Local models are never limited.
 - **"Look at my screen" works again** in the desktop app. You pick the window to share in the Windows picker, and DEX takes one frame.
 
 ## Fixed
@@ -51,7 +52,7 @@
 ## Known limitations
 
 - UKI needs an AI provider key, or an installed Ollama model, for free-form requests. Cloud and local model speed haven't been measured yet.
-- There is no cross-device sync and no spending limit for paid AI providers yet.
+- There is no cross-device sync yet. The daily AI limit counts tokens, not money.
 - In-app updates aren't available yet.
 - Removing an app hides it, but doesn't free disk space.
 - The Privacy Policy text is being updated.

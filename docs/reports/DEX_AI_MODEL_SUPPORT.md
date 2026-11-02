@@ -48,7 +48,9 @@ Each model declares its context window. `classifyTask` estimates tokens, and req
 
 - Paid use happens only for providers you add a key for, and Cloud use can be disabled entirely with **Local only**.
 - **Cheapest** prefers lower-cost models. Reasoning effort caps output length and steps.
-- Not implemented: per-provider spending limits or usage totals. Providers return usage counts per call (`usage.promptTokens/completionTokens`), but DEX does not aggregate them yet. *Tracked.*
+- **Usage totals:** tokens and calls per provider for the current day, shown in Settings › AI Providers. Provider-reported counts are used where available; streamed replies are estimated (chars / 4) and marked "partly estimated".
+- **Daily cloud limit:** an optional token cap for cloud providers. When reached, cloud calls are refused before anything is sent, and the router falls back to an allowed local model if there is one. Local models are never limited (`providers/usage.ts`, `ai-usage-cap.test.ts`).
+- Not implemented: money-denominated budgets. Per-model prices change and are not shipped, so the cap is in tokens.
 
 ## Keys
 
