@@ -14,8 +14,15 @@
 // SINGLETON CONTEXT
 // ---------------------------------------------------------------------------
 
+const SOUND_PREF_KEY = 'dex-ui-sounds';
+
+function readSoundPref(): boolean {
+  try { return localStorage.getItem(SOUND_PREF_KEY) !== 'off'; } catch { return true; }
+}
+
 let _ctx: AudioContext | null = null;
-let _enabled = true;
+// Persisted so a muted user stays muted across restarts (default: on).
+let _enabled = readSoundPref();
 
 function getContext(): AudioContext | null {
   if (!_enabled) return null;
@@ -34,6 +41,7 @@ function getContext(): AudioContext | null {
 
 export function setSoundEnabled(on: boolean): void {
   _enabled = on;
+  try { localStorage.setItem(SOUND_PREF_KEY, on ? 'on' : 'off'); } catch { /* storage blocked */ }
   if (!on && _ctx) {
     _ctx.close().catch((e: unknown) => { console.warn('[DEX]', e); });
     _ctx = null;
