@@ -78,6 +78,7 @@ import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
+import * as WindowDepth from '../shell/WindowDepthManager';
 import { sharedTick } from '../services/SharedTick';
 import { useStageStore, type StageWindowRef } from '../store/stageStore';
 import { ContextBus } from '../services/ContextBus';
@@ -1618,6 +1619,10 @@ export const AppManager: React.FC = () => {
     const doRemove = () => {
       restoredWindowBoundsRef.current.delete(appId);
       mountedAppsRef.current.delete(appId as AppId);
+      // Release z-order tracking so the depth map doesn't accumulate stale
+      // entries across the session (and a reopened app gets a fresh depth
+      // instead of inheriting its old high z-index).
+      WindowDepth.removeWindow(appId);
       closeRunningApp(appId);
       setDetachedApps(prev => { if (!prev.has(appId)) return prev; const n = new Map(prev); n.delete(appId); return n; });
       setMinimizedApps(prev => { if (!prev.has(appId)) return prev; const n = new Set(prev); n.delete(appId); return n; });

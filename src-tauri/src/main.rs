@@ -2830,10 +2830,12 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("rewind:") => rewind::dispatch(ch, &args),
         ch if ch.starts_with("ai-runtime:") => ai_runtime::dispatch(ch, &args),
 
-        // --- Auth enrolment (AuthController setPin/setPassword/enableBiometric)
-        // Salted-SHA-256 credential writes to the shared KV; biometric runs the
-        // real OS verifier. Read/verify side stays renderer-managed for now.
-        ch if ch.starts_with("auth:setup:") || ch == "auth:getState" || ch == "auth:getConfig" => {
+        // --- Auth: full credential engine (enrol + verify + change + clear +
+        // recovery + lockout + session tokens). Secrets are Argon2id-hashed in
+        // the shared KV; biometric runs the real OS verifier. Restored from
+        // #57, which was lost when main's history was rewritten.
+        // `auth:biometricsAvailable` is answered renderer-side. No idle locking.
+        ch if ch.starts_with("auth:") => {
             auth::dispatch(&app, ch, &args)
         }
 

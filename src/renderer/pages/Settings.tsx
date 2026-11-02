@@ -2141,6 +2141,47 @@ export const Settings: React.FC = () => {
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [authError, setAuthError] = useState('');
+  // Security-question recovery enrolment (the guaranteed way back in).
+  const [showSecurityQuestions, setShowSecurityQuestions] = useState(false);
+  const [securityQuestionsSet, setSecurityQuestionsSet] = useState(false);
+  const SECURITY_QUESTION_PROMPTS = [
+    'What was the name of your first pet?',
+    'What is your mother\'s maiden name?',
+    'What was the name of your first school?',
+    'In what city were you born?',
+    'What was your childhood nickname?',
+    'What is the name of your favorite teacher?',
+  ];
+  const [securityQA, setSecurityQA] = useState<{ question: string; answer: string }[]>([
+    { question: SECURITY_QUESTION_PROMPTS[0], answer: '' },
+    { question: SECURITY_QUESTION_PROMPTS[1], answer: '' },
+    { question: SECURITY_QUESTION_PROMPTS[2], answer: '' },
+  ]);
+
+  const handleSaveSecurityQuestions = async () => {
+    setAuthError('');
+    if (securityQA.some(q => !q.question.trim() || !q.answer.trim())) {
+      setAuthError('Fill in every question and answer.');
+      return;
+    }
+    const questionSet = new Set(securityQA.map(q => q.question.trim().toLowerCase()));
+    if (questionSet.size !== securityQA.length) {
+      setAuthError('Choose distinct questions.');
+      return;
+    }
+    try {
+      const result = await window.electron?.invoke('auth:setup:securityQuestions', securityQA);
+      if (result?.success) {
+        setSecurityQuestionsSet(true);
+        setShowSecurityQuestions(false);
+        setSecurityQA(prev => prev.map(q => ({ ...q, answer: '' })));
+      } else {
+        setAuthError(result?.error || 'Failed to save security questions');
+      }
+    } catch {
+      setAuthError('Failed to save security questions');
+    }
+  };
   
   // Check biometric availability on mount
   React.useEffect(() => {
@@ -2158,6 +2199,18 @@ export const Settings: React.FC = () => {
       }
     };
     checkBiometric();
+  }, []);
+
+  // Reflect whether security questions are already enrolled.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await window.electron?.invoke('auth:getSecurityQuestions');
+        if (!cancelled) setSecurityQuestionsSet(!!res?.enabled);
+      } catch { /* leave as not-set */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   React.useEffect(() => {
@@ -2275,6 +2328,11 @@ export const Settings: React.FC = () => {
   };
   
   const handleDisableAuth = (type: 'pin' | 'password' | 'biometric') => {
+    // Actually erase the stored credential natively (not just flip local UI).
+    const channel = type === 'pin' ? 'auth:disablePin'
+      : type === 'password' ? 'auth:disablePassword'
+      : 'auth:disableBiometric';
+    void window.electron?.invoke?.(channel);
     if (type === 'pin') {
       setSettings(prev => ({
         ...prev,
@@ -3282,6 +3340,51 @@ export const Settings: React.FC = () => {
         </div>
       )}
       
+      {/* Security Questions -- account recovery so you're never locked out */}
+      {(settings.pinEnabled || settings.passwordEnabled) && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Security Questions {securityQuestionsSet ? '(set up)' : ''}</span>
+              <span style={styles.settingDesc}>Recover your account and reset your password if you ever forget it — you're never locked out</span>
+            </div>
+            <button style={styles.manageBtn} aria-label="Set up security questions" onClick={() => { setShowSecurityQuestions(v => !v); setAuthError(''); }}>
+              {securityQuestionsSet ? 'Change' : 'Set up'}
+            </button>
+          </div>
+          {showSecurityQuestions && (
+            <div style={{ padding: 'var(--space-4)', background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.18)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+              {securityQA.map((qa, i) => (
+                <div key={i} style={{ marginBottom: 'var(--space-3)' }}>
+                  <select
+                    value={qa.question}
+                    aria-label={`Security question ${i + 1}`}
+                    onChange={e => setSecurityQA(prev => prev.map((q, j) => j === i ? { ...q, question: e.target.value } : q))}
+                    style={{ width: '100%', padding: '8px', marginBottom: '6px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '13px' }}
+                  >
+                    {SECURITY_QUESTION_PROMPTS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    value={qa.answer}
+                    aria-label={`Answer ${i + 1}`}
+                    autoComplete="off"
+                    placeholder="Your answer"
+                    onChange={e => setSecurityQA(prev => prev.map((q, j) => j === i ? { ...q, answer: e.target.value } : q))}
+                    style={{ width: '100%', padding: '8px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+              {authError && <div style={{ color: 'var(--color-danger, #ff5f57)', fontSize: '12px', marginBottom: '8px' }}>{authError}</div>}
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button style={styles.manageBtn} aria-label="Save security questions" onClick={handleSaveSecurityQuestions}>Save</button>
+                <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel security questions" onClick={() => { setShowSecurityQuestions(false); setAuthError(''); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <h3 style={styles.sectionTitle}>Privacy</h3>
       {renderToggle('locationServices', 'Location Services', 'Allow DEX to access your location')}
       <div style={styles.settingRow}>

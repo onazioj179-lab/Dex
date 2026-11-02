@@ -186,6 +186,10 @@ declare global {
         authenticateRecovery: (code: string) => Promise<{ success: boolean; error?: string; token?: string }>;
         verifySession: (token: string) => Promise<boolean>;
         getLockoutStatus: () => Promise<{ isLockedOut: boolean; remainingMinutes: number; attemptsRemaining: number }>;
+        // Security-question account recovery (the guaranteed way back in).
+        setSecurityQuestions: (qa: { question: string; answer: string }[]) => Promise<{ success: boolean; error?: string }>;
+        getSecurityQuestions: () => Promise<{ enabled: boolean; questions: { index: number; question: string }[] }>;
+        recoverAccount: (req: { answers: string[]; newPassword?: string }) => Promise<{ success: boolean; error?: string; token?: string }>;
         onStateChange: (callback: (state: any) => void) => void;
       };
       // Secure Vault - Password Manager & Authenticator

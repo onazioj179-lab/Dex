@@ -8777,5 +8777,61 @@ input[type="search"]:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   LIVE WALLPAPERS — animated background gradients driven by the wallpaperStore
+   'live' mode (see App.tsx liveWallpaperClass). GPU-composited (background-
+   position / opacity only), respects prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dex-live-wp {
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.dex-live-wp--live-ember-pulse {
+  background-image:
+    radial-gradient(60% 80% at 30% 110%, #5c1010 0%, transparent 60%),
+    radial-gradient(50% 70% at 80% 120%, #7a1a00 0%, transparent 55%),
+    linear-gradient(180deg, #0a0a0a 0%, #1a0000 55%, #3a0000 100%);
+  background-size: 140% 140%, 140% 140%, 100% 100%;
+  animation: dex-live-ember 12s ease-in-out infinite alternate;
+}
+@keyframes dex-live-ember {
+  0%   { background-position: 30% 100%, 80% 100%, 0 0; }
+  100% { background-position: 40% 90%, 70% 90%, 0 0; }
+}
+
+.dex-live-wp--live-aurora-shift {
+  background-image:
+    radial-gradient(45% 60% at 20% 30%, rgba(72,52,212,0.55) 0%, transparent 60%),
+    radial-gradient(50% 65% at 75% 40%, rgba(46,204,113,0.35) 0%, transparent 60%),
+    linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  background-size: 160% 160%, 160% 160%, 100% 100%;
+  animation: dex-live-aurora 18s ease-in-out infinite alternate;
+}
+@keyframes dex-live-aurora {
+  0%   { background-position: 0% 50%, 100% 50%, 0 0; }
+  50%  { background-position: 60% 20%, 40% 80%, 0 0; }
+  100% { background-position: 100% 50%, 0% 50%, 0 0; }
+}
+
+.dex-live-wp--live-midnight-waves {
+  background-image:
+    radial-gradient(55% 45% at 50% 100%, rgba(10,61,98,0.7) 0%, transparent 65%),
+    radial-gradient(40% 35% at 20% 90%, rgba(13,110,160,0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #0a1628 0%, #0a3d62 60%, #0d1117 100%);
+  background-size: 200% 120%, 200% 120%, 100% 100%;
+  animation: dex-live-waves 16s ease-in-out infinite alternate;
+}
+@keyframes dex-live-waves {
+  0%   { background-position: 0% 100%, 100% 90%, 0 0; }
+  100% { background-position: 100% 90%, 0% 100%, 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dex-live-wp--live-ember-pulse,
+  .dex-live-wp--live-aurora-shift,
+  .dex-live-wp--live-midnight-waves { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    END OF DESIGN SYSTEM
    ═══════════════════════════════════════════════════════════════════════════ */
