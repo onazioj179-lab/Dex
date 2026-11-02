@@ -921,17 +921,17 @@ html[data-glass-effective-mode="off"] .dex-liquid-glass-strong {
    dropdown, panel, and chrome surface that reads these tokens degrades together
    in one place, matching the .dex-liquid-glass fallbacks above. */
 html[data-perf-tier="low"] {
-  --glass-bg: #141416;
+  --glass-bg: var(--color-bg-overlay);
   --glass-blur: none;
-  --color-bg-glass: #161618;
-  --color-bg-glass-strong: #1a1a1e;
+  --color-bg-glass: var(--color-bg-secondary);
+  --color-bg-glass-strong: var(--color-bg-surface);
 }
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --glass-bg: #141416;
+    --glass-bg: var(--color-bg-overlay);
     --glass-blur: none;
-    --color-bg-glass: #161618;
-    --color-bg-glass-strong: #1a1a1e;
+    --color-bg-glass: var(--color-bg-secondary);
+    --color-bg-glass-strong: var(--color-bg-surface);
   }
 }
 

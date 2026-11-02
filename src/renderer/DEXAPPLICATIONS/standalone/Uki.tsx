@@ -17,7 +17,7 @@ import {
   hasConfiguredProvider,
   hasVisionProvider,
 } from '../../uki/providers/connect';
-import { captureScreenImage, isScreenCaptureAvailable } from '../../uki/screenCapture';
+import { captureScreenImage, isScreenCaptureAvailable, captureCameraFrame, isCameraCaptureAvailable } from '../../uki/screenCapture';
 import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
@@ -273,6 +273,8 @@ export default function Uki(): React.ReactElement {
   // (Electron) and a vision provider are available.
   const [lookAtScreen, setLookAtScreen] = useState(false);
   const screenVisionReady = isScreenCaptureAvailable() && hasVisionProvider();
+  const [lookWithCamera, setLookWithCamera] = useState(false);
+  const cameraVisionReady = isCameraCaptureAvailable() && hasVisionProvider();
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -534,6 +536,13 @@ export default function Uki(): React.ReactElement {
       const shot = await captureScreenImage();
       if (shot) images = [shot];
     }
+    // "Use my camera": one frame for this message only; the camera is off again
+    // before the request is sent.
+    if (lookWithCamera) {
+      setLookWithCamera(false);
+      const frame = await captureCameraFrame();
+      if (frame) images = [...(images ?? []), frame];
+    }
     let full = '';
     try {
       const result = await streamConfiguredLLM(
@@ -742,6 +751,26 @@ export default function Uki(): React.ReactElement {
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </button>
+          )}
+          {cameraVisionReady && (
+            <button
+              type="button"
+              onClick={() => setLookWithCamera((v) => !v)}
+              title={lookWithCamera ? 'One camera photo will be taken when you send' : 'Use my camera (one photo for your next message)'}
+              aria-label="Use my camera for the next message"
+              aria-pressed={lookWithCamera}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 10px', flexShrink: 0, cursor: 'pointer',
+                background: lookWithCamera ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
+                color: lookWithCamera ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                border: '1px solid var(--color-border)', borderRadius: 10,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
               </svg>
             </button>
           )}

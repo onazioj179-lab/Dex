@@ -73,3 +73,14 @@ describe('macOS Blue Modern palette', () => {
     }
   });
 });
+
+describe('glass-off surfaces follow the theme', () => {
+  it('writes theme tokens, not near-black hex (light mode was stuck dark)', async () => {
+    const { applyGlassVars } = await import('../../src/renderer/store/shellPreferencesStore');
+    applyGlassVars({ glassMode: 'off', glassOpacity: 0.8, glassTint: '#0A0A0A', lowEndMode: false } as never);
+    const st = document.documentElement.style;
+    for (const v of ['--glass-bg', '--color-bg-glass', '--color-bg-glass-strong', '--dex-glass-bg']) {
+      expect(st.getPropertyValue(v).trim(), v).toMatch(/^var\(--color-bg-/);
+    }
+  });
+});

@@ -230,11 +230,15 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     // near-black desktop so surfaces read as lifted frosted panels, using the
     // design's own canonical solid values (same as the reduced-transparency
     // fallback). Consistent "frost fill everywhere" without any glass/blur.
-    root.style.setProperty('--dex-glass-bg', '#141416');
-    root.style.setProperty('--color-bg-glass', '#161618');
-    root.style.setProperty('--color-bg-glass-strong', '#1a1a1e');
+    // Theme tokens, not hex: these inline vars beat the [data-theme=light]
+    // stylesheet, so hard-coded near-black values (#141416/#161618/#1a1a1e)
+    // kept the top bar, menus, dock and panels dark in LIGHT mode. In dark mode
+    // the tokens resolve to almost the same values (#151517/#18181A/#1C1C1E).
+    root.style.setProperty('--dex-glass-bg', 'var(--color-bg-overlay)');
+    root.style.setProperty('--color-bg-glass', 'var(--color-bg-secondary)');
+    root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface)');
     root.style.setProperty('--dex-glass-blur', '0px');
-    root.style.setProperty('--glass-bg', '#141416');
+    root.style.setProperty('--glass-bg', 'var(--color-bg-overlay)');
     root.style.setProperty('--glass-blur', 'none');
   } else if (effectiveMode === 'reduced') {
     const op = Math.max(requestedOpacity, 0.92);

@@ -26,3 +26,20 @@ describe('UKI screen sharing via the system picker', () => {
     expect(await captureViaPicker(null)).toBeNull();
   });
 });
+
+describe('UKI one-shot camera frame', () => {
+  it('returns null when camera permission is denied', async () => {
+    const { captureCameraFrame } = await import('../../src/renderer/uki/screenCapture');
+    const gum = vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError'));
+    expect(await captureCameraFrame(gum, 0)).toBeNull();
+    expect(gum).toHaveBeenCalledWith(expect.objectContaining({ audio: false }));
+  });
+
+  it('turns the camera off again even when the frame cannot be read', async () => {
+    const { captureCameraFrame } = await import('../../src/renderer/uki/screenCapture');
+    const stop = vi.fn();
+    const stream = { getVideoTracks: () => [{ stop }], getTracks: () => [{ stop }] } as unknown as MediaStream;
+    await captureCameraFrame(vi.fn().mockResolvedValue(stream), 0);
+    expect(stop).toHaveBeenCalled();
+  });
+});
