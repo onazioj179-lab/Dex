@@ -697,7 +697,7 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
           <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
-          <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Present</button>
+          <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Present</button>
         </div>
       </div>
 
@@ -970,7 +970,7 @@ const PresentationBuilder: React.FC = () => {
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setShowOutline(false)} style={toolbarBtn}>Cancel</button>
-              <button onClick={importOutline} style={{ ...toolbarBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Import</button>
+              <button onClick={importOutline} style={{ ...toolbarBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Import</button>
             </div>
           </div>
         </div>

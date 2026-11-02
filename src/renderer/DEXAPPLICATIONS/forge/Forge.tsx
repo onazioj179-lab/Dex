@@ -1303,7 +1303,7 @@ const Forge: React.FC = () => {
     jobMeta: { display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--color-text-muted)' },
     jobProgress: { width: '100px' },
     progressBar: { height: '3px', background: 'var(--color-border-subtle)', borderRadius: '2px', overflow: 'hidden' },
-    progressFill: { height: '100%', background: 'var(--color-accent)', borderRadius: '2px' },
+    progressFill: { height: '100%', background: 'var(--color-accent-fill)', borderRadius: '2px' },
     jobStatus: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
     jobActions: { display: 'flex', gap: '2px' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' },
@@ -2148,7 +2148,7 @@ const Forge: React.FC = () => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, watermark: { type: watermarkType, text: watermarkText, opacity: watermarkOpacity, position: watermarkPosition } } as any : j));
               toast.success('Watermark applied to job'); setShowWatermark(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Watermark</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Watermark</button>
           </div>
         </div>
       )}
@@ -2181,7 +2181,7 @@ const Forge: React.FC = () => {
               <div style={{ position: 'absolute', left: `${trimIn}%`, width: `${trimOut - trimIn}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', pointerEvents: 'none' }} />
               {/* Draggable IN handle */}
               <div onPointerDown={e => startTrimHandleDrag('in', e)} onPointerMove={onTrimHandleMove} onPointerUp={endTrimHandleDrag} title="Drag in point" style={{ position: 'absolute', left: `${trimIn}%`, top: 0, bottom: 0, width: 10, marginLeft: -5, cursor: 'ew-resize', display: 'flex', alignItems: 'stretch', zIndex: 3 }}>
-                <div style={{ width: 2, margin: '0 auto', background: 'var(--color-accent)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent)' }} />
+                <div style={{ width: 2, margin: '0 auto', background: 'var(--color-accent-fill)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent)' }} />
               </div>
               {/* Draggable OUT handle */}
               <div onPointerDown={e => startTrimHandleDrag('out', e)} onPointerMove={onTrimHandleMove} onPointerUp={endTrimHandleDrag} title="Drag out point" style={{ position: 'absolute', left: `${trimOut}%`, top: 0, bottom: 0, width: 10, marginLeft: -5, cursor: 'ew-resize', display: 'flex', alignItems: 'stretch', zIndex: 3 }}>
@@ -2255,7 +2255,7 @@ const Forge: React.FC = () => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, cropAspect, padColor } as any : j));
               toast.success(`Crop set to ${cropAspect}`); setShowCropPad(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Crop & Pad</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Crop & Pad</button>
           </div>
         </div>
       )}
@@ -2312,7 +2312,7 @@ const Forge: React.FC = () => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleBurnIn: { font: subBurnFont, size: subBurnSize, position: subBurnPosition, style: subBurnStyle } } as any : j));
               toast.success('Subtitle burn-in configured'); setShowSubBurnIn(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
           </div>
         </div>
       )}
@@ -2451,7 +2451,7 @@ const Forge: React.FC = () => {
                   + '.' + (presets.find(p => p.id === j.preset)?.container || 'mp4'),
               })));
               setShowBatchRename(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
           </div>
         </div>
       )}

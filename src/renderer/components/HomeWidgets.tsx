@@ -799,7 +799,7 @@ const MusicControlsWidget: React.FC = () => {
           onClick={() => toggle()}
           style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: 'var(--color-accent)', border: 'none',
+            background: 'var(--color-accent-fill)', border: 'none',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
           aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -1698,7 +1698,7 @@ const RewindSummaryWidget: React.FC = () => {
                   <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
                     <span style={{ width: 56, height: 4, borderRadius: 2, background: 'var(--color-bg-hover, rgba(255,255,255,0.08))', overflow: 'hidden', flexShrink: 0 }}>
-                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 2 }} />
+                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent-fill)', borderRadius: 2 }} />
                     </span>
                   </div>
                 );

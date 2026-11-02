@@ -92,7 +92,7 @@ const buttonBase: React.CSSProperties = {
 
 const primaryButton: React.CSSProperties = {
   ...buttonBase,
-  background: 'var(--color-accent, #4a8af4)',
+  background: 'var(--color-accent-fill)',
   color: '#ffffff',
 };
 

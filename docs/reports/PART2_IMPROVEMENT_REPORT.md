@@ -1,6 +1,6 @@
 # DEX Tauri — Part 2 Improvement Report
 
-**Date:** 2026-11-01 · **Branch:** `claude/dex-tuari-repair-optimize-756d99` (Part 1 = commit `57aa120`, see `DEX_TUARI_SYSTEM_AUDIT_REPORT.md`)
+**Date:** 2026-11-01 · **Branch:** `claude/dex-tuari-repair-optimize-756d99` (Part 1 = commit `57aa120`, see `PART1_SYSTEM_AUDIT_REPORT.md`)
 **Machine:** Windows 11 Pro 26300, 8 logical cores, WebView2 156.0.4314.58. All numbers are from the packaged release build on this machine. The environment was noisy (other sessions building under `Documents\DEX`), so where a comparison isn't controlled, that's stated.
 
 ---

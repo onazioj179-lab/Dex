@@ -1412,7 +1412,7 @@ const VinxEditor: React.FC = () => {
               </span>
             </div>
             <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${quickExport.percent}%`, background: 'var(--color-accent)', borderRadius: 2, transition: 'width 0.12s linear' }} />
+              <div style={{ height: '100%', width: `${quickExport.percent}%`, background: 'var(--color-accent-fill)', borderRadius: 2, transition: 'width 0.12s linear' }} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{quickExport.percent}%</span>
@@ -1698,7 +1698,7 @@ const VinxEditor: React.FC = () => {
                 if (selectedClipIds.length === 0) return;
                 const mask = { id: `mask-${Date.now()}`, name: `${maskShape} mask`, type: maskShape.toLowerCase() as 'ellipse' | 'rectangle' | 'bezier', shape: maskShape.toLowerCase(), feather: maskFeather, opacity: maskOpacity / 100, expansion: maskExpansion, inverted: maskInverted, points: maskShape === 'Ellipse' ? [{ x: 0.5, y: 0.5, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }] : maskShape === 'Rectangle' ? [{ x: 0.25, y: 0.25, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }, { x: 0.75, y: 0.75, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }] : [], keyframes: [] };
                 useVinxStore.getState().addClipMask(selectedClipIds[0], mask);
-              }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Add Mask</button>
+              }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Add Mask</button>
             </div>
           </div>
         </div>
@@ -2166,7 +2166,7 @@ const VinxEditor: React.FC = () => {
                     <span style={{ fontSize: 11, color: job.status === 'complete' ? 'var(--color-success)' : job.status === 'encoding' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{job.status}</span>
                   </div>
                   <div style={{ height: 3, borderRadius: 2, background: 'var(--color-bg-hover)' }}>
-                    <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${job.progress}%`, transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
+                    <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent-fill)', width: `${job.progress}%`, transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
                   </div>
                 </div>
               ))

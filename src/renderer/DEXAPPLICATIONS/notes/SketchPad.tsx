@@ -200,7 +200,7 @@ export default function SketchPad({ mode, onInsert, onCancel }: SketchPadProps) 
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" style={btn} onClick={onCancel}>Cancel</button>
             <button type="button" onClick={insert} disabled={!strokes.length}
-              style={{ ...btn, background: 'var(--color-accent)', color: 'var(--color-accent-text)', border: 'none', opacity: strokes.length ? 1 : 0.5 }}>
+              style={{ ...btn, background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', border: 'none', opacity: strokes.length ? 1 : 0.5 }}>
               Insert
             </button>
           </div>

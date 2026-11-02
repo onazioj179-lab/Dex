@@ -4,13 +4,13 @@
 
 Statuses: **VERIFIED COMPLETE** (implemented and tested; evidence given) · **PARTIAL** · **BROKEN** · **MISSING** · **NOT APPLICABLE** · **BLOCKED** · **NOT TESTED**. PARTIAL, BLOCKED and NOT TESTED are not counted as complete.
 
-All evidence comes from this machine (Windows 11 Pro 26300, x64, WebView2 156.0.4314.58) on the packaged release build, unless noted. Detail is in `DEX_TUARI_SYSTEM_AUDIT_REPORT.md` and `DEX_TAURI_PART2_IMPROVEMENT_REPORT.md`.
+All evidence comes from this machine (Windows 11 Pro 26300, x64, WebView2 156.0.4314.58) on the packaged release build, unless noted. Detail is in `PART1_SYSTEM_AUDIT_REPORT.md` and `PART2_IMPROVEMENT_REPORT.md`.
 
 ## Part 1
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Full system audit | VERIFIED COMPLETE | `DEX_TUARI_SYSTEM_AUDIT_REPORT.md` |
+| Full system audit | VERIFIED COMPLETE | `PART1_SYSTEM_AUDIT_REPORT.md` |
 | Tauri project structure | VERIFIED COMPLETE | Tauri 2.11.2 shell + Vite renderer; MSVC build passes |
 | WebView2 detection repaired | VERIFIED COMPLETE | Root cause: GNU build imported `WebView2Loader.dll`, which wasn't shipped (`0xC0000135`). Now statically linked. Bundle gate passes. **Installed** 6.1.0 starts (1.3 s to window) |
 | WebView2 install behavior | **NOT TESTED** | Missing runtime simulated (dialog + log verified); the embedded bootstrapper on a PC *without* WebView2 needs a clean VM (**BLOCKED**: no VM here) |
@@ -22,10 +22,10 @@ All evidence comes from this machine (Windows 11 Pro 26300, x64, WebView2 156.0.
 | Installer tested | PARTIAL | NSIS upgrade install over 6.0.1 verified (exit 0, app runs). MSI not installed; uninstall not run |
 | Unnecessary packages audited | VERIFIED COMPLETE | 13 removed (76 incl. transitive, −54 MB) |
 | Safe debloat | VERIFIED COMPLETE | Plus approved: 23.5 GB Rust caches + ~10 GB npm cache reclaimed |
-| Performance measured | VERIFIED COMPLETE | `DEX_PERFORMANCE_REPORT.md` |
+| Performance measured | VERIFIED COMPLETE | `PERFORMANCE_REPORT.md` |
 | Security configuration reviewed | PARTIAL | CSP reviewed (and documented); `shell:openExternal/openPath` allowlist is in **PR #62, not yet merged** |
 | Regression testing | VERIFIED COMPLETE | vitest full suite each batch (latest result in Part 3 report) |
-| Part 1 report | VERIFIED COMPLETE | `DEX_TUARI_SYSTEM_AUDIT_REPORT.md` |
+| Part 1 report | VERIFIED COMPLETE | `PART1_SYSTEM_AUDIT_REPORT.md` |
 
 ## Part 2
 
@@ -59,7 +59,7 @@ All evidence comes from this machine (Windows 11 Pro 26300, x64, WebView2 156.0.
 | Keyboard navigation tested | PARTIAL | Static scan + 2 fixes; real Keyboard page; no full manual Tab-through |
 | Screen-reader tested | **NOT TESTED** | No Narrator/NVDA run (needs an interactive session) |
 | Performance benchmarked | VERIFIED COMPLETE | Idle CPU 50–100% → ~1–2% of a core (Rust) |
-| Part 2 report | VERIFIED COMPLETE | `DEX_TAURI_PART2_IMPROVEMENT_REPORT.md` |
+| Part 2 report | VERIFIED COMPLETE | `PART2_IMPROVEMENT_REPORT.md` |
 
 ## Gate decision
 

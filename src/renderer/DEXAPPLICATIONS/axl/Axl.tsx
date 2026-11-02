@@ -2454,7 +2454,7 @@ const AXL: React.FC = () => {
                     <input value={newConfigName} onChange={e => setNewConfigName(e.target.value)} placeholder="Configuration name"
                       onKeyDown={e => { if (e.key === 'Enter') saveCurrentConfig(); }}
                       style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
-                    <button onClick={saveCurrentConfig} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Capture</button>
+                    <button onClick={saveCurrentConfig} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent-fill)', color: '#fff', whiteSpace: 'nowrap' }}>Capture</button>
                   </div>
                   {project.configurations.length === 0 && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No configurations yet</div>
@@ -2483,7 +2483,7 @@ const AXL: React.FC = () => {
                     <input value={newViewName} onChange={e => setNewViewName(e.target.value)} placeholder="View name"
                       onKeyDown={e => { if (e.key === 'Enter') saveCurrentView(); }}
                       style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }} />
-                    <button onClick={saveCurrentView} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Save View</button>
+                    <button onClick={saveCurrentView} style={{ padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent-fill)', color: '#fff', whiteSpace: 'nowrap' }}>Save View</button>
                   </div>
                   {project.namedViews.length === 0 && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>No saved views yet</div>
@@ -2513,7 +2513,7 @@ const AXL: React.FC = () => {
                     <input type="number" value={clearanceGap} min={0} step={1} onChange={e => setClearanceGap(Math.max(0, Number(e.target.value) || 0))}
                       style={{ width: 64, padding: '5px 6px', fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }} />
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{project.units}</span>
-                    <button onClick={runInterferenceCheck} style={{ marginLeft: 'auto', padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: '#fff', whiteSpace: 'nowrap' }}>Run Check</button>
+                    <button onClick={runInterferenceCheck} style={{ marginLeft: 'auto', padding: '6px 10px', fontSize: 10, fontWeight: 600, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-accent-fill)', color: '#fff', whiteSpace: 'nowrap' }}>Run Check</button>
                   </div>
                   {interferenceResults === null && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '16px 0' }}>Run a check to see results</div>

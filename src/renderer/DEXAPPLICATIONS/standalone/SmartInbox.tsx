@@ -775,7 +775,7 @@ const S: Record<string, React.CSSProperties> = {
   title: { fontSize: 16, fontWeight: 700, letterSpacing: 0.2 },
   badge: {
     minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10,
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
     fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontVariantNumeric: 'tabular-nums',
   },
@@ -797,7 +797,7 @@ const S: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', whiteSpace: 'nowrap',
   },
   chipActive: {
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
     borderColor: 'var(--color-accent)',
   },
   degradeNote: {
@@ -907,7 +907,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-base)',
   },
   unreadDot: {
-    width: 7, height: 7, borderRadius: '50%', background: 'var(--color-accent)',
+    width: 7, height: 7, borderRadius: '50%', background: 'var(--color-accent-fill)',
     marginLeft: 'auto', flexShrink: 0,
   },
   empty: {

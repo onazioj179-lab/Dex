@@ -414,7 +414,7 @@ export default function GitClient(): React.ReactElement {
           pulsing dot + accent text reads as active; clears the moment it ends. */}
       {busy && currentOp && (
         <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)', animation: 'ukiPulse 0.9s ease-in-out infinite', flexShrink: 0 }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)', animation: 'ukiPulse 0.9s ease-in-out infinite', flexShrink: 0 }} />
           {currentOp}…
         </div>
       )}

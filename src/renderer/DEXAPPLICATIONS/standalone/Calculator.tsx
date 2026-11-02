@@ -418,7 +418,7 @@ const Calculator: React.FC = () => {
             aria-label="Natural calculation input"
             style={{ flex: 1, minWidth: 0, padding: '8px 12px', borderRadius: 14, color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', fontFamily: 'var(--dex-font-ui)' }}
           />
-          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
+          <button onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ padding: '0 14px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', fontWeight: 600, fontSize: 15 }}>=</button>
         </div>
         {/* Display */}
         <div className="dex-liquid-glass-strong" style={styles.displayArea}>

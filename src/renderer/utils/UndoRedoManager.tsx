@@ -452,7 +452,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--color-border-subtle, var(--color-bg-hover))',
   },
   itemActive: {
-    background: 'var(--color-accent, #007aff)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-text-inverse)',
   },
   itemFuture: {

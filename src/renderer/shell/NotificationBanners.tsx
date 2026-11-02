@@ -771,7 +771,7 @@ export const NotificationCenter: React.FC<{
             {unreadCount > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-accent-text, #fff)',
-                background: 'var(--color-accent)',
+                background: 'var(--color-accent-fill)',
                 padding: '2px 6px', borderRadius: 10,
               }}>
                 {unreadCount}

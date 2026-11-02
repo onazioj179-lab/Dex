@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.

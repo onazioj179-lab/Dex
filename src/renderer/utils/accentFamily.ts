@@ -108,6 +108,9 @@ export function applyAccentFamily(raw: string): boolean {
   const rs = document.documentElement.style;
   rs.setProperty('--color-accent', fam.base);
   rs.setProperty('--accent-color', fam.base);
+  // A chosen accent drives filled surfaces too (the baseline blue uses a darker
+  // fill for AA white text; a custom colour is the user's explicit choice).
+  rs.setProperty('--color-accent-fill', fam.base);
   rs.setProperty('--color-accent-hover', fam.hover);
   rs.setProperty('--color-accent-dark', fam.dark);
   rs.setProperty('--color-accent-light', fam.light);

@@ -2115,7 +2115,7 @@ export const Tasks: React.FC = () => {
                 }}
                 style={{
                   marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', borderRadius: 'var(--radius-lg, 10px)',
-                  background: 'var(--color-accent, #0a84ff)', color: 'var(--color-accent-text, #fff)',
+                  background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -2300,7 +2300,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '32px',
     borderRadius: '10px',
     border: 'none',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: 'var(--color-accent-text)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',

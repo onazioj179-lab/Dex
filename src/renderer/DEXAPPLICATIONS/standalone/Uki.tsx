@@ -694,7 +694,7 @@ export default function Uki(): React.ReactElement {
               <div style={{ ...S.bubble, ...S.bubbleAi, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-secondary)' }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: 'var(--color-accent)',
+                  background: 'var(--color-accent-fill)',
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
                 <span style={{ transition: 'opacity 0.2s ease' }}>{verb}&hellip;</span>
@@ -764,7 +764,7 @@ const S: Record<string, React.CSSProperties> = {
   sidebar: { width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
   sidebarHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px var(--space-2)' },
   brand: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-accent)' },
-  newBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  newBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   searchInput: { margin: '0 var(--space-3) 10px' },
   convList: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 var(--space-2) var(--space-2)' },
   convEmpty: { padding: 'var(--space-3) var(--space-2)', color: 'var(--color-text-tertiary)', fontSize: 12 },
@@ -781,7 +781,7 @@ const S: Record<string, React.CSSProperties> = {
   welcomeSub: { fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 },
   row: { display: 'flex', width: '100%' },
   bubble: { maxWidth: '76%', padding: '10px 14px', borderRadius: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  bubbleUser: { background: 'var(--color-accent)', color: '#fff', borderBottomRightRadius: 3 },
+  bubbleUser: { background: 'var(--color-accent-fill)', color: '#fff', borderBottomRightRadius: 3 },
   bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 3 },
   bubbleSystem: { background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', fontSize: 13, fontStyle: 'italic' },
   caret: { opacity: 0.6, marginLeft: 1 },
@@ -789,10 +789,10 @@ const S: Record<string, React.CSSProperties> = {
   actionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', marginBottom: 6 },
   actionSummary: { margin: 0, fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', color: 'var(--color-text-secondary)', lineHeight: 1.5 },
   actionRow: { display: 'flex', gap: 'var(--space-2)', marginTop: 10 },
-  runBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  runBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '6px var(--space-4)', fontSize: 13, cursor: 'pointer' },
   composer: { display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', padding: 14, borderTop: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
   textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '10px var(--space-3)', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
-  sendBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  sendBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   sendBtnDisabled: { opacity: 0.5, cursor: 'default' },
 };

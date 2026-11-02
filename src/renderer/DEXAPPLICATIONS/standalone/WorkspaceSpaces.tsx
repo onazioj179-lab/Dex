@@ -440,7 +440,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     color: '#fff',
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     border: 'none',
     borderRadius: 'var(--radius-md)',
     cursor: 'pointer',

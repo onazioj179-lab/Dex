@@ -451,7 +451,7 @@ const Scrubber: React.FC<{
       >
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0,
-          width: `${progress * 100}%`, background: 'var(--color-accent)', borderRadius: 2,
+          width: `${progress * 100}%`, background: 'var(--color-accent-fill)', borderRadius: 2,
         }} />
         <div style={{
           position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)',

@@ -135,6 +135,47 @@ export async function clearTurns(): Promise<void> {
   await cache.remove(TURNS_KEY);
 }
 
+/** Forget one remembered exchange. */
+export async function deleteTurn(id: string): Promise<void> {
+  const raw = (await cache.getAsync<UkiTurnRecord[]>(TURNS_KEY)) ?? [];
+  await cache.setAsync(TURNS_KEY, raw.filter((t) => t.id !== id), { encrypted: true });
+}
+
+/** Everything UKI remembers on this device, as plain JSON (Settings > Export). */
+export async function exportUkiMemory(): Promise<{
+  exportedAt: string;
+  turns: UkiTurnRecord[];
+  workflows: UkiWorkflowRecord[];
+  archives: number;
+}> {
+  let archives = 0;
+  try { archives = (await (await import('./compressedMemory')).listArchives()).length; } catch { /* none */ }
+  return { exportedAt: new Date().toISOString(), turns: await readTurns(), workflows: await listWorkflows(), archives };
+}
+
+/**
+ * Clear every conversation memory tier on this device: recent turns, gzip
+ * archives, the transcript and reasoning trail, and the native archive when the
+ * native engine is present. Saved workflows (your own recipes) are kept.
+ * Returns which tiers were cleared so the UI can report honestly.
+ */
+export async function clearAllUkiMemory(): Promise<string[]> {
+  const cleared: string[] = [];
+  await clearTurns(); cleared.push('recent conversations');
+  try { await (await import('./compressedMemory')).clearArchives(); cleared.push('archives'); } catch { /* none */ }
+  try {
+    const { useUkiStore } = await import('../store/ukiStore');
+    useUkiStore.getState().clearConversationHistory();
+    useUkiStore.getState().clearThoughtTrail();
+    cleared.push('transcript', 'reasoning trail');
+  } catch { /* store unavailable */ }
+  try {
+    const dex = (globalThis as unknown as { dex?: { uki?: { memoryClear?: () => Promise<unknown> } } }).dex;
+    if (dex?.uki?.memoryClear) { await dex.uki.memoryClear(); cleared.push('native archive'); }
+  } catch { /* native engine unavailable */ }
+  return cleared;
+}
+
 /** Last N turns, oldest first. */
 export async function recentTurns(n = 12): Promise<UkiTurnRecord[]> {
   const all = await readTurns();

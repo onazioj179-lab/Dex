@@ -7272,7 +7272,7 @@ const Imosion: React.FC = () => {
               >
                 {/* Drop indicator */}
                 {dropTarget?.trackId === track.id && (
-                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${dropTarget.time * zoom}px`, width: '2px', background: 'var(--color-accent)', zIndex: 50, pointerEvents: 'none', boxShadow: '0 0 12px rgba(10,132,255,0.6)' }} />
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${dropTarget.time * zoom}px`, width: '2px', background: 'var(--color-accent-fill)', zIndex: 50, pointerEvents: 'none', boxShadow: '0 0 12px rgba(10,132,255,0.6)' }} />
                 )}
                 {track.clips.map(clip => (
                   <div 
@@ -8777,7 +8777,7 @@ const Imosion: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button aria-label="Apply fades to all clips" onClick={() => { const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; setTracks(prev => prev.map(t => ({ ...t, clips: t.clips.map(c => ({ ...c, fadeIn: fadeInSec, fadeOut: fadeOutSec })) }))); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply to All Clips</button>
+              <button aria-label="Apply fades to all clips" onClick={() => { const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; setTracks(prev => prev.map(t => ({ ...t, clips: t.clips.map(c => ({ ...c, fadeIn: fadeInSec, fadeOut: fadeOutSec })) }))); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply to All Clips</button>
               <button aria-label="Apply fades to selected" onClick={() => { if (!forgeClip) { setShowBatchFade(false); return; } const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; updateClip(forgeClip.trackId, forgeClip.clip.id, { fadeIn: fadeInSec, fadeOut: fadeOutSec }); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', background: 'var(--color-accent-light, rgba(10,132,255,0.06))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Selected Only</button>
             </div>
           </div>
@@ -8806,7 +8806,7 @@ const Imosion: React.FC = () => {
                 <button key={a} onClick={() => setStretchAlgorithm(a)} aria-label={`${a} stretch algorithm`} style={{ padding: '5px', borderRadius: 4, border: '1px solid ' + (stretchAlgorithm === a ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: stretchAlgorithm === a ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: stretchAlgorithm === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{a}</button>
               ))}
             </div>
-            <button aria-label="Apply time stretch" onClick={() => { if (forgeClip) { const factor = stretchRatio / 100; updateClip(forgeClip.trackId, forgeClip.clip.id, { duration: forgeClip.clip.duration * factor }); } setShowTimeStretch(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Stretch</button>
+            <button aria-label="Apply time stretch" onClick={() => { if (forgeClip) { const factor = stretchRatio / 100; updateClip(forgeClip.trackId, forgeClip.clip.id, { duration: forgeClip.clip.duration * factor }); } setShowTimeStretch(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Stretch</button>
           </div>
         </div>
       )}
@@ -8836,7 +8836,7 @@ const Imosion: React.FC = () => {
               <input type="checkbox" checked={pitchPreserveFormant} onChange={e => setPitchPreserveFormant(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} />
               Preserve formants
             </label>
-            <button aria-label="Apply pitch shift" onClick={() => { if (forgeClip) { const totalCents = pitchSemitones * 100 + pitchCents; updateClip(forgeClip.trackId, forgeClip.clip.id, { pitch: totalCents, formantPreserve: pitchPreserveFormant }); } setShowPitchShift(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Pitch Shift</button>
+            <button aria-label="Apply pitch shift" onClick={() => { if (forgeClip) { const totalCents = pitchSemitones * 100 + pitchCents; updateClip(forgeClip.trackId, forgeClip.clip.id, { pitch: totalCents, formantPreserve: pitchPreserveFormant }); } setShowPitchShift(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Pitch Shift</button>
           </div>
         </div>
       )}
@@ -8947,7 +8947,7 @@ const Imosion: React.FC = () => {
               setPianoRollNotes(prev => applyGrooveToNotes(prev, grooveTemplate, grooveStrength));
               window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Groove applied: ${grooveTemplate} at ${grooveStrength}%` } }));
               setShowGrooveQuant(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Groove</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply Groove</button>
           </div>
         </div>
       )}
@@ -9142,7 +9142,7 @@ const Imosion: React.FC = () => {
                 <button key={bd} onClick={() => setBitDepth(bd as any)} aria-label={`${bd}-bit depth`} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid ' + (bitDepth === bd ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: bitDepth === bd ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: bitDepth === bd ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{bd}-bit</button>
               ))}
             </div>
-            <button aria-label="Convert project sample rate" onClick={() => setShowSRConvert(false)} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Convert Project</button>
+            <button aria-label="Convert project sample rate" onClick={() => setShowSRConvert(false)} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Convert Project</button>
           </div>
         </div>
       )}
@@ -9648,7 +9648,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '10px', maxHeight: '350px', overflowY: 'auto' }}>
               <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                 <input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="Template name..." style={{ flex: 1, padding: '6px 10px', background: '#0c0c0e', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '11px', outline: 'none' }} />
-                <button aria-label="Save" onClick={saveTemplate} style={{ padding: '6px var(--space-3)', background: 'var(--color-accent)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.save} Save</button>
+                <button aria-label="Save" onClick={saveTemplate} style={{ padding: '6px var(--space-3)', background: 'var(--color-accent-fill)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.save} Save</button>
               </div>
               {templates.map(tpl => (
                 <div key={tpl.id} onClick={() => applyTemplate(tpl)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 10px', background: '#0c0c0e', borderRadius: '4px', marginBottom: '4px', cursor: 'pointer', border: '1px solid #27272a', transition: 'all 0.15s' }}>
@@ -10337,7 +10337,7 @@ const Imosion: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                       <input type="text" value={newCollabMessage} onChange={(e) => setNewCollabMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendCollabMessage(newCollabMessage)} placeholder="Type a message..." style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '11px' }} />
-                      <button aria-label="Send message" onClick={() => sendCollabMessage(newCollabMessage)} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-accent)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '11px' }}>{Icon.send}</button>
+                      <button aria-label="Send message" onClick={() => sendCollabMessage(newCollabMessage)} style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--color-accent-fill)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '11px' }}>{Icon.send}</button>
                     </div>
                   </div>
 

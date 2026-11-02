@@ -73,7 +73,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px var(--space-5)',
     fontSize: 14,
     fontWeight: 500,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
     border: 'none',
     borderRadius: radius.xl,
@@ -165,7 +165,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.2s ease',
   },
   linkToggleOn: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
   },
   linkToggleKnob: {
     position: 'absolute',

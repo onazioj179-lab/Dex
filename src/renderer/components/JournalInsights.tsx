@@ -126,7 +126,7 @@ const S: Record<string, React.CSSProperties> = {
   topAppBar: {
     height: 4,
     borderRadius: 2,
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     transition: 'width 0.3s ease',
     minWidth: 4,
   },

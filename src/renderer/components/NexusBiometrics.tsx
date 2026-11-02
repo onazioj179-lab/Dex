@@ -201,7 +201,7 @@ const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties =
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
   };
-  if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
+  if (variant === 'accent') return { ...base, background: 'var(--color-accent-fill)', color: '#fff', borderColor: 'transparent' };
   if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.16)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.4)' };
   return { ...base, background: 'rgba(255,255,255,0.04)' };
 };

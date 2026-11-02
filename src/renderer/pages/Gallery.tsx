@@ -1319,7 +1319,7 @@ export const Gallery: React.FC = () => {
                 }}
                 style={{
                   padding: 'var(--space-2) var(--space-5)', borderRadius: 6,
-                  background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)',
+                  background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer', transition: 'opacity 0.2s',
                 }}
@@ -1657,7 +1657,7 @@ export const Gallery: React.FC = () => {
                 }, 'image/png');
               };
               img.src = selectedMedia.url;
-            }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Save Edited Image</button>
+            }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Save Edited Image</button>
           </div>
         </div>
       )}
@@ -1939,7 +1939,7 @@ export const Gallery: React.FC = () => {
                       >
                         <div style={{
                           position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2,
-                          background: 'var(--color-accent, #0a84ff)',
+                          background: 'var(--color-accent-fill)',
                           width: videoDuration ? `${(videoCurrentTime / videoDuration) * 100}%` : '0%',
                           transition: 'width 0.1s linear', willChange: 'width',
                         }} />

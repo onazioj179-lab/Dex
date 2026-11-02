@@ -587,7 +587,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       flexShrink: 0,
     },
     checkboxChecked: {
-      background: 'var(--color-accent)',
+      background: 'var(--color-accent-fill)',
       borderColor: 'var(--color-accent)',
       color: 'var(--color-text-inverse, #fff)',
     },

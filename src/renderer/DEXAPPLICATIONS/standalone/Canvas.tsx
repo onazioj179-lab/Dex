@@ -1313,7 +1313,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   toolBtnActive: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
   },
   divider: {
@@ -1414,7 +1414,7 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'not-allowed',
   },
   saveBtn: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-accent-fill)',
     color: '#fff',
   },
   body: {

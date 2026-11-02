@@ -185,7 +185,7 @@ export const GlassNavItem: React.FC<GlassNavItemProps> = ({
             top: 6,
             bottom: 6,
             width: 2,
-            background: 'var(--color-accent)',
+            background: 'var(--color-accent-fill)',
             borderRadius: 2,
             boxShadow: '0 0 6px rgba(74,158,255,0.55)',
           }}

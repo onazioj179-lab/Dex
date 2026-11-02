@@ -746,7 +746,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     padding: 'var(--space-2) var(--space-4)', borderRadius: 10, border: 'none',
-    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
+    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   suggestList: {

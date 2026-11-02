@@ -40,7 +40,7 @@
 | Part 3 section | Classification | Reason |
 |---|---|---|
 | §6 Mobile features (blur slider, EQ, family controls, biometric restart, camera artifacts, touch freezes, stylus, TV profiles) | **NOT APPLICABLE** | No mobile target. A translucency slider already exists on desktop (Appearance › Glass) |
-| §7 Mac-style apps (Notes, whiteboards, weather, photos, podcasts, captions) | DEX shell feature | See `DEX_PART3_IMPLEMENTATION_REPORT.md` for per-item status |
+| §7 Mac-style apps (Notes, whiteboards, weather, photos, podcasts, captions) | DEX shell feature | See `PART3_IMPLEMENTATION_REPORT.md` for per-item status |
 | §8 Windows-style (file manager, autoplay, taskbar, privacy, gaming, accessibility) | DEX shell feature / Windows integration | Host-owned items (recovery, BitLocker, VPN, RDP, Sandbox, updates) are **Windows' components**; DEX cannot patch them |
 | §8.8 Recovery | Out of scope | DEX must not replace Windows' recovery. DEX has its own crash recovery (boot guard, "Reset DEX data") |
 | §9 Linux kernel/drivers | **BLOCKED** | Only relevant to `dex-os/`, which hasn't been built or booted; no driver changes without hardware validation |

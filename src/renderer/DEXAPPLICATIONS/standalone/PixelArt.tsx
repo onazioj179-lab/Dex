@@ -804,7 +804,7 @@ const PixelArt: React.FC = () => {
             title={`Import an image and downscale it into the ${size}x${size} grid`}
           >Import</button>
           <button onClick={clearFrame} style={toolBtn}>Clear</button>
-          <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Export PNG</button>
+          <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Export PNG</button>
           <button onClick={exportSheet} disabled={frames.length < 2} style={{ ...toolBtn, ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} title={frames.length < 2 ? 'Add a second frame to export a sprite sheet' : 'Export all frames as one sprite-sheet PNG'}>Export Sheet</button>
         </div>
       </div>

@@ -65,7 +65,7 @@ const BTN_DANGER: React.CSSProperties = {
 };
 const BTN_PRIMARY: React.CSSProperties = {
   ...BTN,
-  background: 'var(--color-accent)',
+  background: 'var(--color-accent-fill)',
   color: 'var(--color-accent-text)',
   border: 'none',
 };

@@ -583,7 +583,7 @@ const errorBoundaryIcon: React.CSSProperties = {
 const errorBoundaryTitle: React.CSSProperties = { fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' };
 const errorBoundaryMsg: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 320, textAlign: 'center', lineHeight: 1.5 };
 const errorBoundaryBtn: React.CSSProperties = {
-  padding: 'var(--space-2) 22px', background: 'var(--color-accent)', color: '#fff',
+  padding: 'var(--space-2) 22px', background: 'var(--color-accent-fill)', color: '#fff',
   border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500,
   cursor: 'pointer', marginTop: 4, letterSpacing: '-0.01em',
   transition: 'opacity 0.15s ease, transform 0.12s ease',
