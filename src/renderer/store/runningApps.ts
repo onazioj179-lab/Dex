@@ -312,8 +312,8 @@ export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
 // `version`/`buildDate` overrides are still honoured (creative-suite apps
 // historically tracked independent versions but are now aligned to platform
 // release for the 4.4.0 wave to remove user confusion).
-const PLATFORM_VERSION = '6.1.0';
-const PLATFORM_BUILD_DATE = '2026-07-03';
+const PLATFORM_VERSION = '7.0.1';
+const PLATFORM_BUILD_DATE = '2026-11-01';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 const _O = platform.isMac ? '⌥' : 'Alt';

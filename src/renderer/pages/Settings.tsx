@@ -48,6 +48,8 @@ import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/setting
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { applyMotionDurations } from '../styles/motionDurations';
+import { InterfaceTransparencySlider } from '../components/InterfaceTransparencySlider';
+import { applyGlassVars } from '../store/shellPreferencesStore';
 
 // ===========================================================================
 // TYPES
@@ -1121,17 +1123,19 @@ const applySettings = (settings: Record<string, unknown>) => {
     root.style.setProperty('--font-size-base', `${Math.round(14 * scale / 100)}px`);
     root.style.setProperty('--font-scale', String(scale / 100));
     
-    // Apply transparency settings
-    if (settings.transparency && !settings.reduceTransparency) {
-      root.classList.add('transparency-enabled');
-      root.classList.remove('transparency-disabled');
-    } else {
+    // Reduce Transparency is an accessibility override on top of the Interface
+    // Transparency slider: it forces opaque surfaces without losing the slider
+    // position. applyGlassVars is the only writer of the glass tokens.
+    if (settings.reduceTransparency) {
       root.classList.remove('transparency-enabled');
       root.classList.add('transparency-disabled');
-      // Use solid backgrounds when transparency is disabled
-      root.style.setProperty('--color-bg-glass', 'var(--color-bg-surface-solid)');
-      root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
+      root.setAttribute('data-reduce-transparency', 'true');
+    } else {
+      root.classList.add('transparency-enabled');
+      root.classList.remove('transparency-disabled');
+      root.removeAttribute('data-reduce-transparency');
     }
+    try { applyGlassVars(useShellPreferences.getState()); } catch { /* store not ready */ }
     
     // Apply high contrast — set both the legacy body class and a root attribute
     // so the WCAG-AAA palette in design-system.css ([data-high-contrast="true"])
@@ -2451,23 +2455,6 @@ export const Settings: React.FC = () => {
         try { localStorage.setItem('dex-predictive-prewarm', nextVal ? '1' : '0'); }
         catch { /* storage blocked */ }
       }
-      // Keep the shell-prefs glass mode in sync when the legacy boolean
-      // transparency toggles are flipped from anywhere in Settings.
-      if (key === 'transparency') {
-        try {
-          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'liquid') : 'off');
-        } catch { /* store not ready */ }
-      }
-      if (key === 'reduceTransparency') {
-        try {
-          if (prev.transparency === false) {
-            // transparency disabled -- glass stays off
-            shellPrefs.setGlassMode('off');
-          } else {
-            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'liquid');
-          }
-        } catch { /* store not ready */ }
-      }
       if (key === 'crashReports') {
         try {
           const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;
@@ -2636,76 +2623,14 @@ export const Settings: React.FC = () => {
           />
         </div>
 
-        <h3 style={styles.sectionTitle}>Liquid Glass</h3>
+        <h3 style={styles.sectionTitle}>Interface Transparency</h3>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Glass</span>
-            <span style={styles.settingDesc}>
-              {prefs.glassMode === 'off'
-                ? 'Off — every surface is opaque true black.'
-                : 'On — full Apple-style liquid glass across the whole shell.'}
-            </span>
+            <span style={styles.settingLabel}>Interface Transparency</span>
+            <span style={styles.settingDesc}>Top bar, dock, DEX Bar, menus, panels and window chrome.</span>
           </div>
-          <input
-            type="checkbox"
-            checked={prefs.glassMode !== 'off'}
-            onChange={(e) => prefs.setGlassMode(e.target.checked ? 'liquid' : 'off')}
-            aria-label="Liquid Glass on or off"
-          />
+          <InterfaceTransparencySlider />
         </div>
-        {prefs.glassMode !== 'off' && <>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Intensity</span>
-            <span style={styles.settingDesc}>How transparent the glass is. Liquid is the full Apple look.</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([
-              { id: 'reduced', label: 'Reduced' },
-              { id: 'normal', label: 'Normal' },
-              { id: 'liquid', label: 'Liquid' },
-            ] as const).map((mode) => (
-              <button
-                key={mode.id}
-                aria-label={`Glass mode ${mode.label}`}
-                aria-pressed={prefs.glassMode === mode.id}
-                style={{
-                  ...styles.button,
-                  background: prefs.glassMode === mode.id ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-hover)',
-                  color: prefs.glassMode === mode.id ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
-                }}
-                onClick={() => prefs.setGlassMode(mode.id)}
-              >{mode.label}</button>
-            ))}
-          </div>
-        </div>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Tint</span>
-            <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
-          </div>
-          <input
-            type="color"
-            value={prefs.glassTint}
-            onChange={(e) => prefs.setGlassTint(e.target.value)}
-            style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
-            aria-label="Liquid Glass tint color"
-          />
-        </div>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Opacity</span>
-            <span style={styles.settingDesc}>{(prefs.glassOpacity * 100).toFixed(0)}% — higher is more solid.</span>
-          </div>
-          <input
-            type="range" min={0.4} max={1} step={0.05}
-            value={prefs.glassOpacity}
-            onChange={(e) => prefs.setGlassOpacity(parseFloat(e.target.value))}
-            style={{ width: 200 }}
-            aria-label="Liquid Glass opacity"
-          />
-        </div>
-        </>}
 
         <h3 style={styles.sectionTitle}>Comfort & Power</h3>
         <div style={styles.settingRow}>
@@ -2957,46 +2882,12 @@ export const Settings: React.FC = () => {
         settingDesc={styles.settingDesc}
       />
 
-      {/* Glass mode segmented control -- single source of truth, mirrored
-          into the legacy `transparency` boolean for back-compat with older
-          components that still read settings.transparency. */}
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Glass</span>
-          <span style={styles.settingDesc}>Off, Reduced (light blur), Normal, or Liquid (richest depth).</span>
+          <span style={styles.settingLabel}>Interface Transparency</span>
+          <span style={styles.settingDesc}>From fully opaque (0%) to maximum glass (100%). Applies live to the whole shell.</span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {([
-            { id: 'off', label: 'Off' },
-            { id: 'reduced', label: 'Reduced' },
-            { id: 'normal', label: 'Normal' },
-            { id: 'liquid', label: 'Liquid' },
-          ] as const).map((mode) => {
-            const active = shellPrefs.glassMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                aria-label={`Glass mode ${mode.label}`}
-                aria-pressed={active}
-                onClick={() => {
-                  shellPrefs.setGlassMode(mode.id);
-                  // Mirror to legacy boolean so existing CSS gates keep working.
-                  setSettings(prev => ({
-                    ...prev,
-                    transparency: mode.id !== 'off',
-                    reduceTransparency: mode.id === 'reduced',
-                  }));
-                }}
-                style={{
-                  padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
-                  background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
-                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                }}
-              >{mode.label}</button>
-            );
-          })}
-        </div>
+        <InterfaceTransparencySlider />
       </div>
 
       {renderToggle('reduceTransparency', 'Reduce Transparency', 'Force solid surfaces over translucency for readability')}
@@ -3595,74 +3486,49 @@ export const Settings: React.FC = () => {
           </svg>
         </div>
         <div style={styles.appInfo}>
-          <span style={styles.appName}>DEX</span>
-        </div>
-      </div>
-      
-      {/* Creator Watermark */}
-      <div style={{
-        padding: 'var(--space-5)', borderRadius: '10px', marginBottom: 'var(--space-5)',
-        background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
-        border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: -8, right: -8, width: 64, height: 64, borderRadius: '50%', background: 'var(--color-accent-soft, rgba(74,158,255,0.04))', pointerEvents: 'none' }} />
-        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
-          Created by Onazi Treasure OJ
-        </div>
-        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>
-          Personal Control Hub for Desktop Automation
-        </div>
-        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <span>&copy; 2026 Onazi Treasure OJ</span>
-          <span>MIT License</span>
-          <span>All Rights Reserved</span>
-        </div>
-      </div>
-      
-      <div style={styles.aboutDetails}>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Edition</span>
-          <span style={styles.aboutValue}>DEX Personal</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Released</span>
-          <span style={styles.aboutValue}>May 2026</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Made by</span>
-          <span style={styles.aboutValue}>Onazi Treasure OJ</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>License</span>
-          <span style={styles.aboutValue}>MIT &middot; Free for personal use</span>
+          <span style={styles.appName}>DEX OS</span>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>Version {appVersion}</span>
         </div>
       </div>
 
-      {/* What you get -- user-facing capability snapshot */}
-      <div style={{ marginTop: 'var(--space-2)', marginBottom: 18 }}>
-        <h3 style={styles.sectionTitle}>What DEX does for you</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-          {[
-            { title: 'One assistant for everything', body: 'Press the UKI key, type a command, get it done. Notes, files, timers, screenshots, focus mode -- all from one bar.' },
-            { title: 'Plans you can preview', body: 'Anything risky shows you the steps first. You stay in control with a single Run or Cancel.' },
-            { title: 'Apps that work together', body: 'Notes, Tasks, Files, Workflows, Vinx, Axl, Rewind and more share context so you never lose your place.' },
-            { title: 'Yours, on your machine', body: 'Your patterns, history, and shortcuts stay on this device. Optional analytics is off by default.' },
-            { title: 'Built for keyboards', body: 'Every action has a shortcut. The slash menu has dozens of commands; type / to see them.' },
-            { title: 'Always improving', body: 'Free updates roll in automatically. New features show up here, with the changelog one click away.' },
-          ].map(card => (
-            <div key={card.title} style={{
-              padding: 'var(--space-3) 14px', borderRadius: 10,
-              border: '1px solid var(--color-border-subtle)',
-              background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>{card.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{card.body}</div>
-            </div>
-          ))}
+      {/* Official creator attribution (shown in every official DEX build). The
+          legal copyright holder line stays alongside it. */}
+      <div data-dex-creator="Onazi Oj" style={{
+        padding: 'var(--space-4) var(--space-5)', borderRadius: 'var(--radius-md, 10px)', marginBottom: 'var(--space-5)',
+        background: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+          Created by Onazi Oj
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          DEX Blue Modern
         </div>
       </div>
-      
+
+      <div style={styles.aboutDetails}>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Version</span>
+          <span style={styles.aboutValue}>{appVersion}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Creator</span>
+          <span style={styles.aboutValue}>Onazi Oj</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Copyright</span>
+          <span style={styles.aboutValue}>&copy; 2026 Onazi Treasure OJ</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>License</span>
+          <span style={styles.aboutValue}>DEX Software License Agreement v1.0</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Open-source notices</span>
+          <span style={styles.aboutValue}>See NOTICE (bundled third-party licenses)</span>
+        </div>
+      </div>
+
       <div style={styles.aboutLinks}>
         <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', POLICY_REPOSITORY_URL) || window.open(POLICY_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}>Repository</button>
         <button style={styles.linkBtn} aria-label="Open DEX policies" onClick={() => openPolicyViewer('terms')}>Policies</button>

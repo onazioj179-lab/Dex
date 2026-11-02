@@ -23,7 +23,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { CollapsibleSection } from './CollapsibleSection';
 import { isReduceMotion } from '../utils/MotionController';
 import { useNetworkStore, NETWORK_MODE_LABELS, type NetworkMode } from '../store/networkStore';
-import { useShellPreferences, type GlassMode } from '../store/shellPreferencesStore';
+import { useShellPreferences } from '../store/shellPreferencesStore';
+import { InterfaceTransparencySlider } from './InterfaceTransparencySlider';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import {
   getStoredTier,
@@ -155,7 +156,10 @@ function useBattery(active: boolean): BatteryInfo {
 
     const read = (bat: any) => {
       if (cancelled) return;
-      setInfo({ supported: true, level: Math.round((bat.level ?? 1) * 100), charging: !!bat.charging });
+      // Chromium reports a desktop with no battery as permanently full and
+      // charging with an infinite discharge time; treat that as "no battery".
+      const noBattery = bat.charging && bat.level === 1 && bat.chargingTime === 0 && bat.dischargingTime === Infinity;
+      setInfo({ supported: !noBattery, level: Math.round((bat.level ?? 1) * 100), charging: !!bat.charging });
     };
 
     const nav = navigator as any;
@@ -341,8 +345,6 @@ const ControlCenter: React.FC = () => {
   const setNetworkMode = useNetworkStore((s) => s.setMode);
   const refreshNetwork = useNetworkStore((s) => s.refresh);
 
-  const glassMode = useShellPreferences((s) => s.glassMode);
-  const setGlassMode = useShellPreferences((s) => s.setGlassMode);
   const nightShift = useShellPreferences((s) => s.nightShift);
   const setNightShift = useShellPreferences((s) => s.setNightShift);
 
@@ -490,18 +492,8 @@ const ControlCenter: React.FC = () => {
             />
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', minWidth: 36, textAlign: 'right' }}>{brightness}%</span>
           </div>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Glass material</span>
-          <Segmented<GlassMode>
-            ariaLabel="Liquid glass mode"
-            value={glassMode}
-            onChange={(m) => setGlassMode(m)}
-            options={[
-              { id: 'off', label: 'Off' },
-              { id: 'reduced', label: 'Low' },
-              { id: 'normal', label: 'On' },
-              { id: 'liquid', label: 'Liquid' },
-            ]}
-          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Interface transparency</span>
+          <InterfaceTransparencySlider compact />
         </CollapsibleSection>
       ),
     },
@@ -555,12 +547,12 @@ const ControlCenter: React.FC = () => {
               )}
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Battery status unavailable on this device</span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No battery detected on this device</span>
           )}
         </CollapsibleSection>
       ),
     },
-  ]), [isOpen, toggleSection, networkMode, setNetworkMode, brightness, onBrightness, glassMode, setGlassMode, tier, tierManual, applyTier, battery]);
+  ]), [isOpen, toggleSection, networkMode, setNetworkMode, brightness, onBrightness, tier, tierManual, applyTier, battery]);
   const visibleSections = sections.filter((s) => matches(s.name));
 
   if (!open) return null;

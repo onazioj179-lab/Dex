@@ -842,9 +842,11 @@
      boost (the "lensing" that makes wallpaper bloom behind it), finished with a
      fresnel-style bright top rim and edge highlights. Far more transparent than a
      frosted panel so the wallpaper/content reads through. */
-  background: linear-gradient(180deg, rgba(44, 44, 54, 0.28), rgba(14, 14, 20, 0.42));
-  backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
-  -webkit-backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
+  /* Fill + blur come from Settings > Interface Transparency (applyGlassVars):
+     theme surface mixed with transparency, so it reads in light and dark. */
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   /* Borderless: no hard outline. The lit fresnel rim (inset highlight below)
      defines the edge, so the panel reads as one continuous piece of glass. */
   border: 1px solid transparent;
@@ -864,9 +866,9 @@
 /* Stronger variant: more opaque for content-heavy surfaces that need text
    contrast (panels over busy app content rather than the wallpaper). */
 .dex-liquid-glass-strong {
-  background: linear-gradient(180deg, rgba(24, 24, 30, 0.66), rgba(11, 11, 15, 0.76));
-  backdrop-filter: blur(30px) saturate(185%);
-  -webkit-backdrop-filter: blur(30px) saturate(185%);
+  background: var(--color-bg-glass-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid transparent;
   border-radius: var(--radius-xl);
   box-shadow:
@@ -876,17 +878,6 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 1px 0 0 rgba(255, 255, 255, 0.05),
     inset -1px 0 0 rgba(255, 255, 255, 0.05);
-}
-/* Lite mode (weak GPUs, data-perf-tier="low") strips the EXPENSIVE backdrop blur
-   via the universal rule -- but the glass STAYS translucent so it never goes
-   solid black. We just bump the opacity a touch (it has no frost to lean on) so
-   text stays readable. Result: real see-through glass on every tier; only the
-   blur is dropped on weak GPUs. */
-html[data-perf-tier="low"] .dex-liquid-glass {
-  background: linear-gradient(180deg, rgba(26, 26, 34, 0.58), rgba(12, 12, 16, 0.70));
-}
-html[data-perf-tier="low"] .dex-liquid-glass-strong {
-  background: linear-gradient(180deg, rgba(20, 20, 26, 0.80), rgba(10, 10, 14, 0.88));
 }
 @media (prefers-reduced-transparency: reduce) {
   .dex-liquid-glass,

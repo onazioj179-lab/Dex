@@ -1,7 +1,7 @@
 [package]
 name = "dex-tauri"
-description = "DEX 6.0 Tauri shell (GOAL-6A) — hosts the existing Vite renderer"
-version = "6.1.0"
+description = "DEX OS desktop shell (Tauri) by Onazi Oj"
+version = "7.0.1"
 edition = "2021"
 license = "MIT"
 authors = ["Onazi Treasure OJ <onazi75@gmail.com>"]
@@ -44,6 +44,18 @@ tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link downloa
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
 windows-core = "0.61"
+
+# Release builds: full optimisation, cross-crate LTO, one codegen unit for the
+# best code, and no debug info in the shipped exe. On MSVC symbols never live in
+# the exe; `line-tables-only` makes cargo emit a small .pdb next to it for
+# crash symbolication, and the bundler does not ship .pdb files. Panics keep
+# unwinding (not abort) so a failing command can't take the whole shell down.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+incremental = false
 
 [features]
 # Tauri's default release feature for the embedded asset protocol.
