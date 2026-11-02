@@ -380,10 +380,6 @@ const VinxEditor: React.FC = () => {
   const setClipRole = useVinxStore(s => s.setClipRole);
   const togglePipPresets = useVinxStore(s => s.togglePipPresets);
   const showPipPresets = useVinxStore(s => s.showPipPresets);
-  const toggleReferenceFrame = useVinxStore(s => s.toggleReferenceFrame);
-  const showReferenceFrame = useVinxStore(s => s.showReferenceFrame);
-  const referenceFrameNum = useVinxStore(s => s.referenceFrameNum);
-  const setReferenceFrame = useVinxStore(s => s.setReferenceFrame);
   const toggleAutoReframe = useVinxStore(s => s.toggleAutoReframe);
   const showAutoReframe = useVinxStore(s => s.showAutoReframe);
   const autoReframeAspect = useVinxStore(s => s.autoReframeAspect);
@@ -548,7 +544,6 @@ const VinxEditor: React.FC = () => {
   const [crossfadePreset, setCrossfadePreset] = useState<string | null>(null);
 
   // Reference compare mode
-  const [compareMode, setCompareMode] = useState('Side-by-Side');
 
   // Audio EQ state
   const [eqPreset, setEqPreset] = useState('Flat');
@@ -887,7 +882,6 @@ const VinxEditor: React.FC = () => {
         if (s.showMaskEditor) { toggleMaskEditor(); return; }
         if (s.showClipRolesPanel) { toggleClipRolesPanel(); return; }
         if (s.showPipPresets) { togglePipPresets(); return; }
-        if (s.showReferenceFrame) { toggleReferenceFrame(); return; }
         if (s.showAutoReframe) { toggleAutoReframe(); return; }
         if (s.showKenBurns) { toggleKenBurns(); return; }
         if (s.showCrossfadePresets) { toggleCrossfadePresets(); return; }
@@ -1068,7 +1062,6 @@ const VinxEditor: React.FC = () => {
         ] },
         { separator: true },
         { label: 'Clip Inspector', checked: showClipInspector, onSelect: () => toggleClipInspector() },
-        { label: 'Reference Frame', checked: showReferenceFrame, onSelect: () => toggleReferenceFrame() },
         { label: 'Timecode Overlay', checked: timecodeOverlayEnabled, onSelect: () => toggleTimecodeOverlay() },
         { label: renderPreviewStatus === 'rendering' ? 'Cancel Render Preview' : 'Render Preview', onSelect: () => (renderPreviewStatus === 'rendering' ? cancelRenderPreview() : startRenderPreview()) },
       ],
@@ -1811,40 +1804,6 @@ const VinxEditor: React.FC = () => {
                 {p.name}
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Reference Frame Panel */}
-      {showReferenceFrame && (
-        <div className="dex-creative-panel" style={{ position: 'absolute', right: 12, top: 'min(350px, 40%)', bottom: 12, width: 'min(280px, calc(100% - 24px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Reference Frame</span>
-            <button aria-label="Close Reference Frame panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleReferenceFrame}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Compare current frame with a reference</div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Ref Frame:</span>
-              <input type="number" value={referenceFrameNum} onChange={e => setReferenceFrame(parseInt(e.target.value) || 0)} style={{ width: 60, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11 }} />
-              <button style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 9999, padding: '3px var(--space-2)' }} onClick={() => setReferenceFrame(currentFrame)} aria-label="Set reference to current frame">Capture</button>
-            </div>
-            <div style={{ display: 'flex', gap: 6, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 'var(--space-2)' }}>
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>REFERENCE</div>
-                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {referenceFrameNum}</div>
-              </div>
-              <div style={{ width: 1, background: 'var(--color-border-subtle)' }} />
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>CURRENT</div>
-                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {currentFrame}</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 'var(--space-2)' }}>
-              {['Side-by-Side', 'Overlay', 'Split', 'Difference'].map(mode => (
-                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${compareMode === mode ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
-              ))}
-            </div>
           </div>
         </div>
       )}

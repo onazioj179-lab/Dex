@@ -762,7 +762,6 @@ const Prism: React.FC = () => {
   const [showUnsharpMask, setShowUnsharpMask] = useState(false);
   const [unsharpAmount, setUnsharpAmount] = useState(100);
   const [unsharpRadius, setUnsharpRadius] = useState(1.0);
-  const [unsharpThreshold, setUnsharpThreshold] = useState(0);
   // 16. Add Noise
   const [showAddNoise, setShowAddNoise] = useState(false);
   const [noiseAmount, setNoiseAmount] = useState(10);
@@ -780,12 +779,10 @@ const Prism: React.FC = () => {
     { id: 'action-3', name: 'Social Media Crop', steps: ['Crop 1:1', 'Resize 1080x1080', 'Sharpen 30%'] },
   ]);
   // 19. Quick Mask Mode
-  const [quickMaskMode, setQuickMaskMode] = useState(false);
   // 20. Refine Edge
   const [showRefineEdge, setShowRefineEdge] = useState(false);
   const [refineEdgeSmooth, setRefineEdgeSmooth] = useState(0);
   const [refineEdgeFeather, setRefineEdgeFeather] = useState(0);
-  const [refineEdgeContrast, setRefineEdgeContrast] = useState(0);
   const [refineEdgeShift, setRefineEdgeShift] = useState(0);
 
   // Refs
@@ -2902,7 +2899,6 @@ const Prism: React.FC = () => {
         { id: 'selectSubject', label: 'Select Subject', checked: showSelectSubject, run: () => setShowSelectSubject(v => !v) },
         { id: 'colorRange', label: 'Color Range', checked: showColorRange, run: () => setShowColorRange(v => !v) },
         { id: 'refineEdge', label: 'Refine Edge', checked: showRefineEdge, run: () => setShowRefineEdge(v => !v) },
-        { id: 'quickMask', label: 'Quick Mask', checked: quickMaskMode, run: () => setQuickMaskMode(v => !v) },
       ] },
       { id: 'retouching', label: 'Retouching', items: [
         { id: 'spotHealing', label: 'Spot Healing', checked: showSpotHealing, run: () => setShowSpotHealing(v => { const next = !v; if (next) setActiveTool('heal'); return next; }) },
@@ -5516,7 +5512,7 @@ const Prism: React.FC = () => {
             <button aria-label="Close Unsharp Mask panel" onClick={() => setShowUnsharpMask(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            {[{ label: 'Amount', val: unsharpAmount, set: setUnsharpAmount, min: 1, max: 500, unit: '%' }, { label: 'Radius', val: unsharpRadius, set: (v: number) => setUnsharpRadius(v / 10), min: 1, max: 100, unit: 'px' }, { label: 'Threshold', val: unsharpThreshold, set: setUnsharpThreshold, min: 0, max: 255, unit: '' }].map(s => (
+            {[{ label: 'Amount', val: unsharpAmount, set: setUnsharpAmount, min: 1, max: 500, unit: '%' }, { label: 'Radius', val: unsharpRadius, set: (v: number) => setUnsharpRadius(v / 10), min: 1, max: 100, unit: 'px' }].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 55 }}>{s.label}</span>
                 <input type="range" min={s.min} max={s.max} value={s.label === 'Radius' ? Math.round(unsharpRadius * 10) : s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
@@ -5630,19 +5626,13 @@ const Prism: React.FC = () => {
                 <button key={v} aria-label={`${v} view mode`} style={{ flex: 1, padding: '3px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: v === 'Marching Ants' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: v === 'Marching Ants' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, cursor: 'pointer' }}>{v}</button>
               ))}
             </div>
-            {[{ label: 'Smooth', val: refineEdgeSmooth, set: setRefineEdgeSmooth, max: 100 }, { label: 'Feather', val: refineEdgeFeather, set: setRefineEdgeFeather, max: 250 }, { label: 'Contrast', val: refineEdgeContrast, set: setRefineEdgeContrast, max: 100 }, { label: 'Shift Edge', val: refineEdgeShift, set: setRefineEdgeShift, max: 100 }].map(s => (
+            {[{ label: 'Smooth', val: refineEdgeSmooth, set: setRefineEdgeSmooth, max: 100 }, { label: 'Feather', val: refineEdgeFeather, set: setRefineEdgeFeather, max: 250 }, { label: 'Shift Edge', val: refineEdgeShift, set: setRefineEdgeShift, max: 100 }].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 55 }}>{s.label}</span>
                 <input type="range" min={s.label === 'Shift Edge' ? -100 : 0} max={s.max} value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{s.val}</span>
               </div>
             ))}
-            <div style={{ marginTop: 6, marginBottom: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>Output To</div>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              {['Selection', 'Layer Mask', 'New Layer', 'New Doc'].map(o => (
-                <button key={o} aria-label={`Output to ${o}`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: o === 'Selection' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: o === 'Selection' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{o}</button>
-              ))}
-            </div>
             <button aria-label="Apply refine edge" onClick={() => {
               const w = canvasSize.width, h = canvasSize.height;
               if (!selection.mask) {

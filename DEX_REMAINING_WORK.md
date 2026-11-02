@@ -4,7 +4,7 @@
 
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 1 | Merge `claude/dex-part7` (Part 7; contains `main` through #73) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
+| 1 | Merge `claude/dex-part7-2` (Part 7 continued; #74 merged) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
 | 2 | Accurate Privacy Policy | **BLOCKED** | Owner has not approved the rewrite | `PRIVACY.md`, `src/shared/policies.ts` | Approve a rewrite from `docs/privacy/DATA_FLOWS.md` + `docs/reports/DEX_AI_PRIVACY.md` (must disclose Web Speech cloud recognition, provider data flow, Ollama check) | Owner / legal | P0 |
 | 3 | Local AI measured end to end | DEFERRED (owner) | Owner parked Ollama work. Local AI is now opt-in (no startup probe, not routed to unless connected in Settings › AI Providers) | Ollama | None until the owner reopens it | Owner | — |
 | 4 | Cloud AI measured end to end | NOT TESTED | No provider key here | Providers | Add a key; run a scripted agent session (web search + file read) | Owner key | P1 |
@@ -12,8 +12,8 @@
 | 6 | Clean-machine install test | NOT TESTED | No VM | NSIS/MSI, WebView2 bootstrapper | Install on a VM without WebView2 | VM | P1 |
 | 7 | Screen-reader pass | NOT TESTED | Needs an interactive session | Shell + new assistant controls | Narrator/NVDA walkthrough | Tester | P1 |
 | 8 | Signed updates + downloadable apps | BLOCKED | Needs signing key + hosting | Updater, Store | Owner creates key; choose hosting | Owner | P1 |
-| 9 | Cloud model catalog is dated | PARTIAL | Static lists (`gpt-4o`, `claude-3-5-*`, `gemini-1.5-*`) | `uki/providers/*.ts` | Add current model ids per provider (verify ids against provider docs) | — | P2 |
-| 10 | AI spending limits / usage totals | MISSING | Usage counts returned per call are not aggregated | `orchestrator.ts` | Sum `usage` per provider per day; optional cap blocks calls | — | P2 |
+| 9 | Cloud model catalog is dated | DONE (Part 7) | Current static fallbacks (Claude Opus/Sonnet/Haiku 5.5, Fable 5.1; GPT-5/5 mini/4o; Gemini 2.5) + live lists from each provider's models endpoint when a key is set (`liveModels.ts`); request shapes fixed (no temperature for Claude/reasoning models, token floors) | `uki/providers/*.ts` | Live-verify with a real key (#4) | Owner key | — |
+| 10 | AI spending limits / usage totals | DONE | Per-provider daily totals and an optional daily token cap (`usage.ts`, enforced in `connect.ts`/`orchestrator.ts`, shown in AI settings); streaming counts are estimates and labelled so | `uki/providers/usage.ts` | — | — | — |
 | 11 | Agent resume after app restart | MISSING | Interrupted tasks are marked failed (honest), not resumed | `ukiTasksStore.ts` | Persist step checkpoints + replay | — | P3 |
 | 12 | Cross-device continuity | MISSING | No sync service exists | — | Product decision + authenticated, encrypted sync backend | Service | P3 |
 | 13 | Camera understanding | MISSING | No assistant camera capture (deliberately not continuous) | — | One-shot camera frame via `getUserMedia`, same pattern as the screen picker | — | P3 |
@@ -67,28 +67,28 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 | fix-now | Window Management toggles (Snap/Animate/Remember/Shadows/Max windows) are never consumed | `src/renderer/pages/Settings.tsx` | REMOVED (Part 7: dead keys deleted, no control shown) |
 | fix-now | Unified menu animation system is never imported | `src/renderer/shell/MenuAnimator.ts` | DELETED (Part 7 debloat) |
 | fix-now | force-touch and swipe-down-3 gestures are emitted but no handler reacts | `src/renderer/shell/GestureEngine.ts` | open |
-| fix-now | Visual Timeline / Work Reports / Memory Map Rewind stores are exported but unused | `src/renderer/services/RewindExtensions.ts` | open |
+| fix-now | Visual Timeline / Work Reports / Memory Map Rewind stores are exported but unused | `src/renderer/services/RewindExtensions.ts` | DELETED (Part 7) |
 | fix-careful | Power 'Lock DEX' / 'Safe Mode' / 'Learning' toggles set state nothing reads | `src/renderer/pages/Power.tsx` | FIXED (Part 7: Power rebuilt on real data) |
-| fix-careful | Entire enhanced AutoSave/crash-recovery feature is never used | `src/renderer/services/AutoSaveManager.ts` | open |
+| fix-careful | Entire enhanced AutoSave/crash-recovery feature is never used | `src/renderer/services/AutoSaveManager.ts` | DELETED (Part 7) |
 | fix-careful | Quick Look preview feature (component + useQuickLook hook) is never wired in | `src/renderer/shell/QuickLook.tsx` | WIRED (Files routes to the global Quick Look host) |
 | fix-careful | CreativeCommandBar (NL command bar for creative apps) is never imported by any app | `src/renderer/components/CreativeCommandBar.tsx` | WIRED (creative apps) |
-| fix-careful | recentSearches.ts and searchRecency.ts helper modules are never imported | `src/renderer/services/recentSearches.ts` | open |
+| fix-careful | recentSearches.ts and searchRecency.ts helper modules are never imported | `src/renderer/services/recentSearches.ts` | DELETED (Part 7) |
 | fix-careful | Wallpaper accent extraction + crossfade layer is entirely unused | `src/renderer/shell/WallpaperAccent.tsx` | DELETED (Part 7 debloat) |
 | fix-careful | Entire System Journal UI (JournalView) is never mounted anywhere | `src/renderer/components/JournalView.tsx` | DELETED (Part 7 debloat) |
 | fix-careful | ThemeManager customization panel (presets + accent picker) is never rendered | `src/renderer/components/ThemeManager.tsx` | open |
 | fix-careful | systemUndoStore (useSystemUndoStore) is never imported | `src/renderer/store/systemUndoStore.ts` | DELETED (Part 7 debloat) |
-| fix-careful | SearchHistory module (spell-correction, completions, voice search store) has zero importers | `src/renderer/services/SearchHistory.ts` | open (kept: holds a global type declaration) |
-| fix-careful | REST API / CLI / Mobile-Companion / Portable-Mode stores exported but consumed by no UI | `src/renderer/services/PlatformExtensions.ts` | open |
+| fix-careful | SearchHistory module (spell-correction, completions, voice search store) has zero importers | `src/renderer/services/SearchHistory.ts` | DELETED (Part 7) |
+| fix-careful | REST API / CLI / Mobile-Companion / Portable-Mode stores exported but consumed by no UI | `src/renderer/services/PlatformExtensions.ts` | DELETED (Part 7) |
 | fix-careful | 'Enable Global Shortcuts' toggle is never read by the shortcut handlers | `src/renderer/pages/Settings.tsx` | REMOVED (Part 7: dead key) |
 | fix-careful | ui/ micro-control cluster (RangeSlider, NumberStepper, SegmentedControl, controlMath) is unused; apps use the components/controls duplicates | `src/renderer/ui/RangeSlider.tsx` | open |
 | remove | PerformancePanel component is never mounted | `src/renderer/services/PerformanceMonitor.tsx` | open |
 | remove | SelectionToolbar and LetterScrubber primitives are exported but never used | `src/renderer/shell/UIComponents.tsx` | open |
-| remove | Search indexer worker pipeline is orphaned (its only client is itself never imported) | `src/renderer/workers/searchIndexer.worker.ts` | open |
-| remove | Global undo/redo manager + useGlobalUndo hook is fully orphaned | `src/renderer/services/undoManager.ts` | open |
-| remove | featureSuiteStore claims '38 subsystems' but 35 of 38 stores are never imported anywhere | `src/renderer/store/featureSuiteStore.ts` | open |
+| remove | Search indexer worker pipeline is orphaned (its only client is itself never imported) | `src/renderer/workers/searchIndexer.worker.ts` | DELETED (Part 7) |
+| remove | Global undo/redo manager + useGlobalUndo hook is fully orphaned | `src/renderer/services/undoManager.ts` | DELETED (Part 7) |
+| remove | featureSuiteStore claims '38 subsystems' but 35 of 38 stores are never imported anywhere | `src/renderer/store/featureSuiteStore.ts` | FIXED (Part 7: 2 used stores kept, 35 removed) |
 | remove | Finished UndoRedoButtons toolbar component is exported but never mounted | `src/renderer/store/useUndoRedo.tsx` | DELETED (Part 7 debloat) |
-| remove | Focus/Context-prediction/Smart-recents stores are never consumed | `src/renderer/services/IntelligenceLayer.ts` | open |
-| remove | Per-app focus profiles are stored but never read (no effect) | `src/renderer/services/FocusSessionSystem.ts` | open |
+| remove | Focus/Context-prediction/Smart-recents stores are never consumed | `src/renderer/services/IntelligenceLayer.ts` | DELETED (Part 7) |
+| remove | Per-app focus profiles are stored but never read (no effect) | `src/renderer/services/FocusSessionSystem.ts` | DELETED (Part 7) |
 
 ## 7.0.1 pass (2026-11-01, `claude/cranky-hopper-4f196b`)
 
@@ -111,7 +111,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 42 | Settings toggles still unread | RESOLVED on `claude/dex-part7` (see #51) | e.g. Window Management toggles, "Enable Global Shortcuts" (see the carried-over audit list) | Wire or remove each | — | P2 |
 | 43 | Two parallel 7.0.1 implementations | RESOLVED in the reconcile merge | Kept main's transparency engine and docs numbering; kept this branch's Calculator rewrite (safe parser, focus-scoped keys), live-activity host, local-AI opt-in, bundle gate, About | — | — | — |
 | 44 | Packaged app exits with `thread '<unknown>' has overflowed its stack` | OPEN | Seen 3× right after CDP tracing with gpu/viz/cc categories and 50 windows; 0 DEX native calls in the window before; not reproduced without tracing (4+ min, 50 apps) | Host process / WebView2 | Reproduce without tracing on a quiet machine; if it recurs, capture a minidump | — | P1 |
-| 45 | Test isolation: packaged-app tests write the native `dex-kv.json` mirror even with a separate WebView2 profile | OPEN (process) | DEX mirrors localStorage into `%APPDATA%\com.onazioj.dex` | Test tooling | Add a `DEX_DATA_DIR` override for test runs; until then snapshot → run → restore (done for every run so far) | — | P2 |
+| 45 | Test isolation for packaged-app tests | DONE (Part 7) | `DEX_DATA_DIR=<dir>` redirects everything DEX writes (dex.db, dex-kv.json, index, vault, backups); one `DexPaths` resolver for all 107 call sites. WebView2 profile still needs `WEBVIEW2_USER_DATA_FOLDER` | `src-tauri/src/paths.rs` | Use it in every live test | — | — |
 
 ## Part 7: real functionality, honest controls (2026-11-02, `claude/dex-part7`)
 
@@ -125,7 +125,10 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 51 | Settings controls with no consumer | FIXED | Defaults 149 -> 46 keys; 22 controls with no reader removed (incl. an inactivity Auto-Lock that contradicted the no-idle-lock rule); every remaining control traced to a reader; DND uses the real store; Sound gates the banner chime; Launch at Login is real (HKCU Run); duplicate Text Size removed (it reset the other); Browser privacy is one shared store; "Clear All Data" is an honest "Reset DEX" (KV file kept as backup) | `Settings.tsx`, `useDexSetting.ts`, search indexes | — | — | — |
 | 52 | Browser fabricated privacy stats; misleading "Tor Mode" | FIXED | "Fingerprints = blocked x 0.3", "Cookies = blocked x 0.6" removed; Tor mode only changed the user agent | `Browser.tsx` | — | — | — |
 | 53 | Dead code | DONE (132 files, ~89k lines) | Unreachable from the app entry and unreferenced by tests/scripts/configs/CSS; includes simulated downloads (`BrowserFeatures.ts`) and a random "threat" scanner (`SystemSecurity.ts`). Verified: tsc 0, production build, full unit suite (521/521 files after merging main) | `src/renderer`, `src/shared` | ~380 more orphan files are still imported by tests only; prune with their tests | — | P3 |
-| 54 | Remaining apps not yet audited in this pass | OPEN | Calculator, Clock, Calendar, Notes, Files, Store, Transfers, creative suite, AI provider flow | `DEXAPPLICATIONS/*`, `pages/*` | Same method: trace each control to a consumer | — | P1 |
+| 54 | Remaining apps audited this way | PARTIAL | Done: Power, Settings, Browser, Imosion (bus comp, tape, reference track, export, MIDI learn, varispeed), Forge, Flux, Creative Suite settings, AppManager. Not yet: Calculator, Calendar, Notes, Files, Store, Transfers, Vinx, Prism, Canvas | `DEXAPPLICATIONS/*`, `pages/*` | Same scan (`dead_state` heuristic + manual check) | — | P2 |
+| 55 | Auth engine lost from `main` | FIXED (Part 7) | PR #57 merged a real engine on 2026-07-02, then `main`'s history was rewritten and it vanished: PINs/passwords could be set but never verified, changed or recovered. Restored from the surviving branch (Argon2id, lockout with recovery, security questions, session tokens); 9 native tests | `auth.rs`, `LockScreen.tsx`, `useAuthStore.ts` | Live unlock test on a test profile (`DEX_DATA_DIR`) | Tester | P1 |
+| 56 | Stale agent work | REVIEWED | `friendly-maxwell` (auth) restored; `feat/ui-consistency` superseded by the 44 px header token; `dex-part3-features` already in main. The main checkout (`feat/premium-overhaul-glass`, 149 commits behind) holds 57 uncommitted July files: a dead-code sweep now covered here plus superseded UI edits. Left untouched | — | Owner decides whether to discard that working copy | Owner | P3 |
+| 57 | Fake controls in creative apps | FIXED (Part 7) | Imosion bus compressor/tape/reference track/advanced export/MIDI learn, Forge shutdown + "GPU" toggle, Flux repeater/time remap/env map/frame blend/export presets, Creative Suite settings (polled localStorage every 2 s in 5 apps) | creative apps | Listen/visual check in the packaged app | Tester | P2 |
 
 ## Release status
 
