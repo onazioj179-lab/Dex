@@ -4412,14 +4412,14 @@ export const AppManager: React.FC = () => {
           aria-label="Open Control Center"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 18, borderRadius: 4,
+            width: 28, height: 24, borderRadius: 6,
             background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
             transition: 'background 0.15s ease',
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="4" y1="8" x2="14" y2="8" /><line x1="18" y1="8" x2="20" y2="8" /><circle cx="16" cy="8" r="2" />
             <line x1="4" y1="16" x2="8" y2="16" /><line x1="12" y1="16" x2="20" y2="16" /><circle cx="10" cy="16" r="2" />
           </svg>
