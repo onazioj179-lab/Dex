@@ -39,13 +39,23 @@ function getContext(): AudioContext | null {
 // PUBLIC API
 // ---------------------------------------------------------------------------
 
+const _listeners = new Set<() => void>();
+
+/** For `useSyncExternalStore`: lets every UI that shows the toggle stay in sync. */
+export function subscribeSoundEnabled(cb: () => void): () => void {
+  _listeners.add(cb);
+  return () => { _listeners.delete(cb); };
+}
+
 export function setSoundEnabled(on: boolean): void {
+  const changed = _enabled !== on;
   _enabled = on;
   try { localStorage.setItem(SOUND_PREF_KEY, on ? 'on' : 'off'); } catch { /* storage blocked */ }
   if (!on && _ctx) {
     _ctx.close().catch((e: unknown) => { console.warn('[DEX]', e); });
     _ctx = null;
   }
+  if (changed) _listeners.forEach((cb) => cb());
 }
 
 export function isSoundEnabled(): boolean {

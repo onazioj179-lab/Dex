@@ -9,7 +9,7 @@
  * Clean settings panel with sections
  */
 
-import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
@@ -20,6 +20,7 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
+import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
@@ -1992,6 +1993,7 @@ export const Settings: React.FC = () => {
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
   const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
+  const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
 
@@ -3814,6 +3816,18 @@ export const Settings: React.FC = () => {
   const renderSoundSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Sound</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Interface sounds</span>
+          <span style={styles.settingDesc}>Short tones for toggles, notifications, copy and errors. Off means DEX stays silent; media apps are unaffected.</span>
+        </div>
+        <input
+          type="checkbox"
+          checked={uiSoundsOn}
+          onChange={(e) => setSoundEnabled(e.target.checked)}
+          aria-label="Interface sounds"
+        />
+      </div>
       {renderWindowsLink('Output, input & volume', 'Speakers, headphones, microphones, balance and spatial sound are managed by Windows.', 'ms-settings:sound')}
       {renderWindowsLink('App volume', "Set DEX's volume relative to other apps.", 'ms-settings:apps-volume')}
     </div>

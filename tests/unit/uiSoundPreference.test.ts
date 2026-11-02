@@ -43,4 +43,17 @@ describe('UI sound mute persists across restarts', () => {
     expect(ctor).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it('notifies subscribers once per real change so every toggle stays in sync', async () => {
+    const m = await import('../../src/renderer/shell/SpatialAudio');
+    const cb = vi.fn();
+    const unsub = m.subscribeSoundEnabled(cb);
+    m.setSoundEnabled(false);
+    m.setSoundEnabled(false); // no-op: already off
+    m.setSoundEnabled(true);
+    expect(cb).toHaveBeenCalledTimes(2);
+    unsub();
+    m.setSoundEnabled(false);
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
 });
