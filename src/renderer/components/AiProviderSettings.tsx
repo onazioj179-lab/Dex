@@ -117,9 +117,7 @@ const AiProviderSettings: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
-        AI Providers
-      </h2>
+      {/* The Settings page header already shows the "AI Providers" title. */}
       <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
         Connect a provider to power UKI. {isSecureKeystore()
           ? 'Keys are encrypted with Windows DPAPI for your user account and never leave this device except to the provider itself.'

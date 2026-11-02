@@ -11,7 +11,7 @@
 - **Activity log:** everything UKI does is recorded in Security Center (kept across restarts). You can clear it.
 - **Memory you control:** view what UKI remembers, forget single items, export it all as JSON, or clear everything.
 - **Your AI keys are encrypted** with Windows DPAPI. Keys saved by older versions are moved into secure storage automatically.
-- **Local AI:** DEX finds the models installed in Ollama and uses them without any key.
+- **Local AI works in the desktop app.** Ollama used to refuse DEX's requests. DEX now talks to it directly on this PC, finds the installed models, and uses them without any key.
 - **See and limit AI usage:** today's tokens per provider, plus an optional daily limit for cloud AI. Local models are never limited.
 - **"Look at my screen" works again** in the desktop app. You pick the window to share in the Windows picker, and DEX takes one frame.
 

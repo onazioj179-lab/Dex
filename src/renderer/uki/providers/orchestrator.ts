@@ -14,6 +14,7 @@
 
 import { providerForModel, getProvider } from './registry';
 import { assertWithinCap, recordUsage, estimateTokens } from './usage';
+import { nativeOllamaFetch } from './ollama';
 
 const isCloudProvider = (id: string) => !!getProvider(id as never)?.requiresKey;
 import { getApiKey } from '../keystore';
@@ -87,7 +88,9 @@ export async function chat(
     { apiKey, baseUrl: opts.baseUrl },
   );
 
-  const doFetch = fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
+  const doFetch = fetchImpl
+    ?? (provider.id === 'ollama' && !opts.baseUrl ? (nativeOllamaFetch() as unknown as FetchLike | null) : null)
+    ?? (globalThis.fetch as unknown as FetchLike);
   if (!doFetch) throw new Error('No fetch implementation available');
 
   const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body, ...(opts.signal ? { signal: opts.signal } : {}) });

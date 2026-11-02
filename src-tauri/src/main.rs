@@ -15,6 +15,7 @@ mod activity_feed;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
+mod ollama_proxy;
 mod git;
 mod env_manager;
 mod ssh;
@@ -2521,6 +2522,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "diagnostics:getWebView2" => webview2::status_json(),
         ch @ ("storage:getUsage" | "storage:clearCaches") => storage_ctl::dispatch(&app, ch),
         ch @ ("secrets:status" | "secrets:list" | "secrets:set" | "secrets:get" | "secrets:delete") => secrets_ctl::dispatch(&app, ch, &args),
+        "ollama:request" => ollama_proxy::dispatch(&args),
 
         // --- Batch 5: App data locations -----------------------------------
         "app:getPath" | "data:getLocations" => app_paths(&app),

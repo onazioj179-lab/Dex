@@ -42,7 +42,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Adaptive reasoning profiles (Fast/Balanced/Deep/Auto) | VERIFIED COMPLETE | `assistantPolicy.ts`; tests; Settings control |
 | Model selection + routing + fallback | VERIFIED COMPLETE (logic) | Provider/route tests |
 | **Processing modes enforced (Local / Hybrid / Cloud / Manual)** | VERIFIED COMPLETE | Enforced in `chat()` + stream; test proves `fetch` never called for cloud in Local only. Fixed streaming fallback that sent "Offline" requests to a cloud provider |
-| Local AI (Ollama) | PARTIAL | Installed-model discovery + keyless routing verified; generation not measured (0 models installed, download needs approval — #3) |
+| Local AI (Ollama) | PARTIAL | **Fixed: Ollama was unreachable from the packaged app (403 on its origin)**; native proxy verified in the packaged build. Installed-model discovery + keyless routing verified; generation not measured (0 models installed, the download needs approval: #3) |
 | Secure API-key storage | VERIFIED COMPLETE (Windows) | New `secrets_ctl.rs` (DPAPI via crypt32, Rust tests); keystore migration tests. UI no longer claims a keychain it didn't use |
 | Permissions + risk levels + confirmations | VERIFIED COMPLETE | `DEX_AI_PERMISSIONS.md`; agent tests |
 | File operations (find/read/create/rename/move/Recycle Bin), scoped | VERIFIED COMPLETE (fake native) | `fileTools.ts` tests; native handlers pre-existing |
@@ -69,9 +69,11 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | `tsc --noEmit` | **0 errors** |
 | Full vitest suite (`vitest run`) | **511 files passed, 2 skipped; 5,378 tests passed, 14 skipped, 0 failed** (933 s) |
 | Tests added/changed after that run (keystore, Ollama discovery, screen picker, providers, router, policy, agent) | 11 files, all passed (re-run after a keystore fix that the provider tests caught) |
-| Rust: `cargo test secrets_ctl` | 2 passed, including a **real DPAPI round trip** on this machine |
+| Rust: `cargo test ollama_proxy secrets_ctl` | 4 passed, including a **real DPAPI round trip** on this machine |
 | Watermark / attribution check | OK (2,283+ files) |
-| Packaged-app runtime check of the new UI | **NOT TESTED** in this pass (rebuild + interactive picker needed; see #5) |
+| `npm run build:tauri` (MSVC release + bundle gate) | **Passed**: NSIS 14.4 MB, MSI 18.1 MB, WebView2 loader statically linked |
+| Packaged-app smoke (CDP, real profile backed up first; read-only) | **Passed**: boots with 0 exceptions; tokens live (`#111215`, fill `#0071E3`); `secrets:status` = DPAPI available; traversal name rejected; Ollama proxy 200 and `/api/pull` refused; Settings › AI Providers renders Processing / Reasoning / Daily limit / DPAPI wording (screenshot). No keys existed, so nothing was migrated or written |
+| Interactive screen picker | NOT TESTED (needs a human to pick a window; #5) |
 | Live model calls | **NOT TESTED** (no key; Ollama has 0 models — #3, #4) |
 
 New test files: `uki-assistant-policy`, `uki-agent-runner-policy`, `uki-memory-controls`, `ai-provider-settings-modes`, `palette-blue-modern`, `uki-keystore-secure`, `ollama-discovery`, `uki-screen-picker` (+ Rust `secrets_ctl::tests`).

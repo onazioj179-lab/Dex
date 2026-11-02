@@ -19,7 +19,7 @@ import { createStreamParser, type StreamFormat } from './stream';
 import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } from './modelPrefs';
 import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 import { configuredProviders, getApiKey } from '../keystore';
-import { ollamaInstalledModels } from './ollama';
+import { ollamaInstalledModels, nativeOllamaFetch } from './ollama';
 import { assertWithinCap, recordUsage, estimateTokens } from './usage';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
@@ -323,7 +323,9 @@ export async function streamConfiguredLLM(
     { apiKey, baseUrl: opts.chatOptions?.baseUrl },
   );
 
-  const doFetch = opts.streamFetch ?? defaultStreamFetch;
+  const doFetch = opts.streamFetch
+    ?? (provider.id === 'ollama' && !opts.chatOptions?.baseUrl ? (nativeOllamaFetch() as unknown as StreamFetchLike | null) : null)
+    ?? defaultStreamFetch;
   try {
     const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body, signal: opts.signal });
     if (!res.ok) return null;

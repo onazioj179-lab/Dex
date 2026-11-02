@@ -38,3 +38,25 @@ describe('local Ollama model discovery', () => {
     expect(configuredCandidates('auto').map((c) => c.id)).toContain('llama3.2:3b');
   });
 });
+
+describe('native Ollama proxy adapter (desktop app)', () => {
+  it('maps only default-base URLs to proxy paths', async () => {
+    const { ollamaPath, nativeOllamaFetch } = await import('../../src/renderer/uki/providers/ollama');
+    expect(ollamaPath('http://localhost:11434/api/chat')).toBe('/api/chat');
+    expect(ollamaPath('http://127.0.0.1:11434/api/tags')).toBe('/api/tags');
+    expect(ollamaPath('http://evil.example/api/chat')).toBeNull();
+    const calls: unknown[][] = [];
+    const f = nativeOllamaFetch(async (...a: unknown[]) => { calls.push(a); return { ok: true, status: 200, body: '{"models":[{"name":"phi3"}]}' }; })!;
+    const r = await f('http://localhost:11434/api/tags');
+    expect(await r.json()).toEqual({ models: [{ name: 'phi3' }] });
+    expect(calls[0]).toEqual(['ollama:request', 'GET', '/api/tags', '']);
+    const bad = await f('http://evil.example/api/chat', { method: 'POST', body: '{}' });
+    expect(bad.ok).toBe(false);
+    expect(calls).toHaveLength(1); // never proxied
+  });
+
+  it('returns null outside the desktop app', async () => {
+    const { nativeOllamaFetch } = await import('../../src/renderer/uki/providers/ollama');
+    expect(nativeOllamaFetch(null)).toBeNull();
+  });
+});
