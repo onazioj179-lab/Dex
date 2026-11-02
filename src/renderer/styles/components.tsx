@@ -1023,7 +1023,7 @@ export const DexSwitch: React.FC<DexSwitchProps> = ({
     position: 'relative',
     width: s.width,
     height: s.height,
-    background: checked ? 'var(--color-accent)' : 'var(--color-border)',
+    background: checked ? 'var(--color-accent-fill)' : 'var(--color-border)',
     borderRadius: s.height / 2,
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.5 : 1,
@@ -1304,7 +1304,7 @@ export const DexCheckbox: React.FC<DexCheckboxProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: checked || indeterminate ? 'var(--color-accent)' : 'transparent',
+    background: checked || indeterminate ? 'var(--color-accent-fill)' : 'transparent',
     border: `2px solid ${checked || indeterminate ? 'var(--color-accent)' : 'var(--color-border)'}`,
     borderRadius: radius.sm,
     transition: `all ${transition.fast}`,
@@ -3046,7 +3046,7 @@ export const DexTabs: React.FC<DexTabsProps> = ({
     if (variant === 'pills') {
       return {
         ...base,
-        background: isActive ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+        background: isActive ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
         color: isActive ? '#000' : 'var(--color-text-secondary)',
         borderRadius: radius.full,
       };
@@ -4114,7 +4114,7 @@ export const DexStepper: React.FC<DexStepperProps> = ({
                   backgroundColor: isCompleted
                     ? 'var(--color-success)'
                     : isCurrent
-                    ? 'var(--color-accent)'
+                    ? 'var(--color-accent-fill)'
                     : 'var(--color-bg-hover)',
                   color: isCompleted || isCurrent ? '#fff' : 'var(--color-text-secondary)',
                   fontSize: fontSize.sm,
@@ -4935,7 +4935,7 @@ export const DexToolbar: React.FC<DexToolbarProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: activeId === item.id ? 'var(--color-accent)' : 'none',
+            background: activeId === item.id ? 'var(--color-accent-fill)' : 'none',
             border: 'none',
             borderRadius: radius.md,
             color: activeId === item.id ? '#000' : 'var(--color-text-primary)',

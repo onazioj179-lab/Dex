@@ -1665,7 +1665,7 @@ const Forge: React.FC = () => {
                 <CreativeSlider label="Parallel Jobs" min={1} max={8} step={1} value={parallelJobs} onChange={setParallelJobs} displayValue={parallelJobs} accentColor="var(--color-accent)" />
                 
                 <div style={styles.checkbox} onClick={() => setUseHardwareAccel(!useHardwareAccel)}>
-                  <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent-fill)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {useHardwareAccel && Icons.check}
                   </div>
                   <span>Use Hardware Acceleration</span>
@@ -1673,13 +1673,13 @@ const Forge: React.FC = () => {
                 
                 <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Completion</div>
                 <div style={styles.checkbox} onClick={() => setNotifyOnComplete(!notifyOnComplete)}>
-                  <div style={{ width: '14px', height: '14px', background: notifyOnComplete ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: notifyOnComplete ? 'var(--color-accent-fill)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {notifyOnComplete && Icons.check}
                   </div>
                   <span>Notify on Completion</span>
                 </div>
                 <div style={styles.checkbox} onClick={() => setShutdownAfter(!shutdownAfter)}>
-                  <div style={{ width: '14px', height: '14px', background: shutdownAfter ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: shutdownAfter ? 'var(--color-accent-fill)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {shutdownAfter && Icons.check}
                   </div>
                   <span>Shutdown After Queue Complete</span>

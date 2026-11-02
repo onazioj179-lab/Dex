@@ -2118,7 +2118,7 @@ const Rewind: React.FC = () => {
               aria-label={journalEditing ? 'Update entry' : 'Save entry'}
               style={{
                 padding: '6px 14px', borderRadius: 6, border: 'none',
-                background: journalDraft.body.trim() ? 'var(--color-accent)' : 'rgba(74,158,255,0.3)',
+                background: journalDraft.body.trim() ? 'var(--color-accent-fill)' : 'rgba(74,158,255,0.3)',
                 color: '#fff', fontSize: 12, fontWeight: 600, cursor: journalDraft.body.trim() ? 'pointer' : 'default',
                 fontFamily: 'inherit', opacity: journalDraft.body.trim() ? 1 : 0.5,
               }}
@@ -2298,7 +2298,7 @@ const Rewind: React.FC = () => {
               aria-label={isRecording ? 'Disable background activity logging' : 'Enable background activity logging'}
               style={{
                 ...S.toggleBtn,
-                background: isRecording ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)',
+                background: isRecording ? 'var(--color-accent-fill)' : 'rgba(255,255,255,0.1)',
               }}
               onClick={toggleRecording}
             >
@@ -2330,7 +2330,7 @@ const Rewind: React.FC = () => {
                     aria-label={`${settings[item.key] ? 'Disable' : 'Enable'} ${item.label} tracking`}
                     style={{
                       ...S.toggleBtn,
-                      background: settings[item.key] ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)',
+                      background: settings[item.key] ? 'var(--color-accent-fill)' : 'rgba(255,255,255,0.1)',
                     }}
                     onClick={() => updateSetting(item.key, !settings[item.key])}
                   >
@@ -2358,7 +2358,7 @@ const Rewind: React.FC = () => {
                 aria-label={settings?.screenshotsEnabled ? 'Disable periodic screenshots' : 'Enable periodic screenshots'}
                 style={{
                   ...S.toggleBtn,
-                  background: settings?.screenshotsEnabled ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)',
+                  background: settings?.screenshotsEnabled ? 'var(--color-accent-fill)' : 'rgba(255,255,255,0.1)',
                 }}
                 onClick={() => updateSetting('screenshotsEnabled', !settings?.screenshotsEnabled)}
               >

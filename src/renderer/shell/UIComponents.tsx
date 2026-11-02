@@ -55,7 +55,7 @@ export const DexToggle: React.FC<{
         width: w,
         height: h,
         borderRadius: h / 2,
-        background: checked ? 'var(--color-accent)' : 'var(--color-bg-active)',
+        background: checked ? 'var(--color-accent-fill)' : 'var(--color-bg-active)',
         border: checked ? 'none' : '1px solid var(--color-border)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         position: 'relative',
@@ -116,7 +116,7 @@ export const DexCheckbox: React.FC<{
           height: 18,
           borderRadius: 4,
           border: checked ? 'none' : '2px solid var(--color-border)',
-          background: checked ? 'var(--color-accent)' : 'transparent',
+          background: checked ? 'var(--color-accent-fill)' : 'transparent',
           cursor: disabled ? 'not-allowed' : 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -211,7 +211,7 @@ export function DexRadioGroup<T extends string = string>({
                 aria-hidden="true"
                 style={{
                   width: 8, height: 8, borderRadius: '50%',
-                  background: selected ? 'var(--color-accent)' : 'transparent',
+                  background: selected ? 'var(--color-accent-fill)' : 'transparent',
                   transform: selected ? 'scale(1)' : 'scale(0.4)',
                   transition: isReduceMotion() ? 'none' : 'transform 0.12s ease, background 0.15s ease',
                 }}
@@ -440,7 +440,7 @@ export const DexInput: React.FC<{
         left: 0,
         right: 0,
         height: 2,
-        background: error ? 'var(--color-error)' : 'var(--color-accent)',
+        background: error ? 'var(--color-error)' : 'var(--color-accent-fill)',
         borderRadius: '0 0 6px 6px',
         transform: `scaleX(${focused ? 1 : 0})`,
         transformOrigin: 'center bottom',

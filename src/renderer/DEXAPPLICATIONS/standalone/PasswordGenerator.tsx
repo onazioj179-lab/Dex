@@ -230,7 +230,7 @@ const PasswordGenerator: React.FC = () => {
       <div style={styles.header}>
         <h1 style={styles.title}>Password</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button className="pwgen-history-btn" style={{ ...styles.historyBtn, background: showHistory ? 'var(--color-accent)' : 'var(--color-border)' }} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" aria-pressed={showHistory} title="Saved passwords">
+          <button className="pwgen-history-btn" style={{ ...styles.historyBtn, background: showHistory ? 'var(--color-accent-fill)' : 'var(--color-border)' }} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" aria-pressed={showHistory} title="Saved passwords">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>

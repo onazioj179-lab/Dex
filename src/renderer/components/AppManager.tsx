@@ -4768,7 +4768,7 @@ export const AppManager: React.FC = () => {
             style={{
               [splitMode === 'horizontal' ? 'width' : 'height']: 6,
               [splitMode === 'horizontal' ? 'cursor' : 'cursor']: splitMode === 'horizontal' ? 'col-resize' : 'row-resize',
-              background: splitDragging.current ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+              background: splitDragging.current ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
               transition: 'background 0.25s cubic-bezier(0.4,0,0.2,1)',
               flexShrink: 0, zIndex: 10, position: 'relative',
             }}

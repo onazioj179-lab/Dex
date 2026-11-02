@@ -2519,7 +2519,7 @@ export const Settings: React.FC = () => {
             ...styles.toggle,
             // macOS-style: "on" uses the accent (was system green); the knob uses
             // --color-accent-text (white) so it stays >=3:1 against the blue track.
-            background: settings[key] ? 'var(--color-accent)' : 'var(--color-bg-glass)',
+            background: settings[key] ? 'var(--color-accent-fill)' : 'var(--color-bg-glass)',
             border: settings[key] ? 'none' : '1px solid var(--color-border)',
           }}
           onClick={() => toggleSetting(key)}
@@ -4108,7 +4108,7 @@ export const Settings: React.FC = () => {
             >
               <span style={{
                 marginTop: 3, width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                background: selected ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+                background: selected ? 'var(--color-accent-fill)' : 'transparent',
                 border: `2px solid ${selected ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)'}`,
                 boxShadow: selected ? 'inset 0 0 0 3px var(--color-bg-elevated, #111)' : 'none',
               }} />

@@ -2234,7 +2234,7 @@ export const Browser: React.FC = () => {
                   <div style={{
                     ...styles.downloadBar,
                     width: `${d.progress}%`,
-                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent)',
+                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent-fill)',
                   }} />
                 </div>
                 <span style={styles.downloadStatus}>

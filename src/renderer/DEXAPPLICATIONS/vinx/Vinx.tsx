@@ -1372,7 +1372,7 @@ const VinxEditor: React.FC = () => {
         <span>{playbackSpeed}×</span>
         <div style={{ flex: 1 }} />
         <span style={{ color: isPlaying ? 'var(--color-accent)' : 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: isPlaying ? 'var(--color-accent)' : 'var(--color-success)' }} />
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: isPlaying ? 'var(--color-accent-fill)' : 'var(--color-success)' }} />
           {isPlaying ? 'Playing' : 'Ready'}
         </span>
       </div>

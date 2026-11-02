@@ -234,7 +234,7 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
             >
               <span style={{
                 marginTop: 2, width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                background: selected ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+                background: selected ? 'var(--color-accent-fill)' : 'transparent',
                 border: `1px solid ${selected ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)'}`,
               }} />
               <span style={{ flex: 1 }}>

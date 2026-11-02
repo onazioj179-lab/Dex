@@ -351,7 +351,7 @@ const Banner: React.FC<{
                   onClick={(e) => { e.stopPropagation(); action.onClick(); onDismiss(notification.id); }}
                   style={{
                     padding: '4px 10px', borderRadius: 4,
-                    background: i === 0 && !notification.undoAction ? 'var(--color-accent)' : 'var(--color-border-subtle)',
+                    background: i === 0 && !notification.undoAction ? 'var(--color-accent-fill)' : 'var(--color-border-subtle)',
                     color: i === 0 && !notification.undoAction ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
                     border: 'none', fontSize: 11, fontWeight: 500,
                     cursor: 'pointer',

@@ -470,7 +470,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
               </button>
               <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={toggle} disabled={!track}
-                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent, #4a9eff)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
+                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
                 {isPlaying
                   ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
                   : <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>}
@@ -501,7 +501,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                   fontSize: 11, padding: '3px 0', borderRadius: 6,
                   fontWeight: d.isToday ? 700 : 400,
                   color: d.isToday ? 'var(--color-accent-text, #fff)' : 'var(--color-text-primary)',
-                  background: d.isToday ? 'var(--color-accent, #4a9eff)' : 'transparent',
+                  background: d.isToday ? 'var(--color-accent-fill)' : 'transparent',
                 }}>{d.day}</div>
               ))}
             </div>

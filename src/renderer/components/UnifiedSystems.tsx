@@ -291,7 +291,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
               style={{
                 height: '100%',
                 width: `${task.progressPercent}%`,
-                background: task.status === 'failed' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
+                background: task.status === 'failed' ? 'var(--color-error)' : 'var(--color-accent-fill)',
                 borderRadius: '2px',
                 transition: 'width 0.3s',
               }}
@@ -664,7 +664,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               marginTop: 'var(--space-3)',
               width: '100%',
               padding: 'var(--space-2)',
-              background: description.trim() ? 'var(--color-accent, #3b82f6)' : 'var(--color-bg-hover)',
+              background: description.trim() ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
               border: 'none',
               borderRadius: '6px',
               // Active -> on accent (accent-text); inactive -> on bg-hover

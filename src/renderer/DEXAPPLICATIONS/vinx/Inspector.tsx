@@ -66,7 +66,7 @@ const sliderContainerStyle: React.CSSProperties = {
 
 const keyframeDiamondStyle = (active: boolean): React.CSSProperties => ({
   width: 8, height: 8, transform: 'rotate(45deg)',
-  background: active ? 'var(--color-accent)' : 'var(--color-border)',
+  background: active ? 'var(--color-accent-fill)' : 'var(--color-border)',
   cursor: 'pointer', flexShrink: 0,
 });
 
@@ -330,7 +330,7 @@ const EffectSection: React.FC<{
       }}>
         <div style={{
           width: 10, height: 10, borderRadius: 2,
-          background: effect.enabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+          background: effect.enabled ? 'var(--color-accent-fill)' : 'var(--color-text-tertiary)',
           cursor: 'pointer', flexShrink: 0,
         }} onClick={() => onUpdateParam('__enabled', !effect.enabled)} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effect.name}</span>

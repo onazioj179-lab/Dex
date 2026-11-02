@@ -697,7 +697,7 @@ const NoiseGenerator: React.FC = () => {
           <DexIcon name="shuffle" size={16} />
         </button>
         <button
-          style={{ ...st.playBtn, background: playing ? 'var(--color-error)' : 'var(--color-accent)' }}
+          style={{ ...st.playBtn, background: playing ? 'var(--color-error)' : 'var(--color-accent-fill)' }}
           onClick={togglePlay}
           aria-label={playing ? 'Stop' : 'Play'}
           disabled={!playing && activeCount === 0}

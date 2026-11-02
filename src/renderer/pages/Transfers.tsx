@@ -913,7 +913,7 @@ const Transfers: React.FC = () => {
             {tab.badge !== undefined && tab.badge > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
-                background: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)', color: 'var(--color-text-inverse)',
+                background: activeTab === tab.id ? 'var(--color-accent-fill)' : 'var(--color-text-muted)', color: 'var(--color-text-inverse)',
               }}>
                 {tab.badge}
               </span>

@@ -1489,7 +1489,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               {wordGoal > 0 ? (
                 <>
                   <span style={{ display: 'inline-block', width: 44, height: 4, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.1))', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: reached ? 'var(--color-success)' : 'var(--color-accent)' }} />
+                    <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: reached ? 'var(--color-success)' : 'var(--color-accent-fill)' }} />
                   </span>
                   Goal {wdCount.toLocaleString()}/{wordGoal.toLocaleString()}
                 </>

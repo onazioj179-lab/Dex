@@ -223,7 +223,7 @@ const NexusUkiPanel: React.FC = () => {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Reasoning</div>
           {recentThoughts.map((th) => (
             <div key={th.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-              <span style={{ width: 5, height: 5, borderRadius: 9999, flexShrink: 0, background: th.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)' }} />
+              <span style={{ width: 5, height: 5, borderRadius: 9999, flexShrink: 0, background: th.success ? 'var(--color-accent-fill)' : 'var(--color-error, #ff453a)' }} />
               <span style={{ color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={th.query}>{th.query}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{th.intent}</span>
               <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{Math.round(th.latencyMs)}ms</span>
