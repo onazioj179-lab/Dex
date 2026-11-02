@@ -12,6 +12,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod activity_feed;
+mod browser_view;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -526,6 +527,8 @@ fn system_status() -> Value {
     let mem_used = sys.used_memory(); // bytes (sysinfo 0.30)
     let mem_total = sys.total_memory();
     let mem_percent = if mem_total > 0 { (mem_used as f64 / mem_total as f64) * 100.0 } else { 0.0 };
+    let mem_available = sys.available_memory();
+    let (swap_used, swap_total) = (sys.used_swap(), sys.total_swap());
 
     let (mut rx, mut tx, mut iface_count) = (0u64, 0u64, 0u64);
     for (_iface, data) in &networks {
@@ -556,7 +559,10 @@ fn system_status() -> Value {
         "uptimeSec": uptime,
         // Structured fields read by the Task Manager.
         "cpu": { "usage": cpu_usage, "cores": cores },
-        "memory": { "used": mem_used, "total": mem_total, "percent": mem_percent },
+        "memory": {
+            "used": mem_used, "total": mem_total, "percent": mem_percent,
+            "available": mem_available, "swapUsed": swap_used, "swapTotal": swap_total,
+        },
         "disk": { "used": disk_used, "total": disk_total, "percent": disk_percent },
         "network": { "connected": iface_count > 0, "rxBps": rx_bps, "txBps": tx_bps },
         "uptime": uptime,
@@ -592,6 +598,9 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
 
 /// `system:getProcesses` — top running processes by resource use (pid, name,
 /// cpu%, memMB). Ranked + capped so the UI gets the hogs, not raw noise.
+/// Returns a bare array: every renderer caller (Task Manager, Power, Settings,
+/// UKI) and `global.d.ts` expect `any[]`; the old `{ success, processes }`
+/// wrapper made all of them show an empty list.
 fn system_processes() -> Value {
     let mut sys = sysinfo::System::new_all();
     // Per-process CPU% is a delta between two samples; without the sleep every
@@ -619,7 +628,7 @@ fn system_processes() -> Value {
             })
         })
         .collect();
-    json!({ "success": true, "processes": procs })
+    Value::Array(procs)
 }
 
 #[cfg(test)]
@@ -656,6 +665,64 @@ fn system_kill(pid: u32) -> Value {
             json!({ "success": ok, "message": if ok { "terminated" } else { "kill failed" } })
         }
         None => json!({ "success": false, "message": "process not found" }),
+    }
+}
+
+// --- Launch at login ---------------------------------------------------------
+// Per-user `Run` key (HKCU, no admin). The value is the current executable, so
+// the entry follows wherever DEX is installed. Other platforms report
+// `supported: false` and the Settings row hides itself.
+
+#[cfg(windows)]
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+#[cfg(windows)]
+const RUN_VALUE: &str = "DEX";
+
+#[cfg(windows)]
+fn reg(args: &[&str]) -> bool {
+    use std::os::windows::process::CommandExt;
+    std::process::Command::new("reg")
+        .args(args)
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn launch_at_login_get() -> Value {
+    #[cfg(windows)]
+    {
+        let enabled = reg(&["query", RUN_KEY, "/v", RUN_VALUE]);
+        json!({ "supported": true, "enabled": enabled })
+    }
+    #[cfg(not(windows))]
+    {
+        json!({ "supported": false, "enabled": false })
+    }
+}
+
+fn launch_at_login_set(enable: bool) -> Value {
+    #[cfg(windows)]
+    {
+        let ok = if enable {
+            match std::env::current_exe() {
+                Ok(exe) => {
+                    let quoted = format!("\"{}\"", exe.display());
+                    reg(&["add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &quoted, "/f"])
+                }
+                Err(_) => false,
+            }
+        } else {
+            // Deleting a value that is not there fails; that still means "off".
+            reg(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"]) || !reg(&["query", RUN_KEY, "/v", RUN_VALUE])
+        };
+        let enabled = reg(&["query", RUN_KEY, "/v", RUN_VALUE]);
+        json!({ "supported": true, "success": ok && enabled == enable, "enabled": enabled })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enable;
+        json!({ "supported": false, "success": false, "enabled": false })
     }
 }
 
@@ -1002,6 +1069,27 @@ pub(crate) fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
         Ok(()) => json!({ "success": true }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }
+}
+
+/// Settings > Reset DEX: set the KV file aside (renamed, not deleted, so a
+/// mistaken reset can be undone by renaming it back) and start empty.
+fn kv_reset(app: &tauri::AppHandle) -> Value {
+    let path = kv_path(app);
+    if !path.exists() {
+        return json!({ "success": true, "backup": Value::Null });
+    }
+    let backup = path.with_file_name(format!("dex-kv.reset-{}.json", chrono_free_now_ms()));
+    match std::fs::rename(&path, &backup) {
+        Ok(()) => json!({ "success": true, "backup": backup.display().to_string() }),
+        Err(e) => json!({ "success": false, "error": e.to_string() }),
+    }
+}
+
+fn chrono_free_now_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 // --- Settings + theme (kv-backed) ------------------------------------------
@@ -2166,6 +2254,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("ssh:") { return ssh::dispatch(&app, &channel, &args); }
     if channel.starts_with("analytics:") { return analytics::dispatch(&app, &channel, &args); }
     if channel.starts_with("mode:") { return modes::dispatch(&app, &channel, &args); }
+    if channel.starts_with("browserView:") { return browser_view::dispatch(&app, &window, &channel, &args); }
     if channel.starts_with("activity:") { return activity_feed::dispatch_kv(&app, &channel, &args); }
     if channel.starts_with("duplicates:") { return duplicates_resolver::dispatch(&app, &channel, &args); }
     if channel.starts_with("focus:") { return focus_sessions::dispatch(&app, &channel, &args); }
@@ -2370,6 +2459,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
+        "system:getLaunchAtLogin" => launch_at_login_get(),
+        "system:setLaunchAtLogin" => launch_at_login_set(args.get(0).and_then(|v| v.as_bool()).unwrap_or(false)),
 
         // --- Shell ----------------------------------------------------------
         "shell:openExternal" => shell_open_external(&arg_str(0).unwrap_or_default()),
@@ -2481,6 +2572,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "capability:storage:set" | "storage:set" => {
             kv_set(&app, &arg_str(0).unwrap_or_default(), args.get(1).cloned().unwrap_or(Value::Null))
         }
+        "storage:resetKv" => kv_reset(&app),
 
         // --- Settings (kv-backed; mirrors capabilityLayer.storage) ----------
         // `apply` does power/opacity side effects in Electron that aren't native

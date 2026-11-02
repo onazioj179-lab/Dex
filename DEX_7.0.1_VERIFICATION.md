@@ -131,3 +131,13 @@ New test files: `uki-assistant-policy`, `uki-agent-runner-policy`, `uki-memory-c
 ## Reports
 
 `docs/reports/` (index: `docs/reports/README.md`); release notes: `DEX_7.0.1_RELEASE_NOTES.md`; backlog: `DEX_REMAINING_WORK.md`.
+
+## Part 7 checks (2026-11-02, `claude/dex-part7`)
+
+- `tsc --noEmit` 0 · `vite build` 0 (chunk-cycle guard passes) · full unit suite after merging `main` (#73): **521 files / 5,333 tests passed, 0 failed** (2 files skipped) · native tests 6/6 (`browser_view`, `profile_name`, `powercfg`, `process_ranking`).
+- Live, debug build with embedded frontend, driven over CDP, isolated WebView2 profile; the owner's `%APPDATA%\com.onazioj.dex` was snapshotted first and restored afterwards (SHA-256 identical, 39 files):
+  - `system:getProcesses` returns an array; Power's Energy Use lists real processes.
+  - Power Mode shows the real Windows plan (Balanced). A different mode was **not** clicked: it changes the machine's power plan.
+  - Launch at Login reads the real `Run` key (not set; the test only read it).
+  - Browser: typed `https://example.com` -> child webview loads "Example Domain"; covered -> hidden, uncovered -> visible; app closed -> view released; relaunched -> recreated at the same URL; the page's `dex_ipc` call is refused ("not allowed").
+- Not run: packaged installer, click-through of Browser back/forward/find/reader mode, Settings Launch at Login toggle (writes the registry).

@@ -17,6 +17,7 @@ import { selectVisible } from '../../shared/notifications/center';
 import type { NotificationRecord, NotificationPriority } from '../../shared/notifications/group';
 import { summarizeGroup, type DigestItem } from '../../shared/notifications/digest';
 import { readHubTarget } from '../services/notify';
+import { readDexSetting } from '../hooks/useDexSetting';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -192,9 +193,9 @@ const Banner: React.FC<{
     }
   }, [hovered]);
 
-  // Play sound on mount
+  // Play sound on mount (Settings > Notifications > Sound)
   useEffect(() => {
-    playNotification(window.innerWidth - BANNER_WIDTH / 2);
+    if (readDexSetting('soundEnabled', true)) playNotification(window.innerWidth - BANNER_WIDTH / 2);
   }, []);
 
   // Swipe to dismiss

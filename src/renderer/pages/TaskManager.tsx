@@ -14,6 +14,7 @@ import ScheduledTasksPanel from '../components/ScheduledTasksPanel';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
+import { useElementSize } from '../utils/motionHooksExtended';
 
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
@@ -148,13 +149,17 @@ interface SparklineProps {
 }
 
 const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max = 100, ariaLabel }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Size from a ResizeObserver: calling getBoundingClientRect on every sample
+  // forced a whole-document layout each second (and returned the zoomed size
+  // on the spatial desktop).
+  const { ref: canvasRef, width: cssW, height: cssH } = useElementSize<HTMLCanvasElement>();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    if (!cssW || !cssH) return;
+    const rect = { width: cssW, height: cssH };
     const widthPx = Math.max(60, Math.floor(rect.width));
     const heightPx = Math.max(20, Math.floor(rect.height));
     if (canvas.width !== widthPx * dpr || canvas.height !== heightPx * dpr) {
@@ -224,7 +229,7 @@ const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max 
     ctx.beginPath();
     ctx.arc(endX, endY, 2.4, 0, Math.PI * 2);
     ctx.fill();
-  }, [history, color, max]);
+  }, [history, color, max, cssW, cssH]);
 
   return <canvas ref={canvasRef} role="img" aria-label={ariaLabel} style={{ width: '100%', height, display: 'block' }} />;
 };
@@ -274,12 +279,13 @@ const Donut: React.FC<DonutProps> = ({ value, max = 100, size = 104, stroke = 11
 // graph: a smooth monotone curve with a soft gradient fill and an endpoint glow.
 interface AreaChartProps { history: number[]; color: string; height?: number; max?: number; ariaLabel: string }
 const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max = 100, ariaLabel }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { ref: canvasRef, width: cssW, height: cssH } = useElementSize<HTMLCanvasElement>();
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    if (!cssW || !cssH) return;
+    const rect = { width: cssW, height: cssH };
     const w = Math.max(120, Math.floor(rect.width));
     const h = Math.max(80, Math.floor(rect.height));
     if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
@@ -344,7 +350,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max
     ctx.strokeStyle = color + '44';
     ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(last[0], last[1], 3.4, 0, Math.PI * 2); ctx.stroke();
-  }, [history, color, max, height]);
+  }, [history, color, max, height, cssW, cssH]);
   return <canvas ref={canvasRef} role="img" aria-label={ariaLabel} style={{ width: '100%', height, display: 'block' }} />;
 };
 

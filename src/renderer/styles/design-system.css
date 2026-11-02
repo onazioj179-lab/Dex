@@ -665,6 +665,10 @@
    window shadows are dropped -- with dozens of windows they dominate paint. */
 [data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
 [data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
+/* Zoomed far out, window contents are thumbnails: pause their decorative CSS
+   animations (spinners, pulses) so 50 windows don't repaint every frame. Apps
+   keep running and re-animate as soon as you zoom back in. */
+[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] * { animation-play-state: paused !important; }
 .dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
 .dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
 .dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }

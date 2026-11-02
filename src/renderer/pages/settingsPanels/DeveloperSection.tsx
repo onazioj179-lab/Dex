@@ -87,12 +87,12 @@ const DeveloperSection: React.FC<DeveloperSectionProps> = ({ onNavigate, styles 
         Diagnostics and usage reporting are controlled by{' '}
         <button
           type="button"
-          onClick={() => onNavigate('general')}
+          onClick={() => onNavigate('about')}
           style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 11, padding: 0 }}
         >
-          Send Analytics
+          Optional Product Analytics
         </button>{' '}
-        (General) and{' '}
+        (About) and{' '}
         <button
           type="button"
           onClick={() => onNavigate('privacy')}

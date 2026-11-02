@@ -3317,20 +3317,31 @@ export const AppManager: React.FC = () => {
   // Camera -> one transform on the world layer, plus off-screen culling.
   useEffect(() => {
     let cullTimer: ReturnType<typeof setTimeout> | null = null;
+    let motionTimer: ReturnType<typeof setTimeout> | null = null;
     const cull = () => {
       cullTimer = null;
       const s = useSpatialStore.getState();
       const root = worldRef.current;
-      const next = new Set<string>();
+      const next = new Set<string>();      // culled: off-screen, not painted
+      const distant = new Set<string>();   // on-screen but zoomed far out
       if (s.enabled) {
+        let front: SpatialWindow | null = null;
+        for (const w of Object.values(s.windows)) if (!w.minimized && (!front || w.z > front.z)) front = w;
+        const lowLod = s.camera.z < 0.35;
         for (const w of Object.values(s.windows)) {
-          if (!w.minimized && !isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, 400)) next.add(w.id);
+          if (w.minimized) continue;
+          if (!isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, 400)) next.add(w.id);
+          else if (lowLod && w.id !== front?.id) distant.add(w.id);
         }
       }
       root?.querySelectorAll<HTMLElement>('[data-floating-window]').forEach((el) => {
         if (next.has(el.dataset.floatingWindow || '')) el.setAttribute('data-spatial-offscreen', 'true');
         else el.removeAttribute('data-spatial-offscreen');
       });
+      // Off-screen and zoomed-out ("distant") windows both drop to the
+      // background lifecycle phase: apps that support it pause heavy work.
+      // Distant windows stay painted and live -- only their refresh slows.
+      for (const id of distant) next.add(id);
       const prev = spatialOffscreenRef.current;
       spatialOffscreenRef.current = next;
       for (const id of next) if (!prev.has(id)) appLifecycle.setPhase(id, 'background');
@@ -3349,8 +3360,18 @@ export const AppManager: React.FC = () => {
         // No CSS transition: the camera is already animated frame-by-frame by the
         // store, and the global theme transition would make it lag the pointer.
         el.style.setProperty('transition', 'none', 'important');
-        el.style.setProperty('transform', `translate(${-x * z}px, ${-y * z}px) scale(${z})`, 'important');
+        const prevT = el.style.getPropertyValue('transform');
+        const nextT = `translate(${-x * z}px, ${-y * z}px) scale(${z})`;
+        el.style.setProperty('transform', nextT, 'important');
         el.style.transformOrigin = '0 0';
+        // While the camera moves, keep the world on its own GPU layer so
+        // frames are composited instead of re-painted; drop it shortly after
+        // so content re-rasterises crisply at the final zoom.
+        if (prevT && prevT !== nextT) {
+          el.style.willChange = 'transform';
+          if (motionTimer) clearTimeout(motionTimer);
+          motionTimer = setTimeout(() => { motionTimer = null; el.style.willChange = ''; }, 180);
+        }
         el.dataset.spatialLod = z < 0.35 ? 'low' : 'normal';
       } else {
         el.style.removeProperty('transform');
@@ -3361,7 +3382,7 @@ export const AppManager: React.FC = () => {
     };
     apply(useSpatialStore.getState());
     const unsub = useSpatialStore.subscribe(apply);
-    return () => { unsub(); if (cullTimer) clearTimeout(cullTimer); };
+    return () => { unsub(); if (cullTimer) clearTimeout(cullTimer); if (motionTimer) clearTimeout(motionTimer); };
   }, [splitMode, spatialEnabled]);
 
   // Viewport size (camera fitting, culling, minimap).

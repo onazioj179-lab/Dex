@@ -22,6 +22,10 @@ import { dispatchActivity, updateActivity, completeActivity } from '../utils/liv
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { NativeWebview } from '../components/NativeWebview';
+import { isTauri } from '../services/platform/tauriCompat';
+import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
+import { useRunningApps } from '../store/runningApps';
 
 // ===========================================================================
 // TYPES
@@ -58,18 +62,17 @@ interface HistoryEntry {
   favicon?: string;
 }
 
+// Shared with Settings > Browser (one source of truth in `dex-settings`).
 interface BrowserSettings {
   blockTrackers: boolean;
   blockAds: boolean;
   forceHttps: boolean;
-  fingerprintProtection: boolean;
-  doNotTrack: boolean;
-  clearOnExit: boolean;
-  blockThirdPartyCookies: boolean;
-  enableTorMode: boolean;
-  customUserAgent: string;
-  defaultSearchEngine: 'duckduckgo' | 'google' | 'startpage' | 'brave';
+  defaultSearchEngine: 'duckduckgo' | 'google' | 'bing' | 'brave' | 'startpage';
 }
+
+const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+// Electron renders <webview>; the Tauri shell needs a native child webview.
+const USE_NATIVE_WEBVIEW = isTauri();
 
 // ---------------------------------------------------------------------------
 // KEYCHAIN — Saved passwords & payment cards
@@ -126,8 +129,6 @@ const BLOCKED_DOMAINS = new Set(BLOCKED_DOMAIN_LIST);
 // request-interception API.
 const adblockEngine = new AdblockEngine(BLOCKED_DOMAIN_LIST);
 
-// Privacy-mode User Agent
-const TOR_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0';
 
 // ===========================================================================
 // ICONS
@@ -377,19 +378,16 @@ export const Browser: React.FC = () => {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  // Browser settings contain sensitive config (tor mode, user agent) — use IPC-only, defaults on mount
-  const [browserSettings, setBrowserSettings] = useState<BrowserSettings>({
-    blockTrackers: true,
-    blockAds: true,
-    forceHttps: true,
-    fingerprintProtection: true,
-    doNotTrack: true,
-    clearOnExit: true,
-    blockThirdPartyCookies: true,
-    enableTorMode: false,
-    customUserAgent: '',
-    defaultSearchEngine: 'duckduckgo',
-  });
+  // DEX keeps closed apps mounted; native pages must not outlive the app.
+  const browserRunning = useRunningApps(s => s.runningApps.some(a => a.id === 'browser'));
+  const blockTrackers = useDexSetting<boolean>('blockTrackers', true);
+  const blockAds = useDexSetting<boolean>('blockAds', true);
+  const forceHttps = useDexSetting<boolean>('forceHttps', true);
+  const defaultSearchEngine = useDexSetting<BrowserSettings['defaultSearchEngine']>('defaultSearchEngine', 'duckduckgo');
+  const browserSettings = useMemo<BrowserSettings>(
+    () => ({ blockTrackers, blockAds, forceHttps, defaultSearchEngine }),
+    [blockTrackers, blockAds, forceHttps, defaultSearchEngine],
+  );
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [showDownloads, setShowDownloads] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -664,7 +662,6 @@ export const Browser: React.FC = () => {
   }, [toast]);
 
   const historySaveRef = useRef<ReturnType<typeof setTimeout>>();
-  const settingsSaveRef = useRef<ReturnType<typeof setTimeout>>();
   const sessionSaveRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Settings panel
@@ -691,7 +688,6 @@ export const Browser: React.FC = () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       if (bookmarkSaveRef.current) clearTimeout(bookmarkSaveRef.current);
       if (historySaveRef.current) clearTimeout(historySaveRef.current);
-      if (settingsSaveRef.current) clearTimeout(settingsSaveRef.current);
       if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
       if (zoomSaveRef.current) clearTimeout(zoomSaveRef.current);
     };
@@ -718,10 +714,6 @@ export const Browser: React.FC = () => {
     ipc('capability:storage:get', 'dex-browser-history').then((r: string | null) => {
       if (!mounted) return;
       if (r) { try { const p = JSON.parse(r); if (Array.isArray(p)) setHistory(p); } catch (e) { console.warn('[DEX]', e); } }
-    }).catch((e: unknown) => { console.warn('[DEX]', e); });
-    ipc('capability:storage:get', 'dex-browser-settings').then((r: string | null) => {
-      if (!mounted) return;
-      if (r) { try { setBrowserSettings(prev => ({ ...prev, ...JSON.parse(r) })); } catch (e) { console.warn('[DEX]', e); } }
     }).catch((e: unknown) => { console.warn('[DEX]', e); });
     ipc('capability:storage:get', KEYCHAIN_STORAGE_KEY).then((r: string | null) => {
       if (!mounted) return;
@@ -879,16 +871,6 @@ export const Browser: React.FC = () => {
       return trimmed.length > HISTORY_LIMIT ? trimmed.slice(0, HISTORY_LIMIT) : trimmed;
     });
   }, []);
-
-  // Persist settings (debounced)
-  useEffect(() => {
-    if (settingsSaveRef.current) clearTimeout(settingsSaveRef.current);
-    settingsSaveRef.current = setTimeout(() => {
-      const json = JSON.stringify(browserSettings);
-      // Settings contain sensitive config (tor mode, user agent) — IPC only
-      (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-settings', json).catch((e: unknown) => { console.warn('[DEX]', e); });
-    }, 500);
-  }, [browserSettings]);
 
   // Persist keychain (debounced)
   useEffect(() => {
@@ -1192,10 +1174,19 @@ export const Browser: React.FC = () => {
           setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
         });
       } else if (url.startsWith('http://') || url.startsWith('https://')) {
-        // Let renderer open as a new tab
-        window.electron?.invoke?.('browser:new-tab-request', url).catch((e: unknown) => {
-          console.warn('[Browser] Failed to request new tab:', e);
-        });
+        // target=_blank / window.open -> a new foreground tab.
+        if (tabsRef.current.length >= MAX_TABS) return;
+        const popup: Tab = {
+          id: `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          title: url,
+          url,
+          loading: true,
+          background: false,
+          navHistory: [url],
+          navIndex: 0,
+        };
+        setTabs(prev => [...prev, popup]);
+        setActiveTab(popup.id);
       }
     });
     // Also handle postMessage-based credential capture as fallback
@@ -1580,6 +1571,7 @@ export const Browser: React.FC = () => {
         const searchEngines: Record<string, string> = {
           duckduckgo: 'https://duckduckgo.com/?q=',
           google: 'https://www.google.com/search?q=',
+          bing: 'https://www.bing.com/search?q=',
           startpage: 'https://www.startpage.com/do/search?q=',
           brave: 'https://search.brave.com/search?q=',
         };
@@ -2345,12 +2337,7 @@ export const Browser: React.FC = () => {
               { key: 'blockTrackers', label: 'Block Trackers' },
               { key: 'blockAds', label: 'Block Ads' },
               { key: 'forceHttps', label: 'Force HTTPS' },
-              { key: 'fingerprintProtection', label: 'Fingerprint Protection' },
-              { key: 'doNotTrack', label: 'Do Not Track' },
-              { key: 'clearOnExit', label: 'Clear Data on Exit' },
-              { key: 'blockThirdPartyCookies', label: 'Block 3rd-Party Cookies' },
-              { key: 'enableTorMode', label: 'Privacy Mode' },
-            ] as { key: keyof BrowserSettings; label: string }[]).map(item => (
+            ] as { key: 'blockTrackers' | 'blockAds' | 'forceHttps'; label: string }[]).map(item => (
               <label key={item.key} style={styles.settingRow}>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>{item.label}</span>
                 <div
@@ -2358,7 +2345,12 @@ export const Browser: React.FC = () => {
                     ...styles.toggleTrack,
                     background: browserSettings[item.key] ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                   }}
-                  onClick={() => setBrowserSettings(s => ({ ...s, [item.key]: !s[item.key] }))}
+                  role="switch"
+                  aria-checked={browserSettings[item.key]}
+                  aria-label={item.label}
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); writeDexSetting(item.key, !browserSettings[item.key]); } }}
+                  onClick={() => writeDexSetting(item.key, !browserSettings[item.key])}
                 >
                   <div style={{
                     ...styles.toggleKnob,
@@ -2371,33 +2363,16 @@ export const Browser: React.FC = () => {
               <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Search Engine</span>
               <Select
                 size="sm"
-                options={[{ value: 'duckduckgo', label: 'DuckDuckGo' }, { value: 'google', label: 'Google' }, { value: 'startpage', label: 'Startpage' }, { value: 'brave', label: 'Brave Search' }]}
+                options={[{ value: 'duckduckgo', label: 'DuckDuckGo' }, { value: 'google', label: 'Google' }, { value: 'bing', label: 'Bing' }, { value: 'brave', label: 'Brave Search' }, { value: 'startpage', label: 'Startpage' }]}
                 value={browserSettings.defaultSearchEngine}
-                onChange={v => setBrowserSettings(s => ({ ...s, defaultSearchEngine: v as BrowserSettings['defaultSearchEngine'] }))}
+                onChange={v => writeDexSetting('defaultSearchEngine', v)}
               />
             </div>
 
-            {/* TrackBlock Stats */}
-            <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3) 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
-              <div className="dex-label-caps" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                TrackBlock Stats — This Session
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                {[
-                  { label: 'Trackers Blocked', value: blockedCount, color: 'var(--color-warning)' },
-                  { label: 'HTTPS Upgrades', value: browserSettings.forceHttps ? history.filter(h => h.url?.startsWith('https')).length : 0, color: 'var(--color-success)' },
-                  { label: 'Fingerprints', value: browserSettings.fingerprintProtection ? Math.floor(blockedCount * 0.3) : 0, color: '#bf5af2' },
-                  { label: 'Cookies Blocked', value: browserSettings.blockThirdPartyCookies ? Math.floor(blockedCount * 0.6) : 0, color: 'var(--color-accent)' },
-                ].map(stat => (
-                  <div key={stat.label} style={{ padding: '10px var(--space-3)', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
-                    <div style={{ fontSize: 18, fontWeight: 600, color: stat.color }}>{stat.value.toLocaleString()}</div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{stat.label}</div>
-                  </div>
-                ))}
-              </div>
+            {/* Real count only: requests the ad/tracker blocker stopped this session. */}
+            <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-3)' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Blocked this session</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{blockedCount.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -2632,6 +2607,20 @@ export const Browser: React.FC = () => {
                 </div>
               </div>
             )}
+            {USE_NATIVE_WEBVIEW ? (
+              <NativeWebview
+                ref={getWebviewRef(tab.id)}
+                tabId={tab.id}
+                src={webviewSrcRef.current.get(tab.id) || tab.url}
+                active={tab.id === activeTab && !tabErrors[tab.id] && !readingMode}
+                alive={browserRunning}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: tabErrors[tab.id] && tab.id === activeTab ? 'none' : 'flex',
+                }}
+              />
+            ) : (
             <webview
               ref={getWebviewRef(tab.id)}
               src={webviewSrcRef.current.get(tab.id) || tab.url}
@@ -2646,9 +2635,10 @@ export const Browser: React.FC = () => {
                 allowpopups: 'false',
                 disablebackgroundthrottling: 'true',
                 webpreferences: 'contextIsolation=yes, nodeIntegration=no, javascript=yes, images=yes, webSecurity=yes',
-                useragent: browserSettings.enableTorMode ? TOR_USER_AGENT : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                useragent: BROWSER_USER_AGENT,
               } as Record<string, string>}
             />
+            )}
           </div>
         ) : null)}
 

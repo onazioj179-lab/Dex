@@ -792,10 +792,6 @@ interface SettingDef {
 const SETTINGS_INDEX: SettingDef[] = [
   // General
   { id: 'general:launchAtStartup', label: 'Launch at Login', section: 'general', keywords: ['startup', 'login', 'boot', 'auto start', 'launch'] },
-  { id: 'general:checkForUpdates', label: 'Check for Updates', section: 'general', keywords: ['update', 'version', 'upgrade'] },
-  { id: 'general:restoreLastSession', label: 'Restore Last Session', section: 'general', keywords: ['restore', 'session', 'reopen', 'tabs'] },
-  { id: 'general:autoSave', label: 'Auto-Save', section: 'general', keywords: ['save', 'automatic', 'auto save'] },
-  { id: 'general:analytics', label: 'Send Analytics', section: 'general', keywords: ['analytics', 'telemetry', 'usage data', 'anonymous'] },
   { id: 'general:reset', label: 'Reset All Settings', section: 'general', keywords: ['reset', 'defaults', 'factory', 'restore defaults'] },
   // Appearance
   { id: 'appearance:darkMode', label: 'Theme', section: 'appearance', keywords: ['dark mode', 'light mode', 'theme', 'dark', 'light', 'auto'] },
@@ -805,7 +801,6 @@ const SETTINGS_INDEX: SettingDef[] = [
   { id: 'appearance:transparency', label: 'Transparency', section: 'appearance', keywords: ['transparent', 'opacity', 'glass', 'blur'] },
   { id: 'appearance:windowMaterial', label: 'Background Tint', section: 'appearance', keywords: ['wallpaper', 'tint', 'glass', 'frosted', 'solid', 'blur', 'material'] },
   { id: 'appearance:windowControls', label: 'Window Button Style', section: 'appearance', keywords: ['window', 'buttons', 'traffic light', 'close', 'minimize', 'maximize', 'controls'] },
-  { id: 'appearance:stageManager', label: 'Stage Manager', section: 'appearance', keywords: ['stage manager', 'thumbnails', 'quick switch', 'app switching', 'multitasking'] },
   // Notifications
   { id: 'notifications:enable', label: 'Allow Notifications', section: 'notifications', keywords: ['notifications', 'alerts', 'push', 'notify'] },
   { id: 'notifications:sound', label: 'Notification Sound', section: 'notifications', keywords: ['sound', 'audio', 'alert sound', 'chime'] },
@@ -815,7 +810,6 @@ const SETTINGS_INDEX: SettingDef[] = [
   { id: 'privacy:biometric', label: 'Biometric Unlock', section: 'privacy', keywords: ['fingerprint', 'biometric', 'face', 'hello', 'unlock', 'security'] },
   { id: 'privacy:pin', label: 'PIN Code', section: 'privacy', keywords: ['pin', 'code', 'unlock', 'lock'] },
   { id: 'privacy:password', label: 'Password', section: 'privacy', keywords: ['password', 'unlock', 'security', 'credential'] },
-  { id: 'privacy:autoLock', label: 'Auto-Lock Timer', section: 'privacy', keywords: ['auto lock', 'inactivity', 'timeout', 'lock screen'] },
   { id: 'privacy:location', label: 'Location Services', section: 'privacy', keywords: ['location', 'gps', 'privacy'] },
   { id: 'privacy:firewall', label: 'Built-in Firewall', section: 'privacy', keywords: ['firewall', 'network', 'block', 'security', 'protection'] },
   { id: 'privacy:malware', label: 'Malware Protection', section: 'privacy', keywords: ['malware', 'scan', 'antivirus', 'security', 'protection'] },
@@ -833,12 +827,8 @@ const SETTINGS_INDEX: SettingDef[] = [
   { id: 'general:downloadLocation', label: 'Download Location', section: 'general', keywords: ['download', 'save', 'folder', 'directory', 'location', 'path'] },
   { id: 'appearance:targetFPS', label: 'Target FPS', section: 'appearance', keywords: ['fps', 'frame rate', 'performance', 'refresh'] },
   { id: 'display:nightShift', label: 'Night Shift', section: 'appearance', keywords: ['night shift', 'blue light', 'warmth', 'eye strain', 'night'] },
-  { id: 'performance:hardwareAcceleration', label: 'Hardware Acceleration', section: 'general', keywords: ['hardware', 'acceleration', 'gpu', 'performance'] },
-  { id: 'performance:lowPower', label: 'Low Power Mode', section: 'general', keywords: ['low power', 'battery', 'energy', 'power saving'] },
-  { id: 'performance:memoryOptimization', label: 'Memory Optimization', section: 'general', keywords: ['memory', 'ram', 'optimization', 'performance'] },
   { id: 'accessibility:highContrast', label: 'High Contrast', section: 'appearance', keywords: ['high contrast', 'accessibility', 'visibility'] },
   { id: 'accessibility:largeText', label: 'Large Text', section: 'appearance', keywords: ['large text', 'bigger', 'accessibility', 'font size'] },
-  { id: 'accessibility:screenReader', label: 'Screen Reader', section: 'appearance', keywords: ['screen reader', 'accessibility', 'voiceover', 'narrator'] },
 ];
 
 // ---------------------------------------------------------------------------
