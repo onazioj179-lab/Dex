@@ -54,11 +54,11 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Memory controls (on/off, retention, view, forget, export, clear) | VERIFIED COMPLETE | Settings; tests. Edit-in-place: NOT APPLICABLE (memories are recorded exchanges) |
 | Voice (STT/TTS, visible state, user-started) | PARTIAL | Pre-existing Web Speech path; may use an online service (#14); latency not measured |
 | Screen understanding (user-authorised, one frame) | PARTIAL | System-picker capture added (Tauri had no capture handler); unit-tested; needs a human run (#5) |
-| Camera understanding | MISSING | #13 |
+| Camera understanding | PARTIAL | One-shot frame with an explicit toggle, unit-tested; real camera not tested (#13) |
 | Cross-device continuity | MISSING | No sync service (#12) |
 | Cost controls | VERIFIED COMPLETE (tokens) / PARTIAL (money) | Daily usage totals + optional daily cloud token cap that blocks before sending and falls back to local (`ai-usage-cap.test.ts`); no currency budget (#10) |
 | UKI boot integration | NOT APPLICABLE / BLOCKED | No UKI in `dex-os/`; assistant is never a boot dependency |
-| macOS Blue Modern UI + motion | VERIFIED COMPLETE (tokens) | `DEX_UI_UX_FINAL_AUDIT.md` |
+| macOS Blue Modern UI + motion | VERIFIED COMPLETE (tokens) | `DEX_UI_UX_FINAL_AUDIT.md`. Light mode checked in the packaged app: fixed the glass-off shell staying near-black, plus 6 hard-coded dark surfaces and 71 low-contrast accent fills |
 | Accessibility (new controls labelled, keyboard reachable) | PARTIAL | Screen reader not run (#7) |
 | No AI-generator branding; creator Onazi Oj | VERIFIED COMPLETE | No such strings added; commits carry no AI trailers |
 

@@ -14,6 +14,7 @@
 - **Local AI works in the desktop app.** Ollama used to refuse DEX's requests. DEX now talks to it directly on this PC, finds the installed models, and uses them without any key.
 - **See and limit AI usage:** today's tokens per provider, plus an optional daily limit for cloud AI. Local models are never limited.
 - **"Look at my screen" works again** in the desktop app. You pick the window to share in the Windows picker, and DEX takes one frame.
+- **"Use my camera"** in UKI takes one photo for your next message. The camera turns off before anything is sent.
 
 ## Fixed
 
@@ -21,7 +22,7 @@
 - **No more blank window at startup** in the installed app.
 - **Clear messages instead of silent failure** if the WebView2 runtime is missing or the window can't load, with a log saved for support.
 - **Opening DEX twice** brings the existing window forward instead of starting a second copy.
-- **Light mode is readable** again (text was nearly invisible).
+- **Light mode is readable** again (text was nearly invisible). The top bar, menus, dock and panels no longer stay dark in light mode.
 - **Notes:** "Attach file" and "Import" work.
 - **Maps:** Satellite and Topo styles load. UKI answers for time, word definitions and currency work.
 

@@ -16,7 +16,7 @@
 | 10 | AI spending limits in money | PARTIAL | Daily token totals + a cloud token cap are done; there are no prices, so there is no currency budget | `providers/usage.ts` | Optional per-model price table maintained by the owner | — | P3 |
 | 11 | Agent resume after app restart | MISSING | Interrupted tasks are marked failed (honest), not resumed | `ukiTasksStore.ts` | Persist step checkpoints + replay | — | P3 |
 | 12 | Cross-device continuity | MISSING | No sync service exists | — | Product decision + authenticated, encrypted sync backend | Service | P3 |
-| 13 | Camera understanding | MISSING | No assistant camera capture (deliberately not continuous) | — | One-shot camera frame via `getUserMedia`, same pattern as the screen picker | — | P3 |
+| 13 | Camera understanding | PARTIAL | One-shot camera frame added (Uki app toggle, tracks stopped before sending); not tested with a real camera here | `uki/screenCapture.ts` | Press the camera toggle, send, confirm Windows' camera light turns off | Tester | P2 |
 | 14 | Offline speech recognition | MISSING | Web Speech API may use an online service | Voice | Evaluate an on-device ASR (e.g. a small Whisper build) | — | P3 |
 | 15 | Live boot image root device | BLOCKED (boot-critical) | Live `grub.cfg` uses `root=/dev/sda2` | `dex-os/boot/grub.cfg` | Use `root=LABEL=DEX_ROOT` (see `docs/reports/DEX_UKI_INTEGRATION.md`) | Owner approval + VM | P2 |
 | 16 | Unified Kernel Image, Secure Boot, rollback | MISSING | GRUB + bzImage today; no signing, no previous-kernel entry | `dex-os/` | Design decision; owner-held keys | Owner | P3 |
