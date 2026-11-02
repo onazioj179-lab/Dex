@@ -61,6 +61,7 @@
 // timestamps: SystemTime epoch millis. ids: crate::util::pseudo_uuid_v4().
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -104,7 +105,7 @@ fn current_version(app: &tauri::AppHandle) -> String {
 // --- file IO (same shape as ReleaseManager raw fs writes) -------------------
 
 fn data_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }
@@ -367,8 +368,7 @@ fn resolve_backup_dir(app: &tauri::AppHandle, backup_ref: &str) -> PathBuf {
 // into <appData>; records "restored" history. Returns bool.
 fn restore_from_backup(app: &tauri::AppHandle, backup_dir: &Path) -> bool {
     let dest_root = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let entries = match std::fs::read_dir(backup_dir) {
         Ok(rd) => rd,

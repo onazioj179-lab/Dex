@@ -60,10 +60,10 @@
 //     manager does not generate ids); pseudo_uuid_v4 is therefore not used.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const SNAPSHOTS_FILE: &str = "snapshots.json";
 const SNAPSHOTS_KEY: &str = "snapshots";
@@ -72,7 +72,7 @@ const BLOBS_KEY: &str = "blobs";
 // --- file IO (electron-store/fs-json under appData, mirrors analytics.rs) ----
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(SNAPSHOTS_FILE)
 }

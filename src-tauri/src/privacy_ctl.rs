@@ -72,10 +72,10 @@
 //     generation lives only in the skipped heavy channels addRule/logRequest).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 // PrivacyShield stores under `<userData>/privacy/` with these file names; mirror
 // the SAME relative path under <appData>.
@@ -126,8 +126,7 @@ fn default_config() -> Value {
 // <appData>/privacy/  (created on demand). All privacy state files live here.
 fn privacy_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(PRIVACY_DIR);
     let _ = std::fs::create_dir_all(&dir);

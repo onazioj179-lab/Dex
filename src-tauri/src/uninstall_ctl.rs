@@ -40,10 +40,10 @@
 // ids -> crate::util::pseudo_uuid_v4(); timestamps -> SystemTime epoch millis.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const FOOTPRINT_FILE: &str = "footprint.json";
 
@@ -57,7 +57,7 @@ fn now_ms() -> u64 {
 }
 
 fn user_data_dir(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir
 }

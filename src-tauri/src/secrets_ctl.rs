@@ -18,10 +18,10 @@
 // renderer keeps its legacy fallback (documented, not hidden).
 //
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use tauri::Manager;
 
 const FILE: &str = "uki-secrets.json";
 const MAX_VALUE: usize = 8 * 1024;
@@ -32,7 +32,7 @@ pub fn valid_name(name: &str) -> bool {
 }
 
 fn store_path(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path().app_data_dir().ok().map(|d| d.join(FILE))
+    app.dex_data_dir().ok().map(|d| d.join(FILE))
 }
 
 fn load(app: &tauri::AppHandle) -> BTreeMap<String, String> {

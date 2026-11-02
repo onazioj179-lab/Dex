@@ -66,6 +66,7 @@
 //   update-config / remove-device are pure-data writes and remain ported.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Map, Value};
 use std::io::{Read, Write};
@@ -73,7 +74,6 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Mutex;
-use tauri::Manager;
 
 const CONFIG_FILE: &str = "dex-sync-config.json";
 const DEVICES_FILE: &str = "dex-sync-devices.json";
@@ -99,7 +99,7 @@ static PENDING_CONFLICTS: Mutex<Vec<Value>> = Mutex::new(Vec::new());
 // --- file IO (electron-store JSON-under-appData; mirrors analytics.rs) -------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

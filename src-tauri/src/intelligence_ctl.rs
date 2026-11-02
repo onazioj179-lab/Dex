@@ -51,10 +51,10 @@
 //     `{ ...this.config, ...readJsonFile(configFile, {}) }`.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::Manager;
 
 const EVENTS_FILE: &str = "events.json";
 const PATTERNS_FILE: &str = "patterns.json";
@@ -98,8 +98,7 @@ fn civil_from_ms(ms: i64) -> (i64, i64) {
 // <appData>/intelligence/<name> — mirrors path.join(userData, 'intelligence').
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("intelligence");
     let _ = std::fs::create_dir_all(&dir);

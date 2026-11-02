@@ -47,9 +47,9 @@
 //     to upload to, so it returns { success:false, error:"not ported ..." }.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const CRASH_LOG_FILE: &str = "crash-log.json";
 const MAX_STORED_CRASHES: usize = 200;
@@ -64,7 +64,7 @@ fn now_ms() -> i64 {
 }
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(CRASH_LOG_FILE)
 }

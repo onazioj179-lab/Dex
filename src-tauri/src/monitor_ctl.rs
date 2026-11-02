@@ -68,7 +68,7 @@
 //
 // DIVERGENCES (documented):
 //   - Storage location: Electron used app.getPath('userData'); Tauri uses
-//     app.path().app_data_dir(). Same file NAMES (perf-baseline.json,
+//     app.dex_data_dir(). Same file NAMES (perf-baseline.json,
 //     session-digests.json), same JSON shapes / top-level structure (bare
 //     object for baseline, bare array for digests — no key wrappers, matching
 //     Electron's JSON.stringify of the value directly).
@@ -91,9 +91,9 @@
 //     start/stop does not leak overlapping loops — each loop re-checks the flag.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const BASELINE_FILE: &str = "perf-baseline.json";
 const DIGEST_FILE: &str = "session-digests.json";
@@ -112,7 +112,7 @@ const MONITOR_KEY: &str = "monitor";
 // --- file IO (mirrors analytics.rs store_path/read_file) --------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

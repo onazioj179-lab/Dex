@@ -71,9 +71,9 @@
 //     reports false (faithful to the Electron global.gc-absent branch).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const STORE_FILE: &str = "self-healing.json";
 const DAY_MS: i64 = 86_400_000;
@@ -88,7 +88,7 @@ fn now_ms() -> i64 {
 // --- file IO (electron-store JSON under appData) ----------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(STORE_FILE)
 }
@@ -126,7 +126,7 @@ fn store_set(app: &tauri::AppHandle, key: &str, value: Value) {
 // lives in app_data_dir(), so that is the faithful root for checkpoints + the
 // settings/workflows stores the validators inspect.
 fn user_data_dir(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir
 }

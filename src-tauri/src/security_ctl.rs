@@ -88,10 +88,10 @@
 // fs-json storage tier already used by getPolicy above.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 // SecurityContinuumManager stores under `<userData>/security/` with these file
 // names; mirror the SAME relative path under <appData>.
@@ -137,8 +137,7 @@ fn default_policy() -> Value {
 // <appData>/security/policy.json
 fn policy_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(SECURITY_DIR);
     let _ = std::fs::create_dir_all(&dir);
@@ -284,8 +283,7 @@ fn permissions_registry() -> Vec<Value> {
 // <appData>/security/<name> — shared dir with policy.json (create_dir_all'd).
 fn security_file(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(SECURITY_DIR);
     let _ = std::fs::create_dir_all(&dir);
@@ -506,8 +504,7 @@ fn export_audit(app: &tauri::AppHandle) -> Value {
     // Electron wrote app.getPath('userData')/security-audit.json; mirror the
     // same filename one level up from the security/ dir (under <appData>).
     let audit_path = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(AUDIT_EXPORT_FILE);
 

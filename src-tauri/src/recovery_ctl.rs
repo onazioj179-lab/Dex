@@ -67,7 +67,7 @@
 //
 // DIVERGENCES (documented):
 //   - Storage location: Electron used path.join(app.getPath('userData'),
-//     'recovery'); Tauri uses app.path().app_data_dir().join("recovery"). Same
+//     'recovery'); Tauri uses app.dex_data_dir().join("recovery"). Same
 //     file NAMES and same JSON shapes / top-level structure (bare object for
 //     state/config, bare array for crashes — no key wrappers, matching Electron's
 //     JSON.stringify of the value directly).
@@ -79,9 +79,9 @@
 //     is now - lastCrash, identical to Electron.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const STATE_FILE: &str = "session-state.json";
 const HISTORY_FILE: &str = "crash-history.json";
@@ -99,8 +99,7 @@ fn now_ms() -> i64 {
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("recovery");
     let _ = std::fs::create_dir_all(&dir);

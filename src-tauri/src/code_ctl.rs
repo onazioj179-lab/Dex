@@ -55,10 +55,10 @@
 //     extension set all match the Electron source exactly.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const STATE_FILE: &str = "code-editor-state.json";
 const MAX_DEPTH: u32 = 5;
@@ -68,7 +68,7 @@ const MAX_RECENT: usize = 20;
 // --- state file IO ----------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

@@ -59,9 +59,9 @@
 //       an extension entryPoint requires a sandboxed JS runtime. Honest degrade.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const STORE_FILE: &str = "dex-extensions.json";
 
@@ -77,7 +77,7 @@ const FORBIDDEN_PERMISSIONS: &[&str] = &[
 // --- file IO (mirrors analytics.rs) -----------------------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

@@ -46,10 +46,10 @@
 // that exact invariant in handle_update.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const STORE_FILE: &str = "governance.json";
 const POLICIES_KEY: &str = "retentionPolicies";
@@ -71,7 +71,7 @@ fn now_millis() -> u64 {
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

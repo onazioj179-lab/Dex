@@ -56,10 +56,10 @@
 // renderer by the ported channels, so renderer-visible shapes stay byte-identical.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const TAGS_FILE: &str = "tags.json";
 const METADATA_FILE: &str = "metadata.json";
@@ -77,8 +77,7 @@ const DEFAULT_TAG_COLORS: [&str; 10] = [
 // <appData>/tagging — same relative layout as Electron's <userData>/tagging.
 fn tagging_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(TAGGING_DIR);
     let _ = std::fs::create_dir_all(&dir);

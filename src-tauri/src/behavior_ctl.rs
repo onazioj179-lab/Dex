@@ -50,9 +50,9 @@
 //      Electron process before any execution is recorded.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 // Same file name the documented storage slot uses (Store name + .json).
 const STORE_FILE: &str = "behavior-contracts.json";
@@ -60,7 +60,7 @@ const STORE_FILE: &str = "behavior-contracts.json";
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

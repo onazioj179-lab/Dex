@@ -32,9 +32,9 @@
 // No new crates: serde_json, std, tauri, crate::util, crate::native_ops only.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 // ---------------------------------------------------------------------------
 // Dispatch
@@ -570,8 +570,7 @@ fn run_tool(program: &str, args: &[String]) -> (bool, String) {
 /// Per-subsystem output directory under app data: <app_data>/video/out.
 fn out_dir(app: &tauri::AppHandle) -> PathBuf {
     let base = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let dir = base.join("video").join("out");
     let _ = std::fs::create_dir_all(&dir);

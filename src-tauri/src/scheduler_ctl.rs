@@ -48,16 +48,16 @@
 //     API and we add no chrono dep), matching the native reminder scheduler.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const STORE_FILE: &str = "dex-scheduler.json";
 
 // --- file IO (identical helpers to analytics.rs) ----------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

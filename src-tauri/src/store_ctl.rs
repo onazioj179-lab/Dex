@@ -56,9 +56,9 @@
 // edited in isolation per the task contract (main.rs is owned elsewhere).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const CATALOG_FILE: &str = "catalog.json";
 const INSTALLED_FILE: &str = "installed.json";
@@ -75,8 +75,7 @@ fn not_ported() -> Value {
 // <appData>/store/<name> — mirrors STORE_DIR() = userData/store in Electron.
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("store");
     let _ = std::fs::create_dir_all(&dir);
@@ -486,8 +485,7 @@ fn uninstall(app: &tauri::AppHandle, package_id: &str) -> Value {
         && !package_id.contains("..");
     if id_safe {
         let app_dir = app
-            .path()
-            .app_data_dir()
+            .dex_data_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
             .join("store")
             .join("apps")

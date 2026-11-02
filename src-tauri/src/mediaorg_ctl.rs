@@ -83,9 +83,9 @@
 //       categorized first (same classifier) so they land in the right folder.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 const MEDIA_KEY: &str = "mediaFiles";
 
@@ -299,8 +299,7 @@ fn organize(app: &tauri::AppHandle, skip_pinned: bool) -> Value {
     // Plan the work synchronously (cheap, in-memory) so we can return a queued
     // count; the actual fs moves run off-thread.
     let media_root: PathBuf = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("media");
 

@@ -66,11 +66,11 @@
 //     `id.startsWith('custom_')`); built-ins are never written out.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::native_ops::fp_to_string;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 const TEMPLATES_FILE: &str = "dex-templates.json";
@@ -92,7 +92,7 @@ fn custom_id() -> String {
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(TEMPLATES_FILE)
 }

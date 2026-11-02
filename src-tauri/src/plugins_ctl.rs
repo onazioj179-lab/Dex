@@ -53,16 +53,16 @@
 //     ordering is not load-bearing. Values themselves are identical.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const PLUGINS_FILE: &str = "dex-plugins.json";
 
 // --- file IO (mirrors analytics.rs store_path/read_file) --------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }
@@ -120,7 +120,7 @@ fn now_ms() -> u64 {
 // The directory Electron used: <userData>/plugins/installed. We mirror it under
 // the Tauri app-data dir so installs land in one stable, owned location.
 fn installed_dir(app: &tauri::AppHandle, id: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     dir.join("plugins").join("installed").join(id)
 }
 

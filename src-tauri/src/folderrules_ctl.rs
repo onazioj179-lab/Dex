@@ -46,14 +46,14 @@
 //     disk on every call (compute-on-read), matching the JSON-on-disk contract.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 const RULES_FILE: &str = "folder-rules.json";
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(RULES_FILE)
 }

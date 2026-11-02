@@ -39,9 +39,9 @@
 // shared KV store via crate::kv_get / crate::kv_set so they survive restarts.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const CONFIG_FILE: &str = "uki-config.json";
 const CONFIG_KEY: &str = "ukiConfig";
@@ -67,7 +67,7 @@ fn now_ms() -> i64 {
 }
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

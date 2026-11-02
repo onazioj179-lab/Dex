@@ -50,12 +50,12 @@
 // engine only orchestrated state, timers and the store, all of which IS ported).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 // electron-store name "voice-control" -> voice-control.json under appData.
 const STORE_FILE: &str = "voice-control.json";
@@ -90,7 +90,7 @@ fn now_ms() -> i64 {
 // --- file IO (mirrors analytics.rs store_path/read_file) --------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

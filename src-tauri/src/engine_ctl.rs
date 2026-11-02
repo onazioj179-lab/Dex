@@ -44,9 +44,9 @@
 // Args are the positional JSON array the renderer sent (args.get(0)...).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 // Extension -> mime tables, kept in Electron declaration order. The capability
 // channels surface only the keys; the full pairs are retained so getFormat /
@@ -203,8 +203,7 @@ fn get_format(path: &str) -> Value {
 
 fn config_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("media-engine");
     let _ = std::fs::create_dir_all(&dir);

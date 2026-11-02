@@ -40,10 +40,10 @@
 // helpers are handled at the bottom of dispatch().
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
-use tauri::Manager;
 
 const STORE_FILE: &str = "dex-encryption.json";
 const CONFIG_KEY: &str = "config";
@@ -112,7 +112,7 @@ fn with_key<T>(f: impl FnOnce(&[u8; KEY_LENGTH]) -> T) -> Option<T> {
 // =============================================================================
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(STORE_FILE)
 }

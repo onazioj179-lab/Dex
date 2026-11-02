@@ -64,10 +64,10 @@
 //     app_data_dir() (the Tauri analog) using the SAME relative file names.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use tauri::Manager;
 
 const MAIN_DATA_FILE: &str = "dex-data.json";
 const SESSIONS_FILE: &str = "dex-sessions.json";
@@ -75,7 +75,7 @@ const SESSIONS_FILE: &str = "dex-sessions.json";
 // userData analog: app_data_dir(). Created on demand so reads of a fresh
 // profile behave like Electron's "file does not exist yet" path.
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
