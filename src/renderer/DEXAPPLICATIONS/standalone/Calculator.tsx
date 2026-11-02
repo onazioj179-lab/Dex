@@ -349,9 +349,9 @@ const Calculator: React.FC = () => {
         border: '1px solid var(--color-border-subtle)',
       },
       op: {
-        background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+        background: 'linear-gradient(180deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 80%, #000) 100%)',
         color: 'var(--color-text-inverse)',
-        boxShadow: '0 2px 12px rgba(10,132,255,0.4)',
+        boxShadow: '0 2px 12px color-mix(in srgb, var(--color-accent) 40%, transparent)',
         border: 'none',
       },
       func: { 
@@ -360,9 +360,9 @@ const Calculator: React.FC = () => {
         border: '1px solid var(--color-border-default)',
       },
       equal: { 
-        background: 'linear-gradient(180deg, var(--color-success) 0%, #1fa848 100%)', 
+        background: 'linear-gradient(180deg, var(--color-success) 0%, color-mix(in srgb, var(--color-success) 80%, #000) 100%)', 
         color: 'var(--color-text-inverse)',
-        boxShadow: '0 2px 12px rgba(48,209,88,0.4)',
+        boxShadow: '0 2px 12px color-mix(in srgb, var(--color-success) 40%, transparent)',
         border: 'none',
       },
     };
@@ -542,9 +542,9 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
   },
   modeBtnActive: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'linear-gradient(180deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 80%, #000) 100%)',
     color: 'var(--color-text-inverse)',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.4)',
+    boxShadow: '0 2px 8px color-mix(in srgb, var(--color-accent) 40%, transparent)',
   },
   historyBtn: {
     color: 'var(--color-text-muted)',
@@ -605,7 +605,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 700,
     letterSpacing: '0.5px',
-    border: '1px solid rgba(10,132,255,0.3)',
+    border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)',
   },
   keypad: {
     display: 'grid',

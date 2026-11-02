@@ -32,7 +32,7 @@ I make no claim that the profile reduced size. Startup, memory and idle CPU were
 |---|---|
 | `tests/unit/interfaceTransparency.test.ts` (new, 10 tests: mapping, round-trip, clamping, theme-aware material, blur independence) | Pass |
 | `shellPreferences`, `calc-provider` | Pass (29 tests across the three files above) |
-| `radius-scale-ratchet` | Fails on import in this Windows checkout: the `.mjs` script has a CRLF shebang line. With that line fixed in a scratch copy it passes (888 baseline holds). Pre-existing, untouched, not fixed here |
+| `radius-scale-ratchet` | Was failing on import on Windows (CRLF shebang); fixed via `.gitattributes`. It then caught one off-scale radius from main (`SpatialHud.tsx`), also fixed. Passes (2/2) |
 | Watermark gate (`add-watermarks.js --check`) | Pass, 2276 files |
 | Full `vitest run` suite | **Not run** in this pass |
 | Playwright e2e | Not run |

@@ -101,8 +101,8 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 32 | Packaged-app tests + before/after startup, idle CPU, memory | NOT TESTED | No install/upgrade/uninstall run; 7.0.1 exe and installer are ~2 MB / ~0.4 MB larger than 6.1.0 (cause not isolated) | Install over 6.x, measure, compare | VM / time | P0 |
 | 33 | Click-through of the transparency slider in rendered Settings | NOT TESTED | Preview sits behind the Terms gate; logic is unit-tested and verified live at the store level | Accept gate on a test profile, drag the slider light + dark | Owner / test profile | P1 |
 | 34 | Full `vitest run` and Playwright e2e | NOT RUN | Only targeted suites run | Run in CI | — | P1 |
-| 35 | CRLF shebang breaks `radius-scale-ratchet` import on Windows checkouts | BUG (pre-existing) | `scripts/snap-radius-to-scale.mjs` | Add `.gitattributes` `*.mjs eol=lf`, renormalize | — | P2 |
-| 36 | Calculator visual pass | PARTIAL | Logic + tests pass; two hard-coded gradient end colors remain | Move to tokens | — | P3 |
+| 35 | CRLF shebang broke `radius-scale-ratchet` import on Windows checkouts | FIXED | `.gitattributes` now pins `scripts/*.mjs` and `*.sh` to LF; the unblocked ratchet then caught one off-scale radius in `SpatialHud.tsx` (fixed) | — | — | — |
+| 36 | Calculator visual pass | PARTIAL | Hard-coded accent/success gradient + shadow colors moved to tokens (`color-mix`); logic + tests pass. Not yet re-checked at 125/150/200% scaling or keyboard-navigated in a rendered window | Visual check in the packaged app | — | P3 |
 | 37 | Popup audit, live-activities completion, background-process audit | NOT DONE | Out of this pass | Audit | — | P2 |
 | 38 | Light/dark + 125/150/200% scaling audit of every built-in app | NOT DONE | Out of this pass | Per-app sweep | — | P2 |
 | 39 | UI sound effects | UNKNOWN | No bundled audio files and no UI sound system found in a quick scan | Decide if wanted; audit | Owner | P3 |

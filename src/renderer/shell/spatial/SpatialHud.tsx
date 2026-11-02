@@ -319,7 +319,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {zones.map((z) => (
             <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
               <button aria-label={`Change color of zone ${z.name}`} title="Change color" className="dex-spatial-btn" style={{ ...btn, minWidth: 22, width: 22, padding: 0 }} onClick={() => st().setZoneColor(z.id, nextColor(z.color))}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: z.color }} />
+                <span style={{ width: 10, height: 10, borderRadius: 4, background: z.color }} />
               </button>
               {renaming === z.id
                 ? <RenameField value={z.name} label="Zone name" onDone={(v) => { if (v !== null) st().renameZone(z.id, v); setRenaming(null); }} />
