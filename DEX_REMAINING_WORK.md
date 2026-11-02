@@ -33,63 +33,10 @@
 |---|---|---|---|---|---|---|---|
 | 23 | Spatial desktop FPS / GPU, hardware requirements | NOT TESTED | Preview pane hidden, so no frames | `shell/spatial/*` | Performance-panel trace in the packaged build; one low-end machine | — | P1 |
 | 24 | Spatial camera ~20–35 ms per update with a large on-screen app (50 windows) | PARTIAL | Dominated by the on-screen app's restyle | AppManager world layer | Profile in packaged build | — | P2 |
-| 25 | Spatial: zones, alignment guides, magnetic snap, distribute, lock, send backward, duplicate view, named viewports, layout export/import, configurable shortcuts, touch-screen gestures | MISSING | Not built yet | `spatialStore.ts` | Build on the store | — | P2 |
-| 26 | Creative suite §7–15 (Design, Photo, Video, Audio, Present, Creative Hub) | NOT STARTED | Scope; existing apps unchanged | Prism, Vinx, Imosion, Presentation, Notes, Canvas | Audit each existing app, then fill real gaps | — | P2 |
-| 27 | Glass / translucency (§16) | BLOCKED | Conflicts with the owner's "glass is out" direction | Shell | Owner decision | Owner | P3 |
-| 28 | Markdown cleanup (§1) | BLOCKED | Deleting documentation needs approval | Root + `docs/` | Owner approves a list | Owner | P3 |
+| 25 | Spatial: zones, guides, magnetic snap, align/distribute, lock, send to back, saved views, layout files, rebindable shortcuts, touch pinch | DONE (#70) | — | `spatialStore.ts`, `SpatialHud.tsx` | Duplicate views not applicable: DEX apps are single-instance | — | — |
+| 26 | Creative suite §7–15 | PARTIAL | Canvas now has editable whiteboard objects + templates; Creative Hub app added; PRISM shows image metadata. Not done: shared assets library, Video proxy/hardware-decode audit, Audio/Present gap audit | Canvas, CreativeHub, Prism | Audit Vinx, Imosion, Presentation against §12–14 next | — | P2 |
+| 27 | Glass / translucency (§16) | DONE | Owner chose refined glass (2026-11-02): theme-aware, 20px blur, chrome only; app windows solid | Shell | — | — | — |
+| 28 | Markdown cleanup (§1) | DONE (#70) | Owner approved; 9 files retired, open items carried below, 0 broken links | — | — | — | — |
 | 29 | Foreign native windows on the canvas | NOT APPLICABLE on Windows | No supported way to composite other programs' windows into WebView2 | — | Only via a custom compositor in `dex-os` | — | — |
-
-## Carried over from retired task files (2026-11-01)
-
-These open items came from Markdown task files that were deleted in the Part 5 cleanup (git history keeps the originals).
-
-### From `docs/NEXT-STAGE.md` (backend / native milestone)
-
-| Track | Needs | Foundations already in the code |
-|---|---|---|
-| App marketplace | Hosted registry, submission/review, package signing | `shared/plugin/manifest.ts`, `pluginHost`, `pages/Store.tsx` (see #8) |
-| Cross-device sync + handoff | Account-bound sync server, per-store change feeds | `shared/cloud/*`, `shared/account/*` (see #12) |
-| Real-time co-editing | CRDT relay / signalling server | `shared/collab/crdt.ts`, CollabHub (local) |
-| E2E-encrypted offline sync | Sync server + key exchange | `shared/cloud/encryption.ts`, `uki/keystore` |
-| Pluggable storage backends | Adapter interface + one remote adapter | `shared/cloud/coldTier.ts`, safe-storage layer |
-| Bundled offline AI model | Packaged on-device model + native inference | UKI routing, Ollama provider (see #3) |
-
-### From `docs/AUDIT-BRUTAL-COMPLETION.md` (v6.0.4 defect audit, 2026-06-24)
-
-13 of the 42 open items are resolved (their files no longer exist). The rest, with today's check:
-
-| Bucket | Defect | Where | Status 2026-11-01 |
-|---|---|---|---|
-| fix-now | Frame Snapping panel controls (snap-on-drag, gutter, cycle-on-repeat) do nothing | `src/renderer/pages/settingsPanels/AccessPanels.tsx` | still present |
-| fix-now | IntegrityPanel UI is never rendered, so integrity results are invisible | `src/renderer/services/IntegrityMonitor.tsx` | `IntegrityPanel` now referenced in 1 other file(s) (recheck) |
-| fix-now | PerformancePanel (live FPS/memory/DOM/alerts UI) is built but mounted nowhere | `src/renderer/services/PerformanceMonitor.tsx` | `PerformancePanel` now referenced in 1 other file(s) (recheck) |
-| fix-now | Files settings 'Show Hidden Files' / 'Confirm Delete' / 'Default View' / 'Sort By' do not affect the Files app | `src/renderer/pages/Settings.tsx` | still present |
-| fix-now | Window Management toggles (Snap/Animate/Remember/Shadows/Max windows) are never consumed | `src/renderer/pages/Settings.tsx` | still present |
-| fix-now | Unified menu animation system is never imported | `src/renderer/shell/MenuAnimator.ts` | still present |
-| fix-now | force-touch and swipe-down-3 gestures are emitted but no handler reacts | `src/renderer/shell/GestureEngine.ts` | still present |
-| fix-now | Visual Timeline / Work Reports / Memory Map Rewind stores are exported but unused | `src/renderer/services/RewindExtensions.ts` | still present |
-| fix-careful | Power 'Lock DEX' / 'Safe Mode' / 'Learning' toggles set state nothing reads | `src/renderer/pages/Power.tsx` | still present |
-| fix-careful | Entire enhanced AutoSave/crash-recovery feature is never used | `src/renderer/services/AutoSaveManager.ts` | still present |
-| fix-careful | Quick Look preview feature (component + useQuickLook hook) is never wired in | `src/renderer/shell/QuickLook.tsx` | `useQuickLook` now referenced in 1 other file(s) (recheck) |
-| fix-careful | CreativeCommandBar (NL command bar for creative apps) is never imported by any app | `src/renderer/components/CreativeCommandBar.tsx` | `CreativeCommandBar` now referenced in 4 other file(s) (recheck) |
-| fix-careful | recentSearches.ts and searchRecency.ts helper modules are never imported | `src/renderer/services/recentSearches.ts` | still present |
-| fix-careful | Wallpaper accent extraction + crossfade layer is entirely unused | `src/renderer/shell/WallpaperAccent.tsx` | still present |
-| fix-careful | Entire System Journal UI (JournalView) is never mounted anywhere | `src/renderer/components/JournalView.tsx` | still present |
-| fix-careful | ThemeManager customization panel (presets + accent picker) is never rendered | `src/renderer/components/ThemeManager.tsx` | `ThemeManager` now referenced in 2 other file(s) (recheck) |
-| fix-careful | systemUndoStore (useSystemUndoStore) is never imported | `src/renderer/store/systemUndoStore.ts` | still present |
-| fix-careful | SearchHistory module (spell-correction, completions, voice search store) has zero importers | `src/renderer/services/SearchHistory.ts` | still present |
-| fix-careful | REST API / CLI / Mobile-Companion / Portable-Mode stores exported but consumed by no UI | `src/renderer/services/PlatformExtensions.ts` | still present |
-| fix-careful | 'Enable Global Shortcuts' toggle is never read by the shortcut handlers | `src/renderer/pages/Settings.tsx` | still present |
-| fix-careful | ui/ micro-control cluster (RangeSlider, NumberStepper, SegmentedControl, controlMath) is unused; apps use the components/controls duplicates | `src/renderer/ui/RangeSlider.tsx` | `RangeSlider` now referenced in 2 other file(s) (recheck) |
-| remove | PerformancePanel component is never mounted | `src/renderer/services/PerformanceMonitor.tsx` | `PerformancePanel` now referenced in 1 other file(s) (recheck) |
-| remove | SelectionToolbar and LetterScrubber primitives are exported but never used | `src/renderer/shell/UIComponents.tsx` | still present |
-| remove | Search indexer worker pipeline is orphaned (its only client is itself never imported) | `src/renderer/workers/searchIndexer.worker.ts` | still present |
-| remove | Global undo/redo manager + useGlobalUndo hook is fully orphaned | `src/renderer/services/undoManager.ts` | still present |
-| remove | featureSuiteStore claims '38 subsystems' but 35 of 38 stores are never imported anywhere | `src/renderer/store/featureSuiteStore.ts` | still present |
-| remove | Finished UndoRedoButtons toolbar component is exported but never mounted | `src/renderer/store/useUndoRedo.tsx` | still present |
-| remove | Focus/Context-prediction/Smart-recents stores are never consumed | `src/renderer/services/IntelligenceLayer.ts` | still present |
-| remove | Per-app focus profiles are stored but never read (no effect) | `src/renderer/services/FocusSessionSystem.ts` | still present |
-
-## Release status
-
-**NOT READY** until #1 and #2 are done. After that: **READY WITH DOCUMENTED LIMITATIONS** (items 3–29). None of those items is a crash or data-loss defect.
+| 30 | Packaged app exits with `thread '<unknown>' has overflowed its stack` | OPEN | Seen 3× right after CDP tracing with gpu/viz/cc categories and 50 windows; 0 DEX native calls in the window before; not reproduced without tracing (4+ min, 50 apps) | Host process / WebView2 | Reproduce without tracing on a quiet machine; if it recurs, capture a minidump | — | P1 |
+| 31 | Test isolation: packaged-app tests write the native `dex-kv.json` mirror even with a separate WebView2 profile | OPEN (process) | DEX mirrors localStorage into `%APPDATA%\com.onazioj.dex` | Test tooling | Add a `DEX_DATA_DIR` override for test runs; until then snapshot → run → restore (done for every run so far) | — | P2 |
