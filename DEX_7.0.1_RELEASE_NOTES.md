@@ -28,7 +28,7 @@
 ## Faster
 
 - DEX no longer runs a frame-by-frame monitor in the background. Idle Home: no frame callbacks and about one timer wake-up every 5 seconds. Minimizing DEX no longer makes it think the PC is overheating and turn effects off.
-- Release builds use link-time optimisation. Installers: NSIS 14.3 MB (was 15.1), MSI 17.8 MB (was 19.0).
+- Release builds use link-time optimisation: app 37.1 MB (was 40.1), NSIS installer 14.4 MB (was 15.1), MSI 17.8 MB (was 19.0).
 
 ## Security and integrity
 

@@ -41,9 +41,13 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 |---|---|
 | `tsc --noEmit` (after merging `main`) | **0 errors** |
 | Full `vitest run` (before merging `main`) | 519 files passed, 2 failed, 2 skipped; 5,427 tests passed. Failures: `ai-connect` (expected by the local-AI opt-in; test updated, 28/28 pass) and `renderer-pages › Achievements` (10 s timeout under load; 23/23 pass alone) |
+| Full `vitest run` (after merging `main`, run during the installer build) | 512 files passed, 5 failed, 2 skipped; 5,306 tests passed, 6 failed. Real: `radius-scale-ratchet` and `ui-color-ratchet` (off-scale radii / bare white in Part 5 files from `main`) → fixed in `259b992`, both pass. Load-only: `renderer-pages › Settings`, `component-real › Settings`, `uki-compressed-memory` (2 tests) → 47/47 pass when rerun alone |
 | Watermark / attribution check | OK |
 | `npm run build:tauri` #1 (before merge) | **Passed** in 36.5 min: NSIS 14.3 MB (6.1.0: 15.1), MSI 17.8 MB (6.1.0: 19.0), loader static, no dev files, checksums written, `NotSigned` |
-| `npm run build:tauri` #2 (after merge) | BUILD2_RESULT |
+| `npm run build:tauri` #2 (after merge, at `baf7367`) | **Passed** in 31.9 min: NSIS **14.4 MB**, MSI **17.8 MB**, exe **37.1 MB** (6.1.0: 40.1 MB), loader static, no dev files, `NotSigned`. Only change after this build: `259b992` (three 1–2 px radius snaps and a white→`--color-accent-text` token swap, visually identical) |
+| `SHA256SUMS-7.0.1.txt` | `3510ab9a0fc186d9697c403f2f186099e3b51b27d5261c66fa143206f7fd2059  DEX_7.0.1_x64-setup.exe`<br>`be4e2d7babb0376655601cc0aff80296bd65238f4fc9a707c5e262d895d6976b  DEX_7.0.1_x64_en-US.msi` |
+| Production bundle | 0 source maps; `console.log` calls 2 (vendor), `console.warn/error` kept for diagnostics |
+| Glass after merge (dev preview, fresh profile) | Default 55% → `blur(20px) saturate(144%)`; real theme toggle: dark fills `#151517`@67% → light `#FAFAFC`@67%, `#F5F5F7`@75%, white@87% with no re-apply |
 
 Measurements not taken: cold/warm start time, idle memory, theme-switch latency, glass rendering cost (needs a packaged-app trace).
 
