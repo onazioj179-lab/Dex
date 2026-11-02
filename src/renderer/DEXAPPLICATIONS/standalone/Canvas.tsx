@@ -1187,13 +1187,13 @@ const Canvas: React.FC = () => {
                     onKeyDown={e => { if (e.key === 'Escape') setBoardEdit(null); }}
                     style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-control)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12 }}
                   />
-                  <button type="submit" style={s.smallBtn} aria-label="Save">OK</button>
+                  <button type="submit" style={s.textBtn} aria-label="Save">OK</button>
                 </form>
               ) : (
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={s.smallBtn} onClick={() => setBoardEdit({ kind: 'rename', value: boards.boards.find(b => b.id === boards.activeId)?.name ?? '' })} aria-label="Rename board" title="Rename board">Rename</button>
-                  <button style={s.smallBtn} onClick={() => setBoardEdit({ kind: 'folder', value: boards.boards.find(b => b.id === boards.activeId)?.folder ?? '' })} aria-label="Move board to folder" title="Move to folder">Folder</button>
-                  <button style={s.smallBtn} onClick={() => void deleteActiveBoard()} aria-label="Delete board" title="Delete board">Delete</button>
+                  <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'rename', value: boards.boards.find(b => b.id === boards.activeId)?.name ?? '' })} aria-label="Rename board" title="Rename board">Rename</button>
+                  <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'folder', value: boards.boards.find(b => b.id === boards.activeId)?.folder ?? '' })} aria-label="Move board to folder" title="Move to folder">Folder</button>
+                  <button style={s.textBtn} onClick={() => void deleteActiveBoard()} aria-label="Delete board" title="Delete board">Delete</button>
                 </div>
               )}
             </div>
@@ -1455,6 +1455,19 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
+  },
+  // Text buttons in the Boards row (smallBtn is a fixed 24px icon button).
+  textBtn: {
+    flex: 1,
+    height: 24,
+    padding: '0 8px',
+    background: 'transparent',
+    border: '1px solid var(--color-border-control)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-secondary)',
+    fontSize: 11,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   smallBtn: {
     width: 24,
