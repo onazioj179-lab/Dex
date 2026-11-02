@@ -78,6 +78,26 @@ interface Layer {
   pathKeyframes?: { time: number; d: string }[];
 }
 
+/** Offsets for a repeater of `count` items; index 0 is the original layer. */
+export function repeaterOffsets(type: 'grid' | 'radial' | 'spiral', count: number, spacing = 80): Array<{ dx: number; dy: number; rotation: number }> {
+  const n = Math.max(1, Math.floor(count));
+  const out: Array<{ dx: number; dy: number; rotation: number }> = [];
+  if (type === 'grid') {
+    const cols = Math.ceil(Math.sqrt(n));
+    for (let i = 0; i < n; i++) out.push({ dx: (i % cols) * spacing, dy: Math.floor(i / cols) * spacing, rotation: 0 });
+    return out;
+  }
+  const radius = spacing * 2;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const r = type === 'spiral' ? (radius * (i + 1)) / n : radius;
+    // Relative to the original, which sits at angle 0 on the circle.
+    const r0 = type === 'spiral' ? radius / n : radius;
+    out.push({ dx: Math.cos(a) * r - r0, dy: Math.sin(a) * r, rotation: (a * 180) / Math.PI });
+  }
+  return out;
+}
+
 interface Transform {
   x: number;
   y: number;
@@ -644,8 +664,6 @@ const Flux: React.FC = () => {
   const [showShaderEffects, setShowShaderEffects] = useState(false);
   // GIF/APNG Export
   const [showGifExport, setShowGifExport] = useState(false);
-  const [gifPalette, setGifPalette] = useState(256);
-  const [gifDither, setGifDither] = useState(true);
   const [gifFps, setGifFps] = useState(10);
   const [gifCodec, setGifCodec] = useState<'vp9' | 'vp8'>('vp9');
   // Lottie Export
@@ -671,10 +689,6 @@ const Flux: React.FC = () => {
   const [precompName, setPrecompName] = useState('Pre-comp 1');
   const [precompMoveAttrs, setPrecompMoveAttrs] = useState(true);
   const [precompAdjustDuration, setPrecompAdjustDuration] = useState(false);
-  // 3. Time Remap
-  const [showTimeRemap, setShowTimeRemap] = useState(false);
-  const [timeRemapSpeed, setTimeRemapSpeed] = useState(100);
-  const [timeRemapReverse, setTimeRemapReverse] = useState(false);
   // 4. Morph Shapes
   const [showMorphShapes, setShowMorphShapes] = useState(false);
   const [morphProgress, setMorphProgress] = useState(0);
@@ -697,9 +711,6 @@ const Flux: React.FC = () => {
   const [cameraFov, setCameraFov] = useState(50);
   const [cameraDof, setCameraDof] = useState(false);
   const [cameraFocusDistance, setCameraFocusDistance] = useState(1000);
-  // 9. Environment Map
-  const [showEnvironment, setShowEnvironment] = useState(false);
-  const [envMapPreset, setEnvMapPreset] = useState('studio');
   // 10. Render Queue
   const [showRenderQueue, setShowRenderQueue] = useState(false);
   const [renderQueue, setRenderQueue] = useState<{ id: string; name: string; format: string; status: 'queued' | 'rendering' | 'done' | 'error'; progress: number }[]>([]);
@@ -714,10 +725,6 @@ const Flux: React.FC = () => {
   // 14. Snapshot / A/B
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [snapshots, setSnapshots] = useState<{ id: string; name: string; time: string }[]>([]);
-  // 15. Frame Blending
-  const [showFrameBlending, setShowFrameBlending] = useState(false);
-  const [frameBlendSamples, setFrameBlendSamples] = useState(4);
-  const [frameBlendShutter, setFrameBlendShutter] = useState(180);
   // 16. Color Correction
   const [showColorCorrection, setShowColorCorrection] = useState(false);
   const [ccLift, setCcLift] = useState({ r: 0, g: 0, b: 0 });
@@ -736,11 +743,6 @@ const Flux: React.FC = () => {
   const [showMotionBlur, setShowMotionBlur] = useState(false);
   const [motionBlurSamples, setMotionBlurSamples] = useState(8);
   const [motionBlurShutter, setMotionBlurShutter] = useState(180);
-  // 20. Export Presets
-  const [showExportPresets, setShowExportPresets] = useState(false);
-  const [exportFormat, setExportFormat] = useState('mp4');
-  const [exportCodec, setExportCodec] = useState('h264');
-  const [exportQuality, setExportQuality] = useState(90);
 
   // Detect hardware tier for 3D gating
   useEffect(() => {
@@ -2406,7 +2408,6 @@ const Flux: React.FC = () => {
         { label: 'Text Animator', checked: showTextAnimator, onSelect: () => setShowTextAnimator(v => !v) },
         { label: 'Graph Editor', checked: showGraphEditor, onSelect: () => setShowGraphEditor(v => !v) },
         { label: 'Expressions', checked: showExpressionEditor, onSelect: () => setShowExpressionEditor(v => !v) },
-        { label: 'Time Remap', checked: showTimeRemap, onSelect: () => setShowTimeRemap(v => !v) },
         { label: 'Morph Shapes', checked: showMorphShapes, onSelect: () => setShowMorphShapes(v => !v) },
         { label: 'Wiggle', checked: showAutoWiggle, onSelect: () => setShowAutoWiggle(v => !v) },
         { label: 'Stagger', checked: showStagger, onSelect: () => setShowStagger(v => !v) },
@@ -2427,10 +2428,8 @@ const Flux: React.FC = () => {
       id: 'render', label: 'Render', items: [
         { label: 'Particles+', checked: showAdvancedParticles, onSelect: () => setShowAdvancedParticles(v => !v) },
         { label: 'Camera Rig', checked: showCameraRig, onSelect: () => setShowCameraRig(v => !v) },
-        { label: 'Environment Map', checked: showEnvironment, onSelect: () => setShowEnvironment(v => !v) },
         { label: '3D Text', checked: show3DText, onSelect: () => setShow3DText(v => !v) },
         { label: 'Shaders', checked: showShaderEffects, onSelect: () => setShowShaderEffects(v => !v) },
-        { label: 'Frame Blending', checked: showFrameBlending, onSelect: () => setShowFrameBlending(v => !v) },
         { label: 'Motion Blur', checked: showMotionBlur, onSelect: () => setShowMotionBlur(v => !v) },
         { label: 'Color Correction', checked: showColorCorrection, onSelect: () => setShowColorCorrection(v => !v) },
         { label: 'Stroke Effects', checked: showStrokeEffects, onSelect: () => setShowStrokeEffects(v => !v) },
@@ -2452,11 +2451,10 @@ const Flux: React.FC = () => {
     },
     {
       id: 'export', label: 'Export', items: [
-        { label: 'GIF Export', checked: showGifExport, onSelect: () => setShowGifExport(v => !v) },
+        { label: 'Export Video (WebM)', checked: showGifExport, onSelect: () => setShowGifExport(v => !v) },
         { label: 'Lottie Export', checked: showLottieExport, onSelect: () => setShowLottieExport(v => !v) },
         { label: 'Templates', checked: showCompTemplates, onSelect: () => setShowCompTemplates(v => !v) },
         { label: 'Render Queue', checked: showRenderQueue, onSelect: () => setShowRenderQueue(v => !v) },
-        { label: 'Export Presets', checked: showExportPresets, onSelect: () => setShowExportPresets(v => !v) },
       ],
     },
   ];
@@ -3500,7 +3498,33 @@ const Flux: React.FC = () => {
               <svg width="90" height="90" viewBox="0 0 90 90">{repeaterType === 'grid' ? [...Array(repeaterCount)].map((_, i) => { const cols = Math.ceil(Math.sqrt(repeaterCount)); const r = Math.floor(i / cols); const c = i % cols; return <rect key={i} x={10 + c * 22} y={10 + r * 22} width={16} height={16} rx={2} fill="var(--color-accent)" opacity={0.3 + i * 0.07} />; }) : repeaterType === 'radial' ? [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 2; return <circle key={i} cx={45 + Math.cos(a) * 30} cy={45 + Math.sin(a) * 30} r={6} fill="#bf5af2" opacity={0.4 + i * 0.06} />; }) : [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 4; const r = 10 + i * 3; return <circle key={i} cx={45 + Math.cos(a) * r} cy={45 + Math.sin(a) * r} r={4} fill="#30d158" opacity={0.3 + i * 0.07} />; })}</svg>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Count</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{repeaterCount}</span></div>
-            <input type="range" min="2" max="36" value={repeaterCount} onChange={e => setRepeaterCount(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
+            <input type="range" min="2" max="36" value={repeaterCount} onChange={e => setRepeaterCount(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
+            <button
+              aria-label="Create copies of the selected layer"
+              disabled={!selectedLayerId}
+              onClick={() => {
+                if (!selectedLayerId) return;
+                setLayers(prev => {
+                  const src = prev.find(l => l.id === selectedLayerId);
+                  if (!src) return prev;
+                  const copies = repeaterOffsets(repeaterType, repeaterCount).slice(1).map((o, i) => ({
+                    ...src,
+                    id: `flux-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+                    name: `${src.name} ${i + 2}`,
+                    behaviors: src.behaviors.map(b => ({ ...b, id: `b-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}` })),
+                    filters: src.filters.map(f => ({ ...f, id: `f-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}` })),
+                    transform: { ...src.transform, x: src.transform.x + o.dx, y: src.transform.y + o.dy, rotationZ: src.transform.rotationZ + o.rotation },
+                  }));
+                  const idx = prev.findIndex(l => l.id === selectedLayerId);
+                  const next = [...prev];
+                  next.splice(idx + 1, 0, ...copies);
+                  return next;
+                });
+                setIsDirty(true);
+                setShowRepeater(false);
+              }}
+              style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: selectedLayerId ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: selectedLayerId ? 'var(--color-accent-text)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: selectedLayerId ? 'pointer' : 'default' }}
+            >{selectedLayerId ? `Create ${repeaterCount - 1} copies` : 'Select a layer first'}</button>
           </div>
         </div>
       )}
@@ -3545,11 +3569,6 @@ const Flux: React.FC = () => {
                 <button key={f} aria-label={`${f} export format`} aria-pressed={gifCodec === codec} onClick={() => setGifCodec(codec)} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: gifCodec === codec ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: gifCodec === codec ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Palette Colors</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{gifPalette}</span></div>
-            <input type="range" min="2" max="256" value={gifPalette} onChange={e => setGifPalette(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', marginBottom: 10 }}>
-              <input type="checkbox" checked={gifDither} onChange={e => setGifDither(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} /> Floyd-Steinberg Dithering
-            </label>
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select value={gifFps} onChange={e => setGifFps(Number(e.target.value))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option value={10}>10</option><option value={15}>15</option><option value={24}>24</option><option value={30}>30</option></select>
             </div>
@@ -4064,34 +4083,6 @@ const Flux: React.FC = () => {
         </div>
       )}
 
-      {/* 3. Time Remap */}
-      {showTimeRemap && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 120, width: 280, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Time Remap</span>
-            <button aria-label="Close Time Remap panel" onClick={() => setShowTimeRemap(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Speed</span>
-              <input type="range" min="10" max="400" value={timeRemapSpeed} onChange={e => setTimeRemapSpeed(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{timeRemapSpeed}%</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              {[25, 50, 100, 200, 400].map(s => <button key={s} onClick={() => setTimeRemapSpeed(s)} aria-label={`${s}% speed`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (timeRemapSpeed === s ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: timeRemapSpeed === s ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: timeRemapSpeed === s ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{s}%</button>)}
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
-              <input type="checkbox" checked={timeRemapReverse} onChange={e => setTimeRemapReverse(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
-              Reverse playback
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              <input type="checkbox" defaultChecked style={{ accentColor: '#bf5af2' }} />
-              Frame blending
-            </label>
-          </div>
-        </div>
-      )}
-
       {/* 4. Morph Shapes */}
       {showMorphShapes && (
         <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
@@ -4304,29 +4295,6 @@ const Flux: React.FC = () => {
         </div>
       )}
 
-      {/* 9. Environment Map */}
-      {showEnvironment && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Environment</span>
-            <button aria-label="Close Environment panel" onClick={() => setShowEnvironment(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
-              {[{ id: 'studio', name: 'Studio', desc: 'Soft diffused lighting' }, { id: 'outdoor', name: 'Outdoor HDR', desc: 'Daylight environment' }, { id: 'sunset', name: 'Golden Hour', desc: 'Warm directional light' }, { id: 'night', name: 'Night City', desc: 'Urban neon reflections' }, { id: 'gradient', name: 'Gradient Sky', desc: 'Smooth color backdrop' }, { id: 'abstract', name: 'Abstract', desc: 'Colorful patterns' }].map(e => (
-                <button key={e.id} onClick={() => setEnvMapPreset(e.id)} aria-label={`Select ${e.name} environment`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (envMapPreset === e.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: envMapPreset === e.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ fontSize: 11, color: envMapPreset === e.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{e.desc}</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px dashed var(--color-border-subtle)', textAlign: 'center', cursor: 'pointer' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Load custom HDRI / EXR file</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 10. Render Queue */}
       {showRenderQueue && (
         <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
@@ -4485,33 +4453,6 @@ const Flux: React.FC = () => {
         </div>
       )}
 
-      {/* 15. Frame Blending */}
-      {showFrameBlending && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Frame Blending</span>
-            <button aria-label="Close Frame Blending panel" onClick={() => setShowFrameBlending(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Samples</span>
-              <input type="range" min="2" max="16" value={frameBlendSamples} onChange={e => setFrameBlendSamples(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 16, textAlign: 'right' }}>{frameBlendSamples}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Shutter</span>
-              <input type="range" min="0" max="360" value={frameBlendShutter} onChange={e => setFrameBlendShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{frameBlendShutter}°</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {['Frame Mix', 'Pixel Motion'].map(m => (
-                <button key={m} aria-label={`${m} blend mode`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Frame Mix' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Frame Mix' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 16. Color Correction */}
       {showColorCorrection && (
         <div className="dex-liquid-glass-strong" style={{ position: 'fixed', right: 20, top: 120, width: 320, borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
@@ -4630,32 +4571,6 @@ const Flux: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{motionBlurShutter}°</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 4, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>180° = standard film.</div>
-          </div>
-        </div>
-      )}
-
-      {/* 20. Export Presets */}
-      {showExportPresets && (
-        <div className="dex-liquid-glass-strong" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(350px, calc(100vw - 48px))', borderRadius: 10, boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Export Presets</span>
-            <button aria-label="Close Export Presets panel" onClick={() => setShowExportPresets(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
-              {[{ f: 'mp4', c: 'h264', q: 'YouTube / Web' }, { f: 'mp4', c: 'h265', q: 'High Quality HEVC' }, { f: 'webm', c: 'vp9', q: 'Web Optimized' }, { f: 'mov', c: 'prores', q: 'ProRes Master' }, { f: 'png', c: 'png', q: 'PNG Sequence' }, { f: 'gif', c: 'gif', q: 'Animated GIF' }].map(p => (
-                <button key={p.q} onClick={() => { setExportFormat(p.f); setExportCodec(p.c); }} aria-label={`Export as ${p.q}`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (exportFormat === p.f && exportCodec === p.c ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: exportFormat === p.f && exportCodec === p.c ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ fontSize: 11, color: exportFormat === p.f && exportCodec === p.c ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{p.f.toUpperCase()} / {p.c.toUpperCase()}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.q}</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Quality</span>
-              <input type="range" min="10" max="100" value={exportQuality} onChange={e => setExportQuality(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 26, textAlign: 'right' }}>{exportQuality}%</span>
-            </div>
-            <button aria-label="Export with selected preset" onClick={() => { setShowExportPresets(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'linear-gradient(135deg, #bf5af2, #9b59b6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
           </div>
         </div>
       )}

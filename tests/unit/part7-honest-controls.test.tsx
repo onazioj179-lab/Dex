@@ -110,3 +110,21 @@ describe('NativeWebview helpers', () => {
     expect(isExpression('if (x) { y() }')).toBe(false);
   });
 });
+
+describe('Flux repeater layout', () => {
+  it('keeps the original at index 0 and spaces copies', async () => {
+    const { repeaterOffsets } = await import('../../src/renderer/DEXAPPLICATIONS/flux/Flux');
+    const grid = repeaterOffsets('grid', 4, 80);
+    expect(grid).toEqual([
+      { dx: 0, dy: 0, rotation: 0 }, { dx: 80, dy: 0, rotation: 0 },
+      { dx: 0, dy: 80, rotation: 0 }, { dx: 80, dy: 80, rotation: 0 },
+    ]);
+    const radial = repeaterOffsets('radial', 4, 80);
+    expect(radial).toHaveLength(4);
+    expect(radial[0].dx).toBeCloseTo(0);
+    expect(radial[0].dy).toBeCloseTo(0);
+    expect(radial[2].dx).toBeCloseTo(-320); // opposite side of a 160px circle
+    expect(radial[1].rotation).toBeCloseTo(90);
+    expect(repeaterOffsets('spiral', 1)).toEqual([{ dx: 0, dy: 0, rotation: 0 }]);
+  });
+});
