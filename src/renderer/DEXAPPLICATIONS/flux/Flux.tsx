@@ -3204,7 +3204,7 @@ const Flux: React.FC = () => {
                                 left: `${((kf.time - layer.inPoint) / (layer.outPoint - layer.inPoint)) * 100}%`,
                                 top: '50%', transform: `translate(-50%,-50%) rotate(45deg) scale(${isDragging ? 1.4 : 1})`,
                                 width: 7, height: 7,
-                                background: (currentTime === kf.time || isDragging) ? 'var(--color-warning)' : 'var(--color-accent)',
+                                background: (currentTime === kf.time || isDragging) ? 'var(--color-warning)' : 'var(--color-accent-fill)',
                                 border: '1px solid var(--color-text-tertiary)',
                                 borderRadius: 2, cursor: 'ew-resize', zIndex: isDragging ? 5 : 2,
                                 touchAction: 'none', transition: isDragging ? 'none' : 'transform 80ms ease',

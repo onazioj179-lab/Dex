@@ -1296,7 +1296,7 @@ const Calendar: React.FC = () => {
                       padding: '4px 10px', borderRadius: 4,
                       border: '1px solid ' + (newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
                       fontSize: 12,
-                      background: newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                      background: newEvent.recurring === r ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
                       color: newEvent.recurring === r ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',

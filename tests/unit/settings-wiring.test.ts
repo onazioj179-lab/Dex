@@ -49,13 +49,19 @@ describe('OS toasts while DEX is locked', () => {
   beforeEach(() => localStorage.clear());
   it('are private only when a lock is enabled AND active', () => {
     useAuthStore.setState({ isLocked: false, isEnabled: true });
-    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: false });
+    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: false, osToastSound: true });
     useAuthStore.setState({ isLocked: true, isEnabled: true });
-    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: true });
+    expect(osToastFlags()).toEqual({ osToast: true, osToastPrivate: true, osToastSound: true });
     useAuthStore.setState({ isLocked: true, isEnabled: false });
     expect(osToastFlags().osToastPrivate).toBe(false);
     save({ enableNotifications: false });
     expect(osToastFlags().osToast).toBe(false);
     useAuthStore.setState({ isLocked: false });
+  });
+
+  it('carry the Settings > Sound choice (toasts are silent otherwise)', () => {
+    expect(osToastFlags().osToastSound).toBe(true);
+    save({ soundEnabled: false });
+    expect(osToastFlags().osToastSound).toBe(false);
   });
 });

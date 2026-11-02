@@ -44,7 +44,7 @@ Part 3 started with the completion gate (`PART1_PART2_COMPLETION_AUDIT.md`). Fol
 
 ## Tests
 
-See the test section of `DEX_RELEASE_NOTES.md` for the final run on this branch.
+Later test runs: `DEX_7.0.1_VERIFICATION.md`.
 
 ## Follow-up batch (branch `claude/dex-part3-features`)
 

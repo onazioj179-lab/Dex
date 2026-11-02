@@ -646,7 +646,7 @@ export const Power: React.FC = () => {
               <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>CPU Usage</div>
               <div style={{ display: 'flex', alignItems: 'end', gap: 1, height: 40 }}>
                 {cpuHistory.map((v, i) => (
-                  <div key={i} style={{ flex: 1, height: `${Math.min(100, v)}%`, background: v > 70 ? 'var(--color-error)' : v > 40 ? 'var(--color-warning)' : 'var(--color-accent)', borderRadius: 2, minHeight: 1, opacity: 0.5 + (i / cpuHistory.length) * 0.5, transition: 'height 0.3s' }} />
+                  <div key={i} style={{ flex: 1, height: `${Math.min(100, v)}%`, background: v > 70 ? 'var(--color-error)' : v > 40 ? 'var(--color-warning)' : 'var(--color-accent-fill)', borderRadius: 2, minHeight: 1, opacity: 0.5 + (i / cpuHistory.length) * 0.5, transition: 'height 0.3s' }} />
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
@@ -1237,7 +1237,7 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void; disabled?
       width: 40, height: 22, borderRadius: 10, border: 'none',
       cursor: disabled ? 'default' : 'pointer', position: 'relative' as const,
       padding: 0, flexShrink: 0, transition: 'background 0.2s ease',
-      background: checked ? 'var(--color-accent)' : 'var(--color-border)',
+      background: checked ? 'var(--color-accent-fill)' : 'var(--color-border)',
       opacity: disabled ? 0.4 : 1,
     }}
   >

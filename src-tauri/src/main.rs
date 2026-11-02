@@ -15,6 +15,7 @@ mod activity_feed;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
+mod ollama_proxy;
 mod git;
 mod env_manager;
 mod ssh;
@@ -2425,11 +2426,13 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                     // `osToastPrivate: true` = DEX is locked. Windows toasts show
                     // above the lock screen, so reveal nothing but the fact.
                     let private = p.get("osToastPrivate").and_then(|v| v.as_bool()).unwrap_or(false);
+                    // `osToastSound: true` = Settings > Notifications > Sound is on.
+                    let sound = p.get("osToastSound").and_then(|v| v.as_bool()).unwrap_or(false);
                     if os_toast && (!title.is_empty() || !body.is_empty()) {
                         if private {
-                            native_ops::notify(&app, "DEX", "You have a new notification");
+                            native_ops::notify_with_sound(&app, "DEX", "You have a new notification", sound);
                         } else {
-                            native_ops::notify(&app, title, body);
+                            native_ops::notify_with_sound(&app, title, body, sound);
                         }
                     }
                 }
@@ -2543,6 +2546,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "diagnostics:getWebView2" => webview2::status_json(),
         ch @ ("storage:getUsage" | "storage:clearCaches") => storage_ctl::dispatch(&app, ch),
         ch @ ("secrets:status" | "secrets:list" | "secrets:set" | "secrets:get" | "secrets:delete") => secrets_ctl::dispatch(&app, ch, &args),
+        "ollama:request" => ollama_proxy::dispatch(&args),
 
         // --- Batch 5: App data locations -----------------------------------
         "app:getPath" | "data:getLocations" => app_paths(&app),

@@ -902,7 +902,7 @@ Also fixed: `assets/icon.png` converted palette -> RGBA (Tauri's
 harmless elsewhere). Note for Linux dev boxes: `cargo check` needs
 `libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev` — and beware
 `cargo check | tail` masking the exit code. `cargo check` green, zero warnings;
-`core` tests green. `docs/RELEASE_NOTES.md` (retired 2026-11-01 in favour of `DEX_RELEASE_NOTES.md`) was cleared ahead of the next
+`core` tests green. `docs/RELEASE_NOTES.md` (retired 2026-11-01 in favour of the root release notes, now `DEX_7.0.1_RELEASE_NOTES.md`) was cleared ahead of the next
 release line (publish new notes there once the migrated build ships).
 
 **Earlier slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All

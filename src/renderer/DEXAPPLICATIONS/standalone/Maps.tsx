@@ -29,6 +29,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DexIcon from '../../components/DexIcon';
+import { canvasColor } from '../../utils/canvasTheme';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { DexSearchInput } from '../../styles/components';
 import { AppErrorState } from '../../ui/AppStates';
@@ -246,7 +247,7 @@ const DexMaps: React.FC = () => {
     if (markerRef.current) {
       markerRef.current.setLngLat([lon, lat]);
     } else {
-      markerRef.current = new maplibregl.Marker({ color: '#4A9EFF' }).setLngLat([lon, lat]).addTo(map);
+      markerRef.current = new maplibregl.Marker({ color: canvasColor('--color-accent') }).setLngLat([lon, lat]).addTo(map);
     }
     setPlace(label);
     setPin({ lat, lon, name: label, detail });
@@ -370,7 +371,7 @@ const DexMaps: React.FC = () => {
         return;
       }
       if (markerRef.current) markerRef.current.setLngLat([lng, lat]);
-      else markerRef.current = new maplibregl.Marker({ color: '#4A9EFF' }).setLngLat([lng, lat]).addTo(map);
+      else markerRef.current = new maplibregl.Marker({ color: canvasColor('--color-accent') }).setLngLat([lng, lat]).addTo(map);
       const label = `Pin ${fmtCoord(lat, lng)}`;
       setPin({ lat, lon: lng, name: label, detail: '' });
       setPlace(label);

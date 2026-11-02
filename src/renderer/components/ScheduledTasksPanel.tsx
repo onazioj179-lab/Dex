@@ -161,7 +161,7 @@ const ScheduledTasksPanel: React.FC = () => {
                   background: !t.enabled ? 'var(--color-text-tertiary)'
                     : t.lastOutcome === 'error' ? 'var(--color-error, #ff453a)'
                     : t.lastOutcome === 'ok' ? 'var(--color-success, #32d74b)'
-                    : 'var(--color-accent)' }} />
+                    : 'var(--color-accent-fill)' }} />
                 <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
                 <button onClick={() => setEnabled(t.id, !t.enabled, Date.now())}
                   aria-label={t.enabled ? `Pause ${t.title}` : `Resume ${t.title}`}

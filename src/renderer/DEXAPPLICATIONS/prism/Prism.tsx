@@ -4198,7 +4198,7 @@ const Prism: React.FC = () => {
                 ))}
               </div>
             ))}
-            <button aria-label="Apply style to layer" onClick={() => { if (!activeStylePreset || !selectedLayerId) return; const preset = LAYER_STYLE_PRESETS.find(p => p.id === activeStylePreset); if (!preset) return; pushHistory(`Style: ${preset.name}`); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, name: `${l.name} [${preset.name}]`, effects: preset.effects } : l)); setShowLayerStyles(false); }} disabled={!activeStylePreset || !selectedLayerId} aria-disabled={!activeStylePreset || !selectedLayerId} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: activeStylePreset ? 'var(--color-accent)' : 'var(--color-border-subtle)', color: activeStylePreset ? '#fff' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: activeStylePreset ? 'pointer' : 'not-allowed', opacity: activeStylePreset ? 1 : 0.4, marginTop: 6, transition: 'opacity 0.15s ease, background 0.15s ease' }}>Apply Style to Layer</button>
+            <button aria-label="Apply style to layer" onClick={() => { if (!activeStylePreset || !selectedLayerId) return; const preset = LAYER_STYLE_PRESETS.find(p => p.id === activeStylePreset); if (!preset) return; pushHistory(`Style: ${preset.name}`); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, name: `${l.name} [${preset.name}]`, effects: preset.effects } : l)); setShowLayerStyles(false); }} disabled={!activeStylePreset || !selectedLayerId} aria-disabled={!activeStylePreset || !selectedLayerId} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: activeStylePreset ? 'var(--color-accent-fill)' : 'var(--color-border-subtle)', color: activeStylePreset ? '#fff' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: activeStylePreset ? 'pointer' : 'not-allowed', opacity: activeStylePreset ? 1 : 0.4, marginTop: 6, transition: 'opacity 0.15s ease, background 0.15s ease' }}>Apply Style to Layer</button>
           </div>
         </div>
       )}
@@ -4940,7 +4940,7 @@ const Prism: React.FC = () => {
                   hist[v >> 2]++;
                 }
                 const maxH = Math.max(...hist) || 1;
-                return Array.from({ length: 64 }, (_, i) => <div key={i} style={{ flex: 1, background: levelsChannel === 'r' ? 'var(--color-error)' : levelsChannel === 'g' ? 'var(--color-success)' : levelsChannel === 'b' ? 'var(--color-accent)' : '#888', height: `${(hist[i] / maxH) * 100}%`, opacity: 0.6, borderRadius: '1px 1px 0 0' }} />);
+                return Array.from({ length: 64 }, (_, i) => <div key={i} style={{ flex: 1, background: levelsChannel === 'r' ? 'var(--color-error)' : levelsChannel === 'g' ? 'var(--color-success)' : levelsChannel === 'b' ? 'var(--color-accent-fill)' : '#888', height: `${(hist[i] / maxH) * 100}%`, opacity: 0.6, borderRadius: '1px 1px 0 0' }} />);
               })()}
             </div>
             <div style={{ marginBottom: 'var(--space-2)' }}>
@@ -5216,7 +5216,7 @@ const Prism: React.FC = () => {
               ctx.putImageData(imgData, 0, 0);
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowColorLookup(false);
-            }} style={{ width: '100%', padding: '7px', marginTop: 10, borderRadius: 'var(--radius-lg)', border: 'none', background: colorLookupPreset ? 'var(--color-accent)' : 'var(--color-bg-hover)', color: colorLookupPreset ? '#fff' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: colorLookupPreset ? 'pointer' : 'not-allowed', opacity: colorLookupPreset ? 1 : 0.6 }}>Apply LUT</button>
+            }} style={{ width: '100%', padding: '7px', marginTop: 10, borderRadius: 'var(--radius-lg)', border: 'none', background: colorLookupPreset ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: colorLookupPreset ? '#fff' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: colorLookupPreset ? 'pointer' : 'not-allowed', opacity: colorLookupPreset ? 1 : 0.6 }}>Apply LUT</button>
           </div>
         </div>
       )}

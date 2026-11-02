@@ -73,3 +73,29 @@ describe('macOS Blue Modern palette', () => {
     }
   });
 });
+
+describe('glass-off surfaces follow the theme', () => {
+  // Light mode used to stay dark because the opaque glass fill was near-black hex.
+  it('writes light surfaces in light mode and dark ones in dark mode', async () => {
+    const { applyGlassVars } = await import('../../src/renderer/store/shellPreferencesStore');
+    const root = document.documentElement;
+    const lum = (hex: string) => {
+      const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+      if (!m) return null;
+      const n = parseInt(m[1], 16);
+      return ((n >> 16) + ((n >> 8) & 255) + (n & 255)) / 3;
+    };
+    const vars = ['--glass-bg', '--color-bg-glass', '--color-bg-glass-strong', '--dex-glass-bg'];
+    for (const [theme, isLight] of [['light', true], ['dark', false]] as const) {
+      root.setAttribute('data-theme', theme);
+      applyGlassVars({ glassMode: 'off', glassOpacity: 0.8, glassTint: '#0A0A0A', lowEndMode: false } as never);
+      for (const v of vars) {
+        const value = root.style.getPropertyValue(v);
+        const l = lum(value);
+        if (l === null) expect(value.trim(), v).toMatch(/^var\(--color-bg-/);
+        else expect(l > 128, `${theme} ${v} = ${value}`).toBe(isLight);
+      }
+    }
+    root.removeAttribute('data-theme');
+  });
+});

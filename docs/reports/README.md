@@ -1,6 +1,6 @@
 # DEX engineering reports
 
-Point-in-time evidence from the November 2026 repair and assistant work. The active backlog is `../../DEX_REMAINING_WORK.md`; user-facing changes are in `../../DEX_RELEASE_NOTES.md`; the Part 4 summary is `../../DEX_PART4_COMPLETION_REPORT.md`; the Part 5 summary is `../../DEX_PART5_IMPLEMENTATION_REPORT.md`.
+Point-in-time evidence from the November 2026 repair and assistant work. The active backlog is `../../DEX_REMAINING_WORK.md`; user-facing changes are in `../../DEX_7.0.1_RELEASE_NOTES.md`; the Part 4 evidence and 7.0.1 checks are in `../../DEX_7.0.1_VERIFICATION.md`; the Part 5 summary is `../../DEX_PART5_IMPLEMENTATION_REPORT.md`.
 
 ## Current (Part 5)
 

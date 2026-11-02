@@ -492,7 +492,7 @@ const Weather: React.FC = () => {
           {locations.length > 1 && (
             <button className="dex-weather-loc-btn" style={{ ...s.iconBtn, color: 'var(--color-error)' }} onClick={() => removeLocation(location)} aria-label="Remove location" title="Remove location"><DexIcon name="close" size={16} /></button>
           )}
-          <button className="dex-weather-loc-btn" style={{ ...s.unitBtn, fontWeight: 700, background: unit === 'F' ? 'var(--color-accent)' : 'var(--color-bg-hover)', color: unit === 'F' ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-primary)' }} onClick={() => setUnit(unit === 'C' ? 'F' : 'C')} aria-label="Toggle temperature unit" title={`Switch to ${unit === 'C' ? 'Fahrenheit' : 'Celsius'}`}>
+          <button className="dex-weather-loc-btn" style={{ ...s.unitBtn, fontWeight: 700, background: unit === 'F' ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: unit === 'F' ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-primary)' }} onClick={() => setUnit(unit === 'C' ? 'F' : 'C')} aria-label="Toggle temperature unit" title={`Switch to ${unit === 'C' ? 'Fahrenheit' : 'Celsius'}`}>
             °{unit}
           </button>
           <button className="dex-weather-loc-btn" style={s.unitBtn} onClick={() => setWindUnit(windUnit === 'kmh' ? 'mph' : 'kmh')} aria-label="Toggle wind speed unit" title={`Switch to ${windUnit === 'kmh' ? 'mph' : 'km/h'}`}>
@@ -509,7 +509,7 @@ const Weather: React.FC = () => {
                 onClick={() => setLocation(loc)}
                 style={{
                   ...s.quickChip,
-                  background: loc === location ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                  background: loc === location ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
                   color: loc === location ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-secondary)',
                   fontWeight: loc === location ? 600 : 400,
                 }}

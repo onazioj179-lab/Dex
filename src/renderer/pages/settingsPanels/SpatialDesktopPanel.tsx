@@ -31,7 +31,7 @@ const Switch: React.FC<{ on: boolean; label: string; onChange: (v: boolean) => v
     transition: 'background var(--duration-normal, 150ms) ease',
   }}>
     <span style={{
-      position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: 9999, background: '#FFFFFF',
+      position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: 9999, background: 'var(--color-accent-text)',
       boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left var(--duration-normal, 150ms) ease',
     }} />
   </button>

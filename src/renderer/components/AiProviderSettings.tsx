@@ -21,7 +21,8 @@ import {
   getReasoningPreference, setReasoningPreference,
 } from '../uki/providers/modelPrefs';
 import { routeConfiguredModels, applyProcessingMode } from '../uki/providers/connect';
-import { ollamaHasNoModels } from '../uki/providers/ollama';
+import { ollamaHasNoModels, isLocalAiEnabled, setLocalAiEnabled } from '../uki/providers/ollama';
+import { readUsage, getDailyTokenCap, setDailyTokenCap } from '../uki/providers/usage';
 import {
   PROCESSING_MODES, processingModeLabel, processingModeHint, REASONING_PREFERENCES,
   type ProcessingMode, type ReasoningPreference,
@@ -78,6 +79,22 @@ const AiProviderSettings: React.FC = () => {
   const [mode, setMode] = useState<ProcessingMode>(() => getProcessingMode());
   const [manualModel, setManual] = useState<string>(() => getManualModel() ?? '');
   const [reasoning, setReasoning] = useState<ReasoningPreference>(() => getReasoningPreference());
+  const [cap, setCap] = useState<number>(() => getDailyTokenCap());
+  const [localAi, setLocalAi] = useState<boolean>(() => isLocalAiEnabled());
+  const [localStatus, setLocalStatus] = useState<string>('');
+  const toggleLocalAi = async (on: boolean) => {
+    setLocalAi(on);
+    setLocalStatus(on ? 'Checking http://localhost:11434…' : 'Disconnected. DEX will not contact a local AI service.');
+    const found = await setLocalAiEnabled(on);
+    if (!on) return;
+    setLocalStatus(found === null
+      ? 'No local AI service answered on http://localhost:11434. Start it, then toggle this again.'
+      : found.length === 0
+        ? 'Connected, but no model is installed.'
+        : `Connected: ${found.length} model${found.length === 1 ? '' : 's'} available.`);
+  };
+  const usage = readUsage();
+  const usageRows = Object.entries(usage.byProvider);
 
   const chooseModel = (id: string, modelId: string) => {
     setModels((m) => ({ ...m, [id]: modelId }));
@@ -113,15 +130,33 @@ const AiProviderSettings: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
-        AI Providers
-      </h2>
+      {/* The Settings page header already shows the "AI Providers" title. */}
       <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
         Connect a provider to power UKI. {isSecureKeystore()
           ? 'Keys are encrypted with Windows DPAPI for your user account and never leave this device except to the provider itself.'
           : 'Secure key storage is not available here, so keys are only obfuscated in local storage (not encrypted).'}{' '}
-        Ollama runs locally and needs no key.
       </p>
+
+      <div style={{
+        padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)',
+        background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+      }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={localAi}
+            onChange={(e) => { void toggleLocalAi(e.target.checked); }}
+            aria-label="Connect to a local AI service"
+            style={{ accentColor: 'var(--color-accent)', width: 16, height: 16 }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Connect to a local AI service (Ollama)</span>
+        </label>
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          Off by default. DEX does not install or start any AI runtime. If you already run Ollama on this PC, turn this on to use it: requests stay on this machine (localhost only).
+        </span>
+        {localStatus && <span role="status" style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{localStatus}</span>}
+      </div>
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-6px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)', flexShrink: 0 }} />
@@ -150,7 +185,7 @@ const AiProviderSettings: React.FC = () => {
           <span style={{ color: 'var(--color-text-secondary)' }}>
             {ollamaHasNoModels()
               ? 'Local only is on and Ollama is running, but no model is installed. Install one (for example: ollama pull llama3.2) and reopen this page.'
-              : 'Local only is on, but no on-device (Ollama) model is reachable. Start Ollama, or choose another processing mode.'}
+              : (localAi ? 'Local only is on, but no on-device (Ollama) model is reachable. Start Ollama, or choose another processing mode.' : 'Local only is on, but the local AI connection is off. Turn it on above, or choose another processing mode.')}
           </span>
         ) : (
           <span style={{ color: 'var(--color-text-secondary)' }}>
@@ -210,6 +245,31 @@ const AiProviderSettings: React.FC = () => {
           </select>
         </div>
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{REASONING_HINT[reasoning]}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label htmlFor="daily-token-cap" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 120 }}>
+            Daily cloud limit
+          </label>
+          <input
+            id="daily-token-cap"
+            type="number"
+            min={0}
+            step={10000}
+            value={cap || ''}
+            placeholder="No limit"
+            onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setCap(v); setDailyTokenCap(v); }}
+            style={{ ...selectStyle, width: 140 }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>tokens per day · local models are never limited</span>
+        </div>
+        <div data-testid="ai-usage-today" style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          {usageRows.length === 0
+            ? 'No AI usage recorded today.'
+            : <>Today: {usageRows.map(([id, u]) => (
+                <span key={id} style={{ marginRight: 10 }}>
+                  {getProvider(id as never)?.label ?? id} {(u.prompt + u.completion).toLocaleString()} tokens / {u.calls} call{u.calls === 1 ? '' : 's'}{u.estimated > 0 ? ' (partly estimated)' : ''}
+                </span>
+              ))}</>}
+        </div>
       </div>
 
       <div

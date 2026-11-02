@@ -480,7 +480,7 @@ const WorldClock: React.FC = () => {
             aria-label="Toggle analog clocks"
           >CLK</button>
           <button
-            style={{ ...s.addBtn, background: showAdd ? 'var(--color-text-secondary)' : 'var(--color-accent)' }}
+            style={{ ...s.addBtn, background: showAdd ? 'var(--color-text-secondary)' : 'var(--color-accent-fill)' }}
             onClick={() => setShowAdd(!showAdd)}
             aria-label="Add city"
           >+</button>

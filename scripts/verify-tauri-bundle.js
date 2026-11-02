@@ -19,11 +19,37 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const RELEASE = path.join(ROOT, 'src-tauri', 'target', 'release');
 // DLLs that are NOT part of Windows and would have to ship beside the exe.
 const MUST_NOT_IMPORT = ['webview2loader.dll'];
+const RENDERER_DIST = path.join(ROOT, 'dist', 'renderer');
+// Development files that must never reach users through the packaged frontend.
+const FORBIDDEN_IN_DIST = [/\.map$/i, /(^|[\\/])\.env(\.|$)/i, /\.(test|spec)\.[jt]sx?$/i, /(^|[\\/])__fixtures__([\\/]|$)/i];
+
+function walk(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p, out); else out.push(p);
+  }
+  return out;
+}
+
+function sha256(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+/** Authenticode status via PowerShell; null when it can't be read (non-Windows). */
+function signatureStatus(file) {
+  if (process.platform !== 'win32') return null;
+  const r = spawnSync('powershell', ['-NoProfile', '-Command',
+    `(Get-AuthenticodeSignature -LiteralPath '${file.replace(/'/g, "''")}').Status`], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
 
 /** Return the imported DLL names (regular + delay-load) of a PE file. */
 function peImports(file) {
@@ -81,10 +107,16 @@ function main() {
     console.log('[verify-bundle] OK  WebView2 loader is statically linked (no WebView2Loader.dll import)');
   }
 
+  // The packaged frontend must not carry source maps, env files or test code.
+  const leaked = walk(RENDERER_DIST).filter((f) => FORBIDDEN_IN_DIST.some((re) => re.test(path.relative(RENDERER_DIST, f))));
+  if (leaked.length) failures.push(`development files in dist/renderer: ${leaked.slice(0, 5).map((f) => path.relative(ROOT, f)).join(', ')}`);
+  else console.log('[verify-bundle] OK  no source maps, env files or tests in dist/renderer');
+
   // Installers only exist after a full `tauri build` (skip when checking a bare exe).
   // Match the CURRENT version so stale bundles from older builds can't satisfy it.
   if (!process.argv[2]) {
     const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+    const shipped = [];
     for (const [dir, suffix] of [['nsis', '-setup.exe'], ['msi', '.msi']]) {
       const d = path.join(RELEASE, 'bundle', dir);
       const hits = fs.existsSync(d)
@@ -92,9 +124,20 @@ function main() {
         : [];
       if (!hits.length) failures.push(`no ${dir.toUpperCase()} installer for v${version} in ${d}`);
       for (const f of hits) {
-        const mb = (fs.statSync(path.join(d, f)).size / 1048576).toFixed(1);
-        console.log(`[verify-bundle] OK  ${dir}/${f} (${mb} MB)`);
+        const full = path.join(d, f);
+        const mb = (fs.statSync(full).size / 1048576).toFixed(1);
+        const sig = signatureStatus(full);
+        console.log(`[verify-bundle] OK  ${dir}/${f} (${mb} MB)${sig ? ` signature: ${sig}` : ''}`);
+        shipped.push(full);
       }
+    }
+    // Checksums for release integrity: publish this file next to the installers
+    // so a corrupted or substituted download can be detected.
+    if (shipped.length) {
+      const sums = shipped.map((f) => `${sha256(f)}  ${path.basename(f)}\n`).join('');
+      const out = path.join(RELEASE, 'bundle', `SHA256SUMS-${version}.txt`);
+      fs.writeFileSync(out, sums);
+      console.log(`[verify-bundle] OK  wrote ${path.relative(ROOT, out)}`);
     }
   }
 
@@ -105,4 +148,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { peImports };
+module.exports = { peImports, sha256, FORBIDDEN_IN_DIST };

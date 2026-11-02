@@ -731,7 +731,7 @@ const PixelArt: React.FC = () => {
               title={`${t} (${TOOL_HOTKEY[t]})`}
               style={{
                 ...toolBtn,
-                background: tool === t ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+                background: tool === t ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
                 color: tool === t ? '#fff' : 'var(--color-text-primary)',
                 borderColor: tool === t ? 'var(--color-accent)' : 'var(--color-border-subtle)',
               }}
@@ -742,7 +742,7 @@ const PixelArt: React.FC = () => {
             title="Horizontal symmetry (M)"
             style={{
               ...toolBtn,
-              background: mirror ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: mirror ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: mirror ? '#fff' : 'var(--color-text-primary)',
               borderColor: mirror ? 'var(--color-accent)' : 'var(--color-border-subtle)',
             }}
@@ -752,7 +752,7 @@ const PixelArt: React.FC = () => {
             title="Onion-skin previous frame"
             style={{
               ...toolBtn,
-              background: onion ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: onion ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: onion ? '#fff' : 'var(--color-text-primary)',
               borderColor: onion ? 'var(--color-accent)' : 'var(--color-border-subtle)',
             }}
@@ -762,7 +762,7 @@ const PixelArt: React.FC = () => {
             title="Tile preview (3x3 seamlessness check)"
             style={{
               ...toolBtn,
-              background: tilePreview ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: tilePreview ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: tilePreview ? '#fff' : 'var(--color-text-primary)',
               borderColor: tilePreview ? 'var(--color-accent)' : 'var(--color-border-subtle)',
             }}
@@ -772,7 +772,7 @@ const PixelArt: React.FC = () => {
             title="Lock drawing to a fixed palette"
             style={{
               ...toolBtn,
-              background: paletteLock ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: paletteLock ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: paletteLock ? '#fff' : 'var(--color-text-primary)',
               borderColor: paletteLock ? 'var(--color-accent)' : 'var(--color-border-subtle)',
             }}
@@ -956,7 +956,7 @@ const PixelArt: React.FC = () => {
             disabled={frames.length < 2}
             style={{
               ...toolBtn,
-              background: playing ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: playing ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: playing ? '#fff' : 'var(--color-text-primary)',
               ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
             }}

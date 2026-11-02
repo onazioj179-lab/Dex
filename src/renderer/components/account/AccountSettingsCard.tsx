@@ -187,7 +187,7 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, p
         <h3 style={cardHeading}>Cloud storage</h3>
         <p style={bodyText}>{formatBytes(snap.usedBytes)} of {formatBytes(snap.totalBytes)} used</p>
         <div style={{ height: 8, background: 'var(--color-bg-inset, #101012)', borderRadius: radius.full, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(100, snap.fraction * 100)}%`, height: '100%', background: snap.full ? 'var(--color-error)' : snap.warn ? 'var(--color-warning, #FFC107)' : 'var(--color-accent, #4A9EFF)' }} />
+          <div style={{ width: `${Math.min(100, snap.fraction * 100)}%`, height: '100%', background: snap.full ? 'var(--color-error)' : snap.warn ? 'var(--color-warning, #FFC107)' : 'var(--color-accent-fill)' }} />
         </div>
       </div>
       {PAYMENTS_ENABLED && account.plan === 'free-viewer' && (

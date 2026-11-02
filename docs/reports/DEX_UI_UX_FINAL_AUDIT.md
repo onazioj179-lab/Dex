@@ -20,6 +20,11 @@ Measured contrast (WCAG): dark primary text 17.2:1, secondary 8.5:1 on the base 
 
 Enforced by `tests/unit/palette-blue-modern.test.ts`, which checks the table values, the boot mirror (`index.html`) against the runtime tokens, and the AA pairs. The 210 filled-accent sites in 79 files use the fill token. A custom accent (Dark Knight, Nanite, user colour) drives the fill too.
 
+**Light-mode fixes found by running the packaged app in light mode:**
+- Glass is off by default, and in that mode the shell wrote near-black hex values (`#141416`/`#161618`/`#1a1a1e`) as inline variables on `<html>`. Those beat the light-theme stylesheet, so the **top bar, menus, dock, toolbars and panels stayed dark in light mode**, and the top-bar navigation icons were invisible. They are now theme tokens; dark mode is visually unchanged. Verified with before/after screenshots of the packaged app; regression test in `palette-blue-modern.test.ts`.
+- Fixed elsewhere: the window title-bar gradient, the Mini Player and Home dropdown backgrounds, the active tab label (hard-coded white), the Notes delete-dialog title (`#e5e5ea` on a themed surface), and the Achievements progress tracks.
+- 71 conditional accent fills (`active ? accent : …`) now use the fill token, so white labels pass AA.
+
 **Remaining:** 1,143 hard-coded hex values in `DEXAPPLICATIONS/*` and 573 in shell components and pages. Many are canvas or editor colours where hex is correct (colour pickers, AXL renderer, media scopes). A sweep of UI chrome hex to tokens is tracked in `DEX_REMAINING_WORK.md`.
 
 ## Radius
@@ -43,7 +48,7 @@ There is one source, `styles/motionDurations.ts`, mirrored in CSS and checked by
 | Surface | Status |
 |---|---|
 | AI panel (overlay) | Existing; DEX Bar mic mirrors the awake/asleep state |
-| Expanded workspace (Uki app) | Existing; "look at my screen" now works in the Tauri build via the system picker |
+| Expanded workspace (Uki app) | Existing; "look at my screen" now works in the Tauri build via the system picker; new **"Use my camera"** takes one photo for the next message (camera off before sending) |
 | Command palette / slash commands | Existing |
 | Voice overlay | Existing transcript bubble and listening state |
 | Task dashboard | Nexus: Pause / Resume / Cancel added; statuses include paused and cancelled |
