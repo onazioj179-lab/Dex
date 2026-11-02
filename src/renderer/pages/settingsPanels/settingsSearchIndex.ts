@@ -64,7 +64,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Fingerprint / Windows Hello', section: 'privacy', desc: 'Use fingerprint or face to unlock DEX', keywords: 'biometric face unlock authentication hello' },
   { label: 'PIN Code', section: 'privacy', desc: 'Use a 4-8 digit PIN to unlock', keywords: 'passcode lock authentication' },
   { label: 'Password', section: 'privacy', desc: 'Use a password to unlock', keywords: 'authentication lock credential' },
-  { label: 'Auto-Lock Timer', section: 'privacy', desc: 'Lock DEX after inactivity', keywords: 'idle lock timeout security' },
   { label: 'Recovery Codes', section: 'privacy', desc: 'Backup codes if you forget PIN or password', keywords: 'backup recovery codes' },
   { label: 'Location Services', section: 'privacy', desc: 'Allow DEX to access your location', keywords: 'gps location privacy' },
   { label: 'How DEX protects you', section: 'privacy', desc: 'Lock screen, vault encryption and Windows Security', keywords: 'security firewall antivirus malware defender protection vault encryption' },

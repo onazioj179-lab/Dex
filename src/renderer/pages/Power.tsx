@@ -61,12 +61,17 @@ export function describeBattery(b: BatterySnapshot): string {
 
 export interface ProcessRow { pid: number; name: string; cpu: number; memory: number }
 
-/** Top CPU users, the main driver of energy use. Ignores idle rows. */
-export function rankEnergy(rows: unknown, limit = 10): ProcessRow[] {
+/**
+ * Top CPU users, the main driver of energy use. Ignores idle rows. Native CPU
+ * is per core (one busy thread on 8 cores = 100%); dividing by the core count
+ * gives share of the whole CPU, as Windows Task Manager shows it.
+ */
+export function rankEnergy(rows: unknown, limit = 10, cores = 1): ProcessRow[] {
   if (!Array.isArray(rows)) return [];
+  const per = Math.max(1, cores);
   return rows
     .filter((r): r is ProcessRow => !!r && typeof r.pid === 'number' && typeof r.name === 'string')
-    .map(r => ({ pid: r.pid, name: r.name, cpu: Number(r.cpu) || 0, memory: Number(r.memory) || 0 }))
+    .map(r => ({ pid: r.pid, name: r.name, cpu: (Number(r.cpu) || 0) / per, memory: Number(r.memory) || 0 }))
     .filter(r => r.cpu >= 0.1)
     .sort((a, b) => b.cpu - a.cpu || b.memory - a.memory)
     .slice(0, limit);
@@ -243,13 +248,18 @@ export const Power: React.FC = () => {
 
   // --- Energy (live processes, only while that tab is open) ---
   const [procs, setProcs] = useState<ProcessRow[] | null>(null);
+  const cores = useRef(0);
   useEffect(() => {
     if (tab !== 'energy') return;
     let alive = true;
     const poll = async () => {
       if (document.hidden) return;
+      if (!cores.current) {
+        const st = await dex()?.system?.getStatus?.().catch(() => null);
+        cores.current = Number(st?.cpu?.cores) || 1;
+      }
       const rows = await dex()?.system?.getProcesses?.().catch(() => null);
-      if (alive) setProcs(rows ? rankEnergy(rows) : []);
+      if (alive) setProcs(rows ? rankEnergy(rows, 10, cores.current) : []);
     };
     void poll();
     const t = setInterval(poll, 3000);

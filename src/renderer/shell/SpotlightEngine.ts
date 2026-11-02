@@ -810,7 +810,6 @@ const SETTINGS_INDEX: SettingDef[] = [
   { id: 'privacy:biometric', label: 'Biometric Unlock', section: 'privacy', keywords: ['fingerprint', 'biometric', 'face', 'hello', 'unlock', 'security'] },
   { id: 'privacy:pin', label: 'PIN Code', section: 'privacy', keywords: ['pin', 'code', 'unlock', 'lock'] },
   { id: 'privacy:password', label: 'Password', section: 'privacy', keywords: ['password', 'unlock', 'security', 'credential'] },
-  { id: 'privacy:autoLock', label: 'Auto-Lock Timer', section: 'privacy', keywords: ['auto lock', 'inactivity', 'timeout', 'lock screen'] },
   { id: 'privacy:location', label: 'Location Services', section: 'privacy', keywords: ['location', 'gps', 'privacy'] },
   { id: 'privacy:firewall', label: 'Built-in Firewall', section: 'privacy', keywords: ['firewall', 'network', 'block', 'security', 'protection'] },
   { id: 'privacy:malware', label: 'Malware Protection', section: 'privacy', keywords: ['malware', 'scan', 'antivirus', 'security', 'protection'] },

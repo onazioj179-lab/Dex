@@ -291,11 +291,10 @@ const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: str
     defaultKeys: ['darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'windowControls', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
     localKeys: ['darkMode', 'dex-font-scale', 'dex-window-controls'],
   },
-  sound: { defaultKeys: ['masterVolume', 'outputDevice', 'inputDevice'] },
+  sound: { defaultKeys: [] },
   display: { defaultKeys: ['blurIntensity', 'glassOpacity', 'nightShift'] },
   notifications: { defaultKeys: ['enableNotifications', 'soundEnabled'] },
-  privacy: { defaultKeys: ['locationServices', 'crashReports', 'encryptData', 'autoLockMinutes'] },
-  network: { defaultKeys: ['wifiEnabled', 'bluetoothEnabled', 'dnsOverHttps'] },
+  privacy: { defaultKeys: ['locationServices', 'crashReports'] },
   performance: {
     defaultKeys: ['predictivePrewarm'],
     localKeys: ['dex-predictive-prewarm'],
@@ -308,7 +307,7 @@ const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: str
   keyboard: { defaultKeys: [] },
   files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'sortBy', 'thumbnailSize'] },
   storage: { defaultKeys: [] },
-  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'defaultSearchEngine'] },
+  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'defaultSearchEngine'] },
   uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiRetentionDays', 'ukiAutoCleanup', 'ukiShowTranscript'] },
 };
 
@@ -1233,71 +1232,52 @@ const _isMac = !navigator.platform?.includes('Win') && !navigator.platform?.incl
 const _M = _isMac ? '⌘' : 'Ctrl';
 
 const DEFAULT_SETTINGS = {
-  
   // Appearance
   darkMode: true,
   reduceMotion: false,
   transparency: true,
   accentColor: 'var(--color-accent)', // system default = stylesheet baseline (macOS system blue)
   fontSize: 'medium',
-  targetFPS: 120,
   windowControls: (navigator.platform?.includes('Win') ? 'system' : 'traffic') as 'system' | 'traffic', // auto-detect: system on Windows, traffic on macOS/Linux
-  
+
   // Customization
-  showLabels: false,
   compactMode: false,
-  animationSpeed: 'normal',
-  
+
   // Browser
   blockTrackers: true,
   blockAds: true,
   forceHttps: true,
-  fingerprintProtection: true,
   defaultSearchEngine: 'duckduckgo',
-  
+
   // Files
   showHiddenFiles: false,
   confirmDelete: true,
   sortBy: 'name',
   thumbnailSize: 'medium',
-  
-  // Auto-Fill
-  
+
   // Notifications
   enableNotifications: true,
   soundEnabled: true,
-  
-  // Sound
-  masterVolume: 80,
-  outputDevice: 'built-in' as string,
-  inputDevice: 'built-in' as string,
-  
+
   // Display & Glass
   blurIntensity: 20,
   glassOpacity: 70,
   windowMaterial: 'glass' as 'glass' | 'frosted' | 'solid',
   nightShift: false,
-  
+
   // Privacy & Security
   locationServices: false,
   crashReports: true,
-  encryptData: true,
-  
+
   // Authentication
   authMethod: 'none' as 'none' | 'pin' | 'password' | 'biometric' | 'pin+biometric' | 'password+biometric',
   biometricEnabled: false,
   pinEnabled: false,
   passwordEnabled: false,
-  autoLockMinutes: 5,
-  
-  // Network
-  wifiEnabled: true,
-  bluetoothEnabled: false,
-  dnsOverHttps: true,
-  
+
   // Performance
   predictivePrewarm: true,
-  
+
   // Accessibility
   highContrast: false,
   largeText: false,
@@ -1308,10 +1288,6 @@ const DEFAULT_SETTINGS = {
 
   // Window Management
   showAppTabBar: true,        // Persistent running-app tab bar above content
-
-  // Keyboard Shortcuts
-
-  // Storage & Data
 
   // UKI & Memory
   ukiEnabled: true,
@@ -3264,20 +3240,6 @@ export const Settings: React.FC = () => {
         </div>
       )}
       
-      {/* Auto Lock */}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Auto-Lock Timer</span>
-          <span style={styles.settingDesc}>Lock DEX after inactivity</span>
-        </div>
-        <Select
-          size="sm"
-          options={[{ value: '0', label: 'Never' }, { value: '1', label: '1 minute' }, { value: '5', label: '5 minutes' }, { value: '15', label: '15 minutes' }, { value: '30', label: '30 minutes' }, { value: '60', label: '1 hour' }]}
-          value={String(settings.autoLockMinutes)}
-          onChange={v => setSettings(prev => ({ ...prev, autoLockMinutes: Number(v) }))}
-        />
-      </div>
-      
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
         <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
@@ -4041,7 +4003,6 @@ export const Settings: React.FC = () => {
       {renderToggle('blockTrackers', 'Block Trackers', 'Block known cross-site trackers')}
       {renderToggle('blockAds', 'Block Ads', 'Block known ad servers')}
       {renderToggle('forceHttps', 'Force HTTPS', 'Upgrade http:// pages to https://')}
-      {renderToggle('fingerprintProtection', 'Generic User Agent', "Identify as a common browser instead of DEX")}
 
       <h3 style={styles.sectionTitle}>Search</h3>
       {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [

@@ -52,6 +52,8 @@ describe('Power helpers', () => {
     expect(rankEnergy(rows).map(r => r.pid)).toEqual([3, 2]);
     // The old native shape ({ success, processes }) is not an array.
     expect(rankEnergy({ success: true, processes: rows })).toEqual([]);
+    // Per-core CPU is shown as a share of the whole CPU.
+    expect(rankEnergy([{ pid: 9, name: 'x', cpu: 200, memory: 1 }], 10, 8)[0].cpu).toBe(25);
   });
 
   it('renders only the three real sections', async () => {

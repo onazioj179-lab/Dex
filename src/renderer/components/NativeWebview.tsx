@@ -92,12 +92,19 @@ interface Props {
   src: string;
   /** False for background tabs and while an error overlay covers the page. */
   active: boolean;
+  /**
+   * False once the Browser app is closed. DEX keeps closed apps mounted for a
+   * fast relaunch, so the native page is released here (no audio or scripts
+   * running behind a closed app) and recreated at its last URL on relaunch.
+   */
+  alive?: boolean;
   style?: React.CSSProperties;
 }
 
-export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWebview({ tabId, src, active, style }, ref) {
+export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWebview({ tabId, src, active, alive = true, style }, ref) {
   const elRef = useRef<Host | null>(null);
   const created = useRef(false);
+  const creating = useRef<Promise<void> | null>(null);
   const lastSrc = useRef<string>('');
   const shown = useRef(false);
   const lastRect = useRef('');
@@ -196,47 +203,54 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     };
     Object.assign(el, api);
 
-    let cancelled = false;
-    const r = el.getBoundingClientRect();
-    const initial = src || 'about:blank';
-    lastSrc.current = initial;
-    if (/^https?:/i.test(initial)) {
-      void sweepStale().then(() => {
-        if (cancelled) return;
-        return invoke('browserView:create', tabId, initial, { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) || 1, h: Math.round(r.height) || 1 }, false);
-      }).then((res: any) => {
-        if (cancelled) return;
-        if (res?.success) { created.current = true; shown.current = false; lastRect.current = ''; sync(); }
-        else el.__dexEmit?.('did-fail-load', { errorCode: -1, errorDescription: res?.error || 'Could not open the page' });
-      });
-    }
-
-    return () => {
-      cancelled = true;
-      hosts.delete(tabId);
-      if (created.current) void invoke('browserView:close', tabId);
-      created.current = false;
-    };
-    // The view is created once per tab; later src changes navigate it.
+    return () => { hosts.delete(tabId); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
+  // One guarded path that creates the native view at `url`.
+  const createView = useCallback((url: string) => {
+    const el = elRef.current;
+    if (!el || created.current || creating.current || !/^https?:/i.test(url)) return;
+    const r = el.getBoundingClientRect();
+    lastSrc.current = url;
+    creating.current = sweepStale()
+      .then(() => invoke('browserView:create', tabId, url, { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) || 1, h: Math.round(r.height) || 1 }, false))
+      .then((res: any) => {
+        if (res?.success) { created.current = true; shown.current = false; lastRect.current = ''; sync(); }
+        else el.__dexEmit?.('did-fail-load', { errorCode: -1, errorDescription: res?.error || 'Could not open the page' });
+      })
+      .finally(() => { creating.current = null; });
+  }, [tabId, sync]);
+
+  // Live while the app runs; released when it closes, recreated on relaunch.
+  useEffect(() => {
+    if (!alive) return;
+    createView(state.current.url || src);
+    return () => {
+      const pending = creating.current;
+      const close = () => {
+        if (created.current) void invoke('browserView:close', tabId);
+        created.current = false;
+        shown.current = false;
+        lastSrc.current = '';
+      };
+      if (pending) void pending.then(close); else close();
+    };
+    // Creation uses the latest src/url at the moment the app comes alive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alive, tabId]);
+
   // New URL from the Browser (typed address, bookmark) -> navigate or create.
   useEffect(() => {
-    const el = elRef.current as any;
-    if (!el || !src || src === lastSrc.current) return;
-    lastSrc.current = src;
-    if (created.current) { void invoke('browserView:navigate', tabId, src); return; }
-    if (!/^https?:/i.test(src)) return;
-    const r = el.getBoundingClientRect();
-    void sweepStale()
-      .then(() => invoke('browserView:create', tabId, src, { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) || 1, h: Math.round(r.height) || 1 }, false))
-      .then((res: any) => { if (res?.success) { created.current = true; shown.current = false; lastRect.current = ''; sync(); } });
-  }, [src, tabId, sync]);
+    if (!alive || !src || src === lastSrc.current) return;
+    if (created.current) { lastSrc.current = src; void invoke('browserView:navigate', tabId, src); return; }
+    createView(src);
+  }, [src, alive, tabId, createView]);
 
   // Keep the native view glued to the placeholder. Cheap checks on a slow
   // timer; every frame only while a pointer is down (window drags, resizes).
   useEffect(() => {
+    if (!alive) return;
     sync();
     const el = elRef.current;
     let raf = 0;
@@ -260,7 +274,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
       window.removeEventListener('resize', sync);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [sync]);
+  }, [sync, alive]);
 
   useEffect(() => { sync(); }, [active, sync]);
 

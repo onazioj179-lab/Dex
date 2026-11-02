@@ -25,6 +25,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { NativeWebview } from '../components/NativeWebview';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
+import { useRunningApps } from '../store/runningApps';
 
 // ===========================================================================
 // TYPES
@@ -377,6 +378,8 @@ export const Browser: React.FC = () => {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  // DEX keeps closed apps mounted; native pages must not outlive the app.
+  const browserRunning = useRunningApps(s => s.runningApps.some(a => a.id === 'browser'));
   const blockTrackers = useDexSetting<boolean>('blockTrackers', true);
   const blockAds = useDexSetting<boolean>('blockAds', true);
   const forceHttps = useDexSetting<boolean>('forceHttps', true);
@@ -2610,6 +2613,7 @@ export const Browser: React.FC = () => {
                 tabId={tab.id}
                 src={webviewSrcRef.current.get(tab.id) || tab.url}
                 active={tab.id === activeTab && !tabErrors[tab.id] && !readingMode}
+                alive={browserRunning}
                 style={{
                   width: '100%',
                   height: '100%',
