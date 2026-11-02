@@ -17,7 +17,7 @@
 import { persistGet, persistSet, persistDel } from '../../utils/persistentStore';
 
 export interface BoardLayer { id: string; name: string; visible: boolean; opacity: number; data: string }
-export interface BoardPayload { layers: BoardLayer[]; activeLayerId?: string }
+export interface BoardPayload { layers: BoardLayer[]; activeLayerId?: string; /** Whiteboard objects (see canvasObjects.ts). */ objects?: unknown[] }
 export interface BoardMeta { id: string; name: string; folder: string; updatedAt: number }
 export interface BoardsIndex { boards: BoardMeta[]; activeId: string }
 
