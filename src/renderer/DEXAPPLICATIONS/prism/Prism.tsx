@@ -100,7 +100,6 @@ import {
 } from './PrismEngine';
 import { getPerfTier } from '../../utils/adaptiveCanvas';
 import { buildBandMask } from '../../../shared/creative/luminanceMask';
-import { useCreativeAppSettings } from '../../utils/creative-suite';
 import { AdjustmentControls } from './AdjustmentControls';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
@@ -319,7 +318,6 @@ const Prism: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
-  useCreativeAppSettings('prism');
   // Track app usage
   useAppTracking('prism');
   const collab = useCollaborationFeatures({ appId: 'prism', projectName: 'PRISM Project', autoCheckpointInterval: 300000 });

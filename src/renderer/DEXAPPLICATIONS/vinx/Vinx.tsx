@@ -59,7 +59,6 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
-import { useCreativeAppSettings } from '../../utils/creative-suite';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
 export const VINX_BUILD_DATE = '2026-04-11';
@@ -223,7 +222,6 @@ const DiagBottomRightIcon = (
 const VinxEditor: React.FC = () => {
   const project = useVinxStore(s => s.project);
   // Creative app settings from Settings page
-  useCreativeAppSettings('vinx');
   // Track app usage in pattern engine and engagement system
   useAppTracking('videoeditor');
   const collab = useCollaborationFeatures({ appId: 'vinx', projectName: project.name, autoCheckpointInterval: 300000 });

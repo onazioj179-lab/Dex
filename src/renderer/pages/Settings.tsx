@@ -4288,24 +4288,6 @@ export const Settings: React.FC = () => {
   // ===========================================================================
   const CREATIVE_APP_IDS = ['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl'] as const;
   const [selectedCreativeApp, setSelectedCreativeApp] = useState<string | null>(null);
-  const [creativeAppSettings, setCreativeAppSettings] = useState<Record<string, Record<string, unknown>>>(() => {
-    try {
-      const raw = localStorage.getItem('dex-creative-app-settings');
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
-
-  // Persist per-app settings
-  React.useEffect(() => {
-    try { localStorage.setItem('dex-creative-app-settings', JSON.stringify(creativeAppSettings)); } catch { /* ignore */ }
-  }, [creativeAppSettings]);
-
-  const getAppSetting = (appId: string, key: string, fallback: unknown) => {
-    return creativeAppSettings[appId]?.[key] ?? fallback;
-  };
-  const setAppSetting = (appId: string, key: string, value: unknown) => {
-    setCreativeAppSettings(prev => ({ ...prev, [appId]: { ...prev[appId], [key]: value } }));
-  };
 
   const renderCreativeAppsSettings = () => {
     const detail = selectedCreativeApp ? APP_DEFINITIONS[selectedCreativeApp] : null;
@@ -4313,9 +4295,6 @@ export const Settings: React.FC = () => {
     return (
       <div style={styles.settingsContent}>
         <h3 style={styles.sectionTitleFirst}>DEX Creative Suite</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
-          Manage individual creative applications. Each app has its own version, settings profile, and performance controls.
-        </p>
 
         {/* App Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
@@ -4404,105 +4383,6 @@ export const Settings: React.FC = () => {
               </div>
             </div>
 
-            {/* Performance Controls */}
-            <h3 style={styles.sectionTitle}>Performance</h3>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Quality Mode</span>
-                <span style={styles.settingDesc}>Balance rendering quality vs performance</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'qualityMode', 'balanced') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'qualityMode', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="performance">Performance</option>
-                <option value="balanced">Balanced</option>
-                <option value="quality">Quality</option>
-              </select>
-            </div>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>GPU Acceleration</span>
-                <span style={styles.settingDesc}>Use hardware acceleration for rendering</span>
-              </div>
-              <button
-                style={{
-                  ...styles.toggle,
-                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-accent)' : 'var(--color-bg-glass)',
-                  border: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'none' : '1px solid var(--color-border)',
-                }}
-                onClick={() => setAppSetting(selectedCreativeApp, 'gpuAcceleration', !getAppSetting(selectedCreativeApp, 'gpuAcceleration', true))}
-              >
-                <div style={{ ...styles.toggleKnob, transform: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'translate(20px, -50%)' : 'translate(0, -50%)' }} />
-              </button>
-            </div>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Auto-Save Interval</span>
-                <span style={styles.settingDesc}>How often work is automatically saved</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'autoSaveInterval', '30') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'autoSaveInterval', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="10">Every 10 seconds</option>
-                <option value="30">Every 30 seconds</option>
-                <option value="60">Every 60 seconds</option>
-                <option value="120">Every 2 minutes</option>
-                <option value="off">Disabled</option>
-              </select>
-            </div>
-
-            {/* Cache & Data */}
-            <h3 style={styles.sectionTitle}>Cache & Data</h3>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Cache Limit</span>
-                <span style={styles.settingDesc}>Maximum cache size for this app</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'cacheLimit', '2') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'cacheLimit', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="0.5">500 MB</option>
-                <option value="1">1 GB</option>
-                <option value="2">2 GB</option>
-                <option value="4">4 GB</option>
-                <option value="8">8 GB</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-              <button
-                style={{ ...styles.secondaryBtn, flex: 1 }}
-                onClick={() => {
-                  setCreativeAppSettings(prev => {
-                    const updated = { ...prev };
-                    delete updated[selectedCreativeApp];
-                    return updated;
-                  });
-                  toast.success(`${detail.name} settings reset to defaults`);
-                }}
-              >Reset to Defaults</button>
-              <button
-                style={{ ...styles.secondaryBtn, flex: 1, color: 'var(--color-warning, #FFD60A)' }}
-                onClick={() => toast.success(`${detail.name} cache cleared`)}
-              >Clear Cache</button>
-            </div>
           </div>
         )}
 
@@ -4524,10 +4404,6 @@ export const Settings: React.FC = () => {
                 <span style={{ color: 'var(--color-success, #30d158)' }}>Included with DEX</span>
               </div>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
-              Select an app above to view its version, configure performance, and manage per-app settings.
-              Each creative app can be independently updated in future releases.
-            </p>
           </>
         )}
       </div>

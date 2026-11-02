@@ -24,7 +24,6 @@ import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS, getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
-import { useCreativeAppSettings } from '../../utils/creative-suite';
 import {
   EASING_PRESETS,
   COMPOSITION_PRESETS,
@@ -409,7 +408,6 @@ const Flux: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
-  const appSettings = useCreativeAppSettings('flux');
   // Track app usage
   useAppTracking('flux');
   const collab = useCollaborationFeatures({ appId: 'flux', projectName: 'FLUX Project', autoCheckpointInterval: 300000 });
