@@ -191,3 +191,45 @@ export function drawObjects(ctx: CanvasRenderingContext2D, objs: BoardObject[]):
     ctx.restore();
   }
 }
+
+// ---- board templates (Creative Hub "start from") -----------------------------
+
+export interface BoardTemplate { id: string; name: string; description: string; build(): BoardObject[] }
+
+function at(kind: Exclude<ObjectKind, 'connector'>, x: number, y: number, w: number, h: number, color: string, text: string): BoardObject {
+  return { id: newObjectId(), kind, x, y, w, h, color, text };
+}
+
+export const BOARD_TEMPLATES: BoardTemplate[] = [
+  {
+    id: 'brainstorm', name: 'Brainstorm', description: 'A topic in the middle with ideas around it',
+    build: () => {
+      const centre = at('ellipse', 650, 400, 300, 200, '#0A84FF', 'Topic');
+      const spots = [[250, 120], [650, 90], [1050, 120], [250, 700], [650, 730], [1050, 700]];
+      const ideas = spots.map(([x, y], i) => at('sticky', x, y, 200, 150, STICKY_COLORS[i % STICKY_COLORS.length], 'Idea'));
+      return [centre, ...ideas, ...ideas.map((s) => createConnector(centre.id, s.id, '#8E8E93'))];
+    },
+  },
+  {
+    id: 'kanban', name: 'Kanban', description: 'To do, Doing and Done columns',
+    build: () => {
+      const cols = ['To do', 'Doing', 'Done'].map((t, i) => at('frame', 60 + i * 520, 80, 480, 860, '#5E5CE6', t));
+      const cards = cols.flatMap((c, i) => [0, 1].map((k) => at('sticky', c.x + 40, c.y + 40 + k * 190, 400, 160, STICKY_COLORS[(i * 2 + k) % STICKY_COLORS.length], i === 0 ? 'Task' : '')).filter((s, k) => i === 0 || k === 0));
+      return [...cols, ...cards];
+    },
+  },
+  {
+    id: 'retro', name: 'Retrospective', description: 'Went well, To improve, Actions',
+    build: () => ['Went well', 'To improve', 'Actions'].map((t, i) => at('frame', 60 + i * 520, 80, 480, 860, ['#34C759', '#FF9F0A', '#0A84FF'][i], t)),
+  },
+  {
+    id: 'flow', name: 'Flowchart', description: 'Start, steps and an end, already connected',
+    build: () => {
+      const start = at('ellipse', 120, 420, 200, 120, '#34C759', 'Start');
+      const a = at('rect', 440, 420, 220, 120, '#0A84FF', 'Step 1');
+      const b = at('rect', 780, 420, 220, 120, '#0A84FF', 'Step 2');
+      const end = at('ellipse', 1120, 420, 200, 120, '#FF453A', 'End');
+      return [start, a, b, end, createConnector(start.id, a.id, '#3A3A3C'), createConnector(a.id, b.id, '#3A3A3C'), createConnector(b.id, end.id, '#3A3A3C')];
+    },
+  },
+];

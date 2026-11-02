@@ -6,11 +6,12 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { CanvasObjectLayer } from './CanvasObjectLayer';
-import { type BoardObject, createObject, createConnector, sanitizeObjects, drawObjects, STICKY_COLORS, MAX_IMAGE_BYTES } from './canvasObjects';
+import { type BoardObject, createObject, createConnector, sanitizeObjects, drawObjects, STICKY_COLORS, MAX_IMAGE_BYTES, BOARD_TEMPLATES } from './canvasObjects';
 import {
   type BoardsIndex, type BoardPayload, UNFILED,
   loadIndex, saveIndex, loadBoard, saveBoard, deleteBoardData,
   addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
+  takeCanvasRequest, CANVAS_REQUEST_EVENT,
 } from './canvasBoards';
 
 // ---------------------------------------------------------------------------
@@ -387,6 +388,7 @@ const Canvas: React.FC = () => {
         boardsRef.current = idx;
         setBoards(idx);
         restorePayload(await loadBoard(idx.activeId));
+        void handleRequestRef.current();
       } catch {
         setActiveLayerId(prev => prev || layersRef.current[0]?.id || '');
       }
@@ -547,6 +549,34 @@ const Canvas: React.FC = () => {
     commitObjects(objectsRef.current, [...objectsRef.current, obj]);
     setSelectedObj(obj.id);
   };
+
+  // Requests from the Creative Hub: open a board, or start one from a template.
+  const handleRequestRef = useRef<() => Promise<void>>(async () => {});
+  handleRequestRef.current = async () => {
+    if (!boardsRef.current) return; // initial load will call again
+    const req = takeCanvasRequest();
+    if (!req) return;
+    if (req.boardId && boardsRef.current.boards.some(b => b.id === req.boardId)) {
+      await switchBoard(req.boardId);
+      return;
+    }
+    const tpl = req.templateId ? BOARD_TEMPLATES.find(t => t.id === req.templateId) : undefined;
+    if (!tpl) return;
+    await newBoard();
+    const idx = boardsRef.current;
+    if (idx) {
+      const named = renameBoard(idx, idx.activeId, tpl.name);
+      boardsRef.current = named;
+      setBoards(named);
+      await saveIndex(named);
+    }
+    commitObjects([], tpl.build());
+  };
+  useEffect(() => {
+    const on = () => { void handleRequestRef.current(); };
+    window.addEventListener(CANVAS_REQUEST_EVENT, on);
+    return () => window.removeEventListener(CANVAS_REQUEST_EVENT, on);
+  }, []);
 
   const pickForConnector = (id: string) => {
     if (connectFrom === null || connectFrom === undefined) { setConnectFrom(id); return; }
