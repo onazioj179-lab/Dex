@@ -1299,7 +1299,7 @@ const DexNotes: React.FC = () => {
             border: '1px solid var(--color-border)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: '#e5e5ea', marginBottom: 'var(--space-2)' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' }}>
               Move to Trash?
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-5)', lineHeight: 1.5 }}>
@@ -1308,7 +1308,7 @@ const DexNotes: React.FC = () => {
             <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
               <button onClick={cancelDelete} style={{
                 padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
-                background: 'var(--color-border-subtle)', color: '#e5e5ea', cursor: 'pointer',
+                background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', cursor: 'pointer',
               }}>Cancel</button>
               <button onClick={confirmDelete} style={{
                 padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
@@ -1328,7 +1328,7 @@ const DexNotes: React.FC = () => {
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-panel)',
-          fontSize: 13, color: '#e5e5ea', whiteSpace: 'nowrap',
+          fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap',
           animation: 'fadeIn 0.2s ease-out',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

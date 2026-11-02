@@ -1332,7 +1332,7 @@ export const Gallery: React.FC = () => {
               const renderGridItem = (item: typeof visibleMedia[number]) => (
                 <div key={item.id} style={styles.gridItem} onClick={(e) => handleItemActivate(item, e)} onContextMenu={(e) => { if (!selectedItems.has(item.id)) lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); showCtxMenu(e, buildCtxItems(item)); }}>
                   {selectionMode && (
-                    <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, width: 22, height: 22, borderRadius: 4, background: selectedItems.has(item.id) ? 'var(--color-accent)' : 'rgba(0,0,0,0.5)', border: '2px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, width: 22, height: 22, borderRadius: 4, background: selectedItems.has(item.id) ? 'var(--color-accent-fill)' : 'rgba(0,0,0,0.5)', border: '2px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       {selectedItems.has(item.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
                     </div>
                   )}

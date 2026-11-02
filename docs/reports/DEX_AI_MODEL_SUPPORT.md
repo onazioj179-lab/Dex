@@ -10,9 +10,13 @@
 | Anthropic | Yes | Cloud | Yes | Yes (Sonnet/Opus) | Wired; needs a key to test live |
 | Google (Gemini) | Yes | Cloud | Yes | Yes | Wired; needs a key to test live |
 | OpenRouter | Yes | Cloud | Yes | Per model | Wired; needs a key to test live |
-| Ollama | No | **This device** (localhost) | Yes (NDJSON) | Vision-named models (llava, moondream, …) | Wired; **installed models are discovered** via `/api/tags` |
+| Ollama | No | **This device** (localhost) | Yes in the web preview; in the desktop app the reply arrives in one piece (native proxy) | Vision-named models (llava, moondream, …) | Wired; **installed models are discovered** via `/api/tags` |
 
 Request building and response parsing are pure functions and unit-tested for every provider (`ai-providers*.test.ts`, `ai-orchestrator.test.ts`, `ai-connect.test.ts`). The live network send needs a real key. No key was available in this environment, so cloud output quality and latency were **not measured**.
+
+## Ollama in the desktop app (bug fixed)
+
+Ollama answers **403** to browser requests from origins outside its allow-list, and the packaged app's origin (`http://tauri.localhost`) is not on it. Measured: `curl -H "Origin: http://tauri.localhost"` returned 403, and `Origin: http://localhost` returned 200. So the Ollama provider never worked in the installed app. Requests now go through `ollama:request` (`src-tauri/src/ollama_proxy.rs`). It has a fixed host of 127.0.0.1:11434 and allows only `GET /api/tags` and `POST /api/chat`; it cannot pull or delete models or reach any other host. Verified in the packaged build: `/api/tags` returned 200 through the proxy, and `/api/pull` was refused.
 
 ## Model catalog
 
@@ -48,7 +52,9 @@ Each model declares its context window. `classifyTask` estimates tokens, and req
 
 - Paid use happens only for providers you add a key for, and Cloud use can be disabled entirely with **Local only**.
 - **Cheapest** prefers lower-cost models. Reasoning effort caps output length and steps.
-- Not implemented: per-provider spending limits or usage totals. Providers return usage counts per call (`usage.promptTokens/completionTokens`), but DEX does not aggregate them yet. *Tracked.*
+- **Usage totals:** tokens and calls per provider for the current day, shown in Settings › AI Providers. Provider-reported counts are used where available; streamed replies are estimated (chars / 4) and marked "partly estimated".
+- **Daily cloud limit:** an optional token cap for cloud providers. When reached, cloud calls are refused before anything is sent, and the router falls back to an allowed local model if there is one. Local models are never limited (`providers/usage.ts`, `ai-usage-cap.test.ts`).
+- Not implemented: money-denominated budgets. Per-model prices change and are not shipped, so the cap is in tokens.
 
 ## Keys
 

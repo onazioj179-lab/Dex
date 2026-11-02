@@ -194,7 +194,7 @@ const Achievements: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 10, background: PANEL, border: `1px solid ${BORDER}` }}>
               <DexIcon name={rank.icon} size={16} color={GOLD} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{rank.title}</span>
-              <div style={{ width: 52, height: 4, borderRadius: 4, background: '#2a2a30', overflow: 'hidden' }}>
+              <div style={{ width: 52, height: 4, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', background: GOLD }} />
               </div>
             </div>
@@ -242,7 +242,7 @@ const Achievements: React.FC = () => {
                       {Math.round(c.pct)}%
                     </div>
                   </div>
-                  <div style={{ height: 7, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+                  <div style={{ height: 7, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
                     <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 4, background: done ? '#30d158' : `linear-gradient(90deg, ${c.color}99, ${c.color})`, transition: 'width .2s ease' }} />
                   </div>
                 </div>
@@ -269,7 +269,7 @@ const Achievements: React.FC = () => {
                         <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, flexShrink: 0 }}>{Math.round(pct)}%</span>
                       </div>
                       <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 5, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, height: 5, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
                           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
                         </div>
                         <span style={{ fontSize: 10, color: TXT_DIM, flexShrink: 0 }}>{cur.toLocaleString()}/{tgt.toLocaleString()}</span>
@@ -367,13 +367,13 @@ const HeroSpotlight: React.FC<{
         </div>
         {!isUnlocked && prog ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ flex: 1, height: 6, borderRadius: 4, background: '#1f1f24', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
             </div>
             <span style={{ fontSize: 11, color: TXT_DIM, flexShrink: 0 }}>{prog.current.toLocaleString()}/{prog.target.toLocaleString()}</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#30d158', fontSize: 12, fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-success)', fontSize: 12, fontWeight: 700 }}>
             <DexIcon name="check-circle" size={14} color="#30d158" />
             Earned · {totalUnlocked.toLocaleString()} total
           </div>
@@ -475,7 +475,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
                 <span style={{ fontSize: 10, fontWeight: 700, color: GOLD, flexShrink: 0 }}>+{ch.xpReward}</span>
               </div>
               <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ flex: 1, height: 3, borderRadius: 2, background: '#1f1f24', overflow: 'hidden' }}>
+                <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
                   <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: ch.completed ? '#30d158' : GOLD, transition: 'width .18s' }} />
                 </div>
                 <span style={{ fontSize: 9, color: TXT_DIM, flexShrink: 0 }}>{ch.progress}/{ch.condition.threshold}</span>

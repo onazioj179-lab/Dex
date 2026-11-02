@@ -29,8 +29,24 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
-    "icon": ["../assets/icon.ico", "../assets/icon.png"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "publisher": "Onazi Oj",
+    "copyright": "Copyright (c) 2026 Onazi Treasure OJ. DEX OS created by Onazi Oj.",
+    "category": "Productivity",
+    "shortDescription": "DEX OS",
+    "longDescription": "DEX OS: a personal desktop environment and control hub. Created by Onazi Oj.",
+    "icon": [
+      "../assets/icon.ico",
+      "../assets/icon.png"
+    ],
+    "licenseFile": "../LICENSE",
+    "resources": {
+      "../NOTICE": "NOTICE.txt",
+      "../LICENSE": "LICENSE.txt"
+    },
     "windows": {
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://timestamp.digicert.com",

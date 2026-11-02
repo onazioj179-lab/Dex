@@ -1532,7 +1532,7 @@ export const Tasks: React.FC = () => {
                       {dayTasks.length > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 2 }}>
                           {dayTasks.slice(0, 3).map((t, j) => (
-                            <div key={j} style={{ width: 4, height: 4, borderRadius: '50%', background: t.completed ? 'var(--color-success)' : t.priority === 'high' ? 'var(--color-error)' : 'var(--color-accent)' }} />
+                            <div key={j} style={{ width: 4, height: 4, borderRadius: '50%', background: t.completed ? 'var(--color-success)' : t.priority === 'high' ? 'var(--color-error)' : 'var(--color-accent-fill)' }} />
                           ))}
                         </div>
                       )}
@@ -1698,7 +1698,7 @@ export const Tasks: React.FC = () => {
                     width: 16, height: 16, borderRadius: 4, flexShrink: 0, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     border: selectedIds.has(task.id) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                    background: selectedIds.has(task.id) ? 'var(--color-accent)' : 'transparent',
+                    background: selectedIds.has(task.id) ? 'var(--color-accent-fill)' : 'transparent',
                     color: 'var(--color-accent-text, #fff)',
                   }}
                 >
@@ -1790,7 +1790,7 @@ export const Tasks: React.FC = () => {
                       return (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`${task.subtasks!.filter(s => s.completed).length} of ${task.subtasks!.length} subtasks done`}>
                           <span style={{ width: 48, height: 4, borderRadius: 2, background: 'var(--color-border-subtle)', overflow: 'hidden', display: 'inline-block' }}>
-                            <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--color-success)' : 'var(--color-accent)', transition: 'width 0.2s ease' }} />
+                            <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--color-success)' : 'var(--color-accent-fill)', transition: 'width 0.2s ease' }} />
                           </span>
                           <span style={{ fontSize: 11, color: pct === 100 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>{pct}%</span>
                         </span>

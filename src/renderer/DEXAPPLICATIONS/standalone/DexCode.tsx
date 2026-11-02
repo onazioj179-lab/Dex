@@ -1394,7 +1394,7 @@ const DexCode: React.FC = () => {
                   onClick={() => setLangMode(m)}
                   style={{
                     padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
-                    background: langMode === m ? 'var(--color-accent)' : 'transparent',
+                    background: langMode === m ? 'var(--color-accent-fill)' : 'transparent',
                     color: langMode === m ? '#fff' : 'var(--color-text-secondary)',
                     transition: 'background 0.15s ease, color 0.15s ease',
                   }}
@@ -1765,7 +1765,7 @@ const DexCode: React.FC = () => {
                 borderRadius: '50%',
                 background: saveState === 'saving'
                   ? 'var(--color-text-tertiary)'
-                  : 'var(--color-accent, #4A9EFF)',
+                  : 'var(--color-accent-fill)',
               }}
             />
             {saveState === 'saving' ? 'Saving…' : 'Saved'}
@@ -1778,7 +1778,7 @@ const DexCode: React.FC = () => {
             aria-pressed={terminalOpen}
             style={{
               marginLeft: 'auto',
-              background: terminalOpen ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+              background: terminalOpen ? 'var(--color-accent-fill)' : 'transparent',
               color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
               border: '1px solid var(--color-border)',
               borderRadius: 4,

@@ -24,6 +24,13 @@ import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
+
+// Child effects run before the parent's, so the last value is also kept on
+// window for AppManager to read when its listener attaches.
+function publishBarInset(px: number): void {
+  (window as { __dexBarInset?: number }).__dexBarInset = px;
+  window.dispatchEvent(new CustomEvent('dex-bar-inset', { detail: px }));
+}
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
 
@@ -214,6 +221,17 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   }, []);
 
   useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
+
+  // Publish how much of the bottom edge the bar covers, so app content and
+  // maximized windows can stop above it. Only when docked in the lower part of
+  // the screen, and only after a drag settles (no per-frame layout churn).
+  useEffect(() => {
+    if (dragging) return;
+    const vh = window.innerHeight;
+    const inset = enabled && pos.y > vh * 0.55 ? Math.max(0, Math.round(vh - pos.y + EDGE_PAD)) : 0;
+    publishBarInset(inset);
+  }, [pos.y, dragging, enabled]);
+  useEffect(() => () => publishBarInset(0), []);
   useEffect(() => {
     window.addEventListener('resize', clampNow);
     return () => window.removeEventListener('resize', clampNow);
@@ -470,7 +488,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
               </button>
               <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={toggle} disabled={!track}
-                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent, #4a9eff)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
+                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
                 {isPlaying
                   ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
                   : <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>}
@@ -501,7 +519,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                   fontSize: 11, padding: '3px 0', borderRadius: 6,
                   fontWeight: d.isToday ? 700 : 400,
                   color: d.isToday ? 'var(--color-accent-text, #fff)' : 'var(--color-text-primary)',
-                  background: d.isToday ? 'var(--color-accent, #4a9eff)' : 'transparent',
+                  background: d.isToday ? 'var(--color-accent-fill)' : 'transparent',
                 }}>{d.day}</div>
               ))}
             </div>

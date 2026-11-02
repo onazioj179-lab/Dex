@@ -99,3 +99,51 @@ async function captureViaBridge(): Promise<string | null> {
     return null;
   }
 }
+
+// ---- Camera: one explicit frame ---------------------------------------------
+
+type UserMediaFn = (opts: { video: boolean | Record<string, unknown>; audio: boolean }) => Promise<MediaStream>;
+
+function userMedia(): UserMediaFn | null {
+  const md = typeof navigator !== 'undefined' ? (navigator.mediaDevices as unknown as { getUserMedia?: UserMediaFn } | undefined) : undefined;
+  return md?.getUserMedia ? md.getUserMedia.bind(md) : null;
+}
+
+/** True when a camera capture path exists (the OS still asks for permission). */
+export function isCameraCaptureAvailable(): boolean {
+  return !!userMedia();
+}
+
+/**
+ * Take ONE camera frame for the next message. The camera turns on only for
+ * this call (Windows shows its camera indicator), a short warm-up lets the
+ * exposure settle, and every track is stopped before returning. Never runs
+ * continuously. Returns a JPEG data URL, or null if denied/unavailable.
+ */
+export async function captureCameraFrame(getUserMedia: UserMediaFn | null = userMedia(), warmupMs = 400): Promise<string | null> {
+  if (!getUserMedia) return null;
+  let stream: MediaStream | null = null;
+  try {
+    stream = await getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    if (!stream.getVideoTracks()[0]) return null;
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    await video.play();
+    if (warmupMs > 0) await new Promise((r) => setTimeout(r, warmupMs));
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    const scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    video.srcObject = null;
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch {
+    return null; // permission denied, no camera, or playback blocked
+  } finally {
+    stream?.getTracks().forEach((t) => t.stop());
+  }
+}

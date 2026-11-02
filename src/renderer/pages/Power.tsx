@@ -324,7 +324,7 @@ export const Power: React.FC = () => {
                   <span style={S.muted}>{describeBattery(battery)}</span>
                 </div>
                 <div style={S.track} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Battery level">
-                  <div style={{ ...S.fill, width: `${pct}%`, background: pct <= 20 && !battery.charging ? 'var(--color-error)' : 'var(--color-accent)' }} />
+                  <div style={{ ...S.fill, width: `${pct}%`, background: pct <= 20 && !battery.charging ? 'var(--color-error)' : 'var(--color-accent-fill)' }} />
                 </div>
               </div>
             ) : (

@@ -1,6 +1,6 @@
 [package]
 name = "dex-tauri"
-description = "DEX 7.0 Tauri shell — hosts the existing Vite renderer"
+description = "DEX OS desktop shell (Tauri) by Onazi Oj"
 version = "7.0.1"
 edition = "2021"
 license = "MIT"
@@ -45,14 +45,19 @@ tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link downloa
 webview2-com = "0.38"
 windows-core = "0.61"
 
-[features]
-# Tauri's default release feature for the embedded asset protocol.
-custom-protocol = ["tauri/custom-protocol"]
-
-# Release profile. panic stays "unwind" on purpose: main.rs wraps IPC handlers in
-# catch_unwind so one bad channel can't take the whole shell down.
+# Release builds: full optimisation, cross-crate LTO, one codegen unit for the
+# best code, and no debug info in the shipped exe. On MSVC symbols never live in
+# the exe; `line-tables-only` makes cargo emit a small .pdb next to it for
+# crash symbolication, and the bundler does not ship .pdb files. Panics keep
+# unwinding (not abort): main.rs wraps IPC handlers in catch_unwind so one bad
+# channel can't take the whole shell down.
 [profile.release]
 opt-level = 3
 lto = "thin"
-codegen-units = 4
-strip = "debuginfo"
+codegen-units = 1
+debug = "line-tables-only"
+incremental = false
+
+[features]
+# Tauri's default release feature for the embedded asset protocol.
+custom-protocol = ["tauri/custom-protocol"]

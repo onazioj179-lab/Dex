@@ -120,7 +120,7 @@ const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, 
           height: 8,
           borderRadius: 4,
           background: i === current
-            ? 'var(--color-accent, #4A9EFF)'
+            ? 'var(--color-accent-fill)'
             : i < current ? 'rgba(74, 158, 255, 0.4)' : 'var(--color-border)',
           transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}

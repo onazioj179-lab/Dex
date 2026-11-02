@@ -916,9 +916,8 @@
      boost (the "lensing" that makes wallpaper bloom behind it), finished with a
      fresnel-style bright top rim and edge highlights. Far more transparent than a
      frosted panel so the wallpaper/content reads through. */
-  /* Part 5 (2026-11): token-driven so it follows the ONE glass control point
-     (applyGlassVars): theme-tinted, restrained 20px blur by default, solid when
-     glass is off / reduced. It used to hardcode a dark 22-42% fill + 32px blur. */
+  /* Fill + blur come from Settings > Interface Transparency (applyGlassVars):
+     theme surface mixed with transparency, so it reads in light and dark. */
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -997,17 +996,17 @@ html[data-glass-effective-mode="off"] .dex-liquid-glass-strong {
    dropdown, panel, and chrome surface that reads these tokens degrades together
    in one place, matching the .dex-liquid-glass fallbacks above. */
 html[data-perf-tier="low"] {
-  --glass-bg: #141416;
+  --glass-bg: var(--color-bg-overlay);
   --glass-blur: none;
-  --color-bg-glass: #161618;
-  --color-bg-glass-strong: #1a1a1e;
+  --color-bg-glass: var(--color-bg-secondary);
+  --color-bg-glass-strong: var(--color-bg-surface);
 }
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --glass-bg: #141416;
+    --glass-bg: var(--color-bg-overlay);
     --glass-blur: none;
-    --color-bg-glass: #161618;
-    --color-bg-glass-strong: #1a1a1e;
+    --color-bg-glass: var(--color-bg-secondary);
+    --color-bg-glass-strong: var(--color-bg-surface);
   }
 }
 /* The solid fallbacks above are dark; light theme needs its own, or light mode

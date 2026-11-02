@@ -288,7 +288,7 @@ const CalendarWidget: React.FC = () => {
           return (
             <div key={i} style={{
               padding: 3, borderRadius: 4, color: isToday ? '#000' : d ? '#fff' : 'transparent',
-              background: isToday ? 'var(--color-accent)' : 'transparent', fontWeight: isToday ? 600 : 400,
+              background: isToday ? 'var(--color-accent-fill)' : 'transparent', fontWeight: isToday ? 600 : 400,
             }}>
               {d ?? ''}
             </div>

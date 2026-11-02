@@ -1025,6 +1025,16 @@ export const AppManager: React.FC = () => {
 
 
   // -- App Tab Bar -- persistent running-app tabs, toggle in Settings ------
+  // Space the DEX Bar takes at the bottom of the screen (published by
+  // FloatingLauncher). Apps and maximized windows stop above it.
+  const [barInset, setBarInset] = useState(() => (window as { __dexBarInset?: number }).__dexBarInset ?? 0);
+  useEffect(() => {
+    const onInset = (e: Event) => setBarInset(Math.max(0, Number((e as CustomEvent<number>).detail) || 0));
+    window.addEventListener('dex-bar-inset', onInset);
+    setBarInset((window as { __dexBarInset?: number }).__dexBarInset ?? 0);
+    return () => window.removeEventListener('dex-bar-inset', onInset);
+  }, []);
+
   const [showAppTabBar, setShowAppTabBar] = useState(() => {
     try { return localStorage.getItem('dex-app-tab-bar') !== 'false'; } catch { return true; }
   });
@@ -1059,14 +1069,13 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
-    // The dock was removed in favour of the floating launcher, which floats
-    // above content and reserves NO layout space -- so maximized / snapped
-    // windows fill the whole work area. Only the Stage Manager strip reserves.
+    // The DEX Bar reserves the strip it occupies when it sits along the bottom
+    // edge, so maximized / snapped windows end above it instead of under it.
     return getWorkspaceBounds(
       { width: w, height: h },
       {
         topReserve: 0,
-        dockReserve: 0,
+        dockReserve: barInset,
         leftReserve: stageOffset,
         rightReserve: 0,
         padding,
@@ -1074,7 +1083,7 @@ export const AppManager: React.FC = () => {
         minHeight: 260,
       },
     );
-  }, [stageOffset, showAppTabBar, runningApps.length]);
+  }, [stageOffset, showAppTabBar, runningApps.length, barInset]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -1252,9 +1261,8 @@ export const AppManager: React.FC = () => {
     }
   }, [runningApps, currentAppId, setCurrentRunningApp]);
 
-  // -- Status row: clock + battery ----------------------------------------
-  const [batteryLevel, setBatteryLevel] = useState(100);
-  const [batteryCharging, setBatteryCharging] = useState(false);
+  // -- Status row: clock ---------------------------------------------------
+  // Battery is not shown in the top bar; Control Center reads it on demand.
   const [clockStr, setClockStr] = useState(() => {
     const now = new Date();
     const d = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -1443,7 +1451,7 @@ export const AppManager: React.FC = () => {
   // moves away from the bottom edge. This was the main "moves on contact"
   // behaviour -- the dock now simply stays put.
 
-  // Clock + Battery for status row
+  // Clock for status row
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -1459,26 +1467,9 @@ export const AppManager: React.FC = () => {
       updateClock();
       clockIntervalId = setInterval(updateClock, 60_000);
     }, msToNextMinute);
-    let battCleanup: (() => void) | undefined;
-    if ('getBattery' in navigator) {
-      (navigator as any).getBattery().then((batt: any) => {
-        if (!mountedRef.current) return;
-        setBatteryLevel(Math.round(batt.level * 100));
-        setBatteryCharging(batt.charging);
-        const onLevel = () => { if (mountedRef.current) setBatteryLevel(Math.round(batt.level * 100)); };
-        const onCharge = () => { if (mountedRef.current) setBatteryCharging(batt.charging); };
-        batt.addEventListener('levelchange', onLevel);
-        batt.addEventListener('chargingchange', onCharge);
-        battCleanup = () => {
-          batt.removeEventListener('levelchange', onLevel);
-          batt.removeEventListener('chargingchange', onCharge);
-        };
-      }).catch((e: unknown) => { console.warn('[DEX]', e); });
-    }
     return () => {
       clearTimeout(alignTimeoutId);
       if (clockIntervalId) clearInterval(clockIntervalId);
-      battCleanup?.();
     };
   }, []);
 
@@ -3661,7 +3652,7 @@ export const AppManager: React.FC = () => {
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
                 // Subtle top-lit gradient + hairline highlight gives the title bar real
                 // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
-                background: 'linear-gradient(180deg, #26262B 0%, #1C1C20 100%)',
+                background: 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-surface) 100%)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
                 justifyContent: 'center',
@@ -4468,6 +4459,7 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
+            paddingBottom: appId === 'home' ? 0 : barInset,
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -4751,7 +4743,7 @@ export const AppManager: React.FC = () => {
               </span>
               <span style={{
                 fontSize: 11, fontWeight: isActive ? 600 : 500,
-                color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 letterSpacing: '-0.01em', pointerEvents: 'none',
               }}>
@@ -4867,7 +4859,7 @@ export const AppManager: React.FC = () => {
               background: 'rgba(255,255,255,0.07)',
               // Full-flat: no backdrop-filter (this was a straggler against the
               // platform-wide flat-glass rule). Flat tint + hairline only.
-              border: '1px solid rgba(255,255,255,0.09)',
+              border: '1px solid var(--color-border-subtle)',
               borderRadius: 14, padding: '2px 10px 2px 6px',
               height: 24, overflow: 'hidden',
             }}>
@@ -4891,17 +4883,11 @@ export const AppManager: React.FC = () => {
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Date + time live in the draggable Clock widget on Home (user-placed).
             Keeping the topbar minimal -- only system status indicators here. */}
-        {/* Secondary status (battery / wifi / permission pills) collapses on
+        {/* Secondary status (wifi / permission pills) collapses on
             narrow screens (see .dex-topbar-secondary in globals.css) so the
             essential window controls are never pushed off the right edge. It all
             stays reachable from the control-center popover. */}
         <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-          {/* Battery */}
-          <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
-            <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
-            <div style={{ position: 'absolute', right: -2.5, width: 1.5, height: 3.5, borderRadius: '0 0.5px 0.5px 0', background: 'var(--color-text-tertiary)' }} />
-          </div>
-          {batteryCharging && <svg width="7" height="7" viewBox="0 0 24 24" fill="var(--color-warning)" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
           {/* WiFi indicator - compact dot */}
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
           {/* Quick Controls -- network mode + permission pills with popovers */}
@@ -4915,14 +4901,14 @@ export const AppManager: React.FC = () => {
           aria-label="Open Control Center"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 18, borderRadius: 4,
+            width: 28, height: 24, borderRadius: 6,
             background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
             transition: 'background 0.15s ease',
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="4" y1="8" x2="14" y2="8" /><line x1="18" y1="8" x2="20" y2="8" /><circle cx="16" cy="8" r="2" />
             <line x1="4" y1="16" x2="8" y2="16" /><line x1="12" y1="16" x2="20" y2="16" /><circle cx="10" cy="16" r="2" />
           </svg>
@@ -5128,16 +5114,6 @@ export const AppManager: React.FC = () => {
                   {windowControls === 'traffic' ? 'Switch to System Controls' : 'Switch to Traffic Lights'}
                 </button>
                 )}
-                {/* Battery detail */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: 'var(--space-2) 14px', fontSize: 13, color: 'var(--color-text-primary)',
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="7" width="18" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>
-                  </svg>
-                  Battery: {batteryLevel}%{batteryCharging ? ' (Charging)' : ''}
-                </div>
               </div>
             </>
           )}
@@ -5268,7 +5244,7 @@ export const AppManager: React.FC = () => {
             style={{
               [splitMode === 'horizontal' ? 'width' : 'height']: 6,
               [splitMode === 'horizontal' ? 'cursor' : 'cursor']: splitMode === 'horizontal' ? 'col-resize' : 'row-resize',
-              background: splitDragging.current ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+              background: splitDragging.current ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
               transition: 'background 0.25s cubic-bezier(0.4,0,0.2,1)',
               flexShrink: 0, zIndex: 10, position: 'relative',
             }}

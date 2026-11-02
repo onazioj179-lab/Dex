@@ -72,7 +72,7 @@ export const MiniPlayer: React.FC = () => {
         width: 320, maxWidth: 'calc(100vw - 32px)',
         display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
         padding: '10px var(--space-3)',
-        background: '#0E0E11',
+        background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-xl)',
         boxShadow: '0 10px 30px rgba(0,0,0,0.5), inset 0 0.5px 0 rgba(255,255,255,0.05)',

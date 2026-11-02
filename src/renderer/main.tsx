@@ -109,8 +109,9 @@ installSchemePresetSync();
 import { hydrateKeystore } from './uki/keystore';
 void hydrateKeystore();
 // Discover the models installed in a local Ollama (localhost only, 2 s timeout).
-import { refreshOllamaModels } from './uki/providers/ollama';
-void refreshOllamaModels();
+// Only when the user has turned on the local AI connection (never by default).
+import { isLocalAiEnabled, refreshOllamaModels } from './uki/providers/ollama';
+if (isLocalAiEnabled()) void refreshOllamaModels();
 
 import { initIdleContinuity } from './services/IdleContinuity';
 initIdleContinuity();

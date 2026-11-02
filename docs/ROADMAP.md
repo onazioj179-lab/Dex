@@ -174,6 +174,15 @@
 >    sweeps; handle large data (TB-scale) with less energy — VirtualList everywhere a list can grow, native Rust
 >    for heavy lifting (audio DSP + search index precedent).
 >
+> **CHECKPOINT (2026-11-02) — DEX OS 7.0.1 (Part 6) on `claude/dex-part4`, merged with `main` through #72.**
+> Interface Transparency slider (0–100, default 55 = refined glass) replaces the glass mode/tint/opacity controls;
+> Calculator rebuilt (safe parser, focus-scoped keys); battery out of the top bar; DEX Bar reserves its strip;
+> one live-activity store with honest failure/cancel; local AI (Ollama) opt-in, no startup probe; thermal monitor
+> samples in bursts (was a perpetual rAF loop); notification sound setting reaches the Windows toast; release
+> profile (thin LTO), installer metadata, bundle gate (dev-file check, SHA256SUMS, signature status).
+> Not done: signing (no cert), packaged smoke of 7.0.1, perf traces, high-DPI. Evidence and verdict (NOT READY):
+> `DEX_7.0.1_VERIFICATION.md`; open items: `DEX_REMAINING_WORK.md` #1–#36.
+>
 > **CHECKPOINT (2026-07-01, later) — Stage Manager + UKI background tasks shipped (this session).**
 > Verified live in the Vite preview (driven via `dex-stage-toggle`/F3/Escape events + computed transforms, per the
 > never-screenshot rule): 3 running apps fly into a centered grid at scale ~0.38 with aspect preserved, hit-target

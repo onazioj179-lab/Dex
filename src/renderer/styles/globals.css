@@ -266,7 +266,9 @@ body,
    GPU-compat fallback adds html.dex-no-blur. Perf-tier / thermal gates (below +
    design-system.css) independently strip blur on weak/hot hardware. This
    replaces the former unconditional `* { backdrop-filter:none !important }`
-   that killed real glass on every tier regardless of the user's setting. */
+   that killed real glass on every tier regardless of the user's setting.
+   Only backdrop blur is removed: plain `filter` stays, because hover feedback
+   (brightness) and image previews depend on it. */
 html[data-no-blur="true"] *,
 html[data-no-blur="true"] *::before,
 html[data-no-blur="true"] *::after,
@@ -275,7 +277,6 @@ html.dex-no-blur *::before,
 html.dex-no-blur *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  filter: none !important;
 }
 
 /* ── Skip Navigation Link ─────────────────────────────────────────────────── */

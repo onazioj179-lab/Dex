@@ -360,7 +360,7 @@ const PDFViewer: React.FC = () => {
             title="Toggle highlight annotation mode"
             style={{
               ...btn,
-              background: annotateMode ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              background: annotateMode ? 'var(--color-accent-fill)' : 'var(--color-bg-elevated)',
               color: annotateMode ? '#fff' : 'var(--color-text-primary)',
               borderColor: annotateMode ? 'var(--color-accent)' : 'var(--color-border-subtle)',
             }}

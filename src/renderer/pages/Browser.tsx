@@ -1303,16 +1303,16 @@ export const Browser: React.FC = () => {
           updateActivity(actId, pct);
         }
       } else if (tracked.has(d.id)) {
-        // Reached a terminal state (completed / error) — close the card.
+        // Reached a terminal state — close the card as done or failed.
         tracked.delete(d.id);
-        completeActivity(actId);
+        completeActivity(actId, d.status === 'error');
       }
     });
     // A download item removed from the list while still in flight — close it too.
     tracked.forEach((_pct, id) => {
       if (!seen.has(id)) {
         tracked.delete(id);
-        completeActivity(`browser-${id}`);
+        completeActivity(`browser-${id}`, true);
       }
     });
   }, [downloads]);
@@ -2226,7 +2226,7 @@ export const Browser: React.FC = () => {
                   <div style={{
                     ...styles.downloadBar,
                     width: `${d.progress}%`,
-                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent)',
+                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent-fill)',
                   }} />
                 </div>
                 <span style={styles.downloadStatus}>
