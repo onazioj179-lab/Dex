@@ -27,6 +27,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 
 // ===========================================================================
 // TYPES
@@ -40,7 +41,12 @@ interface FileItem {
   modified: Date;
   extension: string;
   category?: string;
+  /** Dotfile or Windows HIDDEN/SYSTEM attribute (from files:list). */
+  hidden?: boolean;
 }
+
+/** Settings > Files > Thumbnail Size -> grid tile width. */
+const THUMB_TILE: Record<string, number> = { small: 110, medium: 140, large: 190 };
 
 interface QuickAccessItem {
   id: string;
@@ -376,7 +382,9 @@ export const Files: React.FC = () => {
   // localStorage so the chosen ordering survives reloads, consistent with the
   // page's other dex-* prefs (tags, smart folders).
   const [filters, setFilters] = useState<SearchFilters>(() => {
-    let sortBy: SearchFilters['sortBy'] = 'name';
+    const settingSort = readDexSetting<string>('sortBy', 'name');
+    let sortBy: SearchFilters['sortBy'] = (['name', 'date', 'size', 'type'] as const).includes(settingSort as SearchFilters['sortBy'])
+      ? settingSort as SearchFilters['sortBy'] : 'name';
     let sortDir: SearchFilters['sortDir'] = 'asc';
     try {
       const saved = JSON.parse(localStorage.getItem('dex-files-sort') || '{}');
@@ -392,6 +400,21 @@ export const Files: React.FC = () => {
       sortDir,
     };
   });
+
+  // Settings > Files. Read live so changing them in Settings applies at once.
+  const showHiddenFiles = useDexSetting<boolean>('showHiddenFiles', false);
+  const confirmDeleteSetting = useDexSetting<boolean>('confirmDelete', true);
+  const thumbnailSize = useDexSetting<string>('thumbnailSize', 'medium');
+  const settingSortBy = useDexSetting<string>('sortBy', 'name');
+  const firstSortSync = useRef(true);
+  useEffect(() => {
+    // Changing "Sort By" in Settings re-sorts Files; the initial value is
+    // already applied above (without overriding a sort picked in Files).
+    if (firstSortSync.current) { firstSortSync.current = false; return; }
+    if ((['name', 'date', 'size', 'type'] as const).includes(settingSortBy as SearchFilters['sortBy'])) {
+      setFilters(f => ({ ...f, sortBy: settingSortBy as SearchFilters['sortBy'] }));
+    }
+  }, [settingSortBy]);
 
   // Persist sort preference whenever it changes.
   useEffect(() => {
@@ -872,7 +895,7 @@ export const Files: React.FC = () => {
 
   const handleDeleteFile = async (file: FileItem) => {
     setContextMenu(null);
-    const confirmed = await confirm({
+    const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move to Trash?',
       message: `"${file.name}" will be moved to the recycle bin.`,
       confirmLabel: 'Move to Trash',
@@ -935,7 +958,7 @@ export const Files: React.FC = () => {
   const handleBatchDelete = useCallback(async () => {
     if (selectedFiles.size === 0) return;
     const count = selectedFiles.size;
-    const confirmed = await confirm({
+    const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move selected to Trash?',
       message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
       confirmLabel: 'Move to Trash',
@@ -966,7 +989,7 @@ export const Files: React.FC = () => {
     loadFiles(currentPath);
     if (done > 0) toast.success(`Deleted ${done} item${done === 1 ? '' : 's'}`);
     if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
-  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm]);
+  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm, confirmDeleteSetting]);
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
@@ -1264,7 +1287,7 @@ export const Files: React.FC = () => {
 
   // Smart filtering with multiple criteria
   const filteredFiles = useMemo(() => {
-    let result = [...files];
+    let result = showHiddenFiles ? [...files] : files.filter(f => !f.hidden && !f.name.startsWith('.'));
 
     // If viewing a smart collection, filter by category
     if (activeCollection) {
@@ -1358,7 +1381,7 @@ export const Files: React.FC = () => {
     });
 
     return result;
-  }, [files, filters, activeCollection, recentFiles, activeTagFilter, fileTags]);
+  }, [files, filters, activeCollection, recentFiles, activeTagFilter, fileTags, showHiddenFiles]);
 
   // Keep the render-order path list current for Shift+click range selection.
   useEffect(() => { orderedPathsRef.current = filteredFiles.map(f => f.path); }, [filteredFiles]);
@@ -2143,7 +2166,7 @@ export const Files: React.FC = () => {
               })}
             </div>
           ) : (
-            <div style={styles.gridContainer} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
+            <div style={{ ...styles.gridContainer, gridTemplateColumns: `repeat(auto-fill, minmax(${THUMB_TILE[thumbnailSize] ?? 140}px, 1fr))` }} onClick={(e) => { if (e.target === e.currentTarget && selectedFiles.size > 0) clearSelection(); }}>
               {filteredFiles.length === 0 ? (
                 hasActiveFilter ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>

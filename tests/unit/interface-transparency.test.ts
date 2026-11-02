@@ -37,8 +37,10 @@ describe('interface transparency material', () => {
     expect(m.panel).toBeGreaterThanOrEqual(88);
   });
 
-  it('defaults to opaque and migrates old glass modes onto the slider', () => {
-    expect(DEFAULT_SHELL_PREFERENCES.interfaceTransparency).toBe(0);
+  it('defaults to refined glass (20px blur, ~75% fill) and maps old glass modes onto the slider', () => {
+    expect(DEFAULT_SHELL_PREFERENCES.interfaceTransparency).toBe(55);
+    expect(computeInterfaceMaterial(55)).toMatchObject({ blur: 20, panel: 75 });
+    expect(mergePrefs({ glassMode: 'normal' }).interfaceTransparency).toBe(55);
     expect(mergePrefs({ glassMode: 'liquid' }).interfaceTransparency).toBe(100);
     expect(mergePrefs({ glassMode: 'off' }).interfaceTransparency).toBe(0);
     expect(mergePrefs({ interfaceTransparency: 140 }).interfaceTransparency).toBe(100);

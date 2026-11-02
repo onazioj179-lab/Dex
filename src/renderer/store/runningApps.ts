@@ -386,7 +386,8 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative' },
   learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
   collabhub: { name: 'Collab Hub', color: '#5E5CE6', icon: 'collabhub', shortcut: 'Alt+H', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints', category: 'productivity' },
-  canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Clean drawing canvas for freeform sketching and drawing', category: 'creative' },
+  canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Whiteboard and drawing: sticky notes, shapes, frames, connectors, images and paint layers', category: 'creative' },
+  creativehub: { name: 'Creative Hub', color: '#5E5CE6', icon: 'palette', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Recent projects, creative apps, templates and storage in one place', category: 'creative' },
   timer: { name: 'Timer', color: '#30D158', icon: 'timer', shortcut: 'Alt+M', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Simple countdown timer with presets', category: 'utility' },
 
   // New Standalone Apps (Wave 15) -- unique icon keys (NOT generic file-type icons)

@@ -8,7 +8,7 @@ Part 3 started with the completion gate (`PART1_PART2_COMPLETION_AUDIT.md`). Fol
 
 | Item | What changed | Files | Verification |
 |---|---|---|---|
-| Creator attribution | Removed AI-tool lines from PR #60/#61 bodies and `docs/archive/PR-DESCRIPTION.md`; no AI trailers in history; none added going forward | PR bodies, `docs/archive/PR-DESCRIPTION.md` | `git grep` clean; `gh pr view` |
+| Creator attribution | Removed AI-tool lines from PR #60/#61 bodies and `docs/archive/PR-DESCRIPTION.md` (since retired); no AI trailers in history; none added going forward | PR bodies, `docs/archive/PR-DESCRIPTION.md` (since retired) | `git grep` clean; `gh pr view` |
 | Shell allowlist (Part 1 carry-over) | `shell:openExternal/openPath` restricted | PR #62 | 7 Rust tests; merges cleanly with `main` and #61 |
 | macOS-blue accent (owner choice) | Gold and green removed; dark `#0A84FF`, light `#0066CC` (AA), white text on accent; toggles use accent; Omnitrix preset removed; one-time migration of stored green | `design-system.css`, `index.html`, `ThemeManager.tsx`, `Settings.tsx` | Live contrast audit; screenshot shows blue toggles/selection |
 | Neutral graphite surfaces | Base `#111214`, surface `#1B1D20`; light `#F8F8F6`/`#FFFFFF`; text `#F5F5F2`/`#202124` | same | Live audit: 17.2:1 / 15.1:1 |
@@ -54,3 +54,11 @@ See the test section of `DEX_RELEASE_NOTES.md` for the final run on this branch.
 | Radius sweep | Done: all 636 remaining in-app values snapped; guard now at **0** | Ratchet test; tsc |
 | Canvas boards + folders (IndexedDB) | Done | 5 unit tests incl. migration safety |
 | Form-control borders (>=3:1) | Done (PR #65) | Token contrast computed |
+
+## Apps follow the theme (branch `claude/dex-apps-theme-tokens`)
+
+| Item | Status | Verification |
+|---|---|---|
+| Green removed from switches OS-wide | Done: Settings (5 switches), global `.dex-toggle`, Quick Controls permissions, AppManager, Audio, Browser, Workflows now use the accent. Green stays only where it means "OK" (status dots, meters, "Included with DEX") | tsc; grep shows no green on/off switch left |
+| Imosion chrome on tokens | Done: ~230 lines. Borders, menus, hover/selection tints, tabs, export button and selected states moved from a private zinc + green palette to tokens/accent. Track, pad and preset colors untouched (content) | Preview: computed accent `#0A84FF` on primary/active buttons |
+| Imosion in light mode | Fixed: it was half light / half dark with invisible title and track names. Now pinned dark like other DAWs via `.dex-theme-dark`, which re-declares only neutral tokens (custom accent still flows) | Preview in light mode: root bg `#111214`, text `#F5F5F2`, no console errors; `theme-dark-pin.test.ts` (4) keeps it in sync with `:root` |

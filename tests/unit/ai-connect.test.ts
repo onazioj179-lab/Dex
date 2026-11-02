@@ -108,7 +108,12 @@ describe('routeConfiguredModels (registry + keystore + Smart Router)', () => {
     expect(r).toContain('gpt-4o');
   });
 
-  it('offline pulls local (keyless) providers even with no key stored', () => {
+  it('offline routes nowhere until the user connects local AI', () => {
+    expect(routeConfiguredModels('offline', 'hi')).toEqual([]);
+  });
+
+  it('offline pulls local (keyless) providers once local AI is connected, with no key stored', () => {
+    localStorage.setItem('dex-uki-local-ai-enabled', '1');
     const r = routeConfiguredModels('offline', 'hi');
     expect(r).toContain('llama3.1');
     expect(r.every((id) => ['llama3.1', 'qwen2.5', 'mistral'].includes(id))).toBe(true);

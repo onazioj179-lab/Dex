@@ -887,7 +887,7 @@ time-tracking, vinx-presentation, version-history, voice-memo, word-count.
 
 **Earlier slice (2026-06-10): zlib tier ported (start of the non-DB tail).**
 Added `flate2` (zlib, Node `deflateSync`/`inflateSync` byte parity) + `base64`
-to `src-tauri`, with a shared [src-tauri/src/zlib.rs](src-tauri/src/zlib.rs)
+to `src-tauri`, with a shared [src-tauri/src/zlib.rs](../src-tauri/src/zlib.rs)
 helper. Three subsystems went from degrade to fully native:
   - **version-history**: `save`/`getState`/`restore` now deflate/inflate the
     snapshot BLOB (+ 50-version trim), interoperable with Electron-written DBs.
@@ -902,12 +902,12 @@ Also fixed: `assets/icon.png` converted palette -> RGBA (Tauri's
 harmless elsewhere). Note for Linux dev boxes: `cargo check` needs
 `libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev` — and beware
 `cargo check | tail` masking the exit code. `cargo check` green, zero warnings;
-`core` tests green. `docs/RELEASE_NOTES.md` was cleared ahead of the next
+`core` tests green. `docs/RELEASE_NOTES.md` (retired 2026-11-01 in favour of `DEX_RELEASE_NOTES.md`) was cleared ahead of the next
 release line (publish new notes there once the migrated build ships).
 
 **Earlier slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
 share `dex.db` through the native `db.rs` connection and route via
-`db_dispatch` (one channel-prefix arm each) in [main.rs](src-tauri/src/main.rs):
+`db_dispatch` (one channel-prefix arm each) in [main.rs](../src-tauri/src/main.rs):
 activity-feed, changelog, color-labels, dashboard, goal-system, help, journal,
 layout, licensing (+ telemetry/crash, self-contained SHA-256), read-later,
 recycle-bin, time-tracking, word-count. Each module copies its Electron

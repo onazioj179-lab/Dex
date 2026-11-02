@@ -72,6 +72,26 @@ they are scoped to the focused app and do not appear in the global catalog:
 - **Any modal / overlay** — `Escape` closes it (now uniformly, incl. the Kanban
   card editor).
 
+## Spatial desktop
+
+Active once the canvas is on (Settings › Window Management, or `Ctrl/Cmd+Alt+S`).
+On the canvas, `Ctrl/Cmd+Alt+Arrows` pan instead of tiling.
+
+| Keys | Action |
+|---|---|
+| `Ctrl/Cmd+Alt+S` | Turn the spatial desktop on / off |
+| `Ctrl/Cmd+Alt+=` / `-` / `0` | Zoom in / out / actual size |
+| `Ctrl/Cmd+Alt+F` | Show all windows |
+| `Ctrl/Cmd+Alt+Enter` | Zoom to the front window |
+| `Ctrl/Cmd+Alt+Arrows` | Pan |
+| `Ctrl/Cmd+Alt+Backspace` | Previous view |
+| `Ctrl/Cmd+Alt+W` | Find a window (all windows and groups) |
+| `Ctrl/Cmd+Alt+G` | Group the windows in view |
+| `Ctrl/Cmd+Alt+M` | Minimap |
+| Wheel / two-finger scroll over the desktop | Pan |
+| `Ctrl`+wheel or pinch over the desktop, `Alt`+wheel anywhere | Zoom at the pointer |
+| Middle-drag, or `Space`+drag | Pan |
+
 ## Run a command from the terminal
 
 ```

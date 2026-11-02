@@ -27,6 +27,12 @@ export const DEX_SHELL_PREFS_KEY = 'dex-shell-preferences-v1';
 // install that still has a translucent glass mode persisted is flipped to 'off'
 // exactly once. Presence of this key means the migration already ran.
 const GLASS_REMOVED_FLAG = 'dex-glass-removed-v1';
+// Part 5 (owner, 2026-11): refined glass returns as the default for shell
+// chrome. Flips the earlier forced 'off' to 'normal' ONCE; afterwards the
+// Settings switch is the user's choice and is never overridden again.
+const GLASS_REFINED_FLAG = 'dex-glass-refined-v1';
+/** The pre-Part-5 default tint; treated as 'use the theme's own surface'. */
+const LEGACY_DEFAULT_TINT = '#0a0a0a';
 
 export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 
@@ -71,15 +77,14 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
   dockAlign: 'center',
   dockPreset: 'regular',
-  // No glass out of the box (owner direction, 2026-07): the WHOLE OS reads as one
-  // consistent, solid, non-translucent surface — every menu, panel, dropdown,
-  // sidebar, and the floating chrome (DEX Bar). 'off' makes applyGlassVars() emit
-  // fully-opaque true-black surfaces with zero blur. The Settings toggle can still
-  // opt back into translucent glass for anyone who wants it.
-  glassOpacity: 1,
-  glassTint: '#0a0a0a',
-  glassMode: 'off',
-  interfaceTransparency: 0,
+  // Refined glass (Part 5, owner 2026-11): shell chrome and menus are a
+  // restrained translucent material (theme-tinted, 20px blur); app windows stay
+  // solid. Interface Transparency 55 is that look (20px blur, ~75% fill);
+  // reduced transparency, low-end mode or the slider at 0 fall back to solid.
+  glassOpacity: 0.82,
+  glassTint: LEGACY_DEFAULT_TINT,
+  glassMode: 'normal',
+  interfaceTransparency: 55,
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -123,16 +128,21 @@ function loadInitial(): ShellPreferences {
     if (!raw) return { ...DEFAULT_SHELL_PREFERENCES };
     const parsed = JSON.parse(raw);
     const merged = mergePrefs(parsed);
-    // One-time glass-removal migration: flip a previously-saved translucent glass
-    // mode to solid ONCE so existing installs match the new consistent default.
-    // The Settings toggle still works afterwards for deliberate re-enable.
+    // One-time refined-glass migration (see GLASS_REFINED_FLAG). Afterwards the
+    // Interface Transparency slider is the user's choice and is never overridden.
     try {
-      if (localStorage.getItem(GLASS_REMOVED_FLAG) !== '1') {
-        if (merged.glassMode !== 'off') { merged.glassMode = 'off'; merged.glassOpacity = 1; merged.interfaceTransparency = 0; }
+      if (localStorage.getItem(GLASS_REFINED_FLAG) !== '1') {
+        // Installs that were forced solid in 2026-07 get the refined default once.
+        if (merged.interfaceTransparency === 0) {
+          merged.interfaceTransparency = DEFAULT_SHELL_PREFERENCES.interfaceTransparency;
+          merged.glassMode = modeForTransparency(merged.interfaceTransparency);
+          merged.glassOpacity = DEFAULT_SHELL_PREFERENCES.glassOpacity;
+        }
+        localStorage.setItem(GLASS_REFINED_FLAG, '1');
         localStorage.setItem(GLASS_REMOVED_FLAG, '1');
         persist(merged);
       }
-    } catch { /* quota / sandbox — the new default already lands 'off' */ }
+    } catch { /* quota / sandbox — the new default already lands 'normal' */ }
     return merged;
   } catch {
     return { ...DEFAULT_SHELL_PREFERENCES };
@@ -169,7 +179,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   return base;
 }
 
-const MODE_TRANSPARENCY: Record<GlassMode, number> = { off: 0, reduced: 25, normal: 60, liquid: 100 };
+const MODE_TRANSPARENCY: Record<GlassMode, number> = { off: 0, reduced: 25, normal: 55, liquid: 100 };
 
 export function transparencyForMode(mode: GlassMode): number {
   return MODE_TRANSPARENCY[mode] ?? 0;
@@ -243,11 +253,14 @@ export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' 
   if (prefs.lowEndMode) return 'reduced';
   if (typeof window !== 'undefined') {
     try {
-      // Only the transparency preference gates glass. Reduced MOTION used to
-      // count too, which silently disabled the slider on every PC with
-      // Windows' "Animation effects" turned off.
-      const reducedTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
-      if (reducedTransparency) return 'reduced';
+      // Reduce-motion is only a stand-in where the engine can't report the
+      // transparency preference at all (WebView2 can). Otherwise people who
+      // simply turned animations off would never get glass.
+      const mqT = (v: string) => window.matchMedia(`(prefers-reduced-transparency: ${v})`).matches;
+      const transparencyQuerySupported = mqT('reduce') || mqT('no-preference');
+      const reducedTransparency = mqT('reduce');
+      const reducedMotion = !transparencyQuerySupported && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reducedTransparency || reducedMotion) return 'reduced';
       // High-contrast material and Settings > Reduce Transparency: opaque
       // surfaces, nothing showing through.
       const root = document.documentElement;
@@ -362,8 +375,6 @@ export function applyLowEndMode(prefs: Pick<ShellPreferences, 'lowEndMode'>): vo
     root.removeAttribute('data-low-end-mode');
   }
 }
-
-import { hexToRgb } from '../../shared/creative/colorUtils';
 
 // ---------------------------------------------------------------------------
 // Store

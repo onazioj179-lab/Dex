@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Early DEX builds shipped a SharedTick that drove every subscriber on `requestAnimationFrame` regardless of whether the host window was visible, focused, or under thermal pressure. KPI baselines (see [KPI_BASELINES.md](../KPI_BASELINES.md)) showed idle CPU floor of ~7% on a quiet shell — unacceptable for a desktop OS-shell that is supposed to disappear into the background.
+Early DEX builds shipped a SharedTick that drove every subscriber on `requestAnimationFrame` regardless of whether the host window was visible, focused, or under thermal pressure. KPI baselines (see KPI_BASELINES.md (file since retired)) showed idle CPU floor of ~7% on a quiet shell — unacceptable for a desktop OS-shell that is supposed to disappear into the background.
 
 ## Decision
 

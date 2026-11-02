@@ -1,6 +1,6 @@
 # DEX: UI/UX Final Audit (macOS Blue Modern)
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · Supersedes `PART3_UI_UX_AUDIT.md`
+**Date:** 2026-11-01 · **Creator:** Onazi Oj · Supersedes the Part 3 UI/UX audit (retired)
 
 ## Colour
 

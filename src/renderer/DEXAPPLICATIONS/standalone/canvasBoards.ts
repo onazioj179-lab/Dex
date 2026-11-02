@@ -17,7 +17,7 @@
 import { persistGet, persistSet, persistDel } from '../../utils/persistentStore';
 
 export interface BoardLayer { id: string; name: string; visible: boolean; opacity: number; data: string }
-export interface BoardPayload { layers: BoardLayer[]; activeLayerId?: string }
+export interface BoardPayload { layers: BoardLayer[]; activeLayerId?: string; /** Whiteboard objects (see canvasObjects.ts). */ objects?: unknown[] }
 export interface BoardMeta { id: string; name: string; folder: string; updatedAt: number }
 export interface BoardsIndex { boards: BoardMeta[]; activeId: string }
 
@@ -109,4 +109,26 @@ export const deleteBoardData = (id: string, store: BoardStore = idbBoardStore) =
 
 function safeLocalStorage(): Pick<Storage, 'getItem' | 'removeItem'> | null {
   try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
+}
+
+// ---- open requests from other apps (Creative Hub) ----------------------------
+// The Hub may ask Canvas to show a board or start one from a template before
+// Canvas is even mounted, so the request is parked here and consumed once.
+export interface CanvasRequest { boardId?: string; templateId?: string }
+const REQUEST_KEY = 'dex-canvas-request';
+export const CANVAS_REQUEST_EVENT = 'dex-canvas-request';
+
+export function requestCanvas(req: CanvasRequest): void {
+  try { sessionStorage.setItem(REQUEST_KEY, JSON.stringify(req)); } catch { /* private mode */ }
+  try { window.dispatchEvent(new CustomEvent(CANVAS_REQUEST_EVENT)); } catch { /* no DOM */ }
+}
+
+export function takeCanvasRequest(): CanvasRequest | null {
+  try {
+    const raw = sessionStorage.getItem(REQUEST_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(REQUEST_KEY);
+    const r = JSON.parse(raw) as CanvasRequest;
+    return r && typeof r === 'object' ? r : null;
+  } catch { return null; }
 }
