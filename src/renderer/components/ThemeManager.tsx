@@ -150,6 +150,7 @@ export const applyTheme = (preset: ThemePreset) => {
     for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted', '--color-accent-fill']) {
       root.style.removeProperty(prop);
     }
+    root.removeAttribute('data-dex-custom-accent');
   }
   root.style.setProperty('--color-bg-primary', preset.bgPrimary);
   root.style.setProperty('--color-bg-secondary', preset.bgSecondary);

@@ -613,6 +613,76 @@
   /* Tahoe dark is the default -- no overrides required */
 }
 
+/* Always-dark subtree (pro creative apps, e.g. Imosion -- DAWs stay dark like
+   Ableton / FL / Pro Tools). Re-declares ONLY the neutral surface, text, border
+   and status tokens with their :root (dark) values, so a light-mode <html>
+   cannot leak light surfaces into it. Accent is deliberately not pinned: a
+   custom accent is set inline on <html> and must flow through. Kept in sync
+   with :root by tests/unit/theme-dark-pin.test.ts. */
+.dex-theme-dark {
+  color-scheme: dark;
+  --color-bg-active: #333336;
+  --color-bg-base: #111215;
+  --color-bg-blur: #18181A;
+  --color-bg-elevated: #2C2C2E;
+  --color-bg-glass: rgba(28, 28, 30, 0.74);
+  --color-bg-glass-strong: rgba(21, 21, 23, 0.86);
+  --color-bg-hover: #2A2A2D;
+  --color-bg-inset: #161618;
+  --color-bg-overlay: #151517;
+  --color-bg-secondary: #18181A;
+  --color-bg-surface: #1C1C1E;
+  --color-bg-surface-solid: #1C1C1E;
+  --color-bg-tertiary: #2C2C2E;
+  --color-border: rgba(255, 255, 255, 0.16);
+  --color-border-control: #6B6D73;
+  --color-border-default: rgba(255, 255, 255, 0.16);
+  --color-border-glass: rgba(255, 255, 255, 0.16);
+  --color-border-highlight: rgba(255, 255, 255, 0.18);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-error: #FF453A;
+  --color-error-muted: rgba(255, 69, 58, 0.14);
+  --color-scrim: rgba(0, 0, 0, 0.55);
+  --color-success: #34C759;
+  --color-success-muted: rgba(52, 199, 89, 0.14);
+  --color-surface-1: rgba(255, 255, 255, 0.03);
+  --color-surface-2: rgba(255, 255, 255, 0.06);
+  --color-surface-3: rgba(255, 255, 255, 0.09);
+  --color-text-code: #F0F0F2;
+  --color-text-disabled: #58585D;
+  --color-text-inverse: #000000;
+  --color-text-muted: #A0A0A5;
+  --color-text-primary: #F5F5F7;
+  --color-text-secondary: #AEAEB2;
+  --color-text-tertiary: #8E8E93;
+  --color-warning: #FF9F0A;
+  --color-warning-muted: rgba(255, 159, 10, 0.14);
+  color: var(--color-text-primary);
+}
+/* Spatial desktop. A window culled off-screen skips rendering its contents
+   (the app keeps running; DOM and state are untouched). At low zoom the deep
+   window shadows are dropped -- with dozens of windows they dominate paint. */
+[data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
+[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
+.dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
+.dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
+.dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* The default (non-custom) light accent #0066CC is tuned for light surfaces;
+   on the pinned-dark subtree use the dark-scheme default instead. Skipped when
+   the user picked a custom accent (applyAccentFamily marks <html> with
+   data-dex-custom-accent when it writes the accent inline). */
+:root[data-theme="light"]:not([data-dex-custom-accent]) .dex-theme-dark {
+  --color-accent: #0A84FF;
+  --color-accent-fill: #0071E3;
+  --color-accent-hover: #409CFF;
+  --color-accent-dark: #0071E3;
+  --color-accent-light: rgba(10, 132, 255, 0.14);
+  --color-accent-soft: rgba(10, 132, 255, 0.08);
+  --color-accent-muted: rgba(10, 132, 255, 0.10);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PREMIUM UI ANIMATIONS (v3.5.0 - Items 916-921)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -7497,7 +7567,7 @@ input[type="checkbox"][data-toggle]::after {
 }
 .dex-toggle:checked,
 input[type="checkbox"][data-toggle]:checked {
-  background: #30D158;
+  background: var(--color-accent);
 }
 .dex-toggle:checked::after,
 input[type="checkbox"][data-toggle]:checked::after {
@@ -7505,7 +7575,7 @@ input[type="checkbox"][data-toggle]:checked::after {
 }
 .dex-toggle:focus-visible,
 input[type="checkbox"][data-toggle]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(48,209,88,0.30);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 /* Native select polish */
