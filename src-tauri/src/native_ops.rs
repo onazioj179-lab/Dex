@@ -108,12 +108,23 @@ pub fn show_open_dialog(app: &tauri::AppHandle, args: &Value) -> Value {
 /// (DB-backed) AND the OS surface both reflect the notification, matching the
 /// Electron behaviour where `send` also raised a native `Notification`.
 pub fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
+    notify_with_sound(app, title, body, false);
+}
+
+/// Like [`notify`], optionally with the Windows default notification sound.
+/// Without a sound the toast is silent: the WinRT toast writer emits
+/// `<audio silent="true"/>` when no sound is set, so Settings > Notifications >
+/// Sound has to opt in here explicitly.
+pub fn notify_with_sound(app: &tauri::AppHandle, title: &str, body: &str, sound: bool) {
     let mut b = app.notification().builder();
     if !title.is_empty() {
         b = b.title(title);
     }
     if !body.is_empty() {
         b = b.body(body);
+    }
+    if sound {
+        b = b.sound("Default");
     }
     let _ = b.show();
 }

@@ -1,17 +1,17 @@
 # DEX: Remaining Work
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · This is the active backlog. Items from completed task files were moved here before those files were archived.
+**Date:** 2026-11-02 · **Creator:** Onazi Oj · Target: **DEX OS 7.0.1** · This is the active backlog. Items from completed task files were moved here before those files were archived. Evidence for 7.0.1: `DEX_7.0.1_VERIFICATION.md`.
 
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 1 | Merge `claude/dex-part5-spatial` (also carries #67, which merged into a feature branch and never reached `main`) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
+| 1 | Merge `claude/dex-part4` (DEX OS 7.0.1; already contains `main` through PR #72) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
 | 2 | Accurate Privacy Policy | **BLOCKED** | Owner has not approved the rewrite | `PRIVACY.md`, `src/shared/policies.ts` | Approve a rewrite from `docs/privacy/DATA_FLOWS.md` + `docs/reports/DEX_AI_PRIVACY.md` (must disclose Web Speech cloud recognition, provider data flow, Ollama check) | Owner / legal | P0 |
-| 3 | Local AI measured end to end | BLOCKED | Ollama is installed with 0 models; pulling one is a multi-GB download | Ollama | Approve `ollama pull llama3.2:3b`, then measure first token and tokens/s | Owner approval | P1 |
+| 3 | Local AI measured end to end | DEFERRED (owner) | Owner parked Ollama work. 7.0.1 makes local AI opt-in (Settings › AI Providers); DEX installs and starts no runtime | Ollama | None until the owner reopens it | Owner | — |
 | 4 | Cloud AI measured end to end | NOT TESTED | No provider key here | Providers | Add a key; run a scripted agent session (web search + file read) | Owner key | P1 |
 | 5 | Screen sharing in the packaged app | NOT TESTED | The system picker needs a human to choose a window | `uki/screenCapture.ts` | Click "look at my screen", pick a window, confirm one frame is sent and the indicator clears | Tester | P1 |
 | 6 | Clean-machine install test | NOT TESTED | No VM | NSIS/MSI, WebView2 bootstrapper | Install on a VM without WebView2 | VM | P1 |
 | 7 | Screen-reader pass | NOT TESTED | Needs an interactive session | Shell + new assistant controls | Narrator/NVDA walkthrough | Tester | P1 |
-| 8 | Signed updates + downloadable apps | BLOCKED | Needs signing key + hosting | Updater, Store | Owner creates key; choose hosting | Owner | P1 |
+| 8 | Code signing, signed updates, downloadable apps | BLOCKED | No Authenticode certificate and no update-signing key; both 7.0.1 installers report `NotSigned`. Checksums (`SHA256SUMS-7.0.1.txt`) are generated | Installers, updater, Store | Owner buys/creates a certificate and key; configure `bundle.windows.certificateThumbprint` (or a signing command) and the updater pubkey; choose hosting | Owner | P1 |
 | 9 | Cloud model catalog is dated | PARTIAL | Static lists (`gpt-4o`, `claude-3-5-*`, `gemini-1.5-*`) | `uki/providers/*.ts` | Add current model ids per provider (verify ids against provider docs) | — | P2 |
 | 10 | AI spending limits / usage totals | MISSING | Usage counts returned per call are not aggregated | `orchestrator.ts` | Sum `usage` per provider per day; optional cap blocks calls | — | P2 |
 | 11 | Agent resume after app restart | MISSING | Interrupted tasks are marked failed (honest), not resumed | `ukiTasksStore.ts` | Persist step checkpoints + replay | — | P3 |
@@ -35,8 +35,8 @@
 | 24 | Spatial camera ~20–35 ms per update with a large on-screen app (50 windows) | PARTIAL | Dominated by the on-screen app's restyle | AppManager world layer | Profile in packaged build | — | P2 |
 | 25 | Spatial: zones, alignment guides, magnetic snap, distribute, lock, send backward, duplicate view, named viewports, layout export/import, configurable shortcuts, touch-screen gestures | MISSING | Not built yet | `spatialStore.ts` | Build on the store | — | P2 |
 | 26 | Creative suite §7–15 (Design, Photo, Video, Audio, Present, Creative Hub) | NOT STARTED | Scope; existing apps unchanged | Prism, Vinx, Imosion, Presentation, Notes, Canvas | Audit each existing app, then fill real gaps | — | P2 |
-| 27 | Glass / translucency (§16) | BLOCKED | Conflicts with the owner's "glass is out" direction | Shell | Owner decision | Owner | P3 |
-| 28 | Markdown cleanup (§1) | BLOCKED | Deleting documentation needs approval | Root + `docs/` | Owner approves a list | Owner | P3 |
+| 27 | Glass / translucency (§16) | VERIFIED COMPLETE | Owner chose refined glass as default (PR #72); 7.0.1 adds the Interface Transparency slider (0–100, default 55) | `shellPreferencesStore.ts` | — | — | — |
+| 28 | Markdown cleanup (§1) | PARTIAL | 9 task files retired on `main`; 7.0.1 replaced `DEX_RELEASE_NOTES.md` / `DEX_PART4_COMPLETION_REPORT.md` with the 7.0.1 notes and verification (renamed, history kept). Part 1–3 reports kept as evidence | Root + `docs/` | Owner approves deleting `docs/reports/PART*` if evidence is no longer wanted | Owner | P3 |
 | 29 | Foreign native windows on the canvas | NOT APPLICABLE on Windows | No supported way to composite other programs' windows into WebView2 | — | Only via a custom compositor in `dex-os` | — | — |
 
 ## Carried over from retired task files (2026-11-01)
@@ -90,6 +90,18 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 | remove | Focus/Context-prediction/Smart-recents stores are never consumed | `src/renderer/services/IntelligenceLayer.ts` | still present |
 | remove | Per-app focus profiles are stored but never read (no effect) | `src/renderer/services/FocusSessionSystem.ts` | still present |
 
+## 7.0.1 follow-ups (2026-11-02)
+
+| # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
+|---|---|---|---|---|---|---|---|
+| 30 | UI sound effects | PARTIAL | Notification sound now real (Windows default sound, follows Settings › Sound); no other UI sounds. A complete synthesised sound engine in `utils/ux-depth.ts` is never imported | `utils/ux-depth.ts` | Decide which events get sounds, then wire it behind the same setting | Owner design call | P3 |
+| 31 | Packaged-app smoke test of 7.0.1 | NOT TESTED | Needs a run against a copy of the profile (never the real one) | Installer, shell | Install `DEX_7.0.1_x64-setup.exe` over 6.1.0 on a test profile; check startup, slider, Calculator, live activities, upgrade keeps data, uninstall | Tester / VM | P1 |
+| 32 | Startup time, idle memory, theme-switch and glass cost | NOT MEASURED | Needs the packaged app with tracing | Shell | Performance trace at slider 0 / 55 / 100 | — | P2 |
+| 33 | High-DPI (125/150/200%) and multi-monitor | NOT TESTED | Single display | Shell, window manager | Check radii/hairlines and window bounds per scale | Hardware | P2 |
+| 34 | Old local release artifacts | WAITING | 6.1.0 installers remain in the local `target/release/bundle` until 7.0.1 is confirmed installable; published releases untouched | Local build dir | After #31 passes, delete the local 6.1.0 bundles | Owner OK | P3 |
+| 35 | Frontend obfuscation | DECIDED: not added | Minification + identifier mangling only; an obfuscator would break dynamic imports/IPC and slow startup. Sensitive work is in Rust | Build | Revisit only for a specific threat | — | — |
+| 36 | Global Settings toggles still unread | PARTIAL | e.g. Window Management toggles, "Enable Global Shortcuts" (see the carried-over audit list) | `pages/Settings.tsx` | Wire or remove each | — | P2 |
+
 ## Release status
 
-**NOT READY** until #1 and #2 are done. After that: **READY WITH DOCUMENTED LIMITATIONS** (items 3–29). None of those items is a crash or data-loss defect.
+**NOT READY** until #1 (merge), #2 (Privacy Policy) and #8 (signing) are done and #31 passes. After that: **READY WITH DOCUMENTED LIMITATIONS**. None of the open items is a known crash or data-loss defect.

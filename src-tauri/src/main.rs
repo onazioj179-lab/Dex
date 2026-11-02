@@ -2426,11 +2426,13 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                     // `osToastPrivate: true` = DEX is locked. Windows toasts show
                     // above the lock screen, so reveal nothing but the fact.
                     let private = p.get("osToastPrivate").and_then(|v| v.as_bool()).unwrap_or(false);
+                    // `osToastSound: true` = Settings > Notifications > Sound is on.
+                    let sound = p.get("osToastSound").and_then(|v| v.as_bool()).unwrap_or(false);
                     if os_toast && (!title.is_empty() || !body.is_empty()) {
                         if private {
-                            native_ops::notify(&app, "DEX", "You have a new notification");
+                            native_ops::notify_with_sound(&app, "DEX", "You have a new notification", sound);
                         } else {
-                            native_ops::notify(&app, title, body);
+                            native_ops::notify_with_sound(&app, title, body, sound);
                         }
                     }
                 }

@@ -1,85 +1,47 @@
-# DEX — Release Notes (6.1.x)
+# DEX OS 7.0.1 — Release Notes
 
-**Creator:** Onazi Oj
+**Creator:** Onazi Oj · **Theme:** DEX Blue Modern · Changes since 6.1.0 (the last published release).
 
-## New in this release: UKI assistant
+## New
 
-- **Choose where your requests go.** Settings › AI Providers › Processing: Hybrid, **Local only** (nothing leaves your PC), Cloud only, or one pinned model. DEX enforces this itself. Before, the "Offline" choice could still send a streamed reply request to a cloud provider.
-- **Reasoning effort:** Automatic, Fast, Balanced or Deep. This controls how many steps UKI may take and how long its answers can be.
-- **UKI can work with your files**, but only inside Documents, Desktop and Downloads and only after you allow it in Permissions. It always asks before creating, renaming or moving anything. Deleting always goes to the Recycle Bin.
-- **Pause, resume or cancel** UKI's background tasks from Nexus. Cancel stops the request immediately.
-- **Activity log:** everything UKI does is recorded in Security Center (kept across restarts). You can clear it.
-- **Memory you control:** view what UKI remembers, forget single items, export it all as JSON, or clear everything.
-- **Your AI keys are encrypted** with Windows DPAPI. Keys saved by older versions are moved into secure storage automatically.
-- **Local AI works in the desktop app.** Ollama used to refuse DEX's requests. DEX now talks to it directly on this PC, finds the installed models, and uses them without any key.
-- **See and limit AI usage:** today's tokens per provider, plus an optional daily limit for cloud AI. Local models are never limited.
-- **"Look at my screen" works again** in the desktop app. You pick the window to share in the Windows picker, and DEX takes one frame.
-- **"Use my camera"** in UKI takes one photo for your next message. The camera turns off before anything is sent.
+- **Interface Transparency.** One slider in Settings › Appearance (and in Control Center) from 0% (fully opaque, no blur) to 100% (maximum glass). It changes the top bar, DEX Bar, menus, panels and window chrome live, works in light and dark mode, and is saved. Refined glass is the default (55%). Reduce Transparency, High Contrast and low-end mode keep surfaces opaque; on a weak GPU the blur is dropped but surfaces stay readable.
+- **Calculator, rebuilt.** Keypad scales with the window, the pending operator stays highlighted, C clears the entry and AC clears everything, pressing = again repeats the last step, `200 + 10%` gives 220, and dividing by zero says so. Typed expressions (`sqrt(2)`, `5 km in mi`, `20% of 80`) use a safe parser.
+- **One place for long tasks.** Downloads, file copies, exports and transfers show as small cards in the top-right corner with real progress, and Cancel where the task supports it. A failed or cancelled task now says so instead of "Done".
+- **UKI assistant** (from the 6.1.x work, unreleased until now): choose where requests go (Local only, Hybrid, Cloud only, or one pinned model), reasoning effort, file actions limited to Documents/Desktop/Downloads with confirmation, pause/resume/cancel for background tasks, an activity log, memory you can view/forget/export/clear, AI keys encrypted with Windows DPAPI, daily AI usage and an optional cloud limit, "Look at my screen" and "Use my camera" (one frame each).
+- **Spatial desktop and Creative Hub** (from Part 5, merged): windows on a pan/zoom canvas with zones, snapping and saved views; Creative Hub and whiteboard templates.
+
+## Changed
+
+- **Local AI is opt-in.** DEX no longer checks for Ollama on every start or uses it just because it is running. Turn on "Connect to a local AI service (Ollama)" in Settings › AI Providers if you want it. DEX never installs or starts an AI runtime.
+- **Battery is no longer in the top bar.** It is in Control Center, which also says when a PC has no battery.
+- **The DEX Bar no longer covers app content.** Apps and maximized windows end above it.
+- **About** shows the version, the creator (Onazi Oj), the correct license, and where the open-source notices are.
 
 ## Fixed
 
-- **DEX starts again.** Installs of 6.0.x could fail with "WebView2Loader.dll was not found" even though WebView2 was installed. The installer now produces an app that starts reliably.
-- **No more blank window at startup** in the installed app.
-- **Clear messages instead of silent failure** if the WebView2 runtime is missing or the window can't load, with a log saved for support.
-- **Opening DEX twice** brings the existing window forward instead of starting a second copy.
-- **Light mode is readable** again (text was nearly invisible). The top bar, menus, dock and panels no longer stay dark in light mode.
-- **Notes:** "Attach file" and "Import" work.
-- **Maps:** Satellite and Topo styles load. UKI answers for time, word definitions and currency work.
+- Turning off Windows animation effects no longer turns off glass.
+- Hover feedback came back in about a dozen apps (it was switched off whenever glass was off).
+- The Calculator reacted to Enter, Escape and number keys pressed in other apps while it was open in the background.
+- DEX starts reliably on machines where 6.0.x failed with "WebView2Loader.dll was not found"; opening DEX twice focuses the existing window.
+- Light mode: the top bar, menus, dock and panels no longer stay dark; the live-activity card is readable in light mode.
 
 ## Faster
 
-- DEX uses **much less CPU while idle**: about 1–2% of a core instead of 50–100%. It no longer rebuilds the file search index every time it starts.
-- Smaller installer (14 MB).
-- Buttons and toggles use an accessible blue (white text now meets WCAG AA in dark mode).
+- DEX no longer runs a frame-by-frame monitor in the background. Idle Home: no frame callbacks and about one timer wake-up every 5 seconds. Minimizing DEX no longer makes it think the PC is overheating and turn effects off.
+- Release builds use link-time optimisation. Installers: NSIS 14.3 MB (was 15.1), MSI 17.8 MB (was 19.0).
 
-## Privacy and honesty
+## Security and integrity
 
-- Turning off **Memory Recording**, **Allow Notifications**, **Enable UKI** or **Location Services** now really turns those things off.
-- UKI no longer sends your messages to a third-party service when you haven't set up an AI provider.
-- Removed settings that did nothing (including "firewall", "VPN" and "malware" switches that protected nothing). Hardware settings now open the right Windows Settings page.
-- DEX makes no internet connections at startup or while idle. The only startup request is a check for a local Ollama on this PC (127.0.0.1).
-- **Clear All Memory** now really clears everything. It used to leave the saved conversations and transcript behind. With Memory Recording off, the transcript is no longer saved.
-
-## New look
-
-- Neutral graphite surfaces with the **macOS system-blue** accent.
-- Consistent corner radius and motion timing.
-- Respects your "reduce motion" preference.
-
-## Storage
-
-- **Settings › Storage** shows what DEX actually uses and can clear its caches safely. Your notes, settings and backups are kept.
-
-## Colour fixes
-
-- Switches across DEX use the system blue now. The last green on/off switches are gone.
-- Imosion stays dark and readable in light mode, like other pro audio apps. Its title, track names and menus used to disappear.
-
-## Spatial desktop (new)
-
-- Turn it on in **Settings › Window Management**, or press **Ctrl+Alt+S**. Your windows sit on a canvas you can pan and zoom (5–300%), while the apps stay live and usable.
-- Zoom toward the pointer (Ctrl+wheel or pinch over the desktop, or Alt+wheel anywhere). Pan with the wheel, middle-drag or Space+drag.
-- Use **Show all**, **Previous view** and **zoom to a window** (the maximize button does this on the canvas). There's also a minimap.
-- Group windows, then move, collapse or jump to the group. Arrange windows as a grid, masonry, row or cascade, with one-step undo.
-- **Find a window** (Ctrl+Alt+W) lists every window, including minimized ones, so you can use the canvas from the keyboard alone.
-- Leaving the canvas puts your windows back exactly where they were.
-
-## Fixes
-
-- Windows no longer jump up when you open or close another app.
-- Ctrl+Alt+W no longer closes the current app.
-- Dragging and resizing windows, and other style changes, no longer make the browser recompute large parts of the page. A stylesheet bug made this cost up to seconds with many windows open.
+- No private keys or tokens in the source, the app bundle or the installers (scanned).
+- The release check refuses builds that would ship source maps, environment files or tests, and writes a SHA-256 checksum file for the installers.
+- Installer metadata names the publisher (Onazi Oj) and ships the license and third-party notices.
 
 ## Known limitations
 
-- UKI needs an AI provider key, or an installed Ollama model, for free-form requests. Cloud and local model speed haven't been measured yet.
-- There is no cross-device sync yet. The daily AI limit counts tokens, not money.
-- In-app updates aren't available yet.
-- Removing an app hides it, but doesn't free disk space.
-- The Privacy Policy text is being updated.
-- Screen-reader support hasn't been fully tested.
-- The spatial desktop shows DEX's own apps only. Other programs' windows can't be placed on it.
+- **The installers are not code-signed** (no certificate is configured), so Windows SmartScreen may warn on first run. In-app updates are not available.
+- UKI needs an AI provider key, or a connected local Ollama with a model, for free-form requests.
+- No cross-device sync; the AI limit counts tokens, not money.
+- The Privacy Policy text is awaiting the owner's approval of the rewrite.
+- Screen-reader, clean-VM install, multi-monitor and high-DPI checks were not run.
 
-## Test status (this branch)
-
-See `DEX_PART4_COMPLETION_REPORT.md` for the commands, results and remaining gaps. Older evidence: `docs/reports/`.
+Full evidence: `DEX_7.0.1_VERIFICATION.md`. Open items: `DEX_REMAINING_WORK.md`.

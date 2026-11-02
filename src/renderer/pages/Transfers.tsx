@@ -15,6 +15,7 @@ import { DexSearchInput } from '../styles/components';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
+import { notificationSoundEnabled } from '../utils/notificationsAllowed';
 
 // QR Code encoder — Version 1-4 byte mode with L error correction (item 108)
 // Produces a real scannable QR code, no external library needed
@@ -392,9 +393,11 @@ const Transfers: React.FC = () => {
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Transfer failed' } }));
       } catch (e) { console.warn('[Transfers] transfer error handler:', e); }
     };
+    // Transfer chimes follow both this page's toggle and Settings > Sound.
+    const chimeOn = () => soundEnabledRef.current && notificationSoundEnabled();
     const onSendComplete = () => {
       window.dex?.dtp?.getHistory?.(50).then((h: TransferHistoryEntry[]) => { if (h) setHistory(h); }).catch(() => { /* history unavailable */ });
-      if (soundEnabledRef.current) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
+      if (chimeOn()) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
     };
     const onTransferProgress = (info: any) => {
       recordProgress(info);
@@ -406,7 +409,7 @@ const Transfers: React.FC = () => {
     };
     const onTransferComplete = () => {
       window.dex?.dtp?.getHistory?.(50).then((h: TransferHistoryEntry[]) => { if (h) setHistory(h); }).catch(() => { /* history unavailable */ });
-      if (soundEnabledRef.current) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
+      if (chimeOn()) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
     };
 
     window.dex?.dtp?.onDeviceFound?.(onDeviceFound);

@@ -1,12 +1,57 @@
-# DEX — Part 4 Completion Report
+# DEX OS 7.0.1 — Verification
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · **Branch:** `claude/dex-part4` (from `main` after PRs #64/#65)
+**Date:** 2026-11-02 · **Creator:** Onazi Oj · **Branch:** `claude/dex-part4` (contains `main` through PR #72)
 
 Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT APPLICABLE · NOT TESTED. Only VERIFIED COMPLETE counts as done.
 
-**Release verdict: NOT READY** — gated by the owner merge and the Privacy Policy approval (`DEX_REMAINING_WORK.md` #1–#2). Everything else is either verified or listed there with a reason.
+**Release verdict: NOT READY.** Builds, tests and the bundle gate pass, but the release gates below are not met: the owner has not merged this branch (#1), the Privacy Policy rewrite is unapproved (#2), the installers are unsigned (#8), and no clean-machine install or screen-reader pass has been run (#6, #7). Nothing was published.
 
-## Stage A — previous work (re-verified, not assumed)
+## Part 6 (7.0.1) acceptance
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Version 7.0.1 everywhere | VERIFIED COMPLETE | `package.json`, lockfile root, `tauri.conf.json`, `Cargo.toml`/`Cargo.lock`, `PLATFORM_VERSION`; installers named `DEX_7.0.1_*`; About shows the runtime version |
+| Creator attribution (Onazi Oj) | VERIFIED COMPLETE | About (creator card + rows), installer `publisher`/`copyright`, crate description; legal copyright line kept |
+| No coding-agent branding | VERIFIED COMPLETE | Repo-wide scan for agent/AI-generator strings: none in product code; no AI trailers in the last 200 commits |
+| Third-party notices intact | VERIFIED COMPLETE | `NOTICE` + `LICENSE` bundled as installer resources; license page in installer |
+| Battery out of the top bar | VERIFIED COMPLETE | Removed from `AppManager` (and its listener); Control Center keeps it and detects battery-less desktops; preview checked |
+| Interface Transparency slider (0–100) | VERIFIED COMPLETE | `shellPreferencesStore` material engine; Settings + Control Center; `interface-transparency.test.ts` (8); preview: 70% → top bar `blur(24px)`, 61% fill, persisted across reload; reduced transparency / high contrast / low GPU fallbacks tested |
+| Light/dark | VERIFIED COMPLETE (shell, Calculator, live activities) / PARTIAL (creative suite) | Glass fills are theme tokens; Calculator computed colours checked in light mode; creative-suite colour pass still open (#18) |
+| Calculator | VERIFIED COMPLETE | `calculator-engine.test.ts` (10); live keyboard run: `12+7=19`, repeat `=` → 26, `9÷0` → Error + message, `0.1+0.2=0.3`, backspace, `200+10%=220`, operator highlight; `Function()` eval removed |
+| Top bar / DEX Bar | VERIFIED COMPLETE (overlap, hit target) | DEX Bar reserves its strip (apps and maximized windows end above it; checked in preview); Control Center button 28×24 |
+| Live activities | VERIFIED COMPLETE (store, UI) / NOT TESTED (real downloads) | One store for all producers; failure/cancel shown honestly; transfer Cancel wired; `live-activity-unified.test.ts` (5); preview: 340×52 cards, Cancel calls the task |
+| No forced AI runtime | VERIFIED COMPLETE | No startup Ollama probe; local AI opt-in; `local-ai-optin.test.ts` (4); DEX bundles/installs no runtime |
+| Background processes | VERIFIED COMPLETE (renderer) | Thermal monitor: perpetual rAF loop → 1 s burst / 10 s; preview idle Home: 0 frame callbacks/s, 0.2 timer wake-ups/s, thermal `cool` (was `critical`); `thermal-burst.test.ts` |
+| Popups | VERIFIED COMPLETE (audit) | Startup: first-run setup only; achievements are silent; no update/promo dialogs found |
+| Obsolete goal/philosophy copy | VERIFIED COMPLETE | None left in the product (code comments only); About marketing cards removed (one claimed automatic updates) |
+| Production build settings | VERIFIED COMPLETE | Rust: `opt-level 3`, thin LTO, 1 CGU, `.pdb`-only debug info, unwinding panics. Frontend: esbuild minify, no source maps, `console.log/debug/info/trace` marked pure |
+| Obfuscation | EVALUATED, NOT ADDED | Minification + identifier mangling only. A JS obfuscator would break dynamic imports/IPC and cost startup time; security-sensitive work (auth, keys, file access) already lives in Rust behind IPC |
+| Embedded secrets | VERIFIED COMPLETE | Pattern scan of source, history-tracked files and `dist/renderer`: only test fixtures; `.env.example` holds no secrets |
+| Release integrity | VERIFIED COMPLETE (checksums) / BLOCKED (signed updates) | Bundle gate writes `SHA256SUMS-7.0.1.txt`, rejects source maps/env/tests in the frontend, checks the WebView2 loader import, reports Authenticode status. Signed update channel needs the owner's key (#8) |
+| Code signing | BLOCKED | No certificate configured; gate reports `NotSigned` for both installers. Not faked |
+| Sound effects | FIXED / NOT TESTED (audible playback) | DEX ships no audio files (nothing can go missing). Found: Settings › Notifications › Sound did nothing and Windows toasts were always silent (the WinRT writer mutes toasts with no sound). Now the setting is passed to the native toast (`osToastSound` → system default sound) and Transfers' inline chimes respect it; `settings-wiring.test.ts`. A complete UI sound engine in `utils/ux-depth.ts` is unused (#30) |
+| Packaged app smoke test | NOT TESTED for 7.0.1 | Last packaged CDP smoke was the Part 4 build; needs a run on a copy of the profile |
+| High-DPI 125/150/200%, multi-monitor | NOT TESTED | Single display here (#21) |
+| Old release cleanup | NOT DONE (by design) | Published releases untouched. Local 6.1.0 installers remain in this worktree's `target/` until the owner confirms 7.0.1 installs |
+| Deployment | NOT DONE | Nothing published; requires owner approval and signing |
+
+## Tests and builds (7.0.1)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` (after merging `main`) | **0 errors** |
+| Full `vitest run` (before merging `main`) | 519 files passed, 2 failed, 2 skipped; 5,427 tests passed. Failures: `ai-connect` (expected by the local-AI opt-in; test updated, 28/28 pass) and `renderer-pages › Achievements` (10 s timeout under load; 23/23 pass alone) |
+| Watermark / attribution check | OK |
+| `npm run build:tauri` #1 (before merge) | **Passed** in 36.5 min: NSIS 14.3 MB (6.1.0: 15.1), MSI 17.8 MB (6.1.0: 19.0), loader static, no dev files, checksums written, `NotSigned` |
+| `npm run build:tauri` #2 (after merge) | BUILD2_RESULT |
+
+Measurements not taken: cold/warm start time, idle memory, theme-switch latency, glass rendering cost (needs a packaged-app trace).
+
+## Carried forward: Part 4 evidence (2026-11-01)
+
+Kept as the record for the assistant work that ships in 7.0.1. Row numbers (#n) refer to `DEX_REMAINING_WORK.md`.
+
+### Stage A — previous work (re-verified, not assumed)
 
 | Area | Status | Evidence / change in this pass |
 |---|---|---|
@@ -26,14 +71,14 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Part 3: Linux image build/boot, UKI | BLOCKED / NOT APPLICABLE | `docs/reports/DEX_UKI_INTEGRATION.md` |
 | Part 3: podcasts, shared albums, captions, multi-monitor | MISSING / NOT TESTED | #20, #21 |
 
-## Markdown cleanup
+### Markdown cleanup (Part 4)
 
 - Part 1–3 reports moved from the repo root to `docs/reports/` (renamed `PART*_…`, typo `TUARI` fixed), with an index (`docs/reports/README.md`). All references updated; no content deleted.
 - `docs/PR-DESCRIPTION.md` (a stale PR body) moved to `docs/archive/`.
 - Unfinished items from the old reports are in `DEX_REMAINING_WORK.md` (the single active backlog).
 - Kept untouched: README, LICENSE, NOTICE, PRIVACY, TERMS, SECURITY, CONTRIBUTING, ROADMAP, architecture/API docs. Nothing was permanently deleted, so no deletion approval was needed.
 
-## Stage B — assistant (UKI) acceptance matrix
+### Stage B — assistant (UKI) acceptance matrix
 
 | Requirement | Status | Evidence |
 |---|---|---|
@@ -42,7 +87,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Adaptive reasoning profiles (Fast/Balanced/Deep/Auto) | VERIFIED COMPLETE | `assistantPolicy.ts`; tests; Settings control |
 | Model selection + routing + fallback | VERIFIED COMPLETE (logic) | Provider/route tests |
 | **Processing modes enforced (Local / Hybrid / Cloud / Manual)** | VERIFIED COMPLETE | Enforced in `chat()` + stream; test proves `fetch` never called for cloud in Local only. Fixed streaming fallback that sent "Offline" requests to a cloud provider |
-| Local AI (Ollama) | PARTIAL | **Fixed: Ollama was unreachable from the packaged app (403 on its origin)**; native proxy verified in the packaged build. Installed-model discovery + keyless routing verified; generation not measured (0 models installed, the download needs approval: #3) |
+| Local AI (Ollama) | PARTIAL (opt-in since 7.0.1) | **Fixed: Ollama was unreachable from the packaged app (403 on its origin)**; native proxy verified in the packaged build. Installed-model discovery + keyless routing verified; generation not measured (0 models installed, the download needs approval: #3) |
 | Secure API-key storage | VERIFIED COMPLETE (Windows) | New `secrets_ctl.rs` (DPAPI via crypt32, Rust tests); keystore migration tests. UI no longer claims a keychain it didn't use |
 | Permissions + risk levels + confirmations | VERIFIED COMPLETE | `DEX_AI_PERMISSIONS.md`; agent tests |
 | File operations (find/read/create/rename/move/Recycle Bin), scoped | VERIFIED COMPLETE (fake native) | `fileTools.ts` tests; native handlers pre-existing |
@@ -62,7 +107,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Accessibility (new controls labelled, keyboard reachable) | PARTIAL | Screen reader not run (#7) |
 | No AI-generator branding; creator Onazi Oj | VERIFIED COMPLETE | No such strings added; commits carry no AI trailers |
 
-## Tests and checks run
+### Part 4 tests and checks
 
 | Check | Result |
 |---|---|
@@ -80,4 +125,4 @@ New test files: `uki-assistant-policy`, `uki-agent-runner-policy`, `uki-memory-c
 
 ## Reports
 
-`docs/reports/DEX_AI_ARCHITECTURE.md`, `DEX_AI_PERMISSIONS.md`, `DEX_AI_PRIVACY.md`, `DEX_AI_MODEL_SUPPORT.md`, `DEX_AI_PERFORMANCE.md`, `DEX_UKI_INTEGRATION.md`, `DEX_UI_UX_FINAL_AUDIT.md`; root: `DEX_RELEASE_NOTES.md`, `DEX_REMAINING_WORK.md`, this file.
+`docs/reports/` (index: `docs/reports/README.md`); release notes: `DEX_7.0.1_RELEASE_NOTES.md`; backlog: `DEX_REMAINING_WORK.md`.
