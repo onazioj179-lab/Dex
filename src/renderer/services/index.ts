@@ -155,32 +155,6 @@ export {
   type ActiveChallenge,
 } from './dailyChallenges';
 
-// Focus Session System
-export { useFocusSessionStore } from './FocusSessionSystem';
-
-// Platform Extensions
-export {
-  usePortableModeStore,
-  useRESTAPIStore,
-  useCLIStore,
-  useMobileCompanionStore,
-} from './PlatformExtensions';
-
-// Rewind Extensions
-export {
-  useVisualTimelineStore,
-  useWorkReportsStore,
-  useMemoryMapStore,
-  CHANGELOG_CATEGORIES,
-} from './RewindExtensions';
-
-// Intelligence Layer
-export {
-  useFocusIntelligenceStore,
-  useContextPredictionStore,
-  useSmartRecentsStore,
-} from './IntelligenceLayer';
-
 // Performance Optimization (Hardware-Aware)
 export {
   usePerformanceOptimization,
