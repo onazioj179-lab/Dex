@@ -181,3 +181,98 @@ describe('spatial store', () => {
     expect(Object.keys(out.layout as object)).toEqual(['a']);
   });
 });
+
+describe('spatial: snapping, align, distribute, pinch', () => {
+  it('snaps a dragged window to a neighbour edge and reports a guide', async () => {
+    const { magneticSnap } = await import('../../src/renderer/shell/spatial/spatialMath');
+    const other = { x: 0, y: 0, w: 400, h: 300 };
+    const r = magneticSnap({ x: 405, y: 200, w: 300, h: 200 }, [other], 8);
+    expect(r.x).toBe(400); // left edge -> other's right edge
+    expect(r.guides.some((g) => g.axis === 'x' && g.pos === 400)).toBe(true);
+    const far = magneticSnap({ x: 500, y: 500, w: 100, h: 100 }, [other], 8);
+    expect(far).toEqual({ x: 500, y: 500, guides: [] });
+  });
+
+  it('aligns and distributes without changing sizes', async () => {
+    const { alignRects, distributeRects } = await import('../../src/renderer/shell/spatial/spatialMath');
+    const items = [
+      { id: 'a', x: 10, y: 0, w: 100, h: 50 },
+      { id: 'b', x: 300, y: 40, w: 200, h: 80 },
+      { id: 'c', x: 900, y: 10, w: 100, h: 60 },
+    ];
+    const left = alignRects(items, 'left');
+    expect(Object.values(left).every((r) => r.x === 10)).toBe(true);
+    expect(left.b.w).toBe(200);
+    const d = distributeRects(items, 'x');
+    const gap1 = d.b.x - (d.a.x + 100), gap2 = d.c.x - (d.b.x + 200);
+    expect(Math.abs(gap1 - gap2)).toBeLessThanOrEqual(1);
+    expect(d.a.x).toBe(10); expect(d.c.x).toBe(900);
+  });
+
+  it('pinch zooms around the midpoint and pans with it', async () => {
+    const { pinchCamera, screenToWorld } = await import('../../src/renderer/shell/spatial/spatialMath');
+    const cam = { x: 0, y: 0, z: 1 };
+    const before = screenToWorld(cam, 200, 200);
+    const next = pinchCamera(cam, [{ x: 150, y: 200 }, { x: 250, y: 200 }], [{ x: 100, y: 200 }, { x: 300, y: 200 }]);
+    expect(next.z).toBeCloseTo(2, 6);
+    const after = screenToWorld(next, 200, 200);
+    expect(after.x).toBeCloseTo(before.x, 6);
+  });
+});
+
+describe('spatial store: zones, views, locks, bindings, layout files', () => {
+  beforeEach(() => {
+    useSpatialStore.setState({
+      zones: [], views: [], locked: [], camera: { x: 0, y: 0, z: 1 }, viewport: { w: 1280, h: 720 },
+      windows: { a: { id: 'a', title: 'A', x: 100, y: 100, w: 400, h: 300, z: 1, minimized: false } },
+    });
+  });
+
+  it('creates zones from the view and the standard set, and finds windows inside', () => {
+    const st = useSpatialStore.getState();
+    const id = st.createZone('Mine');
+    expect(useSpatialStore.getState().windowsInZone(id)).toEqual(['a']);
+    st.createPresetZones();
+    const names = useSpatialStore.getState().zones.map((z) => z.name);
+    expect(names).toEqual(['Mine', 'Work', 'Creative', 'Development', 'Research', 'Communication', 'Entertainment']);
+    st.createPresetZones(); // idempotent
+    expect(useSpatialStore.getState().zones.length).toBe(7);
+  });
+
+  it('saves views and locks windows', () => {
+    const st = useSpatialStore.getState();
+    const v = st.saveView('Desk');
+    expect(useSpatialStore.getState().views.find((x) => x.id === v)?.camera).toEqual({ x: 0, y: 0, z: 1 });
+    st.toggleLock('a');
+    expect(useSpatialStore.getState().locked).toEqual(['a']);
+    st.toggleLock('a');
+    expect(useSpatialStore.getState().locked).toEqual([]);
+  });
+
+  it('rebinds shortcuts, refuses reserved keys and swaps on clash', () => {
+    const st = useSpatialStore.getState();
+    st.resetBindings();
+    expect(st.setBinding('fitAll', 'ArrowLeft')).toBe(false);
+    expect(useSpatialStore.getState().setBinding('fitAll', 'KeyM')).toBe(true);
+    const b = useSpatialStore.getState().bindings;
+    expect(b.fitAll).toBe('KeyM');
+    expect(b.minimap).toBe('KeyF'); // took the old key
+    useSpatialStore.getState().resetBindings();
+  });
+
+  it('round-trips a layout file and rejects foreign or broken ones', () => {
+    const st = useSpatialStore.getState();
+    st.createZone('Z', { x: 0, y: 0, w: 1000, h: 800 });
+    const file = st.exportLayout();
+    expect(file.kind).toBe('dex-spatial-layout');
+    expect(file.layout.a).toEqual({ x: 100, y: 100, w: 400, h: 300 });
+    useSpatialStore.setState({ zones: [] });
+    expect(useSpatialStore.getState().importLayout(JSON.parse(JSON.stringify(file)))).toBeNull();
+    expect(useSpatialStore.getState().zones.map((z) => z.name)).toEqual(['Z']);
+    expect(useSpatialStore.getState().importLayout({ kind: 'something-else' })).toMatch(/not a DEX/);
+    expect(useSpatialStore.getState().importLayout({ ...file, version: 9 })).toMatch(/Unsupported/);
+    // malformed entries are dropped, not thrown
+    expect(useSpatialStore.getState().importLayout({ ...file, zones: [{ id: 'x', x: 'bad' }], views: [null] })).toBeNull();
+    expect(useSpatialStore.getState().zones).toEqual([]);
+  });
+});

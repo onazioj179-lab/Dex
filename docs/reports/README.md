@@ -29,7 +29,6 @@ Point-in-time evidence from the November 2026 repair and assistant work. The act
 | [PART2_IMPROVEMENT_REPORT.md](PART2_IMPROVEMENT_REPORT.md) | Modularity, storage, privacy, accessibility, motion |
 | [PART1_PART2_COMPLETION_AUDIT.md](PART1_PART2_COMPLETION_AUDIT.md) | Completion gate before Part 3 |
 | [PART3_IMPLEMENTATION_REPORT.md](PART3_IMPLEMENTATION_REPORT.md) | Design system, attribution, Notes, Canvas boards |
-| [PART3_UI_UX_AUDIT.md](PART3_UI_UX_AUDIT.md) | Superseded by DEX_UI_UX_FINAL_AUDIT.md |
 | [PLATFORM_COMPATIBILITY_MATRIX.md](PLATFORM_COMPATIBILITY_MATRIX.md) | Feature-by-platform classification |
 | [PERFORMANCE_REPORT.md](PERFORMANCE_REPORT.md) | Measured shell performance |
 | [SECURITY_PRIVACY_REPORT.md](SECURITY_PRIVACY_REPORT.md) | Security and privacy findings (Part 3) |

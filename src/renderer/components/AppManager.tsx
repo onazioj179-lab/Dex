@@ -73,9 +73,9 @@ import { auditDomTargets } from '../../shared/a11y/targetSize';
 import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
-import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, type SpatialWindow } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
-import { SpatialHud, SpatialGroupFrames } from '../shell/spatial/SpatialHud';
+import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
+import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap, pinchCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
 import { sharedTick } from '../services/SharedTick';
@@ -329,6 +329,19 @@ const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
   collabhub: { w: 760, h: 520 },
   maps: { w: 640, h: 460 },
 };
+
+/** Settings > Frame Snapping prefs (written by AccessPanels.tsx). */
+function readSnapPrefs(): { enabled: boolean; gutter: number; cycleOnRepeat: boolean } {
+  const d = { enabled: true, gutter: 6, cycleOnRepeat: true };
+  try {
+    const p = JSON.parse(localStorage.getItem('dex.snap.preferences') || '{}');
+    return {
+      enabled: p.enabled !== false,
+      gutter: Number.isFinite(p.gutter) ? Math.min(20, Math.max(0, Math.round(p.gutter))) : d.gutter,
+      cycleOnRepeat: p.cycleOnRepeat !== false,
+    };
+  } catch { return d; }
+}
 
 const getUsableFloatingBounds = (
   appId: string,
@@ -976,9 +989,18 @@ export const AppManager: React.FC = () => {
   const [snapPreviewZone, setSnapPreviewZone] = useState<SnapPreviewZone>(null);
   const snapPreviewRef = useRef<SnapPreviewZone>(null);
 
+  // Settings > Frame Snapping (snap on drag, gutter, cycle on repeat).
+  const snapPrefsRef = useRef(readSnapPrefs());
+  const lastSideTileRef = useRef<{ appId: string; side: 'left' | 'right'; step: number } | null>(null);
+  useEffect(() => {
+    const onPrefs = () => { snapPrefsRef.current = readSnapPrefs(); };
+    window.addEventListener('dex:snap-prefs', onPrefs);
+    return () => window.removeEventListener('dex:snap-prefs', onPrefs);
+  }, []);
+
   const detectDragSnapZone = useCallback((cx: number, cy: number): SnapPreviewZone => {
     // Screen-edge snapping has no meaning on the infinite spatial canvas.
-    if (isSpatialEnabled()) return null;
+    if (isSpatialEnabled() || !snapPrefsRef.current.enabled) return null;
     const W = window.innerWidth;
     const H = window.innerHeight;
     const EDGE = 18;
@@ -2136,7 +2158,7 @@ export const AppManager: React.FC = () => {
   }, [openAppInWindow]);
 
   // -- Window tiling presets (up to 5 windows) ----------------------------
-  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize' | 'left-third' | 'center-third' | 'right-third';
+  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize' | 'left-third' | 'center-third' | 'right-third' | 'left-two-thirds' | 'right-two-thirds';
   const tileWindow = useCallback((appId: AppId, position: TilePosition) => {
     // Screen tiling has no meaning on the spatial canvas; maximize / snap there
     // means "bring this window to full view".
@@ -2145,7 +2167,7 @@ export const AppManager: React.FC = () => {
     const maximizedWorkspace = getMaximizedWindowBounds();
     const W = workspace.w;
     const H = workspace.h;
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const LEFT = workspace.x;
     const TOP = workspace.y;
     const usableH = H;
@@ -2166,6 +2188,8 @@ export const AppManager: React.FC = () => {
       'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
       'center-third': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 4) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
       'right-third':  { x: LEFT + PAD * 3 + Math.floor((W - PAD * 4) / 3) * 2, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
+      'left-two-thirds':  { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
+      'right-two-thirds': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 3) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
     };
 
     const rect = positions[position];
@@ -2214,7 +2238,7 @@ export const AppManager: React.FC = () => {
     const W = workspace.w;
     const TOP = workspace.y;
     const LEFT = workspace.x;
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const usableH = workspace.h;
 
     // Pre-defined layouts for 1-6+ windows
@@ -2250,6 +2274,8 @@ export const AppManager: React.FC = () => {
         'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'center-third': { x: LEFT + PAD * 2 + thirdW, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'right-third':  { x: LEFT + PAD * 3 + thirdW * 2, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
+        'left-two-thirds':  { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
+        'right-two-thirds': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 3) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
       };
 
       // Min-size-aware columns: never use more columns than the work area can
@@ -2331,7 +2357,7 @@ export const AppManager: React.FC = () => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0 || ratios.length === 0) return;
     const workspace = getShellWorkspace(0);
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const n = Math.min(ids.length, ratios.length);
     const used = ratios.slice(0, n);
     const sum = used.reduce((a, b) => a + b, 0) || 1;
@@ -2382,7 +2408,7 @@ export const AppManager: React.FC = () => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0 || cols < 1 || rows < 1) return;
     const workspace = getShellWorkspace(0);
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const n = Math.min(ids.length, cols * rows);
     const placed = ids.slice(0, n);
     const colW = Math.floor((workspace.w - PAD * (cols + 1)) / cols);
@@ -2665,8 +2691,18 @@ export const AppManager: React.FC = () => {
         }
       }
       if (focusedApp && (e.metaKey || (e.ctrlKey && e.altKey))) {
-        if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'left'); return; }
-        if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'right'); return; }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          const side = e.key === 'ArrowLeft' ? 'left' : 'right';
+          // Cycle on repeat: pressing the same side again goes 1/2 -> 2/3 -> 1/3.
+          const cycle: TilePosition[] = side === 'left' ? ['left', 'left-two-thirds', 'left-third'] : ['right', 'right-two-thirds', 'right-third'];
+          const last = lastSideTileRef.current;
+          const step = snapPrefsRef.current.cycleOnRepeat && last && last.appId === focusedApp && last.side === side
+            ? (last.step + 1) % cycle.length : 0;
+          lastSideTileRef.current = { appId: focusedApp, side, step };
+          tileWindow(focusedApp as AppId, cycle[step]);
+          return;
+        }
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           // Minimize or restore if already minimized
@@ -3177,6 +3213,15 @@ export const AppManager: React.FC = () => {
     });
   }, []);
 
+  // Magnetic snap for a window being dragged on the canvas; publishes guides.
+  const spatialMagnet = useCallback((appId: string, r: SpatialRect) => {
+    const sp = useSpatialStore.getState();
+    const others = Object.values(sp.windows).filter((w) => w.id !== appId && !w.minimized);
+    const out = magneticSnap(r, others, 8 / sp.camera.z);
+    sp.setGuides(out.guides);
+    return out;
+  }, []);
+
   const pendingSpatialFitRef = useRef(false);
   const setSpatial = useCallback((on: boolean) => {
     const sp = useSpatialStore.getState();
@@ -3251,14 +3296,25 @@ export const AppManager: React.FC = () => {
   }, [detachedApps, minimizedApps]);
 
   // Let the spatial layer act on real windows.
-  const spatialHostRef = useRef({ bringToFront, applySpatialBounds, minimizeFloatingApp, restoreFloatingApp });
-  spatialHostRef.current = { bringToFront, applySpatialBounds, minimizeFloatingApp, restoreFloatingApp };
+  const sendToBack = useCallback((appId: string) => {
+    setDetachedApps(prev => {
+      if (!prev.has(appId)) return prev;
+      const order = Array.from(prev.entries()).sort((x, y) => x[1].z - y[1].z).map(([id]) => id).filter(id => id !== appId);
+      const next = new Map(prev);
+      [appId, ...order].forEach((id, i) => { next.set(id, { ...next.get(id)!, z: 200 + i }); });
+      detachZCounter.current = Math.max(detachZCounter.current, 200 + order.length);
+      return next;
+    });
+  }, []);
+  const spatialHostRef = useRef({ bringToFront, applySpatialBounds, minimizeFloatingApp, restoreFloatingApp, sendToBack });
+  spatialHostRef.current = { bringToFront, applySpatialBounds, minimizeFloatingApp, restoreFloatingApp, sendToBack };
   useEffect(() => {
     useSpatialStore.getState().registerHost({
       focus: (id) => spatialHostRef.current.bringToFront(id as AppId),
       setBounds: (u) => spatialHostRef.current.applySpatialBounds(u),
       setMinimized: (id, m) => (m ? spatialHostRef.current.minimizeFloatingApp(id) : spatialHostRef.current.restoreFloatingApp(id)),
       measure: () => ({ w: contentRef.current?.clientWidth ?? 0, h: contentRef.current?.clientHeight ?? 0 }),
+      sendToBack: (id) => spatialHostRef.current.sendToBack(id),
     });
     return () => useSpatialStore.getState().registerHost(null);
   }, []);
@@ -3384,6 +3440,24 @@ export const AppManager: React.FC = () => {
       el.addEventListener('pointerup', up);
       el.addEventListener('lostpointercapture', up);
     };
+    // Touch screens: two fingers on the desktop pan and pinch-zoom the canvas.
+    const touches = new Map<number, { x: number; y: number }>();
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || inWindow(e.target) || inHud(e.target)) return;
+      touches.set(e.pointerId, local(e));
+    };
+    const onTouchMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+      const ids = Array.from(touches.keys());
+      if (ids.length !== 2) { touches.set(e.pointerId, local(e)); return; }
+      e.preventDefault();
+      const prev: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
+      touches.set(e.pointerId, local(e));
+      const next: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
+      const s = st();
+      s.setCamera(pinchCamera(s.camera, prev, next, s.limits));
+    };
+    const onTouchUp = (e: PointerEvent) => { touches.delete(e.pointerId); };
     // Tabbing into a window that is off-screen pans it into view (same zoom).
     const onFocusIn = (e: FocusEvent) => {
       const win = (e.target as Element | null)?.closest?.('[data-floating-window]') as HTMLElement | null;
@@ -3397,6 +3471,10 @@ export const AppManager: React.FC = () => {
     el.addEventListener('mousedown', onMouseDown, true);
     el.addEventListener('pointerdown', onPointerDown, true);
     el.addEventListener('focusin', onFocusIn);
+    el.addEventListener('pointerdown', onTouchDown);
+    el.addEventListener('pointermove', onTouchMove, { passive: false });
+    el.addEventListener('pointerup', onTouchUp);
+    el.addEventListener('pointercancel', onTouchUp);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
@@ -3404,6 +3482,10 @@ export const AppManager: React.FC = () => {
       el.removeEventListener('mousedown', onMouseDown, true);
       el.removeEventListener('pointerdown', onPointerDown, true);
       el.removeEventListener('focusin', onFocusIn);
+      el.removeEventListener('pointerdown', onTouchDown);
+      el.removeEventListener('pointermove', onTouchMove);
+      el.removeEventListener('pointerup', onTouchUp);
+      el.removeEventListener('pointercancel', onTouchUp);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       el.style.cursor = '';
@@ -3419,29 +3501,34 @@ export const AppManager: React.FC = () => {
       if (!((e.ctrlKey || e.metaKey) && e.altKey) || e.shiftKey) return;
       const st = useSpatialStore.getState();
       const claim = () => { e.preventDefault(); e.stopPropagation(); };
-      if (e.code === 'KeyS') { claim(); setSpatialRef.current(!st.enabled); return; }
+      const code = e.code === 'NumpadAdd' ? 'Equal' : e.code === 'NumpadSubtract' ? 'Minus' : e.code === 'Numpad0' ? 'Digit0' : e.code;
+      const action = (Object.keys(st.bindings) as SpatialAction[]).find((a) => st.bindings[a] === code);
+      if (action === 'toggle') { claim(); setSpatialRef.current(!st.enabled); return; }
       if (!st.enabled) return;
       const { w: vw, h: vh } = st.viewport;
       const panStep = (dx: number, dy: number) => st.setCamera({ ...st.camera, x: st.camera.x + dx / st.camera.z, y: st.camera.y + dy / st.camera.z }, { animate: true });
       switch (e.code) {
-        case 'Equal': case 'NumpadAdd': claim(); st.zoomStep(1); return;
-        case 'Minus': case 'NumpadSubtract': claim(); st.zoomStep(-1); return;
-        case 'Digit0': case 'Numpad0': claim(); st.setZoom(1); return;
-        case 'KeyF': claim(); st.fitAll(); return;
-        case 'Backspace': claim(); st.back(); return;
-        case 'KeyM': claim(); st.toggleMinimap(); return;
-        case 'KeyW': claim(); window.dispatchEvent(new CustomEvent('dex-spatial-windows')); return;
         case 'ArrowLeft': claim(); panStep(-vw * 0.25, 0); return;
         case 'ArrowRight': claim(); panStep(vw * 0.25, 0); return;
         case 'ArrowUp': claim(); panStep(0, -vh * 0.25); return;
         case 'ArrowDown': claim(); panStep(0, vh * 0.25); return;
-        case 'Enter': {
+      }
+      switch (action) {
+        case 'zoomIn': claim(); st.zoomStep(1); return;
+        case 'zoomOut': claim(); st.zoomStep(-1); return;
+        case 'actualSize': claim(); st.setZoom(1); return;
+        case 'fitAll': claim(); st.fitAll(); return;
+        case 'back': claim(); st.back(); return;
+        case 'minimap': claim(); st.toggleMinimap(); return;
+        case 'windows': claim(); window.dispatchEvent(new CustomEvent('dex-spatial-windows')); return;
+        case 'saveView': claim(); st.saveView(); return;
+        case 'focusFront': {
           let top: SpatialWindow | null = null;
           for (const w of Object.values(st.windows)) if (!w.minimized && (!top || w.z > top.z)) top = w;
           if (top) { claim(); st.focusWindow(top.id); }
           return;
         }
-        case 'KeyG': {
+        case 'groupInView': {
           const inView = Object.values(st.windows).filter((w) => !w.minimized && isOnScreen(w, st.camera, vw, vh, 0)).map((w) => w.id);
           if (inView.length) { claim(); st.createGroup(`Group ${st.groups.length + 1}`, inView); }
           return;
@@ -3568,6 +3655,8 @@ export const AppManager: React.FC = () => {
               onDoubleClick={() => { tileWindow(appId, 'maximize'); }}
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return;
+                // A locked window (spatial Windows panel) neither moves nor resizes.
+                if (isWindowLocked(appId)) return;
                 e.preventDefault();
                 const titleBar = e.currentTarget;
                 titleBar.setPointerCapture(e.pointerId);
@@ -3650,6 +3739,12 @@ export const AppManager: React.FC = () => {
                     );
                     currentX = loose.x;
                     currentY = loose.y;
+                    // Canvas: magnetic snap to other windows' edges/centres, with guides.
+                    if (isSpatialEnabled()) {
+                      const snapped = spatialMagnet(appId, { x: currentX, y: currentY, w: dragBounds.w, h: dragBounds.h });
+                      currentX = snapped.x;
+                      currentY = snapped.y;
+                    }
                     if (el) {
                       // GPU translate3d on the window's own layer — the app content
                       // inside is NOT repainted as the window moves (this is what
@@ -3698,8 +3793,14 @@ export const AppManager: React.FC = () => {
                     { x: origX + (ev.clientX - startX) * spatialDeltaScale(), y: origY + (ev.clientY - startY) * spatialDeltaScale(), w: dragBounds.w, h: dragBounds.h },
                     workspace,
                   );
-                  const finalX = looseFinal.x;
-                  const finalY = looseFinal.y;
+                  let finalX = looseFinal.x;
+                  let finalY = looseFinal.y;
+                  if (isSpatialEnabled()) {
+                    const snapped = spatialMagnet(appId, { x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h });
+                    finalX = Math.round(snapped.x);
+                    finalY = Math.round(snapped.y);
+                    useSpatialStore.getState().setGuides([]);
+                  }
                   // Commit snap or final position. A custom zone layout (FancyZones
                   // editor) takes priority: drop onto the zone under the cursor.
                   // Size-proportional motion (Fluent): a larger window animates
@@ -3861,6 +3962,7 @@ export const AppManager: React.FC = () => {
                   style={{ position: 'absolute', right: 0, top: 30, bottom: 20, width: 6, cursor: 'ew-resize', zIndex: 2, background: 'transparent' }}
                   onPointerDown={(e) => {
                     e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                     const startX = e.clientX;
                     const startW = detBounds.w;
                     const el = e.currentTarget.parentElement as HTMLElement;
@@ -3933,6 +4035,7 @@ export const AppManager: React.FC = () => {
                   style={{ position: 'absolute', bottom: 0, left: 20, right: 20, height: 6, cursor: 'ns-resize', zIndex: 2, background: 'transparent' }}
                   onPointerDown={(e) => {
                     e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                     const startY = e.clientY;
                     const startH = detBounds.h;
                     const el = e.currentTarget.parentElement as HTMLElement;
@@ -3972,6 +4075,7 @@ export const AppManager: React.FC = () => {
                   style={{ position: 'absolute', left: 0, top: 30, bottom: 20, width: 6, cursor: 'ew-resize', zIndex: 2, background: 'transparent' }}
                   onPointerDown={(e) => {
                     e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                     const startX = e.clientX;
                     const startW = detBounds.w;
                     const startLeft = detBounds.x;
@@ -4044,6 +4148,7 @@ export const AppManager: React.FC = () => {
                   style={{ position: 'absolute', top: 0, left: 20, right: 20, height: 6, cursor: 'ns-resize', zIndex: 2, background: 'transparent' }}
                   onPointerDown={(e) => {
                     e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                     const startY = e.clientY;
                     const startH = detBounds.h;
                     const startTop = detBounds.y;
@@ -4100,6 +4205,7 @@ export const AppManager: React.FC = () => {
                   }}
                   onPointerDown={(e) => {
                 e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                 const startX = e.clientX; const startY = e.clientY;
                 const startW = detBounds.w; const startH = detBounds.h;
                 let rafId = 0;
@@ -4151,6 +4257,7 @@ export const AppManager: React.FC = () => {
               style={{ position: 'absolute', left: 0, bottom: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
               onPointerDown={(e) => {
                 e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                 const startX = e.clientX; const startY = e.clientY;
                 const startW = detBounds.w; const startH = detBounds.h; const startLeft = detBounds.x;
                 let rafId = 0;
@@ -4200,6 +4307,7 @@ export const AppManager: React.FC = () => {
               style={{ position: 'absolute', right: 0, top: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
               onPointerDown={(e) => {
                 e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                 const startX = e.clientX; const startY = e.clientY;
                 const startW = detBounds.w; const startH = detBounds.h; const startTop = detBounds.y;
                 let rafId = 0;
@@ -4249,6 +4357,7 @@ export const AppManager: React.FC = () => {
               style={{ position: 'absolute', left: 0, top: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 3 }}
               onPointerDown={(e) => {
                 e.stopPropagation(); e.preventDefault();
+                if (isWindowLocked(appId)) return;
                 const startX = e.clientX; const startY = e.clientY;
                 const startW = detBounds.w; const startH = detBounds.h;
                 const startLeft = detBounds.x; const startTop = detBounds.y;
@@ -5094,7 +5203,9 @@ export const AppManager: React.FC = () => {
               anchor to this content surface); on, it carries the camera. */}
           <div ref={worldRef} data-spatial-world={spatialEnabled ? 'on' : 'off'}
             style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }}>
+            {spatialEnabled && <SpatialZones />}
             {spatialEnabled && <SpatialGroupFrames />}
+            {spatialEnabled && <SpatialGuides />}
             {keepAliveElements.filter(el => el && detachedApps.has(el.key as AppId))}
           </div>
           {spatialEnabled && <SpatialHud onExit={() => setSpatial(false)} />}

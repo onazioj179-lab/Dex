@@ -1424,7 +1424,7 @@ on AXL.
 ### Notes
 
 This wave intentionally ships *infrastructure first*. Items marked `[~]`
-in [`docs/IMPROVEMENTS_500.md`](IMPROVEMENTS_500.md) have their core helpers
+in `docs/IMPROVEMENTS_500.md` (file since retired) have their core helpers
 landed and tested but still need UI integration in subsequent waves. Items
 marked `[x]` are complete (helpers exist and the surface they target consumes
 them or is purely an API surface).

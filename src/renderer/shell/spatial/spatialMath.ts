@@ -194,3 +194,90 @@ export function placeNewWindow(cam: Camera, vw: number, vh: number, size: { w: n
   }
   return { x, y, w: size.w, h: size.h };
 }
+
+// ---- magnetic snapping + alignment guides ------------------------------------
+
+export interface Guide { axis: 'x' | 'y'; pos: number; from: number; to: number }
+
+/**
+ * Snap a moving rect's edges/centre to other windows' edges/centres when they
+ * are within `threshold` world px. Returns the adjusted position and the guide
+ * lines to draw (world coordinates). Each axis snaps independently.
+ */
+export function magneticSnap(moving: Rect, others: Rect[], threshold: number): { x: number; y: number; guides: Guide[] } {
+  const xs = (r: Rect) => [r.x, r.x + r.w / 2, r.x + r.w];
+  const ys = (r: Rect) => [r.y, r.y + r.h / 2, r.y + r.h];
+  let bestX: { d: number; delta: number; pos: number; o: Rect } | null = null;
+  let bestY: { d: number; delta: number; pos: number; o: Rect } | null = null;
+  const mx = xs(moving), my = ys(moving);
+  for (const o of others) {
+    for (const a of mx) for (const b of xs(o)) {
+      const d = Math.abs(a - b);
+      if (d <= threshold && (!bestX || d < bestX.d)) bestX = { d, delta: b - a, pos: b, o };
+    }
+    for (const a of my) for (const b of ys(o)) {
+      const d = Math.abs(a - b);
+      if (d <= threshold && (!bestY || d < bestY.d)) bestY = { d, delta: b - a, pos: b, o };
+    }
+  }
+  const x = moving.x + (bestX?.delta ?? 0);
+  const y = moving.y + (bestY?.delta ?? 0);
+  const guides: Guide[] = [];
+  if (bestX) guides.push({ axis: 'x', pos: bestX.pos, from: Math.min(y, bestX.o.y), to: Math.max(y + moving.h, bestX.o.y + bestX.o.h) });
+  if (bestY) guides.push({ axis: 'y', pos: bestY.pos, from: Math.min(x, bestY.o.x), to: Math.max(x + moving.w, bestY.o.x + bestY.o.w) });
+  return { x, y, guides };
+}
+
+export type AlignKind = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
+
+/** Align rects to the extreme (or centre) of their shared bounds. Sizes kept. */
+export function alignRects(items: ArrangeItem[], kind: AlignKind): Record<string, Rect> {
+  const b = boundsOf(items);
+  const out: Record<string, Rect> = {};
+  if (!b) return out;
+  for (const it of items) {
+    let { x, y } = it;
+    if (kind === 'left') x = b.x;
+    else if (kind === 'right') x = b.x + b.w - it.w;
+    else if (kind === 'center-x') x = Math.round(b.x + (b.w - it.w) / 2);
+    else if (kind === 'top') y = b.y;
+    else if (kind === 'bottom') y = b.y + b.h - it.h;
+    else y = Math.round(b.y + (b.h - it.h) / 2);
+    out[it.id] = { x, y, w: it.w, h: it.h };
+  }
+  return out;
+}
+
+/** Equal gaps between rects along an axis; the outermost two stay put. */
+export function distributeRects(items: ArrangeItem[], axis: 'x' | 'y'): Record<string, Rect> {
+  const out: Record<string, Rect> = {};
+  if (items.length < 3) { for (const it of items) out[it.id] = { x: it.x, y: it.y, w: it.w, h: it.h }; return out; }
+  const pos = (r: Rect) => (axis === 'x' ? r.x : r.y);
+  const size = (r: Rect) => (axis === 'x' ? r.w : r.h);
+  const sorted = [...items].sort((a, b) => pos(a) - pos(b));
+  const start = pos(sorted[0]);
+  const end = Math.max(...sorted.map((r) => pos(r) + size(r)));
+  const total = sorted.reduce((s, r) => s + size(r), 0);
+  const gap = (end - start - total) / (sorted.length - 1);
+  let cursor = start;
+  for (const r of sorted) {
+    const p = Math.round(cursor);
+    out[r.id] = axis === 'x' ? { x: p, y: r.y, w: r.w, h: r.h } : { x: r.x, y: p, w: r.w, h: r.h };
+    cursor += size(r) + gap;
+  }
+  return out;
+}
+
+/** Where to drop preset zones: a row starting at `origin`, `w`x`h` each. */
+export function presetZoneRects(count: number, origin: { x: number; y: number }, w = 2400, h = 1500, gap = 200): Rect[] {
+  return Array.from({ length: count }, (_, i) => ({ x: origin.x + i * (w + gap), y: origin.y, w, h }));
+}
+
+/** Two-pointer gesture: new camera from the pinch midpoint/distance change. */
+export function pinchCamera(cam: Camera, prev: [{ x: number; y: number }, { x: number; y: number }], next: [{ x: number; y: number }, { x: number; y: number }], limits: ZoomLimits = DEFAULT_LIMITS): Camera {
+  const mid = (p: typeof prev) => ({ x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 });
+  const dist = (p: typeof prev) => Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y));
+  const m0 = mid(prev), m1 = mid(next);
+  const zoomed = zoomAt(cam, m0.x, m0.y, dist(next) / dist(prev), limits);
+  return panBy(zoomed, m1.x - m0.x, m1.y - m0.y);
+}

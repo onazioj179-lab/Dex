@@ -300,16 +300,38 @@ fn files_list(app: &tauri::AppHandle, dir: &str) -> Value {
             .extension()
             .map(|e| e.to_string_lossy().to_string())
             .unwrap_or_default();
+        let name = entry.file_name().to_string_lossy().to_string();
         files.push(json!({
-            "name": entry.file_name().to_string_lossy(),
             "path": path.to_string_lossy(),
             "isDirectory": is_dir,
             "size": size,
             "modified": modified,
             "extension": ext,
+            "hidden": meta.as_ref().map(|m| is_hidden_entry(&name, m)).unwrap_or(false),
+            "name": name,
         }));
     }
     json!({ "success": true, "path": resolved.to_string_lossy(), "files": files })
+}
+
+/// Hidden per the platform: dotfiles everywhere, plus the HIDDEN / SYSTEM
+/// attributes on Windows (Settings > Files > Show Hidden Files).
+fn is_hidden_entry(name: &str, meta: &std::fs::Metadata) -> bool {
+    if name.starts_with('.') {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+        const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+        if meta.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0 {
+            return true;
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = meta;
+    false
 }
 
 /// Destination of a move/copy: target_dir joined with the source basename.
