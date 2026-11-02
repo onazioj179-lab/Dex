@@ -5164,7 +5164,7 @@ export const AppManager: React.FC = () => {
             position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)',
             zIndex: 9000, display: 'flex', alignItems: 'center', gap: 6,
             height: 24, padding: '0 var(--space-3)', borderRadius: 9999,
-            background: 'rgba(14,14,17,0.92)', border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-glass-strong, var(--color-bg-surface))', border: '1px solid var(--color-border)',
             color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500,
             cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s ease',
             WebkitAppRegion: 'no-drag',

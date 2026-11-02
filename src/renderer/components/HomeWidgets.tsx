@@ -1865,7 +1865,7 @@ const PinnedAppsWidget: React.FC = () => {
           aria-label="Add app to Home"
           style={{
             position: 'absolute', left: 8, right: 8, top: 38, maxHeight: 210, overflowY: 'auto',
-            zIndex: 20, background: '#0E0E11', border: '1px solid var(--color-border)',
+            zIndex: 20, background: 'var(--color-bg-elevated, var(--color-bg-surface))', border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', padding: 6,
           }}
         >
