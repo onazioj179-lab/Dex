@@ -30,6 +30,30 @@ const GLASS_REMOVED_FLAG = 'dex-glass-removed-v1';
 
 export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 
+export const GLASS_BLUR_MIN = 4;
+export const GLASS_BLUR_MAX = 40;
+/** Lowest surface opacity the slider can reach (100% transparency setting). */
+const GLASS_OPACITY_FLOOR = 0.4;
+
+/**
+ * "Interface Transparency" is one 0-100 control layered over the two stored
+ * material parameters (mode + opacity). 0 = fully opaque (no blur, cheapest);
+ * 100 = the most translucent supported glass. Blur strength is a separate
+ * parameter and is NOT derived from this value.
+ */
+export function transparencyToPrefs(percent: number): Pick<ShellPreferences, 'glassMode' | 'glassOpacity'> {
+  const t = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
+  if (t === 0) return { glassMode: 'off', glassOpacity: 1 };
+  const opacity = 1 - (t / 100) * (1 - GLASS_OPACITY_FLOOR);
+  return { glassMode: t >= 75 ? 'liquid' : 'normal', glassOpacity: Math.round(opacity * 1000) / 1000 };
+}
+
+export function prefsToTransparency(prefs: Pick<ShellPreferences, 'glassMode' | 'glassOpacity'>): number {
+  if (prefs.glassMode === 'off') return 0;
+  const t = ((1 - prefs.glassOpacity) / (1 - GLASS_OPACITY_FLOOR)) * 100;
+  return Math.max(1, Math.min(100, Math.round(t)));
+}
+
 export interface ShellPreferences {
   /** Edge of the screen the dock attaches to. */
   dockEdge: DockEdge;
@@ -43,6 +67,8 @@ export interface ShellPreferences {
   glassTint: string;
   /** Global transparency mode for shell glass surfaces. */
   glassMode: GlassMode;
+  /** Backdrop blur strength in px (4-40). Independent of opacity. */
+  glassBlur: number;
   /** Night Shift enabled (warmer color filter). */
   nightShift: boolean;
   /** Night Shift intensity 0–1. */
@@ -73,6 +99,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   glassOpacity: 1,
   glassTint: '#0a0a0a',
   glassMode: 'off',
+  glassBlur: 24,
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -90,6 +117,9 @@ interface ShellPreferencesActions {
   setGlassOpacity: (value: number) => void;
   setGlassTint: (hex: string) => void;
   setGlassMode: (mode: GlassMode) => void;
+  setGlassBlur: (px: number) => void;
+  /** Single 0-100 "Interface Transparency" control (0 = opaque, 100 = max glass). */
+  setInterfaceTransparency: (percent: number) => void;
   setNightShift: (enabled: boolean) => void;
   setNightShiftIntensity: (value: number) => void;
   setLowEndMode: (enabled: boolean) => void;
@@ -145,6 +175,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.glassMode = o.glassMode === 'off' || o.glassMode === 'reduced' || o.glassMode === 'liquid'
     ? o.glassMode
     : 'normal';
+  base.glassBlur = clamp01(o.glassBlur, base.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
   base.nightShift = o.nightShift === true;
   base.nightShiftIntensity = clamp01(o.nightShiftIntensity, base.nightShiftIntensity, 0, 1);
   base.lowEndMode = o.lowEndMode === true;
@@ -182,12 +213,11 @@ export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' 
   if (prefs.lowEndMode) return 'reduced';
   if (typeof window !== 'undefined') {
     try {
-      // OS-level accessibility hint: prefers-reduced-transparency is the
-      // canonical signal; prefers-reduced-motion is a reasonable fallback for
-      // browsers that do not yet expose the transparency query.
-      const reducedTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if ((reducedTransparency || reducedMotion) && prefs.glassMode !== 'off') {
+      // OS-level accessibility hint. Only prefers-reduced-transparency counts:
+      // reduced *motion* says nothing about translucency, and treating it as
+      // such silently disabled the Interface Transparency slider for anyone
+      // with Reduce Motion on.
+      if (window.matchMedia('(prefers-reduced-transparency: reduce)').matches && prefs.glassMode !== 'off') {
         return 'reduced';
       }
     } catch {
@@ -197,7 +227,7 @@ export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' 
   return prefs.glassMode;
 }
 
-export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint' | 'glassMode' | 'lowEndMode'>): void {
+export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint' | 'glassMode' | 'lowEndMode'> & { glassBlur?: number }): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const effectiveMode = getEffectiveGlassMode({ glassMode: prefs.glassMode, lowEndMode: prefs.lowEndMode });
@@ -207,7 +237,16 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   root.style.setProperty('--dex-glass-effective-mode', effectiveMode);
   root.setAttribute('data-glass-mode', prefs.glassMode);
   root.setAttribute('data-glass-effective-mode', effectiveMode);
-  const { r, g, b } = hexToRgb(prefs.glassTint) ?? { r: 10, g: 10, b: 10 };
+  // Inline root vars outrank the [data-theme] stylesheet rules, so the solid /
+  // translucent values below must follow the active theme or light mode would
+  // get dark panels. Re-applied on every data-theme change (see store init).
+  const light = root.getAttribute('data-theme') === 'light';
+  const userTint = hexToRgb(prefs.glassTint) ?? { r: 10, g: 10, b: 10 };
+  const defaultTint = prefs.glassTint.toLowerCase() === DEFAULT_SHELL_PREFERENCES.glassTint;
+  const { r, g, b } = light && defaultTint ? { r: 245, g: 245, b: 247 } : userTint;
+  const solid = light
+    ? { chrome: '#F5F5F8', glass: '#F5F5F8', strong: '#F0F0F3' }
+    : { chrome: '#141416', glass: '#161618', strong: '#1a1a1e' };
   root.style.setProperty('--dex-glass-tint-r', String(r));
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
@@ -230,11 +269,11 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     // near-black desktop so surfaces read as lifted frosted panels, using the
     // design's own canonical solid values (same as the reduced-transparency
     // fallback). Consistent "frost fill everywhere" without any glass/blur.
-    root.style.setProperty('--dex-glass-bg', '#141416');
-    root.style.setProperty('--color-bg-glass', '#161618');
-    root.style.setProperty('--color-bg-glass-strong', '#1a1a1e');
+    root.style.setProperty('--dex-glass-bg', solid.chrome);
+    root.style.setProperty('--color-bg-glass', solid.glass);
+    root.style.setProperty('--color-bg-glass-strong', solid.strong);
     root.style.setProperty('--dex-glass-blur', '0px');
-    root.style.setProperty('--glass-bg', '#141416');
+    root.style.setProperty('--glass-bg', solid.chrome);
     root.style.setProperty('--glass-blur', 'none');
   } else if (effectiveMode === 'reduced') {
     const op = Math.max(requestedOpacity, 0.92);
@@ -247,8 +286,10 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   } else {
     const liquid = effectiveMode === 'liquid';
     // 'liquid' floats a touch more transparent so the wallpaper lensing reads.
-    const op = liquid ? Math.min(requestedOpacity, 0.78) : requestedOpacity;
-    const blur = liquid ? 32 : 24;
+    const op = requestedOpacity;
+    // Blur strength is its own parameter; 'liquid' adds a little extra depth.
+    const baseBlur = clamp01(prefs.glassBlur, DEFAULT_SHELL_PREFERENCES.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
+    const blur = Math.min(GLASS_BLUR_MAX, baseBlur + (liquid ? 8 : 0));
     const sat = liquid ? 200 : 180;
     const filter = `blur(${blur}px) saturate(${sat}%)`;
     root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
@@ -331,16 +372,29 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
   // honest without requiring a reload.
   // Guarded so a store re-create (HMR / repeat import) can't stack duplicate
   // matchMedia 'change' listeners that each re-run applyGlassVars.
+  // Theme switches (light <-> dark) must re-resolve the inline material vars,
+  // otherwise the previous theme's solid/tint values keep winning over the
+  // stylesheet. Guarded like the matchMedia listeners below.
+  if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined'
+      && !(window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired) {
+    (window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired = true;
+    let lastTheme = document.documentElement.getAttribute('data-theme');
+    new MutationObserver(() => {
+      const t = document.documentElement.getAttribute('data-theme');
+      if (t === lastTheme) return;
+      lastTheme = t;
+      try { applyGlassVars(get()); } catch { /* noop */ }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       && !(window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired) {
     (window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired = true;
     try {
-      const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
       const mqTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)');
       const handler = () => {
         try { applyGlassVars(get()); } catch { /* noop */ }
       };
-      mqMotion.addEventListener?.('change', handler);
       mqTransparency.addEventListener?.('change', handler);
     } catch { /* noop */ }
   }
@@ -390,6 +444,17 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       const safe: GlassMode = mode === 'off' || mode === 'reduced' || mode === 'liquid' ? mode : 'normal';
       update({ glassMode: safe });
       applyGlassVars({ ...get(), glassMode: safe });
+    },
+
+    setGlassBlur: (px) => {
+      const v = clamp01(px, DEFAULT_SHELL_PREFERENCES.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
+      update({ glassBlur: v });
+      applyGlassVars({ ...get(), glassBlur: v });
+    },
+    setInterfaceTransparency: (percent) => {
+      const next = transparencyToPrefs(percent);
+      update(next);
+      applyGlassVars({ ...get(), ...next });
     },
 
     setNightShift: (enabled) => {

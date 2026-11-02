@@ -19,6 +19,7 @@ import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
+import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
@@ -1923,6 +1924,7 @@ export const Settings: React.FC = () => {
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
+  const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
 
@@ -2392,7 +2394,12 @@ export const Settings: React.FC = () => {
       // transparency toggles are flipped from anywhere in Settings.
       if (key === 'transparency') {
         try {
-          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'liquid') : 'off');
+          if (nextVal && !prev.reduceTransparency) {
+            // Turning glass on from opaque lands at a visible 60% (opacity 1 would look unchanged).
+            if (shellPrefs.glassMode === 'off') shellPrefs.setInterfaceTransparency(60);
+          } else {
+            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'off');
+          }
         } catch { /* store not ready */ }
       }
       if (key === 'reduceTransparency') {
@@ -2401,7 +2408,8 @@ export const Settings: React.FC = () => {
             // transparency disabled -- glass stays off
             shellPrefs.setGlassMode('off');
           } else {
-            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'liquid');
+            if (nextVal) shellPrefs.setGlassMode('reduced');
+            else if (shellPrefs.glassMode === 'reduced') shellPrefs.setInterfaceTransparency(60);
           }
         } catch { /* store not ready */ }
       }
@@ -2571,75 +2579,22 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Glass</span>
-            <span style={styles.settingDesc}>
-              {prefs.glassMode === 'off'
-                ? 'Off — every surface is opaque true black.'
-                : 'On — full Apple-style liquid glass across the whole shell.'}
-            </span>
+        <InterfaceTransparencyControl styles={styles} />
+        {prefs.glassMode !== 'off' && (
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Tint</span>
+              <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
+            </div>
+            <input
+              type="color"
+              value={prefs.glassTint}
+              onChange={(e) => prefs.setGlassTint(e.target.value)}
+              style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              aria-label="Liquid Glass tint color"
+            />
           </div>
-          <input
-            type="checkbox"
-            checked={prefs.glassMode !== 'off'}
-            onChange={(e) => prefs.setGlassMode(e.target.checked ? 'liquid' : 'off')}
-            aria-label="Liquid Glass on or off"
-          />
-        </div>
-        {prefs.glassMode !== 'off' && <>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Intensity</span>
-            <span style={styles.settingDesc}>How transparent the glass is. Liquid is the full Apple look.</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([
-              { id: 'reduced', label: 'Reduced' },
-              { id: 'normal', label: 'Normal' },
-              { id: 'liquid', label: 'Liquid' },
-            ] as const).map((mode) => (
-              <button
-                key={mode.id}
-                aria-label={`Glass mode ${mode.label}`}
-                aria-pressed={prefs.glassMode === mode.id}
-                style={{
-                  ...styles.button,
-                  background: prefs.glassMode === mode.id ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-hover)',
-                  color: prefs.glassMode === mode.id ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
-                }}
-                onClick={() => prefs.setGlassMode(mode.id)}
-              >{mode.label}</button>
-            ))}
-          </div>
-        </div>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Tint</span>
-            <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
-          </div>
-          <input
-            type="color"
-            value={prefs.glassTint}
-            onChange={(e) => prefs.setGlassTint(e.target.value)}
-            style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
-            aria-label="Liquid Glass tint color"
-          />
-        </div>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Opacity</span>
-            <span style={styles.settingDesc}>{(prefs.glassOpacity * 100).toFixed(0)}% — higher is more solid.</span>
-          </div>
-          <input
-            type="range" min={0.4} max={1} step={0.05}
-            value={prefs.glassOpacity}
-            onChange={(e) => prefs.setGlassOpacity(parseFloat(e.target.value))}
-            style={{ width: 200 }}
-            aria-label="Liquid Glass opacity"
-          />
-        </div>
-        </>}
+        )}
 
         <h3 style={styles.sectionTitle}>Comfort & Power</h3>
         <div style={styles.settingRow}>
@@ -2891,47 +2846,13 @@ export const Settings: React.FC = () => {
         settingDesc={styles.settingDesc}
       />
 
-      {/* Glass mode segmented control -- single source of truth, mirrored
-          into the legacy `transparency` boolean for back-compat with older
-          components that still read settings.transparency. */}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Glass</span>
-          <span style={styles.settingDesc}>Off, Reduced (light blur), Normal, or Liquid (richest depth).</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {([
-            { id: 'off', label: 'Off' },
-            { id: 'reduced', label: 'Reduced' },
-            { id: 'normal', label: 'Normal' },
-            { id: 'liquid', label: 'Liquid' },
-          ] as const).map((mode) => {
-            const active = shellPrefs.glassMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                aria-label={`Glass mode ${mode.label}`}
-                aria-pressed={active}
-                onClick={() => {
-                  shellPrefs.setGlassMode(mode.id);
-                  // Mirror to legacy boolean so existing CSS gates keep working.
-                  setSettings(prev => ({
-                    ...prev,
-                    transparency: mode.id !== 'off',
-                    reduceTransparency: mode.id === 'reduced',
-                  }));
-                }}
-                style={{
-                  padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
-                  background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
-                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                }}
-              >{mode.label}</button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Interface Transparency -- the single glass-to-opaque control, mirrored
+          into the legacy `transparency` boolean for older components that
+          still read settings.transparency. */}
+      <InterfaceTransparencyControl
+        styles={styles}
+        onChange={(pct) => setSettings(prev => ({ ...prev, transparency: pct > 0 }))}
+      />
 
       {renderToggle('reduceTransparency', 'Reduce Transparency', 'Force solid surfaces over translucency for readability')}
 
@@ -3039,18 +2960,15 @@ export const Settings: React.FC = () => {
         </div>
         <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)' }}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Glass Opacity</span>
-            <span style={styles.settingDesc}>Transparency of glass surfaces</span>
+            <span style={styles.settingLabel}>Wallpaper Overlay</span>
+            <span style={styles.settingDesc}>Dims the wallpaper behind the desktop for readability</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 140 }}>
-            <input type="range" min="0" max="100" step="5" value={Math.round((settings.glassOpacity ?? 0.85) * 100)}
-              onChange={e => {
-                const v = Number(e.target.value) / 100;
-                setSettings(prev => ({ ...prev, glassOpacity: v }));
-                useWallpaperStore.getState().setOpacity(v);
-              }}
+            <input type="range" min="0" max="100" step="5" value={Math.round(wallpaperOverlay * 100)}
+              onChange={e => useWallpaperStore.getState().setOpacity(Number(e.target.value) / 100)}
+              aria-label="Wallpaper overlay"
               style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{Math.round((settings.glassOpacity ?? 0.85) * 100)}%</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{Math.round(wallpaperOverlay * 100)}%</span>
           </div>
         </div>
       </div>
@@ -3542,7 +3460,7 @@ export const Settings: React.FC = () => {
       }}>
         <div style={{ position: 'absolute', top: -8, right: -8, width: 64, height: 64, borderRadius: '50%', background: 'var(--color-accent-soft, rgba(74,158,255,0.04))', pointerEvents: 'none' }} />
         <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
-          Created by Onazi Treasure OJ
+          DEX OS Creator: Onazi Oj
         </div>
         <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>
           Personal Control Hub for Desktop Automation
@@ -3564,8 +3482,12 @@ export const Settings: React.FC = () => {
           <span style={styles.aboutValue}>May 2026</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Made by</span>
-          <span style={styles.aboutValue}>Onazi Treasure OJ</span>
+          <span style={styles.aboutLabel}>Creator</span>
+          <span style={styles.aboutValue}>Onazi Oj</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Design</span>
+          <span style={styles.aboutValue}>DEX Blue Modern</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>License</span>
