@@ -105,6 +105,7 @@ import { AdjustmentControls } from './AdjustmentControls';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
 import { clampEventToViewport } from '../../utils/menuPosition';
+import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
 
 // Prism's value sliders all share the app accent (#ff375f) and an 80px label
 // column; this thin wrapper bakes those in so call sites stay declarative and the
@@ -395,6 +396,9 @@ const Prism: React.FC = () => {
   // inline here; now one implementation reusable across the creative apps).
   const { zoom, setZoom, panOffset, setPanOffset, zoomAtCursor } = useCanvasZoomPan({ min: 10, max: 500, initial: 100 });
   const [canvasSize, setCanvasSize] = useState({ width: 1920, height: 1080 });
+  // Metadata of the last opened original (Image info panel).
+  const [imageInfo, setImageInfo] = useState<{ name: string; bytes: number; meta: ImageMetadata } | null>(null);
+  const [showImageInfo, setShowImageInfo] = useState(false);
   
   // Brush settings
   const [brushSize, setBrushSize] = useState(20);
@@ -1224,6 +1228,11 @@ const Prism: React.FC = () => {
       const files = (e.target as HTMLInputElement).files;
       if (!files || files.length === 0) return;
       
+      // Read the original's metadata (only the head of the file is needed).
+      const first = files[0];
+      void first.slice(0, 512 * 1024).arrayBuffer()
+        .then((buf) => setImageInfo({ name: first.name, bytes: first.size, meta: readImageMetadata(buf) }))
+        .catch(() => setImageInfo(null));
       Array.from(files).forEach((file, index) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -2993,6 +3002,39 @@ const Prism: React.FC = () => {
           <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project">{Icons.save} Save</button>
           <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
           <button className="prism-btn" style={styles.btn} onClick={() => exportImage('png')} aria-label="Export image">{Icons.download} Export</button>
+          <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <button className="prism-btn" style={styles.btn} onClick={() => setShowImageInfo(v => !v)} aria-expanded={showImageInfo} aria-label="Image info">Info</button>
+            {showImageInfo && (
+              <div role="dialog" aria-label="Image info" onKeyDown={(e) => { if (e.key === 'Escape') setShowImageInfo(false); }}
+                style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, width: 280, padding: 12, borderRadius: 'var(--radius-lg, 14px)', background: 'var(--color-bg-glass-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', fontSize: 12, color: 'var(--color-text-primary)' }}>
+                {!imageInfo ? <div style={{ color: 'var(--color-text-secondary)' }}>Open an image to see its details.</div> : (() => {
+                  const m = imageInfo.meta;
+                  const rows: Array<[string, string | undefined]> = [
+                    ['File', imageInfo.name],
+                    ['Format', m.format],
+                    ['Size', `${(imageInfo.bytes / 1048576).toFixed(2)} MB`],
+                    ['Dimensions', m.width && m.height ? `${m.width} × ${m.height}` : undefined],
+                    ['Camera', [m.make, m.model].filter(Boolean).join(' ') || undefined],
+                    ['Taken', formatExifDate(m.takenAt)],
+                    ['Exposure', [m.exposure, m.fNumber, m.iso ? `ISO ${m.iso}` : undefined, m.focalLength].filter(Boolean).join(' · ') || undefined],
+                    ['Software', m.software],
+                  ];
+                  return (
+                    <>
+                      <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
+                        {rows.filter(([, v]) => v).map(([k, v]) => (
+                          <React.Fragment key={k}><dt style={{ color: 'var(--color-text-tertiary)' }}>{k}</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{v}</dd></React.Fragment>
+                        ))}
+                      </dl>
+                      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
+                        {m.hasLocation ? 'The original contains GPS location data. ' : ''}Exported images don't include camera, date or location data. Your original file is never changed.
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </span>
           <SendToMenu sourceApp="prism" assetKind="image" getAsset={() => {
             const canvas = canvasRef.current;
             const dataUrl = canvas ? canvas.toDataURL('image/png') : '';
