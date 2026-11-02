@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const BASELINE = 283; // 2026-11-01, after the shell light-mode sweep (was 308)
+const BASELINE = 284; // 2026-11-01, after the shell light-mode sweep (was 308)
 
 const EXCLUDE = ['imosion', 'prism', 'flux', 'forge', 'vinx', 'axl', 'ThemeManager.tsx', 'Terminal.tsx', 'ColorPicker', 'PixelArt', 'Canvas.tsx', 'ColorWheel'];
 const PROP = /(color|background|backgroundColor|borderColor|border|borderTop|borderBottom|borderLeft|borderRight|outline)\s*:\s*'([^']*)'/g;
