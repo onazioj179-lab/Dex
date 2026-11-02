@@ -330,6 +330,19 @@ const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
   maps: { w: 640, h: 460 },
 };
 
+/** Settings > Frame Snapping prefs (written by AccessPanels.tsx). */
+function readSnapPrefs(): { enabled: boolean; gutter: number; cycleOnRepeat: boolean } {
+  const d = { enabled: true, gutter: 6, cycleOnRepeat: true };
+  try {
+    const p = JSON.parse(localStorage.getItem('dex.snap.preferences') || '{}');
+    return {
+      enabled: p.enabled !== false,
+      gutter: Number.isFinite(p.gutter) ? Math.min(20, Math.max(0, Math.round(p.gutter))) : d.gutter,
+      cycleOnRepeat: p.cycleOnRepeat !== false,
+    };
+  } catch { return d; }
+}
+
 const getUsableFloatingBounds = (
   appId: string,
   bounds: { x: number; y: number; w: number; h: number },
@@ -976,9 +989,18 @@ export const AppManager: React.FC = () => {
   const [snapPreviewZone, setSnapPreviewZone] = useState<SnapPreviewZone>(null);
   const snapPreviewRef = useRef<SnapPreviewZone>(null);
 
+  // Settings > Frame Snapping (snap on drag, gutter, cycle on repeat).
+  const snapPrefsRef = useRef(readSnapPrefs());
+  const lastSideTileRef = useRef<{ appId: string; side: 'left' | 'right'; step: number } | null>(null);
+  useEffect(() => {
+    const onPrefs = () => { snapPrefsRef.current = readSnapPrefs(); };
+    window.addEventListener('dex:snap-prefs', onPrefs);
+    return () => window.removeEventListener('dex:snap-prefs', onPrefs);
+  }, []);
+
   const detectDragSnapZone = useCallback((cx: number, cy: number): SnapPreviewZone => {
     // Screen-edge snapping has no meaning on the infinite spatial canvas.
-    if (isSpatialEnabled()) return null;
+    if (isSpatialEnabled() || !snapPrefsRef.current.enabled) return null;
     const W = window.innerWidth;
     const H = window.innerHeight;
     const EDGE = 18;
@@ -2136,7 +2158,7 @@ export const AppManager: React.FC = () => {
   }, [openAppInWindow]);
 
   // -- Window tiling presets (up to 5 windows) ----------------------------
-  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize' | 'left-third' | 'center-third' | 'right-third';
+  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize' | 'left-third' | 'center-third' | 'right-third' | 'left-two-thirds' | 'right-two-thirds';
   const tileWindow = useCallback((appId: AppId, position: TilePosition) => {
     // Screen tiling has no meaning on the spatial canvas; maximize / snap there
     // means "bring this window to full view".
@@ -2145,7 +2167,7 @@ export const AppManager: React.FC = () => {
     const maximizedWorkspace = getMaximizedWindowBounds();
     const W = workspace.w;
     const H = workspace.h;
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const LEFT = workspace.x;
     const TOP = workspace.y;
     const usableH = H;
@@ -2166,6 +2188,8 @@ export const AppManager: React.FC = () => {
       'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
       'center-third': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 4) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
       'right-third':  { x: LEFT + PAD * 3 + Math.floor((W - PAD * 4) / 3) * 2, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
+      'left-two-thirds':  { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
+      'right-two-thirds': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 3) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
     };
 
     const rect = positions[position];
@@ -2214,7 +2238,7 @@ export const AppManager: React.FC = () => {
     const W = workspace.w;
     const TOP = workspace.y;
     const LEFT = workspace.x;
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const usableH = workspace.h;
 
     // Pre-defined layouts for 1-6+ windows
@@ -2250,6 +2274,8 @@ export const AppManager: React.FC = () => {
         'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'center-third': { x: LEFT + PAD * 2 + thirdW, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'right-third':  { x: LEFT + PAD * 3 + thirdW * 2, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
+        'left-two-thirds':  { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
+        'right-two-thirds': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 3) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 3) * 2 / 3), h: usableH - PAD * 2 },
       };
 
       // Min-size-aware columns: never use more columns than the work area can
@@ -2331,7 +2357,7 @@ export const AppManager: React.FC = () => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0 || ratios.length === 0) return;
     const workspace = getShellWorkspace(0);
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const n = Math.min(ids.length, ratios.length);
     const used = ratios.slice(0, n);
     const sum = used.reduce((a, b) => a + b, 0) || 1;
@@ -2382,7 +2408,7 @@ export const AppManager: React.FC = () => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0 || cols < 1 || rows < 1) return;
     const workspace = getShellWorkspace(0);
-    const PAD = 6;
+    const PAD = snapPrefsRef.current.gutter;
     const n = Math.min(ids.length, cols * rows);
     const placed = ids.slice(0, n);
     const colW = Math.floor((workspace.w - PAD * (cols + 1)) / cols);
@@ -2665,8 +2691,18 @@ export const AppManager: React.FC = () => {
         }
       }
       if (focusedApp && (e.metaKey || (e.ctrlKey && e.altKey))) {
-        if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'left'); return; }
-        if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'right'); return; }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          const side = e.key === 'ArrowLeft' ? 'left' : 'right';
+          // Cycle on repeat: pressing the same side again goes 1/2 -> 2/3 -> 1/3.
+          const cycle: TilePosition[] = side === 'left' ? ['left', 'left-two-thirds', 'left-third'] : ['right', 'right-two-thirds', 'right-third'];
+          const last = lastSideTileRef.current;
+          const step = snapPrefsRef.current.cycleOnRepeat && last && last.appId === focusedApp && last.side === side
+            ? (last.step + 1) % cycle.length : 0;
+          lastSideTileRef.current = { appId: focusedApp, side, step };
+          tileWindow(focusedApp as AppId, cycle[step]);
+          return;
+        }
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           // Minimize or restore if already minimized
