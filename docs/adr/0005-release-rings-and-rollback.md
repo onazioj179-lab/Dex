@@ -41,7 +41,7 @@ into the affected ring until the next ADR-tracked decision unfreezes it.
 
 `ReleaseManager` (`src/main/core/ReleaseManager.ts`) owns ring assignment
 and rollback execution. Promotion decisions are recorded in
-`docs/RELEASE_NOTES.md` with the responsible owner.
+`DEX_RELEASE_NOTES.md` with the responsible owner.
 
 ## Consequences
 
