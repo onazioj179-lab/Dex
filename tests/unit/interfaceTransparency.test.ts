@@ -11,6 +11,7 @@ import {
   prefsToTransparency,
   transparencyToPrefs,
   DEFAULT_SHELL_PREFERENCES,
+  GLASS_OPACITY_FLOOR,
 } from '../../src/renderer/store/shellPreferencesStore';
 
 const root = () => document.documentElement;
@@ -21,10 +22,17 @@ describe('Interface Transparency slider mapping', () => {
     expect(transparencyToPrefs(0)).toEqual({ glassMode: 'off', glassOpacity: 1 });
   });
 
-  it('100% is the most translucent supported glass (opacity floor 0.4)', () => {
+  it('100% is the most translucent supported glass (shared opacity floor)', () => {
     const p = transparencyToPrefs(100);
-    expect(p.glassMode).toBe('liquid');
-    expect(p.glassOpacity).toBeCloseTo(0.4, 5);
+    expect(p.glassMode).toBe('normal');
+    expect(p.glassOpacity).toBeCloseTo(GLASS_OPACITY_FLOOR, 5);
+  });
+
+  it('never swaps the glass style mid-drag: Liquid stays Liquid, anything else is Refined', () => {
+    expect(transparencyToPrefs(30, 'liquid').glassMode).toBe('liquid');
+    expect(transparencyToPrefs(95, 'normal').glassMode).toBe('normal');
+    expect(transparencyToPrefs(30, 'reduced').glassMode).toBe('normal');
+    expect(transparencyToPrefs(0, 'liquid').glassMode).toBe('off');
   });
 
   it('is monotonic: more transparency never raises opacity', () => {
@@ -44,8 +52,12 @@ describe('Interface Transparency slider mapping', () => {
 
   it('clamps out-of-range and non-finite input', () => {
     expect(transparencyToPrefs(-40).glassMode).toBe('off');
-    expect(transparencyToPrefs(900).glassOpacity).toBeCloseTo(0.4, 5);
+    expect(transparencyToPrefs(900).glassOpacity).toBeCloseTo(GLASS_OPACITY_FLOOR, 5);
     expect(transparencyToPrefs(NaN).glassMode).toBe('off');
+  });
+
+  it('the refined default (opacity 0.82) shows as 40% on the slider', () => {
+    expect(prefsToTransparency(DEFAULT_SHELL_PREFERENCES)).toBe(40);
   });
 
   it('persists glassBlur separately and clamps it', () => {
@@ -65,20 +77,20 @@ describe('applyGlassVars is theme-aware', () => {
   it('opaque mode in light theme emits light solids, not the dark ones', () => {
     root().setAttribute('data-theme', 'light');
     applyGlassVars({ ...DEFAULT_SHELL_PREFERENCES, ...transparencyToPrefs(0) });
-    expect(v('--color-bg-glass')).toBe('#F5F5F8');
+    expect(v('--color-bg-glass')).toBe('#FFFFFF');
     expect(v('--dex-glass-blur')).toBe('0px');
   });
 
   it('opaque mode in dark theme keeps the dark solids', () => {
     root().setAttribute('data-theme', 'dark');
     applyGlassVars({ ...DEFAULT_SHELL_PREFERENCES, ...transparencyToPrefs(0) });
-    expect(v('--color-bg-glass')).toBe('#161618');
+    expect(v('--color-bg-glass')).toBe('#1C1C1E');
   });
 
   it('glass mode in light theme tints light (default tint) and honours blur strength', () => {
     root().setAttribute('data-theme', 'light');
     applyGlassVars({ ...DEFAULT_SHELL_PREFERENCES, ...transparencyToPrefs(50), glassBlur: 12 });
-    expect(v('--color-bg-glass')).toMatch(/^rgba\(245, 245, 247,/);
+    expect(v('--color-bg-glass')).toMatch(/^rgba\(255, 255, 255,/);
     expect(v('--dex-glass-blur')).toContain('blur(12px)');
   });
 

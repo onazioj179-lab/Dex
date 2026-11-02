@@ -39,6 +39,7 @@ export function InterfaceTransparencyControl({ styles, onChange }: { styles: Row
   const lowEndMode = useShellPreferences((s) => s.lowEndMode);
   const setInterfaceTransparency = useShellPreferences((s) => s.setInterfaceTransparency);
   const setGlassBlur = useShellPreferences((s) => s.setGlassBlur);
+  const setGlassMode = useShellPreferences((s) => s.setGlassMode);
 
   const percent = prefsToTransparency({ glassMode, glassOpacity });
   const forcedFlat = percent > 0 && getEffectiveGlassMode({ glassMode, lowEndMode }) !== glassMode;
@@ -63,6 +64,33 @@ export function InterfaceTransparencyControl({ styles, onChange }: { styles: Row
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 32, textAlign: 'right' }}>{percent}%</span>
         </div>
       </div>
+      {percent > 0 && (
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Glass style</span>
+            <span style={styles.settingDesc}>Refined is restrained and crisp. Liquid is deeper, with stronger lensing.</span>
+          </div>
+          <div role="group" aria-label="Glass style" style={{ display: 'flex', gap: 6 }}>
+            {([{ id: 'normal', label: 'Refined' }, { id: 'liquid', label: 'Liquid' }] as const).map((m) => {
+              const active = (glassMode === 'liquid') === (m.id === 'liquid');
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setGlassMode(m.id)}
+                  style={{
+                    padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    border: active ? '1px solid var(--dex-focus-color, var(--color-accent))' : '1px solid var(--color-border)',
+                    background: active ? 'var(--color-bg-active)' : 'transparent',
+                    color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  }}
+                >{m.label}</button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {percent > 0 && (
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>

@@ -27,13 +27,19 @@ export const DEX_SHELL_PREFS_KEY = 'dex-shell-preferences-v1';
 // install that still has a translucent glass mode persisted is flipped to 'off'
 // exactly once. Presence of this key means the migration already ran.
 const GLASS_REMOVED_FLAG = 'dex-glass-removed-v1';
+// Part 5 (owner, 2026-11): refined glass returns as the default for shell
+// chrome. Flips the earlier forced 'off' to 'normal' ONCE; afterwards the
+// Settings switch is the user's choice and is never overridden again.
+const GLASS_REFINED_FLAG = 'dex-glass-refined-v1';
+/** The pre-Part-5 default tint; treated as 'use the theme's own surface'. */
+const LEGACY_DEFAULT_TINT = '#0a0a0a';
 
 export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 
 export const GLASS_BLUR_MIN = 4;
 export const GLASS_BLUR_MAX = 40;
-/** Lowest surface opacity the slider can reach (100% transparency setting). */
-const GLASS_OPACITY_FLOOR = 0.4;
+/** Lowest surface opacity the slider reaches (100%); keeps text readable over any wallpaper. */
+export const GLASS_OPACITY_FLOOR = 0.55;
 
 /**
  * "Interface Transparency" is one 0-100 control layered over the two stored
@@ -41,11 +47,16 @@ const GLASS_OPACITY_FLOOR = 0.4;
  * 100 = the most translucent supported glass. Blur strength is a separate
  * parameter and is NOT derived from this value.
  */
-export function transparencyToPrefs(percent: number): Pick<ShellPreferences, 'glassMode' | 'glassOpacity'> {
+export function transparencyToPrefs(
+  percent: number,
+  currentMode: GlassMode = 'normal',
+): Pick<ShellPreferences, 'glassMode' | 'glassOpacity'> {
   const t = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
   if (t === 0) return { glassMode: 'off', glassOpacity: 1 };
   const opacity = 1 - (t / 100) * (1 - GLASS_OPACITY_FLOOR);
-  return { glassMode: t >= 75 ? 'liquid' : 'normal', glassOpacity: Math.round(opacity * 1000) / 1000 };
+  // The slider only sets how see-through the material is. It never swaps the
+  // style (Refined <-> Liquid) mid-drag; that is its own choice.
+  return { glassMode: currentMode === 'liquid' ? 'liquid' : 'normal', glassOpacity: Math.round(opacity * 1000) / 1000 };
 }
 
 export function prefsToTransparency(prefs: Pick<ShellPreferences, 'glassMode' | 'glassOpacity'>): number {
@@ -91,15 +102,14 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
   dockAlign: 'center',
   dockPreset: 'regular',
-  // No glass out of the box (owner direction, 2026-07): the WHOLE OS reads as one
-  // consistent, solid, non-translucent surface — every menu, panel, dropdown,
-  // sidebar, and the floating chrome (DEX Bar). 'off' makes applyGlassVars() emit
-  // fully-opaque true-black surfaces with zero blur. The Settings toggle can still
-  // opt back into translucent glass for anyone who wants it.
-  glassOpacity: 1,
-  glassTint: '#0a0a0a',
-  glassMode: 'off',
-  glassBlur: 24,
+  // Refined glass (Part 5, owner 2026-11): shell chrome and menus are a
+  // restrained translucent material (theme-tinted, 20px blur); app windows stay
+  // solid. Reduced transparency, low-end mode or the Settings switch fall back
+  // to a solid fill.
+  glassOpacity: 0.82,
+  glassTint: LEGACY_DEFAULT_TINT,
+  glassMode: 'normal',
+  glassBlur: 20,
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -149,12 +159,14 @@ function loadInitial(): ShellPreferences {
     // mode to solid ONCE so existing installs match the new consistent default.
     // The Settings toggle still works afterwards for deliberate re-enable.
     try {
-      if (localStorage.getItem(GLASS_REMOVED_FLAG) !== '1') {
-        if (merged.glassMode !== 'off') { merged.glassMode = 'off'; merged.glassOpacity = 1; }
+      if (localStorage.getItem(GLASS_REFINED_FLAG) !== '1') {
+        // Installs that were forced solid in 2026-07 get the refined default once.
+        if (merged.glassMode === 'off') { merged.glassMode = 'normal'; merged.glassOpacity = DEFAULT_SHELL_PREFERENCES.glassOpacity; }
+        localStorage.setItem(GLASS_REFINED_FLAG, '1');
         localStorage.setItem(GLASS_REMOVED_FLAG, '1');
         persist(merged);
       }
-    } catch { /* quota / sandbox — the new default already lands 'off' */ }
+    } catch { /* quota / sandbox — the new default already lands 'normal' */ }
     return merged;
   } catch {
     return { ...DEFAULT_SHELL_PREFERENCES };
@@ -213,11 +225,17 @@ export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' 
   if (prefs.lowEndMode) return 'reduced';
   if (typeof window !== 'undefined') {
     try {
-      // OS-level accessibility hint. Only prefers-reduced-transparency counts:
-      // reduced *motion* says nothing about translucency, and treating it as
-      // such silently disabled the Interface Transparency slider for anyone
-      // with Reduce Motion on.
-      if (window.matchMedia('(prefers-reduced-transparency: reduce)').matches && prefs.glassMode !== 'off') {
+      // OS-level accessibility hint: prefers-reduced-transparency is the
+      // canonical signal; prefers-reduced-motion is a reasonable fallback for
+      // browsers that do not yet expose the transparency query.
+      // Reduce-motion is only a stand-in where the engine can't report the
+      // transparency preference at all (WebView2 can). Otherwise people who
+      // simply turned animations off would never get glass.
+      const mqT = (v: string) => window.matchMedia(`(prefers-reduced-transparency: ${v})`).matches;
+      const transparencyQuerySupported = mqT('reduce') || mqT('no-preference');
+      const reducedTransparency = mqT('reduce');
+      const reducedMotion = !transparencyQuerySupported && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if ((reducedTransparency || reducedMotion) && prefs.glassMode !== 'off') {
         return 'reduced';
       }
     } catch {
@@ -237,16 +255,11 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   root.style.setProperty('--dex-glass-effective-mode', effectiveMode);
   root.setAttribute('data-glass-mode', prefs.glassMode);
   root.setAttribute('data-glass-effective-mode', effectiveMode);
-  // Inline root vars outrank the [data-theme] stylesheet rules, so the solid /
-  // translucent values below must follow the active theme or light mode would
-  // get dark panels. Re-applied on every data-theme change (see store init).
+  // Theme-aware tint: the default follows the theme's surface (graphite in
+  // dark, white in light) so glass never paints dark chrome over a light UI.
   const light = root.getAttribute('data-theme') === 'light';
-  const userTint = hexToRgb(prefs.glassTint) ?? { r: 10, g: 10, b: 10 };
-  const defaultTint = prefs.glassTint.toLowerCase() === DEFAULT_SHELL_PREFERENCES.glassTint;
-  const { r, g, b } = light && defaultTint ? { r: 245, g: 245, b: 247 } : userTint;
-  const solid = light
-    ? { chrome: '#F5F5F8', glass: '#F5F5F8', strong: '#F0F0F3' }
-    : { chrome: '#141416', glass: '#161618', strong: '#1a1a1e' };
+  const custom = (prefs.glassTint || '').toLowerCase() !== LEGACY_DEFAULT_TINT ? hexToRgb(prefs.glassTint) : null;
+  const { r, g, b } = custom ?? (light ? { r: 255, g: 255, b: 255 } : { r: 28, g: 28, b: 30 });
   root.style.setProperty('--dex-glass-tint-r', String(r));
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
@@ -269,11 +282,12 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     // near-black desktop so surfaces read as lifted frosted panels, using the
     // design's own canonical solid values (same as the reduced-transparency
     // fallback). Consistent "frost fill everywhere" without any glass/blur.
-    root.style.setProperty('--dex-glass-bg', solid.chrome);
-    root.style.setProperty('--color-bg-glass', solid.glass);
-    root.style.setProperty('--color-bg-glass-strong', solid.strong);
+    const solid = light ? ['#FFFFFF', '#FFFFFF', '#F5F5F7'] : ['#1C1C1E', '#1C1C1E', '#232326'];
+    root.style.setProperty('--dex-glass-bg', solid[0]);
+    root.style.setProperty('--color-bg-glass', solid[1]);
+    root.style.setProperty('--color-bg-glass-strong', solid[2]);
     root.style.setProperty('--dex-glass-blur', '0px');
-    root.style.setProperty('--glass-bg', solid.chrome);
+    root.style.setProperty('--glass-bg', solid[0]);
     root.style.setProperty('--glass-blur', 'none');
   } else if (effectiveMode === 'reduced') {
     const op = Math.max(requestedOpacity, 0.92);
@@ -285,12 +299,15 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     root.style.setProperty('--glass-blur', 'none');
   } else {
     const liquid = effectiveMode === 'liquid';
-    // 'liquid' floats a touch more transparent so the wallpaper lensing reads.
-    const op = requestedOpacity;
-    // Blur strength is its own parameter; 'liquid' adds a little extra depth.
+    // 'normal' is the refined default: restrained blur, enough fill that text
+    // keeps contrast over any wallpaper. 'liquid' is the heavier opt-in look.
+    // The opacity floor is shared with the Interface Transparency slider, so its
+    // 100% end is the most translucent glass that still reads.
+    const op = liquid ? Math.min(requestedOpacity, 0.78) : Math.max(requestedOpacity, GLASS_OPACITY_FLOOR);
+    // Blur strength is its own parameter (default 20px); 'liquid' adds depth.
     const baseBlur = clamp01(prefs.glassBlur, DEFAULT_SHELL_PREFERENCES.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
-    const blur = Math.min(GLASS_BLUR_MAX, baseBlur + (liquid ? 8 : 0));
-    const sat = liquid ? 200 : 180;
+    const blur = Math.min(GLASS_BLUR_MAX, baseBlur + (liquid ? 12 : 0));
+    const sat = liquid ? 200 : 160;
     const filter = `blur(${blur}px) saturate(${sat}%)`;
     root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
     root.style.setProperty('--color-bg-glass', `rgba(${tint}, ${op})`);
@@ -372,21 +389,6 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
   // honest without requiring a reload.
   // Guarded so a store re-create (HMR / repeat import) can't stack duplicate
   // matchMedia 'change' listeners that each re-run applyGlassVars.
-  // Theme switches (light <-> dark) must re-resolve the inline material vars,
-  // otherwise the previous theme's solid/tint values keep winning over the
-  // stylesheet. Guarded like the matchMedia listeners below.
-  if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined'
-      && !(window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired) {
-    (window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired = true;
-    let lastTheme = document.documentElement.getAttribute('data-theme');
-    new MutationObserver(() => {
-      const t = document.documentElement.getAttribute('data-theme');
-      if (t === lastTheme) return;
-      lastTheme = t;
-      try { applyGlassVars(get()); } catch { /* noop */ }
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  }
-
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       && !(window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired) {
     (window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired = true;
@@ -396,6 +398,16 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
         try { applyGlassVars(get()); } catch { /* noop */ }
       };
       mqTransparency.addEventListener?.('change', handler);
+    } catch { /* noop */ }
+  }
+
+  // Glass is tinted per theme, so re-apply when <html data-theme> changes.
+  if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined'
+      && !(window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired) {
+    (window as { __dexGlassThemeWired?: boolean }).__dexGlassThemeWired = true;
+    try {
+      new MutationObserver(() => { try { applyGlassVars(get()); } catch { /* noop */ } })
+        .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     } catch { /* noop */ }
   }
 
@@ -452,7 +464,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       applyGlassVars({ ...get(), glassBlur: v });
     },
     setInterfaceTransparency: (percent) => {
-      const next = transparencyToPrefs(percent);
+      const next = transparencyToPrefs(percent, get().glassMode);
       update(next);
       applyGlassVars({ ...get(), ...next });
     },

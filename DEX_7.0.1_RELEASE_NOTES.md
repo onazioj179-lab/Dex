@@ -5,9 +5,10 @@
 ## What changed
 
 - **Interface Transparency slider** (Settings → Appearance and Settings → Shell → Liquid Glass).
-  One control, 0% fully opaque (no blur, cheapest) to 100% maximum glass. Blur strength is a separate
-  slider and only shows once glass is on. Applies live, persists, defaults to opaque.
-- **Light/dark fix for glass surfaces.** The shell wrote dark-only inline values over the light theme, so
+  One control, 0% fully opaque (no blur, cheapest) to 100% most translucent supported glass. The refined
+  default reads as 40%. Blur strength is a separate slider and a Refined/Liquid style choice sits beside
+  it; both appear once glass is on. The slider never swaps the style mid-drag. Applies live and persists.
+- **Light/dark fix for glass surfaces** (landed in parallel on main as the refined-glass default; reconciled here). The shell wrote dark-only inline values over the light theme, so
   menus, docks and panels could stay near-black in light mode. Material vars now follow the active theme
   and re-resolve on every theme switch with no restart. The CSS fallbacks for low-perf tier and
   reduced-transparency also got light variants.

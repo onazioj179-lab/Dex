@@ -26,7 +26,9 @@ const btn: React.CSSProperties = {
   color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
 };
 const panel: React.CSSProperties = {
-  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
+  // Shell glass material (follows Settings > Liquid Glass; solid when off).
+  background: 'var(--color-bg-glass-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+  border: '1px solid var(--color-border)',
   borderRadius: 'var(--radius-lg, 14px)', boxShadow: '0 8px 24px rgba(0,0,0,0.28)', color: 'var(--color-text-primary)',
 };
 

@@ -86,6 +86,7 @@ const SVG_FOR_APP: Record<string, string> = {
   kanban: 'columns',
   timer: 'clock',
   canvas: 'canvas',
+  creativehub: 'palette',
 };
 
 interface AppIconProps {
