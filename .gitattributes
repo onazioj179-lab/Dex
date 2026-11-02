@@ -1,0 +1,3 @@
+# Scripts with a shebang must keep LF: a CRLF shebang breaks Node/vitest import on Windows checkouts.
+scripts/*.mjs text eol=lf
+*.sh text eol=lf

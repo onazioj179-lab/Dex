@@ -43,9 +43,10 @@ const Card: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
         width: 'min(420px, calc(100vw - 32px))',
         padding: 16,
         borderRadius: 'var(--radius-2xl, 18px)',
-        // Faint DEX-blue wash layered over the glass for the reference look.
+        // Faint accent wash over the theme's own glass/solid surface. No dark layer:
+        // it darkened the card under dark text in light mode.
         backgroundImage:
-          'linear-gradient(180deg, rgba(74,158,255,0.10), rgba(74,158,255,0.02)), linear-gradient(180deg, rgba(44,44,54,0.28), rgba(14,14,20,0.42))',
+          'linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 10%, transparent), color-mix(in srgb, var(--color-accent) 2%, transparent))',
         position: 'relative',
       }}
     >
@@ -56,12 +57,12 @@ const Card: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
         style={{
           position: 'absolute', top: 12, right: 12, width: 24, height: 24,
           borderRadius: '50%', border: 'none', cursor: 'pointer',
-          background: 'rgba(255,255,255,0.10)', color: 'var(--color-text-secondary)',
+          background: 'color-mix(in srgb, var(--color-text-primary) 10%, transparent)', color: 'var(--color-text-secondary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'background 0.12s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-text-primary) 18%, transparent)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--color-text-primary) 10%, transparent)'; }}
       >
         <DexIcon name="close" size={12} color="currentColor" />
       </button>
@@ -126,7 +127,7 @@ const Card: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
             {indeterminate && !isDone && !isError ? '' : `${pct}%`}
           </span>
         </div>
-        <div style={{ height: 8, borderRadius: 9999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: 8, borderRadius: 9999, background: 'color-mix(in srgb, var(--color-text-primary) 12%, transparent)', overflow: 'hidden', position: 'relative' }}>
           {indeterminate && !isDone && !isError ? (
             <div
               style={{

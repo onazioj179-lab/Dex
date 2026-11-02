@@ -36,6 +36,35 @@ const LEGACY_DEFAULT_TINT = '#0a0a0a';
 
 export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 
+export const GLASS_BLUR_MIN = 4;
+export const GLASS_BLUR_MAX = 40;
+/** Lowest surface opacity the slider reaches (100%); keeps text readable over any wallpaper. */
+export const GLASS_OPACITY_FLOOR = 0.55;
+
+/**
+ * "Interface Transparency" is one 0-100 control layered over the two stored
+ * material parameters (mode + opacity). 0 = fully opaque (no blur, cheapest);
+ * 100 = the most translucent supported glass. Blur strength is a separate
+ * parameter and is NOT derived from this value.
+ */
+export function transparencyToPrefs(
+  percent: number,
+  currentMode: GlassMode = 'normal',
+): Pick<ShellPreferences, 'glassMode' | 'glassOpacity'> {
+  const t = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
+  if (t === 0) return { glassMode: 'off', glassOpacity: 1 };
+  const opacity = 1 - (t / 100) * (1 - GLASS_OPACITY_FLOOR);
+  // The slider only sets how see-through the material is. It never swaps the
+  // style (Refined <-> Liquid) mid-drag; that is its own choice.
+  return { glassMode: currentMode === 'liquid' ? 'liquid' : 'normal', glassOpacity: Math.round(opacity * 1000) / 1000 };
+}
+
+export function prefsToTransparency(prefs: Pick<ShellPreferences, 'glassMode' | 'glassOpacity'>): number {
+  if (prefs.glassMode === 'off') return 0;
+  const t = ((1 - prefs.glassOpacity) / (1 - GLASS_OPACITY_FLOOR)) * 100;
+  return Math.max(1, Math.min(100, Math.round(t)));
+}
+
 export interface ShellPreferences {
   /** Edge of the screen the dock attaches to. */
   dockEdge: DockEdge;
@@ -49,6 +78,8 @@ export interface ShellPreferences {
   glassTint: string;
   /** Global transparency mode for shell glass surfaces. */
   glassMode: GlassMode;
+  /** Backdrop blur strength in px (4-40). Independent of opacity. */
+  glassBlur: number;
   /** Night Shift enabled (warmer color filter). */
   nightShift: boolean;
   /** Night Shift intensity 0–1. */
@@ -78,6 +109,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   glassOpacity: 0.82,
   glassTint: LEGACY_DEFAULT_TINT,
   glassMode: 'normal',
+  glassBlur: 20,
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -95,6 +127,9 @@ interface ShellPreferencesActions {
   setGlassOpacity: (value: number) => void;
   setGlassTint: (hex: string) => void;
   setGlassMode: (mode: GlassMode) => void;
+  setGlassBlur: (px: number) => void;
+  /** Single 0-100 "Interface Transparency" control (0 = opaque, 100 = max glass). */
+  setInterfaceTransparency: (percent: number) => void;
   setNightShift: (enabled: boolean) => void;
   setNightShiftIntensity: (value: number) => void;
   setLowEndMode: (enabled: boolean) => void;
@@ -152,6 +187,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.glassMode = o.glassMode === 'off' || o.glassMode === 'reduced' || o.glassMode === 'liquid'
     ? o.glassMode
     : 'normal';
+  base.glassBlur = clamp01(o.glassBlur, base.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
   base.nightShift = o.nightShift === true;
   base.nightShiftIntensity = clamp01(o.nightShiftIntensity, base.nightShiftIntensity, 0, 1);
   base.lowEndMode = o.lowEndMode === true;
@@ -209,7 +245,7 @@ export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' 
   return prefs.glassMode;
 }
 
-export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint' | 'glassMode' | 'lowEndMode'>): void {
+export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint' | 'glassMode' | 'lowEndMode'> & { glassBlur?: number }): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const effectiveMode = getEffectiveGlassMode({ glassMode: prefs.glassMode, lowEndMode: prefs.lowEndMode });
@@ -265,8 +301,12 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     const liquid = effectiveMode === 'liquid';
     // 'normal' is the refined default: restrained blur, enough fill that text
     // keeps contrast over any wallpaper. 'liquid' is the heavier opt-in look.
-    const op = liquid ? Math.min(requestedOpacity, 0.78) : Math.max(requestedOpacity, 0.72);
-    const blur = liquid ? 32 : 20;
+    // The opacity floor is shared with the Interface Transparency slider, so its
+    // 100% end is the most translucent glass that still reads.
+    const op = liquid ? Math.min(requestedOpacity, 0.78) : Math.max(requestedOpacity, GLASS_OPACITY_FLOOR);
+    // Blur strength is its own parameter (default 20px); 'liquid' adds depth.
+    const baseBlur = clamp01(prefs.glassBlur, DEFAULT_SHELL_PREFERENCES.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
+    const blur = Math.min(GLASS_BLUR_MAX, baseBlur + (liquid ? 12 : 0));
     const sat = liquid ? 200 : 160;
     const filter = `blur(${blur}px) saturate(${sat}%)`;
     root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
@@ -353,12 +393,10 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       && !(window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired) {
     (window as { __dexGlassMqWired?: boolean }).__dexGlassMqWired = true;
     try {
-      const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
       const mqTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)');
       const handler = () => {
         try { applyGlassVars(get()); } catch { /* noop */ }
       };
-      mqMotion.addEventListener?.('change', handler);
       mqTransparency.addEventListener?.('change', handler);
     } catch { /* noop */ }
   }
@@ -418,6 +456,17 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       const safe: GlassMode = mode === 'off' || mode === 'reduced' || mode === 'liquid' ? mode : 'normal';
       update({ glassMode: safe });
       applyGlassVars({ ...get(), glassMode: safe });
+    },
+
+    setGlassBlur: (px) => {
+      const v = clamp01(px, DEFAULT_SHELL_PREFERENCES.glassBlur, GLASS_BLUR_MIN, GLASS_BLUR_MAX);
+      update({ glassBlur: v });
+      applyGlassVars({ ...get(), glassBlur: v });
+    },
+    setInterfaceTransparency: (percent) => {
+      const next = transparencyToPrefs(percent, get().glassMode);
+      update(next);
+      applyGlassVars({ ...get(), ...next });
     },
 
     setNightShift: (enabled) => {

@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "6.1.0",
+  "version": "7.0.1",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
   "license": "SEE LICENSE IN LICENSE",
@@ -24,6 +24,7 @@
     "dev:tauri": "tauri dev",
     "build:tauri": "tauri build && node scripts/verify-tauri-bundle.js",
     "verify:bundle": "node scripts/verify-tauri-bundle.js",
+    "release:checksums": "node scripts/release-checksums.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

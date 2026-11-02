@@ -12,7 +12,7 @@
  * ===========================================================================
  */
 
-import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
 import { useInstalledAppsStore } from '../store/installedAppsStore';
@@ -31,7 +31,7 @@ import { SpotlightSearch } from '../shell/SpotlightSearch';
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
 // The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
-import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
+import { setSoundEnabled, isSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
@@ -766,7 +766,8 @@ export const AppManager: React.FC = () => {
   const [windowControls, setWindowControls] = useState<'system' | 'traffic'>(getWindowControlStyle);
   const nativeOverlayWidth = 0; // Custom buttons rendered; no native overlay padding needed
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
-  const [spatialAudioOn, setSpatialAudioOn] = useState(() => isSoundEnabled());
+  // Shared with Settings -> Sound; persisted by SpatialAudio itself.
+  const spatialAudioOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
 
   // Dock-reserved inset CSS variables are published in an effect lower down,
   // after `anyWindowMaximized` is declared (it is one of the dependencies).
@@ -3043,9 +3044,6 @@ export const AppManager: React.FC = () => {
     // Custom event for components using Web Audio API GainNode
     window.dispatchEvent(new CustomEvent('dex-system-volume', { detail: gainFraction }));
   }, [systemVolume]);
-  useEffect(() => {
-    setSoundEnabled(spatialAudioOn);
-  }, [spatialAudioOn]);
 
   // -- Gesture Engine wiring ------------------------------------------------
   useEffect(() => {
@@ -5034,7 +5032,7 @@ export const AppManager: React.FC = () => {
                     <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Spatial Audio</span>
                   </div>
                   <button
-                    onClick={() => setSpatialAudioOn(p => !p)}
+                    onClick={() => setSoundEnabled(!spatialAudioOn)}
                     aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
                     style={{
                       width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -5167,7 +5165,7 @@ export const AppManager: React.FC = () => {
             position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)',
             zIndex: 9000, display: 'flex', alignItems: 'center', gap: 6,
             height: 24, padding: '0 var(--space-3)', borderRadius: 9999,
-            background: 'rgba(14,14,17,0.92)', border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-glass-strong, var(--color-bg-surface))', border: '1px solid var(--color-border)',
             color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500,
             cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s ease',
             WebkitAppRegion: 'no-drag',

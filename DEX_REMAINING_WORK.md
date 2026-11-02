@@ -35,7 +35,7 @@
 | 24 | Spatial camera ~20–35 ms per update with a large on-screen app (50 windows) | PARTIAL | Dominated by the on-screen app's restyle | AppManager world layer | Profile in packaged build | — | P2 |
 | 25 | Spatial: zones, alignment guides, magnetic snap, distribute, lock, send backward, duplicate view, named viewports, layout export/import, configurable shortcuts, touch-screen gestures | MISSING | Not built yet | `spatialStore.ts` | Build on the store | — | P2 |
 | 26 | Creative suite §7–15 (Design, Photo, Video, Audio, Present, Creative Hub) | NOT STARTED | Scope; existing apps unchanged | Prism, Vinx, Imosion, Presentation, Notes, Canvas | Audit each existing app, then fill real gaps | — | P2 |
-| 27 | Glass / translucency (§16) | BLOCKED | Conflicts with the owner's "glass is out" direction | Shell | Owner decision | Owner | P3 |
+| 27 | Glass / translucency (§16) | PARTIAL | Owner decision (2026-11) made refined glass the default. 7.0.1 adds the Interface Transparency slider on top (default reads as 40%; 0% = opaque, no blur; shared 0.55 opacity floor), an independent blur-strength slider, and a Refined/Liquid style choice. Not yet clicked through in a rendered Settings page, light + dark | `shellPreferencesStore`, `InterfaceTransparencyControl` | Click-through | Test profile | P2 |
 | 28 | Markdown cleanup (§1) | BLOCKED | Deleting documentation needs approval | Root + `docs/` | Owner approves a list | Owner | P3 |
 | 29 | Foreign native windows on the canvas | NOT APPLICABLE on Windows | No supported way to composite other programs' windows into WebView2 | — | Only via a custom compositor in `dex-os` | — | — |
 
@@ -89,6 +89,24 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 | remove | Finished UndoRedoButtons toolbar component is exported but never mounted | `src/renderer/store/useUndoRedo.tsx` | still present |
 | remove | Focus/Context-prediction/Smart-recents stores are never consumed | `src/renderer/services/IntelligenceLayer.ts` | still present |
 | remove | Per-app focus profiles are stored but never read (no effect) | `src/renderer/services/FocusSessionSystem.ts` | still present |
+
+## 7.0.1 pass (2026-11-01, `claude/cranky-hopper-4f196b`)
+
+Shipped: Interface Transparency slider, theme-aware glass vars (light mode no longer gets dark panels), Reduce Motion no longer disables glass, creator attribution, version 7.0.1, Tauri release profile, `npm run release:checksums`. Evidence: `DEX_7.0.1_VERIFICATION.md`. Release verdict **NOT READY**.
+
+| # | Requirement | Status | Why incomplete | Next action | Needs | Priority |
+|---|---|---|---|---|---|---|
+| 30 | Code signing of the 7.0.1 installer | BLOCKED | No certificate; installer is unsigned | Install cert, set thumbprint per `docs/SIGNING.md`, rebuild | Owner cert | P0 |
+| 31 | MSI for 7.0.1 | FAILED offline | WiX step downloads the WebView2 bootstrapper | Rebuild with network or an offline bootstrapper | Network | P1 |
+| 32 | Packaged-app tests + before/after startup, idle CPU, memory | NOT TESTED | No install/upgrade/uninstall run; 7.0.1 exe and installer are ~2 MB / ~0.4 MB larger than 6.1.0 (cause not isolated) | Install over 6.x, measure, compare | VM / time | P0 |
+| 33 | Click-through of the transparency slider in rendered Settings | NOT TESTED | Preview sits behind the Terms gate; logic is unit-tested and verified live at the store level | Accept gate on a test profile, drag the slider light + dark | Owner / test profile | P1 |
+| 34 | Playwright e2e; CI-load flakiness of `v6-performance-guards` | PARTIAL | Full unit suite run once: 516/520 files, the 4 failures classified (see verification). e2e not run | Run e2e in CI; make perf guards load-tolerant | — | P2 |
+| 35 | CRLF shebang broke `radius-scale-ratchet` import on Windows checkouts | FIXED | `.gitattributes` now pins `scripts/*.mjs` and `*.sh` to LF; the unblocked ratchet then caught one off-scale radius in `SpatialHud.tsx` (fixed) | — | — | — |
+| 36 | Calculator visual pass | PARTIAL | Hard-coded accent/success gradient + shadow colors moved to tokens (`color-mix`); logic + tests pass. Not yet re-checked at 125/150/200% scaling or keyboard-navigated in a rendered window | Visual check in the packaged app | — | P3 |
+| 37 | Popup audit, live-activities completion, background-process audit | PARTIAL | Removed redundant toasts (pin/unpin in Files, custom-wallpaper-applied, Forge per-10-frame spam); Forge image-sequence export now reports real frame progress on the shared live-activity card. Remaining: ~45 other `toast.success/info` call sites unreviewed (Forge dialogs, Files clipboard), update-notice repetition, background-process audit | Finish the sweep | — | P2 |
+| 38 | Light/dark + 125/150/200% scaling audit of every built-in app | PARTIAL | Scanned for hard-coded dark backgrounds: shell/general hits were overlays/scrims (fine) except 3 real light-mode defects, fixed (Focus-mode pill, Home widget picker, live-activity card/track/close button). Creative apps are deliberately pinned dark. Not yet checked visually, and scaling not tested | Visual pass in the packaged app, light + dark | — | P2 |
+| 39 | UI sound effects | PARTIAL | UI sounds are synthesized Web Audio tones (`shell/SpatialAudio.ts`): no audio files to bundle, no missing-asset case. Mute now persists across restarts, and Settings → Sound has an "Interface sounds" toggle kept in sync with the AppManager menu toggle (5 tests). Not done: per-sound volume, and an audible listen-test in the packaged app | Listen-test | — | P3 |
+| 40 | Old 6.1.0 artifacts / release cleanup | WAITING | Rollback-critical until 7.0.1 is verified | Owner approves after install test | Owner | P3 |
 
 ## Release status
 

@@ -64,7 +64,7 @@ const KV_LAST_AUDIT: &str = "trust.lastSecurityAudit";
 // Mirror EncryptionService electron-store ("dex-encryption") — read-only here.
 const ENC_FILE: &str = "dex-encryption.json";
 
-const APP_VERSION: &str = "6.0.0";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const SCHEMA_VERSION: i64 = 1;
 const DATA_FORMAT_VERSION: i64 = 1;
 const ENCRYPTION_SCHEMA_VERSION: i64 = 1;

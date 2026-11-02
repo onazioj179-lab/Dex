@@ -159,7 +159,7 @@ export const CreativeHub: React.FC = () => {
               const installed = isAppInstalled(removed, a.id);
               return (
                 <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--color-border-subtle)', borderRadius: 'var(--radius-md, 10px)' }}>
-                  <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 3, background: def?.color || 'var(--color-accent)', flexShrink: 0 }} />
+                  <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 4, background: def?.color || 'var(--color-accent)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{def?.name || a.id}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{a.role}{installed ? '' : ' · removed'}</div>

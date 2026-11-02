@@ -160,7 +160,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
             : o.kind === 'text' ? { color: o.color, fontSize: 18, padding: 10 }
             : o.kind === 'rect' ? { border: `2.5px solid ${o.color}`, borderRadius: 6, color: '#1D1D1F', fontSize: 18, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }
             : o.kind === 'ellipse' ? { border: `2.5px solid ${o.color}`, borderRadius: '50%', color: '#1D1D1F', fontSize: 18, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }
-            : o.kind === 'frame' ? { border: `2px dashed ${o.color}`, borderRadius: 8 }
+            : o.kind === 'frame' ? { border: `2px dashed ${o.color}`, borderRadius: 10 }
             : {};
           return (
             <div key={o.id} role="group" aria-label={`${o.kind}${o.text ? `: ${o.text.slice(0, 40)}` : ''}`} style={{ ...base, ...look }}
