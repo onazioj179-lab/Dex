@@ -656,10 +656,20 @@
   --color-warning-muted: rgba(255, 159, 10, 0.14);
   color: var(--color-text-primary);
 }
+/* Spatial desktop. A window culled off-screen skips rendering its contents
+   (the app keeps running; DOM and state are untouched). At low zoom the deep
+   window shadows are dropped -- with dozens of windows they dominate paint. */
+[data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
+[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
+.dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
+.dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
+.dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
 /* The default (non-custom) light accent #0066CC is tuned for light surfaces;
    on the pinned-dark subtree use the dark-scheme default instead. Skipped when
-   the user picked a custom accent (applyAccentFamily writes it inline). */
-:root[data-theme="light"]:not([style*="--color-accent:"]) .dex-theme-dark {
+   the user picked a custom accent (applyAccentFamily marks <html> with
+   data-dex-custom-accent when it writes the accent inline). */
+:root[data-theme="light"]:not([data-dex-custom-accent]) .dex-theme-dark {
   --color-accent: #0A84FF;
   --color-accent-hover: #409CFF;
   --color-accent-dark: #0071E3;

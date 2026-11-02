@@ -44,6 +44,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
+import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
@@ -1114,6 +1115,7 @@ const applySettings = (settings: Record<string, unknown>) => {
       for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft']) {
         root.style.removeProperty(prop);
       }
+      root.removeAttribute('data-dex-custom-accent');
     }
 
     // Apply font size (scale-based)
@@ -1191,6 +1193,8 @@ const applySettings = (settings: Record<string, unknown>) => {
       const vars = appearanceToCssVars(profile, systemDark);
       for (const [k, v] of Object.entries(vars)) {
         root.style.setProperty(k, v as string);
+        // Mirrored as data-dex-* for the shell CSS (see globals.css, Phase 15).
+        root.setAttribute(`data-${k.slice(2)}`, String(v));
       }
     }).catch(() => { /* phase15 import must never break settings apply */ });
 
@@ -4121,6 +4125,9 @@ export const Settings: React.FC = () => {
       {renderToggle('stageManager', 'Stage Manager', 'Organize open apps on the side for quick switching')}
       {renderToggle('showAppTabBar', 'App Tab Bar', 'Show running app tabs above the content area')}
 
+      <h3 style={styles.sectionTitle}>Spatial Desktop</h3>
+      <SpatialDesktopPanel />
+
       <h3 style={styles.sectionTitle}>Title Bar</h3>
       {renderSelect('windowControls', 'Window Button Style', 'Choose the style of window control buttons', [
         { value: 'system', label: 'System Default' },
@@ -4160,6 +4167,22 @@ export const Settings: React.FC = () => {
         ['Alt+Shift+Arrows', 'Top / bottom half, top quadrants'],
         ['Alt+Shift+1 … 6', 'Arrange all windows with a layout'],
         ['Win+` or Ctrl+Alt+`', 'Cycle floating windows'],
+      ] },
+      { title: 'Spatial desktop', rows: [
+        [`${_M}+Alt+S`, 'Turn the spatial desktop on / off'],
+        [`${_M}+Alt+= / -`, 'Zoom in / out'],
+        [`${_M}+Alt+0`, 'Actual size (100%)'],
+        [`${_M}+Alt+F`, 'Show all windows'],
+        [`${_M}+Alt+Enter`, 'Zoom to the front window'],
+        [`${_M}+Alt+Arrows`, 'Pan the canvas'],
+        [`${_M}+Alt+Backspace`, 'Previous view'],
+        [`${_M}+Alt+W`, 'Find a window (list of all windows and groups)'],
+        [`${_M}+Alt+G`, 'Group the windows in view'],
+        [`${_M}+Alt+M`, 'Minimap'],
+        ['Wheel / two-finger scroll', 'Pan (over the desktop)'],
+        [`${_M}+wheel or pinch`, 'Zoom at the pointer (over the desktop)'],
+        ['Alt+wheel', 'Zoom at the pointer (anywhere)'],
+        ['Middle-drag, or Space+drag', 'Pan'],
       ] },
     ];
     const keyStyle: React.CSSProperties = {

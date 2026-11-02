@@ -34,12 +34,28 @@
 
 - **Settings › Storage** shows what DEX actually uses and can clear its caches safely. Your notes, settings and backups are kept.
 
+## Spatial desktop (new)
+
+- Turn it on in **Settings › Window Management**, or press **Ctrl+Alt+S**. Your windows sit on a canvas you can pan and zoom (5–300%), while the apps stay live and usable.
+- Zoom toward the pointer (Ctrl+wheel or pinch over the desktop, or Alt+wheel anywhere). Pan with the wheel, middle-drag or Space+drag.
+- Use **Show all**, **Previous view** and **zoom to a window** (the maximize button does this on the canvas). There's also a minimap.
+- Group windows, then move, collapse or jump to the group. Arrange windows as a grid, masonry, row or cascade, with one-step undo.
+- **Find a window** (Ctrl+Alt+W) lists every window, including minimized ones, so you can use the canvas from the keyboard alone.
+- Leaving the canvas puts your windows back exactly where they were.
+
+## Fixes
+
+- Windows no longer jump up when you open or close another app.
+- Ctrl+Alt+W no longer closes the current app.
+- Dragging and resizing windows, and other style changes, no longer make the browser recompute large parts of the page. A stylesheet bug made this cost up to seconds with many windows open.
+
 ## Known limitations
 
 - In-app updates aren't available yet.
 - Removing an app hides it, but doesn't free disk space.
 - The Privacy Policy text is being updated.
 - Screen-reader support hasn't been fully tested.
+- The spatial desktop shows DEX's own apps only. Other programs' windows can't be placed on it.
 
 ## Test status (this branch)
 

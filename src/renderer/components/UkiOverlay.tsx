@@ -486,6 +486,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Make text larger',
     execute: () => {
       document.documentElement.style.fontSize = '110%';
+      document.documentElement.setAttribute('data-dex-large-text', '');
       localStorage.setItem('dex:a11y:fontSize', '110');
       return 'Text size increased. Say "reset text size" to restore.';
     }
@@ -495,6 +496,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Make text smaller',
     execute: () => {
       document.documentElement.style.fontSize = '90%';
+      document.documentElement.removeAttribute('data-dex-large-text');
       localStorage.setItem('dex:a11y:fontSize', '90');
       return 'Text size decreased. Say "reset text size" to restore.';
     }
@@ -504,6 +506,7 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     description: 'Reset text to normal size',
     execute: () => {
       document.documentElement.style.fontSize = '';
+      document.documentElement.removeAttribute('data-dex-large-text');
       localStorage.removeItem('dex:a11y:fontSize');
       return 'Text size reset to normal.';
     }
@@ -602,7 +605,10 @@ function tryAccessibilityCommand(text: string): string | null {
 function loadA11yPreferences(): void {
   try {
     const fontSize = localStorage.getItem('dex:a11y:fontSize');
-    if (fontSize) document.documentElement.style.fontSize = `${fontSize}%`;
+    if (fontSize) {
+      document.documentElement.style.fontSize = `${fontSize}%`;
+      if (Number(fontSize) >= 110) document.documentElement.setAttribute('data-dex-large-text', '');
+    }
     
     if (localStorage.getItem('dex:a11y:highContrast') === 'true') {
       document.documentElement.classList.add('high-contrast');
