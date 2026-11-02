@@ -23,14 +23,14 @@ beforeEach(() => localStorage.clear());
 describe('modelPrefs (per-provider preferred model)', () => {
   it('round-trips and clears a preference', () => {
     expect(getPreferredModel('openai')).toBeNull();
-    setPreferredModel('openai', 'gpt-4o-mini');
-    expect(getPreferredModel('openai')).toBe('gpt-4o-mini');
+    setPreferredModel('openai', 'gpt-5-mini');
+    expect(getPreferredModel('openai')).toBe('gpt-5-mini');
     clearPreferredModel('openai');
     expect(getPreferredModel('openai')).toBeNull();
   });
 
   it('setting an empty model clears the preference', () => {
-    setPreferredModel('openai', 'gpt-4o-mini');
+    setPreferredModel('openai', 'gpt-5-mini');
     setPreferredModel('openai', '');
     expect(getPreferredModel('openai')).toBeNull();
   });
@@ -38,20 +38,20 @@ describe('modelPrefs (per-provider preferred model)', () => {
 
 describe('pickConfiguredModelId honors the preferred model', () => {
   it('uses a valid preferred model over the default', () => {
-    expect(pickConfiguredModelId(['openai'], () => 'gpt-4o-mini')).toBe('gpt-4o-mini');
+    expect(pickConfiguredModelId(['openai'], () => 'gpt-5-mini')).toBe('gpt-5-mini');
   });
 
   it('falls back to the default when the preferred model is invalid', () => {
-    expect(pickConfiguredModelId(['openai'], () => 'not-a-real-model')).toBe('gpt-4o');
+    expect(pickConfiguredModelId(['openai'], () => 'not-a-real-model')).toBe('gpt-5');
   });
 
   it('falls back to the default when no preference is set', () => {
-    expect(pickConfiguredModelId(['openai'], () => null)).toBe('gpt-4o');
+    expect(pickConfiguredModelId(['openai'], () => null)).toBe('gpt-5');
   });
 
   it('reads the real modelPrefs store by default', () => {
-    setPreferredModel('openai', 'gpt-4o-mini');
-    expect(pickConfiguredModelId(['openai'])).toBe('gpt-4o-mini');
+    setPreferredModel('openai', 'gpt-5-mini');
+    expect(pickConfiguredModelId(['openai'])).toBe('gpt-5-mini');
   });
 });
 
@@ -61,13 +61,13 @@ describe('pickConfiguredModelId (pure model selection)', () => {
   });
 
   it('picks the first provider in priority order', () => {
-    expect(pickConfiguredModelId(['openai'])).toBe('gpt-4o');
-    expect(pickConfiguredModelId(['anthropic'])).toBe('claude-3-5-sonnet-latest');
+    expect(pickConfiguredModelId(['openai'])).toBe('gpt-5');
+    expect(pickConfiguredModelId(['anthropic'])).toBe('claude-opus-5-5');
   });
 
   it('honors priority when several providers are configured', () => {
     // anthropic + openai both set -> openai wins (earlier in PROVIDER_PRIORITY)
-    expect(pickConfiguredModelId(['anthropic', 'openai'])).toBe('gpt-4o');
+    expect(pickConfiguredModelId(['anthropic', 'openai'])).toBe('gpt-5');
     expect(PROVIDER_PRIORITY.indexOf('openai')).toBeLessThan(PROVIDER_PRIORITY.indexOf('anthropic'));
   });
 
@@ -104,8 +104,8 @@ describe('routeConfiguredModels (registry + keystore + Smart Router)', () => {
   it('ranks a configured provider\'s models for the goal', () => {
     setApiKey('openai', 'sk-test');
     const r = routeConfiguredModels('cheapest', 'hi');
-    expect(r[0]).toBe('gpt-4o-mini'); // cheapest OpenAI model
-    expect(r).toContain('gpt-4o');
+    expect(r[0]).toBe('gpt-5-mini'); // cheapest OpenAI model
+    expect(r).toContain('gpt-5');
   });
 
   it('offline routes nowhere until the user connects local AI', () => {
@@ -123,7 +123,7 @@ describe('routeConfiguredModels (registry + keystore + Smart Router)', () => {
     setApiKey('openai', 'sk-test');
     setApiKey('anthropic', 'sk-test');
     const r = routeConfiguredModels('smartest', 'hi');
-    expect(['gpt-4o', 'gpt-4-turbo', 'claude-3-5-sonnet-latest', 'claude-3-opus-latest']).toContain(r[0]);
+    expect(['gpt-5', 'gemini-2.5-pro', 'claude-opus-5-5', 'claude-fable-5-1']).toContain(r[0]);
   });
 });
 

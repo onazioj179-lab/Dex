@@ -41,19 +41,22 @@ describe('OpenAI provider', () => {
 
 describe('Anthropic provider', () => {
   it('hoists the system message and uses x-api-key', () => {
-    const r = anthropicProvider.buildChatRequest({ model: 'claude-3-5-sonnet-latest', messages: msgs, maxTokens: 50 }, { apiKey: 'ak' });
+    const r = anthropicProvider.buildChatRequest({ model: 'claude-opus-5-5', messages: msgs, maxTokens: 50, temperature: 0.7 }, { apiKey: 'ak' });
     expect(r.url).toBe('https://api.anthropic.com/v1/messages');
     expect(r.headers['x-api-key']).toBe('ak');
     expect(r.headers['anthropic-version']).toBeTruthy();
     const body = JSON.parse(r.body!);
     expect(body.system).toBe('You are helpful.');
-    expect(body.max_tokens).toBe(50);
+    // Thinking counts against max_tokens; a 50-token cap would return nothing.
+    expect(body.max_tokens).toBe(8192);
+    // Current Claude models reject sampling parameters.
+    expect(body.temperature).toBeUndefined();
     expect(body.messages).toEqual([{ role: 'user', content: 'hi' }]); // system not in messages
   });
 
   it('parses content blocks and a stream delta', () => {
     const resp = anthropicProvider.parseChatResponse({
-      model: 'claude-3-5-sonnet-latest', content: [{ type: 'text', text: 'hi there' }],
+      model: 'claude-opus-5-5', content: [{ type: 'text', text: 'hi there' }],
       stop_reason: 'end_turn', usage: { input_tokens: 4, output_tokens: 2 },
     });
     expect(resp.content).toBe('hi there');

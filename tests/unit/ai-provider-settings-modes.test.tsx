@@ -33,8 +33,8 @@ describe('Settings > AI Providers: processing + reasoning controls', () => {
     render(<AiProviderSettings />);
     fireEvent.change(screen.getByLabelText('Processing'), { target: { value: 'manual' } });
     const model = screen.getByLabelText('Pinned model') as HTMLSelectElement;
-    fireEvent.change(model, { target: { value: 'gpt-4o-mini' } });
-    expect(getManualModel()).toBe('gpt-4o-mini');
+    fireEvent.change(model, { target: { value: 'gpt-5-mini' } });
+    expect(getManualModel()).toBe('gpt-5-mini');
   });
 
   it('the legacy Offline routing goal reads as Local only', () => {

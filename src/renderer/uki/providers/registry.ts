@@ -50,5 +50,12 @@ export function findModel(modelId: string): RegisteredModel | undefined {
 /** The provider that owns a given model id. */
 export function providerForModel(modelId: string): LLMProvider | undefined {
   const m = findModel(modelId);
-  return m ? getProvider(m.provider) : undefined;
+  if (m) return getProvider(m.provider);
+  // Not in any current list (a saved preference for a renamed model, or an id
+  // a live catalog has not loaded yet): route by the id's family.
+  if (modelId.includes('/')) return getProvider('openrouter');
+  if (modelId.startsWith('claude-')) return getProvider('anthropic');
+  if (modelId.startsWith('gemini-')) return getProvider('google');
+  if (/^(gpt-|o\d|chatgpt-)/.test(modelId)) return getProvider('openai');
+  return undefined;
 }

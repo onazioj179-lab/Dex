@@ -11,23 +11,41 @@
  */
 
 import { parseDataUrl, type LLMProvider, type ChatRequest, type ChatResponse, type ModelInfo, type ProviderConfig, type HttpRequest } from './types';
+import { liveModels } from './liveModels';
 
 const DEFAULT_BASE = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
-const DEFAULT_MAX_TOKENS = 1024;
+// Current Claude models think before answering and that thinking counts
+// against max_tokens, so a small cap returns an empty reply. Callers ask for
+// ~600; never send less than this floor.
+const DEFAULT_MAX_TOKENS = 16000;
+const MIN_MAX_TOKENS = 8192;
 
+const caps = { tools: true, vision: true, streaming: true };
 const MODELS: ModelInfo[] = [
-  { id: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet', contextWindow: 200000, capabilities: { tools: true, vision: true, streaming: true } },
-  { id: 'claude-3-5-haiku-latest',  label: 'Claude 3.5 Haiku',  contextWindow: 200000, capabilities: { tools: true, vision: false, streaming: true } },
-  { id: 'claude-3-opus-latest',     label: 'Claude 3 Opus',     contextWindow: 200000, capabilities: { tools: true, vision: true, streaming: true } },
+  { id: 'claude-opus-5-5',   label: 'Claude Opus 5.5',   contextWindow: 1_000_000, capabilities: caps },
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', contextWindow: 1_000_000, capabilities: caps },
+  { id: 'claude-haiku-5-5',  label: 'Claude Haiku 5.5',  contextWindow: 1_000_000, capabilities: caps },
+  { id: 'claude-fable-5-1',  label: 'Claude Fable 5.1',  contextWindow: 1_000_000, capabilities: caps },
 ];
+
+function headers(config: ProviderConfig): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': config.apiKey ?? '',
+    'anthropic-version': API_VERSION,
+    // Required for direct browser/WebView fetch (Tauri's WebView2): without
+    // this Anthropic-sanctioned opt-in, the request is CORS-blocked.
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+}
 
 export const anthropicProvider: LLMProvider = {
   id: 'anthropic',
   label: 'Anthropic',
   requiresKey: true,
 
-  listModels: () => MODELS,
+  listModels: () => liveModels('anthropic') ?? MODELS,
 
   buildChatRequest(req: ChatRequest, config: ProviderConfig): HttpRequest {
     const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
@@ -51,20 +69,12 @@ export const anthropicProvider: LLMProvider = {
     return {
       url: `${base}/v1/messages`,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey ?? '',
-        'anthropic-version': API_VERSION,
-        // Required for direct browser/WebView fetch (Tauri's WebView2): without
-        // this Anthropic-sanctioned opt-in, the request is CORS-blocked. Harmless
-        // under Electron. This is what makes UKI streaming work natively in Tauri.
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: headers(config),
+      // No temperature: current Claude models reject sampling parameters.
       body: JSON.stringify({
         model: req.model,
-        max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
+        max_tokens: Math.max(req.maxTokens ?? DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS),
         ...(system ? { system } : {}),
-        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         messages,
         stream: !!req.stream,
       }),
@@ -87,6 +97,24 @@ export const anthropicProvider: LLMProvider = {
         ? { promptTokens: j.usage.input_tokens, completionTokens: j.usage.output_tokens }
         : undefined,
     };
+  },
+
+  buildModelsRequest(config: ProviderConfig): HttpRequest {
+    const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
+    return { url: `${base}/v1/models?limit=100`, method: 'GET', headers: headers(config) };
+  },
+
+  parseModels(json: unknown): ModelInfo[] {
+    const data = (json as { data?: Array<{ id?: unknown; display_name?: unknown; max_input_tokens?: unknown }> })?.data;
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((m) => typeof m.id === 'string' && (m.id as string).startsWith('claude-'))
+      .map((m) => ({
+        id: m.id as string,
+        label: typeof m.display_name === 'string' ? m.display_name : (m.id as string),
+        contextWindow: typeof m.max_input_tokens === 'number' ? m.max_input_tokens : 200000,
+        capabilities: caps,
+      }));
   },
 
   parseStreamChunk(data: string): string {
