@@ -215,6 +215,7 @@ const SecurityCenter = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Sec
 const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
 const Canvas = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Canvas'));
+const CreativeHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CreativeHub'));
 const Timer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Timer'));
 const ScreenRecorder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ScreenRecorder'));
 const PresentationBuilder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PresentationBuilder'));
@@ -236,7 +237,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl' | 'uki'
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
-  | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
+  | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'creativehub' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
   | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'security';
 
@@ -381,7 +382,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   qrcode: QRCodeGenerator, colorpicker: ColorPickerApp,
   weather: Weather, worldclock: WorldClock, noisegenerator: NoiseGenerator, dexcode: DexCode,
   nexus: Nexus, learn: Learn, collabhub: CollabHub,
-  canvas: Canvas, timer: Timer,
+  canvas: Canvas, creativehub: CreativeHub, timer: Timer,
   screenrecorder: ScreenRecorder, presentation: PresentationBuilder, pdfviewer: PDFViewer, pixelart: PixelArt,
   maps: DexMaps,
   git: GitClient,
@@ -540,6 +541,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'collabhub', label: 'Collab Hub' },
   // Canvas & Timer
   { id: 'canvas', label: 'Canvas' },
+  { id: 'creativehub', label: 'Creative Hub' },
   { id: 'timer', label: 'Timer' },
   { id: 'maps', label: 'DEX Maps' },
   // New apps
@@ -567,7 +569,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
     stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
     weather: 'Tools', worldclock: 'Tools',
-    canvas: 'Tools', timer: 'Tools',
+    canvas: 'Creative Suite', creativehub: 'Creative Suite', timer: 'Tools',
     maps: 'Tools',
     nexus: 'Tools',
     learn: 'Tools',
@@ -2934,7 +2936,8 @@ export const AppManager: React.FC = () => {
       colorpicker: ['color', 'picker', 'palette', 'hex', 'rgb', 'hsl', 'eyedropper'],
       weather: ['forecast', 'temperature', 'rain', 'sunny', 'climate', 'wind'],
       worldclock: ['timezone', 'clock', 'time', 'utc', 'gmt', 'world'],
-      canvas: ['draw', 'paint', 'sketch', 'whiteboard', 'doodle', 'art'],
+      canvas: ['draw', 'paint', 'sketch', 'whiteboard', 'doodle', 'art', 'sticky', 'diagram', 'flowchart'],
+      creativehub: ['creative', 'projects', 'recent', 'templates', 'hub', 'studio'],
       timer: ['countdown', 'alarm', 'minute', 'hour', 'time'],
       maps: ['map', 'navigation', 'directions', 'location', 'gps', 'route', 'place', 'geo'],
       noisegenerator: ['noise', 'white noise', 'ambient', 'focus', 'sleep', 'sound', 'rain'],

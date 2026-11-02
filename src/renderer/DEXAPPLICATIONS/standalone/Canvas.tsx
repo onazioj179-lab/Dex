@@ -5,10 +5,13 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { CanvasObjectLayer } from './CanvasObjectLayer';
+import { type BoardObject, createObject, createConnector, sanitizeObjects, drawObjects, STICKY_COLORS, MAX_IMAGE_BYTES, BOARD_TEMPLATES } from './canvasObjects';
 import {
   type BoardsIndex, type BoardPayload, UNFILED,
   loadIndex, saveIndex, loadBoard, saveBoard, deleteBoardData,
   addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
+  takeCanvasRequest, CANVAS_REQUEST_EVENT,
 } from './canvasBoards';
 
 // ---------------------------------------------------------------------------
@@ -45,11 +48,9 @@ interface Layer {
 }
 
 // One undo entry snapshots the affected layer's pixels before and after an edit.
-interface HistoryEntry {
-  layerId: string;
-  before: ImageData;
-  after: ImageData;
-}
+type HistoryEntry =
+  | { kind?: 'pixels'; layerId: string; before: ImageData; after: ImageData }
+  | { kind: 'objects'; before: BoardObject[]; after: BoardObject[] };
 
 const COLORS = [
   '#000000', '#FFFFFF', '#FF3B30', '#FF9500', '#FFCC00',
@@ -134,6 +135,14 @@ const Canvas: React.FC = () => {
 
   // Tools / style
   const [tool, setTool] = useState<Tool>('pen');
+  // Whiteboard objects (sticky notes, text boxes, shapes, frames, images, connectors).
+  const [objects, setObjects] = useState<BoardObject[]>([]);
+  const objectsRef = useRef<BoardObject[]>([]);
+  objectsRef.current = objects;
+  const [selectedObj, setSelectedObj] = useState<string | null>(null);
+  /** undefined = not connecting; null = pick the start; id = pick the end. */
+  const [connectFrom, setConnectFrom] = useState<string | null | undefined>(undefined);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(4);
   const [brushOpacity, setBrushOpacity] = useState(1);
@@ -313,6 +322,7 @@ const Canvas: React.FC = () => {
       data: l.canvas.toDataURL('image/png'),
     })),
     activeLayerId: activeIdRef.current,
+    objects: objectsRef.current,
   }), []);
 
   const persist = useCallback(() => {
@@ -330,6 +340,11 @@ const Canvas: React.FC = () => {
   const restorePayload = useCallback((payload: BoardPayload | undefined) => {
     undoStackRef.current = [];
     redoStackRef.current = [];
+    const objs = sanitizeObjects(payload?.objects);
+    objectsRef.current = objs;
+    setObjects(objs);
+    setSelectedObj(null);
+    setConnectFrom(undefined);
     if (!payload || !Array.isArray(payload.layers) || payload.layers.length === 0) {
       const fresh = createLayer('Layer 1');
       setLayers([fresh]);
@@ -373,6 +388,7 @@ const Canvas: React.FC = () => {
         boardsRef.current = idx;
         setBoards(idx);
         restorePayload(await loadBoard(idx.activeId));
+        void handleRequestRef.current();
       } catch {
         setActiveLayerId(prev => prev || layersRef.current[0]?.id || '');
       }
@@ -474,7 +490,8 @@ const Canvas: React.FC = () => {
   const undo = useCallback(() => {
     const entry = undoStackRef.current.pop();
     if (!entry) return;
-    restoreLayer(entry.layerId, entry.before);
+    if (entry.kind === 'objects') { objectsRef.current = entry.before; setObjects(entry.before); setSelectedObj(null); }
+    else restoreLayer(entry.layerId, entry.before);
     redoStackRef.current.push(entry);
     syncHistoryFlags();
     composite();
@@ -484,12 +501,91 @@ const Canvas: React.FC = () => {
   const redo = useCallback(() => {
     const entry = redoStackRef.current.pop();
     if (!entry) return;
-    restoreLayer(entry.layerId, entry.after);
+    if (entry.kind === 'objects') { objectsRef.current = entry.after; setObjects(entry.after); setSelectedObj(null); }
+    else restoreLayer(entry.layerId, entry.after);
     undoStackRef.current.push(entry);
     syncHistoryFlags();
     composite();
     persist();
   }, [composite, syncHistoryFlags, persist]);
+
+  const commitObjects = useCallback((before: BoardObject[], after: BoardObject[]) => {
+    objectsRef.current = after;
+    setObjects(after);
+    undoStackRef.current.push({ kind: 'objects', before, after });
+    if (undoStackRef.current.length > MAX_HISTORY) undoStackRef.current.shift();
+    redoStackRef.current = [];
+    syncHistoryFlags();
+    persist();
+  }, [syncHistoryFlags, persist]);
+
+  const liveObjects = useCallback((objs: BoardObject[]) => { objectsRef.current = objs; setObjects(objs); }, []);
+
+  /** Centre of the visible part of the artboard, for placing new objects. */
+  const viewCenter = (): Point => {
+    const view = viewRef.current;
+    const { zoom: z, pan: p } = viewportRef.current;
+    const w = view ? view.clientWidth : CANVAS_W, h = view ? view.clientHeight : CANVAS_H;
+    return { x: Math.min(CANVAS_W - 60, Math.max(60, (w / 2 - p.x) / z)), y: Math.min(CANVAS_H - 60, Math.max(60, (h / 2 - p.y) / z)) };
+  };
+
+  const addObject = (kind: 'sticky' | 'text' | 'rect' | 'ellipse' | 'frame') => {
+    const c = viewCenter();
+    const jitter = (objectsRef.current.length % 6) * 16;
+    const obj = createObject(kind, { x: c.x + jitter, y: c.y + jitter }, kind === 'sticky' ? STICKY_COLORS[objectsRef.current.length % STICKY_COLORS.length] : color);
+    commitObjects(objectsRef.current, [...objectsRef.current, obj]);
+    setSelectedObj(obj.id);
+    setConnectFrom(undefined);
+  };
+
+  const addImage = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('error', 'That file is not an image'); return; }
+    if (file.size > MAX_IMAGE_BYTES) { toast('error', 'Images up to 8 MB'); return; }
+    const src: string = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = reject; r.readAsDataURL(file); });
+    const dims: { w: number; h: number } = await new Promise((resolve) => { const i = new Image(); i.onload = () => resolve({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => resolve({ w: 320, h: 240 }); i.src = src; });
+    const scale = Math.min(1, 480 / Math.max(dims.w, dims.h));
+    const obj = createObject('image', viewCenter(), '#000000', { src, w: Math.round(dims.w * scale), h: Math.round(dims.h * scale) });
+    commitObjects(objectsRef.current, [...objectsRef.current, obj]);
+    setSelectedObj(obj.id);
+  };
+
+  // Requests from the Creative Hub: open a board, or start one from a template.
+  const handleRequestRef = useRef<() => Promise<void>>(async () => {});
+  handleRequestRef.current = async () => {
+    if (!boardsRef.current) return; // initial load will call again
+    const req = takeCanvasRequest();
+    if (!req) return;
+    if (req.boardId && boardsRef.current.boards.some(b => b.id === req.boardId)) {
+      await switchBoard(req.boardId);
+      return;
+    }
+    const tpl = req.templateId ? BOARD_TEMPLATES.find(t => t.id === req.templateId) : undefined;
+    if (!tpl) return;
+    await newBoard();
+    const idx = boardsRef.current;
+    if (idx) {
+      const named = renameBoard(idx, idx.activeId, tpl.name);
+      boardsRef.current = named;
+      setBoards(named);
+      await saveIndex(named);
+    }
+    commitObjects([], tpl.build());
+  };
+  useEffect(() => {
+    const on = () => { void handleRequestRef.current(); };
+    window.addEventListener(CANVAS_REQUEST_EVENT, on);
+    return () => window.removeEventListener(CANVAS_REQUEST_EVENT, on);
+  }, []);
+
+  const pickForConnector = (id: string) => {
+    if (connectFrom === null || connectFrom === undefined) { setConnectFrom(id); return; }
+    if (connectFrom !== id) {
+      commitObjects(objectsRef.current, [...objectsRef.current, createConnector(connectFrom, id, color)]);
+      toast('success', 'Connected');
+    }
+    setConnectFrom(undefined);
+  };
 
   // -------------------------------------------------------------------------
   // Pointer -> artboard coordinate conversion (accounts for pan/zoom + DPR-free
@@ -551,6 +647,8 @@ const Canvas: React.FC = () => {
   const onPointerDown = (e: React.PointerEvent) => {
     const view = viewRef.current;
     if (!view) return;
+    if (selectedObj) setSelectedObj(null);
+    if (connectFrom !== undefined) { setConnectFrom(undefined); return; }
 
     // Pan: middle button, or space held + left button.
     if (e.button === 1 || (e.button === 0 && spaceDownRef.current)) {
@@ -783,8 +881,8 @@ const Canvas: React.FC = () => {
         setActiveLayerId(fallback.id);
       }
       // Drop history entries tied to the removed layer.
-      undoStackRef.current = undoStackRef.current.filter(h => h.layerId !== id);
-      redoStackRef.current = redoStackRef.current.filter(h => h.layerId !== id);
+      undoStackRef.current = undoStackRef.current.filter(h => h.kind === 'objects' || h.layerId !== id);
+      redoStackRef.current = redoStackRef.current.filter(h => h.kind === 'objects' || h.layerId !== id);
       syncHistoryFlags();
       return next;
     });
@@ -855,6 +953,7 @@ const Canvas: React.FC = () => {
         ctx.drawImage(layer.canvas, 0, 0);
       }
       ctx.globalAlpha = 1;
+      drawObjects(ctx, objectsRef.current);
       return out;
     } catch {
       return null;
@@ -964,6 +1063,20 @@ const Canvas: React.FC = () => {
               <DexIcon name={t.icon} size={16} />
             </button>
           ))}
+        </div>
+
+        <div style={s.divider} />
+
+        {/* Whiteboard objects: stay editable after placing (unlike paint) */}
+        <div style={s.toolGroup} role="group" aria-label="Add to board">
+          {([['sticky', 'Sticky note'], ['text', 'Text box'], ['rect', 'Box'], ['ellipse', 'Ellipse'], ['frame', 'Frame']] as const).map(([k, label]) => (
+            <button key={k} style={{ ...s.textBtn }} onClick={() => addObject(k)} title={`Add ${label.toLowerCase()}`} aria-label={`Add ${label.toLowerCase()}`}>{label}</button>
+          ))}
+          <button style={{ ...s.textBtn }} onClick={() => imageInputRef.current?.click()} title="Add image" aria-label="Add image">Image</button>
+          <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} aria-label="Image to add" onChange={e => { void addImage(e.target.files?.[0]); e.target.value = ''; }} />
+          <button style={{ ...s.textBtn, ...(connectFrom !== undefined ? s.toolBtnActive : {}) }} aria-pressed={connectFrom !== undefined}
+            onClick={() => { setConnectFrom(connectFrom === undefined ? null : undefined); setSelectedObj(null); }}
+            title="Connect two objects: click the first, then the second" aria-label="Connect objects">{connectFrom === undefined ? 'Connect' : connectFrom === null ? 'Pick start…' : 'Pick end…'}</button>
         </div>
 
         <div style={s.divider} />
@@ -1150,6 +1263,19 @@ const Canvas: React.FC = () => {
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerUp}
             onWheel={onWheel}
+          />
+          <CanvasObjectLayer
+            objects={objects}
+            zoom={zoom}
+            pan={pan}
+            snap={snap}
+            selectedId={selectedObj}
+            onSelect={setSelectedObj}
+            onLive={liveObjects}
+            onCommit={commitObjects}
+            connectFrom={connectFrom}
+            onConnectPick={pickForConnector}
+            palette={COLORS}
           />
         </div>
 
