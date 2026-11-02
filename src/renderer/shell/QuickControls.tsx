@@ -327,8 +327,8 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', padding: 'var(--space-2) 10px',
-          background: enabled ? 'var(--color-success-muted, rgba(61,166,106,0.10))' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
-          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-success, #3DA66A) 30%, transparent)' : 'var(--color-border)'}`,
+          background: enabled ? 'var(--color-accent-light)' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
+          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border)'}`,
           borderRadius: 4, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
           marginBottom: 'var(--space-2)',
@@ -341,7 +341,7 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         </span>
         <span style={{
           width: 28, height: 16, borderRadius: 10,
-          background: enabled ? 'var(--color-success, #3DA66A)' : 'var(--color-border)',
+          background: enabled ? 'var(--color-accent)' : 'var(--color-border)',
           position: 'relative', transition: 'background 0.15s',
         }}>
           <span style={{

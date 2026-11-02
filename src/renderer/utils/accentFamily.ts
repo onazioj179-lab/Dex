@@ -107,6 +107,10 @@ export function applyAccentFamily(raw: string): boolean {
   if (!fam) return false;
   const rs = document.documentElement.style;
   rs.setProperty('--color-accent', fam.base);
+  // Lets CSS tell a custom accent from the stylesheet default without an
+  // :root[style*=...] selector (those recompute whole subtrees on every
+  // inline-style write anywhere in the document).
+  document.documentElement.setAttribute('data-dex-custom-accent', '');
   rs.setProperty('--accent-color', fam.base);
   // A chosen accent drives filled surfaces too (the baseline blue uses a darker
   // fill for AA white text; a custom colour is the user's explicit choice).

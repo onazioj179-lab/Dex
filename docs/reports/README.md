@@ -1,8 +1,15 @@
 # DEX engineering reports
 
-Point-in-time evidence from the November 2026 repair and assistant work. The active backlog is `../../DEX_REMAINING_WORK.md`; user-facing changes are in `../../DEX_RELEASE_NOTES.md`; the Part 4 summary is `../../DEX_PART4_COMPLETION_REPORT.md`.
+Point-in-time evidence from the November 2026 repair and assistant work. The active backlog is `../../DEX_REMAINING_WORK.md`; user-facing changes are in `../../DEX_RELEASE_NOTES.md`; the Part 4 summary is `../../DEX_PART4_COMPLETION_REPORT.md`; the Part 5 summary is `../../DEX_PART5_IMPLEMENTATION_REPORT.md`.
 
-## Current (Part 4)
+## Current (Part 5)
+
+| Report | Scope |
+|---|---|
+| [DEX_SPATIAL_WORKSPACE_ARCHITECTURE.md](DEX_SPATIAL_WORKSPACE_ARCHITECTURE.md) | Spatial desktop: coordinates, camera, rendering, culling, groups, persistence, platform boundaries |
+| [DEX_SPATIAL_PERFORMANCE.md](DEX_SPATIAL_PERFORMANCE.md) | Measured costs (and what could not be measured); the ancestor-`[style]` selector defect |
+
+## Part 4
 
 | Report | Scope |
 |---|---|

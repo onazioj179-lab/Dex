@@ -44,6 +44,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
+import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
@@ -741,7 +742,7 @@ const UpdateManagerSection: React.FC = () => {
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
     width: 44, height: 24, borderRadius: 10, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
-    background: on ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+    background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
   const btnBase: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
@@ -1114,6 +1115,7 @@ const applySettings = (settings: Record<string, unknown>) => {
       for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-fill']) {
         root.style.removeProperty(prop);
       }
+      root.removeAttribute('data-dex-custom-accent');
     }
 
     // Apply font size (scale-based)
@@ -1191,6 +1193,8 @@ const applySettings = (settings: Record<string, unknown>) => {
       const vars = appearanceToCssVars(profile, systemDark);
       for (const [k, v] of Object.entries(vars)) {
         root.style.setProperty(k, v as string);
+        // Mirrored as data-dex-* for the shell CSS (see globals.css, Phase 15).
+        root.setAttribute(`data-${k.slice(2)}`, String(v));
       }
     }).catch(() => { /* phase15 import must never break settings apply */ });
 
@@ -3547,7 +3551,7 @@ export const Settings: React.FC = () => {
                   />
                   <span style={{
                     position: 'absolute', inset: 0, borderRadius: 10,
-                    background: entry.enabled ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
+                    background: entry.enabled ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
                     <span style={{
@@ -3710,7 +3714,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -4009,7 +4013,7 @@ export const Settings: React.FC = () => {
                 />
                 <span style={{
                   position: 'absolute', inset: 0, borderRadius: 10,
-                  background: autoOpt ? 'var(--color-success, #30d158)' : 'var(--color-bg-hover)',
+                  background: autoOpt ? 'var(--color-accent)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
                   <span style={{
@@ -4192,6 +4196,9 @@ export const Settings: React.FC = () => {
       {renderToggle('stageManager', 'Stage Manager', 'Organize open apps on the side for quick switching')}
       {renderToggle('showAppTabBar', 'App Tab Bar', 'Show running app tabs above the content area')}
 
+      <h3 style={styles.sectionTitle}>Spatial Desktop</h3>
+      <SpatialDesktopPanel />
+
       <h3 style={styles.sectionTitle}>Title Bar</h3>
       {renderSelect('windowControls', 'Window Button Style', 'Choose the style of window control buttons', [
         { value: 'system', label: 'System Default' },
@@ -4231,6 +4238,22 @@ export const Settings: React.FC = () => {
         ['Alt+Shift+Arrows', 'Top / bottom half, top quadrants'],
         ['Alt+Shift+1 … 6', 'Arrange all windows with a layout'],
         ['Win+` or Ctrl+Alt+`', 'Cycle floating windows'],
+      ] },
+      { title: 'Spatial desktop', rows: [
+        [`${_M}+Alt+S`, 'Turn the spatial desktop on / off'],
+        [`${_M}+Alt+= / -`, 'Zoom in / out'],
+        [`${_M}+Alt+0`, 'Actual size (100%)'],
+        [`${_M}+Alt+F`, 'Show all windows'],
+        [`${_M}+Alt+Enter`, 'Zoom to the front window'],
+        [`${_M}+Alt+Arrows`, 'Pan the canvas'],
+        [`${_M}+Alt+Backspace`, 'Previous view'],
+        [`${_M}+Alt+W`, 'Find a window (list of all windows and groups)'],
+        [`${_M}+Alt+G`, 'Group the windows in view'],
+        [`${_M}+Alt+M`, 'Minimap'],
+        ['Wheel / two-finger scroll', 'Pan (over the desktop)'],
+        [`${_M}+wheel or pinch`, 'Zoom at the pointer (over the desktop)'],
+        ['Alt+wheel', 'Zoom at the pointer (anywhere)'],
+        ['Middle-drag, or Space+drag', 'Pan'],
       ] },
     ];
     const keyStyle: React.CSSProperties = {
@@ -4504,7 +4527,7 @@ export const Settings: React.FC = () => {
               <button
                 style={{
                   ...styles.toggle,
-                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-accent)' : 'var(--color-bg-glass)',
                   border: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'none' : '1px solid var(--color-border)',
                 }}
                 onClick={() => setAppSetting(selectedCreativeApp, 'gpuAcceleration', !getAppSetting(selectedCreativeApp, 'gpuAcceleration', true))}
