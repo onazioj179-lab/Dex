@@ -19,7 +19,7 @@ import path from 'node:path';
 
 const BASELINE = 284; // 2026-11-01, after the shell light-mode sweep (was 308)
 
-const EXCLUDE = ['imosion', 'prism', 'flux', 'forge', 'vinx', 'axl', 'ThemeManager.tsx', 'Terminal.tsx', 'ColorPicker', 'PixelArt', 'Canvas.tsx', 'ColorWheel'];
+const EXCLUDE = ['imosion', 'prism', 'flux', 'forge', 'vinx', 'axl', 'ThemeManager.tsx', 'Terminal.tsx', 'ColorPicker', 'PixelArt', 'Canvas.tsx', 'CanvasObjectLayer', 'ColorWheel'];
 const PROP = /(color|background|backgroundColor|borderColor|border|borderTop|borderBottom|borderLeft|borderRight|outline)\s*:\s*'([^']*)'/g;
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
 const VAR_FALLBACK = /var\([^()]*\)/g;

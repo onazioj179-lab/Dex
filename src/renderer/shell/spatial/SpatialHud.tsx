@@ -321,7 +321,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {zones.map((z) => (
             <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
               <button aria-label={`Change color of zone ${z.name}`} title="Change color" className="dex-spatial-btn" style={{ ...btn, minWidth: 22, width: 22, padding: 0 }} onClick={() => st().setZoneColor(z.id, nextColor(z.color))}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: z.color }} />
+                <span style={{ width: 10, height: 10, borderRadius: 4, background: z.color }} />
               </button>
               {renaming === z.id
                 ? <RenameField value={z.name} label="Zone name" onDone={(v) => { if (v !== null) st().renameZone(z.id, v); setRenaming(null); }} />
@@ -403,7 +403,7 @@ export const SpatialGroupFrames: React.FC = () => {
               title="Drag to move the group"
               style={{
                 position: 'absolute', left: 12, top: 4, height: 22, padding: '0 10px', display: 'flex', alignItems: 'center',
-                borderRadius: 9999, background: g.color, color: '#FFFFFF', fontSize: 12, fontWeight: 600,
+                borderRadius: 9999, background: g.color, color: 'var(--color-accent-text)', fontSize: 12, fontWeight: 600,
                 cursor: 'grab', pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
               }}
               onPointerDown={(e) => {
@@ -494,7 +494,7 @@ export const SpatialZones: React.FC = () => {
             onDoubleClick={() => useSpatialStore.getState().focusZone(z.id)}
             style={{
               position: 'absolute', left: 20, top: -18, height: 32, padding: '0 14px', display: 'flex', alignItems: 'center',
-              borderRadius: 9999, background: z.color, color: '#FFFFFF', fontSize: 15, fontWeight: 600, letterSpacing: '0.01em',
+              borderRadius: 9999, background: z.color, color: 'var(--color-accent-text)', fontSize: 15, fontWeight: 600, letterSpacing: '0.01em',
               cursor: 'grab', pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
             }}>{z.name}</div>
           <div title="Drag to resize the zone" onPointerDown={(e) => startDrag(e, z.id, 'resize')} style={{
