@@ -104,6 +104,14 @@ import { installSchemePresetSync } from './components/ThemeManager';
 initTheme();
 installSchemePresetSync();
 
+// AI provider keys: load from the native DPAPI store and migrate legacy
+// localStorage copies (no-op in the web preview).
+import { hydrateKeystore } from './uki/keystore';
+void hydrateKeystore();
+// Discover the models installed in a local Ollama (localhost only, 2 s timeout).
+import { refreshOllamaModels } from './uki/providers/ollama';
+void refreshOllamaModels();
+
 import { initIdleContinuity } from './services/IdleContinuity';
 initIdleContinuity();
 

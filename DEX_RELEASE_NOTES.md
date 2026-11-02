@@ -2,6 +2,18 @@
 
 **Creator:** Onazi Oj
 
+## New in this release: UKI assistant
+
+- **Choose where your requests go.** Settings › AI Providers › Processing: Hybrid, **Local only** (nothing leaves your PC), Cloud only, or one pinned model. DEX enforces this itself. Before, the "Offline" choice could still send a streamed reply request to a cloud provider.
+- **Reasoning effort:** Automatic, Fast, Balanced or Deep. This controls how many steps UKI may take and how long its answers can be.
+- **UKI can work with your files**, but only inside Documents, Desktop and Downloads and only after you allow it in Permissions. It always asks before creating, renaming or moving anything. Deleting always goes to the Recycle Bin.
+- **Pause, resume or cancel** UKI's background tasks from Nexus. Cancel stops the request immediately.
+- **Activity log:** everything UKI does is recorded in Security Center (kept across restarts). You can clear it.
+- **Memory you control:** view what UKI remembers, forget single items, export it all as JSON, or clear everything.
+- **Your AI keys are encrypted** with Windows DPAPI. Keys saved by older versions are moved into secure storage automatically.
+- **Local AI:** DEX finds the models installed in Ollama and uses them without any key.
+- **"Look at my screen" works again** in the desktop app. You pick the window to share in the Windows picker, and DEX takes one frame.
+
 ## Fixed
 
 - **DEX starts again.** Installs of 6.0.x could fail with "WebView2Loader.dll was not found" even though WebView2 was installed. The installer now produces an app that starts reliably.
@@ -16,13 +28,15 @@
 
 - DEX uses **much less CPU while idle**: about 1–2% of a core instead of 50–100%. It no longer rebuilds the file search index every time it starts.
 - Smaller installer (14 MB).
+- Buttons and toggles use an accessible blue (white text now meets WCAG AA in dark mode).
 
 ## Privacy and honesty
 
 - Turning off **Memory Recording**, **Allow Notifications**, **Enable UKI** or **Location Services** now really turns those things off.
 - UKI no longer sends your messages to a third-party service when you haven't set up an AI provider.
 - Removed settings that did nothing (including "firewall", "VPN" and "malware" switches that protected nothing). Hardware settings now open the right Windows Settings page.
-- DEX makes no network connections at startup or while idle.
+- DEX makes no internet connections at startup or while idle. The only startup request is a check for a local Ollama on this PC (127.0.0.1).
+- **Clear All Memory** now really clears everything. It used to leave the saved conversations and transcript behind. With Memory Recording off, the transcript is no longer saved.
 
 ## New look
 
@@ -36,6 +50,8 @@
 
 ## Known limitations
 
+- UKI needs an AI provider key, or an installed Ollama model, for free-form requests. Cloud and local model speed haven't been measured yet.
+- There is no cross-device sync and no spending limit for paid AI providers yet.
 - In-app updates aren't available yet.
 - Removing an app hides it, but doesn't free disk space.
 - The Privacy Policy text is being updated.
@@ -43,4 +59,4 @@
 
 ## Test status (this branch)
 
-Full unit suite, Rust unit tests, typecheck and the release build pass. See `DEX_PART3_IMPLEMENTATION_REPORT.md` and `DEX_PART1_PART2_COMPLETION_AUDIT.md` for evidence.
+See `DEX_PART4_COMPLETION_REPORT.md` for the commands, results and remaining gaps. Older evidence: `docs/reports/`.

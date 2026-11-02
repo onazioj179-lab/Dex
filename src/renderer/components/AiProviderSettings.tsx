@@ -14,13 +14,14 @@
 
 import React, { useState } from 'react';
 import { allProviders, allModels, findModel, getProvider } from '../uki/providers/registry';
-import { getApiKey, setApiKey, removeApiKey, configuredProviders } from '../uki/keystore';
+import { getApiKey, setApiKey, removeApiKey, configuredProviders, isSecureKeystore } from '../uki/keystore';
 import {
   getPreferredModel, setPreferredModel, getRoutingGoal, setRoutingGoal,
   getProcessingMode, setProcessingMode, getManualModel, setManualModel,
   getReasoningPreference, setReasoningPreference,
 } from '../uki/providers/modelPrefs';
 import { routeConfiguredModels, applyProcessingMode } from '../uki/providers/connect';
+import { ollamaHasNoModels } from '../uki/providers/ollama';
 import {
   PROCESSING_MODES, processingModeLabel, processingModeHint, REASONING_PREFERENCES,
   type ProcessingMode, type ReasoningPreference,
@@ -116,8 +117,10 @@ const AiProviderSettings: React.FC = () => {
         AI Providers
       </h2>
       <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
-        Connect a provider to power UKI. Keys are stored locally on this device (obfuscated; the
-        packaged app uses the OS keychain). Ollama runs locally and needs no key.
+        Connect a provider to power UKI. {isSecureKeystore()
+          ? 'Keys are encrypted with Windows DPAPI for your user account and never leave this device except to the provider itself.'
+          : 'Secure key storage is not available here, so keys are only obfuscated in local storage (not encrypted).'}{' '}
+        Ollama runs locally and needs no key.
       </p>
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-6px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -143,9 +146,11 @@ const AiProviderSettings: React.FC = () => {
               {goal === 'auto' ? 'prefers' : 'will use'} <strong>{routedTop.label}</strong> · {routedProviderLabel}
             </span>
           </>
-        ) : hasAnyKey && goal === 'offline' ? (
+        ) : mode === 'local-only' || goal === 'offline' ? (
           <span style={{ color: 'var(--color-text-secondary)' }}>
-            Offline routing selected, but no on-device (Ollama) model is available. Start Ollama or pick another routing mode.
+            {ollamaHasNoModels()
+              ? 'Local only is on and Ollama is running, but no model is installed. Install one (for example: ollama pull llama3.2) and reopen this page.'
+              : 'Local only is on, but no on-device (Ollama) model is reachable. Start Ollama, or choose another processing mode.'}
           </span>
         ) : (
           <span style={{ color: 'var(--color-text-secondary)' }}>

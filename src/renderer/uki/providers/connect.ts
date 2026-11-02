@@ -19,6 +19,7 @@ import { createStreamParser, type StreamFormat } from './stream';
 import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } from './modelPrefs';
 import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 import { configuredProviders, getApiKey } from '../keystore';
+import { ollamaInstalledModels } from './ollama';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
 import type { ChatMessage, ProviderId } from './types';
@@ -88,6 +89,8 @@ export function configuredCandidates(goal: RoutingGoal): RouteCandidate[] {
       ? allProviders().filter((p) => !p.requiresKey).map((p) => p.id)
       : configuredProviders().filter((pid) => getProvider(pid as ProviderId)),
   );
+  // A local Ollama with installed models is usable without any "key".
+  if ((ollamaInstalledModels()?.length ?? 0) > 0) providerIds.add('ollama');
   return allModels()
     .filter((m) => providerIds.has(m.provider))
     .map((m) => ({

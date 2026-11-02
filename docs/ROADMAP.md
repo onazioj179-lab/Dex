@@ -2258,6 +2258,12 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-01 (Part 4: assistant)
+
+- UKI safety layer shipped on `claude/dex-part4`: enforced processing modes (`shared/uki/assistantPolicy.ts`, checked in `orchestrator.chat()` + stream), Fast/Balanced/Deep budgets, scoped file tools (`uki/fileTools.ts`, Recycle Bin only), pause/resume/cancel, persistent audit, DPAPI key store (`src-tauri/src/secrets_ctl.rs`), Ollama installed-model discovery, system-picker screen capture.
+- Palette = Part 4 table; `--color-accent-fill` for filled surfaces (AA). Radius ratchet at 0.
+- Active backlog: `DEX_REMAINING_WORK.md`. Evidence: `docs/reports/`.
+
 ## Where DEX is
 
 - **Shipping build:** Electron (v5.0.1). It remains the product until the Tauri
