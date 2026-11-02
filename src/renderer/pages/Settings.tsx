@@ -9,7 +9,7 @@
  * Clean settings panel with sections
  */
 
-import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
@@ -19,6 +19,8 @@ import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
+import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
+import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
@@ -49,7 +51,6 @@ import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/setting
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { applyMotionDurations } from '../styles/motionDurations';
-import { InterfaceTransparencySlider } from '../components/InterfaceTransparencySlider';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 
 // ===========================================================================
@@ -1994,6 +1995,8 @@ export const Settings: React.FC = () => {
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
+  const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
+  const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
 
@@ -2459,6 +2462,29 @@ export const Settings: React.FC = () => {
         try { localStorage.setItem('dex-predictive-prewarm', nextVal ? '1' : '0'); }
         catch { /* storage blocked */ }
       }
+      // Keep the shell-prefs glass mode in sync when the legacy boolean
+      // transparency toggles are flipped from anywhere in Settings.
+      if (key === 'transparency') {
+        try {
+          if (nextVal && !prev.reduceTransparency) {
+            // Turning glass on from opaque lands at a visible 60% (opacity 1 would look unchanged).
+            if (shellPrefs.glassMode === 'off') shellPrefs.setInterfaceTransparency(60);
+          } else {
+            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'off');
+          }
+        } catch { /* store not ready */ }
+      }
+      if (key === 'reduceTransparency') {
+        try {
+          if (prev.transparency === false) {
+            // transparency disabled -- glass stays off
+            shellPrefs.setGlassMode('off');
+          } else {
+            if (nextVal) shellPrefs.setGlassMode('reduced');
+            else if (shellPrefs.glassMode === 'reduced') shellPrefs.setInterfaceTransparency(60);
+          }
+        } catch { /* store not ready */ }
+      }
       if (key === 'crashReports') {
         try {
           const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;
@@ -2627,14 +2653,23 @@ export const Settings: React.FC = () => {
           />
         </div>
 
-        <h3 style={styles.sectionTitle}>Interface Transparency</h3>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Interface Transparency</span>
-            <span style={styles.settingDesc}>Top bar, dock, DEX Bar, menus, panels and window chrome.</span>
+        <h3 style={styles.sectionTitle}>Liquid Glass</h3>
+        <InterfaceTransparencyControl styles={styles} />
+        {prefs.glassMode !== 'off' && (
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Tint</span>
+              <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
+            </div>
+            <input
+              type="color"
+              value={prefs.glassTint}
+              onChange={(e) => prefs.setGlassTint(e.target.value)}
+              style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              aria-label="Liquid Glass tint color"
+            />
           </div>
-          <InterfaceTransparencySlider />
-        </div>
+        )}
 
         <h3 style={styles.sectionTitle}>Comfort & Power</h3>
         <div style={styles.settingRow}>
@@ -2886,13 +2921,13 @@ export const Settings: React.FC = () => {
         settingDesc={styles.settingDesc}
       />
 
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Interface Transparency</span>
-          <span style={styles.settingDesc}>From fully opaque (0%) to maximum glass (100%). Applies live to the whole shell.</span>
-        </div>
-        <InterfaceTransparencySlider />
-      </div>
+      {/* Interface Transparency -- the single glass-to-opaque control, mirrored
+          into the legacy `transparency` boolean for older components that
+          still read settings.transparency. */}
+      <InterfaceTransparencyControl
+        styles={styles}
+        onChange={(pct) => setSettings(prev => ({ ...prev, transparency: pct > 0 }))}
+      />
 
       {renderToggle('reduceTransparency', 'Reduce Transparency', 'Force solid surfaces over translucency for readability')}
 
@@ -2938,7 +2973,6 @@ export const Settings: React.FC = () => {
               reader.onload = () => {
                 const dataUrl = reader.result as string;
                 useWallpaperStore.getState().setCustomImage(dataUrl);
-                toast.success('Custom wallpaper applied');
               };
               reader.readAsDataURL(file);
             };
@@ -3000,18 +3034,15 @@ export const Settings: React.FC = () => {
         </div>
         <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)' }}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Glass Opacity</span>
-            <span style={styles.settingDesc}>Transparency of glass surfaces</span>
+            <span style={styles.settingLabel}>Wallpaper Overlay</span>
+            <span style={styles.settingDesc}>Dims the wallpaper behind the desktop for readability</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 140 }}>
-            <input type="range" min="0" max="100" step="5" value={Math.round((settings.glassOpacity ?? 0.85) * 100)}
-              onChange={e => {
-                const v = Number(e.target.value) / 100;
-                setSettings(prev => ({ ...prev, glassOpacity: v }));
-                useWallpaperStore.getState().setOpacity(v);
-              }}
+            <input type="range" min="0" max="100" step="5" value={Math.round(wallpaperOverlay * 100)}
+              onChange={e => useWallpaperStore.getState().setOpacity(Number(e.target.value) / 100)}
+              aria-label="Wallpaper overlay"
               style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{Math.round((settings.glassOpacity ?? 0.85) * 100)}%</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{Math.round(wallpaperOverlay * 100)}%</span>
           </div>
         </div>
       </div>
@@ -3759,6 +3790,18 @@ export const Settings: React.FC = () => {
   const renderSoundSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Sound</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Interface sounds</span>
+          <span style={styles.settingDesc}>Short tones for toggles, notifications, copy and errors. Off means DEX stays silent; media apps are unaffected.</span>
+        </div>
+        <input
+          type="checkbox"
+          checked={uiSoundsOn}
+          onChange={(e) => setSoundEnabled(e.target.checked)}
+          aria-label="Interface sounds"
+        />
+      </div>
       {renderWindowsLink('Output, input & volume', 'Speakers, headphones, microphones, balance and spatial sound are managed by Windows.', 'ms-settings:sound')}
       {renderWindowsLink('App volume', "Set DEX's volume relative to other apps.", 'ms-settings:apps-volume')}
     </div>

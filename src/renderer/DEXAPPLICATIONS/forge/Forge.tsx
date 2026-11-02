@@ -2021,16 +2021,23 @@ const Forge: React.FC = () => {
               const ctx = canvas.getContext('2d');
               if (!ctx) { toast.error('Canvas context unavailable'); return; }
               const fps = 30; const dur = video.duration; const totalFrames = Math.floor(dur * fps);
-              toast.info(`Exporting ${totalFrames} frames as ${imgSeqFormat.toUpperCase()}...`);
+              // Real, measurable progress (frames done / total) on the shared live-activity card
+              // instead of a toast every N frames; the card always completes, even if a seek fails.
+              const seqActivityId = `forge-imgseq-${Date.now()}`;
+              dispatchActivity({ id: seqActivityId, type: 'encode', label: `Exporting ${totalFrames} ${imgSeqFormat.toUpperCase()} frames`, progress: 0, app: 'forge' });
               const frameBlobs: Blob[] = [];
-              for (let i = 0; i < totalFrames; i++) {
-                video.currentTime = i / fps;
-                await new Promise<void>(r => { video.onseeked = () => r(); });
-                ctx.drawImage(video, 0, 0);
-                const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
-                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mimeMap[imgSeqFormat] || 'image/png', 0.92));
-                if (blob) frameBlobs.push(blob);
-                if (i % 10 === 0) toast.info(`Frame ${i + 1}/${totalFrames}...`);
+              try {
+                for (let i = 0; i < totalFrames; i++) {
+                  video.currentTime = i / fps;
+                  await new Promise<void>(r => { video.onseeked = () => r(); });
+                  ctx.drawImage(video, 0, 0);
+                  const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+                  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mimeMap[imgSeqFormat] || 'image/png', 0.92));
+                  if (blob) frameBlobs.push(blob);
+                  if (i % 5 === 0) updateActivity(seqActivityId, Math.round(((i + 1) / totalFrames) * 100));
+                }
+              } finally {
+                completeActivity(seqActivityId);
               }
               // Batch download all frames
               for (let i = 0; i < frameBlobs.length; i++) {

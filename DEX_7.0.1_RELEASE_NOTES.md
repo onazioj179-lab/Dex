@@ -4,9 +4,11 @@
 
 ## New
 
-- **Interface Transparency.** One slider in Settings › Appearance (and in Control Center) from 0% (fully opaque, no blur) to 100% (maximum glass). It changes the top bar, DEX Bar, menus, panels and window chrome live, works in light and dark mode, and is saved. Refined glass is the default (55%). Reduce Transparency, High Contrast and low-end mode keep surfaces opaque; on a weak GPU the blur is dropped but surfaces stay readable.
+- **Interface Transparency.** One slider from 0% (fully opaque, no blur) to 100% (maximum glass) in Settings › Appearance, Settings › Shell and Control Center, with a separate blur-strength slider and a Refined/Liquid style choice. It changes the top bar, DEX Bar, menus, panels and window chrome live, follows light and dark mode, and is saved. Refined glass is the default (reads as 40%). Reduce Transparency and low-end mode keep surfaces opaque.
+- **Wallpaper Overlay** in Display is labelled and wired correctly (it used to be a mislabelled "Glass Opacity" row).
+- **Interface sounds** toggle in Settings › Sound, kept in sync with the menu toggle; the mute is remembered across restarts.
 - **Calculator, rebuilt.** Keypad scales with the window, the pending operator stays highlighted, C clears the entry and AC clears everything, pressing = again repeats the last step, `200 + 10%` gives 220, and dividing by zero says so. Typed expressions (`sqrt(2)`, `5 km in mi`, `20% of 80`) use a safe parser.
-- **One place for long tasks.** Downloads, file copies, exports and transfers show as small cards in the top-right corner with real progress, and Cancel where the task supports it. A failed or cancelled task now says so instead of "Done".
+- **One place for long tasks.** Downloads, file copies, exports (including Forge frame-sequence exports) and transfers show as small cards in the top-right corner with real progress, and Cancel where the task supports it. A failed or cancelled task now says so instead of "Done".
 - **UKI assistant** (from the 6.1.x work, unreleased until now): choose where requests go (Local only, Hybrid, Cloud only, or one pinned model), reasoning effort, file actions limited to Documents/Desktop/Downloads with confirmation, pause/resume/cancel for background tasks, an activity log, memory you can view/forget/export/clear, AI keys encrypted with Windows DPAPI, daily AI usage and an optional cloud limit, "Look at my screen" and "Use my camera" (one frame each).
 - **Spatial desktop and Creative Hub** (from Part 5, merged): windows on a pan/zoom canvas with zones, snapping and saved views; Creative Hub and whiteboard templates.
 
@@ -20,6 +22,7 @@
 ## Fixed
 
 - Turning off Windows animation effects no longer turns off glass.
+- Fewer pop-ups: redundant toasts removed (pin/unpin in Files, "wallpaper applied", per-frame Forge export messages).
 - Hover feedback came back in about a dozen apps (it was switched off whenever glass was off).
 - The Calculator reacted to Enter, Escape and number keys pressed in other apps while it was open in the background.
 - DEX starts reliably on machines where 6.0.x failed with "WebView2Loader.dll was not found"; opening DEX twice focuses the existing window.
@@ -33,7 +36,7 @@
 ## Security and integrity
 
 - No private keys or tokens in the source, the app bundle or the installers (scanned).
-- The release check refuses builds that would ship source maps, environment files or tests, and writes a SHA-256 checksum file for the installers.
+- The release check refuses builds that would ship source maps, environment files or tests, and writes a SHA-256 checksum file for the installers (`npm run release:checksums` writes or verifies it on its own).
 - Installer metadata names the publisher (Onazi Oj) and ships the license and third-party notices.
 
 ## Known limitations

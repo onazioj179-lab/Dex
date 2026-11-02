@@ -49,7 +49,8 @@ windows-core = "0.61"
 # best code, and no debug info in the shipped exe. On MSVC symbols never live in
 # the exe; `line-tables-only` makes cargo emit a small .pdb next to it for
 # crash symbolication, and the bundler does not ship .pdb files. Panics keep
-# unwinding (not abort) so a failing command can't take the whole shell down.
+# unwinding (not abort): main.rs wraps IPC handlers in catch_unwind so one bad
+# channel can't take the whole shell down.
 [profile.release]
 opt-level = 3
 lto = "thin"

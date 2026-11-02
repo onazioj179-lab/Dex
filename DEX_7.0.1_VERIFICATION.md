@@ -1,6 +1,6 @@
 # DEX OS 7.0.1 — Verification
 
-**Date:** 2026-11-02 · **Creator:** Onazi Oj · **Branch:** `claude/dex-part4` (contains `main` through PR #72)
+**Date:** 2026-11-02 · **Creator:** Onazi Oj · **Branch:** `claude/dex-part4` (contains `main` through PR #71 and #72; reconciled with the parallel 7.0.1 pass from `claude/cranky-hopper-4f196b`)
 
 Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT APPLICABLE · NOT TESTED. Only VERIFIED COMPLETE counts as done.
 
@@ -15,7 +15,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | No coding-agent branding | VERIFIED COMPLETE | Repo-wide scan for agent/AI-generator strings: none in product code; no AI trailers in the last 200 commits |
 | Third-party notices intact | VERIFIED COMPLETE | `NOTICE` + `LICENSE` bundled as installer resources; license page in installer |
 | Battery out of the top bar | VERIFIED COMPLETE | Removed from `AppManager` (and its listener); Control Center keeps it and detects battery-less desktops; preview checked |
-| Interface Transparency slider (0–100) | VERIFIED COMPLETE | `shellPreferencesStore` material engine; Settings + Control Center; `interface-transparency.test.ts` (8); preview: 70% → top bar `blur(24px)`, 61% fill, persisted across reload; reduced transparency / high contrast / low GPU fallbacks tested |
+| Interface Transparency slider (0–100) | VERIFIED COMPLETE (unit) / NOT TESTED (rendered click-through) | Two implementations were built in parallel; the reconcile merge keeps **main's** (PR #71: `InterfaceTransparencyControl`, separate blur strength, default reads 40%, `interfaceTransparency.test.ts`). This branch's engine was dropped; its compact slider now drives main's store from Control Center. The live checks recorded below (70% → 24px blur, 55% default) were on the dropped engine and must be repeated (#33) |
 | Light/dark | VERIFIED COMPLETE (shell, Calculator, live activities) / PARTIAL (creative suite) | Glass fills are theme tokens; Calculator computed colours checked in light mode; creative-suite colour pass still open (#18) |
 | Calculator | VERIFIED COMPLETE | `calculator-engine.test.ts` (10); live keyboard run: `12+7=19`, repeat `=` → 26, `9÷0` → Error + message, `0.1+0.2=0.3`, backspace, `200+10%=220`, operator highlight; `Function()` eval removed |
 | Top bar / DEX Bar | VERIFIED COMPLETE (overlap, hit target) | DEX Bar reserves its strip (apps and maximized windows end above it; checked in preview); Control Center button 28×24 |
@@ -45,9 +45,10 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Watermark / attribution check | OK |
 | `npm run build:tauri` #1 (before merge) | **Passed** in 36.5 min: NSIS 14.3 MB (6.1.0: 15.1), MSI 17.8 MB (6.1.0: 19.0), loader static, no dev files, checksums written, `NotSigned` |
 | `npm run build:tauri` #2 (after merge, at `baf7367`) | **Passed** in 31.9 min: NSIS **14.4 MB**, MSI **17.8 MB**, exe **37.1 MB** (6.1.0: 40.1 MB), loader static, no dev files, `NotSigned`. Only change after this build: `259b992` (three 1–2 px radius snaps and a white→`--color-accent-text` token swap, visually identical) |
-| `SHA256SUMS-7.0.1.txt` | `3510ab9a0fc186d9697c403f2f186099e3b51b27d5261c66fa143206f7fd2059  DEX_7.0.1_x64-setup.exe`<br>`be4e2d7babb0376655601cc0aff80296bd65238f4fc9a707c5e262d895d6976b  DEX_7.0.1_x64_en-US.msi` |
+| Installers vs final code | The installers above were built at `baf7367`, **before** the reconcile merge with main's 7.0.1 pass. They do not contain the final code; rebuild before any install test |
+| `SHA256SUMS-7.0.1.txt` (pre-reconcile build) | `3510ab9a0fc186d9697c403f2f186099e3b51b27d5261c66fa143206f7fd2059  DEX_7.0.1_x64-setup.exe`<br>`be4e2d7babb0376655601cc0aff80296bd65238f4fc9a707c5e262d895d6976b  DEX_7.0.1_x64_en-US.msi` |
 | Production bundle | 0 source maps; `console.log` calls 2 (vendor), `console.warn/error` kept for diagnostics |
-| Glass after merge (dev preview, fresh profile) | Default 55% → `blur(20px) saturate(144%)`; real theme toggle: dark fills `#151517`@67% → light `#FAFAFC`@67%, `#F5F5F7`@75%, white@87% with no re-apply |
+| Glass (dev preview, before the reconcile merge) | Theme-token fills followed a real theme toggle with no re-apply. Superseded: the shipped engine is now main's (see the slider row) |
 
 Measurements not taken: cold/warm start time, idle memory, theme-switch latency, glass rendering cost (needs a packaged-app trace).
 

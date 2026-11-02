@@ -1005,6 +1005,20 @@ html[data-perf-tier="low"] {
     --color-bg-glass-strong: var(--color-bg-surface);
   }
 }
+/* The solid fallbacks above are dark; light theme needs its own, or light mode
+   gets near-black panels whenever the tier is low / transparency is reduced. */
+html[data-theme="light"][data-perf-tier="low"] {
+  --glass-bg: #F5F5F8;
+  --color-bg-glass: #F5F5F8;
+  --color-bg-glass-strong: #F0F0F3;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="light"] {
+    --glass-bg: #F5F5F8;
+    --color-bg-glass: #F5F5F8;
+    --color-bg-glass-strong: #F0F0F3;
+  }
+}
 
 /* ── Creative pro-app panels (Vinx / Prism / Forge) ───────────────────────────
    The creative suite deliberately uses NO glass. Pro editors (Premiere, DaVinci

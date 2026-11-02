@@ -326,7 +326,11 @@ describe('AutoSaveManager', () => {
     });
 
     it('formats a timestamp from yesterday as "Yesterday at ..."', () => {
-      const yesterday = Date.now() - 24 * 60 * 60 * 1000;
+      // Calendar arithmetic, not now-24h: on DST-change days a day is 23 or 25 hours long.
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      y.setHours(12, 0, 0, 0);
+      const yesterday = y.getTime();
       const result = formatSaveTime(yesterday);
       expect(result).toMatch(/^Yesterday at/);
     });

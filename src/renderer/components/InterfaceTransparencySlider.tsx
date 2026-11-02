@@ -4,12 +4,12 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Interface Transparency: the one control for shell material, from 0% (fully
-// opaque, no blur) to 100% (maximum glass). Used by Settings and Control Center.
-// Changes apply live through useShellPreferences -> applyGlassVars.
+// Compact Interface Transparency slider for Control Center (Settings uses the
+// fuller InterfaceTransparencyControl, which adds blur strength). Same store
+// API, so both stay in sync. Changes apply live through applyGlassVars.
 
 import React from 'react';
-import { useShellPreferences } from '../store/shellPreferencesStore';
+import { prefsToTransparency, useShellPreferences } from '../store/shellPreferencesStore';
 
 function describe(value: number, overridden: boolean): string {
   if (overridden) return 'Reduce Transparency or High Contrast is on, so surfaces stay opaque.';
@@ -26,7 +26,9 @@ function isOverridden(): boolean {
 }
 
 export const InterfaceTransparencySlider: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
-  const value = useShellPreferences((s) => s.interfaceTransparency);
+  const glassMode = useShellPreferences((s) => s.glassMode);
+  const glassOpacity = useShellPreferences((s) => s.glassOpacity);
+  const value = prefsToTransparency({ glassMode, glassOpacity });
   const setValue = useShellPreferences((s) => s.setInterfaceTransparency);
   const overridden = value > 0 && isOverridden();
   return (
