@@ -4262,7 +4262,7 @@ export const AppManager: React.FC = () => {
               </span>
               <span style={{
                 fontSize: 11, fontWeight: isActive ? 600 : 500,
-                color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 letterSpacing: '-0.01em', pointerEvents: 'none',
               }}>
