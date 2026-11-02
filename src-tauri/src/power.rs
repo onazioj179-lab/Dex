@@ -78,7 +78,42 @@ fn lock_state(app: &tauri::AppHandle) -> tauri::State<'_, PowerProfileState> {
     app.state::<PowerProfileState>()
 }
 
+/// The profile Windows is actually using, from the active power scheme GUID.
+/// `None` off Windows, when powercfg fails, or for a custom plan.
+fn active_scheme_profile() -> Option<&'static str> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let out = std::process::Command::new("powercfg")
+            .arg("/getactivescheme")
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .output()
+            .ok()?;
+        scheme_guid_profile(&String::from_utf8_lossy(&out.stdout))
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+fn scheme_guid_profile(powercfg_out: &str) -> Option<&'static str> {
+    let s = powercfg_out.to_ascii_lowercase();
+    if s.contains("a1841308-3541-4fab-bc81-f71556f20b4a") {
+        Some("eco")
+    } else if s.contains("381b4222-f694-41f0-9685-ff5bb260df2e") {
+        Some("balanced")
+    } else if s.contains("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c") || s.contains("e9a42b02-d5df-448d-aa00-03f14749eb61") {
+        Some("boost")
+    } else {
+        None
+    }
+}
+
 pub fn get_profile(app: &tauri::AppHandle) -> Value {
+    if let Some(p) = active_scheme_profile() {
+        return json!(p);
+    }
     let st = lock_state(app);
     let g = st.lock().unwrap_or_else(|e| e.into_inner());
     json!(g.current_profile)
@@ -139,7 +174,7 @@ fn apply_profile(profile: &str, changes: &mut Vec<String>) {
                 } else if run("powercfg", &["/setactive", "e9a42b02-d5df-448d-aa00-03f14749eb61"]) {
                     changes.push("Activated Ultimate Performance plan".into());
                 } else {
-                    changes.push("High Performance mode requested".into());
+                    changes.push("Could not change Windows power plan (may require admin)".into());
                 }
             }
             "macos" => {
@@ -196,10 +231,23 @@ fn profile_name(profile: &str) -> &str {
     }
 }
 
+/// Accepts the native names and the names the Power app uses, so a choice in
+/// the UI is never silently coerced to Balanced.
+fn normalize_profile(profile: &str) -> &'static str {
+    match profile {
+        "eco" | "powerSaver" | "saver" => "eco",
+        "boost" | "highPerformance" | "performance" => "boost",
+        _ => "balanced",
+    }
+}
+
 pub fn set_profile(app: &tauri::AppHandle, profile: &str) -> Value {
-    let profile = if matches!(profile, "eco" | "balanced" | "boost") { profile } else { "balanced" };
+    let profile = normalize_profile(profile);
     let st = lock_state(app);
     let mut g = st.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(actual) = active_scheme_profile() {
+        g.current_profile = actual.to_string();
+    }
     if g.current_profile == profile {
         return json!({ "success": true, "message": format!("Already in {} mode", profile), "changes": [] });
     }
@@ -364,5 +412,30 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &serde_json::Value)
         "power:setGpuLimit" => set_gpu_limit(args.get(0).and_then(|v| v.as_f64())),
         "power:setFanCurve" => set_fan_curve(args.get(0).and_then(|v| v.as_str()).map(|s| s.to_string())),
         _ => serde_json::Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod profile_name_tests {
+    use super::normalize_profile;
+
+    #[test]
+    fn ui_names_map_to_native_profiles() {
+        assert_eq!(normalize_profile("powerSaver"), "eco");
+        assert_eq!(normalize_profile("highPerformance"), "boost");
+        assert_eq!(normalize_profile("balanced"), "balanced");
+        assert_eq!(normalize_profile("eco"), "eco");
+        assert_eq!(normalize_profile("boost"), "boost");
+        assert_eq!(normalize_profile("nonsense"), "balanced");
+    }
+
+    #[test]
+    fn powercfg_output_maps_to_profile() {
+        use super::scheme_guid_profile;
+        let out = "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)";
+        assert_eq!(scheme_guid_profile(out), Some("balanced"));
+        assert_eq!(scheme_guid_profile("GUID: A1841308-3541-4FAB-BC81-F71556F20B4A (Power saver)"), Some("eco"));
+        assert_eq!(scheme_guid_profile("GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"), Some("boost"));
+        assert_eq!(scheme_guid_profile("GUID: 11111111-2222-3333-4444-555555555555 (OEM)"), None);
     }
 }

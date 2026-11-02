@@ -19,6 +19,20 @@ export function readDexSetting<T>(key: string, fallback: T): T {
   }
 }
 
+/**
+ * Write one Settings value from outside the Settings page (e.g. the Browser's
+ * privacy panel). Persists to localStorage and the native store the Settings
+ * page loads from, then notifies every reader, including an open Settings page.
+ */
+export function writeDexSetting(key: string, value: unknown): void {
+  let all: Record<string, unknown> = {};
+  try { all = JSON.parse(localStorage.getItem('dex-settings') || '{}') || {}; } catch { /* corrupt: start over */ }
+  all[key] = value;
+  try { localStorage.setItem('dex-settings', JSON.stringify(all)); } catch { /* storage blocked */ }
+  try { void (window as any).electron?.invoke?.('capability:storage:set', 'dex-settings', all); } catch { /* bridge absent */ }
+  try { window.dispatchEvent(new CustomEvent('dex-settings-changed', { detail: { source: key } })); } catch { /* noop */ }
+}
+
 export function useDexSetting<T>(key: string, fallback: T): T {
   const [value, setValue] = useState<T>(() => readDexSetting(key, fallback));
   useEffect(() => {

@@ -31,18 +31,13 @@ export interface SettingIndexEntry {
 // Order roughly follows the sidebar so grouped results read naturally.
 export const SETTINGS_INDEX: SettingIndexEntry[] = [
   // ---------------- General ----------------
-  { label: 'Launch at Login', section: 'general', desc: 'Automatically start DEX when you log in', keywords: 'startup boot autostart' },
-  { label: 'Check for Updates', section: 'general', desc: 'Automatically check for app updates', keywords: 'upgrade version' },
-  { label: 'Restore Last Session', section: 'general', desc: 'Reopen apps from your last session', keywords: 'reopen resume' },
-  { label: 'Auto-Save', section: 'general', desc: 'Automatically save your work periodically', keywords: 'autosave persist' },
-  { label: 'Send Analytics', section: 'general', desc: 'Help improve DEX by sending anonymous usage data', keywords: 'telemetry usage privacy data' },
+  { label: 'Launch at Login', section: 'general', desc: 'Start DEX when you sign in to Windows', keywords: 'startup boot autostart' },
   { label: 'Reset All Settings to Defaults', section: 'general', desc: 'Restore every setting to its default value', keywords: 'reset factory defaults clear' },
 
   // ---------------- Appearance ----------------
   { label: 'Appearance', section: 'appearance', desc: 'Switch between dark and light mode', keywords: 'theme dark light auto mode color scheme' },
   { label: 'Accent Color', section: 'appearance', desc: 'Pick the highlight color used across DEX', keywords: 'theme tint highlight color' },
   { label: 'Hero Themes', section: 'appearance', desc: 'One-tap accent presets: Dark Knight, Omnitrix, Nanite', keywords: 'theme preset batman ben 10 generator rex yellow green orange accent hero' },
-  { label: 'Font Scale', section: 'appearance', desc: 'Adjust text size across the app', keywords: 'text size zoom larger smaller font' },
   { label: 'Reduce Motion', section: 'appearance', desc: 'Minimize animated effects', keywords: 'animation accessibility' },
   { label: 'Glass', section: 'appearance', desc: 'Off, Reduced, Normal, or Liquid translucency', keywords: 'transparency blur liquid material glassmorphism' },
   { label: 'Reduce Transparency', section: 'appearance', desc: 'Force solid surfaces over translucency', keywords: 'opacity solid accessibility' },
@@ -50,7 +45,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Blur Intensity', section: 'appearance', desc: 'Blur amount behind glass surfaces', keywords: 'glass background blur' },
   { label: 'Glass Opacity', section: 'appearance', desc: 'Transparency of glass surfaces', keywords: 'transparency alpha' },
   { label: 'Window Button Style', section: 'appearance', desc: 'System (Windows) or traffic light (macOS) buttons', keywords: 'controls traffic lights close minimize maximize titlebar' },
-  { label: 'Stage Manager', section: 'appearance', desc: 'Show running apps as thumbnails for quick switching', keywords: 'multitasking windows switcher' },
 
   // ---------------- Shell & Dock ----------------
   { label: 'Edge', section: 'shell', desc: 'Pin the dock to any side of the display', keywords: 'dock position bottom left right top taskbar' },
@@ -77,7 +71,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Crash reports', section: 'privacy', desc: 'Kept on this device; nothing is sent', keywords: 'crash telemetry analytics diagnostics data' },
   { label: 'Storage used by DEX', section: 'storage', desc: 'Measured disk usage by category', keywords: 'disk space usage size data storage' },
   { label: 'Clear caches', section: 'storage', desc: 'Free web engine cache and logs; your data is kept', keywords: 'cache clear cleanup free space storage' },
-  { label: 'Clear All Data', section: 'privacy', desc: 'Delete all your data', keywords: 'wipe erase reset danger' },
+  { label: 'Reset DEX', section: 'privacy', desc: 'Clear settings and preferences on this device', keywords: 'wipe erase reset danger' },
 
   // ---------------- Network ----------------
   { label: 'Network Mode', section: 'network', desc: 'Full, local-only, or disabled networking', keywords: 'offline local online connectivity' },
@@ -87,12 +81,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
 
   // ---------------- Performance ----------------
   { label: 'Daily Auto-Optimize', section: 'performance', desc: 'Re-detect hardware and optimize each day', keywords: 'tier hardware optimize performance' },
-  { label: 'Hardware Acceleration', section: 'performance', desc: 'Use GPU for rendering and compositing', keywords: 'gpu acceleration graphics' },
-  { label: 'GPU Rendering', section: 'performance', desc: 'Offload UI rendering to the graphics card', keywords: 'gpu graphics performance' },
-  { label: 'Performance Mode', section: 'performance', desc: 'System-wide performance tier', keywords: 'power balanced battery performance' },
-  { label: 'Low Power Mode', section: 'performance', desc: 'Reduce animations and background activity to save battery', keywords: 'battery power saver' },
-  { label: 'Memory Optimization', section: 'performance', desc: 'Automatically free unused memory', keywords: 'ram memory cleanup' },
-  { label: 'Preload Apps', section: 'performance', desc: 'Pre-load frequently used apps for faster launch', keywords: 'startup preload speed' },
   { label: 'Predictive Pre-warm', section: 'performance', desc: 'Pre-warm the next likely app while idle', keywords: 'prewarm predictive performance' },
 
   // ---------------- System Monitor ----------------
@@ -105,7 +93,6 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Letter Spacing', section: 'accessibility', desc: 'Space between characters (WCAG 1.4.12)', keywords: 'tracking text spacing wcag' },
   { label: 'Line Height', section: 'accessibility', desc: 'Spacing between lines of text (WCAG 1.4.12)', keywords: 'leading text spacing wcag' },
   { label: 'Word Spacing', section: 'accessibility', desc: 'Space between words (WCAG 1.4.12)', keywords: 'text spacing wcag' },
-  { label: 'Screen Reader', section: 'accessibility', desc: 'Enable screen reader support and ARIA announcements', keywords: 'aria voiceover narrator accessibility' },
   { label: 'Reduce Motion', section: 'accessibility', desc: 'Minimize animations and motion effects', keywords: 'animation accessibility' },
 
   // ---------------- Window Management ----------------
@@ -139,12 +126,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   // ---------------- Browser ----------------
   { label: 'Block Trackers', section: 'browser', desc: 'Block cross-site trackers and fingerprinting', keywords: 'privacy trackers browser' },
   { label: 'Block Ads', section: 'browser', desc: 'Block advertisements and popups', keywords: 'adblock ads browser' },
-  { label: 'Fingerprint Protection', section: 'browser', desc: 'Prevent browser fingerprint tracking', keywords: 'privacy fingerprint browser' },
-  { label: 'Do Not Track', section: 'browser', desc: 'Send Do Not Track header with requests', keywords: 'privacy dnt browser' },
-  { label: 'Block Third-Party Cookies', section: 'browser', desc: 'Prevent cross-site cookie tracking', keywords: 'cookies privacy browser' },
   { label: 'Force HTTPS', section: 'browser', desc: 'Automatically upgrade connections to HTTPS', keywords: 'https security browser' },
-  { label: 'Clear on Exit', section: 'browser', desc: 'Clear browsing data when DEX closes', keywords: 'history privacy browser' },
-  { label: 'Tor Mode', section: 'browser', desc: 'Route traffic through the Tor network for privacy', keywords: 'tor anonymity privacy browser' },
   { label: 'Search Engine', section: 'browser', desc: 'Default search engine for the browser', keywords: 'duckduckgo google bing brave search browser' },
 
   // ---------------- UKI & Memory ----------------

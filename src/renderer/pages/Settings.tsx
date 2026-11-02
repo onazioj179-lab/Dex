@@ -19,6 +19,7 @@ import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
+import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
 import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
@@ -285,30 +286,30 @@ const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
 // keys are skipped defensively. `localKeys` are removed in a try/catch.
 // ===========================================================================
 const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: string[] }> = {
-  general: { defaultKeys: ['launchAtStartup', 'checkForUpdates', 'restoreLastSession', 'autoSave', 'analytics'] },
+  general: { defaultKeys: [] },
   appearance: {
-    defaultKeys: ['darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'fontScale', 'windowControls', 'stageManager', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
+    defaultKeys: ['darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'windowControls', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
     localKeys: ['darkMode', 'dex-font-scale', 'dex-window-controls'],
   },
-  sound: { defaultKeys: ['masterVolume', 'alertVolume', 'outputDevice', 'inputDevice', 'spatialAudio', 'spatialAudioProfile', 'audioBalance', 'enhancedDialogue', 'mediaAutoPlay', 'creativeAppAudioBypass'] },
-  display: { defaultKeys: ['displayResolution', 'displayScaling', 'blurIntensity', 'glassOpacity', 'adaptiveBrightness', 'truetoneBrightness', 'nightShift', 'nightShiftWarmth', 'displayRefreshRate', 'hdrContent'] },
-  notifications: { defaultKeys: ['enableNotifications', 'soundEnabled', 'badgeEnabled', 'doNotDisturb'] },
-  privacy: { defaultKeys: ['locationServices', 'crashReports', 'antiHacker', 'firewallEnabled', 'vpnProtection', 'encryptData', 'blockMalware', 'sandboxApps', 'autoLockMinutes', 'requireAuthOnWake'] },
-  network: { defaultKeys: ['networkOptIn', 'wifiEnabled', 'wifiProtection', 'preferredNetwork', 'wifiBand', 'bluetoothEnabled', 'bluetoothMode', 'bluetoothDiscoverable', 'blockTrackerDomains', 'dnsOverHttps', 'ipv6Enabled', 'networkMonitor', 'bandwidthOptimization', 'allowWebGL', 'allowJavaScript', 'strictSecurity'] },
+  sound: { defaultKeys: ['masterVolume', 'outputDevice', 'inputDevice'] },
+  display: { defaultKeys: ['blurIntensity', 'glassOpacity', 'nightShift'] },
+  notifications: { defaultKeys: ['enableNotifications', 'soundEnabled'] },
+  privacy: { defaultKeys: ['locationServices', 'crashReports', 'encryptData', 'autoLockMinutes'] },
+  network: { defaultKeys: ['wifiEnabled', 'bluetoothEnabled', 'dnsOverHttps'] },
   performance: {
-    defaultKeys: ['performanceMode', 'hardwareAcceleration', 'lowPowerMode', 'memoryOptimization', 'preloadApps', 'backgroundBoost', 'performanceReservation', 'predictivePrewarm', 'cpuPriority', 'gpuRendering', 'cacheSizeGB', 'maxRamGB'],
+    defaultKeys: ['predictivePrewarm'],
     localKeys: ['dex-predictive-prewarm'],
   },
-  accessibility: { defaultKeys: ['highContrast', 'largeText', 'reduceTransparency', 'screenReader', 'letterSpacing', 'lineHeight', 'wordSpacing'] },
+  accessibility: { defaultKeys: ['highContrast', 'largeText', 'reduceTransparency', 'letterSpacing', 'lineHeight', 'wordSpacing'] },
   window: {
-    defaultKeys: ['snapWindows', 'doubleClickTitlebar', 'showWindowShadows', 'animateWindowResize', 'rememberWindowPositions', 'maxFloatingWindows', 'showAppTabBar'],
+    defaultKeys: ['showAppTabBar'],
     localKeys: ['dex-app-tab-bar'],
   },
-  keyboard: { defaultKeys: ['enableGlobalShortcuts', 'cmdPaletteShortcut', 'quickSearchShortcut', 'screenshotShortcut'] },
-  files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'defaultView', 'sortBy', 'indexFolders', 'watchForChanges', 'thumbnailSize', 'maxStorageGB'] },
+  keyboard: { defaultKeys: [] },
+  files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'sortBy', 'thumbnailSize'] },
   storage: { defaultKeys: [] },
-  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'doNotTrack', 'clearOnExit', 'blockThirdPartyCookies', 'enableTorMode', 'defaultSearchEngine', 'maxDownloadSpeed', 'parallelDownloads'] },
-  uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiWakeWordEnabled', 'ukiWakePhrase', 'ukiRecallMode', 'ukiRetentionDays', 'ukiCacheSizeGB', 'ukiAutoCleanup', 'ukiShowTranscript', 'ukiPersonality'] },
+  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'defaultSearchEngine'] },
+  uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiRetentionDays', 'ukiAutoCleanup', 'ukiShowTranscript'] },
 };
 
 // ===========================================================================
@@ -983,7 +984,7 @@ const loadSettingsFromBackend = async (): Promise<Record<string, unknown> | null
 const saveSettings = (settings: Record<string, unknown>) => {
   localStorage.setItem('dex-settings', JSON.stringify(settings));
   // Let live consumers (useDexSetting) pick the change up immediately.
-  try { window.dispatchEvent(new CustomEvent('dex-settings-changed')); } catch { /* noop */ }
+  try { window.dispatchEvent(new CustomEvent('dex-settings-changed', { detail: { source: 'settings' } })); } catch { /* noop */ }
   // Also save to backend
   saveSettingsToBackend(settings);
   // Apply settings immediately
@@ -1120,10 +1121,14 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.removeAttribute('data-dex-custom-accent');
     }
 
-    // Apply font size (scale-based)
-    const scale = typeof settings.fontScale === 'number' ? settings.fontScale : 100;
-    root.style.setProperty('--font-size-base', `${Math.round(14 * scale / 100)}px`);
-    root.style.setProperty('--font-scale', String(scale / 100));
+    // Text size lives in `dex-font-scale` (Text & Density control, restored at
+    // boot by main.tsx); re-apply it so saving another setting never resets it.
+    let scale = 1;
+    try {
+      const v = parseFloat(localStorage.getItem('dex-font-scale') || '');
+      if (Number.isFinite(v) && v >= 0.8 && v <= 1.4) scale = v;
+    } catch { /* storage blocked */ }
+    root.style.setProperty('--font-scale', String(scale));
     
     // Apply transparency settings
     if (settings.transparency && !settings.reduceTransparency) {
@@ -1228,12 +1233,6 @@ const _isMac = !navigator.platform?.includes('Win') && !navigator.platform?.incl
 const _M = _isMac ? '⌘' : 'Ctrl';
 
 const DEFAULT_SETTINGS = {
-  // General
-  launchAtStartup: true,
-  checkForUpdates: true,
-  analytics: false,
-  autoSave: true,
-  restoreLastSession: true,
   
   // Appearance
   darkMode: true,
@@ -1241,14 +1240,10 @@ const DEFAULT_SETTINGS = {
   transparency: true,
   accentColor: 'var(--color-accent)', // system default = stylesheet baseline (macOS system blue)
   fontSize: 'medium',
-  fontScale: 100,
   targetFPS: 120,
   windowControls: (navigator.platform?.includes('Win') ? 'system' : 'traffic') as 'system' | 'traffic', // auto-detect: system on Windows, traffic on macOS/Linux
-  stageManager: false, // macOS Tahoe Stage Manager -- organizes open apps on the left (off by default)
   
   // Customization
-  taskbarPosition: 'bottom',
-  taskbarSize: 'medium',
   showLabels: false,
   compactMode: false,
   animationSpeed: 'normal',
@@ -1258,154 +1253,72 @@ const DEFAULT_SETTINGS = {
   blockAds: true,
   forceHttps: true,
   fingerprintProtection: true,
-  doNotTrack: true,
-  clearOnExit: false,
-  blockThirdPartyCookies: true,
-  enableTorMode: false,
   defaultSearchEngine: 'duckduckgo',
-  maxDownloadSpeed: 'unlimited',
-  parallelDownloads: 8,
   
   // Files
   showHiddenFiles: false,
   confirmDelete: true,
-  defaultView: 'list',
   sortBy: 'name',
-  indexFolders: true,
-  watchForChanges: true,
   thumbnailSize: 'medium',
-  maxStorageGB: 100000,
   
   // Auto-Fill
-  enableAutoFill: true,
-  savePasswords: true,
-  saveAddresses: true,
-  saveCreditCards: false,
-  autoFillForms: true,
-  smartSuggestions: true,
   
   // Notifications
   enableNotifications: true,
   soundEnabled: true,
-  badgeEnabled: true,
-  doNotDisturb: false,
   
   // Sound
   masterVolume: 80,
-  alertVolume: 70,
   outputDevice: 'built-in' as string,
   inputDevice: 'built-in' as string,
-  spatialAudio: false,
-  spatialAudioProfile: 'fixed' as 'fixed' | 'head-tracked' | 'off',
-  audioBalance: 50,
-  enhancedDialogue: false,
-  mediaAutoPlay: true,
-  creativeAppAudioBypass: true, // Allow creative apps (AXL, VINX, Imosion, Flux) to bypass DEX audio effects
   
   // Display & Glass
-  displayResolution: 'native',
-  displayScaling: '150',
   blurIntensity: 20,
   glassOpacity: 70,
   windowMaterial: 'glass' as 'glass' | 'frosted' | 'solid',
-  adaptiveBrightness: true,
-  truetoneBrightness: false,
   nightShift: false,
-  nightShiftWarmth: 50,
-  displayRefreshRate: 'adaptive' as '60' | '120' | 'adaptive',
-  hdrContent: true,
   
   // Privacy & Security
   locationServices: false,
   crashReports: true,
-  antiHacker: true,
-  firewallEnabled: true,
-  vpnProtection: false,
   encryptData: true,
-  blockMalware: true,
-  sandboxApps: true,
-  historyAutoClearDays: 7,
   
   // Authentication
   authMethod: 'none' as 'none' | 'pin' | 'password' | 'biometric' | 'pin+biometric' | 'password+biometric',
   biometricEnabled: false,
   pinEnabled: false,
   passwordEnabled: false,
-  requireAuthOnWake: false,
   autoLockMinutes: 5,
   
   // Network
-  networkOptIn: true, // Master network toggle -- replaces env-var approach
   wifiEnabled: true,
-  wifiProtection: true,
-  preferredNetwork: 'auto',
-  wifiBand: 'auto',
   bluetoothEnabled: false,
-  bluetoothMode: 'auto',
-  bluetoothDiscoverable: false,
-  blockTrackerDomains: true,
   dnsOverHttps: true,
-  ipv6Enabled: false,
-  networkMonitor: true,
-  bandwidthOptimization: true,
-  allowWebGL: true,
-  allowJavaScript: true,
-  strictSecurity: false,
   
   // Performance
-  performanceMode: 'auto',
-  hardwareAcceleration: true,
-  lowPowerMode: false,
-  memoryOptimization: true,
-  preloadApps: true,
-  backgroundBoost: true,
-  performanceReservation: false,
   predictivePrewarm: true,
-  cpuPriority: 'high',
-  gpuRendering: true,
-  cacheSizeGB: 8,
-  maxRamGB: 0, // 0 = auto (uses 50% of system RAM, no artificial cap)
   
   // Accessibility
   highContrast: false,
   largeText: false,
   reduceTransparency: false,
-  screenReader: false,
   letterSpacing: 0,    // WCAG 1.4.12 text spacing — em multiplier
   lineHeight: 1.5,     // WCAG 1.4.12 line height (unitless)
   wordSpacing: 0,      // WCAG 1.4.12 word spacing — em multiplier
 
   // Window Management
-  snapWindows: true,          // Enable window snapping to edges/zones
-  doubleClickTitlebar: 'maximize' as 'maximize' | 'minimize' | 'none',
-  showWindowShadows: true,
-  animateWindowResize: true,
-  rememberWindowPositions: true,
-  maxFloatingWindows: 12,
   showAppTabBar: true,        // Persistent running-app tab bar above content
 
   // Keyboard Shortcuts
-  enableGlobalShortcuts: true,
-  cmdPaletteShortcut: `${_M}+Shift+P`,
-  quickSearchShortcut: `${_M}+K`,
-  screenshotShortcut: `${_M}+Shift+S`,
 
   // Storage & Data
-  autoCleanCache: true,
-  cacheCleanIntervalDays: 7,
-  compressOldFiles: false,
 
   // UKI & Memory
   ukiEnabled: true,
   ukiMemoryEnabled: true,
-  ukiWakeWordEnabled: false,
-  ukiWakePhrase: 'Hey UKI',
-  ukiRecallMode: 'hybrid' as 'auto' | 'explicit' | 'hybrid',
   ukiRetentionDays: 30,
-  ukiCacheSizeGB: 3,
   ukiAutoCleanup: true,
   ukiShowTranscript: true,
-  ukiPersonality: 'casual' as 'formal' | 'casual',
 
   // UKI Voice (TTS) preferences -- default to a female voice when available
   ukiVoiceGender: 'female' as 'female' | 'male' | 'auto',
@@ -1983,6 +1896,17 @@ export const Settings: React.FC = () => {
   // to + flash once the new section has rendered.
   const pendingScrollRef = React.useRef<string | null>(null);
   const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
+  // Other surfaces (e.g. the Browser's privacy panel) write single keys through
+  // writeDexSetting; pick those up so this page never saves a stale copy over them.
+  useEffect(() => {
+    const onExternal = (e: Event) => {
+      if ((e as CustomEvent).detail?.source === 'settings') return;
+      const latest = loadSettings();
+      if (latest) setSettings((prev) => ({ ...prev, ...latest }));
+    };
+    window.addEventListener('dex-settings-changed', onExternal);
+    return () => window.removeEventListener('dex-settings-changed', onExternal);
+  }, []);
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
@@ -1996,6 +1920,32 @@ export const Settings: React.FC = () => {
   const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
+  const dnd = useNotificationCenterStore((s) => s.doNotDisturb);
+  const setDnd = useNotificationCenterStore((s) => s.setDoNotDisturb);
+
+  // Launch at Login reflects the real per-user Run entry, not a stored flag.
+  const [launchAtLogin, setLaunchAtLogin] = useState({ supported: false, enabled: false, busy: false });
+  useEffect(() => {
+    let alive = true;
+    (window as any).dex?.system?.getLaunchAtLogin?.()
+      .then((r: { supported?: boolean; enabled?: boolean } | null) => {
+        if (alive && r) setLaunchAtLogin({ supported: !!r.supported, enabled: !!r.enabled, busy: false });
+      })
+      .catch(() => { /* bridge absent: row stays hidden */ });
+    return () => { alive = false; };
+  }, []);
+  const toggleLaunchAtLogin = useCallback(async () => {
+    const want = !launchAtLogin.enabled;
+    setLaunchAtLogin((p) => ({ ...p, busy: true }));
+    try {
+      const r = await (window as any).dex?.system?.setLaunchAtLogin?.(want);
+      setLaunchAtLogin({ supported: true, enabled: !!r?.enabled, busy: false });
+      if (!r?.success) toast.error('Could not change the startup entry');
+    } catch {
+      setLaunchAtLogin((p) => ({ ...p, busy: false }));
+      toast.error('Could not change the startup entry');
+    }
+  }, [launchAtLogin.enabled, toast]);
 
   // =========================================================================
   // SEARCH-FIRST SETTINGS (DEX 5.5)
@@ -2450,11 +2400,6 @@ export const Settings: React.FC = () => {
     setSettings((prev) => {
       const nextVal = !prev[key];
       // Side effects for system-level toggles
-      if (key === 'performanceReservation') {
-        try {
-          (window as any).dex?.system?.claimResources?.(Boolean(nextVal));
-        } catch { /* main may not be ready */ }
-      }
       if (key === 'predictivePrewarm') {
         try { localStorage.setItem('dex-predictive-prewarm', nextVal ? '1' : '0'); }
         catch { /* storage blocked */ }
@@ -2551,29 +2496,59 @@ export const Settings: React.FC = () => {
     );
   };
 
+  // A switch row for values that live outside DEFAULT_SETTINGS (native state,
+  // other stores). Same markup as renderToggle.
+  const renderLiveToggle = (label: string, description: string, checked: boolean, onChange: () => void, disabled = false) => (
+    <div style={styles.settingRow} data-setting-row={label}>
+      <div style={styles.settingInfo}>
+        <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
+        <span style={styles.settingDesc}>{description}</span>
+      </div>
+      <button
+        style={{
+          ...styles.toggle,
+          background: checked ? 'var(--color-accent)' : 'var(--color-bg-glass)',
+          border: checked ? 'none' : '1px solid var(--color-border)',
+          opacity: disabled ? 0.5 : 1,
+        }}
+        onClick={onChange}
+        disabled={disabled}
+        role="switch"
+        aria-checked={checked}
+        aria-label={`Toggle ${label}`}
+      >
+        <div style={{
+          ...styles.toggleKnob,
+          ...(checked ? { background: 'var(--color-accent-text)' } : null),
+          transform: checked ? 'translate(20px, -50%)' : 'translate(0, -50%)',
+        }} />
+      </button>
+    </div>
+  );
+
   const renderGeneralSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Startup</h3>
-      {renderToggle('launchAtStartup', 'Launch at Login', 'Automatically start DEX when you log in')}
-      {renderToggle('checkForUpdates', 'Check for Updates', 'Automatically check for app updates')}
-      {renderToggle('restoreLastSession', 'Restore Last Session', 'Reopen apps from your last session')}
-      
-      <h3 style={styles.sectionTitle}>Behavior</h3>
-      {renderToggle('autoSave', 'Auto-Save', 'Automatically save your work periodically')}
-      
-      <h3 style={styles.sectionTitle}>Usage Data</h3>
-      {renderToggle('analytics', 'Send Analytics', 'Help improve DEX by sending anonymous usage data')}
-      
-      <h3 style={styles.sectionTitle}>Reset</h3>
+      {launchAtLogin.supported && (
+        <>
+          <h3 style={styles.sectionTitleFirst}>Startup</h3>
+          {renderLiveToggle('Launch at Login', 'Start DEX when you sign in to Windows', launchAtLogin.enabled, toggleLaunchAtLogin, launchAtLogin.busy)}
+        </>
+      )}
+
+      <h3 style={launchAtLogin.supported ? styles.sectionTitle : styles.sectionTitleFirst}>Reset</h3>
       <button
         style={styles.dangerBtn}
         aria-label="Reset all settings to defaults"
-        onClick={() => {
-          if (confirm('Reset all settings to defaults? This cannot be undone.')) {
-            setSettings({ ...DEFAULT_SETTINGS });
-          }
+        onClick={async () => {
+          const ok = await confirmReset({
+            title: 'Reset all settings?',
+            message: 'Every setting returns to its default. Your files, notes and apps are not affected.',
+            confirmLabel: 'Reset',
+            tone: 'destructive',
+          });
+          if (ok) setSettings({ ...DEFAULT_SETTINGS });
         }}
-      >Reset All Settings to Defaults</button>
+      >Reset All Settings</button>
     </div>
   );
 
@@ -2883,24 +2858,6 @@ export const Settings: React.FC = () => {
         ))}
       </div>
       
-      <h3 style={styles.sectionTitle}>Text Size</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Font Scale</span>
-          <span style={styles.settingDesc}>Adjust text size across the app ({settings.fontScale ?? 100}%)</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 160 }}>
-          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>A</span>
-          <input type="range" min="80" max="130" step="5" value={settings.fontScale ?? 100}
-            onChange={e => {
-              const v = Number(e.target.value);
-              setSettings(prev => ({ ...prev, fontScale: v, fontSize: v <= 90 ? 'small' : v >= 115 ? 'large' : 'medium' }));
-            }}
-            style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-          <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>A</span>
-        </div>
-      </div>
-      
       <TextDensityControls
         sectionTitle={styles.sectionTitle}
         settingRow={styles.settingRow}
@@ -3095,7 +3052,7 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitleFirst}>Notifications</h3>
       {renderToggle('enableNotifications', 'Allow Notifications', 'Show notifications from DEX')}
       {renderToggle('soundEnabled', 'Sound', 'Play sound for notifications')}
-      {renderToggle('doNotDisturb', 'Do Not Disturb', 'Silence all notifications')}
+      {renderLiveToggle('Do Not Disturb', 'Silence banners and sounds', dnd, () => void setDnd(!dnd))}
     </div>
   );
 
@@ -3497,14 +3454,19 @@ export const Settings: React.FC = () => {
       <button 
         style={styles.dangerBtn}
         aria-label="Clear all data"
-        onClick={() => {
-          if (confirm('Are you sure? This will delete all your data.')) {
-            localStorage.clear();
-            /* Data cleared successfully */
-            window.location.reload();
-          }
+        onClick={async () => {
+          const ok = await confirmReset({
+            title: 'Reset DEX?',
+            message: 'Clears settings, layouts and app preferences on this device, then restarts DEX. Notes, files and vault items are kept. The previous preferences file is saved as a backup.',
+            confirmLabel: 'Reset DEX',
+            tone: 'destructive',
+          });
+          if (!ok) return;
+          try { await (window as any).dex?.invoke?.('storage:resetKv'); } catch { /* bridge absent */ }
+          try { localStorage.clear(); } catch { /* storage blocked */ }
+          window.location.reload();
         }}
-      >Clear All Data</button>
+      >Reset DEX</button>
     </div>
   );
 
@@ -3963,31 +3925,7 @@ export const Settings: React.FC = () => {
         );
       })()}
 
-      <h3 style={styles.sectionTitle}>Graphics</h3>
-      {renderToggle('hardwareAcceleration', 'Hardware Acceleration', 'Use GPU for rendering and compositing')}
-      {renderToggle('gpuRendering', 'GPU Rendering', 'Offload UI rendering to the graphics card')}
-
-      <h3 style={styles.sectionTitle}>Power</h3>
-      {renderSelect('performanceMode', 'Performance Mode', 'System-wide performance tier', [
-        { value: 'auto', label: 'Auto (detect hardware)' },
-        { value: 'low', label: 'Low (battery/old hardware)' },
-        { value: 'balanced', label: 'Balanced' },
-        { value: 'performance', label: 'High Performance' },
-      ])}
-      {renderToggle('lowPowerMode', 'Low Power Mode', 'Reduce animations and background activity to save battery')}
-
-      <h3 style={styles.sectionTitle}>Memory</h3>
-      {renderToggle('memoryOptimization', 'Memory Optimization', 'Automatically free unused memory')}
-
-      <h3 style={styles.sectionTitle}>Startup</h3>
-      {renderToggle('preloadApps', 'Preload Apps', 'Pre-load frequently used apps for faster launch')}
-
-      <h3 style={styles.sectionTitle}>Resource Reservation</h3>
-      {renderToggle(
-        'performanceReservation',
-        'Performance Mode',
-        'Reserve CPU/GPU for the foreground app by lowering the priority of background processes (revertible).',
-      )}
+      <h3 style={styles.sectionTitle}>Apps</h3>
       {renderToggle(
         'predictivePrewarm',
         'Predictive Pre-warm',
@@ -4012,7 +3950,6 @@ export const Settings: React.FC = () => {
       {renderSlider('wordSpacing', 'Word Spacing', 'Space between words (WCAG 1.4.12)', 0, 0.5, 'em', 0.02)}
 
       <h3 style={styles.sectionTitle}>Screen Reader</h3>
-      {renderToggle('screenReader', 'Screen Reader', 'Enable screen reader support and ARIA announcements')}
 
       <h3 style={styles.sectionTitle}>Motion</h3>
       {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animations and motion effects')}
@@ -4101,23 +4038,18 @@ export const Settings: React.FC = () => {
   const renderBrowserSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Privacy</h3>
-      {renderToggle('blockTrackers', 'Block Trackers', 'Block cross-site trackers and fingerprinting')}
-      {renderToggle('blockAds', 'Block Ads', 'Block advertisements and popups')}
-      {renderToggle('fingerprintProtection', 'Fingerprint Protection', 'Prevent browser fingerprint tracking')}
-      {renderToggle('doNotTrack', 'Do Not Track', 'Send Do Not Track header with requests')}
-      {renderToggle('blockThirdPartyCookies', 'Block Third-Party Cookies', 'Prevent cross-site cookie tracking')}
+      {renderToggle('blockTrackers', 'Block Trackers', 'Block known cross-site trackers')}
+      {renderToggle('blockAds', 'Block Ads', 'Block known ad servers')}
+      {renderToggle('forceHttps', 'Force HTTPS', 'Upgrade http:// pages to https://')}
+      {renderToggle('fingerprintProtection', 'Generic User Agent', "Identify as a common browser instead of DEX")}
 
-      <h3 style={styles.sectionTitle}>Security</h3>
-      {renderToggle('forceHttps', 'Force HTTPS', 'Automatically upgrade connections to HTTPS')}
-      {renderToggle('clearOnExit', 'Clear on Exit', 'Clear browsing data when DEX closes')}
-      {renderToggle('enableTorMode', 'Tor Mode', 'Route traffic through the Tor network for privacy')}
-
-      <h3 style={styles.sectionTitle}>Search & Downloads</h3>
+      <h3 style={styles.sectionTitle}>Search</h3>
       {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [
         { value: 'duckduckgo', label: 'DuckDuckGo' },
         { value: 'google', label: 'Google' },
         { value: 'bing', label: 'Bing' },
         { value: 'brave', label: 'Brave Search' },
+        { value: 'startpage', label: 'Startpage' },
       ])}
     </div>
   );
@@ -4128,7 +4060,6 @@ export const Settings: React.FC = () => {
   const renderWindowSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Snapping & Layout</h3>
-      {renderToggle('stageManager', 'Stage Manager', 'Organize open apps on the side for quick switching')}
       {renderToggle('showAppTabBar', 'App Tab Bar', 'Show running app tabs above the content area')}
 
       <h3 style={styles.sectionTitle}>Spatial Desktop</h3>
@@ -4239,10 +4170,6 @@ export const Settings: React.FC = () => {
           <span style={styles.aboutLabel}>Retention</span>
           <span style={styles.aboutValue}>{settings.ukiRetentionDays || 30} days</span>
         </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Size Limit</span>
-          <span style={styles.aboutValue}>{settings.ukiCacheSizeGB || 3} GB</span>
-        </div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
         Manage memory settings in <button style={{ background: 'none', border: 'none', color: 'var(--color-accent, #4A9EFF)', cursor: 'pointer', fontSize: 11, padding: 0 }} onClick={() => setActiveSection('uki')}>UKI &amp; Memory</button>
@@ -4295,7 +4222,13 @@ export const Settings: React.FC = () => {
         <button
           style={{ ...styles.dangerBtn, flex: 1 }}
           onClick={async () => {
-            if (!confirm('Clear all UKI memory (conversations, archives, transcript, reasoning trail)? Saved workflows are kept. This cannot be undone.')) return;
+            const ok = await confirmReset({
+              title: 'Clear UKI memory?',
+              message: 'Deletes conversations, archives, transcript and reasoning trail. Saved workflows are kept. This cannot be undone.',
+              confirmLabel: 'Clear',
+              tone: 'destructive',
+            });
+            if (!ok) return;
             try {
               // This used to clear only the native archive, leaving the
               // encrypted conversation store and transcript in place.
