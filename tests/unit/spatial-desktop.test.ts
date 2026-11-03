@@ -276,3 +276,15 @@ describe('spatial store: zones, views, locks, bindings, layout files', () => {
     expect(useSpatialStore.getState().zones).toEqual([]);
   });
 });
+
+describe('spatial minimap default (Part 8)', () => {
+  it('starts hidden, and a persisted "on" no longer brings it back each launch', async () => {
+    const { vi } = await import('vitest');
+    localStorage.setItem('dex-spatial-v1', JSON.stringify({ state: { minimap: true }, version: 0 }));
+    vi.resetModules();
+    const { useSpatialStore } = await import('../../src/renderer/store/spatialStore');
+    expect(useSpatialStore.getState().minimap).toBe(false);
+    useSpatialStore.getState().toggleMinimap();
+    expect(useSpatialStore.getState().minimap).toBe(true);
+  });
+});

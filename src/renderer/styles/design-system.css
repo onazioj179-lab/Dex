@@ -664,6 +664,21 @@
    (the app keeps running; DOM and state are untouched). At low zoom the deep
    window shadows are dropped -- with dozens of windows they dominate paint. */
 [data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
+/* Zoomed far out, background windows become title cards: the app body skips
+   rendering (the app stays mounted and keeps its state) and the window shows
+   its name. This is what keeps a canvas of 50+ windows responsive. The front
+   window stays live. Sizes are large because the whole window is scaled down. */
+[data-spatial-world="on"] [data-spatial-card="true"] [data-window-body] { content-visibility: hidden; }
+[data-spatial-world="on"] [data-spatial-card="true"]::after {
+  content: attr(data-window-title);
+  position: absolute; inset: 36px 0 0 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+  font-size: 56px; font-weight: 600; letter-spacing: -0.02em;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  pointer-events: none;
+}
 [data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
 /* Zoomed far out, window contents are thumbnails: pause their decorative CSS
    animations (spinners, pulses) so 50 windows don't repaint every frame. Apps

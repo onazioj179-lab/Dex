@@ -74,7 +74,7 @@ import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap, pinchCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, fitRect, magneticSnap, pinchCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
@@ -911,6 +911,9 @@ export const AppManager: React.FC = () => {
   // Spatial desktop: the world layer carrying the camera transform (see spatialStore).
   const worldRef = useRef<HTMLDivElement>(null);
   const spatialEnabled = useSpatialStore((s) => s.enabled);
+  // Zoomed far out on the canvas, background windows render as title cards
+  // (contents skipped, app state kept) so dozens of windows stay smooth.
+  const spatialLowLod = useSpatialStore((s) => s.enabled && s.camera.z < 0.35);
   /** Floating windows currently culled off-screen in spatial mode. */
   const spatialOffscreenRef = useRef<Set<string>>(new Set());
 
@@ -3227,6 +3230,11 @@ export const AppManager: React.FC = () => {
       const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
       const placed: Record<string, SpatialRect> = { ...remembered, ...arrange('grid', fresh, origin) };
       sp.setPreSpatial(pre);
+      // Start at the fitted view so the first frame already uses the right
+      // level of detail (rendering every app live at 100% first cost seconds
+      // with many windows open).
+      const all = boundsOf(Object.values(placed));
+      if (all) sp.setCamera(fitRect(all, sp.viewport.w || ws.w, sp.viewport.h || ws.h, 48, sp.limits), { animate: false });
       sp.setEnabled(true);
       if (fromTabs.length > 0) {
         fromTabs.forEach(id => mountedAppsRef.current.add(id as AppId));
@@ -3390,8 +3398,13 @@ export const AppManager: React.FC = () => {
       const prev = spatialOffscreenRef.current;
       spatialOffscreenRef.current = next;
       for (const id of next) if (!prev.has(id)) appLifecycle.setPhase(id, 'background');
-      for (const id of prev) {
-        if (!next.has(id) && s.windows[id] && !s.windows[id].minimized) appLifecycle.setPhase(id, 'foreground');
+      // Only while the canvas is on: after leaving it the tab logic owns each
+      // app's phase, and re-foregrounding every former window here woke all
+      // the hidden tabs at once (seconds of work with many apps open).
+      if (s.enabled) {
+        for (const id of prev) {
+          if (!next.has(id) && s.windows[id] && !s.windows[id].minimized) appLifecycle.setPhase(id, 'foreground');
+        }
       }
     };
     const apply = (s: ReturnType<typeof useSpatialStore.getState>) => {
@@ -3434,9 +3447,16 @@ export const AppManager: React.FC = () => {
   useEffect(() => {
     const el = contentRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight));
+    // Also published as CSS vars: tabs live inside the zero-size world layer
+    // (see the render below) and size themselves from these.
+    const publish = () => {
+      el.style.setProperty('--dex-content-w', `${el.clientWidth}px`);
+      el.style.setProperty('--dex-content-h', `${el.clientHeight}px`);
+      useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
+    };
+    const ro = new ResizeObserver(publish);
     ro.observe(el);
-    useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
+    publish();
     return () => ro.disconnect();
   }, [splitMode]);
 
@@ -3654,6 +3674,8 @@ export const AppManager: React.FC = () => {
           <div
             key={appId}
             data-floating-window={appId}
+            data-spatial-card={spatialLowLod && !isFocused ? 'true' : undefined}
+            data-window-title={getLabel(appId)}
             data-testid={`app-instance-${appId}`}
             data-app-state="foreground"
             data-window-glass={useGlass ? 'on' : 'off'}
@@ -4004,7 +4026,7 @@ export const AppManager: React.FC = () => {
                 </div>
               )}
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
+            <div data-window-body="" style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
               <AppBody appId={appId} />
             </div>
             {/* Resize handles -- all 4 edges + corners for proper OS-like resizing */}
@@ -4490,7 +4512,11 @@ export const AppManager: React.FC = () => {
           aria-hidden={!showInline}
           style={{
             position: 'absolute',
-            inset: 0,
+            // Home sits in the content layer; every other tab sits in the world
+            // layer (a 0x0 anchor), so it takes the content size explicitly.
+            ...(appId === 'home'
+              ? { inset: 0 }
+              : { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' }),
             display: 'flex',
             opacity: showInline ? 1 : 0,
             pointerEvents: showInline ? 'auto' : 'none',
@@ -4510,6 +4536,10 @@ export const AppManager: React.FC = () => {
           }}
           className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
         >
+          {/* Slot 0 is the floating window's title bar; keeping the app body in
+              slot 1 in both modes means switching tab <-> window (or entering
+              the Spatial canvas) keeps the app mounted with its state. */}
+          {false}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
             <AppBody appId={appId} />
           </div>
@@ -4517,7 +4547,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, spatialLowLod, mountedAppsSafeSnapshot.join(',')]);
 
   // -- AppLifecycle phase emitter ------------------------------------------
   // Keep-alive never unmounts apps; instead we broadcast a per-app phase so
@@ -5229,7 +5259,7 @@ export const AppManager: React.FC = () => {
           borderRadius: 0,
           contain: 'layout style',
         }}>
-          {keepAliveElements.filter(el => !(el && detachedApps.has(el.key as AppId)))}
+          {keepAliveElements.filter(el => el && el.key === 'home')}
           {/* World layer: floating windows live here. With the spatial desktop off
               it has no transform, so it is layout-transparent (fixed windows still
               anchor to this content surface); on, it carries the camera. */}
@@ -5238,7 +5268,9 @@ export const AppManager: React.FC = () => {
             {spatialEnabled && <SpatialZones />}
             {spatialEnabled && <SpatialGroupFrames />}
             {spatialEnabled && <SpatialGuides />}
-            {keepAliveElements.filter(el => el && detachedApps.has(el.key as AppId))}
+            {/* Every non-Home app lives here, tab or window, so changing mode
+                never moves it to another parent (which would remount it). */}
+            {keepAliveElements.filter(el => el && el.key !== 'home')}
           </div>
           {spatialEnabled && <SpatialHud onExit={() => setSpatial(false)} />}
         </div>
