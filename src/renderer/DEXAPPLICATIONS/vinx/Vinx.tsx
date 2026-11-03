@@ -58,6 +58,7 @@ async function runMotionTrack(direction: 'forward' | 'backward', frames: number)
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
@@ -329,6 +330,17 @@ const VinxEditor: React.FC = () => {
   const undoStack = useVinxStore(s => s.undoStack);
   const redoStack = useVinxStore(s => s.redoStack);
   const markSaved = useVinxStore(s => s.markSaved);
+  // Saved versions of the project (listed and restored from Collab Hub).
+  const checkpoints = useAppCheckpoints({
+    appId: 'videoeditor',
+    appName: 'Vinx',
+    getSnapshot: () => JSON.stringify(useVinxStore.getState().project),
+    onRestore: (data) => {
+      const restored = JSON.parse(data);
+      if (!restored || typeof restored !== 'object' || !Array.isArray(restored.sequences)) throw new Error('not a Vinx project');
+      useVinxStore.setState({ project: restored, isDirty: true });
+    },
+  });
   const setShowExportDialog = useVinxStore(s => s.setShowExportDialog);
   const isPlaying = useVinxStore(s => s.isPlaying);
   const setIsPlaying = useVinxStore(s => s.setIsPlaying);
@@ -1029,6 +1041,7 @@ const VinxEditor: React.FC = () => {
     {
       id: 'file', label: 'File', items: [
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: () => markSaved() },
+        { label: 'Save Checkpoint', onSelect: () => { const res = checkpoints.saveNow(); window.dispatchEvent(new CustomEvent('dex-toast', { detail: res.ok ? { type: 'success', message: 'Checkpoint saved' } : { type: 'error', message: res.error } })); } },
         { separator: true },
         { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setShowExportDialog(true) },
         { label: quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM)', onSelect: () => (quickExport.active ? handleCancelQuickExport() : handleQuickExport()) },

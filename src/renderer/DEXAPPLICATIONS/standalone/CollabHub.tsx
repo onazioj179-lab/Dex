@@ -18,6 +18,7 @@ import {
   Checkpoint,
 } from '../../services/CollaborationSystem';
 import ShareDialog from '../../components/ShareDialog';
+import { listCheckpoints, requestRestore, deleteCheckpoint, takeCollabOpen, COLLAB_OPEN, CHECKPOINTS_CHANGED, type AppCheckpoint } from '../../services/appCheckpoints';
 import { EmptyState } from '../../components/EmptyState';
 import ChatPanel from '../../components/ChatPanel';
 import { DexSearchInput } from '../../styles/components';
@@ -508,6 +509,14 @@ const CollabHub: React.FC = () => {
   const [filter, setFilter] = useState<string | null>(null);
   const [showShare, setShowShare] = useState<string | null>(null);
   const [showChat, setShowChat] = useState<string | null>(null);
+  // Saved app versions (services/appCheckpoints), refreshed when any app saves.
+  const [appCheckpoints, setAppCheckpoints] = useState<AppCheckpoint[]>(() => listCheckpoints());
+  useEffect(() => {
+    const refresh = () => setAppCheckpoints(listCheckpoints());
+    window.addEventListener(CHECKPOINTS_CHANGED, refresh);
+    window.addEventListener('storage', refresh);
+    return () => { window.removeEventListener(CHECKPOINTS_CHANGED, refresh); window.removeEventListener('storage', refresh); };
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -941,15 +950,21 @@ const CollabHub: React.FC = () => {
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
   }, [projects, activeTab, search, filter]);
 
-  const allCheckpoints = useMemo(() => {
-    const checkpoints: (Checkpoint & { projectName: string })[] = [];
-    projects.forEach(p => {
-      p.checkpoints.forEach(c => {
-        checkpoints.push({ ...c, projectName: p.name });
-      });
-    });
-    return checkpoints.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-  }, [projects]);
+  const allCheckpoints = appCheckpoints;
+
+  // Another app asked to show its Share dialog, chat or checkpoints here.
+  useEffect(() => {
+    const apply = () => {
+      const req = takeCollabOpen();
+      if (!req) return;
+      if (req.panel === 'checkpoints') setActiveTab('checkpoints');
+      else if (req.projectId && req.panel === 'share') setShowShare(req.projectId);
+      else if (req.projectId && req.panel === 'chat') setShowChat(req.projectId);
+    };
+    apply();
+    window.addEventListener(COLLAB_OPEN, apply);
+    return () => window.removeEventListener(COLLAB_OPEN, apply);
+  }, []);
 
   const pendingRequests = useMemo(() => {
     let count = 0;
@@ -1429,11 +1444,35 @@ const CollabHub: React.FC = () => {
                   <div style={styles.checkpointInfo}>
                     <div style={styles.checkpointName}>{cp.name}</div>
                     <div style={styles.checkpointMeta}>
-                      {cp.projectName} • {formatTime(cp.timestamp)} • by {cp.creatorName}
-                      {cp.autoSave && <span style={{ marginLeft: 'var(--space-2)', opacity: 0.6 }}>Auto-saved</span>}
+                      {cp.appName} • {formatTime(cp.timestamp)} • {Math.max(1, Math.round(cp.bytes / 1024))} KB
+                      {cp.auto && <span style={{ marginLeft: 'var(--space-2)', opacity: 0.6 }}>Autosave</span>}
                     </div>
                   </div>
                   <div style={styles.checkpointActions}>
+                    <button
+                      style={styles.cardActionBtn}
+                      title="Restore"
+                      aria-label={`Restore ${cp.name} in ${cp.appName}`}
+                      onClick={() => {
+                        const appId = requestRestore(cp.id);
+                        if (!appId) { toast('error', 'That checkpoint is no longer available'); return; }
+                        (window as any).__dexRunningApps?.getState().launchApp({ id: appId, name: cp.appName, icon: appId });
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                      </svg>
+                    </button>
+                    <button
+                      style={styles.cardActionBtn}
+                      title="Delete"
+                      aria-label={`Delete ${cp.name}`}
+                      onClick={() => { if (window.confirm(`Delete checkpoint "${cp.name}"? This cannot be undone.`)) deleteCheckpoint(cp.id); }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
