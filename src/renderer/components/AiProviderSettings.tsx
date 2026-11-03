@@ -12,9 +12,10 @@
  * one-line mount.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { allProviders, allModels, findModel, getProvider } from '../uki/providers/registry';
 import { getApiKey, setApiKey, removeApiKey, configuredProviders, isSecureKeystore } from '../uki/keystore';
+import { refreshLiveModels, clearLiveModels, LIVE_MODELS_EVENT } from '../uki/providers/liveModels';
 import {
   getPreferredModel, setPreferredModel, getRoutingGoal, setRoutingGoal,
   getProcessingMode, setProcessingMode, getManualModel, setManualModel,
@@ -108,14 +109,33 @@ const AiProviderSettings: React.FC = () => {
 
   const connected = (id: string) => (getApiKey(id)?.length ?? 0) > 0;
 
+  // Ask each connected provider which models this key can use (the static
+  // lists are only a fallback). Only here and on Save: never at launch.
+  const [, bumpModels] = useState(0);
+  const refreshModels = (id: string) => {
+    const p = getProvider(id as Parameters<typeof getProvider>[0]);
+    const key = getApiKey(id);
+    if (p && key) void refreshLiveModels(p, { apiKey: key });
+  };
+  useEffect(() => {
+    for (const p of providers) if (p.requiresKey && connected(p.id)) refreshModels(p.id);
+    const onModels = () => bumpModels((n) => n + 1);
+    window.addEventListener(LIVE_MODELS_EVENT, onModels);
+    return () => window.removeEventListener(LIVE_MODELS_EVENT, onModels);
+    // Once per open of this page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const save = (id: string) => {
     setApiKey(id, keys[id]);
+    refreshModels(id);
     setSavedAt(id);
     setTimeout(() => setSavedAt((s) => (s === id ? null : s)), 1500);
   };
 
   const clear = (id: string) => {
     removeApiKey(id);
+    clearLiveModels(id);
     setKeys((k) => ({ ...k, [id]: '' }));
     setSavedAt(null);
   };

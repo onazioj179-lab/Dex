@@ -11,6 +11,7 @@
 //! event-loop deadlock the migration notes warn about. Sync command bodies run
 //! on a Tauri worker thread, so the `blocking_*` dialog calls are safe here.
 
+use crate::paths::DexPaths;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use tauri::Manager;
@@ -245,8 +246,7 @@ pub fn changelog_export(app: &tauri::AppHandle, args: &Value) -> Value {
 
 fn attachments_dir(app: &tauri::AppHandle) -> std::path::PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
         .join("notes-data")
         .join("attachments");
@@ -433,8 +433,7 @@ fn backup_dir(app: &tauri::AppHandle, conn: &Connection) -> std::path::PathBuf {
         .query_row("SELECT backup_path FROM backup_settings WHERE id = 1", [], |r| r.get(0))
         .unwrap_or_default();
     let dir = if configured.trim().is_empty() {
-        app.path()
-            .app_data_dir()
+        app.dex_data_dir()
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join("backups")
     } else {
@@ -473,8 +472,7 @@ pub fn backup_create(app: &tauri::AppHandle, args: &Value) -> Value {
     let description = args.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     let db_path = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
         .join("databases")
         .join("dex.db");
@@ -587,8 +585,7 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
 
     // 4-6. Swap under the db lock so no other op runs mid-restore.
     let db_path = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
         .join("databases")
         .join("dex.db");

@@ -5,6 +5,7 @@
 // The embedded interactive session (PTY) is out of scope on both shells.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Command;
@@ -12,12 +13,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 fn profiles_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join("ssh-profiles.json")
 }
 fn keys_dir(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from(".")).join("ssh").join("keys");
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from(".")).join("ssh").join("keys");
     let _ = std::fs::create_dir_all(&dir);
     dir
 }

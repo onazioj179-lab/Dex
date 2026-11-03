@@ -11,13 +11,21 @@
  */
 
 import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo, ProviderConfig, HttpRequest } from './types';
+import { liveModels } from './liveModels';
 
 const DEFAULT_BASE = 'https://api.openai.com/v1';
 
+// Reasoning models (GPT-5, o-series) reject a custom temperature and take
+// max_completion_tokens, which also has to cover their hidden reasoning.
+export function isReasoningModel(id: string): boolean {
+  return /^(gpt-5|o\d)/.test(id);
+}
+const MIN_REASONING_TOKENS = 4096;
+
 const MODELS: ModelInfo[] = [
+  { id: 'gpt-5',       label: 'GPT-5',       contextWindow: 400000, capabilities: { tools: true, vision: true, streaming: true } },
+  { id: 'gpt-5-mini',  label: 'GPT-5 mini',  contextWindow: 400000, capabilities: { tools: true, vision: true, streaming: true } },
   { id: 'gpt-4o',      label: 'GPT-4o',      contextWindow: 128000, capabilities: { tools: true, vision: true, streaming: true } },
-  { id: 'gpt-4o-mini', label: 'GPT-4o mini', contextWindow: 128000, capabilities: { tools: true, vision: true, streaming: true } },
-  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo', contextWindow: 128000, capabilities: { tools: true, vision: true, streaming: true } },
 ];
 
 export const openaiProvider: LLMProvider = {
@@ -25,7 +33,7 @@ export const openaiProvider: LLMProvider = {
   label: 'OpenAI',
   requiresKey: true,
 
-  listModels: () => MODELS,
+  listModels: () => liveModels('openai') ?? MODELS,
 
   buildChatRequest(req: ChatRequest, config: ProviderConfig): HttpRequest {
     const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
@@ -49,8 +57,12 @@ export const openaiProvider: LLMProvider = {
               ]
             : m.content,
         })),
-        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-        ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
+        ...(isReasoningModel(req.model)
+          ? (req.maxTokens !== undefined ? { max_completion_tokens: Math.max(req.maxTokens, MIN_REASONING_TOKENS) } : {})
+          : {
+              ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+              ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
+            }),
         stream: !!req.stream,
       }),
     };
@@ -71,6 +83,28 @@ export const openaiProvider: LLMProvider = {
         ? { promptTokens: j.usage.prompt_tokens, completionTokens: j.usage.completion_tokens }
         : undefined,
     };
+  },
+
+  buildModelsRequest(config: ProviderConfig): HttpRequest {
+    const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
+    return { url: `${base}/models`, method: 'GET', headers: { Authorization: `Bearer ${config.apiKey ?? ''}` } };
+  },
+
+  parseModels(json: unknown): ModelInfo[] {
+    const data = (json as { data?: Array<{ id?: unknown }> })?.data;
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((m) => m.id)
+      .filter((id): id is string => typeof id === 'string'
+        && /^(gpt-|o\d|chatgpt-)/.test(id)
+        && !/(audio|realtime|transcribe|tts|image|search|embedding|instruct|moderation)/.test(id))
+      .sort()
+      .map((id) => ({
+        id,
+        label: id,
+        contextWindow: /^(gpt-5|gpt-4\.1|o\d)/.test(id) ? 400000 : 128000,
+        capabilities: { tools: true, vision: /^(gpt-4o|gpt-4\.1|gpt-5|o\d)/.test(id), streaming: true },
+      }));
   },
 
   parseStreamChunk(data: string): string {

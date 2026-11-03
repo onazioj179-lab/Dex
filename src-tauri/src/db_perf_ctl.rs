@@ -77,6 +77,7 @@
 //     each call recomputes and returns an identical value.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -304,8 +305,7 @@ fn now_ms() -> i64 {
 /// The shared database path: <appData>/databases/dex.db (identical to the path
 /// main.rs opens the managed connection at).
 fn db_path(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_data_dir()
+    app.dex_data_dir()
         .ok()
         .map(|d| d.join("databases").join("dex.db"))
 }

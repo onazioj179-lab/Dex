@@ -39,9 +39,9 @@
 //     lives in the skipped heavy channels.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const UNDO_FILE: &str = "undo-stack.json";
 const UNDO_KEY: &str = "undoStack";
@@ -51,7 +51,7 @@ const ENTRIES_KEY: &str = "entries";
 // --- file IO (fs-json under appData, mirrors snapshot_ctl.rs / analytics.rs) --
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(UNDO_FILE)
 }

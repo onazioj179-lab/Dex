@@ -24,6 +24,7 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContex
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
+import { editedCanvasSize } from './galleryEdit';
 
 // ===========================================================================
 // TYPES
@@ -419,9 +420,10 @@ export const Gallery: React.FC = () => {
   const [showCropRotate, setShowCropRotate] = useState(false);
   const [cropRatio, setCropRatio] = useState<'free' | '16:9' | '4:3' | '1:1' | '3:2'>('free');
   const [straightenAngle, setStraightenAngle] = useState(0);
+  const [flipH, setFlipH] = useState(false);
+  const [flipV, setFlipV] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showCompareMode, setShowCompareMode] = useState(false);
-  const [compareItem, setCompareItem] = useState<MediaItem | null>(null);
   const [showSlideshow, setShowSlideshow] = useState(false);
   const [slideshowInterval, setSlideshowInterval] = useState(4);
   const [slideshowTransition, setSlideshowTransition] = useState<'fade' | 'slide' | 'zoom'>('fade');
@@ -1682,8 +1684,8 @@ export const Gallery: React.FC = () => {
             <div style={{ display: 'flex', gap: 4 }}>
               <button aria-label="Rotate clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 90) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-cw" size={10} /> 90</button>
               <button aria-label="Rotate counter-clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 270) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-ccw" size={10} /> 90</button>
-              <button aria-label="Flip vertical" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
-              <button aria-label="Flip horizontal" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
+              <button aria-label="Flip vertical" aria-pressed={flipV} onClick={() => setFlipV(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
+              <button aria-label="Flip horizontal" aria-pressed={flipH} onClick={() => setFlipH(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
             </div>
             <button aria-label="Save edited image as copy" onClick={async () => {
               if (!selectedMedia?.src) return;
@@ -1694,13 +1696,16 @@ export const Gallery: React.FC = () => {
                 img.src = selectedMedia.src;
                 await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
                 const rot = imgRotation % 360;
-                const swap = rot === 90 || rot === 270;
-                canvas.width = swap ? img.height : img.width;
-                canvas.height = swap ? img.width : img.height;
+                // 90° turns, straighten (cropped to the largest upright area),
+                // flips, then a centred crop to the chosen ratio.
+                const out = editedCanvasSize(img.width, img.height, rot, straightenAngle, cropRatio);
+                canvas.width = out.w;
+                canvas.height = out.h;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
                 ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate((rot * Math.PI) / 180);
+                ctx.rotate(((rot + straightenAngle) * Math.PI) / 180);
+                ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
                 ctx.filter = getAdjustmentFilter();
                 ctx.drawImage(img, -img.width / 2, -img.height / 2);
                 canvas.toBlob(blob => {
@@ -2049,7 +2054,7 @@ export const Gallery: React.FC = () => {
                       draggable={false}
                       style={{
                         width: '100%', height: '100%', objectFit: 'contain',
-                        transform: `scale(${imgZoom}) translate(${imgPan.x / imgZoom}px, ${imgPan.y / imgZoom}px) rotate(${imgRotation}deg)`,
+                        transform: `scale(${imgZoom}) translate(${imgPan.x / imgZoom}px, ${imgPan.y / imgZoom}px) rotate(${imgRotation + straightenAngle}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
                         transition: imgDragging ? 'none' : 'transform 0.2s ease',
                         willChange: 'transform',
                         filter: getAdjustmentFilter(),

@@ -93,4 +93,11 @@ export interface LLMProvider {
   parseChatResponse(json: unknown): ChatResponse;
   /** Extract the incremental text from one streaming SSE data chunk (or ''). */
   parseStreamChunk(data: string): string;
+  /**
+   * Optional: the request that lists the models this account can use, and its
+   * parser. Lets the catalog follow the provider instead of going stale
+   * (see liveModels.ts). Pure; the caller does the fetch.
+   */
+  buildModelsRequest?(config: ProviderConfig): HttpRequest;
+  parseModels?(json: unknown): ModelInfo[];
 }

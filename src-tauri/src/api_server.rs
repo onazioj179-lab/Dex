@@ -37,12 +37,12 @@
 //     `store.get(key, default)` (which returns the default without writing).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const CONFIG_FILE: &str = "dex-api-config.json";
 // electron-store: `new Store({ name: 'dex-webhooks' })` -> flat JSON whose
@@ -58,8 +58,7 @@ const WEBHOOK_MAX_RESP_BYTES: u64 = 64 * 1024;
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)

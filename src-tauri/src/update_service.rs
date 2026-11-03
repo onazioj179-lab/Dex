@@ -41,11 +41,11 @@
 //     as app:getVersion / corepc:getVersion in this Tauri build).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const CONFIG_FILE: &str = "update-service.json";
 
@@ -67,7 +67,7 @@ const MIN_POLL_HOURS: i64 = 1;
 const MAX_POLL_HOURS: i64 = 168;
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

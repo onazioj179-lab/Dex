@@ -65,6 +65,7 @@
 //     and applies the `limit` tail.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -95,8 +96,7 @@ fn now_ms() -> i64 {
 
 fn softero_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("softero");
     let _ = std::fs::create_dir_all(&dir);

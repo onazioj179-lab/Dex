@@ -73,10 +73,10 @@
 //   UITreeSnapshot     = { timestamp, windowId, rootNode, focusedNodeId, nodeCount }
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const CACHE_FILE: &str = "accessibility-tree-cache.json";
 const MAX_RECENT_EVENTS: usize = 200;
@@ -92,7 +92,7 @@ fn now_ms() -> i64 {
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(CACHE_FILE)
 }

@@ -56,13 +56,13 @@
 //     the renderer-facing getMetrics handler was.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use tauri::Manager;
 
 const METRICS_FILE: &str = "metrics.json";
 const TIMELINE_FILE: &str = "observability-timeline.json";
@@ -73,7 +73,7 @@ const REPORT_FILE: &str = "observability-report.json";
 const MAX_TIMELINE_EVENTS: usize = 500;
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

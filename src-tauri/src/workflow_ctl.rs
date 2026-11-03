@@ -37,7 +37,7 @@
 //
 // DIVERGENCES (documented):
 //   - Storage location: Electron used app.getPath('userData'); Tauri uses
-//     app.path().app_data_dir(). Same file name and same { workflows: [...] }
+//     app.dex_data_dir(). Same file name and same { workflows: [...] }
 //     wrapper, so the on-disk contract is preserved across the migration.
 //   - Electron held the workflows in an in-memory Map (populated once at engine
 //     construction) and the read handlers served from that Map. This module reads
@@ -46,12 +46,12 @@
 //     same file); it also means out-of-band writes are picked up immediately.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::Manager;
 
 const WORKFLOWS_FILE: &str = "dex-workflows.json";
 const HISTORY_FILE: &str = "dex-workflow-history.json";
@@ -60,7 +60,7 @@ const MAX_HISTORY_SIZE: usize = 20;
 // --- file IO (mirrors analytics.rs store_path/read_file helpers) -------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

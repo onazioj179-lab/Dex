@@ -55,10 +55,10 @@
 //     extension set all match the Electron source exactly.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const STATE_FILE: &str = "code-editor-state.json";
 const MAX_DEPTH: u32 = 5;
@@ -68,7 +68,7 @@ const MAX_RECENT: usize = 20;
 // --- state file IO ----------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }
@@ -438,13 +438,14 @@ fn save_file(app: &tauri::AppHandle, file: &Value) -> Value {
 }
 
 // code:deleteFile(fileId) -> bool
-// Decode id, bail false if the file is gone, else unlink and drop it from recent.
+// Decode id, bail false if the file is gone, else move it to the recycle bin
+// (recoverable, like files:trash) and drop it from recent.
 fn delete_file(app: &tauri::AppHandle, file_id: &str) -> Value {
     let file_path = b64_decode_to_utf8(file_id);
     if !Path::new(&file_path).exists() {
         return json!(false);
     }
-    match std::fs::remove_file(&file_path) {
+    match trash::delete(&file_path) {
         Ok(()) => {
             remove_from_recent(app, &file_path);
             json!(true)

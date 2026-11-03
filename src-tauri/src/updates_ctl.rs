@@ -49,6 +49,7 @@
 //     exactly as ReleaseManager.loadConfig() does (persisted values are stale).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -76,7 +77,7 @@ const RELEASES_URL: &str = "https://github.com/onazioj179-lab/Dex/releases";
 // --- file IO ----------------------------------------------------------------
 
 fn data_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

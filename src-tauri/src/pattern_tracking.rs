@@ -32,9 +32,9 @@
 //     Same behavior as analytics.rs.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const DATA_FILE: &str = "pattern-data.json";
 const DAY_MS: i64 = 86_400_000;
@@ -60,7 +60,7 @@ fn utc_dow(ms: i64) -> i64 {
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(DATA_FILE)
 }

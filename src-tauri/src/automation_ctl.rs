@@ -87,6 +87,7 @@
 //     1-hour window, matching ruleRunCounts.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
@@ -109,8 +110,7 @@ fn now_ms() -> u64 {
 
 fn rules_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(RULES_SUBDIR);
     let _ = std::fs::create_dir_all(&dir);
@@ -296,8 +296,7 @@ fn get_enabled_rules(app: &tauri::AppHandle) -> Value {
 
 fn exec_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(RULES_SUBDIR);
     let _ = std::fs::create_dir_all(&dir);

@@ -137,8 +137,6 @@ interface VinxState {
   // PiP Presets
   showPipPresets: boolean;
   // Reference Frame comparison
-  showReferenceFrame: boolean;
-  referenceFrameNum: number;
   // Auto-Reframe
   showAutoReframe: boolean;
   autoReframeAspect: ReframeAspect;
@@ -363,8 +361,6 @@ interface VinxState {
   togglePipPresets: () => void;
   applyPipPreset: (clipId: string, posX: number, posY: number, scaleX: number, scaleY: number) => void;
   // Reference Frame
-  toggleReferenceFrame: () => void;
-  setReferenceFrame: (frame: number) => void;
   // Auto-Reframe
   toggleAutoReframe: () => void;
   setAutoReframeAspect: (aspect: ReframeAspect) => void;
@@ -656,8 +652,6 @@ export const useVinxStore = create<VinxState>((set, get) => {
     // === NEW PRO FEATURES - defaults ===
     showClipRolesPanel: false,
     showPipPresets: false,
-    showReferenceFrame: false,
-    referenceFrameNum: 0,
     showAutoReframe: false,
     autoReframeAspect: '16:9' as const,
     showKenBurns: false,
@@ -1443,8 +1437,6 @@ export const useVinxStore = create<VinxState>((set, get) => {
     }),
 
     // Reference Frame
-    toggleReferenceFrame: () => set(s => ({ showReferenceFrame: !s.showReferenceFrame })),
-    setReferenceFrame: (frame) => set({ referenceFrameNum: Math.max(0, frame) }),
 
     // Auto-Reframe
     toggleAutoReframe: () => set(s => ({ showAutoReframe: !s.showAutoReframe })),

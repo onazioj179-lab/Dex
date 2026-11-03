@@ -41,13 +41,13 @@
 //     IPv4, 127.0.0.1 fallback).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 use std::path::PathBuf;
 use std::time::Duration;
-use tauri::Manager;
 
 const STORE_FILE: &str = "devices.json";
 const DISCOVERY_PORT: i64 = 41234;
@@ -62,7 +62,7 @@ fn now_ms() -> i64 {
 // --- file IO (mirrors analytics.rs store_path/read_file/write_file) ----------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(STORE_FILE)
 }

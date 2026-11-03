@@ -23,6 +23,8 @@ export interface AuthState {
   hasPassword: boolean;
   hasPin: boolean;
   hasBiometric: boolean;
+  hasSecurityQuestions: boolean;
+  hasRecoveryCodes: boolean;
   biometricsAvailable: boolean;
   lockoutStatus: {
     isLockedOut: boolean;
@@ -76,6 +78,11 @@ interface AuthStore extends AuthState {
   // Recovery
   generateRecoveryCodes: () => Promise<{ success: boolean; codes?: string[] }>;
   authenticateWithRecovery: (code: string) => Promise<boolean>;
+
+  // Security-question account recovery (never-locked-out path)
+  setSecurityQuestions: (qa: { question: string; answer: string }[]) => Promise<{ success: boolean; error?: string }>;
+  getSecurityQuestions: () => Promise<{ index: number; question: string }[]>;
+  recoverAccount: (answers: string[], newPassword?: string) => Promise<{ success: boolean; error?: string }>;
   
   // Idle warning
   idleWarning: { active: boolean; seconds: number } | null;
@@ -105,6 +112,8 @@ export const useAuthStore = create<AuthStore>()(devtools(
   hasPassword: false,
   hasPin: false,
   hasBiometric: false,
+  hasSecurityQuestions: false,
+  hasRecoveryCodes: false,
   biometricsAvailable: false,
   lockoutStatus: {
     isLockedOut: false,
@@ -136,6 +145,8 @@ export const useAuthStore = create<AuthStore>()(devtools(
           hasPassword: state.hasPassword,
           hasPin: state.hasPin,
           hasBiometric: state.hasBiometric,
+          hasSecurityQuestions: !!state.hasSecurityQuestions,
+          hasRecoveryCodes: !!state.hasRecoveryCodes,
           lockoutStatus: state.lockoutStatus,
           biometricsAvailable,
           config: config || null,
@@ -181,6 +192,8 @@ export const useAuthStore = create<AuthStore>()(devtools(
           hasPassword: state.hasPassword,
           hasPin: state.hasPin,
           hasBiometric: state.hasBiometric,
+          hasSecurityQuestions: !!state.hasSecurityQuestions,
+          hasRecoveryCodes: !!state.hasRecoveryCodes,
           lockoutStatus: state.lockoutStatus,
           config: config || null,
         });
@@ -399,6 +412,50 @@ export const useAuthStore = create<AuthStore>()(devtools(
     } catch {
       set({ error: 'Recovery authentication failed', isLoading: false });
       return false;
+    }
+  },
+
+  // Security-question account recovery -- the guaranteed way back in.
+  setSecurityQuestions: async (qa) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.dex?.auth?.setSecurityQuestions(qa);
+      set({ isLoading: false });
+      if (result?.success) {
+        await get().refreshState();
+        return { success: true };
+      }
+      return { success: false, error: result?.error || 'Failed to save security questions' };
+    } catch {
+      set({ isLoading: false });
+      return { success: false, error: 'Failed to save security questions' };
+    }
+  },
+
+  getSecurityQuestions: async () => {
+    try {
+      const result = await window.dex?.auth?.getSecurityQuestions();
+      return result?.questions ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  recoverAccount: async (answers: string[], newPassword?: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.dex?.auth?.recoverAccount({ answers, newPassword });
+      set({ isLoading: false });
+      if (result?.success) {
+        set({ isLocked: false, sessionToken: result.token, error: null });
+        await get().refreshState();
+        return { success: true };
+      }
+      set({ error: result?.error || 'Recovery failed' });
+      return { success: false, error: result?.error || 'Recovery failed' };
+    } catch {
+      set({ isLoading: false, error: 'Recovery failed' });
+      return { success: false, error: 'Recovery failed' };
     }
   },
 

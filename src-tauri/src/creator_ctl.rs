@@ -50,9 +50,9 @@
 //     state as the 'free' tier, see src/shared/plan.ts).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 // Same on-disk file name Electron used (app.getPath('userData') + file). On the
 // Tauri tier the equivalent root is app_data_dir().
@@ -60,8 +60,7 @@ const TOKEN_FILE: &str = "creator-access.json";
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(TOKEN_FILE)

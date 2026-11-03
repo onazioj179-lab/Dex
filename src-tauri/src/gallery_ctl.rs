@@ -60,9 +60,9 @@
 //     the Tauri port and only the default date sort is reachable by default.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 const STATE_FILE: &str = "gallery-state.json";
 
@@ -83,7 +83,7 @@ fn ext_in(set: &[&str], ext: &str) -> bool {
 // --- file IO (mirrors analytics.rs store_path/read_file) --------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

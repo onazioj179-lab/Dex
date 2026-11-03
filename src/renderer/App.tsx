@@ -273,8 +273,18 @@ export const App: React.FC = () => {
   const wallpaperBg = useMemo((): React.CSSProperties => {
     if (wpMode === 'image') return { backgroundImage: `url("${wpValue}")`, backgroundSize: 'cover', backgroundPosition: 'center' };
     if (wpMode === 'gradient') return { backgroundImage: wpValue };
-    if (wpMode === 'live') return { background: 'var(--color-bg-base)' };
+    // Live wallpapers are driven entirely by the `.dex-live-wp--*` CSS classes
+    // (animated gradients); the base color is just a fallback under the animation.
+    if (wpMode === 'live') return { backgroundColor: 'var(--color-bg-base)' };
     return { backgroundColor: wpValue };
+  }, [wpMode, wpValue]);
+  // Live wallpaper class: applies the animated background keyframes in
+  // design-system.css. Only set for known live values so a stale value can't
+  // leave a dead class attached.
+  const liveWallpaperClass = useMemo(() => {
+    if (wpMode !== 'live') return '';
+    const known = new Set(['live-ember-pulse', 'live-aurora-shift', 'live-midnight-waves']);
+    return known.has(wpValue) ? `dex-live-wp dex-live-wp--${wpValue}` : '';
   }, [wpMode, wpValue]);
 
   // Initialize authentication system
@@ -680,7 +690,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
-      <div aria-hidden="true" style={{
+      <div aria-hidden="true" className={liveWallpaperClass} style={{
         position: 'fixed', inset: 0, zIndex: -2,
         ...wallpaperBg,
         filter: wpBlur > 0 ? `blur(${wpBlur}px)` : undefined,

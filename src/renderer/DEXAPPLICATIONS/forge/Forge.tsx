@@ -17,12 +17,10 @@ import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { dispatchActivity, updateActivity, completeActivity } from '../../utils/liveActivity';
 import {
-  detectGPUCapabilities,
   formatFileSize,
   formatDuration as forgeFormatDuration,
   estimateOutputFileSize,
 } from './ForgeFeatures';
-import type { HardwareInfo } from './ForgeFeatures';
 import {
   detectSourceKind,
   planTarget,
@@ -33,7 +31,6 @@ import {
   encodeWav,
   type AudioPeaks,
 } from './transcode';
-import { useCreativeAppSettings } from '../../utils/creative-suite';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
 
@@ -273,7 +270,6 @@ const Forge: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
-  useCreativeAppSettings('forge');
   const collab = useCollaborationFeatures({ appId: 'forge', projectName: 'FORGE Queue', autoCheckpointInterval: 300000 });
 
   // Mount guard — prevents setState after unmount in long async operations
@@ -368,9 +364,6 @@ const Forge: React.FC = () => {
   
   // Settings
   const [parallelJobs, setParallelJobs] = useState(() => Math.max(1, Math.min(8, Math.floor((navigator.hardwareConcurrency || 4) / 2))));
-  const [useHardwareAccel, setUseHardwareAccel] = useState(true);
-  const [gpuInfo, setGpuInfo] = useState<HardwareInfo | null>(null);
-  const [shutdownAfter, setShutdownAfter] = useState(false);
   const [notifyOnComplete, setNotifyOnComplete] = useState(true);
   
   // Active panel
@@ -560,8 +553,6 @@ const Forge: React.FC = () => {
         const data = JSON.parse(saved);
         if (data.selectedPreset) setSelectedPreset(data.selectedPreset);
         if (data.parallelJobs) setParallelJobs(data.parallelJobs);
-        if (data.useHardwareAccel !== undefined) setUseHardwareAccel(data.useHardwareAccel);
-        if (data.shutdownAfter !== undefined) setShutdownAfter(data.shutdownAfter);
         if (data.notifyOnComplete !== undefined) setNotifyOnComplete(data.notifyOnComplete);
         if (data.activeTab && ['presets', 'watch', 'settings'].includes(data.activeTab)) setActiveTab(data.activeTab);
         if (data.presetCategory) setPresetCategory(data.presetCategory);
@@ -570,21 +561,15 @@ const Forge: React.FC = () => {
     }
   }, []);
 
-  // ===== GPU DETECTION =====
-  useEffect(() => {
-    const info = detectGPUCapabilities();
-    setGpuInfo(info);
-  }, []);
-
   useEffect(() => {
     try {
       const data = {
-        selectedPreset, parallelJobs, useHardwareAccel,
-        shutdownAfter, notifyOnComplete, activeTab, presetCategory, watchFolders,
+        selectedPreset, parallelJobs,
+        notifyOnComplete, activeTab, presetCategory, watchFolders,
       };
       localStorage.setItem('forge-workspace', JSON.stringify(data));
     } catch (e) { console.warn('[Forge] Failed to save workspace:', e); }
-  }, [selectedPreset, parallelJobs, useHardwareAccel, shutdownAfter, notifyOnComplete, activeTab, presetCategory, watchFolders]);
+  }, [selectedPreset, parallelJobs, notifyOnComplete, activeTab, presetCategory, watchFolders]);
 
   // ===== STORAGE ESTIMATE =====
   useEffect(() => {
@@ -866,10 +851,6 @@ const Forge: React.FC = () => {
       && activeEncodings.current.size === 0;
     if (allDone) {
       setIsEncoding(false);
-      if (shutdownAfter) {
-        toast.info('Queue complete — shutdown requested');
-        try { window.dex?.invoke?.('app:shutdown'); } catch { /* not in Electron */ }
-      }
       // Request notification permission for future encodes if not yet granted
       if (notifyOnComplete && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -1664,12 +1645,6 @@ const Forge: React.FC = () => {
                 <div style={styles.sectionTitle}>Encoding</div>
                 <CreativeSlider label="Parallel Jobs" min={1} max={8} step={1} value={parallelJobs} onChange={setParallelJobs} displayValue={parallelJobs} accentColor="var(--color-accent)" />
                 
-                <div style={styles.checkbox} onClick={() => setUseHardwareAccel(!useHardwareAccel)}>
-                  <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent-fill)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {useHardwareAccel && Icons.check}
-                  </div>
-                  <span>Use Hardware Acceleration</span>
-                </div>
                 
                 <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Completion</div>
                 <div style={styles.checkbox} onClick={() => setNotifyOnComplete(!notifyOnComplete)}>
@@ -1677,12 +1652,6 @@ const Forge: React.FC = () => {
                     {notifyOnComplete && Icons.check}
                   </div>
                   <span>Notify on Completion</span>
-                </div>
-                <div style={styles.checkbox} onClick={() => setShutdownAfter(!shutdownAfter)}>
-                  <div style={{ width: '14px', height: '14px', background: shutdownAfter ? 'var(--color-accent-fill)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {shutdownAfter && Icons.check}
-                  </div>
-                  <span>Shutdown After Queue Complete</span>
                 </div>
 
                 <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Audio</div>
@@ -2631,8 +2600,6 @@ const Forge: React.FC = () => {
 
       {/* Status Bar */}
       <div style={styles.statusBar}>
-        <span>{Icons.cpu} {useHardwareAccel ? (gpuInfo ? `${gpuInfo.gpuName} (${gpuInfo.recommendedEncoder})` : 'GPU Accelerated') : 'CPU Only'}</span>
-        <span>|</span>
         <span>{Icons.layers} {parallelJobs} parallel jobs</span>
         <span>|</span>
         <span>{Icons.hardDrive} {storageInfo}</span>

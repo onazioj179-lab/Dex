@@ -75,9 +75,9 @@
 //     no id, so it remains unused (entries are keyed by timestamp like upstream).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const MANIFEST_FILE: &str = "dev-manifest.json";
 const CONSOLE_FILE: &str = "dev-console.json";
@@ -107,7 +107,7 @@ const VALID_PERMISSIONS: &[&str] = &[
 // --- file IO (mirrors analytics.rs store_path/read_file) --------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

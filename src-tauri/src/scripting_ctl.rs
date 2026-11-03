@@ -61,12 +61,12 @@
 //     mutates those fields, matching Electron (only execute touches them).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
-use tauri::Manager;
 
 const SCRIPTS_FILE: &str = "dex-scripts.json";
 const SCRIPTS_KEY: &str = "scripts";
@@ -88,7 +88,7 @@ fn generate_id() -> String {
 // --- file IO (electron-store JSON under appData) ----------------------------
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(name)
 }

@@ -42,13 +42,13 @@
 //     (rustls/native-tls) we may not add; returns a shaped "not ported".
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::io::Read;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
-use tauri::Manager;
 
 const CONFIG_FILE: &str = "config.json";
 const POLICIES_FILE: &str = "policies.json";
@@ -103,8 +103,7 @@ fn start_ms() -> u64 {
 
 fn network_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("network");
     let _ = std::fs::create_dir_all(&dir);
@@ -112,7 +111,7 @@ fn network_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 fn app_data_dir(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir
 }

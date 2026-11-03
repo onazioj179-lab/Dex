@@ -71,6 +71,9 @@ export const LockScreen: React.FC = () => {
     authenticateWithPin,
     authenticateWithBiometric,
     authenticateWithRecovery,
+    hasSecurityQuestions,
+    getSecurityQuestions,
+    recoverAccount,
     setError,
     config,
   } = useAuthStore();
@@ -85,6 +88,11 @@ export const LockScreen: React.FC = () => {
   const [unlocking, setUnlocking] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
+  // Security-question recovery (the guaranteed way back in).
+  const [showSecurityRecovery, setShowSecurityRecovery] = useState(false);
+  const [securityQuestions, setSecurityQuestions] = useState<{ index: number; question: string }[]>([]);
+  const [securityAnswers, setSecurityAnswers] = useState<string[]>([]);
+  const [securityNewPassword, setSecurityNewPassword] = useState('');
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -148,6 +156,10 @@ export const LockScreen: React.FC = () => {
     setError(null);
     setShowRecovery(false);
     setRecoveryCode('');
+    setShowSecurityRecovery(false);
+    setSecurityQuestions([]);
+    setSecurityAnswers([]);
+    setSecurityNewPassword('');
   }, [isLocked, setError]);
 
   // Idle-warning listener REMOVED (owner direction): DEX never warns about or
@@ -166,6 +178,42 @@ export const LockScreen: React.FC = () => {
       setRecoveryCode('');
     }
   }, [recoveryCode, authenticateWithRecovery]);
+
+  // Open the security-question recovery form (fetch the questions first).
+  const openSecurityRecovery = useCallback(async () => {
+    const qs = await getSecurityQuestions();
+    if (!qs.length) {
+      showLocalError('No security questions are set up.');
+      return;
+    }
+    setSecurityQuestions(qs);
+    setSecurityAnswers(new Array(qs.length).fill(''));
+    setSecurityNewPassword('');
+    setShowRecovery(false);
+    setShowSecurityRecovery(true);
+  }, [getSecurityQuestions]);
+
+  const handleSecurityRecoverySubmit = useCallback(async () => {
+    if (securityAnswers.some(a => !a.trim())) {
+      showLocalError('Please answer all questions.');
+      return;
+    }
+    const newPw = securityNewPassword.trim();
+    if (newPw && newPw.length < 8) {
+      showLocalError('New password must be at least 8 characters.');
+      return;
+    }
+    const res = await recoverAccount(securityAnswers.map(a => a.trim()), newPw || undefined);
+    if (res.success) {
+      setShowSecurityRecovery(false);
+      setUnlocking(true);
+    } else {
+      triggerShake();
+      showLocalError(res.error || 'One or more answers are incorrect.');
+    }
+    // triggerShake / showLocalError are stable and defined below; intentionally
+    // omitted from deps to avoid a temporal-dead-zone read at render.
+  }, [securityAnswers, securityNewPassword, recoverAccount]);
 
   // Display error from store or local
   const displayError = localError || storeError || '';
@@ -496,14 +544,90 @@ export const LockScreen: React.FC = () => {
             </div>
           )}
 
-          {/* Recovery code link */}
-          {(method.includes('pin') || method.includes('password')) && !showRecovery && (
-            <button
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: fontSize.sm, cursor: 'pointer', marginTop: space[3], padding: `${space[1]}px ${space[2]}px` }}
-              onClick={() => setShowRecovery(true)}
-            >
-              Forgot PIN / Password?
-            </button>
+          {/* Recovery entry points */}
+          {(method.includes('pin') || method.includes('password')) && !showRecovery && !showSecurityRecovery && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: space[1], marginTop: space[3] }}>
+              <button
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: fontSize.sm, cursor: 'pointer', padding: `${space[1]}px ${space[2]}px` }}
+                onClick={() => setShowRecovery(true)}
+              >
+                Use a recovery code
+              </button>
+              {hasSecurityQuestions && (
+                <button
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: fontSize.sm, cursor: 'pointer', padding: `${space[1]}px ${space[2]}px` }}
+                  onClick={openSecurityRecovery}
+                >
+                  Forgot? Recover with security questions
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Security-question recovery form -- the guaranteed way back in. */}
+          {showSecurityRecovery && (
+            <div style={{ marginTop: space[4], width: '100%', maxWidth: 'min(300px, calc(100vw - 48px))' }}>
+              <div style={{ fontSize: fontSize.sm, color: 'var(--color-text-secondary)', marginBottom: space[2], textAlign: 'center' }}>
+                Answer your security questions
+              </div>
+              {securityQuestions.map((q, i) => (
+                <div key={q.index} style={{ marginBottom: space[2] }}>
+                  <div style={{ fontSize: fontSize.sm, color: 'var(--color-text-tertiary)', marginBottom: '4px' }}>{q.question}</div>
+                  <input
+                    type="text"
+                    value={securityAnswers[i] ?? ''}
+                    onChange={e => setSecurityAnswers(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
+                    autoComplete="off"
+                    style={{
+                      width: '100%', padding: space[2], background: 'var(--color-border-subtle)',
+                      border: '1px solid var(--color-border)', borderRadius: radius.lg,
+                      color: 'var(--color-text-primary, #fff)', fontSize: fontSize.md,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              ))}
+              <div style={{ fontSize: fontSize.sm, color: 'var(--color-text-tertiary)', margin: `${space[2]}px 0 4px` }}>
+                New password (optional)
+              </div>
+              <input
+                type="password"
+                value={securityNewPassword}
+                onChange={e => setSecurityNewPassword(e.target.value)}
+                placeholder="Leave blank to just unlock"
+                autoComplete="new-password"
+                style={{
+                  width: '100%', padding: space[2], background: 'var(--color-border-subtle)',
+                  border: '1px solid var(--color-border)', borderRadius: radius.lg,
+                  color: 'var(--color-text-primary, #fff)', fontSize: fontSize.md,
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+                onKeyDown={e => e.key === 'Enter' && handleSecurityRecoverySubmit()}
+              />
+              <div style={{ display: 'flex', gap: space[2], marginTop: '10px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleSecurityRecoverySubmit}
+                  disabled={isLoading}
+                  style={{
+                    padding: `${space[2]}px ${space[5]}px`, borderRadius: radius.lg, border: 'none',
+                    background: 'rgba(74,158,255,0.3)', color: 'var(--color-accent-text, #fff)', fontSize: '13px',
+                    cursor: 'pointer', opacity: isLoading ? 0.5 : 1,
+                  }}
+                >
+                  Recover
+                </button>
+                <button
+                  onClick={() => setShowSecurityRecovery(false)}
+                  style={{
+                    padding: `${space[2]}px ${space[5]}px`, borderRadius: radius.lg, border: 'none',
+                    background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+                    fontSize: '13px', cursor: 'pointer',
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Recovery code input */}

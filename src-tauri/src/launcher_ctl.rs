@@ -46,9 +46,9 @@
 //     reproducible without a collation crate (no new deps allowed).
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 const SUBDIR: &str = "launcher";
 const APPS_FILE: &str = "apps.json";
@@ -73,8 +73,7 @@ fn now_ms() -> i64 {
 
 fn launcher_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(SUBDIR);
     let _ = std::fs::create_dir_all(&dir);

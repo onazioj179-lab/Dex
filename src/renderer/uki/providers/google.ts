@@ -12,12 +12,13 @@
  */
 
 import { parseDataUrl, type LLMProvider, type ChatRequest, type ChatResponse, type ModelInfo, type ProviderConfig, type HttpRequest } from './types';
+import { liveModels } from './liveModels';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 const MODELS: ModelInfo[] = [
-  { id: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro',   contextWindow: 2000000, capabilities: { tools: true, vision: true, streaming: true } },
-  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', contextWindow: 1000000, capabilities: { tools: true, vision: true, streaming: true } },
+  { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   contextWindow: 1048576, capabilities: { tools: true, vision: true, streaming: true } },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', contextWindow: 1048576, capabilities: { tools: true, vision: true, streaming: true } },
 ];
 
 export const googleProvider: LLMProvider = {
@@ -25,7 +26,7 @@ export const googleProvider: LLMProvider = {
   label: 'Google Gemini',
   requiresKey: true,
 
-  listModels: () => MODELS,
+  listModels: () => liveModels('google') ?? MODELS,
 
   buildChatRequest(req: ChatRequest, config: ProviderConfig): HttpRequest {
     const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
@@ -53,7 +54,8 @@ export const googleProvider: LLMProvider = {
         contents,
         generationConfig: {
           ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-          ...(req.maxTokens !== undefined ? { maxOutputTokens: req.maxTokens } : {}),
+          // Gemini 2.5+ thinks inside the output budget; keep room for the answer.
+          ...(req.maxTokens !== undefined ? { maxOutputTokens: /^gemini-(2\.5|[3-9])/.test(req.model) ? Math.max(req.maxTokens, 2048) : req.maxTokens } : {}),
         },
       }),
     };
@@ -74,6 +76,26 @@ export const googleProvider: LLMProvider = {
         ? { promptTokens: j.usageMetadata.promptTokenCount, completionTokens: j.usageMetadata.candidatesTokenCount }
         : undefined,
     };
+  },
+
+  buildModelsRequest(config: ProviderConfig): HttpRequest {
+    const base = (config.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
+    return { url: `${base}/models?pageSize=200&key=${config.apiKey ?? ''}`, method: 'GET', headers: {} };
+  },
+
+  parseModels(json: unknown): ModelInfo[] {
+    const models = (json as { models?: Array<{ name?: unknown; displayName?: unknown; inputTokenLimit?: unknown; supportedGenerationMethods?: unknown }> })?.models;
+    if (!Array.isArray(models)) return [];
+    return models
+      .filter((m) => typeof m.name === 'string' && (m.name as string).includes('gemini')
+        && Array.isArray(m.supportedGenerationMethods) && (m.supportedGenerationMethods as unknown[]).includes('generateContent')
+        && !/(embedding|tts|image|live|audio)/.test(m.name as string))
+      .map((m) => ({
+        id: (m.name as string).replace(/^models\//, ''),
+        label: typeof m.displayName === 'string' ? m.displayName : (m.name as string),
+        contextWindow: typeof m.inputTokenLimit === 'number' ? m.inputTokenLimit : 1048576,
+        capabilities: { tools: true, vision: true, streaming: true },
+      }));
   },
 
   parseStreamChunk(data: string): string {

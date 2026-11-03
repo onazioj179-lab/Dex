@@ -68,10 +68,10 @@
 //     list -> [] and get -> null, matching the electron-store `keys: {}` default.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const STORE_FILE: &str = "dex-keymanager.json";
 const KEYS_KEY: &str = "keys";
@@ -84,7 +84,7 @@ const KEY_CHECKSUM_LENGTH: usize = 8;
 // --- file IO (electron-store JSON under appData) ----------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(STORE_FILE)
 }

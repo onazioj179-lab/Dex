@@ -69,6 +69,7 @@
 //     tauriCompat bridge delivers to the renderer the same way.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -82,8 +83,7 @@ const JOBS_FILE: &str = "jobs.json";
 
 fn pipeline_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("pipeline");
     let _ = std::fs::create_dir_all(&dir);
@@ -458,8 +458,7 @@ fn format_as_note(job: &Value, result: &Value) -> String {
 // saveOutput — note | metadata | file, under <appData>/pipeline/outputs/.
 fn save_output(app: &tauri::AppHandle, job: &Value, result: &Value, opts: &Value) {
     let out_dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("pipeline")
         .join("outputs");

@@ -54,11 +54,11 @@
 //     reproduced verbatim here (same ids/order/fields) rather than stored.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Manager;
 
 const STORE_FILE: &str = "performance-contract.json";
 
@@ -82,7 +82,7 @@ fn now_ms() -> i64 {
 // --- file IO ----------------------------------------------------------------
 
 fn store_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let dir = app.dex_data_dir().unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join(STORE_FILE)
 }

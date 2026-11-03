@@ -13,6 +13,7 @@
 
 mod activity_feed;
 mod browser_view;
+mod paths;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -249,6 +250,7 @@ mod multi_monitor;
 mod multi_window;
 mod unified_notification_hub;
 
+use paths::DexPaths;
 use dex_smart_router::{route_for_prompt, RouteCandidate, RoutingGoal};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -1045,8 +1047,7 @@ fn clipboard_read() -> Value {
 // --- Batch 2: persistent key-value store (JSON in app config dir) ----------
 fn kv_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_config_dir()
+        .dex_config_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let _ = std::fs::create_dir_all(&dir);
     dir.join("dex-kv.json")
@@ -1551,7 +1552,7 @@ fn search_remove_doc(app: &tauri::AppHandle, id: &str) -> Value {
 /// `search:sync` took the "initial build" path: clear + re-index every file in
 /// Documents/Desktop/Downloads (measured ~80 CPU-seconds per launch).
 fn snapshot_path(app: &tauri::AppHandle) -> std::path::PathBuf {
-    app.path().app_data_dir().unwrap_or_default().join("search-index").join("dex-snapshot.json")
+    app.dex_data_dir().unwrap_or_default().join("search-index").join("dex-snapshot.json")
 }
 
 /// Load the persisted snapshot, but only when the index actually holds
@@ -2069,8 +2070,7 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         // The archiver also touches the filesystem: `.dex-archive` files live
         // under app_data_dir/archive (the Tauri analog of Electron userData).
         let archive_dir = app
-            .path()
-            .app_data_dir()
+            .dex_data_dir()
             .unwrap_or_default()
             .join("archive");
         return project_archiver::dispatch(conn, &archive_dir, channel, args);
@@ -2096,7 +2096,7 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("voice-memo:") {
         // Voice memos write/read `.opus` files under app_data_dir/voice-memos
         // (the Tauri analog of Electron userData) and probe for whisper.wasm.
-        let data_dir = app.path().app_data_dir().unwrap_or_default();
+        let data_dir = app.dex_data_dir().unwrap_or_default();
         return voice_memo::dispatch(conn, &data_dir, channel, args);
     }
     if channel.starts_with("dexnotes:") {
@@ -2830,10 +2830,12 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("rewind:") => rewind::dispatch(ch, &args),
         ch if ch.starts_with("ai-runtime:") => ai_runtime::dispatch(ch, &args),
 
-        // --- Auth enrolment (AuthController setPin/setPassword/enableBiometric)
-        // Salted-SHA-256 credential writes to the shared KV; biometric runs the
-        // real OS verifier. Read/verify side stays renderer-managed for now.
-        ch if ch.starts_with("auth:setup:") || ch == "auth:getState" || ch == "auth:getConfig" => {
+        // --- Auth: full credential engine (enrol + verify + change + clear +
+        // recovery + lockout + session tokens). Secrets are Argon2id-hashed in
+        // the shared KV; biometric runs the real OS verifier. Restored from
+        // #57, which was lost when main's history was rewritten.
+        // `auth:biometricsAvailable` is answered renderer-side. No idle locking.
+        ch if ch.starts_with("auth:") => {
             auth::dispatch(&app, ch, &args)
         }
 
@@ -2976,15 +2978,13 @@ fn main() {
             // Vault state lives for the app lifetime; the key is only set while
             // unlocked. File is stored in the app config dir.
             let vault_path = app
-                .path()
-                .app_config_dir()
+                .dex_config_dir()
                 .unwrap_or_default()
                 .join("vault.dex");
             app.manage(std::sync::Mutex::new(dex_vault::VaultManager::new(vault_path)));
             // Native search index (built on demand via search:rebuild).
             let index_dir = app
-                .path()
-                .app_data_dir()
+                .dex_data_dir()
                 .unwrap_or_default()
                 .join("search-index");
             app.manage(std::sync::Mutex::new(
@@ -2997,8 +2997,7 @@ fn main() {
             // Notification center — persists under the app data dir, mirroring
             // Electron's userData/notifications.
             let notif_dir = app
-                .path()
-                .app_data_dir()
+                .dex_data_dir()
                 .unwrap_or_default()
                 .join("notifications");
             app.manage(std::sync::Mutex::new(
@@ -3007,8 +3006,7 @@ fn main() {
             // Shared SQLite database (dex.db) for the ~50 db-backed subsystems.
             // Each ported subsystem ensures its own tables here.
             let db_path = app
-                .path()
-                .app_data_dir()
+                .dex_data_dir()
                 .unwrap_or_default()
                 .join("databases")
                 .join("dex.db");

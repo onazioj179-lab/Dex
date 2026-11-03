@@ -2044,43 +2044,6 @@ const AXL: React.FC = () => {
                   <input type="number" value={simForce} onChange={e => setSimForce(Number(e.target.value))}
                     style={{ marginLeft: 'var(--space-2)', width: 70, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', fontSize: 10, padding: '2px 6px', outline: 'none' }} />
                 </label>
-                {simType !== 'thermal' && simType !== 'modal' && (
-                  <div>
-                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>LOAD DIRECTION</div>
-                    <div style={{ display: 'flex', gap: 3 }}>
-                      {(['X', 'Y', 'Z'] as const).map(axis => {
-                        const colors = { X: 'var(--color-error)', Y: 'var(--color-success)', Z: 'var(--color-accent)' };
-                        return (
-                          <button key={axis} aria-label={`Apply load along ${axis} axis`} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 700, borderRadius: 9999, cursor: 'pointer', border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: colors[axis] }}>
-                            {axis} <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>MESH QUALITY</div>
-                  <div style={{ display: 'flex', gap: 3 }}>
-                    {(['Coarse', 'Medium', 'Fine'] as const).map(q => (
-                      <button key={q} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 9999, cursor: 'pointer', border: q === 'Medium' ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)', background: q === 'Medium' ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: q === 'Medium' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {simType === 'stress' && (
-                  <div>
-                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>BOUNDARY</div>
-                    <div style={{ display: 'flex', gap: 3 }}>
-                      {(['Fixed', 'Pinned', 'Roller'] as const).map(bc => (
-                        <button key={bc} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 9999, cursor: 'pointer', border: bc === 'Fixed' ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)', background: bc === 'Fixed' ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: bc === 'Fixed' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
-                          {bc}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 <button onClick={runSimulation} disabled={simRunning}
                   style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: simRunning ? 'wait' : 'pointer', boxShadow: 'none' }}>
                   {simRunning ? `${simPhrase}...` : 'Run Simulation'}

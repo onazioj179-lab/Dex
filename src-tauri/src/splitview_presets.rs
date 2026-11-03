@@ -47,10 +47,10 @@
 // route stays total.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use tauri::Manager;
 
 const LAYOUTS_FILE: &str = "layouts.json";
 const CONFIG_FILE: &str = "config.json";
@@ -67,8 +67,7 @@ fn now_ms() -> i64 {
 
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("splitview");
     let _ = std::fs::create_dir_all(&dir);

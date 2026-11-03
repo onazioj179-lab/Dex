@@ -19,9 +19,9 @@
 // up startup), databases, backups, the search index, vault, keys.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 const MARKER: &str = "clear-web-cache.pending";
 
@@ -67,7 +67,7 @@ fn web_cache_bytes() -> u64 {
 }
 
 pub fn usage(app: &tauri::AppHandle) -> Value {
-    let data = app.path().app_data_dir().unwrap_or_default();
+    let data = app.dex_data_dir().unwrap_or_default();
     let mut cats: Vec<Value> = Vec::new();
     let mut keep = 0u64;
     let mut disposable = 0u64;

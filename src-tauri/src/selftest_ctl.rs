@@ -53,6 +53,7 @@
 //     via crate::native_ops::emit_event, and trims to the last 100 reports.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -72,8 +73,7 @@ const CRITICAL_FILES: [&str; 2] = ["dex-permissions.json", "dex-encryption.json"
 
 fn security_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(SECURITY_DIR);
     let _ = std::fs::create_dir_all(&dir);
@@ -97,8 +97,7 @@ fn write_file(app: &tauri::AppHandle, name: &str, data: &Value) -> bool {
 // Resolve a file that Electron kept directly under userData (its analog is
 // <appData>/<name>): dex-permissions.json, dex-encryption.json, vaults/, etc.
 fn app_data_file(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    app.path()
-        .app_data_dir()
+    app.dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(name)
 }
@@ -358,7 +357,7 @@ extern "C" {
 
 fn test_filesystem_access(app: &tauri::AppHandle) -> Value {
     let mut allowed: Vec<String> = Vec::new();
-    if let Ok(p) = app.path().app_data_dir() {
+    if let Ok(p) = app.dex_data_dir() {
         allowed.push(p.to_string_lossy().to_string());
     }
     if let Ok(p) = app.path().temp_dir() {
@@ -512,8 +511,7 @@ fn test_no_eval() -> Value {
 fn test_network_policy(app: &tauri::AppHandle) -> Value {
     // Electron probed <userData>/network/policies.json; same relative path here.
     let policy = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("network")
         .join("policies.json");

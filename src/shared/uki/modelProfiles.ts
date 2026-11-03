@@ -33,6 +33,16 @@ export interface ModelProfile {
 
 /** Catalog keyed by the model ids the providers advertise (see registry.ts). */
 export const MODEL_PROFILES: Record<string, ModelProfile> = {
+  // Current hosted models (approximate list prices, relative ranking only)
+  'claude-opus-5-5':   { intelligenceTier: 'frontier', costPer1kIn: 0.004,   costPer1kOut: 0.02,   latencyClass: 'medium', local: false },
+  'claude-sonnet-5-5': { intelligenceTier: 'balanced', costPer1kIn: 0.002,   costPer1kOut: 0.01,   latencyClass: 'fast',   local: false },
+  'claude-haiku-5-5':  { intelligenceTier: 'fast',     costPer1kIn: 0.0001,  costPer1kOut: 0.0005, latencyClass: 'fast',   local: false },
+  'claude-fable-5-1':  { intelligenceTier: 'frontier', costPer1kIn: 0.01,    costPer1kOut: 0.05,   latencyClass: 'slow',   local: false },
+  'gpt-5':             { intelligenceTier: 'frontier', costPer1kIn: 0.00125, costPer1kOut: 0.01,   latencyClass: 'medium', local: false },
+  'gpt-5-mini':        { intelligenceTier: 'fast',     costPer1kIn: 0.00025, costPer1kOut: 0.002,  latencyClass: 'fast',   local: false },
+  'gemini-2.5-pro':    { intelligenceTier: 'frontier', costPer1kIn: 0.00125, costPer1kOut: 0.01,   latencyClass: 'medium', local: false },
+  'gemini-2.5-flash':  { intelligenceTier: 'fast',     costPer1kIn: 0.0003,  costPer1kOut: 0.0025, latencyClass: 'fast',   local: false },
+  // Older ids, kept so saved preferences still rank sensibly
   // OpenAI
   'gpt-4o':      { intelligenceTier: 'frontier', costPer1kIn: 0.0025,  costPer1kOut: 0.01,   latencyClass: 'medium',  local: false },
   'gpt-4o-mini': { intelligenceTier: 'fast',     costPer1kIn: 0.00015, costPer1kOut: 0.0006, latencyClass: 'fast',    local: false },

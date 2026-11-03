@@ -2141,6 +2141,47 @@ export const Settings: React.FC = () => {
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [authError, setAuthError] = useState('');
+  // Security-question recovery enrolment (the guaranteed way back in).
+  const [showSecurityQuestions, setShowSecurityQuestions] = useState(false);
+  const [securityQuestionsSet, setSecurityQuestionsSet] = useState(false);
+  const SECURITY_QUESTION_PROMPTS = [
+    'What was the name of your first pet?',
+    'What is your mother\'s maiden name?',
+    'What was the name of your first school?',
+    'In what city were you born?',
+    'What was your childhood nickname?',
+    'What is the name of your favorite teacher?',
+  ];
+  const [securityQA, setSecurityQA] = useState<{ question: string; answer: string }[]>([
+    { question: SECURITY_QUESTION_PROMPTS[0], answer: '' },
+    { question: SECURITY_QUESTION_PROMPTS[1], answer: '' },
+    { question: SECURITY_QUESTION_PROMPTS[2], answer: '' },
+  ]);
+
+  const handleSaveSecurityQuestions = async () => {
+    setAuthError('');
+    if (securityQA.some(q => !q.question.trim() || !q.answer.trim())) {
+      setAuthError('Fill in every question and answer.');
+      return;
+    }
+    const questionSet = new Set(securityQA.map(q => q.question.trim().toLowerCase()));
+    if (questionSet.size !== securityQA.length) {
+      setAuthError('Choose distinct questions.');
+      return;
+    }
+    try {
+      const result = await window.electron?.invoke('auth:setup:securityQuestions', securityQA);
+      if (result?.success) {
+        setSecurityQuestionsSet(true);
+        setShowSecurityQuestions(false);
+        setSecurityQA(prev => prev.map(q => ({ ...q, answer: '' })));
+      } else {
+        setAuthError(result?.error || 'Failed to save security questions');
+      }
+    } catch {
+      setAuthError('Failed to save security questions');
+    }
+  };
   
   // Check biometric availability on mount
   React.useEffect(() => {
@@ -2158,6 +2199,18 @@ export const Settings: React.FC = () => {
       }
     };
     checkBiometric();
+  }, []);
+
+  // Reflect whether security questions are already enrolled.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await window.electron?.invoke('auth:getSecurityQuestions');
+        if (!cancelled) setSecurityQuestionsSet(!!res?.enabled);
+      } catch { /* leave as not-set */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   React.useEffect(() => {
@@ -2275,6 +2328,11 @@ export const Settings: React.FC = () => {
   };
   
   const handleDisableAuth = (type: 'pin' | 'password' | 'biometric') => {
+    // Actually erase the stored credential natively (not just flip local UI).
+    const channel = type === 'pin' ? 'auth:disablePin'
+      : type === 'password' ? 'auth:disablePassword'
+      : 'auth:disableBiometric';
+    void window.electron?.invoke?.(channel);
     if (type === 'pin') {
       setSettings(prev => ({
         ...prev,
@@ -3282,6 +3340,51 @@ export const Settings: React.FC = () => {
         </div>
       )}
       
+      {/* Security Questions -- account recovery so you're never locked out */}
+      {(settings.pinEnabled || settings.passwordEnabled) && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Security Questions {securityQuestionsSet ? '(set up)' : ''}</span>
+              <span style={styles.settingDesc}>Recover your account and reset your password if you ever forget it — you're never locked out</span>
+            </div>
+            <button style={styles.manageBtn} aria-label="Set up security questions" onClick={() => { setShowSecurityQuestions(v => !v); setAuthError(''); }}>
+              {securityQuestionsSet ? 'Change' : 'Set up'}
+            </button>
+          </div>
+          {showSecurityQuestions && (
+            <div style={{ padding: 'var(--space-4)', background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.18)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+              {securityQA.map((qa, i) => (
+                <div key={i} style={{ marginBottom: 'var(--space-3)' }}>
+                  <select
+                    value={qa.question}
+                    aria-label={`Security question ${i + 1}`}
+                    onChange={e => setSecurityQA(prev => prev.map((q, j) => j === i ? { ...q, question: e.target.value } : q))}
+                    style={{ width: '100%', padding: '8px', marginBottom: '6px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '13px' }}
+                  >
+                    {SECURITY_QUESTION_PROMPTS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    value={qa.answer}
+                    aria-label={`Answer ${i + 1}`}
+                    autoComplete="off"
+                    placeholder="Your answer"
+                    onChange={e => setSecurityQA(prev => prev.map((q, j) => j === i ? { ...q, answer: e.target.value } : q))}
+                    style={{ width: '100%', padding: '8px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+              {authError && <div style={{ color: 'var(--color-danger, #ff5f57)', fontSize: '12px', marginBottom: '8px' }}>{authError}</div>}
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button style={styles.manageBtn} aria-label="Save security questions" onClick={handleSaveSecurityQuestions}>Save</button>
+                <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel security questions" onClick={() => { setShowSecurityQuestions(false); setAuthError(''); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <h3 style={styles.sectionTitle}>Privacy</h3>
       {renderToggle('locationServices', 'Location Services', 'Allow DEX to access your location')}
       <div style={styles.settingRow}>
@@ -4185,24 +4288,6 @@ export const Settings: React.FC = () => {
   // ===========================================================================
   const CREATIVE_APP_IDS = ['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl'] as const;
   const [selectedCreativeApp, setSelectedCreativeApp] = useState<string | null>(null);
-  const [creativeAppSettings, setCreativeAppSettings] = useState<Record<string, Record<string, unknown>>>(() => {
-    try {
-      const raw = localStorage.getItem('dex-creative-app-settings');
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
-
-  // Persist per-app settings
-  React.useEffect(() => {
-    try { localStorage.setItem('dex-creative-app-settings', JSON.stringify(creativeAppSettings)); } catch { /* ignore */ }
-  }, [creativeAppSettings]);
-
-  const getAppSetting = (appId: string, key: string, fallback: unknown) => {
-    return creativeAppSettings[appId]?.[key] ?? fallback;
-  };
-  const setAppSetting = (appId: string, key: string, value: unknown) => {
-    setCreativeAppSettings(prev => ({ ...prev, [appId]: { ...prev[appId], [key]: value } }));
-  };
 
   const renderCreativeAppsSettings = () => {
     const detail = selectedCreativeApp ? APP_DEFINITIONS[selectedCreativeApp] : null;
@@ -4210,9 +4295,6 @@ export const Settings: React.FC = () => {
     return (
       <div style={styles.settingsContent}>
         <h3 style={styles.sectionTitleFirst}>DEX Creative Suite</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
-          Manage individual creative applications. Each app has its own version, settings profile, and performance controls.
-        </p>
 
         {/* App Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
@@ -4301,105 +4383,6 @@ export const Settings: React.FC = () => {
               </div>
             </div>
 
-            {/* Performance Controls */}
-            <h3 style={styles.sectionTitle}>Performance</h3>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Quality Mode</span>
-                <span style={styles.settingDesc}>Balance rendering quality vs performance</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'qualityMode', 'balanced') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'qualityMode', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="performance">Performance</option>
-                <option value="balanced">Balanced</option>
-                <option value="quality">Quality</option>
-              </select>
-            </div>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>GPU Acceleration</span>
-                <span style={styles.settingDesc}>Use hardware acceleration for rendering</span>
-              </div>
-              <button
-                style={{
-                  ...styles.toggle,
-                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-accent)' : 'var(--color-bg-glass)',
-                  border: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'none' : '1px solid var(--color-border)',
-                }}
-                onClick={() => setAppSetting(selectedCreativeApp, 'gpuAcceleration', !getAppSetting(selectedCreativeApp, 'gpuAcceleration', true))}
-              >
-                <div style={{ ...styles.toggleKnob, transform: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'translate(20px, -50%)' : 'translate(0, -50%)' }} />
-              </button>
-            </div>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Auto-Save Interval</span>
-                <span style={styles.settingDesc}>How often work is automatically saved</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'autoSaveInterval', '30') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'autoSaveInterval', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="10">Every 10 seconds</option>
-                <option value="30">Every 30 seconds</option>
-                <option value="60">Every 60 seconds</option>
-                <option value="120">Every 2 minutes</option>
-                <option value="off">Disabled</option>
-              </select>
-            </div>
-
-            {/* Cache & Data */}
-            <h3 style={styles.sectionTitle}>Cache & Data</h3>
-            <div style={styles.settingRow}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>Cache Limit</span>
-                <span style={styles.settingDesc}>Maximum cache size for this app</span>
-              </div>
-              <select
-                value={getAppSetting(selectedCreativeApp, 'cacheLimit', '2') as string}
-                onChange={e => setAppSetting(selectedCreativeApp, 'cacheLimit', e.target.value)}
-                style={{
-                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
-                  outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="0.5">500 MB</option>
-                <option value="1">1 GB</option>
-                <option value="2">2 GB</option>
-                <option value="4">4 GB</option>
-                <option value="8">8 GB</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-              <button
-                style={{ ...styles.secondaryBtn, flex: 1 }}
-                onClick={() => {
-                  setCreativeAppSettings(prev => {
-                    const updated = { ...prev };
-                    delete updated[selectedCreativeApp];
-                    return updated;
-                  });
-                  toast.success(`${detail.name} settings reset to defaults`);
-                }}
-              >Reset to Defaults</button>
-              <button
-                style={{ ...styles.secondaryBtn, flex: 1, color: 'var(--color-warning, #FFD60A)' }}
-                onClick={() => toast.success(`${detail.name} cache cleared`)}
-              >Clear Cache</button>
-            </div>
           </div>
         )}
 
@@ -4421,10 +4404,6 @@ export const Settings: React.FC = () => {
                 <span style={{ color: 'var(--color-success, #30d158)' }}>Included with DEX</span>
               </div>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
-              Select an app above to view its version, configure performance, and manage per-app settings.
-              Each creative app can be independently updated in future releases.
-            </p>
           </>
         )}
       </div>

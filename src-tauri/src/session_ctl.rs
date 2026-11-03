@@ -42,6 +42,7 @@
 // No new dependencies: serde_json + std + tauri (Manager) only.
 // =============================================================================
 
+use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -62,8 +63,7 @@ fn now_millis() -> i64 {
 // `path.join(userData, 'sessions')`).
 fn sessions_dir(app: &tauri::AppHandle) -> PathBuf {
     let base = app
-        .path()
-        .app_data_dir()
+        .dex_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
     let dir = base.join(SESSIONS_DIR);
     let _ = std::fs::create_dir_all(&dir);
