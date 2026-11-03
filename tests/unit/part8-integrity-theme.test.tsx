@@ -85,6 +85,47 @@ describe('SystemIntegrityPanel', () => {
   });
 });
 
+describe('PerformanceMonitor alerts', () => {
+  const realMemory = (performance as any).memory;
+  beforeEach(() => usePerformanceMonitor.getState().clearAlerts());
+  afterEach(() => {
+    Object.defineProperty(performance, 'memory', { value: realMemory, configurable: true });
+    usePerformanceMonitor.getState().clearAlerts();
+  });
+
+  it('measures heap against its limit, not the allocated heap', () => {
+    // 34 MB used of 35 MB allocated used to read "System memory at 97%".
+    Object.defineProperty(performance, 'memory', {
+      value: { usedJSHeapSize: 34 * 2 ** 20, totalJSHeapSize: 35 * 2 ** 20, jsHeapSizeLimit: 4096 * 2 ** 20 },
+      configurable: true,
+    });
+    const s = usePerformanceMonitor.getState();
+    s.collectMetrics();
+    expect(usePerformanceMonitor.getState().currentMetrics!.memoryPercent).toBe(1);
+    s.checkThresholds();
+    expect(usePerformanceMonitor.getState().alerts.filter(a => a.type === 'memory')).toHaveLength(0);
+  });
+
+  it('raises no FPS alert when no frames were sampled (hidden window)', () => {
+    const s = usePerformanceMonitor.getState();
+    s.collectMetrics();
+    const m = usePerformanceMonitor.getState().currentMetrics!;
+    expect(m.fpsSampled).toBe(false);
+    s.checkThresholds();
+    expect(usePerformanceMonitor.getState().alerts.filter(a => a.type === 'fps')).toHaveLength(0);
+  });
+
+  it('keeps one open alert per condition instead of re-raising it every sample', () => {
+    Object.defineProperty(performance, 'memory', {
+      value: { usedJSHeapSize: 95, totalJSHeapSize: 100, jsHeapSizeLimit: 100 },
+      configurable: true,
+    });
+    const s = usePerformanceMonitor.getState();
+    for (let i = 0; i < 5; i++) { s.collectMetrics(); s.checkThresholds(); }
+    expect(usePerformanceMonitor.getState().alerts.filter(a => a.type === 'memory')).toHaveLength(1);
+  });
+});
+
 describe('Theme presets', () => {
   beforeEach(() => localStorage.clear());
 

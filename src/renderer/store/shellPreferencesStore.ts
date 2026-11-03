@@ -152,7 +152,16 @@ function loadInitial(): ShellPreferences {
     const raw = typeof localStorage !== 'undefined'
       ? localStorage.getItem(DEX_SHELL_PREFS_KEY)
       : null;
-    if (!raw) return { ...DEFAULT_SHELL_PREFERENCES };
+    if (!raw) {
+      // A fresh profile has nothing to migrate. Mark the migration done now,
+      // or the first glass choice this user saves (e.g. 0% = 'off') would be
+      // flipped back to glass on the next launch by the migration below.
+      try {
+        localStorage.setItem(GLASS_REFINED_FLAG, '1');
+        localStorage.setItem(GLASS_REMOVED_FLAG, '1');
+      } catch { /* quota / sandbox */ }
+      return { ...DEFAULT_SHELL_PREFERENCES };
+    }
     const parsed = JSON.parse(raw);
     const merged = mergePrefs(parsed);
     // One-time glass-removal migration: flip a previously-saved translucent glass

@@ -39,6 +39,8 @@ export interface PerformanceMetrics {
   
   // Memory
   memoryMB: number;
+  /** JS heap in use as a share of the heap LIMIT (not of the currently
+   *  allocated heap, which V8 grows on demand and so always reads ~95%). */
   memoryPercent: number;
   memoryTrend: 'stable' | 'rising' | 'falling';
   heapUsedMB: number;
@@ -50,6 +52,8 @@ export interface PerformanceMetrics {
   
   // Frame rate
   fps: number;
+  /** False while the window is hidden/minimized (no frames to measure). */
+  fpsSampled: boolean;
   frameDrops: number;
   
   // Network
@@ -152,33 +156,38 @@ import { generateId } from '../../shared/util/id';
 
 export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) => {
   let monitoringInterval: NodeJS.Timeout | null = null;
-  let frameCount = 0;
-  let lastFrameTime = performance.now();
-  let frameDropCount = 0;
   let frameSampleTimer: NodeJS.Timeout | null = null;
   let frameSampleRafId: number | null = null;
+  // Result of the most recent 500 ms sample; null when none could be taken
+  // (window hidden: rAF doesn't run, which is not a slow frame rate).
+  let lastSample: { fps: number; drops: number } | null = null;
 
   // Intermittent frame sampling: run RAF for 500ms every 5s to measure FPS
-  // without consuming GPU continuously
+  // without consuming GPU continuously. The rate is frames over the sample's
+  // own duration, independent of when collectMetrics runs.
   const startFrameSampling = () => {
     if (frameSampleTimer) return;
     const doSample = () => {
-      frameCount = 0;
-      lastFrameTime = performance.now();
-      frameDropCount = 0;
-      let sampling = true;
-      const countFrame = () => {
-        frameCount++;
-        const now = performance.now();
-        const delta = now - lastFrameTime;
-        if (delta > 50) frameDropCount++;
-        if (sampling && get().isMonitoring) {
+      if (typeof document !== 'undefined' && document.hidden) { lastSample = null; return; }
+      let frames = 0;
+      let drops = 0;
+      let first = 0;
+      let prev = 0;
+      const countFrame = (t: number) => {
+        if (!get().isMonitoring) return;
+        if (frames === 0) first = t;
+        else if (t - prev > 50) drops++;
+        prev = t;
+        frames++;
+        if (t - first < 500) {
           frameSampleRafId = requestAnimationFrame(countFrame);
+        } else {
+          frameSampleRafId = null;
+          const span = (t - first) / 1000;
+          lastSample = span > 0 ? { fps: Math.round((frames - 1) / span), drops } : null;
         }
       };
       frameSampleRafId = requestAnimationFrame(countFrame);
-      // Stop sampling after 500ms
-      setTimeout(() => { sampling = false; }, 500);
     };
     doSample();
     frameSampleTimer = setInterval(doSample, 5000);
@@ -235,23 +244,17 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
     },
 
     collectMetrics: () => {
-      const now = performance.now();
-      const elapsedSeconds = (now - lastFrameTime) / 1000;
-      const fps = elapsedSeconds > 0 ? Math.round(frameCount / elapsedSeconds) : 60;
-      
-      // Reset counters
-      frameCount = 0;
-      frameDropCount = 0;
-      lastFrameTime = now;
+      const sample = typeof document !== 'undefined' && document.hidden ? null : lastSample;
+      const fps = sample?.fps ?? 0;
 
       // Get memory info if available
       const memory = (performance as any).memory;
       const heapUsedMB = memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
       const heapTotalMB = memory ? Math.round(memory.totalJSHeapSize / 1024 / 1024) : 0;
-      
-      // Estimate total memory usage
+      const heapLimit = memory?.jsHeapSizeLimit || 0;
+
       const memoryMB = heapUsedMB;
-      const memoryPercent = heapTotalMB > 0 ? Math.round((heapUsedMB / heapTotalMB) * 100) : 0;
+      const memoryPercent = heapLimit > 0 ? Math.round((memory.usedJSHeapSize / heapLimit) * 100) : 0;
 
       // Count DOM nodes
       const domNodes = document.getElementsByTagName('*').length;
@@ -276,7 +279,8 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
         domNodes,
         domListeners,
         fps,
-        frameDrops: frameDropCount,
+        fpsSampled: sample !== null,
+        frameDrops: sample?.drops ?? 0,
         activeRequests: 0,
         bytesReceived: 0,
         bytesSent: 0,
@@ -356,7 +360,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
       const metrics = state.currentMetrics;
       if (!metrics) return;
 
-      const newAlerts: PerformanceAlert[] = [];
+      let newAlerts: PerformanceAlert[] = [];
 
       // Check global thresholds
       if (metrics.memoryPercent >= state.thresholds.memory.critical) {
@@ -364,7 +368,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
           id: generateId(),
           type: 'memory',
           severity: 'critical',
-          message: `System memory at ${metrics.memoryPercent}%`,
+          message: `JS heap at ${metrics.memoryPercent}% of its limit`,
           value: metrics.memoryPercent,
           threshold: state.thresholds.memory.critical,
           timestamp: Date.now(),
@@ -375,7 +379,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
           id: generateId(),
           type: 'memory',
           severity: 'warning',
-          message: `System memory at ${metrics.memoryPercent}%`,
+          message: `JS heap at ${metrics.memoryPercent}% of its limit`,
           value: metrics.memoryPercent,
           threshold: state.thresholds.memory.warning,
           timestamp: Date.now(),
@@ -383,7 +387,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
         });
       }
 
-      if (metrics.fps <= state.thresholds.fps.critical) {
+      if (metrics.fpsSampled && metrics.fps <= state.thresholds.fps.critical) {
         newAlerts.push({
           id: generateId(),
           type: 'fps',
@@ -394,7 +398,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
           timestamp: Date.now(),
           acknowledged: false,
         });
-      } else if (metrics.fps <= state.thresholds.fps.warning) {
+      } else if (metrics.fpsSampled && metrics.fps <= state.thresholds.fps.warning) {
         newAlerts.push({
           id: generateId(),
           type: 'fps',
@@ -424,6 +428,11 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
           });
         }
       });
+
+      // One open alert per condition: don't re-raise it every 5 s until the
+      // user dismisses it (the queue used to fill with copies).
+      const open = new Set(state.alerts.filter(a => !a.acknowledged).map(a => `${a.type}:${a.severity}:${a.appId ?? ''}`));
+      newAlerts = newAlerts.filter(a => !open.has(`${a.type}:${a.severity}:${a.appId ?? ''}`));
 
       if (newAlerts.length > 0) {
         set(state => ({
