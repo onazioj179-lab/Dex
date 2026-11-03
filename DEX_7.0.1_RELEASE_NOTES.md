@@ -37,6 +37,7 @@
 - Touch drags inside apps no longer lose their grip (the shell was taking over every touch), and pinching inside an app no longer opens the overview.
 - The spatial canvas keeps panning and zooming when a third finger lands.
 - Maps tells you when you are offline or search is down (instead of "No places found"), explains why My location failed, and says when map tiles could not load.
+- Creative apps open in the background no longer react to keys typed in another app: Space in Notes no longer toggles FLUX playback, and Ctrl+Z in Notes no longer undoes FLUX, PRISM, Vinx, Imosion, FORGE, AXL, Canvas or Pixel Art edits. FLUX redo no longer gets out of step after an undo.
 - Browser: typing `localhost:5173` or a local IP opens it instead of searching for it; `file:`, `data:` and other non-web addresses are refused with a reason.
 - Task Manager: the per-app "Realtime / Frozen" menu did nothing and is gone. Each open app shows whether it is in the foreground, background or suspended, and apps that support it can be suspended to free GPU and audio.
 

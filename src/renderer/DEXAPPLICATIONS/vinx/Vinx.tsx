@@ -59,6 +59,7 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
 export const VINX_BUILD_DATE = '2026-04-11';
@@ -814,8 +815,7 @@ const VinxEditor: React.FC = () => {
   // -- Keyboard shortcuts (space, J/K/L, tools, undo/redo, etc.) --
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') return;
+      if (!keyEventForApp(e, 'vinx') || isTypingTarget(e.target)) return;
 
       // Play/Pause
       if (e.key === ' ') {

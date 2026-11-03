@@ -70,6 +70,7 @@ import { generateDrumPattern, DRUM_GENRES, type DrumGenre } from '../../../share
 import { generateRiff, RIFF_SCALES, type RiffScale } from '../../../shared/audio/riffMachine';
 import { varyPattern } from '../../../shared/audio/patternVariant';
 import { DexSearchInput } from '../../styles/components';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ==================== APP IDENTITY ====================
 export const IMOSION_VERSION = '1.0.0';
@@ -3746,7 +3747,7 @@ const Imosion: React.FC = () => {
     if (viewMode !== 'pianoroll') return;
     const inField = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
     const onKey = (e: KeyboardEvent) => {
-      if (inField(document.activeElement)) return;
+      if (!keyEventForApp(e, 'imosion') || inField(document.activeElement)) return;
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       if (mod && k === 'c') { e.preventDefault(); e.stopPropagation(); prCopy(); }
@@ -5114,7 +5115,7 @@ const Imosion: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
+      if (!keyEventForApp(e, 'imosion') || isTypingTarget(e.target)) return;
       const ctrl = e.ctrlKey || e.metaKey;
       switch (e.code) {
         case 'Escape':

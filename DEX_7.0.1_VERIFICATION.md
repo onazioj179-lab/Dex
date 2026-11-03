@@ -189,5 +189,7 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | `part9-nexus-app-phases.test.tsx` | 2 passed: lifecycle `handles()` / `subscribeAll()`; Task Manager renders no governance select, offers Suspend only for an app that listens, Suspend → `suspended`, Resume → `background` |
 | `part9-browser-address.test.ts` | 5 passed: URLs kept, bare domains get https (ports/paths kept), localhost/IP/IPv6 open over http, text/numbers searched, 8 dangerous schemes refused, `about:blank` allowed |
 | Second pass | `tsc` exit 0; full `vitest run` **533 files passed, 0 failed**; Browser files re-run after the last edit: 3 files / 46 tests passed |
+| `part9-app-key-scope.test.ts` | 5 passed: a key typed in another app's editor is not FLUX's; with page focus the last-clicked app gets it; else the current app; apps mounted outside the shell keep their keys; typing-target detection |
+| Creative-app regression | 103 test files that mention the changed apps: 1091 tests passed. Third pass: `tsc` exit 0; full `vitest run` **535 files passed, 0 failed** |
 | Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
 | Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |

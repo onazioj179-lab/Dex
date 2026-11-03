@@ -35,6 +35,7 @@ import {
 } from './FluxFeatures';
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ===========================================================================
 // DEX FLUX - Professional Motion Graphics
@@ -876,37 +877,41 @@ const Flux: React.FC = () => {
   }, [layers]);
 
   // ===== UNDO/REDO KEYBOARD SHORTCUTS =====
+  // Only for keys aimed at FLUX (it stays mounted in the background) and never
+  // inside a text field, whose own undo / select-all must keep working. History
+  // is read from refs so no state updater has side effects (StrictMode runs
+  // updaters twice, which pushed two redo entries per undo).
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const redoRef = useRef(redoStack);
+  redoRef.current = redoStack;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'flux') || isTypingTarget(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        setHistory(prev => {
-          if (prev.length <= 1) return prev;
+        const prev = historyRef.current;
+        if (prev.length > 1) {
           const undone = prev[prev.length - 1];
           const restored = prev[prev.length - 2];
           if (restored?.layers) {
             isRestoringRef.current = true;
             setLayers(restored.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
           }
-          // Push undone state to redo stack
-          if (undone) {
-            setRedoStack(rs => [...rs, undone]);
-          }
-          return prev.slice(0, -1);
-        });
+          setRedoStack(rs => [...rs, undone]);
+          setHistory(prev.slice(0, -1));
+        }
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
-        setRedoStack(rs => {
-          if (rs.length === 0) return rs;
-          const redone = rs[rs.length - 1];
-          if (redone?.layers) {
-            isRestoringRef.current = true;
-            setLayers(redone.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
-            setHistory(prev => [...prev, redone]);
-          }
-          return rs.slice(0, -1);
-        });
+        const rs = redoRef.current;
+        const redone = rs[rs.length - 1];
+        if (redone?.layers) {
+          isRestoringRef.current = true;
+          setLayers(redone.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
+          setHistory(prev => [...prev, redone]);
+          setRedoStack(rs.slice(0, -1));
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
@@ -1437,7 +1442,7 @@ const Flux: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if (!keyEventForApp(e, 'flux') || isTypingTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       // Ctrl+S — save project
       if (mod && e.key === 's') {
