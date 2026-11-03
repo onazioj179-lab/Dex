@@ -191,5 +191,7 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | Second pass | `tsc` exit 0; full `vitest run` **533 files passed, 0 failed**; Browser files re-run after the last edit: 3 files / 46 tests passed |
 | `part9-app-key-scope.test.ts` | 5 passed: a key typed in another app's editor is not FLUX's; with page focus the last-clicked app gets it; else the current app; apps mounted outside the shell keep their keys; typing-target detection |
 | Creative-app regression | 103 test files that mention the changed apps: 1091 tests passed. Third pass: `tsc` exit 0; full `vitest run` **535 files passed, 0 failed** |
+| Fourth pass | `tsc` exit 0; full `vitest run` **536 files passed, 0 failed**; Imosion files re-run after the last edit: 25 files / 244 tests passed |
+| `part9-app-key-scope-ratchet.test.ts` | 1 passed: every `window`/`document` keydown handler under `DEXAPPLICATIONS/` and `pages/` calls `keyEventForApp`, except 8 listed Escape-closers / one-shot / unmounted handlers |
 | Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
 | Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |

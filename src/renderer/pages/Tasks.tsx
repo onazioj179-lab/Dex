@@ -21,6 +21,7 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContex
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { searchLines } from '../../shared/search/textSearch';
 import { DexSearchInput } from '../styles/components';
+import { keyEventForApp } from '../shell/input/appKeyScope';
 
 // ===========================================================================
 // TYPES
@@ -612,6 +613,7 @@ export const Tasks: React.FC = () => {
   // Keyboard shortcuts: Ctrl+N to focus new task input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'tasks')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
         newTaskInputRef.current?.focus();
@@ -1168,6 +1170,7 @@ export const Tasks: React.FC = () => {
   useEffect(() => { toggleTaskRef.current = toggleTask; });
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'tasks')) return; // key meant for another app
       // Ignore while typing in any editable control.
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;

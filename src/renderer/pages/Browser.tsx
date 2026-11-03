@@ -27,6 +27,7 @@ import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
 import { normalizeAddress } from '../services/browserAddress';
+import { keyEventForApp } from '../shell/input/appKeyScope';
 
 // ===========================================================================
 // TYPES
@@ -743,6 +744,7 @@ export const Browser: React.FC = () => {
   // Keyboard shortcuts (Ctrl+F find, Ctrl+Shift+I devtools)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'browser')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowFindBar(true);

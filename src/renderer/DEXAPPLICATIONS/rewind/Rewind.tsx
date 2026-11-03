@@ -196,6 +196,7 @@ function formatDate(ts: number): string {
 }
 
 import { formatBytes } from '../../../shared/format/units';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 function todayStr(): string {
   const d = new Date();
@@ -634,6 +635,7 @@ const Rewind: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'rewind')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setCommandPaletteOpen(prev => !prev);

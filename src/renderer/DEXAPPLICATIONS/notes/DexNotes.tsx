@@ -35,6 +35,7 @@ import {
   populateTrieFromBackend,
 } from './WordSuggestions';
 import { deserializeDoc, extractHeadings } from './NotesDocumentModel';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -391,6 +392,7 @@ const DexNotes: React.FC = () => {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'notes')) return; // key meant for another app
       const ctrl = e.ctrlKey || e.metaKey;
 
       // New note: Ctrl+N

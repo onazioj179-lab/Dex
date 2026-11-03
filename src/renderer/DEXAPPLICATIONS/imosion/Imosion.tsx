@@ -3712,7 +3712,7 @@ const Imosion: React.FC = () => {
     const inField = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
     const pitchFor = (k: string) => typingOctave * 12 + MAP[k];
     const onDown = (e: KeyboardEvent) => {
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || inField(document.activeElement)) return;
+      if (!keyEventForApp(e, 'imosion') || e.repeat || e.metaKey || e.ctrlKey || e.altKey || inField(document.activeElement)) return;
       const k = e.key.toLowerCase();
       if (k === 'z') { setTypingOctave(o => Math.max(0, o - 1)); return; }
       if (k === 'x') { setTypingOctave(o => Math.min(9, o + 1)); return; }
