@@ -16,6 +16,7 @@ import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
 import { useElementSize } from '../utils/motionHooksExtended';
+import { appLifecycle, type AppPhase } from '../services/AppLifecycle';
 
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
@@ -41,15 +42,17 @@ const loadDetailLevel = (): DetailLevel => {
 // so the table stays smooth at thousands of processes).
 const PROCESS_ROW_H = 30;
 
-// Pulse v2: per-app process governance class. The renderer treats this as a hint;
-// downstream RenderGovernor / native scheduler can act on it as backends mature.
-type GovernanceClass = 'realtime' | 'foreground' | 'background' | 'frozen';
-const GOVERNANCE_LABEL: Record<GovernanceClass, string> = {
-  realtime: 'Realtime',
-  foreground: 'Foreground',
-  background: 'Background',
-  frozen: 'Frozen',
-};
+// Per-app lifecycle phase, read live from AppLifecycle (the same phases the
+// shell broadcasts). Suspend is offered only for apps that listen for it and
+// therefore really release their GPU / audio / timers; it used to be a select
+// ("Realtime / Frozen") that changed nothing.
+const PHASE_LABEL: Record<AppPhase, string> = { foreground: 'Foreground', background: 'Background', suspended: 'Suspended' };
+
+function useAppPhases(): Record<string, AppPhase> {
+  const [phases, setPhases] = useState<Record<string, AppPhase>>(() => appLifecycle.snapshot());
+  useEffect(() => appLifecycle.subscribeAll((id, phase) => setPhases((p) => (p[id] === phase ? p : { ...p, [id]: phase }))), []);
+  return phases;
+}
 
 interface SystemProcess {
   pid: number;
@@ -408,10 +411,10 @@ const TaskManager: React.FC = () => {
   // observed in this session (the native payload carries no start time).
   const firstSeenRef = useRef<Map<number, number>>(new Map());
 
-  // Pulse v2: workspace grouping + governance state.
+  // Pulse v2: workspace grouping + live app phases.
   const stages = useStageStore(s => s.stages);
   const activeStageId = useStageStore(s => s.activeStageId);
-  const [governance, setGovernance] = useState<Record<string, GovernanceClass>>({});
+  const phases = useAppPhases();
   const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; steps: number; lastRun: number | null }>>([]);
 
   const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
@@ -713,17 +716,13 @@ const TaskManager: React.FC = () => {
   }, [processes, cpuUsage, memoryPercent, hasBattery, batteryPercent, battery]);
 
   // -- Health monitoring (Task Manager 2.0) --------------------------------
-  // Detect resource spikes, frozen apps, and runaway processes, and surface a
+  // Detect resource spikes and runaway processes, and surface a
   // recovery action (end the worst offender). Thresholds mirror the metric tones.
   const topProcess = useMemo(() => {
     let top: SystemProcess | null = null;
     for (const p of processes) if ((p.cpu || 0) > (top?.cpu ?? -1)) top = p;
     return top;
   }, [processes]);
-  const frozenCount = useMemo(
-    () => Object.values(governance).filter(g => g === 'frozen').length,
-    [governance],
-  );
   const health = useMemo(() => {
     const issues: string[] = [];
     let critical = false;
@@ -732,7 +731,6 @@ const TaskManager: React.FC = () => {
     else if (cpuUsage > 70) { issues.push(`CPU elevated at ${cpuUsage}%`); elevated = true; }
     if (memoryPercent > 90) { issues.push(`Memory critical at ${memoryPercent}%`); critical = true; }
     else if (memoryPercent > 80) { issues.push(`Memory high at ${memoryPercent}%`); elevated = true; }
-    if (frozenCount > 0) { issues.push(`${frozenCount} app${frozenCount === 1 ? '' : 's'} frozen`); elevated = true; }
     if (topProcess && (topProcess.cpu || 0) > 80) {
       issues.push(`${topProcess.name} using ${Math.round(topProcess.cpu || 0)}% CPU`);
       elevated = true;
@@ -747,12 +745,10 @@ const TaskManager: React.FC = () => {
       const memOver = memoryPercent > 80 ? memoryPercent - 80 : -1;
       if (cpuOver >= 0 || memOver >= 0) {
         bottleneck = cpuOver >= memOver ? `CPU ${cpuUsage}%` : `Mem ${memoryPercent}%`;
-      } else if (frozenCount > 0) {
-        bottleneck = `${frozenCount} frozen`;
       }
     }
     return { level, issues, bottleneck };
-  }, [cpuUsage, memoryPercent, frozenCount, topProcess]);
+  }, [cpuUsage, memoryPercent, topProcess]);
   const healthTone = health.level === 'critical' ? '#FF453A' : health.level === 'elevated' ? '#FF9F0A' : '#30D158';
   const healthLabel = health.level === 'critical' ? 'Critical' : health.level === 'elevated' ? 'Elevated' : 'Healthy';
   const healthPillText = health.bottleneck ? `${healthLabel} · ${health.bottleneck}` : healthLabel;
@@ -1141,25 +1137,24 @@ const TaskManager: React.FC = () => {
             ) : shellApps.map(app => {
               const definition = APP_DEFINITIONS[app.id];
               const active = currentAppId === app.id;
+              const phase: AppPhase = phases[app.id] ?? appLifecycle.getPhase(app.id);
+              const canSuspend = !active && phase !== 'foreground' && appLifecycle.handles(app.id);
               return (
                 <div key={app.id} style={{ ...styles.appRow, borderColor: active ? 'rgba(74,158,255,0.42)' : 'var(--color-border-subtle)' }}>
                   <div style={styles.appGlyph}><DexIcon name={definition?.icon || app.icon || app.id} size={18} color="#fff" strokeWidth={2.2} /></div>
                   <div style={styles.appMeta}>
                     <div style={styles.appName}>{definition?.name || app.name}</div>
-                    <div style={styles.appDetail}>{active ? 'Focused' : 'Background'} - open {formatAge(app.launchedAt)}</div>
+                    <div style={styles.appDetail}>{active ? 'Focused' : PHASE_LABEL[phase]} - open {formatAge(app.launchedAt)}</div>
                   </div>
                   <button style={styles.ghostButton} onClick={() => setCurrentApp(app.id)} aria-label={`Focus ${definition?.name || app.name}`}>Focus</button>
-                  <select
-                    value={governance[app.id] || 'foreground'}
-                    onChange={(e) => setGovernance(prev => ({ ...prev, [app.id]: e.target.value as GovernanceClass }))}
-                    aria-label={`Set governance for ${definition?.name || app.name}`}
-                    title="Process governance class"
-                    style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
-                  >
-                    {(Object.keys(GOVERNANCE_LABEL) as GovernanceClass[]).map(g => (
-                      <option key={g} value={g}>{GOVERNANCE_LABEL[g]}</option>
-                    ))}
-                  </select>
+                  {canSuspend && (
+                    <button style={styles.ghostButton}
+                      onClick={() => appLifecycle.setPhase(app.id, phase === 'suspended' ? 'background' : 'suspended')}
+                      aria-label={`${phase === 'suspended' ? 'Resume' : 'Suspend'} ${definition?.name || app.name}`}
+                      title={phase === 'suspended' ? 'Let it run in the background again' : 'Release its GPU, audio and timers until you open it'}>
+                      {phase === 'suspended' ? 'Resume' : 'Suspend'}
+                    </button>
+                  )}
                   <button style={styles.endButton} onClick={() => closeApp(app.id)} aria-label={`End ${definition?.name || app.name}`}>End</button>
                 </div>
               );

@@ -26,6 +26,7 @@ import { NativeWebview } from '../components/NativeWebview';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
+import { normalizeAddress } from '../services/browserAddress';
 
 // ===========================================================================
 // TYPES
@@ -1555,32 +1556,24 @@ export const Browser: React.FC = () => {
   }, []);
 
   const navigate = useCallback((url: string) => {
-    let finalUrl = url.trim();
-
-    // Block dangerous protocols
-    const lower = finalUrl.toLowerCase().replace(/\s/g, '');
-    if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('data:text/html')) {
-      toast.error('Blocked: dangerous URL protocol');
+    // Address-bar rules live in services/browserAddress (tested): http(s) only,
+    // localhost / IPs open instead of being searched, other schemes refused.
+    const searchEngines: Record<string, string> = {
+      duckduckgo: 'https://duckduckgo.com/?q=',
+      google: 'https://www.google.com/search?q=',
+      bing: 'https://www.bing.com/search?q=',
+      startpage: 'https://www.startpage.com/do/search?q=',
+      brave: 'https://search.brave.com/search?q=',
+    };
+    const resolved = normalizeAddress(url, searchEngines[browserSettings.defaultSearchEngine] || searchEngines.duckduckgo);
+    if (resolved.kind === 'blocked') {
+      toast.error(resolved.reason);
       return;
     }
-    
-    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
-      if (finalUrl.includes('.') && !finalUrl.includes(' ')) {
-        finalUrl = `https://${finalUrl}`;
-      } else {
-        const searchEngines: Record<string, string> = {
-          duckduckgo: 'https://duckduckgo.com/?q=',
-          google: 'https://www.google.com/search?q=',
-          bing: 'https://www.bing.com/search?q=',
-          startpage: 'https://www.startpage.com/do/search?q=',
-          brave: 'https://search.brave.com/search?q=',
-        };
-        const engine = searchEngines[browserSettings.defaultSearchEngine] || searchEngines.duckduckgo;
-        finalUrl = `${engine}${encodeURIComponent(finalUrl)}`;
-      }
-    }
+    let finalUrl = resolved.url;
 
-    finalUrl = upgradeToHttps(finalUrl);
+    // Local dev servers and LAN devices are plain http; don't force https on them.
+    if (!/^http:\/\/(localhost|127\.|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(finalUrl)) finalUrl = upgradeToHttps(finalUrl);
     if (shouldBlock(finalUrl)) return;
 
     addToHistory(finalUrl, finalUrl.slice(0, 50));

@@ -185,5 +185,9 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | `part9-spatial-touch-ui.test.tsx` | 6 passed: no toolbar, no minimap by default, overlay top-right not bottom; Windows panel opens from the shortcut, Layout tab has Arrange; desktop menu carries every former toolbar action; minimap migration v1 → off; Touch & Pen reports "No touch screen" honestly with haptics disabled, and on a 10-point screen the pad counts 5 contacts then 4, peak 5 |
 | `part9-spotlight-windows.test.ts` | 3 passed: open window found and switched to; on the spatial desktop groups/zones/views found and the camera moved; none when spatial is off |
 | `spatial-desktop.test.ts` | 23 passed (unchanged behaviour) |
+| `part9-maps-honest-errors.test.ts` | 5 passed: results mapped, malformed rows dropped; empty answer = no results; HTTP 503 / network error = error, not "no places"; blank query makes no request; each geolocation failure explained |
+| `part9-nexus-app-phases.test.tsx` | 2 passed: lifecycle `handles()` / `subscribeAll()`; Task Manager renders no governance select, offers Suspend only for an app that listens, Suspend → `suspended`, Resume → `background` |
+| `part9-browser-address.test.ts` | 5 passed: URLs kept, bare domains get https (ports/paths kept), localhost/IP/IPv6 open over http, text/numbers searched, 8 dangerous schemes refused, `about:blank` allowed |
+| Second pass | `tsc` exit 0; full `vitest run` **533 files passed, 0 failed**; Browser files re-run after the last edit: 3 files / 46 tests passed |
 | Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
 | Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |
