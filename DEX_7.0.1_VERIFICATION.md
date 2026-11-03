@@ -141,3 +141,4 @@ New test files: `uki-assistant-policy`, `uki-agent-runner-policy`, `uki-memory-c
   - Launch at Login reads the real `Run` key (not set; the test only read it).
   - Browser: typed `https://example.com` -> child webview loads "Example Domain"; covered -> hidden, uncovered -> visible; app closed -> view released; relaunched -> recreated at the same URL; the page's `dex_ipc` call is refused ("not allowed").
 - Not run: packaged installer, click-through of Browser back/forward/find/reader mode, Settings Launch at Login toggle (writes the registry).
+- Part 7 continued (PR #75): restored auth engine checked live in a debug build with `DEX_DATA_DIR` set to a throwaway folder: 17/17 checks (enrol, reject, unlock + token, lockout, recovery codes, security-question recovery, change PIN). All writes landed in the test folder; the real `%APPDATA%\com.onazioj.dex` hashed identical before and after (39 files).
