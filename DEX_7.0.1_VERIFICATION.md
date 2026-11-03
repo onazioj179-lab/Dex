@@ -161,3 +161,16 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | System Health panel (Task Manager) | Renders all 6 integrity checks with live results ("All process states are consistent · 22s ago" …); Run checks / Copy diagnostic report |
 | File operations (native, temp dir) | Copy into same folder → `a copy.txt`, `a copy 2.txt`, original intact; 200-file nested folder copied recursively and byte-checked; move onto existing name refused, both files intact; folder into itself refused; rename onto existing refused; `../` in a new name stripped; missing source reported |
 | Not run here | Packaged installer / upgrade / uninstall; native file ops through the UI (needs the desktop bridge); creative-app stress; FPS under load (pane hidden most of the time); screen reader |
+
+### Part 8, second pass (packaged build)
+
+| Check | Result |
+|---|---|
+| Launch latency fix (#65) | App bodies memoised: launch p50 with 10 / 30 / 59 open **1 / 7 / 29 ms** (was 48 / 113 / 172 ms), same preview method; apps still render and respond (Calculator keypress) |
+| Full `vitest run` | **528 files passed, 0 failed** (2 skipped) |
+| `npm run build:tauri` at `db821b0` | **Passed** in 37.9 min: NSIS **14.4 MB**, MSI **17.9 MB**, bundle gate OK, `NotSigned` (no certificate) |
+| `SHA256SUMS-7.0.1.txt` | 180689f4e6681dad14f354909f22573924b14ab5a3fa42a54b4189b192c07d00  DEX_7.0.1_x64-setup.exe<br>240f618242e2ff616a959ede831bd691ffe2b8a95e416b225bbd3d9cb4509ece  DEX_7.0.1_x64_en-US.msi |
+| Packaged smoke (release exe over CDP, `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in a throwaway folder) | **13/13 passed**: boots (store ready 4.6 s cold), copy into same folder → "one copy.txt", move/rename onto existing name refused with both files intact, folder copied recursively, folder into itself refused, rename works; 25 apps open with 0 error boundaries (launch p50 29 ms), Close All leaves 1 mounted app; 0% transparency survives a real relaunch (`#1C1C1E`, blur none); 0 uncaught exceptions; host process 54 MB |
+| Real profile untouched | `%APPDATA%\com.onazioj.dex` 39 files SHA-256 identical before/after. `%LOCALAPPDATA%` identical except `logs/startup.log` (+129 bytes): the startup log ignored `DEX_DATA_DIR`. Fixed after this build (`webview2.rs`), 3/3 native tests |
+| Not run | Installing the MSI/NSIS (would replace the installed DEX on this machine; needs a VM or your go-ahead), upgrade over 6.x, uninstall |
+

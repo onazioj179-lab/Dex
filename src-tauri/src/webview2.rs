@@ -47,6 +47,11 @@ const MAX_LOG_BYTES: u64 = 256 * 1024;
 const RUNTIME_CLIENT_GUID: &str = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
 
 pub fn log_dir() -> PathBuf {
+    // A test run with DEX_DATA_DIR keeps its log there too, so it never
+    // appends to the real profile's startup.log.
+    if let Some(dir) = crate::paths::data_dir_override() {
+        return dir.join("logs");
+    }
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
