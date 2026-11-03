@@ -25,7 +25,6 @@ import {
   countWords,
 } from './NotesDocumentModel';
 import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/connect';
-import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { searchLines } from '../../../shared/search/textSearch';
@@ -82,10 +81,10 @@ const _M = platform.isMac ? '⌘' : 'Ctrl';
 
 const TOOLBAR_GROUPS: ToolbarAction[][] = [
   [
-    { id: 'bold', label: 'Bold', icon: 'B', command: 'bold', shortcut: `${_M}+B` },
-    { id: 'italic', label: 'Italic', icon: 'I', command: 'italic', shortcut: `${_M}+I` },
-    { id: 'underline', label: 'Underline', icon: 'U', command: 'underline', shortcut: `${_M}+U` },
-    { id: 'strikethrough', label: 'Strikethrough', icon: 'S', command: 'strikeThrough' },
+    { id: 'bold', label: 'Bold', icon: 'B', glyph: 'bold', command: 'bold', shortcut: `${_M}+B` },
+    { id: 'italic', label: 'Italic', icon: 'I', glyph: 'italic', command: 'italic', shortcut: `${_M}+I` },
+    { id: 'underline', label: 'Underline', icon: 'U', glyph: 'underline', command: 'underline', shortcut: `${_M}+U` },
+    { id: 'strikethrough', label: 'Strikethrough', icon: 'S', glyph: 'strikethrough', command: 'strikeThrough' },
   ],
   [
     { id: 'h1', label: 'Heading 1', icon: 'H1', command: 'formatBlock', arg: 'h1' },
@@ -94,13 +93,13 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
   ],
   [
     { id: 'ul', label: 'Bullet List', icon: 'UL', glyph: 'list', command: 'insertUnorderedList' },
-    { id: 'ol', label: 'Numbered List', icon: 'OL', command: 'insertOrderedList' },
+    { id: 'ol', label: 'Numbered List', icon: 'OL', glyph: 'list-ordered', command: 'insertOrderedList' },
     { id: 'checklist', label: 'Checklist', icon: 'CL', glyph: 'check-square', command: 'checklist' },
   ],
   [
-    { id: 'blockquote', label: 'Quote', icon: 'Q', command: 'formatBlock', arg: 'blockquote' },
-    { id: 'code', label: 'Code Block', icon: '<>', command: 'codeBlock' },
-    { id: 'hr', label: 'Divider', icon: '--', command: 'insertHorizontalRule' },
+    { id: 'blockquote', label: 'Quote', icon: 'Q', glyph: 'quote', command: 'formatBlock', arg: 'blockquote' },
+    { id: 'code', label: 'Code Block', icon: '<>', glyph: 'code-block', command: 'codeBlock' },
+    { id: 'hr', label: 'Divider', icon: '--', glyph: 'minus', command: 'insertHorizontalRule' },
   ],
   [
     { id: 'highlight', label: 'Highlight', icon: 'HL', glyph: 'highlighter', command: 'highlight' },
@@ -111,7 +110,7 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'table', label: 'Insert Table', icon: 'TBL', glyph: 'grid', command: 'table' },
     { id: 'sketch', label: 'Insert Sketch', icon: 'Drw', glyph: 'pen-tool', command: 'sketch' },
     { id: 'signature', label: 'Insert Handwritten Signature', icon: 'Sig', glyph: 'feather', command: 'signature' },
-    { id: 'columns', label: 'Two Columns', icon: 'Col', command: 'columns' },
+    { id: 'columns', label: 'Two Columns', icon: 'Col', glyph: 'columns', command: 'columns' },
     { id: 'callout-note', label: 'Callout: Note', icon: 'Note', glyph: 'info', command: 'callout', arg: 'note' },
     { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', glyph: 'alert-triangle', command: 'callout', arg: 'warning' },
     { id: 'callout-tip', label: 'Callout: Tip', icon: 'Tip', glyph: 'lightbulb', command: 'callout', arg: 'tip' },
@@ -119,8 +118,8 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
   [
     // Native execCommand verbs -- routed through the toolbar's default dispatcher,
     // so they persist exactly like Bold/Heading do. Indentation drives nested lists.
-    { id: 'outdent', label: 'Decrease Indent', icon: 'Out', command: 'outdent' },
-    { id: 'indent', label: 'Increase Indent', icon: 'In', command: 'indent' },
+    { id: 'outdent', label: 'Decrease Indent', icon: 'Out', glyph: 'outdent', command: 'outdent' },
+    { id: 'indent', label: 'Increase Indent', icon: 'In', glyph: 'indent', command: 'indent' },
     { id: 'align-left', label: 'Align Left', icon: 'AL', glyph: 'align-left', command: 'justifyLeft' },
     { id: 'align-center', label: 'Align Center', icon: 'AC', glyph: 'align-center', command: 'justifyCenter' },
     { id: 'align-right', label: 'Align Right', icon: 'AR', glyph: 'align-right', command: 'justifyRight' },
@@ -156,42 +155,6 @@ const AI_SYSTEM =
   'You are a writing assistant inside DEX Notes. Return ONLY the resulting text — ' +
   "no preamble, commentary, or surrounding quotes. Preserve the author's meaning.";
 
-interface AiAction {
-  id: string;
-  label: string;
-  mode: 'replace' | 'append';
-  build: (text: string) => string;
-}
-
-const AI_ACTIONS: AiAction[] = [
-  {
-    id: 'ai-improve',
-    label: 'Improve',
-    mode: 'replace',
-    build: (t) => renderPrompt(STANDARD_TEMPLATES.rewrite_tone, { tone: 'clear, polished, and professional', text: t }),
-  },
-  {
-    id: 'ai-summarise',
-    label: 'Summarise',
-    mode: 'replace',
-    build: (t) => renderPrompt(STANDARD_TEMPLATES.summarise, { maxSentences: '3', text: t }),
-  },
-  {
-    id: 'ai-bullets',
-    label: 'Bullets',
-    mode: 'replace',
-    build: (t) => renderPrompt(STANDARD_TEMPLATES.bullet_points, { count: '5', text: t }),
-  },
-  {
-    id: 'ai-extend',
-    label: 'Continue',
-    mode: 'append',
-    build: (t) =>
-      'Continue writing the following text naturally, matching its tone and style. ' +
-      'Return only the continuation (do not repeat the existing text):\n\n' + t,
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
@@ -210,7 +173,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px var(--space-3)',
     borderBottom: '1px solid var(--color-bg-hover)',
     background: 'var(--color-bg-inset, rgba(0,0,0,0.15))',
-    flexWrap: 'wrap',
+    // One row (Apple Notes); scrolls sideways instead of wrapping to two rows.
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    scrollbarWidth: 'none',
     minHeight: 38,
     flexShrink: 0,
   },
@@ -306,24 +272,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 720,
     margin: '0 auto',
     padding: '48px var(--space-8)',
-  },
-  aiBtn: {
-    height: 28,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 10px',
-    border: 'none',
-    borderRadius: 4,
-    background: 'transparent',
-    color: 'var(--color-accent)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-  },
-  aiBtnDisabled: {
-    opacity: 0.5,
-    cursor: 'default',
   },
   aiStatus: {
     color: 'var(--color-accent)',
@@ -453,7 +401,6 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     const target = el.querySelectorAll('h1,h2,h3')[index] as HTMLElement | undefined;
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
-  const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -769,58 +716,6 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     return `Enhanced the note — result appended below the original text (${result.length} chars).`;
   };
 
-  const runAiAction = useCallback(async (action: AiAction) => {
-    if (readOnly || aiBusy) return;
-    const sel = window.getSelection();
-    const hasSelection = !!sel && sel.rangeCount > 0 && !sel.isCollapsed && !!sel.toString().trim();
-    const selectedText = hasSelection ? sel!.toString().trim() : '';
-    const fullText = (editorRef.current?.textContent || '').trim();
-    const source = selectedText || fullText;
-    if (!source) {
-      setAiStatus('Nothing to work with — write or select some text first.');
-      return;
-    }
-    if (!hasConfiguredProvider()) {
-      setAiStatus('No AI provider configured.');
-      return;
-    }
-    // Preserve the selection across the await so a 'replace' lands in the right spot.
-    const savedRange = hasSelection && sel ? sel.getRangeAt(0).cloneRange() : null;
-
-    setAiBusy(true);
-    setAiStatus('uki is working…');
-    let result: string | null = null;
-    try {
-      result = await askConfiguredLLM(action.build(source), AI_SYSTEM, {
-        chatOptions: { temperature: 0.5, maxTokens: 900 },
-      });
-    } catch {
-      result = null;
-    }
-    setAiBusy(false);
-    if (!result) {
-      setAiStatus('uki could not complete that — check your provider key and connection.');
-      return;
-    }
-    setAiStatus('');
-
-    pushUndo();
-    editorRef.current?.focus();
-    const replace = action.mode === 'replace' && hasSelection;
-    if (replace) {
-      if (savedRange) {
-        const s = window.getSelection();
-        s?.removeAllRanges();
-        s?.addRange(savedRange);
-      }
-      document.execCommand('insertText', false, result);
-    } else {
-      // Append at the end — non-destructive (whole-note runs never overwrite).
-      setCaretToEnd();
-      document.execCommand('insertText', false, (fullText ? '\n\n' : '') + result);
-    }
-    emitChange();
-  }, [readOnly, aiBusy, pushUndo, emitChange, setCaretToEnd]);
 
   // -- Custom Commands ---------------------------------------------------
 
