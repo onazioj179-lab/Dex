@@ -48,6 +48,7 @@ import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settin
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
+import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
@@ -172,6 +173,11 @@ const Icons = {
       <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8"/>
     </svg>
   ),
+  touch: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M9 11V5a2 2 0 0 1 4 0v6"/><path d="M13 10.5V9a2 2 0 0 1 4 0v3.5"/><path d="M9 11l-1.6-1.6a2 2 0 0 0-2.8 2.8L9 17c1.2 1.6 2.6 3 5 3h1a5 5 0 0 0 5-5v-2"/>
+    </svg>
+  ),
   storage: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
@@ -236,6 +242,7 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   permissions: Icons.privacy,
   creator: Icons.account,
   keyboard: Icons.keyboard,
+  touch: Icons.touch,
   files: Icons.files,
   storage: Icons.storage,
   browser: Icons.browser,
@@ -260,7 +267,7 @@ const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
+  { label: 'Productivity', ids: ['notifications', 'keyboard', 'touch', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
   { label: 'AI', ids: ['aiproviders', 'uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
@@ -4428,6 +4435,7 @@ export const Settings: React.FC = () => {
       case 'permissions': return <PermissionsPanel />;
       case 'creator': return <CreatorAccessPanel />;
       case 'keyboard': return renderKeyboardSettings();
+      case 'touch': return <TouchInputPanel />;
       case 'files': return renderFilesSettings();
       case 'storage': return renderStorageSettings();
       case 'browser': return renderBrowserSettings();

@@ -8,6 +8,7 @@
 // Uses Pointer Events API exclusively - no Touch Events API
 
 import { Z_HELP_OVERLAY_MAX } from '../../shared/zIndex';
+import { MAX_CONTACTS } from '../shell/input/touchContacts';
 
 type GestureType =
   | 'tap'
@@ -31,6 +32,10 @@ interface GestureEvent {
   deltaX?: number;
   deltaY?: number;
   target: EventTarget | null;
+  /** Every contact started on the bare desktop/shell, not inside an app window or
+   *  a touch surface that handles its own gestures. System gestures (overview,
+   *  app switching) should only act when this is true. */
+  onDesktop?: boolean;
 }
 
 interface ActivePointer {
@@ -50,6 +55,8 @@ interface ActivePointer {
   buttons: number;
   isPrimary: boolean;
   target: EventTarget | null;
+  /** Started inside an app window or a self-handling touch surface. */
+  inApp: boolean;
 }
 
 interface StylusState {
@@ -91,28 +98,53 @@ class GestureRecognizer {
     startTarget: EventTarget | null;
   } | null = null;
   private initialPinchDistance = 0;
+  /** One system pinch/spread or swipe-up per gesture, not one per pointermove. */
+  private pinchLatched = false;
+  private swipeUpLatched = false;
+  private contactListeners: Set<(count: number) => void> = new Set();
 
   attach(element: HTMLElement): void {
     this.element = element;
-    element.addEventListener('pointerdown', this.onPointerDown);
-    element.addEventListener('pointermove', this.onPointerMove);
-    element.addEventListener('pointerup', this.onPointerUp);
-    element.addEventListener('pointercancel', this.onPointerCancel);
-    element.addEventListener('pointerleave', this.onPointerCancel);
+    // Capture phase: an app that stops propagation of its pointerup must not
+    // leave a ghost contact here (which made every later single touch count as
+    // two). Never pointer-captures anything itself: capturing on <body> stole
+    // capture from the element the finger was actually dragging.
+    element.addEventListener('pointerdown', this.onPointerDown, true);
+    element.addEventListener('pointermove', this.onPointerMove, true);
+    element.addEventListener('pointerup', this.onPointerUp, true);
+    element.addEventListener('pointercancel', this.onPointerCancel, true);
     element.addEventListener('contextmenu', this.onContextMenu);
   }
 
   detach(): void {
     if (!this.element) return;
-    this.element.removeEventListener('pointerdown', this.onPointerDown);
-    this.element.removeEventListener('pointermove', this.onPointerMove);
-    this.element.removeEventListener('pointerup', this.onPointerUp);
-    this.element.removeEventListener('pointercancel', this.onPointerCancel);
-    this.element.removeEventListener('pointerleave', this.onPointerCancel);
+    this.element.removeEventListener('pointerdown', this.onPointerDown, true);
+    this.element.removeEventListener('pointermove', this.onPointerMove, true);
+    this.element.removeEventListener('pointerup', this.onPointerUp, true);
+    this.element.removeEventListener('pointercancel', this.onPointerCancel, true);
     this.element.removeEventListener('contextmenu', this.onContextMenu);
     this.element = null;
     this.pointers.clear();
     this.clearLongPress();
+    this.notifyContacts();
+  }
+
+  /** Live count of tracked contacts (diagnostics: Settings > Touch & Pen). */
+  onContacts(cb: (count: number) => void): () => void {
+    this.contactListeners.add(cb);
+    return () => { this.contactListeners.delete(cb); };
+  }
+
+  get contactCount(): number { return this.pointers.size; }
+
+  private notifyContacts(): void {
+    for (const cb of this.contactListeners) {
+      try { cb(this.pointers.size); } catch (_e) { /* ignore */ }
+    }
+  }
+
+  private onDesktop(pts: ActivePointer[]): boolean {
+    return pts.every((p) => !p.inApp);
   }
 
   on(type: GestureType, callback: GestureCallback): () => void {
@@ -146,6 +178,15 @@ class GestureRecognizer {
       }
     }
 
+    // A primary touch means no other touch is down (Pointer Events spec), so any
+    // touch still tracked lost its pointerup. Same for a new mouse press.
+    if ((e.pointerType === 'touch' && e.isPrimary) || e.pointerType === 'mouse') {
+      for (const [id, p] of this.pointers) if (p.type === e.pointerType) this.pointers.delete(id);
+    }
+    if (this.pointers.size === 0) { this.pinchLatched = false; this.swipeUpLatched = false; }
+    if (!this.pointers.has(e.pointerId) && this.pointers.size >= MAX_CONTACTS) return;
+
+    const startEl = e.target as Element | null;
     const pointer: ActivePointer = {
       id: e.pointerId,
       type: e.pointerType,
@@ -162,10 +203,12 @@ class GestureRecognizer {
       twist: e.twist,
       buttons: e.buttons,
       isPrimary: e.isPrimary,
-      target: e.target
+      target: e.target,
+      inApp: !!startEl?.closest?.('[data-floating-window], [data-app-id]:not([data-app-id="home"]), [data-touch-surface], canvas, [contenteditable="true"]'),
     };
 
     this.pointers.set(e.pointerId, pointer);
+    this.notifyContacts();
 
     if (e.pointerType === 'pen') {
       stylusInputManager.onStylusActivity(e);
@@ -179,11 +222,6 @@ class GestureRecognizer {
       this.clearLongPress();
       const pts = Array.from(this.pointers.values());
       this.initialPinchDistance = this.distanceBetween(pts[0], pts[1]);
-    }
-
-    // Only capture pointer for touch/pen — mouse capture breaks React onClick
-    if (this.element && e.pointerType !== 'mouse') {
-      try { this.element.setPointerCapture(e.pointerId); } catch (_e) { /* ignore */ }
     }
   };
 
@@ -233,15 +271,19 @@ class GestureRecognizer {
       const scaleDiff = currentDist - this.initialPinchDistance;
 
       if (Math.abs(scaleDiff) > PINCH_THRESHOLD) {
-        const scale = currentDist / (this.initialPinchDistance || 1);
-        this.emit({
-          type: scaleDiff > 0 ? 'two-finger-spread' : 'two-finger-pinch',
-          centerX,
-          centerY,
-          scale,
-          target: pts[0].target
-        });
-      } else if (Math.abs(avgDeltaY) > TAP_DISTANCE_THRESHOLD || Math.abs(avgDeltaX) > TAP_DISTANCE_THRESHOLD) {
+        if (!this.pinchLatched) {
+          this.pinchLatched = true;
+          const scale = currentDist / (this.initialPinchDistance || 1);
+          this.emit({
+            type: scaleDiff > 0 ? 'two-finger-spread' : 'two-finger-pinch',
+            centerX,
+            centerY,
+            scale,
+            target: pts[0].target,
+            onDesktop: this.onDesktop(pts),
+          });
+        }
+      } else if (!this.pinchLatched && (Math.abs(avgDeltaY) > TAP_DISTANCE_THRESHOLD || Math.abs(avgDeltaX) > TAP_DISTANCE_THRESHOLD)) {
         this.emit({
           type: 'two-finger-scroll',
           centerX,
@@ -264,19 +306,22 @@ class GestureRecognizer {
           centerX: pts[0].currentX,
           centerY: pts[0].currentY,
           deltaX: avgDeltaX,
-          target: pts[0].target
+          target: pts[0].target,
+          onDesktop: this.onDesktop(pts),
         });
         for (const p of pts) {
           p.startX = p.currentX;
           p.startY = p.currentY;
         }
-      } else if (avgDeltaY < -SWIPE_THRESHOLD && Math.abs(avgDeltaY) > Math.abs(avgDeltaX)) {
+      } else if (!this.swipeUpLatched && avgDeltaY < -SWIPE_THRESHOLD && Math.abs(avgDeltaY) > Math.abs(avgDeltaX)) {
+        this.swipeUpLatched = true;
         this.emit({
           type: 'three-finger-swipe-up',
           centerX: pts[0].currentX,
           centerY: pts[0].currentY,
           deltaY: avgDeltaY,
-          target: pts[0].target
+          target: pts[0].target,
+          onDesktop: this.onDesktop(pts),
         });
         for (const p of pts) {
           p.startX = p.currentX;
@@ -327,13 +372,12 @@ class GestureRecognizer {
     }
 
     this.pointers.delete(e.pointerId);
-    if (this.element && e.pointerType !== 'mouse') {
-      try { this.element.releasePointerCapture(e.pointerId); } catch (_e) { /* ignore */ }
-    }
+    this.notifyContacts();
   };
 
   private onPointerCancel = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);
+    this.notifyContacts();
     this.clearLongPress();
     if (this.dragState?.active) {
       this.endDrag();

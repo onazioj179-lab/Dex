@@ -12,7 +12,13 @@
 - **UKI assistant** (from the 6.1.x work, unreleased until now): choose where requests go (Local only, Hybrid, Cloud only, or one pinned model), reasoning effort, file actions limited to Documents/Desktop/Downloads with confirmation, pause/resume/cancel for background tasks, an activity log, memory you can view/forget/export/clear, AI keys encrypted with Windows DPAPI, daily AI usage and an optional cloud limit, "Look at my screen" and "Use my camera" (one frame each).
 - **Spatial desktop and Creative Hub** (from Part 5, merged): windows on a pan/zoom canvas with zones, snapping and saved views; Creative Hub and whiteboard templates.
 
+- **Touch & Pen settings.** Shows how many fingers your screen supports and has a test pad that draws every live contact. Up to ten fingers are tracked at once where the screen supports it.
+- **Spotlight finds open windows**, and on the spatial desktop also your window groups, zones and saved views.
+
 ## Changed
+
+- **Spatial desktop: no more corner toolbar or default minimap.** Right-click or long-press the desktop for zoom, arrange and window options (shortcuts unchanged). The minimap is off unless you turn it on.
+- **Haptics only where there is a motor.** DEX no longer calls vibrate on every button press; a short pulse marks a snap on supported phones/tablets, and you can turn it off.
 
 - **Local AI is opt-in.** DEX no longer checks for Ollama on every start or uses it just because it is running. Turn on "Connect to a local AI service (Ollama)" in Settings › AI Providers if you want it. DEX never installs or starts an AI runtime.
 - **Battery is no longer in the top bar.** It is in Control Center, which also says when a PC has no battery.
@@ -27,6 +33,9 @@
 - The Calculator reacted to Enter, Escape and number keys pressed in other apps while it was open in the background.
 - DEX starts reliably on machines where 6.0.x failed with "WebView2Loader.dll was not found"; opening DEX twice focuses the existing window.
 - Light mode: the top bar, menus, dock and panels no longer stay dark; the live-activity card is readable in light mode.
+
+- Touch drags inside apps no longer lose their grip (the shell was taking over every touch), and pinching inside an app no longer opens the overview.
+- The spatial canvas keeps panning and zooming when a third finger lands.
 
 ## Faster
 

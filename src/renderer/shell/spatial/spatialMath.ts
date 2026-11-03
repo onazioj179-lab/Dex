@@ -281,3 +281,10 @@ export function pinchCamera(cam: Camera, prev: [{ x: number; y: number }, { x: n
   const zoomed = zoomAt(cam, m0.x, m0.y, dist(next) / dist(prev), limits);
   return panBy(zoomed, m1.x - m0.x, m1.y - m0.y);
 }
+
+/** Camera after an N-finger gesture step: zoom by `scale` about the previous
+ *  centroid (cx, cy), then pan by the centroid's movement (screen px). */
+export function gestureCamera(cam: Camera, d: { cx: number; cy: number; dx: number; dy: number; scale: number }, limits: ZoomLimits = DEFAULT_LIMITS): Camera {
+  const zoomed = zoomAt(cam, d.cx, d.cy, d.scale, limits);
+  return panBy(zoomed, d.dx, d.dy);
+}

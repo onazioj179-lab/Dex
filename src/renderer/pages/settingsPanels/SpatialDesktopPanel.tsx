@@ -49,7 +49,8 @@ export const SpatialDesktopPanel: React.FC = () => {
           <div style={label}>Spatial desktop</div>
           <div style={desc}>
             Arrange windows freely on an infinite canvas you can pan and zoom ({mod}+S). Apps stay live and
-            interactive. Your normal window layout comes back when you turn it off.
+            interactive. Right-click or long-press the desktop for zoom, arrange and window options. Your normal
+            window layout comes back when you turn it off.
           </div>
         </div>
         <Switch on={enabled} label="Spatial desktop" onChange={(v) => window.dispatchEvent(new CustomEvent('dex-spatial-toggle', { detail: { enabled: v } }))} />
@@ -57,7 +58,7 @@ export const SpatialDesktopPanel: React.FC = () => {
       <div style={row}>
         <div>
           <div style={label}>Minimap</div>
-          <div style={desc}>Show an overview of the canvas in the corner ({mod}+M).</div>
+          <div style={desc}>Show an overview of the canvas in the top-right corner ({mod}+M). Click or drag on it to move the view.</div>
         </div>
         <Switch on={minimap} label="Minimap" onChange={() => useSpatialStore.getState().toggleMinimap()} />
       </div>

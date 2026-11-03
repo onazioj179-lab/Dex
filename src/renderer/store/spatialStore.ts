@@ -194,7 +194,7 @@ export const useSpatialStore = create<SpatialState>()(
         camera: HOME_CAMERA,
         limits: DEFAULT_LIMITS,
         history: [],
-        minimap: true,
+        minimap: false,
         snapGrid: false,
         groups: [],
         layout: {},
@@ -436,7 +436,12 @@ export const useSpatialStore = create<SpatialState>()(
     },
     {
       name: 'dex-spatial-v1',
-      version: 1,
+      // v2: the minimap is opt-in (it was the always-on square in the corner).
+      version: 2,
+      migrate: (persisted, version) => {
+        const p = (persisted && typeof persisted === 'object' ? persisted : {}) as Record<string, unknown>;
+        return (version < 2 ? { ...p, minimap: false } : p) as unknown as SpatialState;
+      },
       storage: debouncedJsonStorage,
       partialize: (s) => ({
         enabled: s.enabled, camera: s.camera, minimap: s.minimap, snapGrid: s.snapGrid,
@@ -457,7 +462,7 @@ export const useSpatialStore = create<SpatialState>()(
           ...current,
           enabled: p.enabled === true,
           camera: sanitizeCamera(p.camera, current.limits),
-          minimap: p.minimap !== false,
+          minimap: p.minimap === true,
           snapGrid: p.snapGrid === true,
           groups: clean.groups,
           layout: clean.layout,

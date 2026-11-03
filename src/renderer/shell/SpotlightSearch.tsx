@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<SpotlightCategory, string> = {
   top: 'Top Result',
   recent: 'Recent',
   apps: 'Apps',
+  windows: 'Open Windows',
   settings: 'Settings',
   notes: 'Notes',
   tasks: 'Tasks',
@@ -41,7 +42,7 @@ const CATEGORY_LABELS: Record<SpotlightCategory, string> = {
 };
 
 const CATEGORY_ORDER: SpotlightCategory[] = [
-  'top', 'calculator', 'apps', 'settings', 'recent',
+  'top', 'calculator', 'windows', 'apps', 'settings', 'recent',
   'notes', 'tasks', 'files', 'projects', 'workflows',
   'commands', 'clipboard', 'screenshots', 'conversations', 'actions', 'web',
 ];
@@ -55,6 +56,8 @@ const CategoryIcon: React.FC<{ category: SpotlightCategory }> = memo(({ category
       return <svg {...props}><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/></svg>;
     case 'apps':
       return <svg {...props}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>;
+    case 'windows':
+      return <svg {...props}><rect x="3" y="5" width="13" height="10" rx="1.5"/><path d="M8 19h11a2 2 0 002-2V9"/></svg>;
     case 'settings':
       return <svg {...props}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
     case 'recent':
