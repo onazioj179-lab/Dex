@@ -56,7 +56,7 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
     try {
       addRecent({ path: file.path, name: file.name, appId: 'files' });
       const result = await ((window as any).dex?.shell?.openPath?.(file.path)
-        ?? (window as any).electron?.invoke?.('shell:openPath', file.path));
+        ?? (window as any).dex?.invoke?.('shell:openPath', file.path));
       if (result && typeof result === 'string') {
         console.warn('[Home] Failed to open pinned file:', result);
       }
@@ -361,7 +361,7 @@ export const Home: React.FC = () => {
   // Data state - backend hydration via centralized Zustand store
   const refreshData = useCallback(async () => {
     try {
-      const result = await (window as any).electron?.invoke?.('files:recent', { limit: 8 });
+      const result = await (window as any).dex?.invoke?.('files:recent', { limit: 8 });
       if (result?.success && Array.isArray(result.files) && result.files.length > 0) {
         const addRecent = useRecentFiles.getState().addRecent;
         // Deduplicate by normalised path before adding
@@ -414,7 +414,7 @@ export const Home: React.FC = () => {
 
   const pinFileFromDialog = useCallback(async (position?: { x: number; y: number }) => {
     try {
-      const result = await ((window as any).electron?.invoke?.('files:openDialog', {
+      const result = await ((window as any).dex?.invoke?.('files:openDialog', {
         properties: ['openFile'],
       }) ?? (window as any).dex?.invoke?.('dialog:showOpenDialog', { properties: ['openFile'] }));
       const filePath = result?.filePaths?.[0];

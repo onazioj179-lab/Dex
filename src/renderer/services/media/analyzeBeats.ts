@@ -51,8 +51,8 @@ interface Bridge {
 }
 
 function bridge(): Bridge | null {
-  const w = window as unknown as { dex?: Bridge; electron?: Bridge };
-  const b = w.dex ?? w.electron;
+  const w = window as unknown as { dex?: Bridge };
+  const b = w.dex;
   return b && typeof b.invoke === 'function' ? b : null;
 }
 

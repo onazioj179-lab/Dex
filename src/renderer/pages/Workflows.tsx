@@ -989,8 +989,8 @@ export const Workflows: React.FC = () => {
           switch (node.actionId) {
             case 'a1': { // Get Files (config: path, filter)
               const folder = node.config.path || 'documents';
-              if (window.electron?.invoke) {
-                const res = await window.electron.invoke('files:list', folder);
+              if (window.dex?.invoke) {
+                const res = await window.dex.invoke('files:list', folder);
                 context.files = res?.files || [];
               }
               break;
@@ -998,8 +998,8 @@ export const Workflows: React.FC = () => {
             case 'a2': { // Copy File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
-              if (src && dest && window.electron?.invoke) {
-                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:copy', src, dest);
+              if (src && dest && window.dex?.invoke) {
+                const r = await window.dex.invoke<{ success?: boolean; error?: string }>('files:copy', src, dest);
                 if (r && r.success === false) throw new Error(r.error || 'Copy failed');
               }
               break;
@@ -1007,17 +1007,17 @@ export const Workflows: React.FC = () => {
             case 'a3': { // Move File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
-              if (src && dest && window.electron?.invoke) {
-                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:move', src, dest);
+              if (src && dest && window.dex?.invoke) {
+                const r = await window.dex.invoke<{ success?: boolean; error?: string }>('files:move', src, dest);
                 if (r && r.success === false) throw new Error(r.error || 'Move failed');
               }
               break;
             }
             case 'a11': { // Delete File (config: path)
               const path = node.config.path || context.files?.[0]?.path;
-              if (path && window.electron?.invoke) {
+              if (path && window.dex?.invoke) {
                 // Recycle Bin, not a permanent delete: automations must be undoable.
-                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:trash', path);
+                const r = await window.dex.invoke<{ success?: boolean; error?: string }>('files:trash', path);
                 if (r && r.success === false) throw new Error(r.error || 'Could not move file to the Recycle Bin');
               }
               break;
@@ -1025,32 +1025,32 @@ export const Workflows: React.FC = () => {
             case 'a12': { // Rename File (config: path, newName)
               const path = node.config.path || '';
               const newName = node.config.newName || '';
-              if (path && newName && window.electron?.invoke) {
-                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:rename', path, newName);
+              if (path && newName && window.dex?.invoke) {
+                const r = await window.dex.invoke<{ success?: boolean; error?: string }>('files:rename', path, newName);
                 if (r && r.success === false) throw new Error(r.error || 'Rename failed');
               }
               break;
             }
             case 'a36': { // Open File with default app (config: path)
               const path = node.config.path || context.files?.[0]?.path;
-              if (path && window.electron?.invoke) {
+              if (path && window.dex?.invoke) {
                 // Refused targets (executables, scripts, missing paths) come
                 // back as { success:false, error } -- surface them as the result.
-                context.result = await window.electron.invoke('shell:openPath', path);
+                context.result = await window.dex.invoke('shell:openPath', path);
               }
               break;
             }
             case 'a35': { // Open URL (config: url)
               const url = node.config.url || '';
-              if (url && window.electron?.invoke) {
-                context.result = await window.electron.invoke('shell:openExternal', url);
+              if (url && window.dex?.invoke) {
+                context.result = await window.dex.invoke('shell:openExternal', url);
               }
               break;
             }
             case 'a7': { // Run Script (config: language, code)
               const script = node.config.code || '';
-              if (script && window.electron?.invoke) {
-                const res = await window.electron.invoke('workflow:runScript', script);
+              if (script && window.dex?.invoke) {
+                const res = await window.dex.invoke('workflow:runScript', script);
                 context.output = res?.output || '';
                 context.result = res;
               }
@@ -1058,9 +1058,9 @@ export const Workflows: React.FC = () => {
             }
             case 'a8': { // Open App (config: appName)
               const app = node.config.appName || '';
-              if (app && window.electron?.invoke) {
+              if (app && window.dex?.invoke) {
                 // Launch via the installed-apps index (shell:openPath refuses executables).
-                context.result = await window.electron.invoke('launcher:quick', app);
+                context.result = await window.dex.invoke('launcher:quick', app);
               }
               break;
             }

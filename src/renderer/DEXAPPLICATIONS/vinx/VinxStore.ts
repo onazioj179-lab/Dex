@@ -519,7 +519,7 @@ function saveProject(project: VinxProject): void {
   try {
     const json = JSON.stringify(project);
     localStorage.setItem(STORAGE_KEY, json);
-    (window as any).electron?.invoke?.('capability:storage:set', STORAGE_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch (e) { console.warn('[VINX] Failed to save project:', e); }
 }
 
@@ -538,7 +538,7 @@ function saveLayout(layout: PanelLayout): void {
   try {
     const json = JSON.stringify(layout);
     localStorage.setItem(LAYOUT_KEY, json);
-    (window as any).electron?.invoke?.('capability:storage:set', LAYOUT_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', LAYOUT_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch (e) { console.warn('[VINX] Failed to save layout:', e); }
 }
 
@@ -1650,14 +1650,14 @@ export const useVinxStore = create<VinxState>((set, get) => {
 // Async IPC load on module init — overrides localStorage data with IPC backend data
 (async () => {
   try {
-    const raw = await (window as any).electron?.invoke?.('capability:storage:get', STORAGE_KEY);
+    const raw = await (window as any).dex?.invoke?.('capability:storage:get', STORAGE_KEY);
     if (raw) {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (parsed && parsed.id && parsed.sequences) {
         useVinxStore.setState({ project: parsed });
       }
     }
-    const layoutRaw = await (window as any).electron?.invoke?.('capability:storage:get', LAYOUT_KEY);
+    const layoutRaw = await (window as any).dex?.invoke?.('capability:storage:get', LAYOUT_KEY);
     if (layoutRaw) {
       const parsed = typeof layoutRaw === 'string' ? JSON.parse(layoutRaw) : layoutRaw;
       if (parsed && typeof parsed.mediaBrowserWidth === 'number') {

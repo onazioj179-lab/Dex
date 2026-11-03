@@ -23,6 +23,7 @@ mod env_manager;
 mod ssh;
 mod fs_ops;
 mod file_mutations;
+mod compact_window;
 mod watch;
 mod analytics;
 mod power;
@@ -2709,6 +2710,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             let _ = window.hide();
             json!({ "success": true })
         }
+        "window:enterCompact" => compact_window::enter(&window, &args.get(0).cloned().unwrap_or(Value::Null)),
+        "window:exitCompact" => compact_window::exit(&window),
         // No native title-bar overlay under Tauri (the titlebar is CSS) — accept
         // the toggle as a no-op so the renderer's titlebar logic proceeds.
         "window:setTitleBarOverlay" => json!({ "success": true }),

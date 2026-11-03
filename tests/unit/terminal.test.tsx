@@ -20,7 +20,7 @@ const listeners: Record<string, Listener[]> = {};
 const invokeCalls: Array<{ ch: string; args: unknown[] }> = [];
 
 function mockBridge(spawnResult: { sessionId?: string; error?: string } = { sessionId: 'pty-1' }) {
-  (window as unknown as { electron: unknown }).electron = {
+  (window as unknown as { dex: unknown }).dex = {
     invoke: vi.fn(async (ch: string, ...args: unknown[]) => {
       invokeCalls.push({ ch, args });
       if (ch === 'pty:spawn') return spawnResult;

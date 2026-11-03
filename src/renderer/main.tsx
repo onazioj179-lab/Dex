@@ -17,7 +17,7 @@ import './styles/design-system.css';
 import './styles/design-tokens.css'; // canonical token layer — load last (authoritative)
 import './styles/print.css';
 
-// Electron->Tauri migration (GOAL-6A): install the window.dex / window.electron
+// Electron->Tauri migration (GOAL-6A): install the window.dex / window.dex
 // compatibility layer FIRST — before any service reads window.dex — so the
 // renderer's IPC calls route to the native dex_ipc dispatcher under the Tauri
 // shell. This is a no-op under Electron (where the real preload provides them).
@@ -193,7 +193,7 @@ memorySentinel.on('high', (e: MemoryPressureEvent) =>
 );
 memorySentinel.on('critical', (e: MemoryPressureEvent) => {
   rendererLogger.error('memory.pressure.critical', { heapUsedMB: e.heapUsedMB, utilization: e.utilization });
-  const bridge = (window as any).dex || (window as any).electron || (window as any).dexAPI;
+  const bridge = (window as any).dex;
   bridge?.invoke?.('render-error:report', { kind: 'memory-pressure', heapUsedMB: e.heapUsedMB, utilization: e.utilization }).catch(() => {});
 });
 memorySentinel.start();
@@ -205,7 +205,7 @@ memorySentinel.start();
 (() => {
   const reportToMain = (kind: 'error' | 'unhandledrejection', payload: Record<string, unknown>) => {
     try {
-      const dex = (window as any).dex || (window as any).electron || (window as any).dexAPI;
+      const dex = (window as any).dex;
       if (dex?.invoke) {
         dex.invoke('render-error:report', { kind, ...payload, t: Date.now() })
           .catch(() => { /* main may be down; logger has it */ });

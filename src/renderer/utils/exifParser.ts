@@ -260,8 +260,8 @@ export function parseExif(buffer: ArrayBuffer): ExifData | null {
 export async function loadExifFromPath(filePath: string): Promise<ExifData | null> {
   try {
     // Use Electron IPC to read the first 128KB
-    if (window.electron?.invoke) {
-      const buffer = await window.electron.invoke('fs:readFileHead', filePath, 131072);
+    if (window.dex?.invoke) {
+      const buffer = await window.dex.invoke('fs:readFileHead', filePath, 131072);
       if (buffer instanceof ArrayBuffer) {
         return parseExif(buffer);
       }

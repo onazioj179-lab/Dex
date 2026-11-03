@@ -134,7 +134,7 @@ const DEFAULT_POWER: PowerState = {
 
 function getIPC(): any {
   const w = window as unknown as Record<string, unknown>;
-  return w.electron || w.api || null;
+  return w.dex || null;
 }
 
 function ipcSend(channel: string, data?: any): void {

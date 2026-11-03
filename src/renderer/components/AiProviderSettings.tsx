@@ -34,7 +34,6 @@ import { getCapabilities } from '../services/platform';
 /** Human label for the shell + backend coverage (the dual-shell "blend"). */
 function shellLabel(): string {
   const c = getCapabilities();
-  if (c.shell === 'electron') return 'Electron · full backend';
   if (c.shell === 'tauri') return `Tauri (lite) · ${c.nativeSubsystems.length} native subsystems`;
   return 'Web preview · local-only';
 }

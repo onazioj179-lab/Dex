@@ -139,7 +139,7 @@ let _devicePromise: Promise<DeviceInfo | null> | null = null;
 
 function bridgeInvoke<T = unknown>(channel: string): Promise<T | null> {
   try {
-    const ipc = typeof window !== 'undefined' ? (window as unknown as { electron?: { invoke?: (c: string) => Promise<T> } }).electron : undefined;
+    const ipc = typeof window !== 'undefined' ? (window as unknown as { dex?: { invoke?: (c: string) => Promise<T> } }).dex : undefined;
     if (ipc?.invoke) return ipc.invoke(channel).catch(() => null);
   } catch { /* ignore */ }
   return Promise.resolve(null);

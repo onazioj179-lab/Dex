@@ -72,9 +72,9 @@ export function installMemoryPressureBridge(): void {
   if (installed) return;
   installed = true;
 
-  const electron = (window as unknown as {
-    electron?: { on?: (channel: string, handler: (...args: any[]) => void) => void };
-  }).electron;
+  const bridge = (window as unknown as {
+    dex?: { on?: (channel: string, handler: (...args: any[]) => void) => void };
+  }).dex;
 
   const handler = (payload: { level: 'moderate' | 'high' | 'critical'; heapUsedMB: number }) => {
     if (!payload || typeof payload.level !== 'string') return;
@@ -93,15 +93,9 @@ export function installMemoryPressureBridge(): void {
     }, 60_000);
   };
 
-  // preload bridge: window.electron.on (renderer-safe, contextIsolated)
-  if (electron?.on) {
-    electron.on('memory:pressure', handler);
-  } else if (typeof (window as any).require === 'function') {
-    // Fallback for non-isolated contexts (legacy builds only).
-    try {
-      const { ipcRenderer } = (window as any).require('electron');
-      ipcRenderer?.on('memory:pressure', (_evt: unknown, payload: any) => handler(payload));
-    } catch { /* ignore */ }
+  // preload bridge: window.dex.on (renderer-safe, contextIsolated)
+  if (bridge?.on) {
+    bridge.on('memory:pressure', handler);
   }
 }
 

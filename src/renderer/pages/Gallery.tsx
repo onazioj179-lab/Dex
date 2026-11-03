@@ -200,13 +200,13 @@ const loadAllMedia = async (): Promise<MediaItem[]> => {
   const allMedia: MediaItem[] = [];
 
   try {
-    if (window.electron?.invoke) {
+    if (window.dex?.invoke) {
       const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
 
       // Load pictures and videos in parallel
       const [pictureFiles, videoFiles] = await Promise.all([
-        Promise.race([window.electron.invoke('media:getMediaFiles', 'pictures'), timeout]),
-        Promise.race([window.electron.invoke('media:getMediaFiles', 'videos'), timeout]),
+        Promise.race([window.dex.invoke('media:getMediaFiles', 'pictures'), timeout]),
+        Promise.race([window.dex.invoke('media:getMediaFiles', 'videos'), timeout]),
       ]);
 
       const processFiles = (files: Array<{ path?: string; name?: string; extension?: string; modified?: number; size?: number; duration?: number }>, fallbackType: 'image' | 'video') => {
@@ -268,8 +268,8 @@ const loadAllMedia = async (): Promise<MediaItem[]> => {
 // Favorites persistence
 const loadFavorites = async (): Promise<string[]> => {
   try {
-    if (window.electron?.invoke) {
-      const result = await window.electron.invoke('capability:storage:get', 'dex-gallery-favorites');
+    if (window.dex?.invoke) {
+      const result = await window.dex.invoke('capability:storage:get', 'dex-gallery-favorites');
       if (result) {
         const parsed = JSON.parse(result);
         return Array.isArray(parsed) ? parsed : [];
@@ -289,7 +289,7 @@ const loadFavorites = async (): Promise<string[]> => {
 const saveFavorites = async (favorites: string[]) => {
   const data = JSON.stringify(favorites);
   localStorage.setItem('dex-gallery-favorites', data);
-  try { await window.electron?.invoke?.('capability:storage:set', 'dex-gallery-favorites', data); } catch { /* */ }
+  try { await window.dex?.invoke?.('capability:storage:set', 'dex-gallery-favorites', data); } catch { /* */ }
 };
 
 // ===========================================================================
@@ -1054,7 +1054,7 @@ export const Gallery: React.FC = () => {
         { id: 'vinx', label: 'Edit in Vinx', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'videoeditor') },
         { id: 'forge', label: 'Send to Forge', icon: Icons.settings, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'forge') },
       ] : []),
-      { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).electron?.invoke) (window as any).electron.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
+      { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).dex?.invoke) (window as any).dex.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
       { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
   }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
@@ -1316,7 +1316,7 @@ export const Gallery: React.FC = () => {
                 onClick={() => {
                   try {
                     const folder = selectedAlbum === 'videos' ? 'videos' : 'pictures';
-                    window.electron?.invoke?.('shell:openPath', folder);
+                    window.dex?.invoke?.('shell:openPath', folder);
                   } catch { toast.error('Could not open folder'); }
                 }}
                 style={{

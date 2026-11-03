@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import { sharedTick } from '../services/SharedTick';
 import { resolveAutosaveInterval } from './autosavePrefs';
 
-const invoke = (window as any).electron?.invoke;
+const invoke = (window as any).dex?.invoke;
 
 // Interval for durable version-history snapshots (5 minutes)
 const VERSION_SNAPSHOT_INTERVAL = 5 * 60_000;

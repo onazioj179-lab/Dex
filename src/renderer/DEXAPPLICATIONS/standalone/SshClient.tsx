@@ -40,7 +40,7 @@ interface SshBridge {
 
 const getBridge = (): SshBridge | null => {
   const w = window as any;
-  return (w.dex?.ssh ?? w.electron?.ssh ?? null) as SshBridge | null;
+  return (w.dex?.ssh ?? null) as SshBridge | null;
 };
 
 const META_KEY = 'dex.ssh.meta';      // Record<profileId, SshMeta>

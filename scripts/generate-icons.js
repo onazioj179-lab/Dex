@@ -7,7 +7,7 @@
 #!/usr/bin/env node
 /**
  * DEX Icon Generator
- * Converts SVG icon to all required formats for electron-builder:
+ * Converts the SVG icon to the raster formats the installer needs:
  * - icon.png (1024x1024) -- master
  * - icon.ico (256x256) -- Windows
  * - 256x256.png -- Windows fallback
@@ -43,7 +43,7 @@ async function generate() {
     .toFile(path.join(ASSETS, '512x512.png'));
   console.log('[Icons] 512x512.png');
 
-  // 3. 256x256 PNG (Windows + electron-builder)
+  // 3. 256x256 PNG (Windows)
   await sharp(svgBuffer)
     .resize(256, 256)
     .png({ quality: 100, compressionLevel: 9 })
@@ -66,7 +66,7 @@ async function generate() {
   console.log('[Icons] tray-icon@2x.png (64x64)');
 
   // 6. Generate ICO from 256x256 PNG (multi-size ICO is critical for Windows)
-  // electron-builder can auto-generate ICO from PNG, but we'll create the sizes it needs
+  // Create the ICO sizes explicitly
   const icoSizes = [16, 24, 32, 48, 64, 128, 256];
   for (const size of icoSizes) {
     await sharp(svgBuffer)

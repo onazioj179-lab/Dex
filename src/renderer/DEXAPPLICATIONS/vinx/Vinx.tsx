@@ -13,7 +13,6 @@
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
 import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
-import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
@@ -506,7 +505,6 @@ const VinxEditor: React.FC = () => {
   const sourceCanvasRef = useRef<HTMLDivElement>(null);
   // UKI natural-language assistant bar. Drives the previously-orphaned
   // handleVinxOp handler (silence removal, speed ramp, etc.).
-  const [showAiBar, setShowAiBar] = useState(false);
 
   // Quick Export (WebM) — real canvas.captureStream + MediaRecorder render of
   // the live timeline playback. Tracks an in-flight capture + its progress.
@@ -1120,25 +1118,6 @@ const VinxEditor: React.FC = () => {
   return (
     <div style={appContainerStyle} className="vinx-app" {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop videos to import</div>}
-      {showAiBar && (
-        <div
-          className="dex-creative-panel-strong"
-          onClick={(e) => e.stopPropagation()}
-          style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', width: 'min(560px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 'var(--z-max)', padding: 'var(--space-2)' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.4px' }}>VINX ASSISTANT</span>
-            <button aria-label="Close assistant" onClick={() => setShowAiBar(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>x</button>
-          </div>
-          <CreativeCommandBar
-            appId="vinx"
-            facts={{ clipId: selectedClipIds[0], sequenceId: activeSequence?.id }}
-            onApplyOp={handleVinxOp}
-            examples={['remove silence', 'slow motion 0.5x', 'stabilize', 'auto color']}
-            placeholder="Describe an edit..."
-          />
-        </div>
-      )}
       <style>{`
         /* === VINX - PROFESSIONAL NLE STYLES === */
         .vinx-app button { font-family: inherit; }
@@ -1320,14 +1299,6 @@ const VinxEditor: React.FC = () => {
 
         <div style={toolbarSeparatorStyle} />
 
-        <button
-          aria-label="Toggle AI assistant"
-          aria-pressed={showAiBar}
-          onClick={() => setShowAiBar(v => !v)}
-          style={{ ...toolbarBtnStyle, background: showAiBar ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : undefined, color: showAiBar ? 'var(--color-accent)' : undefined }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg> Assistant
-        </button>
 
       </div>
 

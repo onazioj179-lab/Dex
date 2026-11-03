@@ -372,9 +372,9 @@ const TASK_TEMPLATES: { name: string; tasks: Omit<Task, 'id'>[] }[] = [
 // Load tasks from backend or localStorage
 const loadTasksFromBackend = async (): Promise<Task[]> => {
   try {
-    if (window.electron?.invoke) {
+    if (window.dex?.invoke) {
       // Try to get from data store
-      const stored = await window.electron.invoke('capability:storage:get', 'dex-tasks');
+      const stored = await window.dex.invoke('capability:storage:get', 'dex-tasks');
       if (stored && Array.isArray(stored)) {
         return stored.map((t: Omit<Task, 'dueDate'> & { dueDate: string | null }) => ({
           ...t,
@@ -404,8 +404,8 @@ const loadTasksFromStorage = (): Task[] => {
 
 const saveTasksToBackend = async (tasks: Task[]): Promise<boolean> => {
   try {
-    if (window.electron?.invoke) {
-      await window.electron.invoke('capability:storage:set', 'dex-tasks', tasks);
+    if (window.dex?.invoke) {
+      await window.dex.invoke('capability:storage:set', 'dex-tasks', tasks);
       return true;
     }
   } catch (e) {

@@ -1305,24 +1305,6 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               {NOTE_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
             </select>
           </div>
-          {/* uki AI writing actions */}
-          <div style={styles.toolbarSep} />
-          <div style={styles.toolbarGroup}>
-            {AI_ACTIONS.map(action => (
-              <button
-                key={action.id}
-                aria-label={`uki: ${action.label}`}
-                title={`uki: ${action.label} (uses your configured AI provider)`}
-                style={{ ...styles.aiBtn, ...(aiBusy ? styles.aiBtnDisabled : {}) }}
-                disabled={aiBusy}
-                onMouseEnter={e => { if (!aiBusy) e.currentTarget.style.background = 'var(--color-accent-soft, rgba(100,210,255,0.12))'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                onMouseDown={e => { e.preventDefault(); void runAiAction(action); }}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
           {/* Outline toggle — opens the heading table of contents */}
           <div style={styles.toolbarSep} />
           <button

@@ -453,7 +453,7 @@ const Forge: React.FC = () => {
   const activeEncodings = useRef<Set<string>>(new Set());
   // Track watch-folder IPC listeners so they can be detached on unmount.
   // Without this each added watch folder leaks a 'watch:fileAdded' handler.
-  const watchHandlersRef = useRef<Array<(event: any, data: any) => void>>([]);
+  const watchHandlersRef = useRef<Array<(data: any) => void>>([]);
 
   // Cleanup blob URLs on unmount to prevent memory leaks
   const jobsRef = useRef(jobs);
@@ -465,7 +465,7 @@ const Forge: React.FC = () => {
       });
       // Detach any watch-folder IPC listeners registered during this session
       watchHandlersRef.current.forEach(h => {
-        try { window.electron?.ipcRenderer?.off?.('watch:fileAdded', h); } catch { /* already detached */ }
+        try { window.dex?.off?.('watch:fileAdded', h); } catch { /* already detached */ }
       });
       watchHandlersRef.current = [];
     };
@@ -1017,8 +1017,8 @@ const Forge: React.FC = () => {
           try {
             await dex.invoke('watch:start', { id: folderId, path: folderPath });
             // Listen for new files detected by the watcher
-            const handler = (_event: any, data: { id: string; files: string[] }) => {
-              if (data.id === folderId) {
+            const handler = (data: { id: string; files: string[] }) => {
+              if (data?.id === folderId) {
                 // Auto-queue detected files for encoding
                 const newJobs = data.files
                   .filter((f: string) => /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v|ts|mxf|prores)$/i.test(f))
@@ -1039,7 +1039,7 @@ const Forge: React.FC = () => {
                 }
               }
             };
-            window.electron?.ipcRenderer?.on?.('watch:fileAdded', handler);
+            window.dex?.on?.('watch:fileAdded', handler);
             // Remember the handler so the unmount effect can detach it
             watchHandlersRef.current.push(handler);
           } catch {

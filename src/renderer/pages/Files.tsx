@@ -338,7 +338,7 @@ Breadcrumb.displayName = 'Breadcrumb';
  * copy/move/delete/rename/mkdir through this: it throws on a reported failure.
  */
 async function fileOp(channel: string, ...args: unknown[]): Promise<unknown> {
-  const r = await window.electron!.invoke(channel, ...args);
+  const r = await window.dex!.invoke(channel, ...args);
   if (r && typeof r === 'object' && (r as { success?: boolean }).success === false) {
     throw new Error((r as { error?: string }).error || `${channel} failed`);
   }
@@ -649,9 +649,9 @@ export const Files: React.FC = () => {
     setColumnData({});
     setColumnLoading(new Set());
     try {
-      if (window.electron?.invoke) {
-        const result = await window.electron.invoke('files:list', location);
-        if (result.success) {
+      if (window.dex?.invoke) {
+        const result = await window.dex.invoke('files:list', location);
+        if (result?.success && Array.isArray(result.files)) {
           const filesWithCategory = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
             ...f,
             modified: new Date(f.modified),
@@ -677,6 +677,10 @@ export const Files: React.FC = () => {
             .sort((a: FileItem, b: FileItem) => b.modified.getTime() - a.modified.getTime())
             .slice(0, 20);
           setRecentFiles(recent);
+        } else {
+          setFiles([]);
+          setAllFiles([]);
+          setLoadError(result?.error ? `Couldn't open this folder: ${result.error}` : "Couldn't open this folder.");
         }
       } else {
         // No files available - show empty state
@@ -695,10 +699,10 @@ export const Files: React.FC = () => {
   // files:list bridge as the main view, caching results per path so each pushed
   // Miller column populates instead of rendering blank.
   const loadColumn = useCallback(async (location: string) => {
-    if (!window.electron?.invoke) return;
+    if (!window.dex?.invoke) return;
     setColumnLoading(prev => { const next = new Set(prev); next.add(location); return next; });
     try {
-      const result = await window.electron.invoke('files:list', location);
+      const result = await window.dex.invoke('files:list', location);
       if (result?.success) {
         const filesWithCategory: FileItem[] = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
           ...f,
@@ -734,7 +738,7 @@ export const Files: React.FC = () => {
     setDragOverPath(null);
     if (!dragFile || !targetDir.isDirectory) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:move', dragFile.path, targetDir.path);
         loadFiles(currentPath);
       }
@@ -823,8 +827,8 @@ export const Files: React.FC = () => {
       trackFileOpen(file.path);
       addRecent({ path: file.path, name: file.name, appId: 'files' });
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesOpened', amount: 1 } }));
-      if (window.electron?.invoke) {
-        const res = await window.electron.invoke('shell:openPath', file.path);
+      if (window.dex?.invoke) {
+        const res = await window.dex.invoke('shell:openPath', file.path);
         if (res && res.success === false) {
           toast.error(res.error ? `Can't open ${file.name}: ${res.error}` : `Can't open ${file.name}`);
         }
@@ -856,7 +860,7 @@ export const Files: React.FC = () => {
   const handlePasteFile = async () => {
     if (!clipboard) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         const dest = currentPath;
         if (clipboard.mode === 'copy') {
           await fileOp('files:copy', clipboard.file.path, dest);
@@ -881,7 +885,7 @@ export const Files: React.FC = () => {
     setFolderNameDraft(null);
     if (!name) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:mkdir', `${currentPath}/${name}`);
         loadFiles(currentPath);
       }
@@ -917,7 +921,7 @@ export const Files: React.FC = () => {
     if (!confirmed) return;
     try {
       // The OS Recycle Bin (restorable), never a permanent delete.
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:trash', file.path);
         loadFiles(currentPath);
       }
@@ -981,7 +985,7 @@ export const Files: React.FC = () => {
     for (const path of paths) {
       try {
         // The OS Recycle Bin (restorable), never a permanent delete.
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           await fileOp('files:trash', path);
           done++;
         } else {
@@ -1009,7 +1013,7 @@ export const Files: React.FC = () => {
     setRenamingPath(null);
     if (!next || next === file.name) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:rename', file.path, next);
         loadFiles(currentPath);
       }
@@ -1027,8 +1031,8 @@ export const Files: React.FC = () => {
   const handleShowInExplorer = async (file: FileItem) => {
     setContextMenu(null);
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('shell:showItemInFolder', file.path);
+      if (window.dex?.invoke) {
+        await window.dex.invoke('shell:showItemInFolder', file.path);
       }
     } catch (err) {
       console.error('Show in explorer failed:', err);
@@ -1141,7 +1145,7 @@ export const Files: React.FC = () => {
     let ok = 0;
     for (const src of paths) {
       try {
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           if (mode === 'copy') await fileOp('files:copy', src, currentPath);
           else await fileOp('files:move', src, currentPath);
           ok++;
@@ -1164,9 +1168,9 @@ export const Files: React.FC = () => {
   const pickDestinationFolder = useCallback(async (): Promise<string | null> => {
     const opts = { properties: ['openDirectory'] as string[], defaultPath: currentPath || undefined };
     try {
-      let result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('files:openDialog', opts);
+      let result = await window.dex?.invoke<{ canceled?: boolean; filePaths?: string[] }>('files:openDialog', opts);
       if (!result || (!result.filePaths && !result.canceled)) {
-        result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('dialog:showOpenDialog', opts);
+        result = await window.dex?.invoke<{ canceled?: boolean; filePaths?: string[] }>('dialog:showOpenDialog', opts);
       }
       const dest = result?.filePaths?.[0];
       return dest || null;
@@ -1202,7 +1206,7 @@ export const Files: React.FC = () => {
     let failed = 0;
     for (const src of paths) {
       try {
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           await fileOp(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
           done++;
         } else {
@@ -1232,13 +1236,13 @@ export const Files: React.FC = () => {
   // into the folder being viewed through files:copy, with live progress.
   const handleAddFiles = useCallback(async () => {
     const dest = currentPath;
-    if (!dest || !window.electron?.invoke) {
+    if (!dest || !window.dex?.invoke) {
       toast.error('Adding files needs the DEX desktop app');
       return;
     }
     let picked: string[] = [];
     try {
-      const result = await window.electron.invoke<{ canceled?: boolean; filePaths?: string[] }>(
+      const result = await window.dex.invoke<{ canceled?: boolean; filePaths?: string[] }>(
         'files:openDialog', { properties: ['openFile', 'multiSelections'] },
       );
       picked = result?.canceled ? [] : (result?.filePaths ?? []);
@@ -1836,8 +1840,8 @@ export const Files: React.FC = () => {
                 const ok = await confirm({ title: 'Organize folder?', message: 'Organize files in this folder into Audio, Video, Images, Documents, Archives, and Other subfolders?', confirmLabel: 'Organize' });
                 if (!ok) return;
                 try {
-                  if (window.electron?.invoke) {
-                    const ops = await window.electron.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
+                  if (window.dex?.invoke) {
+                    const ops = await window.dex.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
                     loadFiles(currentPath);
                     const list = Array.isArray(ops) ? ops : [];
                     const moved = list.filter(o => o.success).length;

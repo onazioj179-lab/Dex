@@ -38,7 +38,7 @@ function persist(key: string, value: unknown): void {
   try {
     const json = JSON.stringify(value);
     localStorage.setItem(key, json);
-    (window as any).electron?.invoke?.('capability:storage:set', key, json)
+    (window as any).dex?.invoke?.('capability:storage:set', key, json)
       .catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch { /* ignore */ }
 }
@@ -69,7 +69,7 @@ function loadActive(): string | null {
 // Async IPC load — overrides localStorage on startup if the backend has newer data.
 async function loadLayoutsAsync(): Promise<ZoneLayout[] | null> {
   try {
-    const raw = await (window as any).electron?.invoke?.('capability:storage:get', LAYOUTS_KEY);
+    const raw = await (window as any).dex?.invoke?.('capability:storage:get', LAYOUTS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {

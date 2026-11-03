@@ -10,7 +10,7 @@
 // All calls go through the preload-gated invoke() channel.
 // ===========================================================================
 
-const api = () => (window as any).dex ?? (window as any).electronAPI;
+const api = () => (window as any).dex;
 
 const invoke = (channel: string, ...args: unknown[]): Promise<any> => {
   const a = api();

@@ -81,7 +81,7 @@ function savePins(pins: DockPin[]) {
   try {
     const json = JSON.stringify(pins);
     localStorage.setItem(STORAGE_KEY, json);
-    (window as any).electron?.invoke?.('capability:storage:set', STORAGE_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch { /* ignore */ }
 }
 
@@ -139,14 +139,14 @@ function saveSettings(s: DockSettings): void {
   try {
     const json = JSON.stringify({ ...s, version: SETTINGS_VERSION });
     localStorage.setItem(SETTINGS_KEY, json);
-    (window as any).electron?.invoke?.('capability:storage:set', SETTINGS_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', SETTINGS_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch { /* ignore */ }
 }
 
 // Async IPC load — overrides localStorage state on startup
 async function loadPinsAsync(): Promise<DockPin[] | null> {
   try {
-    const raw = await (window as any).electron?.invoke?.('capability:storage:get', STORAGE_KEY);
+    const raw = await (window as any).dex?.invoke?.('capability:storage:get', STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -164,7 +164,7 @@ async function loadPinsAsync(): Promise<DockPin[] | null> {
 
 async function loadSettingsAsync(): Promise<DockSettings | null> {
   try {
-    const raw = await (window as any).electron?.invoke?.('capability:storage:get', SETTINGS_KEY);
+    const raw = await (window as any).dex?.invoke?.('capability:storage:get', SETTINGS_KEY);
     if (raw) return { ...DEFAULT_SETTINGS, ...migrateSettings(JSON.parse(raw)) };
   } catch { /* fallback */ }
   return null;

@@ -101,7 +101,6 @@ import {
 import { getPerfTier } from '../../utils/adaptiveCanvas';
 import { buildBandMask } from '../../../shared/creative/luminanceMask';
 import { AdjustmentControls } from './AdjustmentControls';
-import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
@@ -599,7 +598,6 @@ const Prism: React.FC = () => {
   // ===== PRO FEATURES STATE =====
   // UKI natural-language assistant bar ("remove background", "auto enhance").
   // Drives the previously-orphaned applyCreativeOp handler below.
-  const [showAiBar, setShowAiBar] = useState(false);
   // Content-Aware Fill
   const [showContentAwareFill, setShowContentAwareFill] = useState(false);
   const [contentAwareSampling, setContentAwareSampling] = useState<'auto' | 'rectangular' | 'custom'>('auto');
@@ -865,7 +863,7 @@ const Prism: React.FC = () => {
     // Async IPC load (overrides localStorage if available)
     (async () => {
       try {
-        const ipcData = await (window as any).electron?.invoke?.('capability:storage:get', 'prism-workspace');
+        const ipcData = await (window as any).dex?.invoke?.('capability:storage:get', 'prism-workspace');
         if (ipcData) {
           const data = typeof ipcData === 'string' ? JSON.parse(ipcData) : ipcData;
           if (data.zoom) setZoom(data.zoom);
@@ -893,7 +891,7 @@ const Prism: React.FC = () => {
       };
       const json = JSON.stringify(data);
       localStorage.setItem('prism-workspace', json);
-      (window as any).electron?.invoke?.('capability:storage:set', 'prism-workspace', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'prism-workspace', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     } catch (e) { console.warn('[Prism] Failed to save workspace:', e); }
   }, [zoom, canvasSize, brushSize, brushHardness, brushOpacity, foregroundColor, backgroundColor, activeTool, showLayers, showAdjustments, activePanel]);
 
@@ -2935,25 +2933,6 @@ const Prism: React.FC = () => {
 
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
-      {showAiBar && (
-        <div
-          className="dex-creative-panel-strong"
-          onClick={(e) => e.stopPropagation()}
-          style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', width: 'min(560px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', zIndex: 7000, padding: 'var(--space-2)' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.4px' }}>PRISM ASSISTANT</span>
-            <button aria-label="Close assistant" onClick={() => setShowAiBar(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>x</button>
-          </div>
-          <CreativeCommandBar
-            appId="prism"
-            facts={{ layerId: selectedLayerId, selectionId: selection.mask ? 'active' : undefined }}
-            onApplyOp={applyCreativeOp}
-            examples={['auto enhance', 'remove background', 'upscale 2x', 'denoise']}
-            placeholder="Describe an edit..."
-          />
-        </div>
-      )}
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop images to import</div>}
       <style>{`
         /* === PRISM - PROFESSIONAL UI === */
@@ -3080,17 +3059,6 @@ const Prism: React.FC = () => {
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <button className="prism-btn" style={styles.btn} onClick={undo} disabled={historyIndex <= 0} aria-label="Undo">{Icons.undo}</button>
           <button className="prism-btn" style={styles.btn} onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Redo">{Icons.redo}</button>
-          <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <button
-            className="prism-btn"
-            style={{ ...styles.btn, color: showAiBar ? '#ff375f' : undefined, background: showAiBar ? '#2e1520' : undefined }}
-            onClick={() => setShowAiBar(v => !v)}
-            aria-label="Toggle AI assistant"
-            aria-pressed={showAiBar}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>
-            Assistant
-          </button>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <MenuBar groups={featureMenus} />
         </div>

@@ -516,7 +516,7 @@ const Learn: React.FC = () => {
 
   // Fetch battery and power state
   useEffect(() => {
-    const ipc = (window as any).electron;
+    const ipc = (window as any).dex;
     if (!ipc?.invoke) return;
     
     // Initial power state
@@ -553,14 +553,14 @@ const Learn: React.FC = () => {
 
   // Handle power profile change
   const changePowerProfile = useCallback((profileId: string) => {
-    const ipc = (window as any).electron;
+    const ipc = (window as any).dex;
     setPowerProfile(profileId);
     ipc?.invoke?.('battery:setProfile', profileId).catch(() => {});
   }, []);
   
   // Toggle restriction mode
   const toggleRestrictions = useCallback(() => {
-    const ipc = (window as any).electron;
+    const ipc = (window as any).dex;
     const newState = !restrictedMode;
     setRestrictedMode(newState);
     // Update config to enable/disable non-essential timer pausing
@@ -571,7 +571,7 @@ const Learn: React.FC = () => {
 
   // Fetch data from main process pattern engine
   useEffect(() => {
-    const ipc = (window as any).electron;
+    const ipc = (window as any).dex;
     if (!ipc?.invoke) return;
     ipc.invoke('patterns:getSuggestions', {}).then((s: Suggestion[]) => setSuggestions(s || [])).catch((e: unknown) => console.warn('[Learn] getSuggestions:', e));
     ipc.invoke('patterns:getFrequent', null, 20).then((f: FrequentItem[]) => setFrequentItems(f || [])).catch((e: unknown) => console.warn('[Learn] getFrequent:', e));
@@ -621,7 +621,7 @@ const Learn: React.FC = () => {
 
   const handleReset = useCallback(() => {
     reset();
-    const ipc = (window as any).electron;
+    const ipc = (window as any).dex;
     ipc?.invoke?.('patterns:cleanup').catch((e: unknown) => console.warn('[Learn] cleanup:', e));
   }, [reset]);
 
@@ -1403,7 +1403,7 @@ const Learn: React.FC = () => {
                 ].map(item => (
                   <button
                     key={item.label}
-                    onClick={() => (window as any).electron?.invoke?.(item.action)}
+                    onClick={() => (window as any).dex?.invoke?.(item.action)}
                     style={{
                       padding: '10px var(--space-3)', borderRadius: 10, border: 'none',
                       background: 'var(--color-bg-hover, rgba(255,255,255,.05))', cursor: 'pointer',

@@ -33,9 +33,12 @@ declare global {
 
 declare global {
   interface Window {
-    dex: {
+    dex?: {
       // Generic invoke for dynamic IPC calls
-      invoke: (channel: string, ...args: any[]) => Promise<any>;
+      invoke: <T = any>(channel: string, ...args: any[]) => Promise<T>;
+      // Native push events (Tauri events); the callback receives the payload.
+      on?: (channel: string, callback: (payload: any) => void) => void;
+      off?: (channel: string, callback: (payload: any) => void) => void;
 
       // Platform information
       platform: {
@@ -1015,34 +1018,6 @@ declare global {
       };
     };
     
-    // Legacy electron API for backward compatibility
-    electron?: {
-      invoke: <T = any>(channel: string, ...args: any[]) => Promise<T>;
-      on?: (channel: string, callback: (...args: any[]) => void) => void;
-      off?: (channel: string, callback: (...args: any[]) => void) => void;
-      ipcRenderer?: {
-        send: (channel: string, ...args: any[]) => void;
-        sendSync: (channel: string, ...args: any[]) => any;
-        invoke: <T = any>(channel: string, ...args: any[]) => Promise<T>;
-        on: (channel: string, callback: (...args: any[]) => void) => void;
-        off: (channel: string, callback: (...args: any[]) => void) => void;
-      };
-      shell?: {
-        openPath: (path: string) => Promise<string>;
-        openExternal: (url: string) => Promise<void>;
-      };
-      media?: {
-        getMediaFiles?: (type: string) => Promise<any[]>;
-        [key: string]: any;
-      };
-    };
-
-    // Legacy electronAPI for backward compatibility
-    electronAPI?: {
-      onAppEvent?: (callback: (event: string, data: unknown) => void) => void;
-      [key: string]: any;
-    };
-
     // Process info
     process?: {
       versions: Record<string, string>;

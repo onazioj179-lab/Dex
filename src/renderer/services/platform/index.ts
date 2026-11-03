@@ -18,7 +18,7 @@
 import { routeConfiguredModels, configuredCandidates } from '../../uki/providers/connect';
 import type { RoutingGoal } from '../../../shared/uki/smartRouter';
 
-export type ShellKind = 'electron' | 'tauri' | 'web';
+export type ShellKind = 'tauri' | 'web';
 
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -31,7 +31,6 @@ function tauriInvoke(): TauriInvoke | null {
 /** Which desktop shell is hosting the renderer right now. */
 export function detectShell(): ShellKind {
   if (tauriInvoke()) return 'tauri';
-  if ((globalThis as { dex?: unknown }).dex) return 'electron';
   return 'web';
 }
 

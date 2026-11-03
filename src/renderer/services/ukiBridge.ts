@@ -221,8 +221,15 @@ export function initUkiRendererBridge(): void {
   initialized = true;
 
   const dex = (window as any).dex;
-  const ipc = (window as any).electron?.ipcRenderer || (window as any).ipcRenderer;
-  if (!ipc) return;
+  // Native pushes arrive through dex.on(channel, payload). The handlers below
+  // keep the (event, payload) shape, so adapt once here. (This used to look for
+  // Electron's ipcRenderer, which doesn't exist under Tauri, so UKI's native
+  // state/listening/transcript events never reached the UI.)
+  if (!dex?.on) return;
+  const ipc = {
+    on: (channel: string, cb: (e: unknown, payload?: any) => void) => dex.on(channel, (payload: unknown) => cb(undefined, payload)),
+    send: (channel: string, ...args: unknown[]) => { void Promise.resolve(dex.invoke(channel, ...args)).catch(() => {}); },
+  };
 
   syncWorkflowContext(dex);
 
@@ -380,7 +387,7 @@ export function initUkiRendererBridge(): void {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; query?: string; name?: string; target?: string; from?: string; to?: string; source?: string; dest?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
-    const electron = (window as any).electron;
+    const bridge = (window as any).dex;
     const notify = (msg: string) => { try { dex?.toast?.error?.(msg); } catch { /* toast unavailable */ } };
     switch (c.action) {
       case 'search':
@@ -577,13 +584,12 @@ ${c.target}`)) {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
-    const electron = (window as any).electron;
     switch (c.action) {
       case 'minimize':
-        electron?.window?.minimize?.();
+        void Promise.resolve(dex.invoke('window:minimize')).catch(() => {});
         break;
       case 'maximize':
-        electron?.window?.maximize?.();
+        void Promise.resolve(dex.invoke('window:maximize')).catch(() => {});
         break;
       case 'battery':
         // Informational -- response via TTS

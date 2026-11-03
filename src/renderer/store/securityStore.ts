@@ -166,8 +166,8 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
       const defaultStatus: SecurityStatus = {
         overallHealth: 'healthy',
         layers: [
-          { layer: 1, name: 'OS Sandbox', status: 'active', details: 'Electron sandbox enabled' },
-          { layer: 2, name: 'Process Isolation', status: 'active', details: 'Context isolation active' },
+          { layer: 1, name: 'OS Sandbox', status: 'active', details: 'WebView2 renderer sandbox' },
+          { layer: 2, name: 'Process Isolation', status: 'active', details: 'UI runs apart from the native host; IPC is allow-listed' },
           { layer: 3, name: 'Data Protection', status: 'active', details: 'Encryption ready' },
           { layer: 4, name: 'Execution Control', status: 'active', details: 'Script validation enabled' },
           { layer: 5, name: 'Audit & Integrity', status: 'active', details: 'Logging active' },

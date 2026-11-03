@@ -96,8 +96,8 @@ const Calendar: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        if ((window as any).electron?.invoke) {
-          const stored = await (window as any).electron.invoke('capability:storage:get', 'dex-calendar-events');
+        if ((window as any).dex?.invoke) {
+          const stored = await (window as any).dex.invoke('capability:storage:get', 'dex-calendar-events');
           if (stored && Array.isArray(stored)) { setEvents(stored); return; }
         }
       } catch (e) { console.warn('[DEX]', e); }
@@ -125,8 +125,8 @@ const Calendar: React.FC = () => {
     } catch (e) { console.warn('[DEX]', e); }
     (async () => {
       try {
-        if ((window as any).electron?.invoke) {
-          await (window as any).electron.invoke('capability:storage:set', 'dex-calendar-events', events);
+        if ((window as any).dex?.invoke) {
+          await (window as any).dex.invoke('capability:storage:set', 'dex-calendar-events', events);
         }
       } catch (e) { console.warn('[DEX]', e); }
     })();

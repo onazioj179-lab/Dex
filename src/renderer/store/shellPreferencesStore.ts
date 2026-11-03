@@ -218,8 +218,8 @@ function persist(prefs: ShellPreferences): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(DEX_SHELL_PREFS_KEY, JSON.stringify(prefs));
     }
-    const electron = (typeof window !== 'undefined' ? (window as any).electron : null) || null;
-    electron?.invoke?.('capability:storage:set', DEX_SHELL_PREFS_KEY, JSON.stringify(prefs))
+    const bridge = (typeof window !== 'undefined' ? (window as any).dex : null) || null;
+    bridge?.invoke?.('capability:storage:set', DEX_SHELL_PREFS_KEY, JSON.stringify(prefs))
       .catch((e: unknown) => { console.warn('[DEX shell prefs]', e); });
   } catch {
     /* quota or sandbox — fine */
@@ -423,7 +423,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
   // Late-hydrate from main-process storage in case localStorage was wiped but
   // the IPC mirror still has the prefs.
   if (typeof window !== 'undefined') {
-    (window as any).electron?.invoke?.('capability:storage:get', DEX_SHELL_PREFS_KEY)
+    (window as any).dex?.invoke?.('capability:storage:get', DEX_SHELL_PREFS_KEY)
       .then((stored: string | null) => {
         if (!stored) return;
         try {

@@ -50,7 +50,7 @@ import StoragePanel from './settingsPanels/StoragePanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
-import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
+import { isOptionalAnalyticsEnabled, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 
@@ -957,8 +957,8 @@ const loadSettings = () => {
 const saveSettingsToBackend = async (settings: Record<string, unknown>, retries = 2): Promise<boolean> => {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('capability:storage:set', 'dex-settings', settings);
+      if (window.dex?.invoke) {
+        await window.dex.invoke('capability:storage:set', 'dex-settings', settings);
         return true;
       }
     } catch (e) {
@@ -971,8 +971,8 @@ const saveSettingsToBackend = async (settings: Record<string, unknown>, retries 
 // Load from backend
 const loadSettingsFromBackend = async (): Promise<Record<string, unknown> | null> => {
   try {
-    if (window.electron?.invoke) {
-      const settings = await window.electron.invoke('capability:storage:get', 'dex-settings');
+    if (window.dex?.invoke) {
+      const settings = await window.dex.invoke('capability:storage:get', 'dex-settings');
       if (settings) return settings;
     }
   } catch (e) {
@@ -1066,8 +1066,8 @@ const countChangedSettings = (settings: typeof DEFAULT_SETTINGS): number => {
 const applySettings = (settings: Record<string, unknown>) => {
   try {
     // Apply performance settings via IPC
-    if (window.electron?.invoke) {
-      window.electron.invoke('settings:apply', settings).catch((e: unknown) => { console.warn('[DEX]', e); });
+    if (window.dex?.invoke) {
+      window.dex.invoke('settings:apply', settings).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
     
     const root = document.documentElement;
@@ -1889,7 +1889,6 @@ export const Settings: React.FC = () => {
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
-  const [policyAcceptance, setPolicyAcceptance] = useState(() => readPolicyAcceptance());
   const [optionalAnalytics, setOptionalAnalytics] = useState(() => isOptionalAnalyticsEnabled());
   // Hoist shell-prefs hook to component top-level so the hook count stays
   // stable across category switches (renderShellSettings used to call this
@@ -2120,11 +2119,6 @@ export const Settings: React.FC = () => {
     toast.info(enabled ? 'Optional analytics enabled' : 'Optional analytics disabled');
   }, [toast]);
 
-  const resetPolicyAcceptance = useCallback(() => {
-    clearPolicyAcceptance();
-    setPolicyAcceptance(null);
-    toast.info('Policy acceptance reset. DEX will ask again on next launch.');
-  }, [toast]);
   
   // Authentication state
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -2170,7 +2164,7 @@ export const Settings: React.FC = () => {
       return;
     }
     try {
-      const result = await window.electron?.invoke('auth:setup:securityQuestions', securityQA);
+      const result = await window.dex?.invoke('auth:setup:securityQuestions', securityQA);
       if (result?.success) {
         setSecurityQuestionsSet(true);
         setShowSecurityQuestions(false);
@@ -2187,8 +2181,8 @@ export const Settings: React.FC = () => {
   React.useEffect(() => {
     const checkBiometric = async () => {
       try {
-        if (window.electron?.invoke) {
-          const available = await window.electron.invoke('auth:biometricsAvailable');
+        if (window.dex?.invoke) {
+          const available = await window.dex.invoke('auth:biometricsAvailable');
           setBiometricAvailable(available);
         } else if ('PublicKeyCredential' in window) {
           const available = await (window as any).PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -2206,7 +2200,7 @@ export const Settings: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await window.electron?.invoke('auth:getSecurityQuestions');
+        const res = await window.dex?.invoke('auth:getSecurityQuestions');
         if (!cancelled) setSecurityQuestionsSet(!!res?.enabled);
       } catch { /* leave as not-set */ }
     })();
@@ -2219,16 +2213,6 @@ export const Settings: React.FC = () => {
     });
   }, []);
 
-  // Sync crash-reporting toggle from the main-process diagnostics controller
-  // so what Settings displays matches what was actually set (e.g. by Onboarding).
-  React.useEffect(() => {
-    const electron = (window as unknown as { electron?: { diagnostics?: { getPreferences?: () => Promise<{ crashReportingEnabled?: boolean }> } } }).electron;
-    electron?.diagnostics?.getPreferences?.().then((p) => {
-      if (p && typeof p.crashReportingEnabled === 'boolean') {
-        setSettings(prev => prev.crashReports === p.crashReportingEnabled ? prev : { ...prev, crashReports: !!p.crashReportingEnabled });
-      }
-    }).catch(() => { /* IPC unavailable */ });
-  }, []);
 
   React.useEffect(() => {
     const handleSettingsNavigate = (event: Event) => {
@@ -2265,8 +2249,8 @@ export const Settings: React.FC = () => {
       return;
     }
     // Save PIN via IPC
-    if (window.electron?.invoke) {
-      window.electron.invoke('auth:setup:pin', pinInput).then(() => {
+    if (window.dex?.invoke) {
+      window.dex.invoke('auth:setup:pin', pinInput).then(() => {
         setSettings(prev => ({ ...prev, pinEnabled: true, authMethod: 'pin' }));
         setShowPinSetup(false);
         setPinInput('');
@@ -2295,8 +2279,8 @@ export const Settings: React.FC = () => {
       return;
     }
     // Save password via IPC
-    if (window.electron?.invoke) {
-      window.electron.invoke('auth:setup:password', passwordInput).then(() => {
+    if (window.dex?.invoke) {
+      window.dex.invoke('auth:setup:password', passwordInput).then(() => {
         setSettings(prev => ({ ...prev, passwordEnabled: true, authMethod: 'password' }));
         setShowPasswordSetup(false);
         setPasswordInput('');
@@ -2313,8 +2297,8 @@ export const Settings: React.FC = () => {
   const handleEnableBiometric = async () => {
     setAuthError('');
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('auth:setup:biometric');
+      if (window.dex?.invoke) {
+        await window.dex.invoke('auth:setup:biometric');
         const newMethod = settings.pinEnabled ? 'pin+biometric' as const : settings.passwordEnabled ? 'password+biometric' as const : 'biometric' as const;
         setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod }));
       } else if ('PublicKeyCredential' in window) {
@@ -2332,7 +2316,7 @@ export const Settings: React.FC = () => {
     const channel = type === 'pin' ? 'auth:disablePin'
       : type === 'password' ? 'auth:disablePassword'
       : 'auth:disableBiometric';
-    void window.electron?.invoke?.(channel);
+    void window.dex?.invoke?.(channel);
     if (type === 'pin') {
       setSettings(prev => ({
         ...prev,
@@ -2373,7 +2357,7 @@ export const Settings: React.FC = () => {
       return;
     }
     try {
-      const result = await window.electron?.invoke('auth:changePassword', JSON.stringify({ currentPassword: currentPasswordInput, newPassword: passwordInput }));
+      const result = await window.dex?.invoke('auth:changePassword', JSON.stringify({ currentPassword: currentPasswordInput, newPassword: passwordInput }));
       if (result?.success) {
         setShowPasswordChange(false);
         setCurrentPasswordInput('');
@@ -2402,7 +2386,7 @@ export const Settings: React.FC = () => {
       return;
     }
     try {
-      const result = await window.electron?.invoke('auth:changePin', JSON.stringify({ currentPin: currentPinInput, newPin: pinInput }));
+      const result = await window.dex?.invoke('auth:changePin', JSON.stringify({ currentPin: currentPinInput, newPin: pinInput }));
       if (result?.success) {
         setShowPinChange(false);
         setCurrentPinInput('');
@@ -2418,7 +2402,7 @@ export const Settings: React.FC = () => {
 
   const handleGenerateRecoveryCodes = async () => {
     try {
-      const result = await window.electron?.invoke('auth:generateRecoveryCodes');
+      const result = await window.dex?.invoke('auth:generateRecoveryCodes');
       if (result?.success && result.codes) {
         setRecoveryCodes(result.codes);
         setShowRecoveryCodes(true);
@@ -2464,12 +2448,6 @@ export const Settings: React.FC = () => {
           }
         } catch { /* store not ready */ }
       }
-      if (key === 'crashReports') {
-        try {
-          const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;
-          electron?.diagnostics?.setPreferences?.({ crashReportingEnabled: nextVal });
-        } catch { /* IPC may be unavailable */ }
-      }
       return { ...prev, [key]: nextVal };
     });
   };
@@ -2485,7 +2463,7 @@ export const Settings: React.FC = () => {
         type="button"
         style={styles.manageBtn}
         aria-label={`Open Windows settings: ${label}`}
-        onClick={() => { void (window as any).electron?.invoke?.('shell:openExternal', uri); }}
+        onClick={() => { void (window as any).dex?.invoke?.('shell:openExternal', uri); }}
       >Open in Windows</button>
     </div>
   );
@@ -3421,7 +3399,7 @@ export const Settings: React.FC = () => {
         <button
           type="button"
           style={styles.manageBtn}
-          onClick={() => { void (window as any).electron?.invoke?.('shell:openExternal', 'windowsdefender:'); }}
+          onClick={() => { void (window as any).dex?.invoke?.('shell:openExternal', 'windowsdefender:'); }}
         >Open</button>
       </div>
 
@@ -3592,25 +3570,15 @@ export const Settings: React.FC = () => {
       </div>
 
       <div style={styles.aboutLinks}>
-        <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', POLICY_REPOSITORY_URL) || window.open(POLICY_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}>Repository</button>
+        <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => (window as any).dex?.invoke?.('shell:openExternal', POLICY_REPOSITORY_URL) || window.open(POLICY_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}>Repository</button>
         <button style={styles.linkBtn} aria-label="Open DEX policies" onClick={() => openPolicyViewer('terms')}>Policies</button>
-        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', `${POLICY_REPOSITORY_URL}/issues`) || window.open(`${POLICY_REPOSITORY_URL}/issues`, '_blank', 'noopener,noreferrer')}>Report Issue</button>
+        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).dex?.invoke?.('shell:openExternal', `${POLICY_REPOSITORY_URL}/issues`) || window.open(`${POLICY_REPOSITORY_URL}/issues`, '_blank', 'noopener,noreferrer')}>Report Issue</button>
       </div>
 
       {/* Legal & Privacy */}
       <div style={{ marginTop: 'var(--space-6)' }}>
         <h3 style={styles.sectionTitle}>Legal & Privacy</h3>
         <div style={styles.aboutDetails}>
-          <div style={styles.aboutRow}>
-            <span style={styles.aboutLabel}>Policy State</span>
-            <span style={{ ...styles.aboutValue, color: hasAcceptedCurrentPolicies(policyAcceptance) ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>
-              {hasAcceptedCurrentPolicies(policyAcceptance) ? 'Accepted current policies' : 'Needs review'}
-            </span>
-          </div>
-          <div style={styles.aboutRow}>
-            <span style={styles.aboutLabel}>Accepted</span>
-            <span style={styles.aboutValue}>{policyAcceptance?.acceptedAt ? new Date(policyAcceptance.acceptedAt).toLocaleString() : 'Not recorded'}</span>
-          </div>
           <div style={styles.aboutRow}>
             <span style={styles.aboutLabel}>Contact</span>
             <span style={styles.aboutValue}>{POLICY_CONTACT_EMAIL}</span>
@@ -3654,9 +3622,6 @@ export const Settings: React.FC = () => {
           ))}
         </div>
 
-        <button style={styles.linkBtn} onClick={resetPolicyAcceptance} aria-label="Reset policy acceptance">
-          Reset Policy Acceptance
-        </button>
       </div>
 
       {/* Diagnostic Share */}
@@ -3697,7 +3662,7 @@ export const Settings: React.FC = () => {
             // Native WebView2 detection (desktop shell only) — the first thing
             // support needs when the app fails to start or renders blank.
             try {
-              const wv = await (window as any).electron?.invoke?.('diagnostics:getWebView2');
+              const wv = await (window as any).dex?.invoke?.('diagnostics:getWebView2');
               if (wv) {
                 diag.push('');
                 diag.push('=== WebView2 ===');

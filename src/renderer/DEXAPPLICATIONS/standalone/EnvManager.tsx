@@ -31,7 +31,7 @@ interface EnvBridge {
 
 const getBridge = (): EnvBridge | null => {
   const w = window as any;
-  return (w.dex?.env ?? w.electron?.env ?? null) as EnvBridge | null;
+  return (w.dex?.env ?? null) as EnvBridge | null;
 };
 
 const toast = (type: 'success' | 'error' | 'info', message: string) => {

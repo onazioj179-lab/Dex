@@ -21,6 +21,9 @@ const WithToast: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 // Mock window.dex IPC bridge
 beforeEach(() => {
   (window as any).dex = {
+    invoke: vi.fn().mockResolvedValue(null),
+    on: vi.fn(),
+    off: vi.fn(),
     files: {
       listDirectory: vi.fn().mockResolvedValue([]),
       readFile: vi.fn().mockResolvedValue(''),

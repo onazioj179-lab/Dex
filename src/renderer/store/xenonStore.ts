@@ -70,12 +70,12 @@ export function initXenonListener(): () => void {
   }
   initialized = true;
 
-  const electron = (window as any).electron;
-  if (!electron?.on) return () => {};
+  const bridge = (window as any).dex;
+  if (!bridge?.on) return () => {};
 
   const listen = (channel: string, handler: (...args: any[]) => void) => {
-    electron.on(channel, handler);
-    cleanupFns.push(() => electron.off?.(channel, handler));
+    bridge.on(channel, handler);
+    cleanupFns.push(() => bridge.off?.(channel, handler));
   };
 
   // Note: preload's electron.on() strips the IPC event arg — callbacks receive data directly

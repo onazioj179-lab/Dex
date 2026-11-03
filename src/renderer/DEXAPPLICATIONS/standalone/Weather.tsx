@@ -706,6 +706,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   header: {
     padding: 'var(--space-4) var(--space-5) var(--space-2)', flexShrink: 0,
+    // Stays at the top while the forecast scrolls.
+    position: 'sticky', top: 0, zIndex: 2, background: 'var(--color-bg-base)',
   },
   locationRow: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',

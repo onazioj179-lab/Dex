@@ -85,14 +85,6 @@ export function startIdlePauseCoordinator(_opts?: { systemIdleMs?: number }): vo
   // The Home screen must remain fully rendered while the user is away,
   // even if that costs more power. Hidden/minimized/blurred states still
   // pause background app work through the listeners above.
-
-  // Electron resume / wake / unlock IPC -- always force resume
-  const ipc = (window as unknown as { electron?: { ipcRenderer?: { on?: (e: string, cb: () => void) => void } } }).electron?.ipcRenderer;
-  if (ipc?.on) {
-    ipc.on('dex:resume', () => resume('focus'));
-    ipc.on('dex:wake', () => resume('focus'));
-    ipc.on('dex:unlock', () => resume('focus'));
-  }
 }
 
 /**

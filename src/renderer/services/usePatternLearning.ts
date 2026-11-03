@@ -35,7 +35,7 @@ export const usePatternLearning = () => {
   // Record app open
   const recordAppOpen = useCallback((appId: string, context?: string) => {
     appOpenTime.current.set(appId, Date.now());
-    window.electron?.invoke('patterns:recordAppOpen', appId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
+    window.dex?.invoke('patterns:recordAppOpen', appId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record app close (with duration)
@@ -43,22 +43,22 @@ export const usePatternLearning = () => {
     const openTime = appOpenTime.current.get(appId);
     const duration = openTime ? Date.now() - openTime : undefined;
     appOpenTime.current.delete(appId);
-    window.electron?.invoke('patterns:recordAppClose', appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
+    window.dex?.invoke('patterns:recordAppClose', appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record file open
   const recordFileOpen = useCallback((filePath: string, appId?: string) => {
-    window.electron?.invoke('patterns:recordFileOpen', filePath, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
+    window.dex?.invoke('patterns:recordFileOpen', filePath, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record tool use
   const recordToolUse = useCallback((toolId: string, appId?: string) => {
-    window.electron?.invoke('patterns:recordToolUse', toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
+    window.dex?.invoke('patterns:recordToolUse', toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record generic action
   const recordAction = useCallback((actionId: string, context?: string) => {
-    window.electron?.invoke('patterns:recordAction', actionId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
+    window.dex?.invoke('patterns:recordAction', actionId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Get suggestions
@@ -68,7 +68,7 @@ export const usePatternLearning = () => {
     limit?: number;
   }): Promise<Suggestion[]> => {
     try {
-      return await window.electron?.invoke('patterns:getSuggestions', context) || [];
+      return await window.dex?.invoke('patterns:getSuggestions', context) || [];
     } catch {
       return [];
     }
@@ -80,7 +80,7 @@ export const usePatternLearning = () => {
     limit = 10
   ): Promise<FrequentItem[]> => {
     try {
-      return await window.electron?.invoke('patterns:getFrequent', type, limit) || [];
+      return await window.dex?.invoke('patterns:getFrequent', type, limit) || [];
     } catch {
       return [];
     }
@@ -89,7 +89,7 @@ export const usePatternLearning = () => {
   // Get recent items
   const getRecentItems = useCallback(async (limit = 10): Promise<string[]> => {
     try {
-      return await window.electron?.invoke('patterns:getRecent', limit) || [];
+      return await window.dex?.invoke('patterns:getRecent', limit) || [];
     } catch {
       return [];
     }
@@ -133,7 +133,7 @@ export const useToolTracking = (appId: string) => {
     
     // Record tool combinations if we have a previous tool
     if (lastTool.current && lastTool.current !== toolId) {
-      window.electron?.invoke('patterns:recordToolCombo', lastTool.current, toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
+      window.dex?.invoke('patterns:recordToolCombo', lastTool.current, toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
     lastTool.current = toolId;
   }, [recordToolUse, appId]);

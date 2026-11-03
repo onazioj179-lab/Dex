@@ -35,7 +35,7 @@ export function classifyCrash(record: CrashRecord): CrashCategory {
   if (/native|napi|rust panic|segfault/.test(haystack)) return 'native';
   if (/unhandled.?rejection|promise/.test(haystack)) return 'unhandled-rejection';
   if (/renderer|web-contents|webcontents/.test(haystack)) return 'renderer';
-  if (/main|electron-main/.test(haystack)) return 'main';
+  if (/main|bridge-main/.test(haystack)) return 'main';
   return 'unknown';
 }
 

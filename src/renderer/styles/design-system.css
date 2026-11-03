@@ -8835,3 +8835,25 @@ input[type="search"]:focus-visible {
 /* ═══════════════════════════════════════════════════════════════════════════
    END OF DESIGN SYSTEM
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ===========================================================================
+   App window material (dark). The desktop sits on --color-bg-base (#111215);
+   an app window is one step lighter, like a macOS window over its desktop,
+   with its cards/inputs one step above that. Before this, every app painted
+   its whole window in the desktop tone and read as flat black.
+   Scoped to app windows only (not Home), dark theme only; creative studios
+   keep their own palettes; Dark-room and High Contrast keep their overrides.
+   =========================================================================== */
+html:not([data-theme="light"]):not([data-darkroom="on"]):not([data-high-contrast="true"])
+  [data-app-id]:not([data-app-id="home"]):not([data-app-id="imosion"]):not([data-app-id="prism"]):not([data-app-id="flux"]):not([data-app-id="forge"]):not([data-app-id="videoeditor"]):not([data-app-id="axl"]) {
+  --color-bg-base: #1C1C1E;
+  --color-bg-secondary: #19191B;
+  --color-bg-inset: #18181A;
+  --color-bg-surface: #252527;
+  --color-bg-surface-solid: #252527;
+  --color-bg-elevated: #2C2C2E;
+  --color-bg-tertiary: #2C2C2E;
+  --color-bg-hover: #303033;
+  --color-bg-active: #38383B;
+  background-color: var(--color-bg-base);
+}

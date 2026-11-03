@@ -56,8 +56,8 @@ function loadBoards(): KanbanBoard[] {
 
 async function loadBoardsAsync(): Promise<KanbanBoard[] | null> {
   try {
-    if ((window as any).electron?.invoke) {
-      const stored = await (window as any).electron.invoke('capability:storage:get', STORAGE_KEY);
+    if ((window as any).dex?.invoke) {
+      const stored = await (window as any).dex.invoke('capability:storage:get', STORAGE_KEY);
       if (stored && Array.isArray(stored)) return stored;
     }
   } catch (e) { console.warn('[DEX]', e); }
@@ -68,8 +68,8 @@ function saveBoards(boards: KanbanBoard[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(boards)); } catch (e) { console.warn('[DEX]', e); }
   (async () => {
     try {
-      if ((window as any).electron?.invoke) {
-        await (window as any).electron.invoke('capability:storage:set', STORAGE_KEY, boards);
+      if ((window as any).dex?.invoke) {
+        await (window as any).dex.invoke('capability:storage:set', STORAGE_KEY, boards);
       }
     } catch (e) { console.warn('[DEX]', e); }
   })();

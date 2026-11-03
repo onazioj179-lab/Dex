@@ -78,9 +78,6 @@ export interface Capabilities {
 /** Report what the current shell can do. Cheap; call it wherever you branch. */
 export function getCapabilities(): Capabilities {
   const shell = detectShell();
-  if (shell === 'electron') {
-    return { shell, full: true, nativeSubsystems: ['*'], has: () => true };
-  }
   if (shell === 'tauri') {
     return {
       shell,

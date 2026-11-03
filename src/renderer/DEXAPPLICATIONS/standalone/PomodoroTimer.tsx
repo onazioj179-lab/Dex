@@ -20,8 +20,8 @@ const PHASE_LABELS: Record<PomoPhase, string> = {
 
 const PHASE_COLORS: Record<PomoPhase, string> = {
   work: 'var(--color-error)',
-  shortBreak: 'var(--color-success)',
-  longBreak: 'var(--color-accent)',
+  shortBreak: 'var(--color-accent)',
+  longBreak: 'var(--color-info, #64D2FF)',
 };
 
 function fmtTime(secs: number) {

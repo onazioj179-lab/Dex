@@ -123,13 +123,13 @@ const PDFViewer: React.FC = () => {
       // Try files:openDialog first; fall back to dialog:showOpenDialog
       let result: OpenDialogResult | undefined;
       try {
-        result = await window.electron?.invoke?.<OpenDialogResult>(
+        result = await window.dex?.invoke?.<OpenDialogResult>(
           'files:openDialog',
           { filters: [{ name: 'PDF', extensions: ['pdf'] }], properties: ['openFile'] },
         );
       } catch { /* try fallback */ }
       if (!result || (!result.filePaths && !result.canceled)) {
-        result = await window.electron?.invoke?.<OpenDialogResult>(
+        result = await window.dex?.invoke?.<OpenDialogResult>(
           'dialog:showOpenDialog',
           { filters: [{ name: 'PDF', extensions: ['pdf'] }], properties: ['openFile'] },
         );

@@ -787,66 +787,14 @@ export const AppManager: React.FC = () => {
   // Dock-reserved inset CSS variables are published in an effect lower down,
   // after `anyWindowMaximized` is declared (it is one of the dependencies).
 
-  // -- Suspend/Resume & Crash Recovery toasts --
+  // -- Crash recovery --
+  // Native suspend/resume/lock pushes came from Electron's main process; the
+  // Tauri shell doesn't emit them, so only the crash-recovery check remains
+  // (it used to sit behind an Electron-only ipcRenderer guard and never ran).
   useEffect(() => {
-    const ipcRenderer = (window as any).electron?.ipcRenderer;
-    if (!ipcRenderer) return;
-
-    const onResume = () => {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'System resumed — restoring session' } }));
-      // Force repaint to fix blank/black screen after sleep
-      requestAnimationFrame(() => {
-        document.body.style.opacity = '0.999';
-        requestAnimationFrame(() => { document.body.style.opacity = '1'; });
-      });
-    };
-    const onLock = () => {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Session locked' } }));
-    };
-    // System suspend/OS-lock events: do not force a Dex lock overlay. Only lock when
-    // the user has explicitly enabled `lockOnSleep`. Always flush autosave + park work.
-    const onSystemSuspend = () => {
-      // Auto-snapshot workspace before suspend for crash/resume recovery.
-      try {
-        const snap = _wsStore.capture('auto-suspend', [], null);
-        _wsStore.saveAuto(snap);
-        _persistWsStore();
-      } catch { /* never block suspend */ }
-      window.dispatchEvent(new CustomEvent('dex-system-suspend'));
-      try {
-        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
-        if (cfg?.lockOnSleep) {
-          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
-        }
-      } catch { /* ignore */ }
-    };
-    const onSystemLock = () => {
-      // Auto-snapshot workspace before locking for post-unlock continuity.
-      try {
-        const snap = _wsStore.capture('auto-lock', [], null);
-        _wsStore.saveAuto(snap);
-        _persistWsStore();
-      } catch { /* never block lock */ }
-      window.dispatchEvent(new CustomEvent('dex-system-lock'));
-      try {
-        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
-        if (cfg?.lockOnSleep) {
-          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
-        }
-      } catch { /* ignore */ }
-    };
-    ipcRenderer.on?.('dex:resume', onResume);
-    ipcRenderer.on?.('dex:lock-screen', onLock);
-    ipcRenderer.on?.('dex:system-suspend', onSystemSuspend);
-    ipcRenderer.on?.('dex:system-lock', onSystemLock);
-
-    // Repaint on idle/sleep return is handled by ScreenGuardSystem (single source
-    // of truth). AppManager no longer flickers body opacity on visibility change
-    // — that caused the wallpaper to flash when returning from idle.
-
     // Check for crash recovery state — gate toast through calm engine so it
     // never interrupts deep-flow focus unnecessarily (warnings always pass through).
-    (window as any).electron?.invoke?.('recovery:savedState').then((state: any) => {
+    (window as any).dex?.invoke?.('recovery:savedState')?.then((state: any) => {
       if (state?.timestamp) {
         const ago = Math.round((Date.now() - state.timestamp) / 60000);
         const decision = _calmEngine.decide('notification');
@@ -862,12 +810,6 @@ export const AppManager: React.FC = () => {
       }
     }).catch((e: unknown) => { console.warn('[DEX] recovery:', e); });
 
-    return () => {
-      ipcRenderer.removeListener?.('dex:resume', onResume);
-      ipcRenderer.removeListener?.('dex:lock-screen', onLock);
-      ipcRenderer.removeListener?.('dex:system-suspend', onSystemSuspend);
-      ipcRenderer.removeListener?.('dex:system-lock', onSystemLock);
-    };
   }, []);
   // Launchpad context menu (right-click on apps in grid)
   const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
@@ -1659,25 +1601,6 @@ export const AppManager: React.FC = () => {
     const handler = () => setWindowControls(getWindowControlStyle());
     window.addEventListener('dex-window-controls-changed', handler);
     return () => window.removeEventListener('dex-window-controls-changed', handler);
-  }, []);
-
-  // Sync titlebar overlay with window controls preference on Windows
-  useEffect(() => {
-    if (!IS_WINDOWS) return;
-    const electron = (window as any).electron;
-    if (electron?.window?.setTitleBarOverlay) {
-      // Custom buttons rendered in-app; hide native overlay
-      electron.window.setTitleBarOverlay(false);
-    }
-  }, [windowControls]);
-
-  // On mount, ensure native overlay is disabled (custom buttons used instead)
-  useEffect(() => {
-    if (!IS_WINDOWS) return;
-    const electron = (window as any).electron;
-    if (electron?.window?.setTitleBarOverlay) {
-      electron.window.setTitleBarOverlay(false);
-    }
   }, []);
 
   // Auto-close open menus/overlays after 30s idle to save resources
@@ -4691,25 +4614,21 @@ export const AppManager: React.FC = () => {
       return aIdx - bIdx;
     });
 
+    // The open-app tabs live INSIDE the top bar (one row of chrome, macOS
+    // style). The container is itself a drag region, so empty space between
+    // tabs still moves the window; the tabs are not.
     return (
       <>
       <div
         ref={tabContainerRef}
+        data-tauri-drag-region
+        role="tablist"
+        aria-label="Open apps"
         style={{
-          height: 32, display: 'flex', alignItems: 'center',
-          padding: '0 var(--space-2)', gap: 2,
-          // Tier 2 shares the SAME tone as the title bar above (no #0E0E11 seam)
-          // so the two tiers read as one continuous, seamless top bar.
-          background: 'var(--glass-bg, rgba(20,20,24,0.66))',
-          backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-          WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-          // The single hairline of the whole top chrome -- a crisp content edge,
-          // with NO inner gloss line and NO drop-shadow gap (owner: seamless).
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          position: 'relative', zIndex: 2,
-          flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
-          scrollbarWidth: 'none',
-        }}
+          flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', margin: '0 12px', gap: 2,
+          overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none',
+        } as React.CSSProperties}
       >
         {sortedTabs.map(app => {
           const def = APP_DEFINITIONS[app.id];
@@ -4739,7 +4658,7 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 12px', height: 26, borderRadius: 10, /* pill-shaped tabs (owner request) */
+                padding: '0 10px', height: 24, borderRadius: 6, /* pill-shaped tabs (owner request) */
                 background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'var(--color-bg-elevated, #1C1C20)' : 'transparent',
                 border: isDragging ? '1px solid var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
@@ -4847,6 +4766,7 @@ export const AppManager: React.FC = () => {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
+      {renderAppTabBar() ?? (
       <span style={{
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
         // Truly CENTERED in the bar -- was pinned at a hardcoded left:280, which
@@ -4901,6 +4821,7 @@ export const AppManager: React.FC = () => {
           );
         })()}
       </span>
+      )}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Date + time live in the draggable Clock widget on Home (user-placed).
             Keeping the topbar minimal -- only system status indicators here. */}
@@ -5196,7 +5117,6 @@ export const AppManager: React.FC = () => {
       ) : (
         <>
           {renderTitleBar()}
-          {renderAppTabBar()}
         </>
       )}
 
