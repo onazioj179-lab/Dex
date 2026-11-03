@@ -4,6 +4,7 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  */
 import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
+import { insertKanbanCard, type KanbanRestoreDetail } from '../../services/recycleRestore';
 import { DexSearchInput } from '../../styles/components';
 import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../../shared/time/dateHelpers';
 import { textIncludesAll, priorityRank, byField } from '../../../shared/collections/sortFilter';
@@ -321,6 +322,18 @@ const KanbanApp: React.FC = () => {
 
   // Auto-save
   useEffect(() => { saveBoards(boards); }, [boards]);
+
+  // A card restored from the DEX Recycle Bin while this board is open: take it
+  // into live state (saveBoards persists it) so storage isn't overwritten.
+  useEffect(() => {
+    const onRestore = (e: Event) => {
+      const detail = (e as CustomEvent<KanbanRestoreDetail>).detail;
+      detail.handled = true;
+      setBoards(prev => insertKanbanCard(prev as any, detail.data, detail.boardName) as unknown as KanbanBoard[]);
+    };
+    window.addEventListener('dex-kanban-restore', onRestore);
+    return () => window.removeEventListener('dex-kanban-restore', onRestore);
+  }, []);
 
   // Focus helpers
   useEffect(() => { if (addingToCol) newCardRef.current?.focus(); }, [addingToCol]);

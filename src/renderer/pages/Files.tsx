@@ -332,6 +332,19 @@ Breadcrumb.displayName = 'Breadcrumb';
 // COMPONENT
 // ===========================================================================
 
+/**
+ * Native file mutations resolve `{ success: false, error }` instead of
+ * rejecting, so a bare invoke reports every failure as success. Route every
+ * copy/move/delete/rename/mkdir through this: it throws on a reported failure.
+ */
+async function fileOp(channel: string, ...args: unknown[]): Promise<unknown> {
+  const r = await window.electron!.invoke(channel, ...args);
+  if (r && typeof r === 'object' && (r as { success?: boolean }).success === false) {
+    throw new Error((r as { error?: string }).error || `${channel} failed`);
+  }
+  return r;
+}
+
 export const Files: React.FC = () => {
   const { confirm, ConfirmHost } = useConfirm();
   // ===== PATTERN LEARNING =====
@@ -722,7 +735,7 @@ export const Files: React.FC = () => {
     if (!dragFile || !targetDir.isDirectory) return;
     try {
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:move', dragFile.path, targetDir.path);
+        await fileOp('files:move', dragFile.path, targetDir.path);
         loadFiles(currentPath);
       }
     } catch (err) {
@@ -846,9 +859,9 @@ export const Files: React.FC = () => {
       if (window.electron?.invoke) {
         const dest = currentPath;
         if (clipboard.mode === 'copy') {
-          await window.electron.invoke('files:copy', clipboard.file.path, dest);
+          await fileOp('files:copy', clipboard.file.path, dest);
         } else {
-          await window.electron.invoke('files:move', clipboard.file.path, dest);
+          await fileOp('files:move', clipboard.file.path, dest);
           setClipboard(null);
         }
         loadFiles(currentPath);
@@ -869,7 +882,7 @@ export const Files: React.FC = () => {
     if (!name) return;
     try {
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:mkdir', `${currentPath}/${name}`);
+        await fileOp('files:mkdir', `${currentPath}/${name}`);
         loadFiles(currentPath);
       }
     } catch (err) {
@@ -903,17 +916,14 @@ export const Files: React.FC = () => {
     });
     if (!confirmed) return;
     try {
-      // Send to recycle bin first
-      if ((window as any).dex?.invoke) {
-        await (window as any).dex.invoke('recycle-bin:delete', 'files', file.isDirectory ? 'folder' : 'file', file.name, JSON.stringify({ path: file.path, size: file.size }), currentPath);
-      }
+      // The OS Recycle Bin (restorable), never a permanent delete.
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:delete', file.path);
+        await fileOp('files:trash', file.path);
         loadFiles(currentPath);
       }
     } catch (err) {
       console.error('Delete failed:', err);
-      toast.error('Failed to delete file');
+      toast.error(`Could not move "${file.name}" to the Recycle Bin`);
     }
   };
 
@@ -969,14 +979,10 @@ export const Files: React.FC = () => {
     let done = 0;
     let failed = 0;
     for (const path of paths) {
-      const item = files.find(f => f.path === path);
       try {
-        // Record in the recycle bin first (best-effort), mirroring single delete.
-        if ((window as any).dex?.invoke && item) {
-          await (window as any).dex.invoke('recycle-bin:delete', 'files', item.isDirectory ? 'folder' : 'file', item.name, JSON.stringify({ path: item.path, size: item.size }), currentPath);
-        }
+        // The OS Recycle Bin (restorable), never a permanent delete.
         if (window.electron?.invoke) {
-          await window.electron.invoke('files:delete', path);
+          await fileOp('files:trash', path);
           done++;
         } else {
           failed++;
@@ -987,7 +993,7 @@ export const Files: React.FC = () => {
     }
     clearSelection();
     loadFiles(currentPath);
-    if (done > 0) toast.success(`Deleted ${done} item${done === 1 ? '' : 's'}`);
+    if (done > 0) toast.success(`Moved ${done} item${done === 1 ? '' : 's'} to the Recycle Bin`);
     if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
   }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm, confirmDeleteSetting]);
 
@@ -1004,7 +1010,7 @@ export const Files: React.FC = () => {
     if (!next || next === file.name) return;
     try {
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:rename', file.path, next);
+        await fileOp('files:rename', file.path, next);
         loadFiles(currentPath);
       }
     } catch (err) {
@@ -1136,8 +1142,8 @@ export const Files: React.FC = () => {
     for (const src of paths) {
       try {
         if (window.electron?.invoke) {
-          if (mode === 'copy') await window.electron.invoke('files:copy', src, currentPath);
-          else await window.electron.invoke('files:move', src, currentPath);
+          if (mode === 'copy') await fileOp('files:copy', src, currentPath);
+          else await fileOp('files:move', src, currentPath);
           ok++;
         }
       } catch (err) {
@@ -1197,7 +1203,7 @@ export const Files: React.FC = () => {
     for (const src of paths) {
       try {
         if (window.electron?.invoke) {
-          await window.electron.invoke(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
+          await fileOp(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
           done++;
         } else {
           failed++;
@@ -1221,6 +1227,57 @@ export const Files: React.FC = () => {
     // destination is the folder being viewed. Refresh in either of those cases.
     if (mode === 'move' || dest === currentPath) loadFiles(currentPath);
   }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles]);
+
+  // Empty-folder "Add Files": pick files with the native dialog and copy them
+  // into the folder being viewed through files:copy, with live progress.
+  const handleAddFiles = useCallback(async () => {
+    const dest = currentPath;
+    if (!dest || !window.electron?.invoke) {
+      toast.error('Adding files needs the DEX desktop app');
+      return;
+    }
+    let picked: string[] = [];
+    try {
+      const result = await window.electron.invoke<{ canceled?: boolean; filePaths?: string[] }>(
+        'files:openDialog', { properties: ['openFile', 'multiSelections'] },
+      );
+      picked = result?.canceled ? [] : (result?.filePaths ?? []);
+    } catch (err) {
+      console.error('File picker failed:', err);
+      toast.error('Could not open file picker');
+      return;
+    }
+    if (picked.length === 0) return;
+    const destName = dest.split(/[\\/]/).filter(Boolean).pop() || dest;
+    const activityId = useLiveActivityStore.getState().start({
+      title: `Copying to ${destName}`,
+      subtitle: `0 of ${picked.length} items`,
+      icon: 'files',
+      badge: 'FILES',
+      progress: 0,
+    });
+    let done = 0;
+    let failed = 0;
+    for (const src of picked) {
+      try {
+        await fileOp('files:copy', src, dest);
+        done++;
+      } catch (err) {
+        console.error('Failed to copy', src, '->', dest, err);
+        failed++;
+      }
+      useLiveActivityStore.getState().update(activityId, {
+        subtitle: `${done + failed} of ${picked.length} items`,
+        progress: (done + failed) / picked.length,
+      });
+    }
+    useLiveActivityStore.getState().complete(activityId, {
+      status: failed > 0 ? 'error' : 'success',
+      title: `Copied to ${destName}`,
+      subtitle: failed > 0 ? `${done} done · ${failed} failed` : `${done} item${done === 1 ? '' : 's'}`,
+    });
+    loadFiles(dest);
+  }, [currentPath, loadFiles, toast]);
 
   // Keyboard shortcuts for the multi-selection. Declared after the batch
   // handlers so every reference is in scope. Delete removes the selection;
@@ -2037,7 +2094,7 @@ export const Files: React.FC = () => {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={handleAddFiles} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
@@ -2179,7 +2236,7 @@ export const Files: React.FC = () => {
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={handleAddFiles} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
