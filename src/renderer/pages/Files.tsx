@@ -1837,10 +1837,19 @@ export const Files: React.FC = () => {
                 if (!ok) return;
                 try {
                   if (window.electron?.invoke) {
-                    await window.electron.invoke('files:organizeByType', currentPath);
+                    const ops = await window.electron.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
                     loadFiles(currentPath);
+                    const list = Array.isArray(ops) ? ops : [];
+                    const moved = list.filter(o => o.success).length;
+                    const skipped = list.length - moved;
+                    if (list.length === 0) toast.info('No files to organize here');
+                    else if (skipped === 0) toast.success(`Organized ${moved} file${moved === 1 ? '' : 's'}`);
+                    else toast.error(`Organized ${moved}; ${skipped} skipped (a file with that name already exists or couldn't be moved)`);
                   }
-                } catch (e) { console.warn('[Files] organizeByType failed:', e); }
+                } catch (e) {
+                  console.warn('[Files] organizeByType failed:', e);
+                  toast.error('Could not organize this folder');
+                }
               }}
               title="Organize files by type (Audio, Video, Images...)"
               aria-label="Organize files by type"

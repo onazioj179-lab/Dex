@@ -706,6 +706,21 @@ const Loading: React.FC<{ appId?: string }> = ({ appId }) => {
   );
 };
 
+// An app's content, memoised on its id. The keep-alive list is rebuilt on
+// every launch/focus change; without this every open app re-rendered its whole
+// tree each time, so launching got slower with every window already open.
+const AppBody = React.memo(function AppBody({ appId }: { appId: AppId }) {
+  const Comp = APP_COMPONENTS[appId];
+  if (!Comp) return null;
+  return (
+    <AppErrorBoundary appId={appId}>
+      <Suspense fallback={<Loading appId={appId} />}>
+        <Comp />
+      </Suspense>
+    </AppErrorBoundary>
+  );
+});
+
 // -- Settings persistence --------------------------------------------------
 const getWindowControlStyle = (): 'system' | 'traffic' => {
   const isWin = navigator.platform.includes('Win');
@@ -3974,11 +3989,7 @@ export const AppManager: React.FC = () => {
               )}
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
-              <AppErrorBoundary appId={appId}>
-                <Suspense fallback={<Loading appId={appId} />}>
-                  <Comp />
-                </Suspense>
-              </AppErrorBoundary>
+              <AppBody appId={appId} />
             </div>
             {/* Resize handles -- all 4 edges + corners for proper OS-like resizing */}
             {!isMaximized && (
@@ -4484,11 +4495,7 @@ export const AppManager: React.FC = () => {
           className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
         >
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-            <AppErrorBoundary appId={appId}>
-              <Suspense fallback={<Loading appId={appId} />}>
-                <Comp />
-              </Suspense>
-            </AppErrorBoundary>
+            <AppBody appId={appId} />
           </div>
         </div>
       );
