@@ -753,6 +753,7 @@ interface NoteToolbarProps {
   saving: boolean;
   /** Timestamp of the last successful save, for the autosave indicator. */
   lastSavedAt?: number | null;
+  saveError?: string | null;
 }
 
 const COLOR_LABELS = [
@@ -778,6 +779,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
   onColorLabel,
   focusMode,
   saving,
+  saveError,
   lastSavedAt,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -785,7 +787,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
 
   if (!note) return null;
 
-  const autosaveState: 'idle' | 'saving' | 'saved' = saving ? 'saving' : lastSavedAt ? 'saved' : 'idle';
+  const autosaveState: 'idle' | 'saving' | 'saved' | 'error' = saving ? 'saving' : saveError ? 'error' : lastSavedAt ? 'saved' : 'idle';
 
   // -- Print / Save-as-PDF / Share -----------------------------------------
   // Bridge-free (works in the browser dev server AND the Tauri WebView): reads

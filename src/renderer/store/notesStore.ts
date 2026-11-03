@@ -415,6 +415,8 @@ export interface NotesStoreState {
   /** True once initialize() has loaded the note list at least once. */
   initialized: boolean;
   saving: boolean;
+  /** Why the last save didn't reach the database, or null when it did. */
+  saveError: string | null;
   searching: boolean;
 
   // Actions -- Data
@@ -520,6 +522,7 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   loading: false,
   initialized: false,
   saving: false,
+  saveError: null,
   searching: false,
 
   // -- Initialize ----------------------------------------------------------
@@ -585,9 +588,24 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   updateNote: async (id: string, updates) => {
     set({ saving: true });
     try {
-      await ipc('dexnotes:update', id, updates);
+      const result = await ipc('dexnotes:update', id, updates);
       // Update local state immediately
       const { activeNote, notes } = get();
+      if (result && result.success === false) {
+        // The row is gone (deleted elsewhere, or never reached the database).
+        // Recreate it from what's on screen so the user's text isn't lost.
+        const base = activeNote?.id === id ? activeNote : notes.find(n => n.id === id);
+        const full = { ...(base || {}), ...updates } as Record<string, unknown>;
+        const created = await ipc('dexnotes:create', {
+          id, title: full.title ?? '', content: full.content ?? full.plain_text ?? '',
+          plain_text: full.plain_text, folder_id: full.folder_id ?? null,
+        });
+        if (!created) {
+          set({ saveError: 'This note could not be saved' });
+          return;
+        }
+      }
+      set({ saveError: null });
       if (activeNote && activeNote.id === id) {
         set({ activeNote: { ...activeNote, ...updates, updated_at: Date.now() } });
       }

@@ -219,7 +219,7 @@ const DexNotes: React.FC = () => {
     selectedFolderId, selectedNoteId, searchQuery, searchResults,
     sortField, sortDirection, viewMode, editorMode, focusMode,
     sidebarCollapsed, listCollapsed, paneSize,
-    loading, saving, searching, initialized,
+    loading, saving, saveError, searching, initialized,
   } = store;
 
   // UKI app-action: create a note (mutating -> confirm-gated). A ref keeps the
@@ -745,7 +745,7 @@ const DexNotes: React.FC = () => {
       wasSaving.current = true;
     } else if (wasSaving.current) {
       wasSaving.current = false;
-      setLastSavedAt(Date.now());
+      if (!useNotesStore.getState().saveError) setLastSavedAt(Date.now());
     }
   }, [saving]);
 
@@ -774,7 +774,7 @@ const DexNotes: React.FC = () => {
             Notes database could not be initialized.
           </div>
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center', maxWidth: 320 }}>
-            The better-sqlite3 module may need to be rebuilt for this Electron version.
+            The notes database didn't respond. Your notes are not deleted; try again.
           </div>
           <button
             onClick={() => { setInitFailed(false); createAttempted.current = false; store.initialize(); }}
@@ -806,6 +806,7 @@ const DexNotes: React.FC = () => {
             focusMode={focusMode}
             saving={saving}
             lastSavedAt={lastSavedAt}
+            saveError={saveError}
           />
           <TitleInput title={titleValue} onChange={handleTitleChange} />
           <NotesEditor
@@ -1097,6 +1098,7 @@ const DexNotes: React.FC = () => {
               focusMode={focusMode}
               saving={saving}
               lastSavedAt={lastSavedAt}
+            saveError={saveError}
             />
             {(() => {
               // Folder breadcrumb: walk the selected folder up to the root so the
