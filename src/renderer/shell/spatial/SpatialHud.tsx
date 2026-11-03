@@ -64,6 +64,14 @@ export const SpatialHud: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const st = useSpatialStore.getState;
   const [menu, setMenu] = useState<null | 'arrange' | 'windows'>(null);
   const pct = Math.round(zoom * 100);
+  // Sit above the DEX bar when it is docked along the bottom edge (it reserves
+  // that strip and publishes the height), instead of underneath it.
+  const [barInset, setBarInset] = useState(() => (window as { __dexBarInset?: number }).__dexBarInset ?? 0);
+  useEffect(() => {
+    const on = (e: Event) => setBarInset(Number((e as CustomEvent<number>).detail) || 0);
+    window.addEventListener('dex-bar-inset', on);
+    return () => window.removeEventListener('dex-bar-inset', on);
+  }, []);
   useEffect(() => {
     const open = () => setMenu((m) => (m === 'windows' ? null : 'windows'));
     window.addEventListener('dex-spatial-windows', open);
@@ -73,7 +81,7 @@ export const SpatialHud: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const arrangeItems: Array<[ArrangeKind, string]> = [['grid', 'Grid'], ['masonry', 'Masonry'], ['row', 'Presentation row'], ['cascade', 'Cascade']];
 
   return (
-    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, bottom: 16, zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
+    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, bottom: 16 + barInset, zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
       {menu === 'windows' && <WindowsPanel onClose={() => setMenu(null)} />}
       {menu === 'arrange' && (
         <div role="menu" aria-label="Arrange windows" style={{ ...panel, padding: 6, display: 'flex', flexDirection: 'column', minWidth: 180, pointerEvents: 'auto' }}>

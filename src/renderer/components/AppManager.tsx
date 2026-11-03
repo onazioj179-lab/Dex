@@ -2372,6 +2372,9 @@ export const AppManager: React.FC = () => {
 
   useEffect(() => {
     const onResize = () => {
+      // On the canvas, rects are WORLD coordinates: clamping them to the screen
+      // piled every window into one screen-sized box on any resize.
+      if (isSpatialEnabled()) return;
       const workspace = getShellWorkspace(0);
       setDetachedApps(prev => {
         let changed = false;
@@ -3167,6 +3170,19 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const pendingSpatialFitRef = useRef(false);
+  // Apps that were tabs (not floating) when the canvas opened, or that were
+  // launched while on it. They become canvas windows and go back to being
+  // tabs when the canvas closes.
+  const spatialFromTabsRef = useRef<Set<string>>(new Set());
+  /** Natural canvas size for an app: its window size, or a roomy default. */
+  const spatialSizeFor = useCallback((id: string, ws: { w: number; h: number }) => {
+    const def = APP_WINDOW_SIZES[id];
+    const min = APP_WINDOW_MIN_SIZES[id] ?? { w: 360, h: 280 };
+    const base = def && !def.maximized
+      ? { w: def.w, h: def.h }
+      : { w: Math.max(def?.w ?? 0, 680, Math.round(ws.w * 0.62)), h: Math.max(def?.h ?? 0, 460, Math.round(ws.h * 0.72)) };
+    return { w: Math.max(min.w, base.w), h: Math.max(min.h, base.h) };
+  }, []);
   const setSpatial = useCallback((on: boolean) => {
     const sp = useSpatialStore.getState();
     if (on === sp.enabled) return;
@@ -3196,11 +3212,37 @@ export const AppManager: React.FC = () => {
           h: Math.max(min.h, maxed ? Math.max(460, Math.round(ws.h * 0.72)) : b.h),
         });
       });
+      // Open tabs join the canvas too, each at its own natural size, so the
+      // workspace shows every open app (it used to show only floating ones).
+      const fromTabs = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
+      spatialFromTabsRef.current = new Set(fromTabs);
+      fromTabs.forEach(id => {
+        const mem = sp.layout[id];
+        const collides = mem && Object.values(remembered).some((r) =>
+          mem.x < r.x + r.w && mem.x + mem.w > r.x && mem.y < r.y + r.h && mem.y + mem.h > r.y);
+        if (mem && !collides) { remembered[id] = mem; return; }
+        fresh.push({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) });
+      });
       const taken = boundsOf(Object.values(remembered));
       const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+      const placed: Record<string, SpatialRect> = { ...remembered, ...arrange('grid', fresh, origin) };
       sp.setPreSpatial(pre);
       sp.setEnabled(true);
-      applySpatialBounds({ ...remembered, ...arrange('grid', fresh, origin) });
+      if (fromTabs.length > 0) {
+        fromTabs.forEach(id => mountedAppsRef.current.add(id as AppId));
+        const front = currentApp;
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          for (const [id, r] of Object.entries(placed)) {
+            const z = id === front ? nextDetachZ() + 50 : (next.get(id)?.z ?? nextDetachZ());
+            next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z });
+          }
+          return next;
+        });
+        setCurrentApp('home' as AppId);
+      } else {
+        applySpatialBounds(placed);
+      }
       pendingSpatialFitRef.current = true;
     } else {
       // Leave: remember the world layout, restore the screen layout.
@@ -3209,14 +3251,65 @@ export const AppManager: React.FC = () => {
       sp.rememberLayout(world);
       const pre = sp.preSpatial ?? {};
       const restore: Record<string, SpatialRect> = {};
+      const backToTabs = Array.from(spatialFromTabsRef.current).filter(id => detachedApps.has(id as AppId));
       detachedApps.forEach((b, id) => {
+        if (spatialFromTabsRef.current.has(id)) return;
         restore[id] = clampWindowToWorkspace(pre[id] ?? { x: ws.x + 40, y: ws.y + 40, w: b.w, h: b.h }, ws);
       });
       sp.setPreSpatial(null);
       sp.setEnabled(false);
-      applySpatialBounds(restore);
+      if (backToTabs.length > 0) {
+        // The front-most canvas window that came from a tab becomes the current tab.
+        const front = backToTabs.reduce((a, b) => ((detachedApps.get(a as AppId)?.z ?? 0) >= (detachedApps.get(b as AppId)?.z ?? 0) ? a : b));
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          backToTabs.forEach(id => next.delete(id));
+          for (const [id, r] of Object.entries(restore)) {
+            const b = next.get(id);
+            if (b) next.set(id, { ...b, ...r });
+          }
+          return next;
+        });
+        setMinimizedApps(prev => { if (!backToTabs.some(id => prev.has(id))) return prev; const n = new Set(prev); backToTabs.forEach(id => n.delete(id)); return n; });
+        setCurrentApp(front as AppId);
+      } else {
+        applySpatialBounds(restore);
+      }
+      spatialFromTabsRef.current = new Set();
     }
-  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode]);
+  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, setCurrentApp, spatialSizeFor]);
+
+  // On the canvas every app is a window: an app launched (or switched to) as a
+  // tab while the canvas is open is placed on it instead of covering it.
+  useEffect(() => {
+    if (!spatialEnabled || splitMode !== 'off') return;
+    const missing = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
+    if (missing.length === 0) return;
+    missing.forEach(id => { spatialFromTabsRef.current.add(id); mountedAppsRef.current.add(id as AppId); });
+    const focus = currentApp && missing.includes(currentApp) ? currentApp : null;
+    const ws = getShellWorkspace(0);
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      const todo = missing.filter(id => !next.has(id));
+      if (todo.length === 1) {
+        // One new window: the free spot in the current view.
+        const id = todo[0];
+        const rect = spatialPlaceFor(id, next) ?? { x: 0, y: 0, ...spatialSizeFor(id, ws) };
+        next.set(id, { ...rect, z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+      } else if (todo.length > 1) {
+        // A burst (e.g. a restored session): a tidy grid beside what is there.
+        const taken = boundsOf(Array.from(next.values()));
+        const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+        const placed = arrange('grid', todo.map(id => ({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) })), origin);
+        for (const [id, r] of Object.entries(placed)) {
+          next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+        }
+        pendingSpatialFitRef.current = true;
+      }
+      return next;
+    });
+    if (focus) setCurrentApp('home' as AppId);
+  }, [spatialEnabled, splitMode, runningApps, currentApp, detachedApps, spatialPlaceFor, setCurrentApp, getShellWorkspace, spatialSizeFor]);
 
   // Mirror real windows into the spatial store (HUD, minimap, list, groups).
   useEffect(() => {
