@@ -4617,10 +4617,6 @@ const Prism: React.FC = () => {
             <button aria-label="Close Smart Objects panel" onClick={() => setShowSmartObjects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              <button aria-label="View linked smart objects" style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Linked</button>
-              <button aria-label="View embedded smart objects" style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Embedded</button>
-            </div>
             <div style={{ padding: 14, borderRadius: 6, background: 'var(--color-bg-inset)', textAlign: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>{(() => { const sel = layers.find(l => l.id === selectedLayerId); return sel && sel.name.startsWith('[SO] ') ? <DexIcon name="package" size={20} /> : '--'; })()}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{(() => { const sel = layers.find(l => l.id === selectedLayerId); return sel && sel.name.startsWith('[SO] ') ? sel.name : 'No smart object selected'; })()}</div>
@@ -4674,18 +4670,6 @@ const Prism: React.FC = () => {
             <button aria-label="Close Panorama Stitch panel" onClick={() => setShowPanorama(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ padding: 30, borderRadius: 6, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', marginBottom: 'var(--space-3)', cursor: 'pointer' }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>--</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Drop panorama images here</div>
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Projection</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['Cylindrical', 'Spherical', 'Perspective', 'Auto'].map(p => (
-                  <button key={p} aria-label={`${p} panorama projection`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: p === 'Cylindrical' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: p === 'Cylindrical' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p}</button>
-                ))}
-              </div>
-            </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="checkbox" defaultChecked style={{ accentColor: 'var(--color-accent)' }} />
@@ -4784,14 +4768,6 @@ const Prism: React.FC = () => {
                 <input type="checkbox" defaultChecked style={{ accentColor: 'var(--color-accent)' }} />
                 Ghost Removal
               </label>
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Blend Method</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['Weighted Average', 'Depth Map', 'Pyramid'].map(m => (
-                  <button key={m} aria-label={`${m} blend method`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Depth Map' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: m === 'Depth Map' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
-                ))}
-              </div>
             </div>
             <button aria-label="Stack and merge focus images" onClick={() => {
               const input = document.createElement('input');
@@ -5620,12 +5596,6 @@ const Prism: React.FC = () => {
             <button aria-label="Close Refine Edge panel" onClick={() => setShowRefineEdge(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ marginBottom: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>View Mode</div>
-            <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
-              {['Marching Ants', 'Overlay', 'On Black', 'On White', 'B&W'].map(v => (
-                <button key={v} aria-label={`${v} view mode`} style={{ flex: 1, padding: '3px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: v === 'Marching Ants' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: v === 'Marching Ants' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, cursor: 'pointer' }}>{v}</button>
-              ))}
-            </div>
             {[{ label: 'Smooth', val: refineEdgeSmooth, set: setRefineEdgeSmooth, max: 100 }, { label: 'Feather', val: refineEdgeFeather, set: setRefineEdgeFeather, max: 250 }, { label: 'Shift Edge', val: refineEdgeShift, set: setRefineEdgeShift, max: 100 }].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 55 }}>{s.label}</span>

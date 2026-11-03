@@ -3841,7 +3841,6 @@ const Imosion: React.FC = () => {
   const [trackFolders, setTrackFolders] = useState<{ id: string; name: string; trackIds: string[]; collapsed: boolean; color: string }[]>([]);
   const [showTrackFolderDialog, setShowTrackFolderDialog] = useState(false);
   // Clip gain envelopes
-  const [showClipGainEnvelope, setShowClipGainEnvelope] = useState(false);
   // Stem export
   const [showStemExport, setShowStemExport] = useState(false);
   // Freeze/flatten tracks
@@ -6952,7 +6951,6 @@ const Imosion: React.FC = () => {
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowBatchFade(!showBatchFade); setShowToolsMenu(false); }}>Batch Fade</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowTimeStretch(!showTimeStretch); setShowToolsMenu(false); }}>Time Stretch</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowPitchShift(!showPitchShift); setShowToolsMenu(false); }}>Pitch Shift</div>
-                <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowClipGainEnvelope(!showClipGainEnvelope); setShowToolsMenu(false); }}>Clip Gain Envelope</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowClipFx(!showClipFx); setShowToolsMenu(false); }}>Clip Effects</div>
                 <div className="dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px' }} onClick={() => { setShowWarpMarkers(!showWarpMarkers); setShowToolsMenu(false); }}>Warp Markers</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
@@ -10882,40 +10880,6 @@ const Imosion: React.FC = () => {
         </div>
       )}
 
-      {/* Clip Gain Envelope Panel */}
-      {showClipGainEnvelope && (
-        <div style={{ position: 'fixed', left: '50%', bottom: 80, transform: 'translateX(-50%)', width: 480, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 200 }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clip Gain Envelope</span>
-            <button aria-label="Close Clip Gain Envelope" onClick={() => setShowClipGainEnvelope(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ height: 120, background: 'rgba(0,0,0,0.3)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', position: 'relative', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
-              {/* Waveform background */}
-              <svg width="100%" height="100%" viewBox="0 0 480 120" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.3 }}>
-                <path d="M0,60 Q30,20 60,60 Q90,100 120,60 Q150,30 180,60 Q210,90 240,60 Q270,25 300,60 Q330,85 360,60 Q390,35 420,60 Q450,80 480,60" fill="none" stroke="#0a84ff" strokeWidth="1" />
-              </svg>
-              {/* Gain envelope line */}
-              <svg width="100%" height="100%" viewBox="0 0 480 120" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-                <line x1="0" y1="40" x2="480" y2="40" stroke="#8f8748" strokeWidth="1.5" strokeDasharray="2,2" />
-                {/* Envelope nodes */}
-                <circle cx="0" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
-                <circle cx="160" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
-                <circle cx="320" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
-                <circle cx="480" cy="40" r="4" fill="#8f8748" style={{ cursor: 'grab' }} />
-              </svg>
-              {/* 0dB reference line */}
-              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed var(--color-border)' }} />
-              <span style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: 8, color: 'var(--color-text-tertiary)' }}>0 dB</span>
-            </div>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
-              <button aria-label="Add gain envelope node" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'rgba(143, 135, 72,0.08)', color: 'var(--color-warning)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Add Node</button>
-              <button aria-label="Reset gain envelope" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Reset Envelope</button>
-              <button aria-label="Normalize gain envelope" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Normalize</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Routing Panel */}
       {showRouting && (

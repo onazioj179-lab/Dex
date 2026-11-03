@@ -128,3 +128,13 @@ describe('Flux repeater layout', () => {
     expect(repeaterOffsets('spiral', 1)).toEqual([{ dx: 0, dy: 0, rotation: 0 }]);
   });
 });
+
+describe('Flux distribute', () => {
+  it('spaces items evenly by rank and keeps the outermost two', async () => {
+    const { distributePositions } = await import('../../src/renderer/DEXAPPLICATIONS/flux/Flux');
+    expect(distributePositions([0, 10, 100])).toEqual([0, 50, 100]);
+    // Order in the array does not matter, rank does.
+    expect(distributePositions([100, 0, 30, 90])).toEqual([100, 0, 100 / 3, 200 / 3]);
+    expect(distributePositions([5, 9])).toEqual([5, 9]);
+  });
+});

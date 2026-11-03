@@ -78,6 +78,21 @@ interface Layer {
   pathKeyframes?: { time: number; d: string }[];
 }
 
+/**
+ * Evenly spaced positions for `values`, keeping each item's rank and the two
+ * outermost items where they are (classic "distribute"). Fewer than 3 items
+ * are returned unchanged.
+ */
+export function distributePositions(values: number[]): number[] {
+  if (values.length < 3) return [...values];
+  const order = values.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]);
+  const min = order[0][0];
+  const step = (order[order.length - 1][0] - min) / (values.length - 1);
+  const out = [...values];
+  order.forEach(([, i], rank) => { out[i] = min + step * rank; });
+  return out;
+}
+
 /** Offsets for a repeater of `count` items; index 0 is the original layer. */
 export function repeaterOffsets(type: 'grid' | 'radial' | 'spiral', count: number, spacing = 80): Array<{ dx: number; dy: number; rotation: number }> {
   const n = Math.max(1, Math.floor(count));
@@ -724,7 +739,7 @@ const Flux: React.FC = () => {
   const [guideLayers, setGuideLayers] = useState<Set<string>>(new Set());
   // 14. Snapshot / A/B
   const [showSnapshot, setShowSnapshot] = useState(false);
-  const [snapshots, setSnapshots] = useState<{ id: string; name: string; time: string }[]>([]);
+  const [snapshots, setSnapshots] = useState<{ id: string; name: string; time: string; layers: Layer[] }[]>([]);
   // 16. Color Correction
   const [showColorCorrection, setShowColorCorrection] = useState(false);
   const [ccLift, setCcLift] = useState({ r: 0, g: 0, b: 0 });
@@ -3546,12 +3561,6 @@ const Flux: React.FC = () => {
                 <input type="range" min="0" max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: s.color }} />
               </div>
             ))}
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Material</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
-              {['Metal', 'Glass', 'Plastic', 'Wood', 'Chrome', 'Gold', 'Matte', 'Neon'].map(m => (
-                <button key={m} aria-label={`${m} material`} style={{ padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
-              ))}
-            </div>
           </div>
         </div>
       )}
@@ -4399,9 +4408,21 @@ const Flux: React.FC = () => {
               ))}
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 6 }}>Distribute</span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
-              {['H Spacing', 'V Spacing', 'H Centers', 'V Centers'].map(d => (
-                <button key={d} aria-label={`Distribute ${d}`} style={{ padding: '5px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{d}</button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3 }}>
+              {(['Horizontally', 'Vertically'] as const).map(d => (
+                <button key={d} aria-label={`Distribute ${d.toLowerCase()}`} onClick={() => {
+                  // Visible, unlocked layers; the outermost two stay put.
+                  setLayers(prev => {
+                    const idx = prev.map((l, i) => (l.visible && !l.locked ? i : -1)).filter(i => i >= 0);
+                    if (idx.length < 3) return prev;
+                    const axis = d === 'Horizontally' ? 'x' : 'y';
+                    const next = distributePositions(idx.map(i => prev[i].transform[axis]));
+                    const out = [...prev];
+                    idx.forEach((i, k) => { out[i] = { ...out[i], transform: { ...out[i].transform, [axis]: next[k] } }; });
+                    return out;
+                  });
+                  setIsDirty(true);
+                }} style={{ padding: '5px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{d}</button>
               ))}
             </div>
           </div>
@@ -4437,14 +4458,14 @@ const Flux: React.FC = () => {
             <button aria-label="Close Snapshots panel" onClick={() => setShowSnapshot(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString() }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
+            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString(), layers }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {snapshots.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No snapshots taken</div>}
               {snapshots.map(s => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', flex: 1 }}>{s.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.time}</span>
-                  <button aria-label="Compare snapshot" style={{ background: 'none', border: 'none', color: '#bf5af2', cursor: 'pointer', fontSize: 11  }}>A/B</button>
+                  <button aria-label={`Restore ${s.name}`} onClick={() => { setLayers(s.layers); setIsDirty(true); }} style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 11  }}>Restore</button>
                   <button aria-label="Delete snapshot" onClick={() => setSnapshots(prev => prev.filter(ss => ss.id !== s.id))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
                 </div>
               ))}
