@@ -128,24 +128,37 @@ function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
 
 const fmtCoord = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 
-// Geocode a place name via Open-Meteo (free, no API key).
-const geocode = async (q: string): Promise<GeoResult[]> => {
-  if (!q.trim()) return [];
+// Geocode a place name via Open-Meteo (free, no API key). A failed request is
+// reported as an error, never as "no places found".
+export interface GeocodeOutcome { results: GeoResult[]; error: null | 'offline' | 'service' }
+export const geocode = async (q: string, fetcher: typeof fetch = fetch): Promise<GeocodeOutcome> => {
+  if (!q.trim()) return { results: [], error: null };
   try {
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`);
+    const res = await fetcher(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`);
+    if (!res.ok) return { results: [], error: 'service' };
     const data = await res.json();
-    if (!Array.isArray(data.results)) return [];
-    return data.results.map((r: any): GeoResult => ({
-      name: r.name,
-      lat: r.latitude,
-      lon: r.longitude,
-      detail: [r.admin1, r.country].filter(Boolean).join(', '),
-    }));
+    if (!Array.isArray(data?.results)) return { results: [], error: null };
+    const results = data.results
+      .filter((r: any) => Number.isFinite(r?.latitude) && Number.isFinite(r?.longitude) && typeof r?.name === 'string')
+      .map((r: any): GeoResult => ({
+        name: r.name,
+        lat: r.latitude,
+        lon: r.longitude,
+        detail: [r.admin1, r.country].filter(Boolean).join(', '),
+      }));
+    return { results, error: null };
   } catch (err) {
     console.warn('[Maps] Geocode failed:', err);
-    return [];
+    return { results: [], error: typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'service' };
   }
 };
+
+/** User-facing reason for a geolocation failure (GeolocationPositionError codes). */
+export function locationErrorMessage(code: number): string {
+  if (code === 1) return 'Location permission was denied. Allow location for DEX in Windows Settings > Privacy & security > Location.';
+  if (code === 3) return 'Finding your location took too long. Try again.';
+  return 'Your location is not available right now.';
+}
 
 const ctrlBtn: React.CSSProperties = {
   width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -213,6 +226,9 @@ const DexMaps: React.FC = () => {
   const searchPhrase = useWorkingPhrase(searching, 'search');
   const [place, setPlace] = useState('San Francisco');
   const [failed, setFailed] = useState(false);
+  const [searchError, setSearchError] = useState<GeocodeOutcome['error']>(null);
+  /** Base-map tiles failing to load (offline, provider down): shown, not just logged. */
+  const [tilesFailing, setTilesFailing] = useState(false);
 
   const [recent, setRecent] = useState<GeoResult[]>(() => loadList<GeoResult>(RECENT_KEY));
   const [saved, setSaved] = useState<SavedPlace[]>(() => loadList<SavedPlace>(SAVED_KEY));
@@ -299,7 +315,7 @@ const DexMaps: React.FC = () => {
         } catch { /* noop */ }
       }
       pts = [...pts, { lat, lon }];
-      const mk = new maplibregl.Marker({ color: pts.length === 1 ? '#34C759' : '#FF9F0A' })
+      const mk = new maplibregl.Marker({ color: pts.length === 1 ? canvasColor('--color-accent') : canvasColor('--color-text-secondary') })
         .setLngLat([lon, lat]).addTo(map);
       measureMarkersRef.current.push(mk);
 
@@ -315,7 +331,7 @@ const DexMaps: React.FC = () => {
             map.addSource(measureLineId, { type: 'geojson', data: geo as any });
             map.addLayer({
               id: measureLineId, type: 'line', source: measureLineId,
-              paint: { 'line-color': '#4A9EFF', 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
+              paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
             });
           }
           map.fitBounds([[pts[0].lon, pts[0].lat], [pts[1].lon, pts[1].lat]], { padding: 120, maxZoom: 12, duration: 600 });
@@ -353,6 +369,16 @@ const DexMaps: React.FC = () => {
     mapRef.current = map;
     map.on('error', (e) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
+      if ((e as { tile?: unknown; sourceId?: string }).tile || (e as { sourceId?: string }).sourceId || /fetch|network|load/i.test(String(e?.error?.message ?? ''))) {
+        lastTileError = Date.now();
+        setTilesFailing(true);
+      }
+    });
+    // Clear once tiles load again well after the last failure (not on 'idle',
+    // which also fires when every pending tile has simply failed).
+    let lastTileError = 0;
+    map.on('data', (e) => {
+      if ((e as { tile?: unknown }).tile && lastTileError && Date.now() - lastTileError > 3000) { lastTileError = 0; setTilesFailing(false); }
     });
     return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -399,7 +425,7 @@ const DexMaps: React.FC = () => {
             map.addSource(measureLineId, { type: 'geojson', data: geo as any });
             map.addLayer({
               id: measureLineId, type: 'line', source: measureLineId,
-              paint: { 'line-color': '#4A9EFF', 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
+              paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
             });
           }
         } catch { /* noop */ }
@@ -420,8 +446,9 @@ const DexMaps: React.FC = () => {
         if (typeof d.lat === 'number' && typeof d.lon === 'number') {
           goTo(d.lat, d.lon, d.label || 'Location', d.zoom ?? 12);
         } else if (typeof d.query === 'string') {
-          const hits = await geocode(d.query);
+          const { results: hits, error } = await geocode(d.query);
           if (hits[0]) goTo(hits[0].lat, hits[0].lon, hits[0].name, 12, hits[0].detail);
+          else toast(error ? 'error' : 'info', error ? 'Place search is unavailable. Check your connection.' : `No place found for "${d.query}".`);
         }
       } catch (err) { console.warn('[Maps] goto failed:', err); }
     };
@@ -457,8 +484,8 @@ const DexMaps: React.FC = () => {
     let cancelled = false;
     setSearching(true);
     const t = setTimeout(async () => {
-      const hits = await geocode(query);
-      if (!cancelled) { setResults(hits); setSearching(false); }
+      const { results: hits, error } = await geocode(query);
+      if (!cancelled) { setResults(hits); setSearchError(error); setSearching(false); }
     }, 320);
     return () => { cancelled = true; clearTimeout(t); };
   }, [query]);
@@ -472,7 +499,7 @@ const DexMaps: React.FC = () => {
   }, [goTo, pushRecent]);
 
   const locate = useCallback(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) { toast('info', 'Location is not available on this device.'); return; }
     // Honor Settings > Privacy & Security > Location Services (off by default).
     // It used to be ignored: "My location" read the position regardless.
     if (!locationServicesEnabled()) {
@@ -481,7 +508,8 @@ const DexMaps: React.FC = () => {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => goTo(pos.coords.latitude, pos.coords.longitude, 'My location', 14),
-      (err) => console.warn('[Maps] geolocation denied:', err.message),
+      (err) => { console.warn('[Maps] geolocation failed:', err.message); toast('error', locationErrorMessage(err.code)); },
+      { timeout: 15000, maximumAge: 60000 },
     );
   }, [goTo]);
 
@@ -526,6 +554,12 @@ const DexMaps: React.FC = () => {
     <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
       <style>{MAPS_STYLE}</style>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {tilesFailing && (
+        <div role="status" className="dex-liquid-glass-strong" style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
+          <DexIcon name="alert-triangle" size={14} color="var(--color-text-tertiary)" />
+          Some map tiles could not load. Check your connection.
+        </div>
+      )}
 
       {/* Mirror current view for UKI screen-context. */}
       <span data-app-content style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
@@ -595,7 +629,14 @@ const DexMaps: React.FC = () => {
             {searchPhrase} places…
           </div>
         )}
-        {query.trim() && !searching && results.length === 0 && (
+        {query.trim() && !searching && results.length === 0 && searchError && (
+          <div role="alert" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
+            <DexIcon name="alert-triangle" size={20} color="var(--color-text-tertiary)" />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{searchError === 'offline' ? 'You are offline' : 'Place search is unavailable'}</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{searchError === 'offline' ? 'Connect to the internet to search for places.' : 'The search service did not respond. Try again in a moment.'}</span>
+          </div>
+        )}
+        {query.trim() && !searching && results.length === 0 && !searchError && (
           <div role="status" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
             <DexIcon name="map-pin" size={20} color="var(--color-text-tertiary)" />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No places found</span>

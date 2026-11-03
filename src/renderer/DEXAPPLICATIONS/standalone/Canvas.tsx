@@ -13,6 +13,7 @@ import {
   addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
   takeCanvasRequest, CANVAS_REQUEST_EVENT,
 } from './canvasBoards';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -998,8 +999,8 @@ const Canvas: React.FC = () => {
   // -------------------------------------------------------------------------
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (!keyEventForApp(e, 'canvas')) return;
+      const typing = isTypingTarget(e.target);
       if (e.code === 'Space' && !typing) {
         spaceDownRef.current = true;
       }

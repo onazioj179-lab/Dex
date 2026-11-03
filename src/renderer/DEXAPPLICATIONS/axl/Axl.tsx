@@ -100,6 +100,7 @@ import SketchOverlay from './components/SketchOverlay';
 import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
 import { ResizablePanel } from '../../components/ResizablePanel';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ==================== APP IDENTITY ====================
 export const AXL_VERSION = '1.0.0';
@@ -1604,7 +1605,7 @@ const AXL: React.FC = () => {
   // ─── Keyboard shortcuts ───────────────────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (!keyEventForApp(e, 'axl') || isTypingTarget(e.target)) return;
       const k = e.key.toLowerCase();
 
       // ── Ctrl+Shift combos ──

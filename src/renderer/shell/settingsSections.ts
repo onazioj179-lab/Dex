@@ -38,6 +38,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'permissions', name: 'Permissions', keywords: 'access camera mic location files grant' },
   { id: 'creator', name: 'Creator Access', keywords: 'developer creator unlock advanced' },
   { id: 'keyboard', name: 'Keyboard Shortcuts', keywords: 'hotkeys shortcuts keybindings keys' },
+  { id: 'touch', name: 'Touch & Pen', keywords: 'touchscreen multitouch fingers pen stylus gestures haptics vibration' },
   { id: 'files', name: 'Files', keywords: 'finder explorer storage default folder' },
   { id: 'storage', name: 'Storage & Data', keywords: 'disk space cache clear data usage' },
   { id: 'browser', name: 'Browser', keywords: 'web search engine homepage bookmarks' },

@@ -12,7 +12,13 @@
 - **UKI assistant** (from the 6.1.x work, unreleased until now): choose where requests go (Local only, Hybrid, Cloud only, or one pinned model), reasoning effort, file actions limited to Documents/Desktop/Downloads with confirmation, pause/resume/cancel for background tasks, an activity log, memory you can view/forget/export/clear, AI keys encrypted with Windows DPAPI, daily AI usage and an optional cloud limit, "Look at my screen" and "Use my camera" (one frame each).
 - **Spatial desktop and Creative Hub** (from Part 5, merged): windows on a pan/zoom canvas with zones, snapping and saved views; Creative Hub and whiteboard templates.
 
+- **Touch & Pen settings.** Shows how many fingers your screen supports and has a test pad that draws every live contact. Up to ten fingers are tracked at once where the screen supports it.
+- **Spotlight finds open windows**, and on the spatial desktop also your window groups, zones and saved views.
+
 ## Changed
+
+- **Spatial desktop: no more corner toolbar or default minimap.** Right-click or long-press the desktop for zoom, arrange and window options (shortcuts unchanged). The minimap is off unless you turn it on.
+- **Haptics only where there is a motor.** DEX no longer calls vibrate on every button press; a short pulse marks a snap on supported phones/tablets, and you can turn it off.
 
 - **Local AI is opt-in.** DEX no longer checks for Ollama on every start or uses it just because it is running. Turn on "Connect to a local AI service (Ollama)" in Settings › AI Providers if you want it. DEX never installs or starts an AI runtime.
 - **Battery is no longer in the top bar.** It is in Control Center, which also says when a PC has no battery.
@@ -27,6 +33,13 @@
 - The Calculator reacted to Enter, Escape and number keys pressed in other apps while it was open in the background.
 - DEX starts reliably on machines where 6.0.x failed with "WebView2Loader.dll was not found"; opening DEX twice focuses the existing window.
 - Light mode: the top bar, menus, dock and panels no longer stay dark; the live-activity card is readable in light mode.
+
+- Touch drags inside apps no longer lose their grip (the shell was taking over every touch), and pinching inside an app no longer opens the overview.
+- The spatial canvas keeps panning and zooming when a third finger lands.
+- Maps tells you when you are offline or search is down (instead of "No places found"), explains why My location failed, and says when map tiles could not load.
+- Creative apps open in the background no longer react to keys typed in another app: Space in Notes no longer toggles FLUX playback, and Ctrl+Z in Notes no longer undoes FLUX, PRISM, Vinx, Imosion, FORGE, AXL, Canvas or Pixel Art edits. FLUX redo no longer gets out of step after an undo. The same applies to every other app: Files no longer pastes a copied file when you press Ctrl+V in a text box, Delete no longer removes a selected Canvas object while you work elsewhere, and Imosion no longer plays notes when you type in another app.
+- Browser: typing `localhost:5173` or a local IP opens it instead of searching for it; `file:`, `data:` and other non-web addresses are refused with a reason.
+- Task Manager: the per-app "Realtime / Frozen" menu did nothing and is gone. Each open app shows whether it is in the foreground, background or suspended, and apps that support it can be suspended to free GPU and audio.
 
 ## Faster
 

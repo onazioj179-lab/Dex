@@ -174,3 +174,24 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | Real profile untouched | `%APPDATA%\com.onazioj.dex` 39 files SHA-256 identical before/after. `%LOCALAPPDATA%` identical except `logs/startup.log` (+129 bytes): the startup log ignored `DEX_DATA_DIR`. Fixed after this build (`webview2.rs`), 3/3 native tests |
 | Not run | Installing the MSI/NSIS (would replace the installed DEX on this machine; needs a VM or your go-ahead), upgrade over 6.x, uninstall |
 
+
+## Part 9 (spatial UX, multitouch, haptics, search)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | exit 0 |
+| Full `vitest run` | **530 files passed, 0 failed** (2 skipped); 5444 tests |
+| `multitouch-contacts.test.ts` | 13 passed: N-contact translation/scale/rotation; 10 simultaneous contacts tracked by id, an 11th refused; stale contacts dropped on a new primary touch; palm rejection; N-finger camera equals the old 2-finger pinch; haptics never fire on desktop hardware, rate-limited and switchable on mobile hardware; global recognizer fires one desktop pinch per gesture, marks pinches inside an app, and still sees a pointerup an app stopped |
+| `part9-spatial-touch-ui.test.tsx` | 6 passed: no toolbar, no minimap by default, overlay top-right not bottom; Windows panel opens from the shortcut, Layout tab has Arrange; desktop menu carries every former toolbar action; minimap migration v1 → off; Touch & Pen reports "No touch screen" honestly with haptics disabled, and on a 10-point screen the pad counts 5 contacts then 4, peak 5 |
+| `part9-spotlight-windows.test.ts` | 3 passed: open window found and switched to; on the spatial desktop groups/zones/views found and the camera moved; none when spatial is off |
+| `spatial-desktop.test.ts` | 23 passed (unchanged behaviour) |
+| `part9-maps-honest-errors.test.ts` | 5 passed: results mapped, malformed rows dropped; empty answer = no results; HTTP 503 / network error = error, not "no places"; blank query makes no request; each geolocation failure explained |
+| `part9-nexus-app-phases.test.tsx` | 2 passed: lifecycle `handles()` / `subscribeAll()`; Task Manager renders no governance select, offers Suspend only for an app that listens, Suspend → `suspended`, Resume → `background` |
+| `part9-browser-address.test.ts` | 5 passed: URLs kept, bare domains get https (ports/paths kept), localhost/IP/IPv6 open over http, text/numbers searched, 8 dangerous schemes refused, `about:blank` allowed |
+| Second pass | `tsc` exit 0; full `vitest run` **533 files passed, 0 failed**; Browser files re-run after the last edit: 3 files / 46 tests passed |
+| `part9-app-key-scope.test.ts` | 5 passed: a key typed in another app's editor is not FLUX's; with page focus the last-clicked app gets it; else the current app; apps mounted outside the shell keep their keys; typing-target detection |
+| Creative-app regression | 103 test files that mention the changed apps: 1091 tests passed. Third pass: `tsc` exit 0; full `vitest run` **535 files passed, 0 failed** |
+| Fourth pass | `tsc` exit 0; full `vitest run` **536 files passed, 0 failed**; Imosion files re-run after the last edit: 25 files / 244 tests passed |
+| `part9-app-key-scope-ratchet.test.ts` | 1 passed: every `window`/`document` keydown handler under `DEXAPPLICATIONS/` and `pages/` calls `keyEventForApp`, except 8 listed Escape-closers / one-shot / unmounted handlers |
+| Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
+| Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |

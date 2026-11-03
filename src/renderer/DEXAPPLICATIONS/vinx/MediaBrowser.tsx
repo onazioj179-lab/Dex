@@ -23,6 +23,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { DexSearchInput } from '../../styles/components';
 import { buildClipFromMedia, resolveDropTrack, appendFrameForTrack } from './mediaClip';
 import { createAddClipCommand } from './VinxCommands';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -314,6 +315,7 @@ const MediaTab: React.FC = memo(() => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'vinx')) return; // key meant for another app
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMediaId) {

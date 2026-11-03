@@ -26,6 +26,12 @@ import { Z_CONTEXT_MENU, Z_MODAL } from '../utils/zIndexTokens';
 import { useHomePinnedFilesStore, type HomePinnedFile } from '../store/homePinnedFilesStore';
 import { useHomePinnedAppsStore, type HomePinnedApp } from '../store/homePinnedAppsStore';
 import { useSmoothDrag } from '../hooks/useSmoothDrag';
+import { spatialMenuActions } from '../shell/spatial/SpatialHud';
+
+const SPATIAL_MENU_ICONS: Record<string, string> = {
+  enter: 'maximize', fit: 'maximize', 'zoom-in': 'zoom-in', 'zoom-out': 'minus', actual: 'search',
+  back: 'arrow-left', windows: 'layers', minimap: 'grid', leave: 'close',
+};
 
 // App icon images
 import vinxIconPng from '../../../appicons/vinx.png';
@@ -438,7 +444,7 @@ export const Home: React.FC = () => {
     const tag = (e.target as HTMLElement).tagName.toLowerCase();
     if (tag === 'button' || tag === 'input' || tag === 'a') return;
     e.preventDefault();
-    const p = clampEventToViewport(e, { width: 220, height: 420 });
+    const p = clampEventToViewport(e, { width: 260, height: 640 });
     setCtxMenu({ x: p.left, y: p.top });
   }, []);
 
@@ -702,7 +708,10 @@ export const Home: React.FC = () => {
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >
-            {[
+            {([
+              // Spatial desktop actions (the canvas has no toolbar of its own).
+              ...spatialMenuActions().map((a) => ({ label: a.label, shortcut: a.shortcut, disabled: a.disabled, icon: <DexIcon name={SPATIAL_MENU_ICONS[a.id] ?? 'grid'} size={14} />, action: () => { a.run(); setCtxMenu(null); } })),
+              null,
               { label: 'Stage Manager', icon: <DexIcon name="grid" size={14} />, action: () => { window.dispatchEvent(new CustomEvent('dex-stage-toggle')); setCtxMenu(null); } },
               { label: 'Change Wallpaper', icon: <DexIcon name="palette" size={14} />, action: () => { setShowWallpaperPicker(true); setCtxMenu(null); } },
               { label: 'Pin File Here...', icon: <DexIcon name="file-plus" size={14} />, action: () => { void pinFileFromDialog(ctxMenu); } },
@@ -712,7 +721,7 @@ export const Home: React.FC = () => {
               null,
               { label: 'Settings', icon: <DexIcon name="settings" size={14} />, action: () => { handleLaunchApp('settings'); setCtxMenu(null); } },
               { label: 'Refresh', icon: <DexIcon name="refresh" size={14} />, action: () => { refreshData(); setCtxMenu(null); } },
-            ].map((item, i) =>
+            ] as Array<null | { label: string; icon: React.ReactNode; action: () => void; shortcut?: string; disabled?: boolean }>).map((item, i) =>
               item === null ? (
                 <div key={`sep-${i}`} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               ) : (
@@ -720,6 +729,7 @@ export const Home: React.FC = () => {
                   key={item.label}
                   role="menuitem"
                   className="dex-hover-bg"
+                  disabled={item.disabled}
                   onClick={item.action}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -729,13 +739,14 @@ export const Home: React.FC = () => {
                     display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 8px)', margin: '0 4px', padding: '7px var(--space-3)',
                     background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13,
-                    textAlign: 'left', cursor: 'pointer',
+                    textAlign: 'left', cursor: item.disabled ? 'default' : 'pointer', opacity: item.disabled ? 0.45 : 1,
                     borderRadius: 10,
                     transition: 'background 0.12s ease',
                   }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, color: 'var(--color-text-secondary)' }}>{item.icon}</span>
                   {item.label}
+                  {item.shortcut && <span style={{ marginLeft: 'auto', paddingLeft: 16, fontSize: 11, color: 'var(--color-text-tertiary)' }}>{item.shortcut}</span>}
                 </button>
               )
             )}

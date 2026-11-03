@@ -37,6 +37,7 @@ import {
   type DexProject, type WorkspaceHit, type ProjectSymbol, type ProjectFile,
 } from './dexCode/project';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -569,6 +570,7 @@ const DexCode: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'dexcode')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         runCode();

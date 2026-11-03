@@ -105,6 +105,7 @@ import CreativeCommandBar from '../../components/CreativeCommandBar';
 import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // Prism's value sliders all share the app accent (#ff375f) and an 80px label
 // column; this thin wrapper bakes those in so call sites stay declarative and the
@@ -2228,6 +2229,7 @@ const Prism: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'prism')) return; // not for PRISM (it stays mounted in the background)
       // Ignore global shortcuts while the user is typing in a form field. Without
       // this guard, editing a numeric input (font size, levels, canvas size, guide
       // position) or a select would fire single-key tool switches and Ctrl combos

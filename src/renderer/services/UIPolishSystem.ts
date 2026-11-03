@@ -9,6 +9,7 @@
 // Unified system for dropdowns, menus, overlays, and UI responsiveness
 // Fixes: Immediate close, z-index management, button responsiveness, black screen
 // =============================================================================
+import { haptic as hapticPulse } from '../shell/input/haptics';
 
 // ---------------------------------------------------------------------------
 // Z-INDEX LAYER SYSTEM
@@ -188,7 +189,7 @@ export interface ButtonFeedbackOptions {
 const DEFAULT_BUTTON_FEEDBACK: ButtonFeedbackOptions = {
   scale: 0.97,
   duration: 100,
-  haptic: true,
+  haptic: false,
 };
 
 export function applyButtonFeedback(
@@ -201,10 +202,8 @@ export function applyButtonFeedback(
     element.style.transform = `scale(${scale})`;
     element.style.transition = `transform ${duration}ms cubic-bezier(0.2, 0, 0.2, 1)`;
     
-    // Haptic feedback if available
-    if (haptic && 'vibrate' in navigator) {
-      navigator.vibrate(10);
-    }
+    // Opt-in only; routed through the shared service (real actuator + user setting + rate limit).
+    if (haptic) hapticPulse('select');
   };
   
   const onPointerUp = () => {

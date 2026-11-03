@@ -74,7 +74,9 @@ import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap, pinchCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap, gestureCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { ContactTracker } from '../shell/input/touchContacts';
+import { haptic } from '../shell/input/haptics';
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
@@ -3083,10 +3085,15 @@ export const AppManager: React.FC = () => {
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
-    const unsubPinch = gestureRecognizer.on('two-finger-pinch', () => {
+    // Pinch/spread only drive the overview when started on the bare desktop: a
+    // pinch inside an app (zooming a photo, a map, a canvas) is the app's, and on
+    // the spatial desktop it zooms the camera instead.
+    const unsubPinch = gestureRecognizer.on('two-finger-pinch', (g) => {
+      if (!g.onDesktop || isSpatialEnabled()) return;
       setShowOverview(false);
     });
-    const unsubSpread = gestureRecognizer.on('two-finger-spread', () => {
+    const unsubSpread = gestureRecognizer.on('two-finger-spread', (g) => {
+      if (!g.onDesktop || isSpatialEnabled()) return;
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
@@ -3239,6 +3246,8 @@ export const AppManager: React.FC = () => {
     const sp = useSpatialStore.getState();
     const others = Object.values(sp.windows).filter((w) => w.id !== appId && !w.minimized);
     const out = magneticSnap(r, others, 8 / sp.camera.z);
+    // One pulse as the snap engages (supported hardware + setting only).
+    if (out.guides.length && !sp.guides.length) haptic('snap');
     sp.setGuides(out.guides);
     return out;
   }, []);
@@ -3482,24 +3491,25 @@ export const AppManager: React.FC = () => {
       el.addEventListener('pointerup', up);
       el.addEventListener('lostpointercapture', up);
     };
-    // Touch screens: two fingers on the desktop pan and pinch-zoom the canvas.
-    const touches = new Map<number, { x: number; y: number }>();
+    // Touch screens: two or more fingers on the desktop pan and pinch-zoom the
+    // canvas about their centroid (any number of contacts, up to ten). One
+    // finger is left alone so it can still tap and drag windows and icons.
+    const touches = new ContactTracker();
     const onTouchDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || inWindow(e.target) || inHud(e.target)) return;
-      touches.set(e.pointerId, local(e));
+      const p = local(e);
+      touches.down({ pointerId: e.pointerId, pointerType: 'touch', clientX: p.x, clientY: p.y, isPrimary: e.isPrimary });
     };
     const onTouchMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
-      const ids = Array.from(touches.keys());
-      if (ids.length !== 2) { touches.set(e.pointerId, local(e)); return; }
+      const p = local(e);
+      const d = touches.move({ pointerId: e.pointerId, pointerType: 'touch', clientX: p.x, clientY: p.y });
+      if (!d || d.count < 2) return;
       e.preventDefault();
-      const prev: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
-      touches.set(e.pointerId, local(e));
-      const next: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
       const s = st();
-      s.setCamera(pinchCamera(s.camera, prev, next, s.limits));
+      s.setCamera(gestureCamera(s.camera, d, s.limits));
     };
-    const onTouchUp = (e: PointerEvent) => { touches.delete(e.pointerId); };
+    const onTouchUp = (e: PointerEvent) => { touches.up(e.pointerId); };
     // Tabbing into a window that is off-screen pans it into view (same zoom).
     const onFocusIn = (e: FocusEvent) => {
       const win = (e.target as Element | null)?.closest?.('[data-floating-window]') as HTMLElement | null;
@@ -5227,7 +5237,7 @@ export const AppManager: React.FC = () => {
             {spatialEnabled && <SpatialGuides />}
             {keepAliveElements.filter(el => el && detachedApps.has(el.key as AppId))}
           </div>
-          {spatialEnabled && <SpatialHud onExit={() => setSpatial(false)} />}
+          {spatialEnabled && <SpatialHud />}
         </div>
       ) : (
         <div ref={splitContainerRef} style={{

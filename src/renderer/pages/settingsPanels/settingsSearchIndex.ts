@@ -110,6 +110,8 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Creator Access', section: 'creator', desc: 'Owner-only Creative Full Access unlock', keywords: 'owner creator unlock signature' },
 
   // ---------------- Keyboard Shortcuts ----------------
+  { label: 'Touch screen test', section: 'touch', desc: 'See how many fingers the screen tracks at once', keywords: 'touch multitouch fingers ten points contacts test touchscreen' },
+  { label: 'Haptic feedback', section: 'touch', desc: 'Short pulses on snap and gesture boundaries (supported hardware)', keywords: 'haptics vibration vibrate feedback' },
   { label: 'Command palette shortcut', section: 'keyboard', desc: 'Ctrl+K opens the command palette', keywords: 'shortcut hotkey palette ctrl k' },
   { label: 'Search everything shortcut', section: 'keyboard', desc: 'Ctrl+Shift+F searches everything', keywords: 'shortcut hotkey search find' },
   { label: 'Window tiling shortcuts', section: 'keyboard', desc: 'Snap, maximize and arrange windows', keywords: 'shortcut hotkey snap tile window layout' },

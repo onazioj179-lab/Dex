@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   type BoardObject, STICKY_COLORS, MIN_SIZE, connectorEnds, paintOrder, removeObjects, snapValue, textOn, newObjectId,
 } from './canvasObjects';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 interface Props {
   objects: BoardObject[];
@@ -45,6 +46,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
   useEffect(() => {
     if (!selectedId) return;
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'canvas')) return; // key meant for another app
       if (editing) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
