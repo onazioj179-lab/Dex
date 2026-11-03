@@ -22,6 +22,7 @@ mod git;
 mod env_manager;
 mod ssh;
 mod fs_ops;
+mod file_mutations;
 mod watch;
 mod analytics;
 mod power;
@@ -338,54 +339,9 @@ fn is_hidden_entry(name: &str, meta: &std::fs::Metadata) -> bool {
     false
 }
 
-/// Destination of a move/copy: target_dir joined with the source basename.
-fn dest_in_dir(src: &str, target_dir: &str) -> PathBuf {
-    let name = std::path::Path::new(src)
-        .file_name()
-        .map(|n| n.to_os_string())
-        .unwrap_or_default();
-    PathBuf::from(target_dir).join(name)
-}
-
 fn io_result(res: std::io::Result<()>, path: &str) -> Value {
     match res {
         Ok(()) => json!({ "success": true, "path": path }),
-        Err(e) => json!({ "success": false, "error": e.to_string() }),
-    }
-}
-
-fn files_rename(old: &str, new_name: &str) -> Value {
-    // Only the basename of new_name (prevent path traversal via the filename).
-    let safe = std::path::Path::new(new_name)
-        .file_name()
-        .map(|n| n.to_os_string())
-        .unwrap_or_default();
-    let dest = std::path::Path::new(old)
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join(safe);
-    io_result(std::fs::rename(old, &dest), &dest.to_string_lossy())
-}
-
-fn files_move(src: &str, target_dir: &str) -> Value {
-    let dest = dest_in_dir(src, target_dir);
-    match std::fs::rename(src, &dest) {
-        Ok(()) => json!({ "success": true, "path": dest.to_string_lossy() }),
-        // rename fails across volumes — fall back to copy + remove.
-        Err(_) => match std::fs::copy(src, &dest) {
-            Ok(_) => io_result(std::fs::remove_file(src), &dest.to_string_lossy()),
-            Err(e) => json!({ "success": false, "error": e.to_string() }),
-        },
-    }
-}
-
-fn files_copy(src: &str, target_dir: &str) -> Value {
-    let dest = dest_in_dir(src, target_dir);
-    if std::path::Path::new(src).is_dir() {
-        return json!({ "success": false, "error": "directory copy not supported yet" });
-    }
-    match std::fs::copy(src, &dest) {
-        Ok(_) => json!({ "success": true, "path": dest.to_string_lossy() }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }
 }
@@ -2447,9 +2403,9 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             // until the index has been built (search:rebuild).
             index_search(&app, &query, 200).unwrap_or_else(|| files_search(&app, &query, location))
         }
-        "files:rename" => files_rename(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
-        "files:move" => files_move(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
-        "files:copy" => files_copy(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
+        "files:rename" => file_mutations::rename_in_place(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
+        "files:move" => file_mutations::move_into(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
+        "files:copy" => file_mutations::copy_into(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
         "files:delete" => files_delete(&arg_str(0).unwrap_or_default()),
         "files:mkdir" => files_mkdir(&arg_str(0).unwrap_or_default()),
         "files:organizeByType" => files_organize_by_type(&arg_str(0).unwrap_or_default()),

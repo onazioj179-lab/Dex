@@ -114,9 +114,18 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
   const stageApps = apps.filter(a => a.id !== 'home');
   const idsKey = stageApps.map(a => a.id).join(',');
 
+  // Reset only when the stage closes. These resets used to sit in effects that
+  // re-run on every window-list change and every parent render while hidden,
+  // which chained into "Maximum update depth exceeded" when many apps launched.
+  useEffect(() => {
+    if (visible) return;
+    setLayout(prev => (prev.size === 0 ? prev : new Map()));
+    setSearch('');
+  }, [visible]);
+
   // -- Fly live windows into the grid ---------------------------------------
   useEffect(() => {
-    if (!visible) { setLayout(new Map()); return; }
+    if (!visible) return;
     closingRef.current = false;
     const reduce = isReduceMotion();
     const current = appsRef.current.filter(a => a.id !== 'home');
@@ -219,7 +228,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
 
   // -- Keyboard: Escape dismisses, Enter opens first match, typing filters --
   useEffect(() => {
-    if (!visible) { setSearch(''); return; }
+    if (!visible) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { closeStage(); return; }
       if (e.key === 'Enter') {

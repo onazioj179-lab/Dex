@@ -142,3 +142,22 @@ New test files: `uki-assistant-policy`, `uki-agent-runner-policy`, `uki-memory-c
   - Browser: typed `https://example.com` -> child webview loads "Example Domain"; covered -> hidden, uncovered -> visible; app closed -> view released; relaunched -> recreated at the same URL; the page's `dex_ipc` call is refused ("not allowed").
 - Not run: packaged installer, click-through of Browser back/forward/find/reader mode, Settings Launch at Login toggle (writes the registry).
 - Part 7 continued (PR #75): restored auth engine checked live in a debug build with `DEX_DATA_DIR` set to a throwaway folder: 17/17 checks (enrol, reject, unlock + token, lockout, recovery codes, security-question recovery, change PIN). All writes landed in the test folder; the real `%APPDATA%\com.onazioj.dex` hashed identical before and after (39 files).
+
+## Part 8 checks (2026-11-03, `claude/dex-os-completion-stabilization-93cea6`)
+
+Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`, policy and welcome flags seeded as a test fixture; no real profile touched). Native file operations were tested with Rust unit tests in a temp folder, not against user files.
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | **0 errors** (after each batch) |
+| Full `vitest run` (after the first two batches) | **526 files / 5,417 tests passed, 0 failed** (2 files skipped) |
+| New tests | `part8-integrity-theme` (11), `recycle-restore` (11), `glass-choice-persists` (2; fails without the fix); Rust `file_mutations` **6/6** |
+| Multi-window stress: 10 / 30 / 59 windows (59 = every app; apps are single-instance, so 100 is not reachable) | No crash, 0 error boundaries. Launch p50 48 / 113 / 172 ms with 10 / 30 / 59 already open (grows with open count). Peak 59 windows: ~15.5k DOM nodes, heap ~145–195 MB. Focus p50 167 ms, minimize p50 64 ms (59/59 minimized), restore p50 147 ms. Timings taken while the preview pane was visible except one round marked below |
+| Close-all release (3 rounds × 59 windows) | **Before fix:** 12.8k DOM nodes and every closed app still mounted after Close All. **After:** DOM back to 167 (baseline 163), 1 mounted app (Home), heap back to 107–109 MB after rounds 1–2. Round 2 launch p95 10.7 s is background-timer throttling (pane hidden), not the app |
+| Console errors during stress | **Before:** "Maximum update depth exceeded" in `AppOverview` (×18). **After:** 0 across 3 × 59 launches |
+| Theme switch stress: 100 light/dark toggles, 10 apps open | 0 stale inline colours, 0 errors, heap 111 → 109 MB. Toggle p50 152 ms, p95 240 ms (whole-tree restyle). Resolved tokens: dark text `#F5F5F7` / surface `#1C1C1E`; light text `#1D1D1F` / surface `#FFFFFF` |
+| Interface Transparency click-through (#33) | Keyboard on the rendered slider: 40% (default) `rgba(28,28,30,0.74)` + `blur(20px)`; 100% `rgba(28,28,30,0.5)`; 0% opaque `#1C1C1E`, `blur none`, mode `off`; light mode `#FFFFFF`. **Bug found:** on a fresh profile 0% reverted to glass after relaunch (migration flag never set). Fixed; re-verified live: 0% survives relaunch |
+| Performance alerts | **Before:** 10 critical alerts in the first minute ("System memory 90–97%" = heapUsed/heapTotal; "0 FPS" while hidden). **After:** 0 alerts after a minute idle; heap now against `jsHeapSizeLimit` |
+| System Health panel (Task Manager) | Renders all 6 integrity checks with live results ("All process states are consistent · 22s ago" …); Run checks / Copy diagnostic report |
+| File operations (native, temp dir) | Copy into same folder → `a copy.txt`, `a copy 2.txt`, original intact; 200-file nested folder copied recursively and byte-checked; move onto existing name refused, both files intact; folder into itself refused; rename onto existing refused; `../` in a new name stripped; missing source reported |
+| Not run here | Packaged installer / upgrade / uninstall; native file ops through the UI (needs the desktop bridge); creative-app stress; FPS under load (pane hidden most of the time); screen reader |

@@ -999,7 +999,8 @@ export const Workflows: React.FC = () => {
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
               if (src && dest && window.electron?.invoke) {
-                await window.electron.invoke('files:copy', src, dest);
+                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:copy', src, dest);
+                if (r && r.success === false) throw new Error(r.error || 'Copy failed');
               }
               break;
             }
@@ -1007,14 +1008,17 @@ export const Workflows: React.FC = () => {
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
               if (src && dest && window.electron?.invoke) {
-                await window.electron.invoke('files:move', src, dest);
+                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:move', src, dest);
+                if (r && r.success === false) throw new Error(r.error || 'Move failed');
               }
               break;
             }
             case 'a11': { // Delete File (config: path)
               const path = node.config.path || context.files?.[0]?.path;
               if (path && window.electron?.invoke) {
-                await window.electron.invoke('files:delete', path);
+                // Recycle Bin, not a permanent delete: automations must be undoable.
+                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:trash', path);
+                if (r && r.success === false) throw new Error(r.error || 'Could not move file to the Recycle Bin');
               }
               break;
             }
@@ -1022,7 +1026,8 @@ export const Workflows: React.FC = () => {
               const path = node.config.path || '';
               const newName = node.config.newName || '';
               if (path && newName && window.electron?.invoke) {
-                await window.electron.invoke('files:rename', path, newName);
+                const r = await window.electron.invoke<{ success?: boolean; error?: string }>('files:rename', path, newName);
+                if (r && r.success === false) throw new Error(r.error || 'Rename failed');
               }
               break;
             }

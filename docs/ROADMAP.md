@@ -2267,6 +2267,12 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-03 (Part 8: completion + stress testing)
+
+- Data-safety fixes in Files and the native layer (`src-tauri/src/file_mutations.rs`): delete goes to the OS Recycle Bin, copy never overwrites, move/rename refuse existing names, recursive folder copy; renderer treats `{success:false}` as failure. DEX Recycle Bin restore actually rehydrates notes/Kanban cards.
+- Stress-tested 3x59 windows and 100 theme switches in the preview: closed apps now unmount on every close path; AppOverview update loop fixed; perf alerts measure real things; fresh-install 0% transparency now persists.
+- Open from this pass: launch latency grows with open windows (#65), theme-switch cost (#66). Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8.
+
 ## Checkpoint 2026-11-01 (Part 4: assistant)
 
 - UKI safety layer shipped on `claude/dex-part4`: enforced processing modes (`shared/uki/assistantPolicy.ts`, checked in `orchestrator.chat()` + stream), Fast/Balanced/Deep budgets, scoped file tools (`uki/fileTools.ts`, Recycle Bin only), pause/resume/cancel, persistent audit, DPAPI key store (`src-tauri/src/secrets_ctl.rs`), Ollama installed-model discovery, system-picker screen capture.

@@ -394,7 +394,7 @@ const checkNavigationIntegrity = (): IntegrityCheckResult => {
 };
 
 // All integrity checks
-const INTEGRITY_CHECKS: IntegrityCheck[] = [
+export const INTEGRITY_CHECKS: IntegrityCheck[] = [
   {
     type: 'state_consistency',
     name: 'State Consistency',
@@ -482,20 +482,24 @@ export const useIntegrityMonitor = create<IntegrityMonitorState>((set, get) => (
   startMonitoring: () => {
     if (get().isMonitoring) return;
 
-    const intervals = new Map<CheckType, NodeJS.Timeout>();
-
-    INTEGRITY_CHECKS.forEach(check => {
-      if (check.interval > 0) {
-        // Run immediately
-        get().runCheck(check.type);
-        
-        // Then schedule
-        const interval = setInterval(() => {
+    // One shared 30 s tick instead of a timer per check: each check still runs
+    // at its own cadence, but the renderer wakes once instead of six times.
+    const TICK_MS = 30000;
+    const lastRun = new Map<CheckType, number>();
+    const tick = () => {
+      const now = Date.now();
+      INTEGRITY_CHECKS.forEach(check => {
+        if (check.interval <= 0) return;
+        const prev = lastRun.get(check.type);
+        if (prev === undefined || now - prev >= check.interval - 1000) {
+          lastRun.set(check.type, now);
           get().runCheck(check.type);
-        }, check.interval);
-        intervals.set(check.type, interval);
-      }
-    });
+        }
+      });
+    };
+    tick();
+    const intervals = new Map<CheckType, NodeJS.Timeout>();
+    intervals.set('state_consistency', setInterval(tick, TICK_MS));
 
     set({ isMonitoring: true, checkIntervals: intervals });
   },
@@ -664,143 +668,4 @@ export const useFailedChecks = () => {
   return useIntegrityMonitor(state => 
     Array.from(state.lastResults.values()).filter(r => !r.passed)
   );
-};
-
-// ===========================================================================
-// INTEGRITY PANEL COMPONENT
-// ===========================================================================
-
-import React from 'react';
-
-export const IntegrityPanel: React.FC = () => {
-  const health = useIntegrityHealth();
-  const failedChecks = useFailedChecks();
-  const { runAllChecks, generateDiagnosticReport } = useIntegrityMonitor.getState();
-
-  const healthColor = {
-    healthy: 'var(--color-success)',
-    warning: '#ff9500',
-    error: 'var(--color-error)',
-    critical: 'var(--color-error)',
-  }[health];
-
-  const handleRunChecks = () => {
-    runAllChecks();
-  };
-
-  const handleGenerateReport = () => {
-    const report = generateDiagnosticReport();
-    // Store for debugging - accessible via window.__DEX_DIAGNOSTIC_REPORT__
-    if (typeof window !== 'undefined') {
-      (window as any).__DEX_DIAGNOSTIC_REPORT__ = report;
-    }
-  };
-
-  return (
-    <div style={panelStyles.container}>
-      <div style={panelStyles.header}>
-        <div style={{ ...panelStyles.healthDot, background: healthColor }} />
-        <span style={panelStyles.title}>System Integrity</span>
-        <span style={panelStyles.status}>{health}</span>
-      </div>
-
-      {failedChecks.length > 0 && (
-        <div style={panelStyles.issues}>
-          {failedChecks.map(check => (
-            <div 
-              key={check.id}
-              style={{
-                ...panelStyles.issue,
-                borderColor: check.severity === 'critical' ? 'var(--color-error)' : '#ff9500',
-              }}
-            >
-              <span style={panelStyles.checkName}>{check.type.replace('_', ' ')}</span>
-              <span style={panelStyles.checkMessage}>{check.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={panelStyles.actions}>
-        <button style={panelStyles.button} onClick={handleRunChecks}>
-          Run Checks
-        </button>
-        <button style={panelStyles.button} onClick={handleGenerateReport}>
-          Generate Report
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const panelStyles: Record<string, React.CSSProperties> = {
-  container: {
-    padding: 'var(--space-3)',
-    background: 'var(--color-bg-surface)',
-    borderRadius: 6,
-    border: '1px solid var(--color-border-subtle)',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    marginBottom: 'var(--space-3)',
-  },
-  healthDot: {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'var(--color-text-primary)',
-    flex: 1,
-  },
-  status: {
-    fontSize: 11,
-    fontWeight: 500,
-    color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
-  },
-  issues: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    marginBottom: 'var(--space-3)',
-  },
-  issue: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-    padding: '6px var(--space-2)',
-    borderRadius: 4,
-    background: 'var(--color-bg-inset)',
-    borderLeft: '2px solid',
-  },
-  checkName: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-    textTransform: 'capitalize',
-  },
-  checkMessage: {
-    fontSize: 11,
-    color: 'var(--color-text-tertiary)',
-  },
-  actions: {
-    display: 'flex',
-    gap: 'var(--space-2)',
-  },
-  button: {
-    flex: 1,
-    padding: '6px var(--space-3)',
-    borderRadius: 4,
-    border: '1px solid var(--color-border-default)',
-    background: 'var(--color-bg-surface)',
-    fontSize: 12,
-    fontWeight: 500,
-    color: 'var(--color-text-primary)',
-    cursor: 'pointer',
-  },
 };

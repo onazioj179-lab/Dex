@@ -1610,6 +1610,35 @@ export const AppManager: React.FC = () => {
     }
   }, [closeRunningApp]);
 
+  // Every other close path (Task Manager "End", an app's own Exit, closing a
+  // crashed app, UKI, Close All) goes straight to the store and used to leave
+  // the window mounted, still running its timers/audio, for up to 5 minutes.
+  // Release an app the moment it leaves runningApps, as handleCloseApp does.
+  const prevRunningIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const now = new Set(runningApps.map(a => a.id));
+    let released = false;
+    prevRunningIdsRef.current.forEach(id => {
+      if (now.has(id) || id === 'home') return;
+      if (mountedAppsRef.current.delete(id as AppId)) released = true;
+      restoredWindowBoundsRef.current.delete(id);
+      WindowDepth.removeWindow(id);
+    });
+    prevRunningIdsRef.current = now;
+    if (!released) return;
+    setDetachedApps(prev => {
+      let n: Map<string, { x: number; y: number; w: number; h: number; z: number }> | null = null;
+      prev.forEach((_, id) => { if (!now.has(id)) { n = n ?? new Map(prev); n.delete(id); } });
+      return n ?? prev;
+    });
+    setMinimizedApps(prev => {
+      let n: Set<string> | null = null;
+      prev.forEach(id => { if (!now.has(id)) { n = n ?? new Set(prev); n.delete(id); } });
+      return n ?? prev;
+    });
+    forceUpdate(n => n + 1);
+  }, [runningApps]);
+
   // Listen for window control style changes from Settings
   useEffect(() => {
     const handler = () => setWindowControls(getWindowControlStyle());
@@ -3049,6 +3078,15 @@ export const AppManager: React.FC = () => {
 
     const handleGesture = (e: Event) => {
       const g = (e as CustomEvent<GestureEvent>).detail;
+      if (g.type === 'force-touch') {
+        // A hard pen/touch press has no right button: open the context menu of
+        // whatever is under the press, through the same onContextMenu handlers.
+        const target = document.elementFromPoint(g.originX, g.originY);
+        target?.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true, clientX: g.originX, clientY: g.originY,
+        }));
+        return;
+      }
       if (!g.active) {
         // Gesture completed — cycle running apps or trigger overview
         switch (g.type) {
@@ -3078,6 +3116,7 @@ export const AppManager: React.FC = () => {
             setShowOverview(true);
             setCurrentRunningApp('home' as AppId);
             break;
+          case 'swipe-down-3':
           case 'pinch-in':
             setShowOverview(false);
             break;

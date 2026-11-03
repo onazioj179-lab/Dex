@@ -129,7 +129,8 @@ const PowerRename: React.FC = () => {
       const r = results[i];
       if (!it.path || !r.changed || r.error) { survivors.push(it); continue; }
       try {
-        await electron.invoke('files:rename', it.path, r.next);
+        const res = await electron.invoke('files:rename', it.path, r.next);
+        if (res && res.success === false) throw new Error(res.error || 'rename failed');
         ok++;
         // Reflect the new name so a second pass operates on the renamed file.
         const dir = it.path.slice(0, Math.max(it.path.lastIndexOf('/'), it.path.lastIndexOf('\\')) + 1);

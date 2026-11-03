@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { DexSearchInput } from '../../styles/components';
+import { restoreRecycledItem, unrestorableReason } from '../../services/recycleRestore';
 
 // ── IPC helper ─────────────────────────────────────────────────
 async function ipc(channel: string, ...args: any[]): Promise<any> {
@@ -145,7 +146,9 @@ const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelet
   onDelete: (id: number) => void;
 }) => {
   const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
   const days = daysLeft(item.expires_at);
+  const notRestorable = unrestorableReason(item);
   const badgeColor = days <= 3 ? 'var(--color-error)' : days <= 7 ? 'var(--color-warning)' : 'var(--color-border)';
 
   return (
@@ -153,6 +156,8 @@ const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelet
       style={{ ...rowStyle, background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.18))' : hover ? 'var(--color-bg-hover)' : 'transparent' }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
     >
       {/* Select */}
       <input
@@ -192,20 +197,25 @@ const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelet
             <span style={{ opacity: 0.7 }}>From </span>{item.original_location}
           </div>
         )}
+        {notRestorable && (
+          <div style={{ fontSize: 11, color: 'var(--color-warning)', marginTop: 1 }}>{notRestorable}</div>
+        )}
       </div>
 
-      {/* Actions (visible on hover) */}
-      {hover && (
+      {/* Actions (on hover or keyboard focus) */}
+      {(hover || focused) && (
         <>
+          {!notRestorable && (
+            <button
+              disabled={busy}
+              style={{ ...btnSmall, background: 'color-mix(in srgb, var(--color-success) 18%, transparent)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
+              onClick={() => onRestore(item.id)}
+              aria-label={`Restore ${item.item_name || 'item'}`}
+            >Restore</button>
+          )}
           <button
             disabled={busy}
-            style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
-            onClick={() => onRestore(item.id)}
-            aria-label={`Restore ${item.item_name || 'item'}`}
-          >Restore</button>
-          <button
-            disabled={busy}
-            style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
+            style={{ ...btnSmall, background: 'color-mix(in srgb, var(--color-error) 15%, transparent)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
             onClick={() => onDelete(item.id)}
             aria-label={`Permanently delete ${item.item_name || 'item'}`}
           >Delete</button>
@@ -269,13 +279,16 @@ const RecycleBin: React.FC = () => {
     setBusy(true);
     try {
       const it = findItem(id);
+      if (!it) throw new Error('Item not found');
+      // Put it back in its app first; drop the bin row only once that worked.
+      await restoreRecycledItem(it, (ch, ...a) => (window as any).dex.invoke(ch, ...a));
       await ipc('recycle-bin:restore', id);
-      toast('success', it?.original_location
+      toast('success', it.original_location
         ? `Restored "${it.item_name || 'item'}" to ${it.original_location}`
         : 'Item restored');
     } catch (err) {
       console.warn('[RecycleBin] restore failed:', err);
-      toast('error', 'Could not restore item');
+      toast('error', err instanceof Error ? `Could not restore: ${err.message}` : 'Could not restore item');
     } finally {
       setBusy(false);
       reload();
@@ -433,19 +446,28 @@ const RecycleBin: React.FC = () => {
     if (ids.length === 0) return;
     setBusy(true);
     let ok = 0;
+    let failed = 0;
     try {
       for (const id of ids) {
-        try { await ipc('recycle-bin:restore', id); ok++; }
-        catch (err) { console.warn('[RecycleBin] bulk restore failed for', id, err); }
+        try {
+          const it = findItem(id);
+          if (!it) throw new Error('Item not found');
+          await restoreRecycledItem(it, (ch, ...a) => (window as any).dex.invoke(ch, ...a));
+          await ipc('recycle-bin:restore', id);
+          ok++;
+        } catch (err) {
+          failed++;
+          console.warn('[RecycleBin] bulk restore failed for', id, err);
+        }
       }
-      toast(ok > 0 ? 'success' : 'error',
-        ok > 0 ? `Restored ${ok} item${ok === 1 ? '' : 's'}` : 'Could not restore items');
+      if (ok > 0) toast('success', `Restored ${ok} item${ok === 1 ? '' : 's'}${failed ? ` · ${failed} could not be restored` : ''}`);
+      else toast('error', `Could not restore ${failed === 1 ? 'the item' : 'these items'}`);
     } finally {
       setSelected(new Set());
       setBusy(false);
       reload();
     }
-  }, [selected, reload]);
+  }, [selected, reload, findItem]);
 
   const handleDeleteSelected = useCallback(async () => {
     const ids = [...selected];
@@ -609,7 +631,7 @@ const RecycleBin: React.FC = () => {
               >Restore {selected.size}</button>
               <button
                 disabled={busy}
-                style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
+                style={{ ...btnSmall, background: 'color-mix(in srgb, var(--color-error) 15%, transparent)', color: 'var(--color-error)', opacity: busy ? 0.5 : 1 }}
                 onClick={handleDeleteSelected}
               >Delete {selected.size}</button>
               <button
