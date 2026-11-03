@@ -642,7 +642,7 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
 /// Spawn the reminder polling thread. Runs for the app lifetime; degrades to a
 /// no-op tick whenever the DB is unavailable. Called once from setup().
 pub fn start_reminder_scheduler(app: tauri::AppHandle) {
-    std::thread::spawn(move || {
+    crate::util::spawn_named("native_ops", move || {
         // Initial delay mirrors the TS setTimeout(2000) before the first poll.
         std::thread::sleep(std::time::Duration::from_secs(2));
         loop {
@@ -660,7 +660,7 @@ pub fn start_reminder_scheduler(app: tauri::AppHandle) {
 
 /// Spawn the auto-backup thread. Checks ~5s after boot (catchup), then every 5 min.
 pub fn start_autobackup_scheduler(app: tauri::AppHandle) {
-    std::thread::spawn(move || {
+    crate::util::spawn_named("native_ops", move || {
         let start = now_ms();
         std::thread::sleep(std::time::Duration::from_secs(5));
         loop {

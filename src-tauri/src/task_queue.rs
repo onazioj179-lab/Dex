@@ -319,7 +319,7 @@ fn process_queue(app: &tauri::AppHandle) {
 fn execute_stub_task(app: &tauri::AppHandle, id: &str) {
     let app = app.clone();
     let id = id.to_string();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("task_queue", move || {
         // Tiny yield so `running` is observable before completion, matching the
         // event ordering a real async run would produce.
         std::thread::sleep(std::time::Duration::from_millis(20));
@@ -371,7 +371,7 @@ fn execute_stub_task(app: &tauri::AppHandle, id: &str) {
         if completed {
             let app2 = app.clone();
             let id2 = id.clone();
-            std::thread::spawn(move || {
+            crate::util::spawn_named("task_queue", move || {
                 std::thread::sleep(std::time::Duration::from_millis(3000));
                 with_tasks(|tasks| {
                     tasks.remove(&id2);
