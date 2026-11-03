@@ -11,6 +11,7 @@ import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import NexusUkiPanel from '../components/NexusUkiPanel';
 import ScheduledTasksPanel from '../components/ScheduledTasksPanel';
+import SystemIntegrityPanel from '../components/SystemIntegrityPanel';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
@@ -891,6 +892,9 @@ const TaskManager: React.FC = () => {
       {/* Scheduled background tasks: recurring cron/interval reminders that the
           scheduledTaskRunner fires on the shared heartbeat, retrying on failure. */}
       <ScheduledTasksPanel />
+
+      {/* Integrity checks + performance alerts from the background monitors. */}
+      <SystemIntegrityPanel />
 
       {/* Overview hero — the concept's Overview page, driven by live system data:
           two headline cards + a radial load gauge, a row of asset tiles, the big

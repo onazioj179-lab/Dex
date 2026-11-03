@@ -3049,6 +3049,15 @@ export const AppManager: React.FC = () => {
 
     const handleGesture = (e: Event) => {
       const g = (e as CustomEvent<GestureEvent>).detail;
+      if (g.type === 'force-touch') {
+        // A hard pen/touch press has no right button: open the context menu of
+        // whatever is under the press, through the same onContextMenu handlers.
+        const target = document.elementFromPoint(g.originX, g.originY);
+        target?.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true, clientX: g.originX, clientY: g.originY,
+        }));
+        return;
+      }
       if (!g.active) {
         // Gesture completed — cycle running apps or trigger overview
         switch (g.type) {
@@ -3078,6 +3087,7 @@ export const AppManager: React.FC = () => {
             setShowOverview(true);
             setCurrentRunningApp('home' as AppId);
             break;
+          case 'swipe-down-3':
           case 'pinch-in':
             setShowOverview(false);
             break;

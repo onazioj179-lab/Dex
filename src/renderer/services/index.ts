@@ -90,9 +90,6 @@ export {
   useSystemHealth,
   usePerformanceAlerts,
   useResourceBudget,
-  
-  // Components
-  PerformancePanel,
 } from './PerformanceMonitor';
 
 // Integrity Monitor
@@ -110,9 +107,6 @@ export {
   useIntegrityHealth,
   useCheckResult,
   useFailedChecks,
-  
-  // Components
-  IntegrityPanel,
 } from './IntegrityMonitor';
 
 // Pattern Learning (Local-only, background)
