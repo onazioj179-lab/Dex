@@ -1,10 +1,10 @@
 # DEX: Remaining Work
 
-**Date:** 2026-11-02 · **Creator:** Onazi Oj · This is the active backlog. Items from completed task files were moved here before those files were archived.
+**Date:** 2026-11-03 · **Creator:** Onazi Oj · This is the active backlog. Items from completed task files were moved here before those files were archived.
 
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 1 | Merge `claude/dex-part7-2` (Part 7 continued; #74 merged) | Open PR | Owner merges personally | — | Review + merge | Owner | P0 |
+| 1 | Merge the Part 8 branch `claude/dex-os-completion-stabilization-93cea6` | Open PR | Owner merges personally (Part 7 #75 is merged) | — | Review + merge | Owner | P0 |
 | 2 | Accurate Privacy Policy | **BLOCKED** | Owner has not approved the rewrite | `PRIVACY.md`, `src/shared/policies.ts` | Approve a rewrite from `docs/privacy/DATA_FLOWS.md` + `docs/reports/DEX_AI_PRIVACY.md` (must disclose Web Speech cloud recognition, provider data flow, Ollama check) | Owner / legal | P0 |
 | 3 | Local AI measured end to end | DEFERRED (owner) | Owner parked Ollama work. Local AI is now opt-in (no startup probe, not routed to unless connected in Settings › AI Providers) | Ollama | None until the owner reopens it | Owner | — |
 | 4 | Cloud AI measured end to end | NOT TESTED | No provider key here | Providers | Add a key; run a scripted agent session (web search + file read) | Owner key | P1 |
@@ -61,12 +61,12 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 | Bucket | Defect | Where | Status 2026-11-02 |
 |---|---|---|---|
 | fix-now | Frame Snapping panel controls (snap-on-drag, gutter, cycle-on-repeat) do nothing | `src/renderer/pages/settingsPanels/AccessPanels.tsx` | FIXED (#70) |
-| fix-now | IntegrityPanel UI is never rendered, so integrity results are invisible | `src/renderer/services/IntegrityMonitor.tsx` | open |
-| fix-now | PerformancePanel (live FPS/memory/DOM/alerts UI) is built but mounted nowhere | `src/renderer/services/PerformanceMonitor.tsx` | open |
+| fix-now | IntegrityPanel UI is never rendered, so integrity results are invisible | `src/renderer/services/IntegrityMonitor.tsx` | FIXED (Part 8: System Health section in Task Manager; one timer instead of six) |
+| fix-now | PerformancePanel (live FPS/memory/DOM/alerts UI) is built but mounted nowhere | `src/renderer/services/PerformanceMonitor.tsx` | FIXED (Part 8: alerts shown in System Health; the metrics behind them were wrong and are fixed; old panel deleted) |
 | fix-now | Files settings 'Show Hidden Files' / 'Confirm Delete' / 'Default View' / 'Sort By' do not affect the Files app | `src/renderer/pages/Settings.tsx` | FIXED (#70) |
 | fix-now | Window Management toggles (Snap/Animate/Remember/Shadows/Max windows) are never consumed | `src/renderer/pages/Settings.tsx` | REMOVED (Part 7: dead keys deleted, no control shown) |
 | fix-now | Unified menu animation system is never imported | `src/renderer/shell/MenuAnimator.ts` | DELETED (Part 7 debloat) |
-| fix-now | force-touch and swipe-down-3 gestures are emitted but no handler reacts | `src/renderer/shell/GestureEngine.ts` | open |
+| fix-now | force-touch and swipe-down-3 gestures are emitted but no handler reacts | `src/renderer/shell/GestureEngine.ts` | FIXED (Part 8: swipe-down-3 closes the overview; force-touch opens the context menu under the press) |
 | fix-now | Visual Timeline / Work Reports / Memory Map Rewind stores are exported but unused | `src/renderer/services/RewindExtensions.ts` | DELETED (Part 7) |
 | fix-careful | Power 'Lock DEX' / 'Safe Mode' / 'Learning' toggles set state nothing reads | `src/renderer/pages/Power.tsx` | FIXED (Part 7: Power rebuilt on real data) |
 | fix-careful | Entire enhanced AutoSave/crash-recovery feature is never used | `src/renderer/services/AutoSaveManager.ts` | DELETED (Part 7) |
@@ -75,14 +75,14 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 | fix-careful | recentSearches.ts and searchRecency.ts helper modules are never imported | `src/renderer/services/recentSearches.ts` | DELETED (Part 7) |
 | fix-careful | Wallpaper accent extraction + crossfade layer is entirely unused | `src/renderer/shell/WallpaperAccent.tsx` | DELETED (Part 7 debloat) |
 | fix-careful | Entire System Journal UI (JournalView) is never mounted anywhere | `src/renderer/components/JournalView.tsx` | DELETED (Part 7 debloat) |
-| fix-careful | ThemeManager customization panel (presets + accent picker) is never rendered | `src/renderer/components/ThemeManager.tsx` | open |
+| fix-careful | ThemeManager customization panel (presets + accent picker) is never rendered | `src/renderer/components/ThemeManager.tsx` | DELETED (Part 8: duplicate of Settings › Appearance; presets reduced to DEX Blue Modern dark/light, installs on a retired coloured preset migrate back) |
 | fix-careful | systemUndoStore (useSystemUndoStore) is never imported | `src/renderer/store/systemUndoStore.ts` | DELETED (Part 7 debloat) |
 | fix-careful | SearchHistory module (spell-correction, completions, voice search store) has zero importers | `src/renderer/services/SearchHistory.ts` | DELETED (Part 7) |
 | fix-careful | REST API / CLI / Mobile-Companion / Portable-Mode stores exported but consumed by no UI | `src/renderer/services/PlatformExtensions.ts` | DELETED (Part 7) |
 | fix-careful | 'Enable Global Shortcuts' toggle is never read by the shortcut handlers | `src/renderer/pages/Settings.tsx` | REMOVED (Part 7: dead key) |
-| fix-careful | ui/ micro-control cluster (RangeSlider, NumberStepper, SegmentedControl, controlMath) is unused; apps use the components/controls duplicates | `src/renderer/ui/RangeSlider.tsx` | open |
-| remove | PerformancePanel component is never mounted | `src/renderer/services/PerformanceMonitor.tsx` | open |
-| remove | SelectionToolbar and LetterScrubber primitives are exported but never used | `src/renderer/shell/UIComponents.tsx` | open |
+| fix-careful | ui/ micro-control cluster (RangeSlider, NumberStepper, SegmentedControl, controlMath) is unused; apps use the components/controls duplicates | `src/renderer/ui/RangeSlider.tsx` | DELETED (Part 8, with `ui/CleanUI.ts`) |
+| remove | PerformancePanel component is never mounted | `src/renderer/services/PerformanceMonitor.tsx` | DELETED (Part 8) |
+| remove | SelectionToolbar and LetterScrubber primitives are exported but never used | `src/renderer/shell/UIComponents.tsx` | DELETED (Part 8: the whole file was unreachable) |
 | remove | Search indexer worker pipeline is orphaned (its only client is itself never imported) | `src/renderer/workers/searchIndexer.worker.ts` | DELETED (Part 7) |
 | remove | Global undo/redo manager + useGlobalUndo hook is fully orphaned | `src/renderer/services/undoManager.ts` | DELETED (Part 7) |
 | remove | featureSuiteStore claims '38 subsystems' but 35 of 38 stores are never imported anywhere | `src/renderer/store/featureSuiteStore.ts` | FIXED (Part 7: 2 used stores kept, 35 removed) |
@@ -99,7 +99,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 30 | Code signing of the 7.0.1 installer | BLOCKED | No certificate; installer is unsigned | Install cert, set thumbprint per `docs/SIGNING.md`, rebuild | Owner cert | P0 |
 | 31 | MSI for 7.0.1 | VERIFIED (pre-reconcile build) | Built fine with network on `claude/dex-part4` (17.8 MB). Rebuild after merge for the final code | Rebuild | — | P1 |
 | 32 | Packaged-app tests + before/after startup, idle CPU, memory | NOT TESTED | No install/upgrade/uninstall run. Sizes on `claude/dex-part4` (pre-reconcile build): exe 37.1 MB vs 40.1 MB, NSIS 14.4 vs 15.1 MB, MSI 17.8 vs 19.0 MB. Idle Home in the dev preview: 0 frame callbacks/s after the thermal-monitor fix | Install over 6.x on a test profile, measure, compare | VM / time | P0 |
-| 33 | Click-through of the transparency slider in rendered Settings | NOT TESTED | Preview sits behind the Terms gate; logic is unit-tested and verified live at the store level | Accept gate on a test profile, drag the slider light + dark | Owner / test profile | P1 |
+| 33 | Click-through of the transparency slider in rendered Settings | DONE (Part 8): rendered slider 0/40/100%, light + dark, persistence; found and fixed 0% reverting on fresh installs. Packaged app still unchecked | Preview sits behind the Terms gate; logic is unit-tested and verified live at the store level | Accept gate on a test profile, drag the slider light + dark | Owner / test profile | P1 |
 | 34 | Playwright e2e; CI-load flakiness of `v6-performance-guards` | PARTIAL | Full unit suite run once: 516/520 files, the 4 failures classified (see verification). e2e not run | Run e2e in CI; make perf guards load-tolerant | — | P2 |
 | 35 | CRLF shebang broke `radius-scale-ratchet` import on Windows checkouts | FIXED | `.gitattributes` now pins `scripts/*.mjs` and `*.sh` to LF; the unblocked ratchet then caught one off-scale radius in `SpatialHud.tsx` (fixed) | — | — | — |
 | 36 | Calculator visual pass | PARTIAL | Hard-coded accent/success gradient + shadow colors moved to tokens (`color-mix`); logic + tests pass. Not yet re-checked at 125/150/200% scaling or keyboard-navigated in a rendered window | Visual check in the packaged app | — | P3 |
@@ -129,8 +129,25 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 55 | Auth engine lost from `main` | FIXED, verified live | PR #57 merged a real engine on 2026-07-02, then `main`'s history was rewritten and it vanished: PINs/passwords could be set but never verified, changed or recovered. Restored from the surviving branch (Argon2id, lockout with recovery, security questions, session tokens); 9 native tests | `auth.rs`, `LockScreen.tsx`, `useAuthStore.ts` | Debug build over CDP with `DEX_DATA_DIR` (17/17): enrol PIN, wrong PIN rejected, unlock + session token, lockout after 5, correct PIN refused while locked, recovery codes, security-question recovery during lockout (case/space-normalised), new password, change PIN. Remaining: click-through of the lock-screen UI | Tester | P2 |
 | 56 | Stale agent work + lost merges | REVIEWED | `main` was replaced by a different history between July and November, so PRs #1-#59 are not ancestors of `main`. Content check of every merged PR (share of its added lines present today): only #57 and #58 (auth) were lost (8-10%), now restored (97-100%); all others 52-99% present, gaps matching later deliberate rewrites. `feat/ui-consistency` superseded; `dex-part3-features` already in main. The main checkout (`feat/premium-overhaul-glass`, 149 behind) holds 57 uncommitted July files, left untouched | — | Owner decides whether to discard that working copy | Owner | P3 |
 | 57 | Fake controls in creative apps | FIXED (Part 7) | Imosion bus compressor/tape/reference track/advanced export/MIDI learn, Forge shutdown + "GPU" toggle, Flux repeater/time remap/env map/frame blend/export presets, Creative Suite settings (polled localStorage every 2 s in 5 apps) | creative apps | Listen/visual check in the packaged app | Tester | P2 |
-| 58 | Restore a collaboration checkpoint | MISSING | Checkpoints store serialized app data (`CollaborationSystem.restoreCheckpoint`), but no app ever calls `createCheckpoint` (so checkpoints hold no app data) and none can load one back; CollabHub's Restore button had no handler and was removed | `useCollaborationFeatures.ts`, creative apps | Add an `onRestore(data)` per app (start with Flux/Prism, whose state already serialises) | — | P3 |
+| 58 | Restore a collaboration checkpoint | MISSING (unchanged) | Checkpoints store serialized app data (`CollaborationSystem.restoreCheckpoint`), but no app ever calls `createCheckpoint` (so checkpoints hold no app data) and none can load one back; CollabHub's Restore button had no handler and was removed | `useCollaborationFeatures.ts`, creative apps | Add an `onRestore(data)` per app (start with Flux/Prism, whose state already serialises) | — | P3 |
 
 ## Release status
 
-**NOT READY** until #1 and #2 are done. After that: **READY WITH DOCUMENTED LIMITATIONS** (items 3–29). None of those items is a crash or data-loss defect.
+**NOT READY** until #1 (merge Part 8) and #2 (privacy policy) are done, and the 7.0.1 installer is rebuilt from the merged code and install-tested (#32). After that: **READY WITH DOCUMENTED LIMITATIONS**. Part 8 found and fixed data-loss defects in Files (#59–#62); none of the remaining open items is a crash or data-loss defect.
+
+## Part 8: completion + stress testing (2026-11-03, `claude/dex-os-completion-stabilization-93cea6`)
+
+Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8 checks.
+
+| # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
+|---|---|---|---|---|---|---|---|
+| 59 | Files deleted permanently while saying "moved to the recycle bin" | FIXED | Single + batch delete and the Workflows "Delete File" action use the OS Recycle Bin (`files:trash`) | `Files.tsx`, `Workflows.tsx` | Click-through in the packaged app | Tester | — |
+| 60 | Native copy/move/rename could overwrite or lose data | FIXED | Copy never overwrites ("name copy.ext"); move/rename onto an existing name refused; recursive folder copy (was "not supported yet"); folder into itself refused; cross-volume move removes the original only after a full copy | `file_mutations.rs` | Packaged click-through incl. a second drive | Tester | — |
+| 61 | File-op failures reported as success | FIXED | The bridge resolves `{success:false}`; Files, PowerRename and Workflows now treat it as a failure | `Files.tsx` `fileOp()` | Other apps may ignore `{success:false}` on non-file channels; sweep them | — | P2 |
+| 62 | DEX Recycle Bin "Restore" did nothing | FIXED | Notes are un-trashed or recreated, Kanban cards go back to their column; the row is removed only afterwards. Old Files rows say they can't be restored | `recycleRestore.ts`, `RecycleBin.tsx`, `KanbanApp.tsx` | Rows written by `content_expiry`/`bulk_metadata` are shown as not restorable | — | P3 |
+| 63 | "Add Files" in an empty folder called a channel that doesn't exist | FIXED | Picks files and copies them in with live progress | `Files.tsx` | — | — | — |
+| 64 | Closed apps kept running | FIXED | Every close path now unmounts (was only the window's close button) | `AppManager.tsx` | — | — | — |
+| 65 | Launch latency grows with open windows | OPEN | p50 48 ms (10 open) → 172 ms (59 open); each launch re-renders work proportional to open windows | `AppManager.tsx` | Profile a launch with 30 open; memoise per-window chrome | — | P2 |
+| 66 | Theme switch cost | OPEN | 152 ms p50 per light/dark switch with 10 apps (full restyle) | design-system CSS | Profile style recalc; check the `[data-theme]` selectors' breadth | — | P3 |
+| 67 | 100+ windows | NOT APPLICABLE | DEX apps are single-instance; 59 is the maximum | — | Only relevant if multi-instance apps are added | — | — |
+

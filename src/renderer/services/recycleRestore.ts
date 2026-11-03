@@ -18,6 +18,8 @@
  * those rows are reported as not restorable instead of faking it.
  */
 
+import { useNotesStore } from '../store/notesStore';
+
 export interface RecycledItem {
   id: number;
   app: string;
@@ -130,7 +132,6 @@ async function restoreNote(data: Record<string, any>, ipc: Ipc): Promise<void> {
     if (!created) throw new Error('Notes could not recreate the note');
   }
   try {
-    const { useNotesStore } = await import('../store/notesStore');
     await useNotesStore.getState().loadNotes();
   } catch { /* Notes refreshes itself when opened */ }
 }

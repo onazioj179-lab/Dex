@@ -72,6 +72,12 @@ the report after a relaunch. tsc 0, cargo rebuild clean.
 
 ## RESUME HERE  ← next session starts here
 
+**Part 8 checkpoint (2026-11-03 — file mutations):** `files:copy` / `files:move` / `files:rename`
+now dispatch to `file_mutations.rs` (6 tests): never overwrite (copy picks "name copy.ext"),
+refuse move/rename onto an existing name, recursive folder copy skipping symlinks, refuse a folder
+into itself, cross-volume move deletes the source only after a complete copy. These channels
+return `{ success:false, error }` (the bridge does not reject), so callers must check `success`.
+
 **Security checkpoint (2026-11-01 — shell open hardening):** `shell_open` used to forward ANY
 string to `open::that` (ShellExecuteW), so the renderer/an XSS could launch executables. Split
 into `shell_open_external` + `shell_open_path` in src-tauri/src/main.rs. `shell:openExternal`
