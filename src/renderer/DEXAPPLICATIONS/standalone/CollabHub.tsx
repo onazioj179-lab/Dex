@@ -451,9 +451,9 @@ const avatarColor = (seed: string): string => {
 };
 
 const STATUS_COLORS: Record<MemberStatus, string> = {
-  online: '#30d158',
-  away: '#ff9f0a',
-  offline: '#636366',
+  online: 'var(--color-success)',
+  away: 'var(--color-warning)',
+  offline: 'var(--color-text-tertiary)',
 };
 
 function loadRooms(): CollabRoom[] {

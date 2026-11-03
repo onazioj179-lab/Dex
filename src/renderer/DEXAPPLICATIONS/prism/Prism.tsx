@@ -4066,12 +4066,12 @@ const Prism: React.FC = () => {
               </div>
               <div style={{ flex: 1, padding: 10, borderRadius: 4, background: 'rgba(191,90,242,0.08)', border: '1px solid rgba(191,90,242,0.2)', textAlign: 'center' }}>
                 <div style={{ fontSize: 16, marginBottom: 2 }}>HF</div>
-                <div style={{ fontSize: 9, color: '#bf5af2', fontWeight: 600 }}>High Freq</div>
+                <div style={{ fontSize: 9, color: 'var(--color-accent)', fontWeight: 600 }}>High Freq</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Texture & Detail</div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Gaussian Radius</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{freqRadius}px</span></div>
-            <input type="range" min="1" max="30" value={freqRadius} onChange={e => setFreqRadius(Number(e.target.value))} style={{ width: '100%', accentColor: '#bf5af2', marginBottom: 10 }} />
+            <input type="range" min="1" max="30" value={freqRadius} onChange={e => setFreqRadius(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
             <button aria-label="Create frequency separation layers" onClick={() => {
               const canvas = canvasRef.current; if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -4145,7 +4145,7 @@ const Prism: React.FC = () => {
               setLayers(prev => [highLayer, lowLayer, ...prev]);
               setSelectedLayerId(highLayer.id);
               setShowFreqSeparation(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Separation Layers</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Separation Layers</button>
           </div>
         </div>
       )}
