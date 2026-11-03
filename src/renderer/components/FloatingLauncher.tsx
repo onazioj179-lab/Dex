@@ -228,7 +228,12 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   useEffect(() => {
     if (dragging) return;
     const vh = window.innerHeight;
-    const inset = enabled && pos.y > vh * 0.55 ? Math.max(0, Math.round(vh - pos.y + EDGE_PAD)) : 0;
+    // Reserve a strip only when the bar is docked against the bottom edge (like
+    // the macOS Dock). A bar left floating higher up overlays content instead;
+    // reserving for it left an empty band under every app.
+    const barBottom = pos.y + sizeRef.current.h;
+    const docked = enabled && vh - barBottom <= EDGE_PAD * 2 + 4;
+    const inset = docked ? Math.max(0, Math.round(vh - pos.y + EDGE_PAD)) : 0;
     publishBarInset(inset);
   }, [pos.y, dragging, enabled]);
   useEffect(() => () => publishBarInset(0), []);

@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import DexIcon from '../../components/DexIcon';
+import { useElementSize } from '../../utils/motionHooksExtended';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
@@ -175,6 +176,21 @@ const PresentationBuilder: React.FC = () => {
   const presentRef = useRef<HTMLDivElement | null>(null);
   const dragSlideId = useRef<string | null>(null);
   const dragBlockState = useRef<{ blockId: string; startX: number; startY: number; bx: number; by: number } | null>(null);
+  // The slide is authored at 960x540 and scaled to fit the stage (editor) or
+  // the screen (present), like Keynote. Drags divide by the scale so blocks
+  // follow the pointer at any zoom.
+  const { ref: stageRef, ...stageSize } = useElementSize<HTMLDivElement>();
+  const fitScale = stageSize.width > 0
+    ? Math.max(0.2, Math.min(2.5, Math.min(stageSize.width / CANVAS_W, stageSize.height / CANVAS_H)))
+    : 1;
+  const fitScaleRef = useRef(fitScale);
+  fitScaleRef.current = fitScale;
+  const [screenScale, setScreenScale] = useState(() => Math.min(window.innerWidth / CANVAS_W, window.innerHeight / CANVAS_H));
+  useEffect(() => {
+    const onResize = () => setScreenScale(Math.min(window.innerWidth / CANVAS_W, window.innerHeight / CANVAS_H));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   // Cleanup for an in-flight canvas block drag, so its window listeners are removed
   // if the component unmounts mid-drag (the mouseup handler would otherwise never fire).
   const dragCleanup = useRef<(() => void) | null>(null);
@@ -394,8 +410,8 @@ const PresentationBuilder: React.FC = () => {
     const move = (mv: MouseEvent) => {
       const st = dragBlockState.current;
       if (!st) return;
-      const dx = mv.clientX - st.startX;
-      const dy = mv.clientY - st.startY;
+      const dx = (mv.clientX - st.startX) / fitScaleRef.current;
+      const dy = (mv.clientY - st.startY) / fitScaleRef.current;
       updateBlock(st.blockId, { x: Math.max(0, st.bx + dx), y: Math.max(0, st.by + dy) });
     };
     const up = () => {
@@ -621,7 +637,7 @@ const PresentationBuilder: React.FC = () => {
             else setCurrentIdx(i => Math.min(slides.length - 1, i + 1));
           }}
         >
-          {currentSlide && renderSlide(currentSlide)}
+          {currentSlide && renderSlide(currentSlide, screenScale)}
         </div>
 
         {/* Speaker notes strip */}
@@ -771,9 +787,9 @@ const PresentationBuilder: React.FC = () => {
         </div>
 
         {/* Center — canvas */}
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 'var(--space-6)', overflow: 'auto', background: 'var(--color-bg-base)',
+        <div ref={stageRef} style={{
+          flex: 1, minWidth: 0, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 'var(--space-6)', overflow: 'hidden', background: 'var(--color-bg-base)',
         }}>
           <div className="dex-presentation-print" style={{ display: 'flex', flexDirection: 'column' }}>
             {/* Print: render all slides */}
@@ -785,8 +801,8 @@ const PresentationBuilder: React.FC = () => {
               ))}
             </div>
             {/* Editor visible canvas */}
-            <div className="print-hidden" style={{ boxShadow: 'var(--pg-shadow-popover)' }}>
-              {currentSlide && renderSlide(currentSlide, 1, true)}
+            <div className="print-hidden" style={{ boxShadow: 'var(--pg-shadow-popover)', outline: '1px solid var(--color-border-subtle)', borderRadius: 6 }}>
+              {currentSlide && renderSlide(currentSlide, fitScale, true)}
             </div>
           </div>
         </div>

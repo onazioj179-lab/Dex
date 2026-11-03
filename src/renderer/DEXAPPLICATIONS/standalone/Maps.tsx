@@ -213,6 +213,9 @@ const DexMaps: React.FC = () => {
   const searchPhrase = useWorkingPhrase(searching, 'search');
   const [place, setPlace] = useState('San Francisco');
   const [failed, setFailed] = useState(false);
+  // First paint of the basemap can take a few seconds (style + tiles over the
+  // network); show that instead of a blank canvas.
+  const [mapReady, setMapReady] = useState(false);
 
   const [recent, setRecent] = useState<GeoResult[]>(() => loadList<GeoResult>(RECENT_KEY));
   const [saved, setSaved] = useState<SavedPlace[]>(() => loadList<SavedPlace>(SAVED_KEY));
@@ -351,6 +354,7 @@ const DexMaps: React.FC = () => {
       return;
     }
     mapRef.current = map;
+    map.once('idle', () => setMapReady(true));
     map.on('error', (e) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
     });
@@ -526,6 +530,14 @@ const DexMaps: React.FC = () => {
     <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
       <style>{MAPS_STYLE}</style>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {!mapReady && (
+        <div role="status" aria-live="polite" style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--color-bg-base)', color: 'var(--color-text-secondary)', fontSize: 13, pointerEvents: 'none',
+        }}>
+          Loading map…
+        </div>
+      )}
 
       {/* Mirror current view for UKI screen-context. */}
       <span data-app-content style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
