@@ -157,3 +157,18 @@ describe('Native browser view: page -> host outbox', () => {
     expect(outboxToEvent({ t: 'run', code: 'x' })).toBeNull();
   });
 });
+
+describe('Interface sound volume', () => {
+  it('is clamped, persisted and notifies subscribers', async () => {
+    const audio = await import('../../src/renderer/shell/SpatialAudio');
+    const seen = vi.fn();
+    const off = audio.subscribeSoundEnabled(seen);
+    audio.setSoundVolume(0.4);
+    expect(audio.getSoundVolume()).toBe(0.4);
+    expect(localStorage.getItem('dex-ui-sound-volume')).toBe('0.4');
+    audio.setSoundVolume(7);
+    expect(audio.getSoundVolume()).toBe(1);
+    expect(seen).toHaveBeenCalledTimes(2);
+    off();
+  });
+});
