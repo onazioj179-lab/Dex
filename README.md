@@ -1,6 +1,6 @@
 # DEX — your calm, all-in-one desktop
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 6.0.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Development target 7.0.1 · Copyright (c) 2026 · DEX Software License Agreement v1.0
 
 **DEX is one app that replaces a dozen — and it's 100% free.** Notes, tasks,
 files, a browser, a calendar, drawing, photo and video editing, music, a
@@ -174,3 +174,7 @@ Full details: [PRIVACY.md](PRIVACY.md) · [TERMS.md](TERMS.md) · in-app
 **DEX** — designed, built, and maintained by **Onazi Treasure OJ**
 &lt;onazi75@gmail.com&gt;. Copyright (c) 2026 Onazi Treasure OJ. All rights
 reserved.
+
+## DEX OS 7.0.1 development
+
+Part 11 workspace improvements and outstanding release gates are recorded in [the verification ledger](docs/PART11-VERIFICATION.md). This is a development target; packaged desktop and UKI boot acceptance are not yet complete.

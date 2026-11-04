@@ -5,6 +5,7 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { WorkspacePanel } from '../../ui/WorkspacePanel';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -1083,7 +1084,8 @@ const Canvas: React.FC = () => {
         </div>
 
         {/* Layers panel */}
-        <div className="dex-liquid-glass" style={s.layersPanel}>
+        <WorkspacePanel storageKey="dex-canvas-layers-layout" title="Layers" side="right">
+        <div style={{ ...s.layersPanel, width: '100%' }}>
           <div style={s.layersHeader}>
             <span style={s.layersTitle}>Layers</span>
             <button style={s.smallBtn} onClick={addLayer} title="Add layer" aria-label="Add layer">
@@ -1158,6 +1160,7 @@ const Canvas: React.FC = () => {
             })}
           </div>
         </div>
+        </WorkspacePanel>
       </div>
     </div>
   );

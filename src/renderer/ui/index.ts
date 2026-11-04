@@ -21,6 +21,7 @@ export { Stack, HStack, VStack, Spacer } from './Stack';
 export type { StackProps, StackGap, StackAlign, StackJustify } from './Stack';
 
 export { Field } from './Field';
+export { WorkspacePanel } from './WorkspacePanel';
 export type { FieldProps } from './Field';
 
 export { Badge } from './Badge';
