@@ -22,6 +22,7 @@ import { DexSearchInput } from '../styles/components';
 import {
   useClipboardEntries,
   useClipboardActions,
+  useClipboardStore,
   type ClipEntry,
   type ClipKind,
 } from '../store/clipboardStore';
@@ -90,6 +91,8 @@ interface ClipboardHistoryProps {
 export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onClose, onSelect }) => {
   const entries = useClipboardEntries();
   const { remove, togglePin, clearUnpinned } = useClipboardActions();
+  const captureOtherApps = useClipboardStore(s => s.captureOtherApps);
+  const setCaptureOtherApps = useClipboardStore(s => s.setCaptureOtherApps);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -327,13 +330,22 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
           )}
         </div>
 
-        {visible.length > 0 && (
-          <div style={styles.hint}>
-            <span>Enter to paste</span>
-            <span>Del to remove</span>
-            <span>Esc to close</span>
-          </div>
-        )}
+        <div style={styles.hint}>
+          {visible.length > 0 && (
+            <>
+              <span>Enter to paste</span>
+              <span>Del to remove</span>
+              <span>Esc to close</span>
+            </>
+          )}
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginLeft: visible.length > 0 ? 'auto' : undefined }}
+            title="Copies made inside DEX are always kept. Turn this on to also keep what you copy in other programs."
+          >
+            <input type="checkbox" checked={captureOtherApps} onChange={e => setCaptureOtherApps(e.target.checked)} />
+            Include copies from other apps
+          </label>
+        </div>
       </div>
     </div>
   );

@@ -698,6 +698,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
 export const useCommandPalette = (enabled: boolean = true) => {
   const [isOpen, setIsOpen] = useState(false);
+  const launchApp = useRunningApps(s => s.launchApp);
+  const openApp = useCallback((appId: string) => {
+    const def = APP_DEFINITIONS[appId];
+    if (def) launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
+  }, [launchApp]);
 
   useEffect(() => {
     if (!enabled) {

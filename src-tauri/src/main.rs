@@ -48,6 +48,7 @@ mod voice_notes;
 mod log_manager;
 mod notes_metadata;
 mod permissions_manager;
+mod webview_permissions;
 mod pattern_tracking;
 mod accessibility_ctl;
 mod adaptive_ctl;
@@ -2346,6 +2347,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("logs:get" | "logs:clear") => log_manager::dispatch(&app, ch, &args),
         ch @ ("notes:start-server" | "notes:stop-server") => notes_metadata::dispatch(&app, ch, &args),
         ch @ ("permissions:getAll" | "permissions:grant" | "permissions:revoke") => permissions_manager::dispatch(&app, ch, &args),
+        ch @ ("webPermissions:list" | "webPermissions:set" | "webPermissions:reset") => webview_permissions::dispatch(&app, ch, &args),
         ch @ ("patterns:recordAppOpen" | "patterns:recordAppClose" | "patterns:recordFileOpen" | "patterns:recordToolUse" | "patterns:recordAction" | "patterns:recordToolCombo" | "patterns:getSuggestions" | "patterns:getFrequent" | "patterns:getRecent" | "patterns:getToolCombos" | "patterns:getDayPatterns" | "patterns:getHourlyPatterns" | "patterns:getPreferredApp" | "patterns:getSessionStats" | "patterns:getAllPatterns" | "patterns:cleanup") => pattern_tracking::dispatch(&app, ch, &args),
         ch @ ("contract:getConfig" | "contract:getGuarantees" | "contract:getViolations") => contract_ctl::dispatch(&app, ch, &args),
         ch @ ("device:getThisDevice" | "device:getAll") => device_ctl::dispatch(&app, ch, &args),
@@ -3004,6 +3006,9 @@ fn main() {
             native_ops::start_reminder_scheduler(app.handle().clone());
             // Automatic backup scheduler (honors backup_settings; catchup on boot).
             native_ops::start_autobackup_scheduler(app.handle().clone());
+            // Answer DEX's own clipboard/MIDI/camera permission requests from the
+            // saved policy instead of a WebView2 prompt every time.
+            webview_permissions::install(app.handle());
             Ok(())
         })
         .on_page_load(|_webview, _payload| webview2::mark_page_loaded())
