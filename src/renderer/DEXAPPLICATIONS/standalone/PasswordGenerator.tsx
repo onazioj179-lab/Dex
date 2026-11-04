@@ -119,8 +119,10 @@ const PasswordGenerator: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
   const [legacy, setLegacy] = useState(loadLegacy);
-  const vaultUnlocked = useVaultStore(s => s.isUnlocked);
+  const vaultExists = useVaultStore(s => s.vaultExists);
   const addCredential = useVaultStore(s => s.addCredential);
+  const [vaultForm, setVaultForm] = useState<{ pending: string[]; master: string; confirm: string; error: string | null } | null>(null);
+  const hasNativeVault = !!(window as unknown as { dex?: { vault?: unknown } }).dex?.vault;
   const clearTimer = useRef<ReturnType<typeof setTimeout>>();
   const statusTimer = useRef<ReturnType<typeof setTimeout>>();
   const nextId = useRef(1);
@@ -133,6 +135,11 @@ const PasswordGenerator: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* private mode */ }
   }, [prefs]);
+
+  // Learn whether a Vault exists / is unlocked (native app only).
+  useEffect(() => {
+    if (hasNativeVault) void useVaultStore.getState().initialize();
+  }, [hasNativeVault]);
 
   const flash = useCallback((msg: string) => {
     setStatus(msg);
@@ -175,8 +182,7 @@ const PasswordGenerator: React.FC = () => {
     ].slice(0, 10)));
   }, [value, result, flash]);
 
-  const saveToVault = useCallback(async (text = value) => {
-    if (!text || !vaultUnlocked) return false;
+  const storeInVault = useCallback(async (text: string) => {
     const id = await addCredential({
       type: 'custom',
       title: `Generated ${new Date().toLocaleString()}`,
@@ -185,19 +191,43 @@ const PasswordGenerator: React.FC = () => {
       tags: ['generated'],
       favorite: false,
     });
-    flash(id ? 'Saved to the Vault.' : 'Could not save to the Vault.');
     return !!id;
-  }, [value, vaultUnlocked, addCredential, flash]);
+  }, [addCredential]);
 
-  const moveLegacyToVault = useCallback(async () => {
-    let moved = 0;
-    for (const e of legacy) if (e.password && await saveToVault(e.password)) moved++;
-    if (moved === legacy.length) {
+  const legacyValues = useRef<string[]>([]);
+  legacyValues.current = legacy.map(e => e.password ?? '');
+
+  /** Save values to the Vault, or ask for the master password first. */
+  const saveAll = useCallback(async (values: string[]) => {
+    const list = values.filter(Boolean);
+    if (list.length === 0) return;
+    if (!useVaultStore.getState().isUnlocked) {
+      setVaultForm({ pending: list, master: '', confirm: '', error: null });
+      return;
+    }
+    let saved = 0;
+    for (const v of list) if (await storeInVault(v)) saved++;
+    if (list === legacyValues.current && saved === list.length) {
       try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
       setLegacy([]);
     }
-    flash(`Moved ${moved} of ${legacy.length} to the Vault.`);
-  }, [legacy, saveToVault, flash]);
+    flash(saved === list.length ? (list.length === 1 ? 'Saved to the Vault.' : `Moved ${saved} passwords to the Vault.`) : `Saved ${saved} of ${list.length}. The rest could not be saved.`);
+  }, [storeInVault, flash]);
+
+  const submitVaultForm = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vaultForm) return;
+    const store = useVaultStore.getState();
+    if (!store.vaultExists) {
+      if (vaultForm.master.length < 8) { setVaultForm({ ...vaultForm, error: 'Use at least 8 characters.' }); return; }
+      if (vaultForm.master !== vaultForm.confirm) { setVaultForm({ ...vaultForm, error: 'The passwords do not match.' }); return; }
+    }
+    const ok = store.vaultExists ? await store.unlockVault(vaultForm.master) : await store.createVault(vaultForm.master);
+    if (!ok) { setVaultForm({ ...vaultForm, master: '', confirm: '', error: useVaultStore.getState().error || 'Incorrect master password.' }); return; }
+    const pending = vaultForm.pending;
+    setVaultForm(null);
+    await saveAll(pending);
+  }, [vaultForm, saveAll]);
 
   const deleteLegacy = useCallback(() => {
     try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
@@ -280,13 +310,48 @@ const PasswordGenerator: React.FC = () => {
             <button
               className="pwg-btn"
               style={S.btn}
-              onClick={() => void saveToVault()}
-              disabled={!value || !vaultUnlocked}
-              title={vaultUnlocked ? 'Save to the encrypted Vault' : 'Unlock the Vault to save'}
+              onClick={() => void saveAll([value])}
+              disabled={!value || !hasNativeVault}
+              title={hasNativeVault ? 'Save to the encrypted Vault' : 'Available in the installed app'}
             >
               Save to Vault
             </button>
           </div>
+          {vaultForm && (
+            <form onSubmit={submitVaultForm} style={S.vaultForm} aria-label={vaultExists ? 'Unlock the Vault' : 'Create a Vault'}>
+              <div style={S.note}>
+                {vaultExists ? 'Enter your Vault master password.' : 'Create a Vault. Choose a master password; it cannot be recovered if you forget it.'}
+              </div>
+              <input
+                type="password"
+                autoComplete="off"
+                autoFocus
+                placeholder="Master password"
+                aria-label="Master password"
+                value={vaultForm.master}
+                onChange={e => setVaultForm({ ...vaultForm, master: e.target.value, error: null })}
+                style={S.input}
+              />
+              {!vaultExists && (
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Confirm master password"
+                  aria-label="Confirm master password"
+                  value={vaultForm.confirm}
+                  onChange={e => setVaultForm({ ...vaultForm, confirm: e.target.value, error: null })}
+                  style={S.input}
+                />
+              )}
+              {vaultForm.error && <div role="alert" style={{ fontSize: 12, color: 'var(--color-error)' }}>{vaultForm.error}</div>}
+              <div style={S.actions}>
+                <button type="submit" className="pwg-btn pwg-primary" style={{ ...S.btn, ...S.primary }} disabled={!vaultForm.master}>
+                  {vaultExists ? 'Unlock and Save' : 'Create and Save'}
+                </button>
+                <button type="button" className="pwg-btn" style={S.btn} onClick={() => setVaultForm(null)}>Cancel</button>
+              </div>
+            </form>
+          )}
           <div style={S.status} aria-live="polite">{status ?? ''}</div>
         </section>
 
@@ -343,7 +408,7 @@ const PasswordGenerator: React.FC = () => {
               {legacy.length} {legacy.length === 1 ? 'password' : 'passwords'} saved by an earlier version {legacy.length === 1 ? 'is' : 'are'} stored unencrypted on this computer.
             </div>
             <div style={S.actions}>
-              <button className="pwg-btn" style={S.btn} onClick={() => void moveLegacyToVault()} disabled={!vaultUnlocked} title={vaultUnlocked ? undefined : 'Unlock the Vault first'}>Move to Vault</button>
+              <button className="pwg-btn" style={S.btn} onClick={() => void saveAll(legacyValues.current)} disabled={!hasNativeVault}>Move to Vault</button>
               <button className="pwg-btn" style={{ ...S.btn, color: 'var(--color-error)' }} onClick={deleteLegacy}>Delete</button>
             </div>
           </section>
@@ -408,6 +473,8 @@ const S: Record<string, React.CSSProperties> = {
   recentValue: { flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   recentMeta: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   link: { minHeight: 28, padding: '0 8px', border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--color-accent)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  vaultForm: { display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10, borderTop: '1px solid var(--color-border-subtle)' },
+  input: { minHeight: 32, padding: '0 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit' },
   hint: { fontSize: 11, color: 'var(--color-text-tertiary)' },
 };
 
