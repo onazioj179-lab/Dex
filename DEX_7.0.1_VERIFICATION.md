@@ -195,3 +195,17 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | `part9-app-key-scope-ratchet.test.ts` | 1 passed: every `window`/`document` keydown handler under `DEXAPPLICATIONS/` and `pages/` calls `keyEventForApp`, except 8 listed Escape-closers / one-shot / unmounted handlers |
 | Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
 | Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |
+
+## Part 10 (permissions, Password Generator+, spatial layout, docs, 2026-11-03, `claude/dex-part10`)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | exit 0 (after every batch, including the last edit) |
+| Full `vitest run` | **539 files passed, 0 failed** (2 skipped); 5,492 tests. Edits made after this run (wording, About rows) were followed by a re-run of the UKI, Settings, Workflows and clipboard tests: 25 files / 182 tests passed |
+| `cargo test --bin dex-tauri` | **96 passed, 0 failed**, including 4 new `webview_permissions` tests: only the bundled origin is trusted (look-alike hosts refused), clipboard allowed and SysEx blocked by default, other permissions left to WebView2, stored choice overrides the default |
+| `password-generator-plus.test.ts` | 12 passed: rejection sampling drops the biased tail; every selected class present; only selected classes used; look-alikes excluded; length clamped 8-128; exact search-space entropy; passphrase word count, capitalisation, single digit; 1,179 unique words; strength tiers |
+| `spatial-desktop.test.ts` | 26 passed, 3 new: a free spot is kept; a blocked window moves the shortest way (up here, not right); 12 windows placed around one spot never overlap and spread both up and down |
+| Watermark gate | `add-watermarks.js --check` OK after stamping 8 Part 9 test files that failed it on `main` |
+| Rendered preview (Vite, throwaway localhost profile) | Password Generator: password mode 128 bits "Very strong"; passphrase mode 6 words, 61 bits "Fair", two amber segments; R regenerates; options persist across reload; Save to Vault disabled with "Available in the installed app" (no native vault in a browser). Omni Clipboard: "Include copies from other apps" off by default, persists when turned on (turned off again afterwards). Window title "DEX OS". The preview's own first-run Terms screen was accepted to reach the shell; this is a disposable localhost origin, not the owner's profile |
+| GitHub repository metadata | Description and topics updated with `gh repo edit` and read back with `gh repo view` |
+| Not run | Installed-app check that the clipboard and MIDI prompts are gone (#87, #88); Settings › Permissions and Save to Vault in the desktop app (#89, #90); 7.0.1 installer build, install test and checksums (#97); frame timing with many windows (#91). Nothing was published to GitHub Releases |
