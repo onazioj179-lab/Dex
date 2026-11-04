@@ -72,7 +72,7 @@ import ZoneEditor from './ZoneEditor';
 import { auditDomTargets } from '../../shared/a11y/targetSize';
 import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
-import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
+import { getFloatingBounds, saveFloatingBounds, isMaximizedRect, isShortMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
 import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, fitRect, magneticSnap, gestureCamera, nearestFreeSpot, screenToWorld, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
 import { ContactTracker } from '../shell/input/touchContacts';
@@ -1288,6 +1288,34 @@ export const AppManager: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inFullscreenApp]);
 
+  // Windows restored from an earlier session can carry a maximized size from a
+  // build that reserved a strip above the DEX Bar (full width, short at the
+  // bottom). Snap each such window to the current maximized bounds once, the
+  // first time it is seen, so no app shows a blank band under it.
+  const shortMaxCheckedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isSpatialEnabled()) return;
+    const unchecked = [...detachedApps.keys()].filter(id => !shortMaxCheckedRef.current.has(id));
+    if (unchecked.length === 0) return;
+    const ws = getShellWorkspace(0);
+    if (ws.w < 320 || ws.h < 260) return; // not laid out yet; check on a later pass
+    const maxB = getMaximizedWindowBounds();
+    unchecked.forEach(id => shortMaxCheckedRef.current.add(id));
+    setDetachedApps(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of unchecked) {
+        const b = next.get(id);
+        if (b && !isSameWindowBounds(b, maxB, 1) && isShortMaximizedRect(b, ws)) {
+          next.set(id, { ...maxB, z: b.z });
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detachedApps]);
+
   // Self-heal on window focus / visibility return.
   // If the user "left DEX" (alt-tab / sleep / minimize) and came back to a
   // wallpaper-only screen, force-restore home so they always land somewhere useful.
@@ -1820,7 +1848,7 @@ export const AppManager: React.FC = () => {
       if (spatialRect) { next.set(appId, { ...spatialRect, z }); return next; }
       const ws = getShellWorkspace(0);
       const remembered = getFloatingBounds(appId);
-      if (remembered && !isMaximizedRect(remembered, ws)) {
+      if (remembered && !isMaximizedRect(remembered, ws) && !isShortMaximizedRect(remembered, ws)) {
         const clamped = clampWindowToWorkspace({ x: remembered.x, y: remembered.y, w: remembered.w, h: remembered.h }, ws);
         next.set(appId, { ...clamped, z });
       } else {
@@ -1886,7 +1914,7 @@ export const AppManager: React.FC = () => {
       const ws = getShellWorkspace(0);
       const remembered = getFloatingBounds(id);
       let rect: { x: number; y: number; w: number; h: number };
-      if (remembered && !isMaximizedRect(remembered, ws)) {
+      if (remembered && !isMaximizedRect(remembered, ws) && !isShortMaximizedRect(remembered, ws)) {
         rect = clampWindowToWorkspace({ x: remembered.x, y: remembered.y, w: remembered.w, h: remembered.h }, ws);
       } else {
         const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, ws);
@@ -2402,19 +2430,29 @@ export const AppManager: React.FC = () => {
     });
   }, [detachedApps, getShellWorkspace, autoTileAll]);
 
+  // The maximized bounds before the latest resize. A window is "maximized" when
+  // it equals the maximized bounds, but by the time the resize handler runs the
+  // work area has already changed, so comparing with the NEW bounds dropped
+  // every maximized window to a short normal window (a blank band at the bottom).
+  const lastMaxBoundsRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   useEffect(() => {
     const onResize = () => {
       // On the canvas, rects are WORLD coordinates: clamping them to the screen
       // piled every window into one screen-sized box on any resize.
       if (isSpatialEnabled()) return;
       const workspace = getShellWorkspace(0);
+      const maxB = getMaximizedWindowBounds();
+      const prevMax = lastMaxBoundsRef.current;
+      lastMaxBoundsRef.current = maxB;
       setDetachedApps(prev => {
         let changed = false;
         const next = new Map(prev);
         next.forEach((bounds, appId) => {
-          const clamped = CREATIVE_APPS.has(appId) || isSameWindowBounds(bounds, getMaximizedWindowBounds(), 1)
-            ? getMaximizedWindowBounds()
-            : clampWindowToWorkspace(bounds, workspace);
+          const wasMaximized = CREATIVE_APPS.has(appId)
+            || isSameWindowBounds(bounds, maxB, 1)
+            || (prevMax !== null && isSameWindowBounds(bounds, prevMax, 1))
+            || isShortMaximizedRect(bounds, workspace);
+          const clamped = wasMaximized ? maxB : clampWindowToWorkspace(bounds, workspace);
           if (!isSameWindowBounds(bounds, clamped, 1)) {
             next.set(appId, { ...clamped, z: bounds.z });
             changed = true;
@@ -2424,7 +2462,27 @@ export const AppManager: React.FC = () => {
       });
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    // The work area also changes without a window resize (the app tab bar or
+    // title bar showing or hiding). Follow the content surface itself
+    // (ResizeObserver already batches to at most once per frame) so maximized
+    // windows keep filling it.
+    let lastSize = '';
+    const ro = typeof ResizeObserver !== 'undefined' && contentRef.current
+      ? new ResizeObserver(() => {
+          const el = contentRef.current;
+          const size = el ? `${el.clientWidth}x${el.clientHeight}` : '';
+          if (size === lastSize) return;
+          const first = lastSize === '';
+          lastSize = size;
+          if (first) { lastMaxBoundsRef.current = getMaximizedWindowBounds(); return; }
+          onResize();
+        })
+      : null;
+    if (ro && contentRef.current) ro.observe(contentRef.current);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      ro?.disconnect();
+    };
   }, [getMaximizedWindowBounds, getShellWorkspace]);
 
   // Selectable tiling layouts (DEX_FEATURE_BACKLOG P1): arrange every detached

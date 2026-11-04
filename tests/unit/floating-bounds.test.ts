@@ -15,6 +15,7 @@ import {
   saveFloatingBounds,
   forgetFloatingBounds,
   isMaximizedRect,
+  isShortMaximizedRect,
 } from '../../src/renderer/shell/floatingBounds';
 
 beforeEach(() => { try { localStorage.clear(); } catch { /* jsdom */ } });
@@ -69,5 +70,21 @@ describe('isMaximizedRect', () => {
 
   it('false when only one edge is off by more than tolerance', () => {
     expect(isMaximizedRect({ x: 0, y: 66, w: 1000, h: 734 }, ws)).toBe(false);
+  });
+});
+
+describe('isShortMaximizedRect (blank band under maximized windows)', () => {
+  const ws = { x: 0, y: 0, w: 1440, h: 834 };
+  it('a full-width window stopped above an old DEX Bar strip counts as maximized', () => {
+    expect(isShortMaximizedRect({ x: 0, y: 0, w: 1440, h: 834 - 130 }, ws)).toBe(true);
+    expect(isShortMaximizedRect({ x: 0, y: 0, w: 1440, h: 834 }, ws)).toBe(true);
+  });
+  it('ordinary floating windows do not', () => {
+    expect(isShortMaximizedRect({ x: 200, y: 80, w: 900, h: 600 }, ws)).toBe(false);
+    expect(isShortMaximizedRect({ x: 0, y: 0, w: 900, h: 800 }, ws)).toBe(false);
+    expect(isShortMaximizedRect({ x: 0, y: 40, w: 1440, h: 790 }, ws)).toBe(false);
+  });
+  it('a full-width window much shorter than the work area is left alone', () => {
+    expect(isShortMaximizedRect({ x: 0, y: 0, w: 1440, h: 400 }, ws)).toBe(false);
   });
 });
