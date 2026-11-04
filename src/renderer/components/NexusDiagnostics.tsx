@@ -81,7 +81,14 @@ const NexusDiagnostics: React.FC = () => {
   useEffect(() => {
     if (!invoke || !visible) return;
     let alive = true;
+    let inFlight = false;
     const pull = async () => {
+      // Never overlap: on a busy machine a sample can outlast the interval.
+      if (inFlight) return;
+      inFlight = true;
+      try { await pullOnce(); } finally { inFlight = false; }
+    };
+    const pullOnce = async () => {
       const [s, sys] = await Promise.all([
         invoke('xenon:selfSample').catch(() => null),
         invoke('xenon:systemSample').catch(() => null),

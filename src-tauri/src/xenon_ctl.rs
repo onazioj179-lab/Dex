@@ -371,11 +371,14 @@ fn system_sample(app: &tauri::AppHandle) -> Value {
 // descendant (the WebView2 browser, renderer and GPU processes). Used by
 // Nexus > Diagnostics. Read on request only; nothing samples in the background.
 fn self_sample() -> Value {
+    // CPU and memory only: a full refresh also reads every process's disk I/O
+    // and command line, which takes seconds on a busy machine.
+    let kind = sysinfo::ProcessRefreshKind::new().with_cpu().with_memory();
     let mut sys = sysinfo::System::new();
     sys.refresh_cpu();
-    sys.refresh_processes();
+    sys.refresh_processes_specifics(kind);
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_processes();
+    sys.refresh_processes_specifics(kind);
     let Ok(me) = sysinfo::get_current_pid() else {
         return json!({ "available": false });
     };
