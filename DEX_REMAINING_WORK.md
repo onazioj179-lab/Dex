@@ -5,7 +5,7 @@
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
 | 1 | Merge the Part 8 branch `claude/dex-os-completion-stabilization-93cea6` | DONE | PR #76 merged; its last two commits reached `main` through #77 (same patches, `git cherry`). Seven later Part 7 commits that were never pushed (Browser page-to-host bridge, checkpoints, UKI resume, sound volume, Rewind, thread stacks) ship in the Part 10 branch | — | — | — | — |
-| 2 | Accurate Privacy Policy | **BLOCKED** | Owner has not approved the rewrite | `PRIVACY.md`, `src/shared/policies.ts` | Approve a rewrite from `docs/privacy/DATA_FLOWS.md` + `docs/reports/DEX_AI_PRIVACY.md` (must disclose Web Speech cloud recognition, provider data flow, Ollama check) | Owner / legal | P0 |
+| 2 | Accurate Privacy Policy | DONE (PR #80, merged by the owner) | Privacy Policy 3.0.0 rewritten from the real data flows; the in-app text is generated from `PRIVACY.md` and a test keeps them identical | `PRIVACY.md`, `src/shared/policies.ts` | — | — | — |
 | 3 | Local AI measured end to end | DEFERRED (owner) | Owner parked Ollama work. Local AI is now opt-in (no startup probe, not routed to unless connected in Settings › AI Providers) | Ollama | None until the owner reopens it | Owner | — |
 | 4 | Cloud AI measured end to end | NOT TESTED | No provider key here | Providers | Add a key; run a scripted agent session (web search + file read) | Owner key | P1 |
 | 5 | Screen sharing in the packaged app | NOT TESTED | The system picker needs a human to choose a window | `uki/screenCapture.ts` | Click "look at my screen", pick a window, confirm one frame is sent and the indicator clears | Tester | P1 |
@@ -133,7 +133,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 
 ## Release status
 
-**NOT READY.** #1 is done. Still required: the Privacy Policy rewrite (#2), an install test of the single 7.0.1 setup (built and smoke-tested in Part 12; #32, #97), and a check in the installed app that the clipboard and MIDI prompts are gone (#87, #88). Signing (#30) is recommended but not required to publish. After that: **READY WITH DOCUMENTED LIMITATIONS**. Part 8 found and fixed data-loss defects in Files (#59–#62); none of the remaining open items is a crash or data-loss defect.
+**NOT READY.** #1 is done. Still required: an install test of the single 7.0.1 setup (built and smoke-tested in Part 12; #32, #97), and a check in the installed app that the clipboard and MIDI prompts are gone (#87, #88). Signing (#30) is recommended but not required to publish. After that: **READY WITH DOCUMENTED LIMITATIONS**. Part 8 found and fixed data-loss defects in Files (#59–#62); none of the remaining open items is a crash or data-loss defect.
 
 ## Part 8: completion + stress testing (2026-11-03, `claude/dex-os-completion-stabilization-93cea6`)
 
@@ -191,13 +191,13 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 10.
 | 90 | Password Generator+ | DONE, verified in the preview | Rejection-sampled CSPRNG, one character per chosen class, look-alike exclusion, passphrases (1,179 words), exact entropy, Enter/R and Ctrl+C. The plaintext password history in localStorage is gone (session-only list; old entries can be moved to the Vault or deleted). Nothing in DEX could unlock the Vault; Save to Vault now unlocks or creates it inline | `PasswordGenerator.tsx`, `passwordGen.ts` | Save to Vault in the desktop app (the browser preview has no vault) | Installed build | P2 |
 | 91 | Spatial canvas grew into a horizontal strip | FIXED (unit-tested) | Turning the canvas on gridded unplaced windows to the right of placed ones, every time. Each window now keeps its on-screen place, or moves to the nearest free spot in any direction | `spatialMath.ts` `nearestFreeSpot`, `AppManager.tsx` | Frame timing with 10/30/50 windows in the installed app (#23, #24) | Installed build | P1 |
 | 92 | Xenon C++ | NOT APPLICABLE | There is no C++ Xenon. Xenon is `xenon_ctl.rs`, a Rust data port (status, pattern file, one-shot samples); the Electron-era live optimizer is not running (`getStatus` says `running:false`). C++ is only the unused Electron addon (#75) and AXL's C solid kernel | `xenon_ctl.rs` | Decide whether to port the live sampler and its push events | Owner | P3 |
-| 93 | Internal metrics in one place | NOT DONE | Pieces exist (`startup_timeline.rs`, `crash_reporter.rs`, Task Manager figures) but no single local diagnostics view | — | Local-only diagnostics page; nothing uploaded | — | P2 |
+| 93 | Internal metrics in one place | DONE (PR #80) | Nexus › Diagnostics shows local-only internal metrics; nothing is uploaded | Nexus | — | — | — |
 | 94 | Professional English | PARTIAL | Fixed: UKI small talk (slang removed), exclamation marks and "successfully" in status text, "Password Generator" name, window title "DEX OS". Not done: a full string-by-string sweep | — | Continue app by app | — | P2 |
 | 95 | README and documentation | DONE | README rewritten (true release status, packages, requirements, build, layout, security, license); CHANGELOG `v7.0.1`; RELEASE.md rewritten for Tauri; CONTRIBUTING and SIGNING corrected; Part 5 report retired (its open items were already here). Store planner host version was hard-coded 6.0.0, now the build version | docs | — | — | — |
 | 96 | GitHub repository | DONE (remote, read back) | Description and topics set with `gh repo edit`. The release workflow now publishes `DEX_<ver>_RELEASE_NOTES.md`, titles releases "DEX OS <ver>" and uploads `SHA256SUMS` | GitHub, `release.yml` | — | — | — |
 | 97 | GitHub release v7.0.1 | NOT PUBLISHED | Part 12 built the single setup from this code, checksummed it and passed a packaged smoke test (6/6). Not installed on a machine; signing is blocked (#30) | — | Merge, install test (VM or over 6.1.0), then push tag `v7.0.1` (the workflow builds, checksums and publishes) | Owner | P0 |
 | 98 | Old releases | KEEP | Only v6.0.1 and v6.1.0 exist; both stay as rollback until 7.0.1 installs successfully (#40). The workflow's keep-3 prune deletes nothing after 7.0.1 | — | Owner decides after #97 | Owner | P3 |
-| 99 | Nexus, Spotlight, context menus, dropdowns, notifications | NOT AUDITED this pass | Beyond Part 9's fixes | — | Audit pass | — | P2 |
+| 99 | Nexus, Spotlight, context menus, dropdowns, notifications | PARTIAL (PR #80 polish pass) | Polish pass on Nexus, context menus, Spotlight and Notification Center; not verified in the installed app | — | Check in the installed app | Installed build | P2 |
 
 ## Part 12: one installer, release build, full-height apps (2026-11-04, `claude/dex-os-final-release-27d6d4`)
 
@@ -205,7 +205,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 100 | Release build broken on `main` (chunk cycle) | FIXED | `appKeyScope.ts` in `app-axl` made a core/app chunk cycle; CI "Build" red since #78 | `vite.config.ts` | — | — | — |
+| 100 | Release build broken on `main` (chunk cycle) | FIXED (also by #81; merge keeps #81) | `appKeyScope.ts` in `app-axl` made a core/app chunk cycle; CI "Build" red since #78 | `vite.config.ts` | — | — | — |
 | 101 | One official installer | DONE | NSIS only; Electron packaging jobs removed from CI | `tauri.conf.json`, `ci.yml`, `release.yml`, release scripts | — | — | — |
 | 102 | Install, upgrade, uninstall, reinstall of the 7.0.1 setup | NOT TESTED | Running it here would replace the owner's working 6.1.0 | NSIS setup | Run on a VM, or over 6.1.0 when the owner chooses | Owner / VM | P0 |
 | 103 | Blank strip above the DEX Bar in every app | FIXED (owner request) | Apps and maximized windows use the full height; the bar floats | `AppManager.tsx`, `FloatingLauncher.tsx` | Check in the installed app that no app has essential controls under the bar | Installed build | P2 |

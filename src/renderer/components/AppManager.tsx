@@ -893,6 +893,7 @@ export const AppManager: React.FC = () => {
   const hubLoadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
   const hubMarkRead = useNotificationCenterStore(s => s.markRead);
   const hubClearAll = useNotificationCenterStore(s => s.clearAll);
+  const hubDelete = useNotificationCenterStore(s => s.deleteNotification);
   const hubGetOrdered = useNotificationCenterStore(s => s.getOrdered);
 
   // Refresh hub state whenever the center opens; keep the badge count warm.
@@ -5660,6 +5661,7 @@ export const AppManager: React.FC = () => {
         notifications={centerNotifications}
         onClearAll={() => { void hubClearAll(); }}
         onMarkAsRead={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubMarkRead(n); }}
+        onDismiss={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubDelete(n); }}
         onActivate={(item) => {
           // Revive the persisted deep-link: route through the same
           // dex-spotlight-navigate contract Quick Actions / Spotlight use, then

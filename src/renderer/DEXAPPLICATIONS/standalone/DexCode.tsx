@@ -1405,7 +1405,7 @@ const DexCode: React.FC = () => {
             </div>
             {/* In plain mode, choose whether UKI writes code or just acts. */}
             {langMode === 'plain' && (
-              <div role="tablist" aria-label="Plain-English behaviour" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
+              <div role="tablist" aria-label="Plain-English behavior" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
                 {(['code', 'doit'] as const).map(m => (
                   <button
                     key={m}

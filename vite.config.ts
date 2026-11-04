@@ -45,9 +45,24 @@ function noChunkCycles(): Plugin {
       for (const f of graph.keys()) {
         const cycle = !state.has(f) && visit(f);
         if (cycle) {
+          // Name the modules behind each edge, so the fix is obvious.
+          const short = (id: string) => id.replace(/\\/g, '/').replace(/^.*\/src\//, 'src/');
+          const edges = cycle.slice(0, -1).map((from, i) => {
+            const to = cycle[i + 1];
+            const target = bundle[to];
+            const source = bundle[from];
+            if (!target || target.type !== 'chunk' || !source || source.type !== 'chunk') return `  ${from} -> ${to}`;
+            const inTarget = new Set(Object.keys(target.modules));
+            const pairs: string[] = [];
+            for (const m of Object.keys(source.modules)) {
+              for (const dep of this.getModuleInfo(m)?.importedIds ?? []) {
+                if (inTarget.has(dep)) pairs.push(`${short(m)} imports ${short(dep)}`);
+              }
+            }
+            return `  ${from} -> ${to}:\n    ${pairs.slice(0, 6).join('\n    ')}`;
+          });
           this.error(
-            `Static import cycle between chunks: ${cycle.join(' -> ')}
-` +
+            `Static import cycle between chunks: ${cycle.join(' -> ')}\n${edges.join('\n')}\n` +
               'Pin the shared module into one chunk in manualChunks (see the notes there).',
           );
         }
@@ -145,11 +160,14 @@ export default defineConfig({
           // then threw "Cannot access '<x>' before initialization" from
           // app-notes at boot and rendered a blank window.
           if (id.includes('DEXAPPLICATIONS/notes/WordSuggestions')) return 'dex-app-core';
-          // shell/input (appKeyScope, touch contacts, haptics) is used by every
-          // app and by shared components. Unpinned, Rollup put appKeyScope in
-          // app-axl, so dex-app-core imported app-axl and app-axl imported
-          // dex-app-core: a chunk cycle that fails the release build.
+          // shell/input (appKeyScope, touch contacts, haptics) is imported by
+          // nearly every app AND by shared code (WordSuggestions). Left unpinned,
+          // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // The shared NativeWebview imports a constant from the ad-block content
+          // script; keep that module shared so app-browser (and the ad-block
+          // engine) is not pulled into startup.
+          if (id.includes('DEXAPPLICATIONS/browser/adblockContentScript')) return 'dex-app-core';
           // Standalone apps (Calculator, Calendar, Nexus, DexCode, …) are each
           // lazy-imported separately by AppManager, but were all collapsed into one
           // ~370K `app-standalone` chunk — so opening any one downloaded all of them.

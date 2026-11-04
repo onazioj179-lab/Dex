@@ -52,7 +52,7 @@ import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
-import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
+import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, readPolicyAcceptance } from '../utils/policyConsent';
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 
@@ -1898,7 +1898,6 @@ export const Settings: React.FC = () => {
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
   const [policyAcceptance, setPolicyAcceptance] = useState(() => readPolicyAcceptance());
-  const [optionalAnalytics, setOptionalAnalytics] = useState(() => isOptionalAnalyticsEnabled());
   // Hoist shell-prefs hook to component top-level so the hook count stays
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
@@ -2123,11 +2122,6 @@ export const Settings: React.FC = () => {
     setPolicyViewerOpen(true);
   }, []);
 
-  const toggleOptionalAnalytics = useCallback((enabled: boolean) => {
-    setOptionalAnalyticsEnabled(enabled);
-    setOptionalAnalytics(enabled);
-    toast.info(enabled ? 'Optional analytics enabled' : 'Optional analytics disabled');
-  }, [toast]);
 
   const resetPolicyAcceptance = useCallback(() => {
     clearPolicyAcceptance();
@@ -3555,6 +3549,15 @@ export const Settings: React.FC = () => {
     return `${os} · ${host}`;
   };
 
+  const DATA_STATE_LABEL: Record<string, string> = {
+    local: 'Stays on this computer',
+    'when-used': 'Only when you use the feature',
+    off: 'Off until you turn it on',
+    'user-submitted': 'Only what you send',
+    'feature-controlled': 'Only with your permission',
+    never: 'Never collected',
+  };
+
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
       <div style={{ ...styles.aboutHeader, marginTop: 'var(--space-3)' }}>
@@ -3654,30 +3657,11 @@ export const Settings: React.FC = () => {
           ))}
         </div>
 
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Optional Product Analytics</span>
-            <span style={styles.settingDesc}>Feature usage and performance signals used to improve DEX. Off by default.</span>
-          </div>
-          <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={optionalAnalytics}
-              onChange={e => toggleOptionalAnalytics(e.target.checked)}
-              style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-              aria-label="Toggle optional product analytics"
-            />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
-              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
-            </span>
-          </label>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 'var(--space-2)', marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
             <div key={category.id} style={{ padding: '10px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
               <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{category.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{DATA_STATE_LABEL[category.defaultState]}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
             </div>
           ))}

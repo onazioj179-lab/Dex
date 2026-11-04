@@ -2142,11 +2142,11 @@ export const Gallery: React.FC = () => {
                   {[
                     { color: 'var(--color-error)', name: 'Red' },
                     { color: 'var(--color-warning)', name: 'Orange' },
-                    { color: 'var(--color-warning)', name: 'Yellow' },
+                    { color: 'var(--color-tag-yellow, #FFD60A)', name: 'Yellow' },
                     { color: 'var(--color-success)', name: 'Green' },
                     { color: 'var(--color-accent)', name: 'Blue' },
                     { color: 'var(--color-tag-purple, #BF5AF2)', name: 'Purple' },
-                    { color: 'var(--color-text-tertiary)', name: 'Grey' },
+                    { color: 'var(--color-text-tertiary)', name: 'Gray' },
                   ].map(({ color, name }) => (
                     <button
                       key={color}

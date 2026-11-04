@@ -331,7 +331,7 @@ const ACTION_BLOCKS: ActionBlock[] = [
     configFields: [{ key: 'name', label: 'Process Name', type: 'text' }] },
   { id: 'a48', name: 'Schedule Task', category: 'System', description: 'Run at a scheduled time',
     configFields: [{ key: 'time', label: 'Time (HH:MM)', type: 'text' }, { key: 'repeat', label: 'Repeat', type: 'select', options: ['once', 'daily', 'weekly'] }] },
-  { id: 'a49', name: 'Empty Trash', category: 'System', description: 'Empty the system recycle bin',
+  { id: 'a49', name: 'Empty Trash', category: 'System', description: 'Empty the Windows Recycle Bin',
     configFields: [] },
 
   // Web (4 actions)

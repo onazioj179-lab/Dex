@@ -138,7 +138,9 @@ const ResultItem: React.FC<{
       id={id}
       onClick={onClick}
       onMouseDown={e => e.preventDefault()}
-      onMouseEnter={onHover}
+      // mousemove, not mouseenter: a list scrolling under a still pointer must
+      // not steal the keyboard selection.
+      onMouseMove={isSelected ? undefined : onHover}
       aria-selected={isSelected}
       role="option"
       style={{
@@ -522,20 +524,25 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         e.preventDefault();
         setSelectedIndex(i => Math.max(i - pageSize, 0));
         break;
+      // Plain Home/End move the text cursor in the search field; with Ctrl they
+      // jump to the first/last result.
       case 'Home':
+        if (!(e.ctrlKey || e.metaKey)) break;
         e.preventDefault();
         setSelectedIndex(0);
         break;
       case 'End':
+        if (!(e.ctrlKey || e.metaKey)) break;
         e.preventDefault();
         setSelectedIndex(flatResults.length - 1);
         break;
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault();
-        if (flatResults[selectedIndex]) {
-          executeResult(flatResults[selectedIndex]);
-        }
+        // The list may have shrunk since the selection was made.
+        const target = flatResults[Math.min(selectedIndex, flatResults.length - 1)];
+        if (target) executeResult(target);
         break;
+      }
       case 'Escape':
         e.preventDefault();
         if (query) {
@@ -548,6 +555,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }
         break;
       case 'Tab':
+        // In the embedded Home search, Tab leaves the field unless results are open.
+        if (variant !== 'overlay' && !(showResults && flatResults.length > 0)) break;
         e.preventDefault();
         if (e.shiftKey) {
           setSelectedIndex(i => Math.max(i - 1, 0));
@@ -556,7 +565,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }
         break;
     }
-  }, [flatResults, selectedIndex, executeResult, query, variant, onClose]);
+  }, [flatResults, selectedIndex, executeResult, query, variant, onClose, showResults]);
 
   // Scroll selected item into view
   useEffect(() => {

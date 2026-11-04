@@ -2269,10 +2269,10 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
 
 ## Checkpoint 2026-11-04 (Part 12: one installer, release build)
 
-- The release build was broken on `main` since #78 (chunk cycle via `shell/input/appKeyScope.ts`); fixed in `vite.config.ts`.
+- The release build was broken on `main` since #78 (chunk cycle via `shell/input/appKeyScope.ts`); fixed here and, in parallel, by #81 (the merge keeps #81's version, which also keeps the Browser chunk out of startup).
 - One official Windows setup (NSIS); MSI and the stale Electron CI packaging removed. Built, checksummed and smoke-tested (6/6, 31 apps) on an isolated profile.
 - Apps fill the full screen height; the DEX Bar floats over them.
-- Open: install/upgrade test of the setup (#102), per-app workflow pass (#105), Privacy Policy (#2), signing (#30). Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
+- Open: install/upgrade test of the setup (#102), per-app workflow pass (#105), signing (#30). Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
 
 ## Checkpoint 2026-11-03 (Part 8: completion + stress testing)
 
