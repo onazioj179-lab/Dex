@@ -2170,6 +2170,36 @@ fn notifications_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -
     }
 }
 
+/// Set when fullscreen was entered from maximized, so leaving it re-maximizes.
+static FULLSCREEN_FROM_MAXIMIZED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Keep the main page covering the whole main window. With child webviews in
+/// the window (the Browser app), the main webview is not refitted when the
+/// window changes size: entering fullscreen from maximized left it at the
+/// maximized bounds, and the window background showed as a black strip
+/// (bottom with a bottom taskbar, top with a top one).
+fn fit_main_webview(app: &tauri::AppHandle) {
+    let (Some(win), Some(wv)) = (app.get_window("main"), app.get_webview("main")) else { return };
+    let Ok(size) = win.inner_size() else { return };
+    if size.width == 0 || size.height == 0 {
+        return; // minimized
+    }
+    let want = tauri::Rect {
+        position: tauri::PhysicalPosition::new(0, 0).into(),
+        size: tauri::PhysicalSize::new(size.width, size.height).into(),
+    };
+    let current = wv.bounds().ok();
+    let same = current.map_or(false, |b| {
+        let scale = win.scale_factor().unwrap_or(1.0);
+        let pos = b.position.to_physical::<i32>(scale);
+        let sz = b.size.to_physical::<u32>(scale);
+        pos.x == 0 && pos.y == 0 && sz.width == size.width && sz.height == size.height
+    });
+    if !same {
+        let _ = wv.set_bounds(want);
+    }
+}
+
 /// Generic IPC dispatcher — the Electron->Tauri migration bridge. The renderer's
 /// `window.dex` / `window.electron` route every `<namespace>:<method>` channel
 /// here (see src/renderer/services/platform/tauriCompat.ts). Channels are ported
@@ -2691,7 +2721,34 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         }
         "window:toggleFullscreen" => {
             let next = !window.is_fullscreen().unwrap_or(false);
-            let ok = window.set_fullscreen(next).is_ok();
+            // Fullscreen straight from maximized kept the maximized client size
+            // (the page stayed 48 px short of the screen: the black strip), and
+            // leaving it did not restore the window. Leave maximized first and
+            // re-maximize on the way out.
+            let ok = if next {
+                let was_max = window.is_maximized().unwrap_or(false);
+                FULLSCREEN_FROM_MAXIMIZED.store(was_max, std::sync::atomic::Ordering::Relaxed);
+                if was_max {
+                    let _ = window.unmaximize();
+                }
+                window.set_fullscreen(true).is_ok()
+            } else {
+                let ok = window.set_fullscreen(false).is_ok();
+                if FULLSCREEN_FROM_MAXIMIZED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                    let _ = window.maximize();
+                }
+                ok
+            };
+            // The size change lands after this returns; refit once it has
+            // (the Resized handler covers most cases, this covers the rest).
+            let app2 = app.clone();
+            std::thread::spawn(move || {
+                for delay in [120u64, 400] {
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
+                    let app3 = app2.clone();
+                    let _ = app2.run_on_main_thread(move || fit_main_webview(&app3));
+                }
+            });
             json!({ "success": ok, "fullscreen": next })
         }
         "window:maximize" => {
@@ -3023,6 +3080,13 @@ fn main() {
             webview_permissions::install(app.handle());
             startup_timeline::mark("Native setup complete");
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Resized(_) = event {
+                if window.label() == "main" {
+                    fit_main_webview(window.app_handle());
+                }
+            }
         })
         .on_page_load(|_webview, _payload| {
             webview2::mark_page_loaded();
