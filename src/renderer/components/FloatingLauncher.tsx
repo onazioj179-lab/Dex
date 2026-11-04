@@ -35,6 +35,7 @@ const PANEL_R = 14;       // widget-drawer radius — matches --radius-xl / .dex
 const EXPAND_KEY = 'dex-nook-expanded';
 const SEARCH_W_KEY = 'dex-nook-search-w';
 const SEARCH_W_DEFAULT = 240;
+const DOCKED_KEY = 'dex-bar-docked';
 
 // --- calendar (reads the same store the Calendar app + Home widget write) ----
 interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string }
@@ -196,6 +197,11 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
     if (x < 0 || y < 0) return { x: Math.max(EDGE_PAD, Math.round((vw - 240) / 2)), y: Math.max(EDGE_PAD, vh - BAR_H - EDGE_PAD) };
+    // A bar the user left docked reopens docked, whatever the window height
+    // was when it was placed (the saved y alone is from the old size).
+    let dockedPref = false;
+    try { dockedPref = localStorage.getItem(DOCKED_KEY) === '1'; } catch { /* storage blocked */ }
+    if (dockedPref) return { x, y: Math.max(EDGE_PAD, vh - BAR_H - EDGE_PAD) };
     return { x, y };
   });
   const [dragging, setDragging] = useState(false);
@@ -205,13 +211,24 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
 
   // Measure the rendered bar and pull it on-screen. Runs on mount, expand
   // change, and resize -- not every render -- so there's no reflow loop.
+  // Last viewport the bar was laid out in, so a resize can tell whether it was
+  // docked against the bottom edge before the window changed size.
+  const lastVhRef = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 800);
   const clampNow = useCallback(() => {
     const el = containerRef.current;
     if (el) sizeRef.current = { w: el.offsetWidth, h: el.offsetHeight };
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
     if (vw < 80 || vh < 80) return;
-    setPos(p => clampBarToBounds(p.x, p.y, vw, vh, sizeRef.current.w, sizeRef.current.h));
+    const prevVh = lastVhRef.current;
+    lastVhRef.current = vh;
+    setPos(p => {
+      // Docked at the bottom stays docked when the window grows (maximize,
+      // display change); left at its old y it floated mid-screen over apps.
+      const wasDocked = prevVh - (p.y + sizeRef.current.h) <= 64;
+      const y = wasDocked && prevVh !== vh ? vh - sizeRef.current.h - EDGE_PAD : p.y;
+      return clampBarToBounds(p.x, y, vw, vh, sizeRef.current.w, sizeRef.current.h);
+    });
   }, []);
 
   useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
@@ -309,6 +326,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     }
     pendingRef.current = null;
     setPosition(fx, fy);
+    try { localStorage.setItem(DOCKED_KEY, window.innerHeight - (fy + sizeRef.current.h) <= 64 ? '1' : '0'); } catch { /* quota */ }
   }, [pos.x, pos.y, setPosition]);
 
   if (!enabled) return null;
