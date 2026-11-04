@@ -30,7 +30,9 @@ interface RegistryEntry {
   published: { author: string; version: string; sha256: string; downloadUrl?: string; downloads?: number; publishedAt: number };
 }
 
-const dex: any = (window as any).dex;
+// A getter, not a captured value: this module is evaluated before the Tauri
+// bridge (window.dex) is installed, so a module-level copy was undefined.
+const bridge = (): any => (window as any).dex;
 
 export const PluginMarketplace: React.FC = () => {
   const [tab, setTab] = useState<Tab>('installed');
@@ -42,7 +44,7 @@ export const PluginMarketplace: React.FC = () => {
   // ----- Installed -----------------------------------------------------------
   const refreshInstalled = useCallback(async () => {
     try {
-      const list = await dex?.invoke?.('plugins:list');
+      const list = await bridge()?.invoke?.('plugins:list');
       if (Array.isArray(list)) setInstalled(list);
     } catch (e: any) { setStatus(`List failed: ${e?.message ?? e}`); }
   }, []);
@@ -50,7 +52,7 @@ export const PluginMarketplace: React.FC = () => {
   // ----- Registry ------------------------------------------------------------
   const refreshRegistry = useCallback(async () => {
     try {
-      const entries = await dex?.invoke?.('plugins:browseRegistry');
+      const entries = await bridge()?.invoke?.('plugins:browseRegistry');
       setRegistry(Array.isArray(entries) ? entries : []);
     } catch (e: any) { setStatus(`Registry failed: ${e?.message ?? e}`); }
   }, []);
@@ -64,7 +66,7 @@ export const PluginMarketplace: React.FC = () => {
     setBusyId(entry.manifest.id);
     setStatus(`Installing ${entry.manifest.name}…`);
     try {
-      await dex?.invoke?.('plugins:downloadAndInstall', entry);
+      await bridge()?.invoke?.('plugins:downloadAndInstall', entry);
       setStatus(`Installed ${entry.manifest.name} v${entry.manifest.version}`);
       await refreshInstalled();
     } catch (e: any) { setStatus(`Install failed: ${e?.message ?? e}`); }
@@ -74,7 +76,7 @@ export const PluginMarketplace: React.FC = () => {
   const enableToggle = async (row: InstalledRow) => {
     setBusyId(row.manifest.id);
     try {
-      await dex?.invoke?.(row.enabled ? 'plugins:disable' : 'plugins:enable', row.manifest.id);
+      await bridge()?.invoke?.(row.enabled ? 'plugins:disable' : 'plugins:enable', row.manifest.id);
       await refreshInstalled();
     } catch (e: any) { setStatus(`Toggle failed: ${e?.message ?? e}`); }
     setBusyId(null);
@@ -83,7 +85,7 @@ export const PluginMarketplace: React.FC = () => {
   const uninstall = async (row: InstalledRow) => {
     setBusyId(row.manifest.id);
     try {
-      await dex?.invoke?.('plugins:uninstall', row.manifest.id);
+      await bridge()?.invoke?.('plugins:uninstall', row.manifest.id);
       await refreshInstalled();
     } catch (e: any) { setStatus(`Uninstall failed: ${e?.message ?? e}`); }
     setBusyId(null);
@@ -95,10 +97,10 @@ export const PluginMarketplace: React.FC = () => {
     if (!publishDir.trim()) { setStatus('Provide a source directory path'); return; }
     setStatus('Packaging…');
     try {
-      const pkg = await dex?.invoke?.('plugins:package', publishDir.trim());
+      const pkg = await bridge()?.invoke?.('plugins:package', publishDir.trim());
       if (!pkg?.envelope) throw new Error('Package returned no envelope');
       setStatus(`Packaged ${pkg.envelope.manifest.name} v${pkg.envelope.manifest.version}; publishing locally…`);
-      const res = await dex?.invoke?.('plugins:publish', pkg.envelope);
+      const res = await bridge()?.invoke?.('plugins:publish', pkg.envelope);
       if (res?.ok) {
         setStatus(`Published to ${res.registryUrl}`);
         await refreshRegistry();

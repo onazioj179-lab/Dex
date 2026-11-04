@@ -19,7 +19,9 @@ import {
 } from '../services/diagnostics/localMetrics';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
-const invoke: Invoke | undefined = (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke;
+// Looked up when the view mounts, not at module load: in the packaged build this
+// module can be evaluated before the Tauri bridge (window.dex) is installed.
+const getInvoke = (): Invoke | undefined => (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke;
 
 interface Timeline { totalMs: number; phases: Array<{ name: string; durationMs: number; atMs: number }> }
 interface SelfSample { available: boolean; processCount: number; memoryMB: number; hostMemoryMB: number; cpuPercent: number }
@@ -60,6 +62,7 @@ function useVisible(): boolean {
 }
 
 const NexusDiagnostics: React.FC = () => {
+  const invoke = useMemo(getInvoke, []);
   const local = useLocalSnapshot();
   const visible = useVisible();
   const tasks = useUkiTasks((s) => s.tasks);
@@ -91,7 +94,7 @@ const NexusDiagnostics: React.FC = () => {
     void pull();
     const id = window.setInterval(pull, REFRESH_MS);
     return () => { alive = false; window.clearInterval(id); };
-  }, [visible]);
+  }, [visible, invoke]);
 
   const loadOnce = useCallback(async () => {
     if (!invoke) return;
@@ -103,7 +106,7 @@ const NexusDiagnostics: React.FC = () => {
     if (tl) setTimeline(tl as Timeline);
     if (cs) setCrashes(cs as CrashStats);
     if (Array.isArray(rc)) setRecentCrashes((rc as CrashRecord[]).slice().reverse());
-  }, []);
+  }, [invoke]);
 
   const runFrames = useCallback(async () => {
     setMeasuring(true);

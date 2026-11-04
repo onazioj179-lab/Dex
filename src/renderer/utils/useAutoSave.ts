@@ -8,7 +8,10 @@ import { useEffect, useRef } from 'react';
 import { sharedTick } from '../services/SharedTick';
 import { resolveAutosaveInterval } from './autosavePrefs';
 
-const invoke = (window as any).electron?.invoke;
+// Looked up per call: this module is evaluated before the Tauri bridge is
+// installed (static imports run before main.tsx's body), so a module-level
+// capture was always undefined and version snapshots were never written.
+const getInvoke = (): ((...a: unknown[]) => Promise<unknown>) | undefined => (window as any).electron?.invoke;
 
 // Interval for durable version-history snapshots (5 minutes)
 const VERSION_SNAPSHOT_INTERVAL = 5 * 60_000;
@@ -46,6 +49,7 @@ export function useAutoSave(
     document.addEventListener('visibilitychange', flushOnHidden);
 
     // Durable version-history snapshot (less frequent, survives localStorage wipe)
+    const invoke = getInvoke();
     if (invoke) {
       sharedTick.subscribe(versionId, () => {
         try {
