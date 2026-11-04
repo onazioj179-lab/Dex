@@ -11,7 +11,7 @@
  * stays here; "Copy report" puts a numbers-only summary on the clipboard when
  * you ask for it.
  */
-import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useUkiTasks } from '../store/ukiTasksStore';
 import {
@@ -77,31 +77,36 @@ const NexusDiagnostics: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
-  // Live resource figures: only while this view is open and the window visible.
+  // Live resource figures. One sampler for the life of the view: it never stops
+  // on a visibility change (a hidden/visible flip used to tear it down and, in
+  // rare timing, leave it stopped), it skips its tick while the window is
+  // hidden, and samples never overlap.
+  const pullRef = useRef<() => Promise<void>>(async () => undefined);
   useEffect(() => {
-    if (!invoke || !visible) return;
+    if (!invoke) return;
     let alive = true;
     let inFlight = false;
     const pull = async () => {
-      // Never overlap: on a busy machine a sample can outlast the interval.
       if (inFlight) return;
       inFlight = true;
-      try { await pullOnce(); } finally { inFlight = false; }
+      try {
+        const [s, sys] = await Promise.all([
+          invoke('xenon:selfSample').catch(() => null),
+          invoke('xenon:systemSample').catch(() => null),
+        ]);
+        if (!alive) return;
+        if (s && (s as SelfSample).available) setSelf(s as SelfSample);
+        if (sys) setSystem(sys as SystemSample);
+        setTick((t) => t + 1);
+      } finally {
+        inFlight = false;
+      }
     };
-    const pullOnce = async () => {
-      const [s, sys] = await Promise.all([
-        invoke('xenon:selfSample').catch(() => null),
-        invoke('xenon:systemSample').catch(() => null),
-      ]);
-      if (!alive) return;
-      if (s && (s as SelfSample).available) setSelf(s as SelfSample);
-      if (sys) setSystem(sys as SystemSample);
-      setTick((t) => t + 1);
-    };
+    pullRef.current = pull;
     void pull();
-    const id = window.setInterval(pull, REFRESH_MS);
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void pull(); }, REFRESH_MS);
     return () => { alive = false; window.clearInterval(id); };
-  }, [visible, invoke]);
+  }, [invoke]);
 
   const loadOnce = useCallback(async () => {
     if (!invoke) return;
@@ -173,7 +178,7 @@ const NexusDiagnostics: React.FC = () => {
         <div style={S.note}>Measured on this computer. Nothing is uploaded.</div>
         <div style={S.barActions}>
           {status && <span role="status" style={S.status}>{status}</span>}
-          <button style={S.btn} onClick={() => { void loadOnce(); void runFrames(); }} disabled={measuring}>Refresh</button>
+          <button style={S.btn} onClick={() => { void loadOnce(); void runFrames(); void pullRef.current(); }} disabled={measuring}>Refresh</button>
           <button style={S.btn} onClick={() => void copyReport()}>Copy report</button>
         </div>
       </div>
