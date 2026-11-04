@@ -223,7 +223,13 @@ const PasswordGenerator: React.FC = () => {
       if (vaultForm.master !== vaultForm.confirm) { setVaultForm({ ...vaultForm, error: 'The passwords do not match.' }); return; }
     }
     const ok = store.vaultExists ? await store.unlockVault(vaultForm.master) : await store.createVault(vaultForm.master);
-    if (!ok) { setVaultForm({ ...vaultForm, master: '', confirm: '', error: useVaultStore.getState().error || 'Incorrect master password.' }); return; }
+    if (!ok) {
+      // Unlock fails only on a wrong password; show that plainly rather than the
+      // native error text ("decryption failed ...").
+      const error = store.vaultExists ? 'Incorrect master password.' : 'Could not create the Vault.';
+      setVaultForm({ ...vaultForm, master: '', confirm: '', error });
+      return;
+    }
     const pending = vaultForm.pending;
     setVaultForm(null);
     await saveAll(pending);
