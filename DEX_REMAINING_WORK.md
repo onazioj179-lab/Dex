@@ -97,7 +97,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | # | Requirement | Status | Why incomplete | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|
 | 30 | Code signing of the 7.0.1 installer | BLOCKED | No certificate; installer is unsigned | Install cert, set thumbprint per `docs/SIGNING.md`, rebuild | Owner cert | P0 |
-| 31 | MSI for 7.0.1 | VERIFIED (pre-reconcile build) | Built fine with network on `claude/dex-part4` (17.8 MB). Rebuild after merge for the final code | Rebuild | — | P1 |
+| 31 | MSI for 7.0.1 | NOT APPLICABLE (Part 12) | DEX ships one setup (NSIS). MSI is no longer built or published | — | — | — |
 | 32 | Packaged-app tests + before/after startup, idle CPU, memory | PARTIAL (Part 8): release exe smoke 13/13 in an isolated profile; installer install/upgrade/uninstall still not run | No install/upgrade/uninstall run. Sizes on `claude/dex-part4` (pre-reconcile build): exe 37.1 MB vs 40.1 MB, NSIS 14.4 vs 15.1 MB, MSI 17.8 vs 19.0 MB. Idle Home in the dev preview: 0 frame callbacks/s after the thermal-monitor fix | Install over 6.x on a test profile, measure, compare | VM / time | P0 |
 | 33 | Click-through of the transparency slider in rendered Settings | DONE (Part 8): rendered slider 0/40/100%, light + dark, persistence; found and fixed 0% reverting on fresh installs. Packaged app still unchecked | Preview sits behind the Terms gate; logic is unit-tested and verified live at the store level | Accept gate on a test profile, drag the slider light + dark | Owner / test profile | P1 |
 | 34 | Playwright e2e; CI-load flakiness of `v6-performance-guards` | PARTIAL | Full unit suite run once: 516/520 files, the 4 failures classified (see verification). e2e not run | Run e2e in CI; make perf guards load-tolerant | — | P2 |
@@ -106,7 +106,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 | 37 | Popup audit, live-activities completion, background-process audit | PARTIAL | Done: redundant toasts removed; one live-activity store for every producer (downloads/encodes/transfers were Home-only); failed/cancelled tasks shown honestly; transfer Cancel; thermal monitor no longer runs a perpetual frame loop (and no longer mistakes a minimized window for overheating). Remaining: ~45 other `toast.success/info` sites, update-notice repetition | Finish the toast sweep | — | P2 |
 | 38 | Light/dark + 125/150/200% scaling audit of every built-in app | PARTIAL | Scanned for hard-coded dark backgrounds: shell/general hits were overlays/scrims (fine) except 3 real light-mode defects, fixed (Focus-mode pill, Home widget picker, live-activity card/track/close button). Creative apps are deliberately pinned dark. Not yet checked visually, and scaling not tested | Visual pass in the packaged app, light + dark | — | P2 |
 | 39 | UI sound effects | PARTIAL | Interface sounds are synthesized Web Audio (`shell/SpatialAudio.ts`), mute persists, Settings toggle synced. Windows notification toasts were always silent (WinRT writes `<audio silent>` when no sound is set); Settings › Notifications › Sound now reaches the toast. Not done: listen-test in the packaged app | Listen-test | — | P3 |
-| 40 | Old 6.1.0 artifacts / release cleanup | WAITING | Rollback-critical until 7.0.1 is verified | Owner approves after install test | Owner | P3 |
+| 40 | Old 6.1.0 artifacts / release cleanup | WAITING | Rollback-critical until 7.0.1 installs. Inventory (Part 12): installed 6.1.0 at `%LOCALAPPDATA%DEX` (replaced by the 7.0.1 setup, not deleted by hand); Electron-era leftovers `%LOCALAPPDATA%dex-updaterinstaller.exe` (87 MB, May 2026) and `%APPDATA%dex` (old Electron profile, may hold user data); stale 6.1.0/7.0.1 MSI/NSIS files in worktree `target/` folders. Nothing was deleted | Owner approves deleting `dex-updater` after 7.0.1 installs; keep `%APPDATA%dex` until its contents are checked | Owner | P3 |
 | 41 | Frontend obfuscation | DECIDED: not added | Minification + identifier mangling only; an obfuscator would break dynamic imports/IPC and slow startup. Sensitive work is in Rust | Revisit only for a specific threat | — | — |
 | 42 | Settings toggles still unread | RESOLVED on `claude/dex-part7` (see #51) | e.g. Window Management toggles, "Enable Global Shortcuts" (see the carried-over audit list) | Wire or remove each | — | P2 |
 | 43 | Two parallel 7.0.1 implementations | RESOLVED in the reconcile merge | Kept main's transparency engine and docs numbering; kept this branch's Calculator rewrite (safe parser, focus-scoped keys), live-activity host, local-AI opt-in, bundle gate, About | — | — | — |
@@ -133,7 +133,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 
 ## Release status
 
-**NOT READY.** #1 is done. Still required: the Privacy Policy rewrite (#2), a 7.0.1 installer built from the merged code and install-tested (#32, #97), and a check in the installed app that the clipboard and MIDI prompts are gone (#87, #88). Signing (#30) is recommended but not required to publish. After that: **READY WITH DOCUMENTED LIMITATIONS**. Part 8 found and fixed data-loss defects in Files (#59–#62); none of the remaining open items is a crash or data-loss defect.
+**NOT READY.** #1 is done. Still required: the Privacy Policy rewrite (#2), an install test of the single 7.0.1 setup (built and smoke-tested in Part 12; #32, #97), and a check in the installed app that the clipboard and MIDI prompts are gone (#87, #88). Signing (#30) is recommended but not required to publish. After that: **READY WITH DOCUMENTED LIMITATIONS**. Part 8 found and fixed data-loss defects in Files (#59–#62); none of the remaining open items is a crash or data-loss defect.
 
 ## Part 8: completion + stress testing (2026-11-03, `claude/dex-os-completion-stabilization-93cea6`)
 
@@ -195,6 +195,19 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 10.
 | 94 | Professional English | PARTIAL | Fixed: UKI small talk (slang removed), exclamation marks and "successfully" in status text, "Password Generator" name, window title "DEX OS". Not done: a full string-by-string sweep | — | Continue app by app | — | P2 |
 | 95 | README and documentation | DONE | README rewritten (true release status, packages, requirements, build, layout, security, license); CHANGELOG `v7.0.1`; RELEASE.md rewritten for Tauri; CONTRIBUTING and SIGNING corrected; Part 5 report retired (its open items were already here). Store planner host version was hard-coded 6.0.0, now the build version | docs | — | — | — |
 | 96 | GitHub repository | DONE (remote, read back) | Description and topics set with `gh repo edit`. The release workflow now publishes `DEX_<ver>_RELEASE_NOTES.md`, titles releases "DEX OS <ver>" and uploads `SHA256SUMS` | GitHub, `release.yml` | — | — | — |
-| 97 | GitHub release v7.0.1 | NOT PUBLISHED | No 7.0.1 installer was built from this code, installed or checksummed in this pass; signing is blocked (#30) | — | Merge, `npm run build:tauri`, install test, `npm run release:checksums`, then push tag `v7.0.1` | Owner | P0 |
+| 97 | GitHub release v7.0.1 | NOT PUBLISHED | Part 12 built the single setup from this code, checksummed it and passed a packaged smoke test (6/6). Not installed on a machine; signing is blocked (#30) | — | Merge, install test (VM or over 6.1.0), then push tag `v7.0.1` (the workflow builds, checksums and publishes) | Owner | P0 |
 | 98 | Old releases | KEEP | Only v6.0.1 and v6.1.0 exist; both stay as rollback until 7.0.1 installs successfully (#40). The workflow's keep-3 prune deletes nothing after 7.0.1 | — | Owner decides after #97 | Owner | P3 |
 | 99 | Nexus, Spotlight, context menus, dropdowns, notifications | NOT AUDITED this pass | Beyond Part 9's fixes | — | Audit pass | — | P2 |
+
+## Part 12: one installer, release build, full-height apps (2026-11-04, `claude/dex-os-final-release-27d6d4`)
+
+Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
+
+| # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
+|---|---|---|---|---|---|---|---|
+| 100 | Release build broken on `main` (chunk cycle) | FIXED | `appKeyScope.ts` in `app-axl` made a core/app chunk cycle; CI "Build" red since #78 | `vite.config.ts` | — | — | — |
+| 101 | One official installer | DONE | NSIS only; Electron packaging jobs removed from CI | `tauri.conf.json`, `ci.yml`, `release.yml`, release scripts | — | — | — |
+| 102 | Install, upgrade, uninstall, reinstall of the 7.0.1 setup | NOT TESTED | Running it here would replace the owner's working 6.1.0 | NSIS setup | Run on a VM, or over 6.1.0 when the owner chooses | Owner / VM | P0 |
+| 103 | Blank strip above the DEX Bar in every app | FIXED (owner request) | Apps and maximized windows use the full height; the bar floats | `AppManager.tsx`, `FloatingLauncher.tsx` | Check in the installed app that no app has essential controls under the bar | Installed build | P2 |
+| 104 | Product name "DEX" vs "DEX OS" in the installer and Start menu | KEPT "DEX" | Renaming changes the install folder and uninstall key, so 7.0.1 would install beside 6.1.0 (two entries). Window title is "DEX OS" | `tauri.conf.json` | Rename only with a migration that removes the old entry | Owner | P3 |
+| 105 | Per-app completion pass (Part 12 §2–5) | NOT DONE this pass | This pass fixed release blockers. Packaged smoke opened 31 apps without a crash; workflow-level checks per app remain as in #54, #77, #99 | Apps | Continue app by app | — | P2 |
