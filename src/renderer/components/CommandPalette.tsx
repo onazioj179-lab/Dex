@@ -225,7 +225,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'browser', title: 'Open Browser', icon: Icons.browser, category: 'app', action: () => openApp('browser'), keywords: ['web', 'internet', 'safari'] },
     { id: 'settings', title: 'Open Settings', icon: Icons.settings, category: 'app', action: () => openApp('settings'), keywords: ['preferences', 'config'], shortcut: `${_M}+,` },
     { id: 'power', title: 'Open Power Manager', icon: Icons.power, category: 'app', action: () => openApp('power'), keywords: ['battery', 'cpu', 'performance'] },
-    { id: 'recyclebin', title: 'Open Recycle Bin', icon: Icons.trash, category: 'app', action: () => openApp('recyclebin'), keywords: ['trash', 'deleted', 'restore'] },
+    { id: 'recyclebin', title: 'Open Trash', icon: Icons.trash, category: 'app', action: () => openApp('recyclebin'), keywords: ['trash', 'deleted', 'restore'] },
 
     // Apps — Productivity
     { id: 'notes', title: 'Open Notes', icon: Icons.notes, category: 'app', action: () => openApp('notes'), keywords: ['write', 'text'] },

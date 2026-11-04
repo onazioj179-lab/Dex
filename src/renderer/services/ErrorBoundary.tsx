@@ -83,8 +83,15 @@ export const submitCrashReport = (report: CrashReport) => {
   if (crashReports.length > MAX_CRASH_REPORTS) {
     crashReports.shift();
   }
-  
-  // Store for retrieval via getCrashReports() - avoids console noise
+  // Also keep it in the local crash log (on this computer only) so Nexus >
+  // Diagnostics can count crashes across restarts.
+  try {
+    const invoke = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex?.invoke;
+    void invoke?.('crash-reporter:reportRendererError', {
+      message: `${report.appId}: ${report.error.message}`,
+      stack: report.error.stack,
+    })?.catch(() => undefined);
+  } catch { /* bridge absent */ }
 };
 
 export const getCrashReports = (appId?: string): CrashReport[] => {

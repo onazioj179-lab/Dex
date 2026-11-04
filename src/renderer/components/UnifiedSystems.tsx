@@ -717,18 +717,18 @@ export function RecycleBinView(): React.ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--color-text-primary)' }}>
       <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Recycle Bin ({count})</h2>
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Trash ({count})</h2>
         {count > 0 && (
           <button
             onClick={handleEmpty}
-            aria-label={confirmEmpty === 0 ? 'Empty recycle bin' : confirmEmpty === 1 ? 'Confirm empty recycle bin' : 'Absolutely sure, empty recycle bin'}
+            aria-label={confirmEmpty === 0 ? 'Empty Trash' : confirmEmpty === 1 ? 'Confirm emptying Trash' : 'Empty Trash permanently'}
             style={{
               ...pillBtnStyle,
               color: confirmEmpty > 0 ? 'var(--color-error)' : 'var(--color-text-secondary)',
               borderColor: confirmEmpty > 0 ? 'var(--color-error)' : 'var(--color-border, #3a3a3c)',
             }}
           >
-            {confirmEmpty === 0 ? 'Empty Recycle Bin' : confirmEmpty === 1 ? 'Confirm?' : 'Absolutely sure?'}
+            {confirmEmpty === 0 ? 'Empty Trash' : confirmEmpty === 1 ? 'Confirm' : 'Empty permanently'}
           </button>
         )}
       </div>
@@ -746,7 +746,7 @@ export function RecycleBinView(): React.ReactElement {
         {loading ? (
           <DexLoader variant="panel" style={{ padding: 'var(--space-10)', minHeight: 0 }} />
         ) : items.length === 0 ? (
-          <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Recycle bin is empty</div>
+          <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Trash is empty</div>
         ) : (
           items.map((item) => (
             <div key={item.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
