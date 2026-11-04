@@ -284,7 +284,7 @@ export const DEX_ARCHITECTURE: readonly DexArchitectureFact[] = [
   },
   {
     id: 'motion', topic: 'motion',
-    fact: 'Motion is organised by category — window, workspace, dock, and panel. Animation communicates state rather than decoration, and every transition respects Reduce Motion and current system load.',
+    fact: 'Motion is organized by category — window, workspace, dock, and panel. Animation communicates state rather than decoration, and every transition respects Reduce Motion and current system load.',
   },
   {
     id: 'thermal', topic: 'thermal protection',

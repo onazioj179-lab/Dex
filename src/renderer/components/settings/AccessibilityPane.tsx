@@ -50,7 +50,7 @@ export function AccessibilityPane({ value, onChange }: AccessibilityPaneProps): 
   return (
     <SettingsPaneShell
       title="Accessibility"
-      description="Tune contrast, colour, density and motion for your needs."
+      description="Adjust contrast, color, density and motion."
       testId="settings-pane-accessibility"
     >
       <ul style={{ ...settingsListStyle, listStyle: 'none', margin: 0, padding: 0 }}>
@@ -70,7 +70,7 @@ export function AccessibilityPane({ value, onChange }: AccessibilityPaneProps): 
           </select>
         </li>
         <li style={settingsRowStyle}>
-          <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary }}>Colour-blind palette</span>
+          <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary }}>Color-blind palette</span>
           <select
             value={value.colorBlind}
             onChange={(e) => onChange({ ...value, colorBlind: e.target.value as ColorBlindMode | 'none' })}

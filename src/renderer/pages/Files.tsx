@@ -913,7 +913,7 @@ export const Files: React.FC = () => {
     setContextMenu(null);
     const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move to Trash?',
-      message: `"${file.name}" will be moved to the recycle bin.`,
+      message: `"${file.name}" will be moved to the Recycle Bin.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
@@ -973,7 +973,7 @@ export const Files: React.FC = () => {
     const count = selectedFiles.size;
     const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move selected to Trash?',
-      message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
+      message: `${count} item${count === 1 ? '' : 's'} will be moved to the Recycle Bin.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });

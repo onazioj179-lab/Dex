@@ -245,7 +245,7 @@ function collectGalleryFavorites(): SourceFact[] {
     if (!Array.isArray(list)) return [];
     return list.slice(0, MAX_FACTS_PER_SOURCE).map(path => ({
       source: 'gallery-favorites',
-      user: `Is ${path} a favourite image?`,
+      user: `Is ${path} a favorite image?`,
       response: clip(`Image ${path} is starred in Gallery.`),
       ts: Date.now(),
       appId: 'gallery',
