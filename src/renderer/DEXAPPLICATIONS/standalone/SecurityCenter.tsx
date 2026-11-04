@@ -104,12 +104,10 @@ const SecurityCenter: React.FC = () => {
     }],
   }];
 
-  const stat = (label: string, value: number, accent?: string): React.ReactNode => (
-    <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border-subtle)', borderRadius: radius.xl, padding: '12px 16px', minWidth: 110 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.text.tertiary }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: accent || colors.text.primary, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-    </div>
-  );
+  // Per-filter counts shown on the chips themselves (the separate stat cards
+  // repeated the status bar and did nothing when clicked).
+  const countFor = (f: Filter): number =>
+    f === 'all' ? entries.length : f === 'mutations' ? stats.mutations : entries.filter((e) => e.outcome === f).length;
 
   return (
     <AppShell
@@ -123,23 +121,18 @@ const SecurityCenter: React.FC = () => {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontFamily: fontStack.ui }}>
-        {/* Summary */}
-        <div style={{ display: 'flex', gap: 12, padding: 16, flexWrap: 'wrap', borderBottom: '1px solid var(--color-border-subtle)' }}>
-          {stat('Total', stats.total, colors.accent.default)}
-          {stat('Writes', stats.mutations, colors.semantic.warning)}
-          {stat('Denied', stats.denied, colors.semantic.warning)}
-          {stat('Failed', stats.failed, colors.semantic.error)}
-        </div>
-
         {/* Filter chips */}
-        <div style={{ display: 'flex', gap: 4, padding: '10px 16px 6px' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '10px 16px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
           {FILTERS.map((f) => (
             <button key={f.id} onClick={() => setFilter(f.id)} style={{
               height: 26, padding: '0 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: radius.md,
               border: '1px solid var(--color-border-subtle)',
               background: filter === f.id ? colors.accent.light : 'transparent',
               color: filter === f.id ? colors.accent.default : colors.text.secondary,
-            }}>{f.label}</button>
+            }}>
+              {f.label}
+              <span style={{ marginLeft: 6, fontVariantNumeric: 'tabular-nums', color: filter === f.id ? colors.accent.default : colors.text.tertiary }}>{countFor(f.id)}</span>
+            </button>
           ))}
           {stats.total > 0 && (
             <button

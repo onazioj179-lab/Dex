@@ -274,7 +274,7 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   recyclebin: { w: 600, h: 460 },
   powerrename: { w: 940, h: 620 },
   transfers: { w: 600, h: 460 },
-  power: { w: 500, h: 440 },
+  power: { w: 780, h: 520 },
   axl: { w: 1000, h: 650, maximized: true },
   stopwatch: { w: 340, h: 480 },
   unitconverter: { w: 440, h: 780 },
@@ -298,6 +298,7 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   git: { w: 820, h: 620 },
   env: { w: 760, h: 600 },
   ssh: { w: 760, h: 640 },
+  backup: { w: 760, h: 700 },
 };
 
 const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
@@ -374,6 +375,9 @@ const CREATIVE_APPS: ReadonlySet<string> = new Set(['videoeditor', 'imosion', 'p
 const COMPACT_APPS: ReadonlySet<string> = new Set([
   'calculator', 'passwordgenerator', 'stopwatch', 'timer', 'unitconverter', 'pomodoro',
   'qrcode', 'colorpicker', 'weather', 'worldclock', 'noisegenerator',
+  // Medium utilities whose content is a single column or a short list: a
+  // full-screen tab left most of the screen empty.
+  'power', 'backup',
 ]);
 
 // Platform detection for title bar overlay handling
@@ -4876,7 +4880,8 @@ export const AppManager: React.FC = () => {
           const def = APP_DEFINITIONS[app.id];
           const isActive = currentApp === app.id;
           const isDragging = draggingTab === app.id;
-          const color = def?.color || 'var(--color-text-tertiary)';
+          // Monochrome glyphs (per-app colours were a rainbow across the bar).
+          const color = isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)';
           const icon = Icons[app.id];
           return (
             <div
@@ -5390,7 +5395,7 @@ export const AppManager: React.FC = () => {
               const q = appMenuSearch.trim().toLowerCase();
 
               const renderTile = (app: (typeof LAUNCHPAD_APPS)[number], keyPrefix: string) => {
-                const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={24} color={app.color} />;
+                const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={22} color="currentColor" />;
                 const isActive = currentApp === app.id;
                 const isRunning = runningApps.some(a => a.id === app.id);
                 return (
@@ -5417,14 +5422,16 @@ export const AppManager: React.FC = () => {
                       transition: 'background 0.12s ease',
                     }}
                   >
+                    {/* One neutral tile for every glyph icon: a different colour per
+                        app read as decoration (full-colour PNG icons keep theirs). */}
                     <div style={{
-                      color: app.color,
+                      color: 'var(--color-text-primary)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: 40, height: 40,
                       borderRadius: 10,
-                      background: 'transparent',
+                      background: AppIconPngs[app.id] ? 'transparent' : 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)',
                       border: 'none',
-                      boxShadow: isActive ? `0 0 0 1.5px ${app.color}66` : 'none',
+                      boxShadow: isActive ? '0 0 0 1.5px var(--color-accent)' : 'none',
                       overflow: 'hidden',
                     }}>
                       {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={36} /> : icon}

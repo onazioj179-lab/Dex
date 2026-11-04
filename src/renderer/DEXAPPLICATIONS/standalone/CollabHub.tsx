@@ -38,7 +38,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    background: 'linear-gradient(180deg, var(--color-bg-elevated, #1a1a1c) 0%, var(--color-bg-base, #0d0d0f) 100%)',
+    background: 'var(--color-bg-base)',
     color: 'var(--color-text-primary, #fff)',
     fontFamily: 'var(--dex-font-ui)',
   },
@@ -59,20 +59,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: 36,
     height: 36,
     borderRadius: 'var(--radius-lg)',
-    background: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+    background: 'var(--color-accent-fill)',
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 16px rgba(94,92,230,0.3)',
   },
   title: {
     fontSize: 18,
     fontWeight: 600,
     letterSpacing: '-0.01em',
     margin: 0,
-    background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
+    color: 'var(--color-text-primary)',
   },
   subtitle: {
     fontSize: 12,
@@ -98,9 +96,9 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   actionBtnPrimary: {
-    background: 'linear-gradient(135deg, #0a84ff, #5e5ce6)',
-    border: 'none',
-    boxShadow: '0 4px 16px rgba(10,132,255,0.3)',
+    background: 'var(--color-accent-fill)',
+    color: 'var(--color-accent-text, #fff)',
+    border: '1px solid transparent',
   },
   tabs: {
     display: 'flex',
@@ -166,6 +164,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 20,
+    color: 'var(--color-text-secondary)',
   },
   cardMenu: {
     width: 28,
@@ -207,13 +206,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: 26,
     height: 26,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+    background: 'var(--color-bg-active)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 10,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     marginLeft: -8,
     border: '2px solid var(--color-bg-base, #1a1a1c)',
   },
@@ -271,7 +270,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: 40,
     height: 40,
     borderRadius: 'var(--radius-lg)',
-    background: 'linear-gradient(135deg, #30d158, #34c759)',
+    background: 'var(--color-bg-active)',
+    color: 'var(--color-text-secondary)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -324,7 +324,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
     padding: 'var(--space-3) var(--space-5)',
     margin: '0 var(--space-6) var(--space-4)',
-    background: 'linear-gradient(135deg, rgba(255,69,58,0.15), rgba(255,69,58,0.08))',
+    background: 'color-mix(in srgb, var(--color-error) 12%, transparent)',
     border: '1px solid var(--color-error-muted, rgba(255,69,58,0.3))',
     borderRadius: 10,
     fontSize: 13,
@@ -341,40 +341,41 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// App colors and icons
+// App badges: one neutral treatment (the letter identifies the app); a
+// rainbow of per-app gradients read as decoration, not information.
 const APP_THEMES: Record<string, { bg: string; color: string; icon: string }> = {
-  vinx: { bg: 'linear-gradient(135deg, #ff6b6b, #ee5a5a)', color: '#ff6b6b', icon: 'V' },
-  imosion: { bg: 'linear-gradient(135deg, #845ef7, #7048e8)', color: '#845ef7', icon: 'I' },
-  prism: { bg: 'linear-gradient(135deg, #22b8cf, #15aabf)', color: '#22b8cf', icon: 'P' },
-  flux: { bg: 'linear-gradient(135deg, #ff922b, #fd7e14)', color: '#ff922b', icon: 'F' },
-  forge: { bg: 'linear-gradient(135deg, #51cf66, #40c057)', color: '#51cf66', icon: 'G' },
-  axl: { bg: 'linear-gradient(135deg, #339af0, #228be6)', color: '#339af0', icon: 'A' },
+  vinx: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'V' },
+  imosion: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'I' },
+  prism: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'P' },
+  flux: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'F' },
+  forge: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'G' },
+  axl: { bg: 'var(--color-bg-active)', color: 'var(--color-text-secondary)', icon: 'A' },
 };
 
-// Activity feed icons (rendered white on a colored gradient circle)
+// Activity feed icons (stroke = currentColor; the tile sets the colour)
 const ACTIVITY_ICONS = {
   pending: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
   ),
   approved: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"/>
     </svg>
   ),
   denied: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
   ),
   checkpoint: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
     </svg>
   ),
   user: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
     </svg>
   ),
@@ -1009,11 +1010,11 @@ const CollabHub: React.FC = () => {
             : `${req.requesterName}'s request was denied`,
           description: req.message || `Requested ${req.requestedRole} access to ${p.name}`,
           icon: req.status === 'pending' ? ACTIVITY_ICONS.pending : req.status === 'approved' ? ACTIVITY_ICONS.approved : ACTIVITY_ICONS.denied,
-          iconBg: req.status === 'pending' 
-            ? 'linear-gradient(135deg, #ff9f0a, #ff6b00)'
+          iconBg: req.status === 'pending'
+            ? 'var(--color-warning)'
             : req.status === 'approved'
-            ? 'linear-gradient(135deg, #30d158, #28a745)'
-            : 'linear-gradient(135deg, #ff453a, #dc3545)',
+            ? 'var(--color-accent-fill)'
+            : 'var(--color-error)',
           actionable: req.status === 'pending',
           requestId: req.id,
           status: req.status,
@@ -1031,7 +1032,7 @@ const CollabHub: React.FC = () => {
           title: cp.autoSave ? 'Auto-saved checkpoint' : `Checkpoint: ${cp.name}`,
           description: `${cp.creatorName} saved a checkpoint on ${p.name}`,
           icon: ACTIVITY_ICONS.checkpoint,
-          iconBg: 'linear-gradient(135deg, #30d158, #34c759)',
+          iconBg: 'var(--color-bg-active)',
         });
       });
 
@@ -1049,7 +1050,7 @@ const CollabHub: React.FC = () => {
           title: `${c.name} joined`,
           description: `Joined ${p.name} as ${c.role}${c.isVisitor ? ' (visitor)' : ''}`,
           icon: ACTIVITY_ICONS.user,
-          iconBg: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+          iconBg: 'var(--color-bg-active)',
         });
       });
     });
@@ -1124,7 +1125,7 @@ const CollabHub: React.FC = () => {
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logo}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
               <path d="M2 12h20"/>
@@ -1283,7 +1284,7 @@ const CollabHub: React.FC = () => {
                   }}
                   onClick={() => setFilter(f === 'All' ? null : f)}
                 >
-                  {f === 'All' ? 'All' : `${APP_THEMES[f]?.icon || ''} ${f.charAt(0).toUpperCase() + f.slice(1)}`}
+                  {f === 'All' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
             </div>
@@ -1377,7 +1378,7 @@ const CollabHub: React.FC = () => {
                     </div>
 
                     <div style={styles.cardFooter}>
-                      <span style={{ ...styles.cardAppBadge, background: `${theme.color}20`, color: theme.color }}>
+                      <span style={{ ...styles.cardAppBadge, background: 'var(--color-bg-hover)', color: theme.color }}>
                         {project.appId}
                       </span>
                       <div style={styles.cardActions}>
@@ -1437,7 +1438,7 @@ const CollabHub: React.FC = () => {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; }}
                 >
                   <div style={styles.checkpointIcon}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                     </svg>
                   </div>
@@ -1503,7 +1504,7 @@ const CollabHub: React.FC = () => {
                     gap: 14,
                     padding: '14px var(--space-4)',
                     background: item.actionable
-                      ? 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))'
+                      ? 'color-mix(in srgb, var(--color-warning) 9%, transparent)'
                       : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
                     border: item.actionable
                       ? '1px solid var(--color-warning-muted, rgba(255,159,10,0.2))'
@@ -1513,12 +1514,12 @@ const CollabHub: React.FC = () => {
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.background = item.actionable
-                      ? 'linear-gradient(135deg, rgba(255,159,10,0.15), rgba(255,159,10,0.08))'
+                      ? 'color-mix(in srgb, var(--color-warning) 14%, transparent)'
                       : 'var(--color-bg-active, rgba(255,255,255,0.08))';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.background = item.actionable
-                      ? 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))'
+                      ? 'color-mix(in srgb, var(--color-warning) 9%, transparent)'
                       : 'var(--color-bg-hover, rgba(255,255,255,0.04))';
                   }}
                 >
@@ -1527,6 +1528,7 @@ const CollabHub: React.FC = () => {
                     height: 40,
                     borderRadius: 'var(--radius-lg)',
                     background: item.iconBg,
+                    color: item.iconBg === 'var(--color-bg-active)' ? 'var(--color-text-secondary)' : '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1824,8 +1826,8 @@ const CollabHub: React.FC = () => {
                       <div style={{
                         display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
                         padding: 'var(--space-4)',
-                        background: 'linear-gradient(135deg, rgba(48,209,88,0.08), rgba(48,209,88,0.02))',
-                        border: '1px solid var(--color-success-muted, rgba(48,209,88,0.25))',
+                        background: 'var(--color-bg-hover)',
+                        border: '1px solid var(--color-border-subtle)',
                         borderRadius: 'var(--radius-lg)',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
@@ -1931,9 +1933,9 @@ const CollabHub: React.FC = () => {
                                   <div style={{
                                     fontSize: 12, lineHeight: 1.4, padding: '6px 10px', borderRadius: 10,
                                     maxWidth: '75%', wordBreak: 'break-word',
-                                    color: 'var(--color-text-primary, #fff)',
+                                    color: mine ? '#fff' : 'var(--color-text-primary, #fff)',
                                     background: mine
-                                      ? 'linear-gradient(135deg, #0a84ff, #5e5ce6)'
+                                      ? 'var(--color-accent-fill)'
                                       : 'var(--color-bg-active, rgba(255,255,255,0.08))',
                                   }}>
                                     {msg.body}
@@ -2006,9 +2008,9 @@ const CollabHub: React.FC = () => {
                                   </div>
                                   <div style={{
                                     fontSize: 13, lineHeight: 1.4, padding: '8px 12px', borderRadius: 10,
-                                    color: 'var(--color-text-primary, #fff)',
+                                    color: mine ? '#fff' : 'var(--color-text-primary, #fff)',
                                     background: mine
-                                      ? 'linear-gradient(135deg, #0a84ff, #5e5ce6)'
+                                      ? 'var(--color-accent-fill)'
                                       : 'var(--color-bg-active, rgba(255,255,255,0.08))',
                                     wordBreak: 'break-word',
                                   }}>
