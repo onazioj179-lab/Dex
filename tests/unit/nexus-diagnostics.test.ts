@@ -46,3 +46,16 @@ describe('local diagnostics', () => {
     expect(f.fps).toBe(48);
   });
 });
+
+describe('Nexus chart colours', () => {
+  it('turns hex, rgb and CSS variables into valid canvas colours with alpha', async () => {
+    const { canvasColor } = await import('../../src/renderer/pages/TaskManager');
+    expect(canvasColor('#0A84FF', 0.5)).toBe('rgba(10, 132, 255, 0.5)');
+    expect(canvasColor('#fff', 0)).toBe('rgba(255, 255, 255, 0)');
+    expect(canvasColor('rgb(1, 2, 3)', 1)).toBe('rgba(1, 2, 3, 1)');
+    document.documentElement.style.setProperty('--test-tone', '#FF453A');
+    expect(canvasColor('var(--test-tone)', 0.33)).toBe('rgba(255, 69, 58, 0.33)');
+    // Unset variable: its fallback is used. Never "var(...)55", which canvas rejects.
+    expect(canvasColor('var(--unset-tone, #000000)', 0.2)).toBe('rgba(0, 0, 0, 0.2)');
+  });
+});

@@ -611,7 +611,9 @@ const CenterCard: React.FC<{
   onActivate?: (n: BannerNotification) => void;
   /** Show the source line (timeline view); the grouped view has a source header. */
   showSource?: boolean;
-}> = ({ n, onMarkAsRead, onActivate, showSource }) => {
+  /** Remove this notification. */
+  onDismiss?: (id: string) => void;
+}> = ({ n, onMarkAsRead, onActivate, showSource, onDismiss }) => {
   const [hovered, setHovered] = useState(false);
   const color = n.color ?? ICON_COLORS[n.icon ?? 'info'] ?? 'var(--color-accent)';
   const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
@@ -648,7 +650,25 @@ const CenterCard: React.FC<{
             <span style={{ fontSize: 12, fontWeight: n.read ? 500 : 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
               {n.title}
             </span>
-            {relativeTime && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{relativeTime}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              {relativeTime && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{relativeTime}</span>}
+              {onDismiss && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label={`Dismiss ${n.title}`}
+                  title="Dismiss"
+                  style={{
+                    width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer',
+                    color: 'var(--color-text-tertiary)', padding: 0,
+                    opacity: hovered ? 1 : 0.55,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              )}
+            </span>
           </div>
           {showSource && n.source && (
             <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{n.source}</div>
@@ -716,8 +736,30 @@ export const NotificationCenter: React.FC<{
   onMarkAsRead?: (id: string) => void;
   /** Activate a persisted deep-link target (navigate + close). */
   onActivate?: (n: BannerNotification) => void;
-}> = ({ open, notifications, onClearAll, onClose, onMarkAsRead, onActivate }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline');
+  /** Remove one notification. */
+  onDismiss?: (id: string) => void;
+}> = ({ open, notifications, onClearAll, onClose, onMarkAsRead, onActivate, onDismiss }) => {
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    try { return localStorage.getItem('dex-notif-center-view') === 'grouped' ? 'grouped' : 'timeline'; } catch { return 'timeline'; }
+  });
+  const setViewMode = (m: ViewMode) => {
+    setViewModeState(m);
+    try { localStorage.setItem('dex-notif-center-view', m); } catch { /* ignore */ }
+  };
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes; focus moves into the panel while it is open and back after.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      try { prev?.focus?.({ preventScroll: true }); } catch { /* element gone */ }
+    };
+  }, [open, onClose]);
   const groups = useMemo(() => groupNotificationsBySource(notifications), [notifications]);
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -736,7 +778,14 @@ export const NotificationCenter: React.FC<{
         onClick={onClose}
       />
       {/* Panel slides in from right with smooth spring -- frosted glass */}
-      <div className="dex-liquid-glass" style={{
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-label="Notification Center"
+        tabIndex={-1}
+        className="dex-liquid-glass"
+        style={{
+        outline: 'none',
         position: 'fixed', top: 30, right: 8, bottom: 8,
         width: 'min(360px, calc(100vw - 48px))', zIndex: 'var(--z-notification)',
         borderRadius: 14,
@@ -747,8 +796,8 @@ export const NotificationCenter: React.FC<{
       }}>
         <style>{`
           @keyframes notifBackdropIn {
-            from { opacity: 0; backdrop-filter: blur(0); }
-            to { opacity: 1; backdrop-filter: var(--blur-md); }
+            from { opacity: 0; }
+            to { opacity: 1; }
           }
           @keyframes notifCenterIn {
             from { opacity: 0; transform: translateX(24px) scale(0.96); }
@@ -895,7 +944,7 @@ export const NotificationCenter: React.FC<{
                   </div>
                   {/* Group notifications */}
                   {group.notifications.map(n => (
-                    <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} />
+                    <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} onDismiss={onDismiss} />
                   ))}
                 </div>
               );
@@ -903,7 +952,7 @@ export const NotificationCenter: React.FC<{
           ) : (
             /* Timeline View */
             notifications.map(n => (
-              <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} showSource />
+              <CenterCard key={n.id} n={n} onMarkAsRead={onMarkAsRead} onActivate={onActivate} onDismiss={onDismiss} showSource />
             ))
           )}
         </div>
