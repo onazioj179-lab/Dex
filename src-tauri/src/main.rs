@@ -2913,6 +2913,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 }
 
 fn main() {
+    startup_timeline::anchor();
     webview2::install_panic_logger();
     // Must run before WebView2 opens its cache files (see storage_ctl.rs).
     storage_ctl::run_pending_cache_clear();
@@ -2921,6 +2922,7 @@ fn main() {
     if !webview2::preflight() {
         std::process::exit(1);
     }
+    startup_timeline::mark("WebView2 check");
     webview2::start_load_watchdog(std::time::Duration::from_secs(30));
     let result = tauri::Builder::default()
         // MUST be the first plugin. A second launch focuses the running window
@@ -3009,9 +3011,13 @@ fn main() {
             // Answer DEX's own clipboard/MIDI/camera permission requests from the
             // saved policy instead of a WebView2 prompt every time.
             webview_permissions::install(app.handle());
+            startup_timeline::mark("Native setup complete");
             Ok(())
         })
-        .on_page_load(|_webview, _payload| webview2::mark_page_loaded())
+        .on_page_load(|_webview, _payload| {
+            webview2::mark_page_loaded();
+            startup_timeline::mark("Interface page loaded");
+        })
         .invoke_handler(tauri::generate_handler![smart_router_route, dex_ipc])
         .run(tauri::generate_context!());
     if let Err(e) = result {

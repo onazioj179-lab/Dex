@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import NexusUkiPanel from '../components/NexusUkiPanel';
 import ScheduledTasksPanel from '../components/ScheduledTasksPanel';
 import SystemIntegrityPanel from '../components/SystemIntegrityPanel';
+import NexusDiagnostics from '../components/NexusDiagnostics';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
@@ -21,15 +22,18 @@ import { appLifecycle, type AppPhase } from '../services/AppLifecycle';
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
 //   1 Essential   - key metric cards only (CPU / Memory / Apps / Battery)
-//   2 Diagnostics - full metrics + workspaces / workflows / open apps
+//   2 Detailed    - full metrics + workspaces / workflows / open apps
 //   3 Advanced    - adds the full, virtualized system-process table
 type DetailLevel = 1 | 2 | 3;
 const DETAIL_LEVELS: { level: DetailLevel; label: string; title: string }[] = [
   { level: 1, label: 'Essential', title: 'Essential — key metrics only' },
-  { level: 2, label: 'Diagnostics', title: 'Diagnostics — full metrics, workspaces, workflows, open apps' },
+  { level: 2, label: 'Detailed', title: 'Detailed — full metrics, workspaces, workflows, open apps' },
   { level: 3, label: 'Advanced', title: 'Advanced — adds the full system process table' },
 ];
 const DETAIL_LEVEL_KEY = 'dex-taskmanager-detail';
+// Activity (live system + apps) or Diagnostics (how DEX itself performs).
+type NexusView = 'activity' | 'diagnostics';
+const VIEW_KEY = 'dex-taskmanager-view';
 const loadDetailLevel = (): DetailLevel => {
   try {
     const v = Number(localStorage.getItem(DETAIL_LEVEL_KEY));
@@ -390,6 +394,10 @@ const TaskManager: React.FC = () => {
   const [netRxHistory, setNetRxHistory] = useState<number[]>([]);
   const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
   const [detailLevel, setDetailLevel] = useState<DetailLevel>(loadDetailLevel);
+  const [view, setView] = useState<NexusView>(() => {
+    try { return localStorage.getItem(VIEW_KEY) === 'diagnostics' ? 'diagnostics' : 'activity'; } catch { return 'activity'; }
+  });
+  useEffect(() => { try { localStorage.setItem(VIEW_KEY, view); } catch { /* ignore */ } }, [view]);
   // Process-table sort: local-only (no backend). Default mirrors the previous
   // hardcoded behaviour (CPU, highest first); clicking a header cycles it.
   const [sortKey, setSortKey] = useState<'name' | 'pid' | 'cpu' | 'memory'>('cpu');
@@ -830,6 +838,20 @@ const TaskManager: React.FC = () => {
           </span>
         </div>
         <div style={styles.headerControls}>
+          <div style={styles.segGroup} role="tablist" aria-label="View">
+            {(['activity', 'diagnostics'] as NexusView[]).map((v) => (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                style={{ ...styles.segButton, ...(view === v ? styles.segButtonActive : null) }}
+              >
+                {v === 'activity' ? 'Activity' : 'Diagnostics'}
+              </button>
+            ))}
+          </div>
+          {view === 'activity' && (<>
           <div style={styles.segGroup} role="group" aria-label="Detail level">
             {DETAIL_LEVELS.map(({ level, label, title }) => (
               <button
@@ -855,8 +877,12 @@ const TaskManager: React.FC = () => {
           <button style={styles.refreshButton} onClick={handleManualRefresh} aria-label="Refresh Task Manager">
             <DexIcon name="refresh" size={14} /> Refresh
           </button>
+          </>)}
         </div>
       </div>
+
+      {view === 'diagnostics' && <NexusDiagnostics />}
+      <div style={{ display: view === 'diagnostics' ? 'none' : 'contents' }}>
 
       {health.level !== 'healthy' && (
         <div
@@ -1348,6 +1374,7 @@ const TaskManager: React.FC = () => {
         )}
       </div>
       )}
+      </div>
     </div>
   );
 };

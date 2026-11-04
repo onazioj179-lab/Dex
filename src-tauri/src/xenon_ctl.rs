@@ -367,6 +367,50 @@ fn system_sample(app: &tauri::AppHandle) -> Value {
     sample
 }
 
+// self_sample(): memory and CPU of DEX itself, i.e. this host process plus every
+// descendant (the WebView2 browser, renderer and GPU processes). Used by
+// Nexus > Diagnostics. Read on request only; nothing samples in the background.
+fn self_sample() -> Value {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_cpu();
+    sys.refresh_processes();
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    sys.refresh_processes();
+    let Ok(me) = sysinfo::get_current_pid() else {
+        return json!({ "available": false });
+    };
+    let procs = sys.processes();
+    let in_tree = |mut pid: sysinfo::Pid| -> bool {
+        for _ in 0..64 {
+            if pid == me { return true; }
+            match procs.get(&pid).and_then(|p| p.parent()) {
+                Some(parent) if parent != pid => pid = parent,
+                _ => return false,
+            }
+        }
+        false
+    };
+    let (mut count, mut mem, mut cpu, mut host_mem) = (0u32, 0u64, 0f64, 0u64);
+    for (pid, p) in procs {
+        if in_tree(*pid) {
+            count += 1;
+            mem += p.memory();
+            cpu += p.cpu_usage() as f64;
+            if *pid == me { host_mem = p.memory(); }
+        }
+    }
+    let cores = sys.cpus().len().max(1) as f64;
+    json!({
+        "available": true,
+        "timestamp": now_ms(),
+        "processCount": count,
+        "memoryMB": (mem as f64 / 1048576.0).round() as i64,
+        "hostMemoryMB": (host_mem as f64 / 1048576.0).round() as i64,
+        // Share of the whole machine (all cores = 100%).
+        "cpuPercent": (cpu / cores * 10.0).round() / 10.0,
+    })
+}
+
 /// Route a `xenon:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts).
 ///
@@ -375,6 +419,7 @@ fn system_sample(app: &tauri::AppHandle) -> Value {
 ///   - xenon:getPatterns     — persisted pattern store verbatim
 ///   - xenon:reportActiveApp — persists pattern usage + co-occurrence (void)
 ///   - xenon:systemSample    — live one-shot sample (sysinfo) + emits the event
+///   - xenon:selfSample      — DEX's own process tree: count, memory, CPU share
 ///
 /// Honest degrade (returned, never faked):
 ///   - xenon:execute — no such handler exists in Xenon.ts (no source contract).
@@ -388,6 +433,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "xenon:getPatterns" => get_patterns(app),
         "xenon:reportActiveApp" => report_active_app(app, args),
         "xenon:systemSample" => system_sample(app),
+        "xenon:selfSample" => self_sample(),
 
         // Void push-event names — no invoke contract / engine-only side effects.
         "xenon:power"
@@ -402,5 +448,18 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         }
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn self_sample_sees_this_process() {
+        let v = super::self_sample();
+        assert_eq!(v["available"], true);
+        assert!(v["processCount"].as_u64().unwrap() >= 1);
+        assert!(v["hostMemoryMB"].as_i64().unwrap() >= 1);
+        let cpu = v["cpuPercent"].as_f64().unwrap();
+        assert!((0.0..=100.0).contains(&cpu));
     }
 }
