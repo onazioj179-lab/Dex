@@ -296,8 +296,15 @@ const TaskManager: React.FC = () => {
       return;
     }
     try {
-      const s = await api.system.getStatus();
-      if (!s) throw new Error('No data returned');
+      const raw = await api.system.getStatus();
+      if (!raw) throw new Error('No data returned');
+      // Native CPU usage is a float (86.13348...); show whole percents.
+      const s: SystemStatusInfo = {
+        ...raw,
+        ...(raw.cpu ? { cpu: { ...raw.cpu, usage: Math.round(raw.cpu.usage) } } : null),
+        ...(raw.memory ? { memory: { ...raw.memory, percent: Math.round(raw.memory.percent) } } : null),
+        ...(raw.disk ? { disk: { ...raw.disk, percent: Math.round(raw.disk.percent) } } : null),
+      };
       setStatus(s);
       setHist(p => ({
         cpu: pushSample(p.cpu, s.cpu?.usage ?? 0),

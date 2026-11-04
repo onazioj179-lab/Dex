@@ -786,7 +786,7 @@ export const NotificationCenter: React.FC<{
         className="dex-liquid-glass"
         style={{
         outline: 'none',
-        position: 'fixed', top: 30, right: 8, bottom: 8,
+        position: 'fixed', top: 40, right: 8, bottom: 8, // below the 34px top bar, aligned with Control Center
         width: 'min(360px, calc(100vw - 48px))', zIndex: 'var(--z-notification)',
         borderRadius: 14,
         boxShadow: 'var(--pg-shadow-popover-strong)',

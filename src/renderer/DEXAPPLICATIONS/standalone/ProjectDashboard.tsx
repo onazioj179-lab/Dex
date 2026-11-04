@@ -609,7 +609,7 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   statLabel: { fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 500 },
-  statValue: { fontSize: 30, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' },
+  statValue: { fontSize: 22, fontWeight: 600, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' },
   statSub: {
     fontSize: 12, color: 'var(--color-text-muted)',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

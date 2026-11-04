@@ -204,12 +204,6 @@ const ICON_COLOR: Record<NotificationIcon, string> = {
   error: 'var(--color-error)',
 };
 
-const ICON_GLYPH: Record<NotificationIcon, string> = {
-  info: 'i',
-  success: '✓',
-  warning: '!',
-  error: '×',
-};
 
 function emitToast(type: 'info' | 'success' | 'error', message: string): void {
   try {
@@ -660,7 +654,7 @@ const SmartInbox: React.FC = () => {
                   <div
                     key={item.key}
                     data-inbox-row={item.key}
-                    className={`inbox-row dex-liquid-glass-strong${item.read ? '' : ' inbox-row-unread'}${activeKey === item.key ? ' inbox-row-active' : ''}`}
+                    className={`inbox-row${item.read ? '' : ' inbox-row-unread'}${activeKey === item.key ? ' inbox-row-active' : ''}`}
                     style={{ ...S.row, ...(item.read ? {} : S.rowUnread) }}
                     role="option"
                     aria-selected={activeKey === item.key}
@@ -676,21 +670,17 @@ const SmartInbox: React.FC = () => {
                     }}
                     title={`Open ${item.source}`}
                   >
-                    <span style={{ ...S.iconDot, background: ICON_COLOR[item.icon] + '22', color: ICON_COLOR[item.icon] }} aria-hidden="true">
-                      {ICON_GLYPH[item.icon]}
-                    </span>
+                    {/* One compact line per item, like a mail list: unread dot,
+                        severity dot, title + body, source, time. (Each item was a
+                        90 px card repeating its source three times.) */}
+                    <span style={{ ...S.unreadDot, visibility: item.read ? 'hidden' : 'visible' }} aria-label={item.read ? undefined : 'unread'} />
+                    <span style={{ ...S.iconDot, background: ICON_COLOR[item.icon] }} aria-hidden="true" title={item.icon} />
                     <span style={S.rowMain}>
-                      <span style={S.rowTopLine}>
-                        <span style={S.rowTitle}>{item.title}</span>
-                        <span style={S.rowTime}>{relativeTime(item.ts)}</span>
-                      </span>
-                      {item.body && <span style={S.rowBody}>{item.body}</span>}
-                      <span style={S.rowMeta}>
-                        <span style={S.rowSource}>{item.source}</span>
-                        {item.kind === 'activity' && <span style={S.rowKind}>activity</span>}
-                        {!item.read && <span style={S.unreadDot} aria-label="unread" />}
-                      </span>
+                      <span style={{ ...S.rowTitle, fontWeight: item.read ? 500 : 600 }}>{item.title}</span>
+                      {item.body && item.body !== item.source && <span style={S.rowBody}>{item.body}</span>}
                     </span>
+                    <span style={S.rowSource}>{item.source}{item.kind === 'activity' ? ' · activity' : ''}</span>
+                    <span style={S.rowTime}>{relativeTime(item.ts)}</span>
                     {/* Hover/focus quick actions (Apple Mail swipe-action parity). */}
                     <span className="inbox-row-actions" style={S.rowActions}>
                       {!item.read && (
@@ -742,10 +732,8 @@ const INBOX_CSS = `
 .inbox-tool-btn:focus-visible, .inbox-chip:focus-visible, .inbox-row:focus-visible, .inbox-row-action:focus-visible, .inbox-search-input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .inbox-chip:hover { color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
 .inbox-search-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent); }
-.inbox-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); border-color: var(--color-border, rgba(255,255,255,0.15)); }
-.inbox-row.inbox-row-unread:hover { border-color: var(--color-accent); }
-.inbox-row.inbox-row-active { border-color: var(--color-accent); }
-.inbox-row:active { transform: scale(0.995); }
+.inbox-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); }
+.inbox-row.inbox-row-active { background: color-mix(in srgb, var(--color-accent) 16%, transparent); }
 .inbox-row-actions { opacity: 0; transform: translateX(4px); transition: opacity 0.12s ease, transform 0.12s ease; pointer-events: none; }
 .inbox-row:hover .inbox-row-actions, .inbox-row:focus-within .inbox-row-actions, .inbox-row.inbox-row-active .inbox-row-actions { opacity: 1; transform: none; pointer-events: auto; }
 .inbox-row-action:hover { background: var(--color-bg-base); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
@@ -854,61 +842,52 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)', borderRadius: 10, padding: '1px 7px',
     fontVariantNumeric: 'tabular-nums', letterSpacing: 0,
   },
-  list: { display: 'flex', flexDirection: 'column', gap: 4 },
+  list: { display: 'flex', flexDirection: 'column' },
   row: {
     position: 'relative',
-    display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', textAlign: 'left',
-    padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)',
-    border: '1px solid transparent',
+    display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+    height: 36, padding: '0 10px', borderRadius: 'var(--radius-sm)',
+    borderBottom: '1px solid color-mix(in srgb, var(--color-border-subtle) 60%, transparent)',
     color: 'var(--color-text-primary)',
     cursor: 'pointer', width: '100%', fontFamily: 'var(--font-family)',
-    transition: 'border-color 0.12s ease, background 0.12s ease, transform 0.12s ease',
+    transition: 'background 0.12s ease',
   },
-  rowUnread: { borderColor: 'var(--color-accent)' },
+  rowUnread: {},
   rowActions: {
-    position: 'absolute', top: 'var(--space-2)', right: 'var(--space-2)',
-    display: 'flex', alignItems: 'center', gap: 4,
+    position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)',
+    display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 8,
+    background: 'var(--color-bg-base)',
   },
   rowAction: {
-    width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
+    width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
     cursor: 'pointer', padding: 0, fontFamily: 'var(--font-family)',
     transition: 'all 0.12s ease',
   },
-  iconDot: {
-    flexShrink: 0, width: 26, height: 26, borderRadius: 'var(--radius-md)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, fontWeight: 700, marginTop: 1,
-  },
-  rowMain: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1 },
-  rowTopLine: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' },
+  iconDot: { flexShrink: 0, width: 6, height: 6, borderRadius: '50%', opacity: 0.85 },
+  rowMain: { display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, flex: 1, overflow: 'hidden' },
+  rowTopLine: { display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' },
   rowTitle: {
-    fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+    fontSize: 13, color: 'var(--color-text-primary)', flexShrink: 0, maxWidth: '55%',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   rowTime: {
-    fontSize: 11, color: 'var(--color-text-muted)', flexShrink: 0,
+    fontSize: 11, color: 'var(--color-text-muted)', flexShrink: 0, minWidth: 56, textAlign: 'right',
     fontVariantNumeric: 'tabular-nums',
   },
   rowBody: {
-    fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.4,
-    overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
-    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+    fontSize: 12, color: 'var(--color-text-tertiary)', minWidth: 0,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  rowMeta: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 1 },
+  rowMeta: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
   rowSource: {
-    fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
+    fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160,
   },
-  rowKind: {
-    fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4,
-    color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-bg-base)',
-  },
+  rowKind: { fontSize: 10, color: 'var(--color-text-muted)' },
   unreadDot: {
-    width: 7, height: 7, borderRadius: '50%', background: 'var(--color-accent-fill)',
-    marginLeft: 'auto', flexShrink: 0,
+    width: 7, height: 7, borderRadius: '50%', background: 'var(--color-accent-fill)', flexShrink: 0,
   },
   empty: {
     height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center',

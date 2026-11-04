@@ -576,7 +576,6 @@ const Weather: React.FC = () => {
         </div>
       )}
       <div style={{ ...s.currentCard, background: heroGradient }}>
-        <div style={s.heroGlow} aria-hidden />
         <div style={s.heroContent}>
           <div style={s.currentMain}>
             <span style={s.currentIcon}><DexIcon name={WEATHER_ICONS[current.condition] || 'cloud'} size={52} /></span>
@@ -772,18 +771,16 @@ const s: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-family)',
   },
   currentCard: {
-    position: 'relative' as const, overflow: 'hidden',
+    // flexShrink 0: in the scrolling column an overflow:hidden child shrinks
+    // to fit, which squashed current conditions into a 40 px strip in a
+    // window-sized Weather.
+    position: 'relative' as const, overflow: 'hidden', flexShrink: 0,
     padding: 'var(--space-5)', margin: 'var(--space-2) var(--space-5) var(--space-3)', borderRadius: 18,
     background: 'linear-gradient(160deg, #4a93e0 0%, #3a7cc8 55%, #5a8fd6 100%)',
     border: '1px solid rgba(255,255,255,0.10)',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.14)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14)',
     color: '#fff',
     transition: 'background 0.6s ease',
-  },
-  heroGlow: {
-    position: 'absolute' as const, top: -80, right: -60, width: 220, height: 220,
-    borderRadius: '50%', pointerEvents: 'none' as const,
-    background: 'radial-gradient(circle, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 70%)',
   },
   heroContent: { position: 'relative' as const, zIndex: 1 },
   tempDeg: { fontWeight: 200, opacity: 0.85 },
