@@ -223,3 +223,4 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | Full `vitest run` | 541 files passed, 1 failed, 2 skipped; 5,504 tests passed. The failure is `component-real` "Home page module exports a valid component" timing out at 10 s under full-suite load; alone the file passes 18/18 |
 | `cargo test --bin dex-tauri` | 98 passed, 0 failed |
 | Not run | Installing the MSI/NSIS on this machine (would replace the owner's installed DEX), clean-VM install, screen reader, multi-monitor, real touch hardware |
+| Final build (commit 2ad6322) | Bundle gate OK; SHA-256 verified (`release:checksums --verify`). Smoke test: 14/14 in 4 of 5 fresh-profile runs; the fifth missed only the Diagnostics live figures (backlog #103). Save to Vault UI test 7/7. Uploaded to a draft GitHub release; no tag created |
