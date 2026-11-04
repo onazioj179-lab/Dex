@@ -15,16 +15,10 @@ import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
 import { getDiskInfo } from '../../utils/nativeBridge';
 import { planExport } from '../../../shared/video/pipeline';
-import { isNativeOnlyFormat } from './quickExport';
+import { isNativeOnlyFormat, isQuickExportSupported, runQuickExport, type QuickExportController } from './quickExport';
 import DexIcon from '../../components/DexIcon';
 
 // Track active export intervals for cleanup
-interface ActiveExport {
-  intervalId: ReturnType<typeof setInterval>;
-  recorder: MediaRecorder;
-  stream: MediaStream;
-}
-
 // ---------------------------------------------------------------------------
 // STYLES
 // ---------------------------------------------------------------------------
@@ -101,7 +95,12 @@ const jobRowStyle: React.CSSProperties = {
 // EXPORT DIALOG
 // ---------------------------------------------------------------------------
 
-export const ExportDialog: React.FC = memo(() => {
+interface ExportDialogProps {
+  startPlayback: () => void;
+  stopPlayback: () => void;
+  seek: (frame: number) => void;
+}
+export const ExportDialog: React.FC<ExportDialogProps> = memo(({ startPlayback, stopPlayback, seek }) => {
   const showExportDialog = useVinxStore(s => s.showExportDialog);
   const setShowExportDialog = useVinxStore(s => s.setShowExportDialog);
   const addExportJob = useVinxStore(s => s.addExportJob);
@@ -115,17 +114,14 @@ export const ExportDialog: React.FC = memo(() => {
   const duration = useVinxStore(s => s.getSequenceDuration());
 
   // Track active exports for cleanup on unmount
-  const activeExportsRef = useRef<Map<string, ActiveExport>>(new Map());
+  const activeExportsRef = useRef<Map<string, QuickExportController>>(new Map());
 
   // Cleanup all active exports on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
-      activeExportsRef.current.forEach(({ intervalId, recorder, stream }) => {
-        clearInterval(intervalId);
-        if (recorder.state === 'recording') {
-          try { recorder.stop(); } catch { /* already stopped */ }
-        }
-        stream.getTracks().forEach(t => t.stop());
+      activeExportsRef.current.forEach((controller, id) => {
+        controller.cancel();
+        updateExportJob(id, { status: 'failed', error: 'Export cancelled when the workspace closed' });
       });
       activeExportsRef.current.clear();
     };
@@ -180,7 +176,7 @@ export const ExportDialog: React.FC = memo(() => {
     // (ProRes, H.265/HEVC, DNxHD, AV1, MXF, etc.) require the native encoder.
     // Do NOT fake a completed render for these — queue a failed job with a clear
     // note and point the user at the working WebM path.
-    if (!isAudioOnly && isNativeOnlyFormat(String(settings.format))) {
+    if (isAudioOnly || isNativeOnlyFormat(String(settings.format))) {
       const failJob: ExportJob = {
         id: generateId('export'),
         projectId: '',
@@ -199,6 +195,10 @@ export const ExportDialog: React.FC = memo(() => {
       return;
     }
 
+    if (activeExportsRef.current.size || duration <= 0 || !isQuickExportSupported()) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: activeExportsRef.current.size ? 'An export is already running.' : duration <= 0 ? 'Add timeline content before exporting.' : 'This environment cannot record WebM video.' } }));
+      return;
+    }
     const ext = isAudioOnly ? settings.format : 'webm';
 
     // ROADMAP-600 #571-572: plan the export through the shared video pipeline.
@@ -284,82 +284,32 @@ export const ExportDialog: React.FC = memo(() => {
       }
     }
 
-    // Real export: capture the program viewer canvas via MediaRecorder
-    const programCanvas = document.querySelector('[data-vinx-program-canvas] canvas, [data-vinx-program-canvas] video') as HTMLCanvasElement | HTMLVideoElement | null;
-    const targetFps = planFps;
-    const totalFrames = planTotalFrames;
-
-    // Create an offscreen canvas to composite the output
-    const offscreen = document.createElement('canvas');
-    offscreen.width = settings.width || projectWidth || 1920;
-    offscreen.height = settings.height || projectHeight || 1080;
-    const ctx = offscreen.getContext('2d');
-    if (!ctx) {
-      updateExportJob(job.id, { status: 'failed', error: 'Cannot create rendering context' });
-      return;
-    }
-
-    // Set up MediaRecorder capture from the offscreen canvas
-    const stream = (offscreen as any).captureStream(targetFps) as MediaStream;
-    const planMime = (exportPlan.mimeType || 'video/webm;codecs=vp9').split(',')[0];
-    const mimeType = MediaRecorder.isTypeSupported(planMime)
-      ? planMime
-      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-        ? 'video/webm;codecs=vp8'
-        : 'video/webm';
-    const bitrate = exportPlan.bitrateKbps * 1000;
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrate });
-    const chunks: Blob[] = [];
-
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => {
-      // Remove from active exports tracking
-      activeExportsRef.current.delete(job.id);
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${outputName}.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
-      updateExportJob(job.id, { status: 'complete', progress: 100, endTime: Date.now() });
-    };
-    recorder.onerror = () => {
-      // Remove from active exports tracking on error
-      activeExportsRef.current.delete(job.id);
-      updateExportJob(job.id, { status: 'failed', error: 'MediaRecorder encoding failed' });
-    };
-
-    // Start recording and render frames at the target FPS
-    recorder.start();
+    const programCanvas = document.querySelector('[data-vinx-program-canvas]') as HTMLElement | null;
+    if (!programCanvas) { updateExportJob(job.id, { status: 'failed', error: 'Program viewer is unavailable' }); return; }
     updateExportJob(job.id, { status: 'encoding', startTime: Date.now(), progress: 0 });
-    let frame = 0;
-    const intervalMs = 1000 / targetFps;
-
-    const renderInterval = setInterval(() => {
-      // Composite current viewer content into offscreen canvas
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-      if (programCanvas) {
-        try {
-          ctx.drawImage(programCanvas, 0, 0, offscreen.width, offscreen.height);
-        } catch { /* cross-origin or detached */ }
-      }
-      frame++;
-      const progress = Math.min(99, Math.round((frame / totalFrames) * 100));
-      updateExportJob(job.id, { progress, encodingFps: Math.round(1000 / intervalMs) });
-
-      if (frame >= totalFrames) {
-        clearInterval(renderInterval);
-        activeExportsRef.current.delete(job.id);
-        recorder.stop();
-      }
-    }, intervalMs);
-
-    // Track this export for cleanup on unmount
-    activeExportsRef.current.set(job.id, { intervalId: renderInterval, recorder, stream });
-  }, [settings, outputName, addExportJob, updateExportJob, frameRate, duration, projectWidth, projectHeight, emitCaptions, projectMarkers]);
+    let settled = false;
+    try {
+      const controller = runQuickExport({
+        programCanvas, width: settings.width || projectWidth, height: settings.height || projectHeight,
+        fps: planFps, durationFrames: Math.ceil(duration * planFps / (frameRate || 30)), filename: outputName,
+        videoBitsPerSecond: exportPlan.bitrateKbps * 1000,
+        startPlayback, stopPlayback, seek,
+        onProgress: (_elapsed, _total, progress) => updateExportJob(job.id, { progress }),
+        onComplete: () => {
+          settled = true; activeExportsRef.current.delete(job.id);
+          updateExportJob(job.id, { status: 'complete', progress: 100, endTime: Date.now() });
+        },
+        onError: error => {
+          settled = true; activeExportsRef.current.delete(job.id);
+          updateExportJob(job.id, { status: 'failed', error, endTime: Date.now() });
+        },
+      });
+      if (!settled) activeExportsRef.current.set(job.id, controller);
+    } catch (error) {
+      stopPlayback();
+      updateExportJob(job.id, { status: 'failed', error: error instanceof Error ? error.message : 'Export failed' });
+    }
+  }, [settings, outputName, addExportJob, updateExportJob, frameRate, duration, projectWidth, projectHeight, emitCaptions, projectMarkers, startPlayback, stopPlayback, seek]);
 
   if (!showExportDialog) return null;
 
@@ -536,7 +486,7 @@ export const ExportDialog: React.FC = memo(() => {
                   <button
                     aria-label={`Remove export job ${job.outputPath}`}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4, display: 'flex', alignItems: 'center' }}
-                    onClick={() => removeExportJob(job.id)}
+                    onClick={() => { activeExportsRef.current.get(job.id)?.cancel(); activeExportsRef.current.delete(job.id); removeExportJob(job.id); }}
                   >
                     <DexIcon name="close" size={12} />
                   </button>
