@@ -346,264 +346,27 @@ interface UpdateHistoryEntry {
 }
 
 // ===========================================================================
-// SYSTEM MONITOR (Task Manager)
-// View live system processes, CPU/memory usage, and terminate processes.
+// SYSTEM MONITOR -> Task Manager
+// Settings used to carry a second, separately polling copy of Task Manager's
+// process table. One tool owns processes now; this section points to it.
 // ===========================================================================
-interface SystemProcess {
-  pid: number;
-  name: string;
-  cpu: number;
-  memory: number;
-  path?: string;
-}
-
-interface SystemStatusInfo {
-  cpu?: { usage: number; cores: number };
-  memory?: { total: number; used: number; percent: number };
-  battery?: { percent: number; charging: boolean };
-  uptime?: number;
-}
-
 const SystemMonitorPanel: React.FC = () => {
-  const { confirm, ConfirmHost } = useConfirm();
-  const [processes, setProcesses] = React.useState<SystemProcess[]>([]);
-  const [status, setStatus] = React.useState<SystemStatusInfo>({});
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [filter, setFilter] = React.useState('');
-  const [sortBy, setSortBy] = React.useState<'cpu' | 'memory' | 'name' | 'pid'>('cpu');
-  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
-  const [busyPid, setBusyPid] = React.useState<number | null>(null);
-
-  const dexApi = (window as any).dex;
-
-  const refresh = React.useCallback(async () => {
-    if (!dexApi?.system?.getProcesses) {
-      setError('The system monitor is not available in this build.');
-      setLoading(false);
-      return;
-    }
-    try {
-      const [procs, stat] = await Promise.all([
-        dexApi.system.getProcesses().catch(() => []),
-        dexApi.system.getStatus?.().catch(() => null),
-      ]);
-      setProcesses(Array.isArray(procs) ? procs : []);
-      if (stat) setStatus(stat);
-      setError(null);
-    } catch (e) {
-      console.warn('[Settings] load processes failed:', e);
-      setError('Could not load the process list. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [dexApi]);
-
-  React.useEffect(() => {
-    refresh();
-    const id = window.setInterval(refresh, 3000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
-
-  const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
-    if (!dexApi?.power?.closeProcess) {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Ending processes is not available in this build.' } }));
-      return;
-    }
-    const ok = await confirm({
-      title: 'End process?',
-      message: `End process "${name}" (PID ${pid})? Unsaved data may be lost.`,
-      confirmLabel: 'End process',
-      tone: 'destructive',
-    });
-    if (!ok) return;
-    setBusyPid(pid);
-    try {
-      const result = await dexApi.power.closeProcess(pid, false);
-      if (!result?.ok && !result?.success) {
-        console.warn('[Settings] closeProcess failed:', result?.error);
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't end "${name}". It may require elevated permissions.` } }));
-      } else {
-        setProcesses(prev => prev.filter(p => p.pid !== pid));
-      }
-    } catch (e) {
-      console.error('[Settings] closeProcess error:', e);
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't end "${name}". Please try again.` } }));
-    } finally {
-      setBusyPid(null);
-    }
-  }, [dexApi]);
-
-  const filtered = React.useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    let list = q ? processes.filter(p => p.name.toLowerCase().includes(q) || String(p.pid).includes(q)) : [...processes];
-    list.sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1;
-      switch (sortBy) {
-        case 'name': return a.name.localeCompare(b.name) * dir;
-        case 'pid': return (a.pid - b.pid) * dir;
-        case 'memory': return ((a.memory || 0) - (b.memory || 0)) * dir;
-        case 'cpu':
-        default: return ((a.cpu || 0) - (b.cpu || 0)) * dir;
-      }
-    });
-    return list;
-  }, [processes, filter, sortBy, sortDir]);
-
-  const totalCpu = status.cpu?.usage ?? 0;
-  const totalMem = status.memory?.percent ?? 0;
-  const memUsedGB = status.memory ? (status.memory.used / 1024 ** 3).toFixed(1) : '0.0';
-  const memTotalGB = status.memory ? (status.memory.total / 1024 ** 3).toFixed(1) : '0.0';
-
-  const setSort = (col: 'cpu' | 'memory' | 'name' | 'pid') => {
-    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortBy(col); setSortDir(col === 'name' ? 'asc' : 'desc'); }
-  };
-
-  const headerCellStyle: React.CSSProperties = {
-    textAlign: 'left', padding: 'var(--space-2) 10px', fontSize: 11, fontWeight: 600,
-    color: 'var(--color-text-secondary)', cursor: 'pointer', userSelect: 'none',
-    borderBottom: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-elevated, #1a1a1e)',
-    position: 'sticky', top: 0, zIndex: 1,
-  };
-  const cellStyle: React.CSSProperties = {
-    padding: '6px 10px', fontSize: 12, color: 'var(--color-text-primary)',
-    borderBottom: '1px solid var(--color-border-subtle)',
-    fontVariantNumeric: 'tabular-nums',
-  };
-
+  const open = () => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'taskmanager', appName: 'Task Manager' } }));
+  const shortcut = APP_DEFINITIONS.taskmanager?.shortcut;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5) var(--space-6)', maxWidth: 980 }}>
-      <div>
-        <h3 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>System Monitor</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
-          Live view of all processes running on this computer. End unresponsive processes or check resource usage.
-        </p>
-      </div>
-
-      {/* Live stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CPU</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? 'var(--color-error)' : totalCpu > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.cpu?.cores || '?'} cores</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-5) var(--space-6)', maxWidth: 640 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: 0, color: 'var(--color-text-primary)' }}>System Monitor</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px 0', borderTop: '1px solid var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Task Manager</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Processes, performance history, DEX apps and diagnostics.{shortcut ? ` ${shortcut}` : ''}</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Memory</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? 'var(--color-error)' : totalMem > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{memUsedGB} / {memTotalGB} GB</div>
-        </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Processes</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{processes.length}</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{filtered.length} shown</div>
-        </div>
-        {status.battery && (
-          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: 'var(--space-3) 14px' }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Battery</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{status.battery.percent}%</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.battery.charging ? 'Charging' : 'On battery'}</div>
-          </div>
-        )}
-      </div>
-
-      {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="Filter by name or PID..."
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          style={{
-            flex: 1, height: 32, padding: '0 var(--space-3)', borderRadius: 6,
-            background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)',
-            color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none',
-          }}
-        />
         <button
-          onClick={refresh}
-          style={{
-            height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
-            background: 'var(--color-bg-elevated, #1a1a1e)', color: 'var(--color-text-primary)',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          }}
-        >Refresh</button>
+          type="button"
+          onClick={open}
+          style={{ height: 28, padding: '0 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+        >Open Task Manager</button>
       </div>
-
-      {error && (
-        <div style={{ padding: '10px 14px', background: 'var(--color-error-muted, rgba(255,69,58,0.12))', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 6, color: 'var(--color-error)', fontSize: 12 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Process table */}
-      <div style={{
-        border: '1px solid var(--color-border-subtle)', borderRadius: 10, overflow: 'hidden',
-        background: 'var(--color-bg-base, #0e0e11)',
-      }}>
-        <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr>
-                <th style={headerCellStyle} onClick={() => setSort('name')}>
-                  Name {sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                </th>
-                <th style={{ ...headerCellStyle, width: 80, textAlign: 'right' }} onClick={() => setSort('pid')}>
-                  PID {sortBy === 'pid' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                </th>
-                <th style={{ ...headerCellStyle, width: 80, textAlign: 'right' }} onClick={() => setSort('cpu')}>
-                  CPU {sortBy === 'cpu' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                </th>
-                <th style={{ ...headerCellStyle, width: 90, textAlign: 'right' }} onClick={() => setSort('memory')}>
-                  Memory {sortBy === 'memory' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                </th>
-                <th style={{ ...headerCellStyle, width: 80, textAlign: 'center' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>Loading processes...</td></tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
-                  {filter ? 'No processes match filter.' : 'No process data available.'}
-                </td></tr>
-              )}
-              {filtered.map(p => (
-                <tr key={p.pid} style={{ transition: 'background 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td style={{ ...cellStyle, fontWeight: 500, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.path || p.name}>
-                    {p.name}
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: 'var(--color-text-secondary)' }}>{p.pid}</td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.cpu || 0) > 50 ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>{(p.cpu || 0).toFixed(1)}%</td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.memory || 0) > 10 ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>{(p.memory || 0).toFixed(1)}%</td>
-                  <td style={{ ...cellStyle, textAlign: 'center' }}>
-                    <button
-                      onClick={() => handleEndProcess(p.pid, p.name)}
-                      disabled={busyPid === p.pid}
-                      aria-label={busyPid === p.pid ? `Ending ${p.name}` : `End process ${p.name} (PID ${p.pid})`}
-                      style={{
-                        padding: '3px 10px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.4)',
-                        background: busyPid === p.pid ? 'var(--color-error-muted, rgba(255,69,58,0.1))' : 'transparent',
-                        color: 'var(--color-error)', fontSize: 11, fontWeight: 600,
-                        cursor: busyPid === p.pid ? 'wait' : 'pointer',
-                      }}
-                    >{busyPid === p.pid ? '...' : 'End'}</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>
-        Auto-refreshes every 3 seconds. Ending system processes may cause instability.
-      </p>
-      <ConfirmHost />
     </div>
   );
 };

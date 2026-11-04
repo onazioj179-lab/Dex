@@ -2267,6 +2267,15 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-04 (Part 13: telemetry, top bar, control consolidation)
+
+- DEX telemetry (Task Manager › Diagnostics) rebuilt: section list + detail pane like the Performance view instead of a card grid; live DEX memory/CPU history from `xenon:selfSample` with 1/5/15-minute ranges (`services/diagnostics/resourceHistory.ts`, in-memory only, sampled only while open and visible); startup phase waterfall; crash/error log table; launch p95. Chart shared in `components/telemetry/LineChart.tsx`.
+- Settings › System Monitor no longer runs a second 3 s process poller; it opens Task Manager.
+- Top bar: network/mic/camera/location icons show only when notable (restricted network, permission on). The controls moved to a new Control Center › Privacy section (shared `usePermissionToggle`). Battery stays out of the top bar.
+- Fixed the React border shorthand/longhand bug on Task Manager's resource list and "Group by app" pill (deselected rows kept a white border).
+- Earlier on this branch: fullscreen black strip (#85 work), docked DEX Bar, Weather, Trophies, launcher icons.
+- Open: verify in the packaged build (preview pane was hidden: layout verified by measurement, not by eye); per-app sizing pass for remaining apps; creative/engineering app passes.
+
 ## Checkpoint 2026-11-04 (Part 12: one installer, release build)
 
 - The release build was broken on `main` since #78 (chunk cycle via `shell/input/appKeyScope.ts`); fixed here and, in parallel, by #81 (the merge keeps #81's version, which also keeps the Browser chunk out of startup).

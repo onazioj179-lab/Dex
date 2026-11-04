@@ -28,6 +28,8 @@ import { InterfaceTransparencySlider } from './InterfaceTransparencySlider';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { setSoundEnabled, isSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { usePermissionToggle } from '../shell/QuickControls';
+import { PERMISSION_LABELS, type PermissionId } from '../store/permissionStore';
 import {
   getStoredTier,
   setManualOverride,
@@ -113,7 +115,7 @@ applyBrightness(loadBrightness());
 // ---------------------------------------------------------------------------
 
 const COLLAPSE_KEY = 'dex-control-center-collapsed-v2';
-type SectionId = 'sound' | 'network' | 'display' | 'performance' | 'battery';
+type SectionId = 'sound' | 'network' | 'privacy' | 'display' | 'performance' | 'battery';
 
 function loadCollapsed(): Set<SectionId> {
   try {
@@ -122,7 +124,7 @@ function loadCollapsed(): Set<SectionId> {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((id): id is SectionId =>
-      id === 'sound' || id === 'network' || id === 'display' || id === 'performance' || id === 'battery'));
+      id === 'sound' || id === 'network' || id === 'privacy' || id === 'display' || id === 'performance' || id === 'battery'));
   } catch {
     return new Set();
   }
@@ -343,6 +345,32 @@ const ccBadge: React.CSSProperties = {
   color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 
+// ---------------------------------------------------------------------------
+// Privacy row: one DEX permission (microphone / camera / location) as a
+// switch. Same toggle the top-bar indicator uses, so the OS microphone prompt
+// and its denial notice behave identically in both places.
+// ---------------------------------------------------------------------------
+const PrivacyRow: React.FC<{ id: PermissionId }> = ({ id }) => {
+  const { enabled, busy, notice, toggle } = usePermissionToggle(id);
+  return (
+    <>
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 26, fontSize: 12, color: 'var(--color-text-primary)', cursor: busy ? 'wait' : 'pointer' }}>
+        {PERMISSION_LABELS[id]}
+        <input
+          type="checkbox"
+          role="switch"
+          checked={enabled}
+          disabled={busy}
+          onChange={() => void toggle()}
+          aria-label={`${PERMISSION_LABELS[id]} permission`}
+          style={{ accentColor: 'var(--color-accent)', width: 16, height: 16, cursor: busy ? 'wait' : 'pointer' }}
+        />
+      </label>
+      {notice && <span role="status" style={{ fontSize: 11, color: enabled ? 'var(--color-text-tertiary)' : 'var(--color-warning)' }}>{notice}</span>}
+    </>
+  );
+};
+
 const ControlCenter: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -503,6 +531,24 @@ const ControlCenter: React.FC = () => {
             ]}
           />
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{NETWORK_MODE_LABELS[networkMode]}</span>
+        </CollapsibleSection>
+      ),
+    },
+    {
+      id: 'privacy' as SectionId,
+      name: 'Privacy Permissions Microphone Camera Location GPS',
+      node: (
+        <CollapsibleSection
+          key="privacy"
+          label="Privacy"
+          collapsed={!isOpen('privacy')}
+          onToggle={() => toggleSection('privacy')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>}
+        >
+          <PrivacyRow id="microphone" />
+          <PrivacyRow id="camera" />
+          <PrivacyRow id="gps" />
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Off by default. An indicator shows in the top bar while one is on.</span>
         </CollapsibleSection>
       ),
     },
