@@ -97,10 +97,10 @@ const formatUptime = (seconds: number): string => {
 const toneFor = (percent: number): string => (percent > 80 ? 'var(--color-error)' : percent > 55 ? 'var(--color-warning)' : 'var(--color-success)');
 
 const batteryTone = (percent: number, charging: boolean): string => {
-  if (charging) return '#30D158';
-  if (percent < 15) return '#FF453A';
-  if (percent < 30) return '#FF9F0A';
-  return '#30D158';
+  if (charging) return 'var(--color-success)';
+  if (percent < 15) return 'var(--color-error)';
+  if (percent < 30) return 'var(--color-warning)';
+  return 'var(--color-success)';
 };
 
 const formatBps = (bps: number): string => {
@@ -148,6 +148,35 @@ const toastEvent = (type: 'success' | 'error' | 'info', message: string): void =
   try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* ignore */ }
 };
 
+/**
+ * A colour the canvas can use, with alpha. Accepts hex, rgb()/rgba() or a CSS
+ * variable such as var(--color-accent), resolved against `el` so the charts
+ * follow the theme. (Appending hex alpha to "var(...)" made an invalid colour,
+ * and addColorStop threw.)
+ */
+export function canvasColor(color: string, alpha: number, el?: Element | null): string {
+  let c = color.trim();
+  const m = /^var\((--[\w-]+)(?:\s*,\s*([^)]+))?\)$/.exec(c);
+  if (m) {
+    const resolved = typeof getComputedStyle === 'function'
+      ? getComputedStyle(el ?? document.documentElement).getPropertyValue(m[1]).trim()
+      : '';
+    c = resolved || (m[2] ?? 'var(--color-accent)').trim();
+  }
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].split('').map((x) => x + x).join('') : hex[1];
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c);
+  if (rgb) return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`;
+  return c; // named colour: no alpha, but still valid
+}
+
+/** CSS tint of a colour (works with var(...) too). */
+const tintOf = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
 interface SparklineProps {
   history: number[];
   color: string;
@@ -179,7 +208,7 @@ const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, widthPx, heightPx);
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = canvasColor('var(--color-text-primary, #ffffff)', 0.06, canvas);
     ctx.lineWidth = 1;
     for (let gridIndex = 1; gridIndex < 4; gridIndex++) {
       const y = (heightPx / 4) * gridIndex;
@@ -204,8 +233,8 @@ const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max 
     };
 
     const gradient = ctx.createLinearGradient(0, 0, 0, heightPx);
-    gradient.addColorStop(0, color + '55');
-    gradient.addColorStop(1, color + '00');
+    gradient.addColorStop(0, canvasColor(color, 0.33, canvas));
+    gradient.addColorStop(1, canvasColor(color, 0, canvas));
     ctx.fillStyle = gradient;
     ctx.beginPath();
     const [firstX, firstY] = pointFor(samples[0], 0);
@@ -305,7 +334,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max
     const padT = 10;
     const padB = 6;
     const plotH = h - padT - padB;
-    ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+    ctx.strokeStyle = canvasColor('var(--color-text-primary, #ffffff)', 0.06, canvas);
     ctx.lineWidth = 1;
     for (let i = 0; i <= 3; i++) {
       const y = padT + (plotH / 3) * i;
@@ -339,13 +368,14 @@ const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max
     };
 
     const grad = ctx.createLinearGradient(0, padT, 0, h);
-    grad.addColorStop(0, color + '5e');
-    grad.addColorStop(1, color + '00');
+    grad.addColorStop(0, canvasColor(color, 0.37, canvas));
+    grad.addColorStop(1, canvasColor(color, 0, canvas));
     ctx.fillStyle = grad;
     trace(true);
     ctx.fill();
 
-    ctx.strokeStyle = color;
+    const solid = canvasColor(color, 1, canvas);
+    ctx.strokeStyle = solid;
     ctx.lineWidth = 2.4;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -353,9 +383,9 @@ const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max
     ctx.stroke();
 
     const last = pts[pts.length - 1];
-    ctx.fillStyle = color;
+    ctx.fillStyle = solid;
     ctx.beginPath(); ctx.arc(last[0], last[1], 3.4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = color + '44';
+    ctx.strokeStyle = canvasColor(color, 0.27, canvas);
     ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(last[0], last[1], 3.4, 0, Math.PI * 2); ctx.stroke();
   }, [history, color, max, height, cssW, cssH]);
@@ -366,7 +396,7 @@ const AreaChart: React.FC<AreaChartProps> = ({ history, color, height = 188, max
 interface AssetTileProps { icon: string; tint: string; value: string; label: string; detail: string }
 const AssetTile: React.FC<AssetTileProps> = ({ icon, tint, value, label, detail }) => (
   <div className="dex-liquid-glass" style={styles.assetTile}>
-    <span style={{ ...styles.assetGlyph, background: tint + '22', color: tint, borderColor: tint + '40' }}>
+    <span style={{ ...styles.assetGlyph, background: tintOf(tint, 13), color: tint, borderColor: tintOf(tint, 25) }}>
       <DexIcon name={icon} size={16} color={tint} strokeWidth={2.2} />
     </span>
     <div style={{ minWidth: 0 }}>
@@ -669,7 +699,7 @@ const TaskManager: React.FC = () => {
     ? `${status.cpu.cores || '?'} cores - ${cpuUsage > 80 ? 'High load' : cpuUsage > 55 ? 'Moderate' : 'Nominal'}`
     : 'Waiting for system bridge';
   const processCount = processes.length;
-  const appsTone = shellApps.length > 12 ? '#FF9F0A' : '#0A84FF';
+  const appsTone = shellApps.length > 12 ? 'var(--color-warning)' : 'var(--color-accent)';
 
   const battery = status.battery;
   const hasBattery = battery && battery.hasBattery !== false;
@@ -757,7 +787,7 @@ const TaskManager: React.FC = () => {
     }
     return { level, issues, bottleneck };
   }, [cpuUsage, memoryPercent, topProcess]);
-  const healthTone = health.level === 'critical' ? '#FF453A' : health.level === 'elevated' ? '#FF9F0A' : '#30D158';
+  const healthTone = health.level === 'critical' ? 'var(--color-error)' : health.level === 'elevated' ? 'var(--color-warning)' : 'var(--color-success)';
   const healthLabel = health.level === 'critical' ? 'Critical' : health.level === 'elevated' ? 'Elevated' : 'Healthy';
   const healthPillText = health.bottleneck ? `${healthLabel} · ${health.bottleneck}` : healthLabel;
 
@@ -831,7 +861,7 @@ const TaskManager: React.FC = () => {
           <span
             data-health-pill
             title={health.issues.join(' · ') || 'All systems nominal'}
-            style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '14' }}
+            style={{ ...styles.healthPill, color: healthTone, borderColor: tintOf(healthTone, 40), background: tintOf(healthTone, 8) }}
           >
             <span style={{ width: 7, height: 7, borderRadius: 9999, background: healthTone, display: 'inline-block' }} />
             {healthPillText}
@@ -888,7 +918,7 @@ const TaskManager: React.FC = () => {
         <div
           data-health-banner
           role="status"
-          style={{ ...styles.healthBanner, borderColor: healthTone + '55', background: healthTone + '12' }}
+          style={{ ...styles.healthBanner, borderColor: tintOf(healthTone, 33), background: tintOf(healthTone, 7) }}
         >
           <DexIcon name="activity" size={15} color={healthTone} strokeWidth={2.3} />
           <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--color-text-primary)' }}>
@@ -953,7 +983,7 @@ const TaskManager: React.FC = () => {
           <div style={styles.heroAssetRow}>
             <AssetTile
               icon="hard-drive"
-              tint="#5E5CE6"
+              tint="var(--color-accent)"
               value={`${memoryPercent}%`}
               label="Memory"
               detail={memoryDetail}
@@ -977,7 +1007,7 @@ const TaskManager: React.FC = () => {
             ) : (
               <AssetTile
                 icon="wifi"
-                tint={networkConnected ? '#5AC8FA' : 'var(--color-text-tertiary)'}
+                tint={networkConnected ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
                 value={networkConnected ? 'Online' : 'Offline'}
                 label="Network"
                 detail={`${formatBps(rxBps)} down`}
@@ -996,13 +1026,13 @@ const TaskManager: React.FC = () => {
                 <span style={{ ...styles.chartPill, ...styles.chartPillMuted }}>Live</span>
               </div>
             </div>
-            <AreaChart history={cpuHistory} color="#7B5CFF" max={100} ariaLabel="CPU load over time" />
+            <AreaChart history={cpuHistory} color="var(--color-accent)" max={100} ariaLabel="CPU load over time" />
           </div>
         </div>
 
         <div className="dex-liquid-glass-strong" style={styles.focusCard}>
           <div style={styles.focusTop}>
-            <span style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '18', margin: 0 }}>
+            <span style={{ ...styles.healthPill, color: healthTone, borderColor: tintOf(healthTone, 40), background: tintOf(healthTone, 9), margin: 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: 9999, background: healthTone, display: 'inline-block' }} />
               {healthLabel}
             </span>
@@ -1049,7 +1079,7 @@ const TaskManager: React.FC = () => {
             value={bridgeAvailable ? String(processCount) : 'Local'}
             detail={bridgeAvailable ? `${visibleProcesses.length} listed - sampled every 3s` : 'DEX apps only'}
             history={processHistory}
-            tone="#5E5CE6"
+            tone="var(--color-accent)"
             max={Math.max(50, ...processHistory)}
           />
           <MetricCard
@@ -1057,7 +1087,7 @@ const TaskManager: React.FC = () => {
             value={formatBps(rxBps)}
             detail={networkConnected ? 'Receiving' : 'Offline'}
             history={netRxHistory}
-            tone="#5AC8FA"
+            tone="var(--color-accent)"
             max={Math.max(1024, ...netRxHistory)}
           />
           <MetricCard
@@ -1065,7 +1095,7 @@ const TaskManager: React.FC = () => {
             value={formatBps(txBps)}
             detail={networkConnected ? 'Sending' : 'Offline'}
             history={netTxHistory}
-            tone="#FF9F0A"
+            tone="var(--color-text-secondary)"
             max={Math.max(1024, ...netTxHistory)}
           />
           {status.disk && (
@@ -1194,7 +1224,7 @@ const TaskManager: React.FC = () => {
             <span>System Processes</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {pinned.length > 0 && (
-                <span style={{ ...styles.countPill, background: 'rgba(255,159,10,0.16)', color: '#FFB340' }} title="Pinned to watch list">
+                <span style={{ ...styles.countPill, background: 'color-mix(in srgb, var(--color-warning) 16%, transparent)', color: 'var(--color-warning)' }} title="Pinned to watch list">
                   {pinned.length} pinned
                 </span>
               )}
@@ -1237,7 +1267,7 @@ const TaskManager: React.FC = () => {
                   if (row.kind === 'group') {
                     const group = row.group;
                     const collapsed = !!collapsedGroups[group.key];
-                    const groupCpuColor = group.cpu > 50 ? '#FF453A' : group.cpu > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
+                    const groupCpuColor = group.cpu > 50 ? 'var(--color-error)' : group.cpu > 20 ? 'var(--color-warning)' : 'var(--color-text-secondary)';
                     return (
                       <button
                         type="button"
@@ -1262,7 +1292,7 @@ const TaskManager: React.FC = () => {
                   const process = row.process;
                   const isPinnedRow = row.kind === 'pinned';
                   const cpuValue = process.cpu || 0;
-                  const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
+                  const cpuColor = cpuValue > 50 ? 'var(--color-error)' : cpuValue > 20 ? 'var(--color-warning)' : 'var(--color-text-secondary)';
                   const isKilling = killing === process.pid;
                   const hovered = hoveredPid === process.pid;
                   const isPinned = pinnedSet.has(process.pid);
@@ -1283,7 +1313,7 @@ const TaskManager: React.FC = () => {
                       onClick={() => setSelectedPid(prev => (prev === process.pid ? null : process.pid))}
                     >
                       <span style={styles.processName} title={process.name}>
-                        {isPinnedRow && <span style={{ color: '#FFB340', marginRight: 5 }}>★</span>}
+                        {isPinnedRow && <span style={{ color: 'var(--color-warning)', marginRight: 5 }}>★</span>}
                         {process.name}
                       </span>
                       <span style={styles.processPid}>{process.pid}</span>
@@ -1291,7 +1321,7 @@ const TaskManager: React.FC = () => {
                       <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
                       <div style={styles.processActions} onClick={e => e.stopPropagation()}>
                         <button
-                          style={{ ...styles.iconAction, color: isPinned ? '#FFB340' : 'var(--color-text-tertiary)' }}
+                          style={{ ...styles.iconAction, color: isPinned ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }}
                           onClick={() => togglePin(process.pid)}
                           aria-label={isPinned ? `Unpin ${process.name}` : `Pin ${process.name} to watch list`}
                           aria-pressed={isPinned}
@@ -1339,7 +1369,7 @@ const TaskManager: React.FC = () => {
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle} title={selectedProcess.name}>{selectedProcess.name}</span>
                 <button
-                  style={{ ...styles.iconAction, color: pinnedSet.has(selectedProcess.pid) ? '#FFB340' : 'var(--color-text-tertiary)' }}
+                  style={{ ...styles.iconAction, color: pinnedSet.has(selectedProcess.pid) ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }}
                   onClick={() => togglePin(selectedProcess.pid)}
                   aria-label={pinnedSet.has(selectedProcess.pid) ? 'Unpin' : 'Pin to watch list'}
                   title={pinnedSet.has(selectedProcess.pid) ? 'Unpin from watch list' : 'Pin to watch list'}
@@ -1431,7 +1461,7 @@ const styles: Record<string, React.CSSProperties> = {
   chartTitle: { fontSize: 14, fontWeight: 720, letterSpacing: '-0.01em' },
   chartSub: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   chartRangePills: { display: 'flex', alignItems: 'center', gap: 6 },
-  chartPill: { padding: '3px 9px', borderRadius: 9999, fontSize: 10.5, fontWeight: 650, background: 'rgba(123,92,255,0.18)', color: '#B7A4FF', border: '1px solid rgba(123,92,255,0.30)' },
+  chartPill: { padding: '3px 9px', borderRadius: 9999, fontSize: 10.5, fontWeight: 650, background: 'var(--color-accent-fill-muted, color-mix(in srgb, var(--color-accent) 16%, transparent))', color: 'var(--color-accent)', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)' },
   chartPillMuted: { background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border-subtle)' },
   focusCard: { position: 'relative', padding: 18, borderRadius: 'var(--radius-xl, 16px)', display: 'flex', flexDirection: 'column', gap: 9, overflow: 'hidden', background: 'linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-bg-glass-strong)' },
   focusTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -1465,7 +1495,7 @@ const styles: Record<string, React.CSSProperties> = {
   processActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   processRowHover: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' },
   processRowNested: { paddingLeft: 'calc(var(--space-3) + 14px)' },
-  processRowPinned: { background: 'rgba(255,159,10,0.08)', borderLeft: '2px solid #FFB340' },
+  processRowPinned: { background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)', borderLeft: '2px solid var(--color-warning)' },
   processRowSelected: { background: 'rgba(74,158,255,0.12)' },
   groupRow: {
     display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)',
