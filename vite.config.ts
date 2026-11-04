@@ -145,6 +145,11 @@ export default defineConfig({
           // then threw "Cannot access '<x>' before initialization" from
           // app-notes at boot and rendered a blank window.
           if (id.includes('DEXAPPLICATIONS/notes/WordSuggestions')) return 'dex-app-core';
+          // shell/input (appKeyScope, touch contacts, haptics) is used by every
+          // app and by shared components. Unpinned, Rollup put appKeyScope in
+          // app-axl, so dex-app-core imported app-axl and app-axl imported
+          // dex-app-core: a chunk cycle that fails the release build.
+          if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
           // Standalone apps (Calculator, Calendar, Nexus, DexCode, …) are each
           // lazy-imported separately by AppManager, but were all collapsed into one
           // ~370K `app-standalone` chunk — so opening any one downloaded all of them.

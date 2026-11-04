@@ -30,8 +30,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "publisher": "Onazi Oj",
     "copyright": "Copyright (c) 2026 Onazi Treasure OJ. DEX OS created by Onazi Oj.",
@@ -52,6 +51,10 @@
       "timestampUrl": "http://timestamp.digicert.com",
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "../assets/icon.ico"
       }
     }
   }

@@ -23,6 +23,8 @@ the GitHub release uses that file. Highlights:
 - One permissions page in Settings, and no more repeated clipboard or MIDI prompts.
 - Every app's keyboard shortcuts apply only to that app.
 - Local AI is opt-in; DEX never installs or starts an AI runtime.
+- One official Windows installer (`DEX_7.0.1_x64-setup.exe`); MSI is no longer
+  built, and the leftover Electron packaging job is gone.
 - Installers are not code-signed yet, and in-app updates are not available.
 
 ---

@@ -6,9 +6,9 @@ How to build, verify and publish a DEX OS release (Tauri, Windows x64).
 
 - All changes are merged to `main` and the working tree is clean.
 - `npm run lint` and `npm test` pass.
-- The version is the same in all four places:
-  `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and
-  `PLATFORM_VERSION` (with `PLATFORM_BUILD_DATE`) in `src/renderer/store/runningApps.ts`.
+- The version is the same in `package.json`, `src-tauri/tauri.conf.json` and
+  `src-tauri/Cargo.toml`. The app reads its version from `package.json` at build
+  time; update `PLATFORM_BUILD_DATE` in `src/renderer/store/runningApps.ts`.
 - `docs/CHANGELOG.md` has a `## vX.Y.Z` section, and `DEX_X.Y.Z_RELEASE_NOTES.md`
   exists if the release has full notes (the release workflow prefers that file).
 
@@ -28,12 +28,18 @@ npm run build:tauri
 
 Outputs:
 
-- `src-tauri/target/release/bundle/nsis/DEX_X.Y.Z_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/DEX_X.Y.Z_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/DEX_X.Y.Z_x64-setup.exe`, the one
+  official Windows setup
+
+MSI is not built or published. The setup installs per user to
+`%LOCALAPPDATA%\DEX` with the uninstall entry `HKCU\...\Uninstall\DEX`: the same
+folder and entry as 6.x, so installing over 6.x upgrades in place and keeps user
+data (`%LOCALAPPDATA%\com.onazioj.dex`). If a machine still has an MSI install of
+DEX, the setup offers to remove it first.
 
 `build:tauri` runs `scripts/verify-tauri-bundle.js` afterwards, which fails if
-the executable imports DLLs the installer does not include or if either package
-for the current version is missing.
+the executable imports DLLs the installer does not include or if the setup for
+the current version is missing.
 
 ## 2. Sign (when a certificate is available)
 
@@ -75,7 +81,7 @@ To publish a locally built, signed release instead, create it first; the
 workflow then uploads onto the existing release rather than creating one:
 
 ```bash
-gh release create vX.Y.Z --repo onazioj179-lab/Dex --title "DEX OS X.Y.Z" --notes-file DEX_X.Y.Z_RELEASE_NOTES.md src-tauri/target/release/bundle/nsis/DEX_X.Y.Z_x64-setup.exe src-tauri/target/release/bundle/msi/DEX_X.Y.Z_x64_en-US.msi src-tauri/target/release/bundle/SHA256SUMS
+gh release create vX.Y.Z --repo onazioj179-lab/Dex --title "DEX OS X.Y.Z" --notes-file DEX_X.Y.Z_RELEASE_NOTES.md src-tauri/target/release/bundle/nsis/DEX_X.Y.Z_x64-setup.exe src-tauri/target/release/bundle/SHA256SUMS
 ```
 
 ## 6. Old releases

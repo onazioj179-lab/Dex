@@ -16,10 +16,15 @@ creative tools and an AI assistant into one workspace.
 
 | Platform | Package |
 |---|---|
-| Windows 10 or 11, 64-bit (x64) | Installer (`.exe`) or Windows Installer package (`.msi`) from [Releases](https://github.com/onazioj179-lab/Dex/releases) |
+| Windows 10 or 11, 64-bit (x64) | `DEX_<version>_x64-setup.exe` from [Releases](https://github.com/onazioj179-lab/Dex/releases), the one official installer |
 | macOS, Linux, Windows on ARM | Not available |
 
-The installers are not code-signed yet, so Windows SmartScreen may show a
+The setup installs DEX for the current user in `%LOCALAPPDATA%\DEX`, adds a
+Start menu shortcut (and a desktop shortcut if you leave that option on), and registers one uninstall entry (Settings ›
+Apps › DEX). Installing a newer version over an older one upgrades it in place
+and keeps your data.
+
+The installer is not code-signed yet, so Windows SmartScreen may show a
 warning. Select **More info**, then **Run anyway**. Each release lists SHA-256
 checksums so you can verify the download (see [Verifying a download](#verifying-a-download)).
 
@@ -50,7 +55,7 @@ checksums so you can verify the download (see [Verifying a download](#verifying-
 
 ### Known limitations
 
-- Installers are unsigned, and updates are not delivered automatically.
+- The installer is unsigned, and updates are not delivered automatically.
 - Cloud AI features require an API key from a supported provider.
 - Speech recognition uses the system Web Speech service, which may process audio online.
 - The bootable DEX OS image in [`dex-os/`](dex-os/README.md) is experimental and has not been boot-tested for this release.
@@ -90,12 +95,13 @@ features (files, clipboard, system information) are unavailable there.
 | Type-check and attribution check | `npm run lint` |
 | Unit tests | `npm test` |
 | End-to-end tests | `npm run test:e2e` |
-| Installers (NSIS and MSI) | `npm run build:tauri` |
-| SHA-256 checksums for the installers | `npm run release:checksums` |
+| Installer (`DEX_<version>_x64-setup.exe`) | `npm run build:tauri` |
+| SHA-256 checksum for the installer | `npm run release:checksums` |
 
-`npm run build:tauri` writes the installers to
-`src-tauri/target/release/bundle/nsis/` and `src-tauri/target/release/bundle/msi/`,
+`npm run build:tauri` writes the installer to `src-tauri/target/release/bundle/nsis/`,
 then checks that the executable does not depend on DLLs the installer does not ship.
+DEX does not ship an MSI: one setup means one install folder, one uninstall
+entry and one upgrade path.
 
 ### Verifying a download
 
