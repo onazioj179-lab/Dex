@@ -2924,19 +2924,26 @@ fn main() {
     }
     startup_timeline::mark("WebView2 check");
     webview2::start_load_watchdog(std::time::Duration::from_secs(30));
-    let result = tauri::Builder::default()
-        // MUST be the first plugin. A second launch focuses the running window
-        // and exits instead of starting a duplicate shell: a duplicate would
-        // double-run the reminder/autobackup schedulers and file watchers on the
-        // same dex.db, and if launched with different WebView2 options it hangs
-        // with an empty window (the profile is locked by the first instance).
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    let builder = tauri::Builder::default();
+    // MUST be the first plugin. A second launch focuses the running window and
+    // exits instead of starting a duplicate shell: a duplicate would double-run
+    // the reminder/autobackup schedulers and file watchers on the same dex.db,
+    // and if launched with different WebView2 options it hangs with an empty
+    // window (the profile is locked by the first instance). An isolated test
+    // profile (DEX_DATA_DIR, own WebView2 folder) shares none of that, so it is
+    // exempt; otherwise a packaged test run would just focus the user's DEX.
+    let builder = if paths::data_dir_override().is_none() {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
             }
         }))
+    } else {
+        builder
+    };
+    let result = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {

@@ -19,6 +19,7 @@ import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import { getMaxConcurrentApps, getStoredTier } from '../services/TierManager';
 import { ContextBus } from '../services/ContextBus';
 import { platform } from '../utils';
+import { getBundledAppVersion } from '../utils/appVersion';
 
 export interface RunningApp {
   id: string;
@@ -308,11 +309,8 @@ export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
 
 // App definitions with colors and shortcuts for UI
 // Platform release stamped onto every built-in app so dock, Launchpad,
-// Settings -> About, and UKI all report consistent versions. Per-app
-// `version`/`buildDate` overrides are still honoured (creative-suite apps
-// historically tracked independent versions but are now aligned to platform
-// release for the 4.4.0 wave to remove user confusion).
-const PLATFORM_VERSION = '7.0.1';
+// Settings -> About, and UKI all report the build version (package.json).
+const PLATFORM_VERSION = getBundledAppVersion();
 const PLATFORM_BUILD_DATE = '2026-11-01';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';

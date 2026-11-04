@@ -117,7 +117,13 @@ function main() {
   if (!process.argv[2]) {
     const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8'));
     const shipped = [];
-    for (const [dir, suffix] of [['nsis', '-setup.exe'], ['msi', '.msi']]) {
+    // One official Windows setup (NSIS). A leftover MSI from an older build
+    // config is reported so it never gets attached to a release by hand.
+    const msiDir = path.join(RELEASE, 'bundle', 'msi');
+    if (fs.existsSync(msiDir) && fs.readdirSync(msiDir).some((f) => f.includes(`_${version}_`))) {
+      console.warn(`[verify-bundle] WARN stale MSI for v${version} in ${msiDir}; it is not a release asset`);
+    }
+    for (const [dir, suffix] of [['nsis', '-setup.exe']]) {
       const d = path.join(RELEASE, 'bundle', dir);
       const hits = fs.existsSync(d)
         ? fs.readdirSync(d).filter((f) => f.includes(`_${version}_`) && f.toLowerCase().endsWith(suffix))

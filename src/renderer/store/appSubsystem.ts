@@ -17,6 +17,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import { useRunningApps } from './runningApps';
+import { getBundledAppVersion } from '../utils/appVersion';
 
 // ===========================================================================
 // TYPES -- App Definition & State
@@ -116,7 +117,7 @@ export interface WorkSession {
 // APP REGISTRY -- Static App Definitions
 // ===========================================================================
 
-const APP_VERSION = '3.6.0';
+const APP_VERSION = getBundledAppVersion();
 
 export const APP_REGISTRY: AppDefinition[] = [
   // -------------------------------------------------------------------------

@@ -59,7 +59,17 @@
 ## Faster
 
 - DEX no longer runs a frame-by-frame monitor in the background. Idle Home: no frame callbacks and about one timer wake-up every 5 seconds. Minimizing DEX no longer makes it think the PC is overheating and turn effects off.
-- Release builds use link-time optimisation: app 37.1 MB (was 40.1), NSIS installer 14.4 MB (was 15.1), MSI 17.8 MB (was 19.0).
+- Release builds use link-time optimisation: app 37.1 MB (was 40.1), installer 14.4 MB (was 15.1).
+
+## One installer
+
+- DEX 7.0.1 ships **one** Windows setup, `DEX_7.0.1_x64-setup.exe`. The MSI package is no longer built or published, and the old Electron packaging job that ran alongside the Tauri release on every tag was removed, so a release can no longer carry two competing installers.
+- The setup installs for the current user in `%LOCALAPPDATA%\DEX`, with one uninstall entry. That is the same folder and entry 6.x used, so installing 7.0.1 over 6.x upgrades in place and keeps your data. If DEX was installed from an MSI before, the setup offers to remove that copy first.
+- If WebView2 is missing, the setup installs it. Nothing else is bundled; no AI runtime is installed.
+
+## Upgrading
+
+Run `DEX_7.0.1_x64-setup.exe`. It detects the installed version, replaces it, and keeps your notes, settings and files. To go back, uninstall 7.0.1 and run the 6.1.0 setup from the [v6.1.0 release](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0); your data folder is not removed by uninstalling unless you tick "Delete the application data".
 
 ## Security and integrity
 
@@ -69,7 +79,7 @@
 
 ## Known limitations
 
-- **The installers are not code-signed** (no certificate is configured), so Windows SmartScreen may warn on first run. In-app updates are not available.
+- **The installer is not code-signed** (no certificate is configured), so Windows SmartScreen may warn on first run. In-app updates are not available.
 - UKI needs an AI provider key, or a connected local Ollama with a model, for free-form requests.
 - No cross-device sync; the AI limit counts tokens, not money.
 - The Privacy Policy text is awaiting the owner's approval of the rewrite.

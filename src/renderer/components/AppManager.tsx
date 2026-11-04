@@ -1043,16 +1043,6 @@ export const AppManager: React.FC = () => {
 
 
   // -- App Tab Bar -- persistent running-app tabs, toggle in Settings ------
-  // Space the DEX Bar takes at the bottom of the screen (published by
-  // FloatingLauncher). Apps and maximized windows stop above it.
-  const [barInset, setBarInset] = useState(() => (window as { __dexBarInset?: number }).__dexBarInset ?? 0);
-  useEffect(() => {
-    const onInset = (e: Event) => setBarInset(Math.max(0, Number((e as CustomEvent<number>).detail) || 0));
-    window.addEventListener('dex-bar-inset', onInset);
-    setBarInset((window as { __dexBarInset?: number }).__dexBarInset ?? 0);
-    return () => window.removeEventListener('dex-bar-inset', onInset);
-  }, []);
-
   const [showAppTabBar, setShowAppTabBar] = useState(() => {
     try { return localStorage.getItem('dex-app-tab-bar') !== 'false'; } catch { return true; }
   });
@@ -1087,13 +1077,13 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
-    // The DEX Bar reserves the strip it occupies when it sits along the bottom
-    // edge, so maximized / snapped windows end above it instead of under it.
+    // The DEX Bar floats over apps; it reserves no strip, so maximized and
+    // snapped windows use the full height (no blank band along the bottom).
     return getWorkspaceBounds(
       { width: w, height: h },
       {
         topReserve: 0,
-        dockReserve: barInset,
+        dockReserve: 0,
         leftReserve: stageOffset,
         rightReserve: 0,
         padding,
@@ -1101,7 +1091,7 @@ export const AppManager: React.FC = () => {
         minHeight: 260,
       },
     );
-  }, [stageOffset, showAppTabBar, runningApps.length, barInset]);
+  }, [stageOffset, showAppTabBar, runningApps.length]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -4499,7 +4489,6 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
-            paddingBottom: appId === 'home' ? 0 : barInset,
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
