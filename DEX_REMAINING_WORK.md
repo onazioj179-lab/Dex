@@ -148,6 +148,16 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8 checks.
 | 63 | "Add Files" in an empty folder called a channel that doesn't exist | FIXED | Picks files and copies them in with live progress | `Files.tsx` | — | — | — |
 | 64 | Closed apps kept running | FIXED | Every close path now unmounts (was only the window's close button) | `AppManager.tsx` | — | — | — |
 | 65 | Launch latency grows with open windows | FIXED (p50 29 ms with 59 open, was 172 ms) | p50 48 ms (10 open) → 172 ms (59 open); each launch re-renders work proportional to open windows | `AppManager.tsx` | Profile a launch with 30 open; memoise per-window chrome | — | P2 |
-| 66 | Theme switch cost | OPEN | 152 ms p50 per light/dark switch with 10 apps (full restyle) | design-system CSS | Profile style recalc; check the `[data-theme]` selectors' breadth | — | P3 |
+| 66 | Theme switch cost | OPEN (unchanged) | 152 ms p50 per light/dark switch with 10 apps (full restyle) | design-system CSS | Profile style recalc; check the `[data-theme]` selectors' breadth | — | P3 |
 | 67 | 100+ windows | NOT APPLICABLE | DEX apps are single-instance; 59 is the maximum | — | Only relevant if multi-instance apps are added | — | — |
+
+## Part 8 follow-up (2026-11-03, PR #77)
+
+| # | Requirement | Status | Detail | Next action | Priority |
+|---|---|---|---|---|---|
+| 68 | First-run Welcome/Terms popup | REMOVED (owner) | Boots straight to Home; policies readable in Settings > About | Privacy-policy rewrite (#2) still needs owner approval | — |
+| 69 | Electron leftovers | REMOVED | Renderer uses the Tauri `window.dex` bridge only; revived UKI native events, Browser download progress, Forge watch folders, crash-recovery check; compact window is real (`compact_window.rs`) | Native suspend/resume/lock events don't exist in Tauri yet (old Electron listeners deleted) | P3 |
+| 70 | Spatial Workspace with many windows | DONE | All open apps become canvas windows at natural sizes; apps keep DOM/state across tab <-> canvas; zoomed-out windows are title cards; 59 apps enter 0.8-1.1 s / exit 0.4-0.9 s (preview) | Packaged-app numbers in DEX_7.0.1_VERIFICATION.md | — |
+| 71 | Browser saved passwords | NON-FUNCTIONAL (fails safe) | Encryption used an Electron-only sync IPC, so nothing is stored | Move the vault to `secrets:*` (DPAPI) with async save/load | P2 |
+| 72 | UKI inside apps | REMOVED (owner) | PRISM/VINX assistant bars, AXL AI Copilot, Notes AI row | UKI stays system-wide | — |
 

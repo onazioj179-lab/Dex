@@ -912,9 +912,6 @@ export const AppManager: React.FC = () => {
   // Spatial desktop: the world layer carrying the camera transform (see spatialStore).
   const worldRef = useRef<HTMLDivElement>(null);
   const spatialEnabled = useSpatialStore((s) => s.enabled);
-  // Zoomed far out on the canvas, background windows render as title cards
-  // (contents skipped, app state kept) so dozens of windows stay smooth.
-  const spatialLowLod = useSpatialStore((s) => s.enabled && s.camera.z < 0.35);
   /** Floating windows currently culled off-screen in spatial mode. */
   const spatialOffscreenRef = useRef<Set<string>>(new Set());
 
@@ -2994,8 +2991,13 @@ export const AppManager: React.FC = () => {
     // Attach multi-touch pointer gesture recognizer to document body
     gestureRecognizer.attach(document.body);
 
+    // On the Spatial canvas, pinch and swipe belong to the canvas (zoom / pan).
+    // Treating a canvas pinch as "show/hide the app overview" re-rendered the
+    // whole shell on every zoom step.
+    const onCanvas = () => useSpatialStore.getState().enabled;
     // Map touch gestures → app navigation
     const unsub3L = gestureRecognizer.on('three-finger-swipe-left', () => {
+      if (onCanvas()) return;
       const ids = runningApps.map(a => a.id);
       const curIdx = ids.indexOf(currentAppId);
       if (curIdx < ids.length - 1) {
@@ -3003,6 +3005,7 @@ export const AppManager: React.FC = () => {
       }
     });
     const unsub3R = gestureRecognizer.on('three-finger-swipe-right', () => {
+      if (onCanvas()) return;
       const ids = runningApps.map(a => a.id);
       const curIdx = ids.indexOf(currentAppId);
       if (curIdx > 0) {
@@ -3010,13 +3013,16 @@ export const AppManager: React.FC = () => {
       }
     });
     const unsub3U = gestureRecognizer.on('three-finger-swipe-up', () => {
+      if (onCanvas()) return;
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
     const unsubPinch = gestureRecognizer.on('two-finger-pinch', () => {
+      if (onCanvas()) return;
       setShowOverview(false);
     });
     const unsubSpread = gestureRecognizer.on('two-finger-spread', () => {
+      if (onCanvas()) return;
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
@@ -3032,6 +3038,7 @@ export const AppManager: React.FC = () => {
         }));
         return;
       }
+      if (onCanvas() && g.type !== 'edge-swipe-left' && g.type !== 'edge-swipe-right') return;
       if (!g.active) {
         // Gesture completed — cycle running apps or trigger overview
         switch (g.type) {
@@ -3291,7 +3298,9 @@ export const AppManager: React.FC = () => {
           return next;
         });
         setMinimizedApps(prev => { if (!backToTabs.some(id => prev.has(id))) return prev; const n = new Set(prev); backToTabs.forEach(id => n.delete(id)); return n; });
-        setCurrentApp(front as AppId);
+        // Focus the tab directly: the shell's setCurrentApp() would float the
+        // app again on the next frame (apps opened from the UI are windows).
+        setCurrentRunningApp(front as AppId);
         });
         sp.setEnabled(false);
         leavingSpatialRef.current = false;
@@ -3301,7 +3310,7 @@ export const AppManager: React.FC = () => {
       }
       spatialFromTabsRef.current = new Set();
     }
-  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, setCurrentApp, spatialSizeFor]);
+  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, setCurrentApp, setCurrentRunningApp, spatialSizeFor]);
 
   // On the canvas every app is a window: an app launched (or switched to) as a
   // tab while the canvas is open is placed on it instead of covering it.
@@ -3394,20 +3403,37 @@ export const AppManager: React.FC = () => {
       const s = useSpatialStore.getState();
       const root = worldRef.current;
       const next = new Set<string>();      // culled: off-screen, not painted
-      const distant = new Set<string>();   // on-screen but zoomed far out
+      const distant = new Set<string>();   // on-screen but shown as a title card
       if (s.enabled) {
         let front: SpatialWindow | null = null;
         for (const w of Object.values(s.windows)) if (!w.minimized && (!front || w.z > front.z)) front = w;
-        const lowLod = s.camera.z < 0.35;
+        // Level of detail per window, by its size ON SCREEN: a window is live
+        // when it is visible and big enough to use (>= ~360px wide), capped at
+        // LIVE_MAX at once (front window first, then the largest). Everything
+        // else is a title card. A single global zoom threshold flipped every
+        // window at once, which made zooming stutter with many windows.
+        const LIVE_MIN_PX = 360;
+        const LIVE_MAX = 12;
+        const onScreen: SpatialWindow[] = [];
         for (const w of Object.values(s.windows)) {
           if (w.minimized) continue;
           if (!isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, 400)) next.add(w.id);
-          else if (lowLod && w.id !== front?.id) distant.add(w.id);
+          else onScreen.push(w);
         }
+        const candidates = onScreen
+          .filter((w) => w.id === front?.id || w.w * s.camera.z >= LIVE_MIN_PX)
+          .sort((a, b) => (a.id === front?.id ? -1 : b.id === front?.id ? 1 : b.w * b.h - a.w * a.h));
+        const live = new Set(candidates.slice(0, LIVE_MAX).map((w) => w.id));
+        for (const w of onScreen) if (!live.has(w.id)) distant.add(w.id);
       }
       root?.querySelectorAll<HTMLElement>('[data-floating-window]').forEach((el) => {
-        if (next.has(el.dataset.floatingWindow || '')) el.setAttribute('data-spatial-offscreen', 'true');
+        const id = el.dataset.floatingWindow || '';
+        if (next.has(id)) el.setAttribute('data-spatial-offscreen', 'true');
         else el.removeAttribute('data-spatial-offscreen');
+        // Set here, not in render, so a zoom never re-renders the shell. On the
+        // canvas a window is a card until marked live (new windows start cheap).
+        if (s.enabled && !next.has(id) && !distant.has(id)) el.setAttribute('data-spatial-live', 'true');
+        else el.removeAttribute('data-spatial-live');
       });
       // Off-screen and zoomed-out ("distant") windows both drop to the
       // background lifecycle phase: apps that support it pause heavy work.
@@ -3448,13 +3474,14 @@ export const AppManager: React.FC = () => {
           if (motionTimer) clearTimeout(motionTimer);
           motionTimer = setTimeout(() => { motionTimer = null; el.style.willChange = ''; }, 180);
         }
-        el.dataset.spatialLod = z < 0.35 ? 'low' : 'normal';
       } else {
         el.style.removeProperty('transform');
         el.style.removeProperty('transition');
-        delete el.dataset.spatialLod;
       }
-      if (!cullTimer) cullTimer = setTimeout(cull, 120);
+      // Debounced: decide level of detail once the camera settles, so a zoom or
+      // pan gesture never flips windows between card and live mid-motion.
+      if (cullTimer) clearTimeout(cullTimer);
+      cullTimer = setTimeout(cull, 120);
     };
     apply(useSpatialStore.getState());
     const unsub = useSpatialStore.subscribe(apply);
@@ -3496,14 +3523,19 @@ export const AppManager: React.FC = () => {
       const dx = e.deltaX * unit, dy = e.deltaY * unit;
       // Alt+wheel zooms anywhere; Ctrl+wheel (also trackpad pinch) zooms over the
       // desktop and is left to the app when over a window.
+      // When the canvas takes the wheel it also stops it here: apps listen for
+      // Ctrl+wheel on window to zoom their own canvases, and every mounted app
+      // re-rendered (and zoomed itself) on each step of a workspace zoom.
       if (e.altKey || (e.ctrlKey && !inWindow(e.target))) {
         e.preventDefault();
+        e.stopPropagation();
         const p = local(e);
         st().zoomAtPoint(p.x, p.y, Math.min(1.25, Math.max(0.8, Math.exp(-dy * 0.0025))));
         return;
       }
       if (!inWindow(e.target)) {
         e.preventDefault();
+        e.stopPropagation();
         st().pan(-(e.shiftKey ? dy : dx), e.shiftKey ? 0 : -dy);
       }
     };
@@ -3692,7 +3724,6 @@ export const AppManager: React.FC = () => {
           <div
             key={appId}
             data-floating-window={appId}
-            data-spatial-card={spatialLowLod && !isFocused ? 'true' : undefined}
             data-window-title={getLabel(appId)}
             data-testid={`app-instance-${appId}`}
             data-app-state="foreground"
@@ -4571,7 +4602,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, spatialLowLod, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, mountedAppsSafeSnapshot.join(',')]);
 
   // -- AppLifecycle phase emitter ------------------------------------------
   // Keep-alive never unmounts apps; instead we broadcast a per-app phase so

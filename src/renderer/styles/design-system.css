@@ -664,12 +664,12 @@
    (the app keeps running; DOM and state are untouched). At low zoom the deep
    window shadows are dropped -- with dozens of windows they dominate paint. */
 [data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
-/* Zoomed far out, background windows become title cards: the app body skips
-   rendering (the app stays mounted and keeps its state) and the window shows
-   its name. This is what keeps a canvas of 50+ windows responsive. The front
-   window stays live. Sizes are large because the whole window is scaled down. */
-[data-spatial-world="on"] [data-spatial-card="true"] [data-window-body] { content-visibility: hidden; }
-[data-spatial-world="on"] [data-spatial-card="true"]::after {
+/* Title cards: a canvas window is live only when it is on screen and big
+   enough to use (decided in AppManager's cull, capped at 12 live); otherwise
+   its body skips rendering (the app stays mounted and keeps its state) and it
+   shows its name. Sizes are large because the window itself is scaled down. */
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) [data-window-body] { content-visibility: hidden; }
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"])::after {
   content: attr(data-window-title);
   position: absolute; inset: 36px 0 0 0;
   display: flex; align-items: center; justify-content: center;
@@ -679,11 +679,10 @@
   background: var(--color-bg-surface);
   pointer-events: none;
 }
-[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
-/* Zoomed far out, window contents are thumbnails: pause their decorative CSS
-   animations (spinners, pulses) so 50 windows don't repaint every frame. Apps
-   keep running and re-animate as soon as you zoom back in. */
-[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] * { animation-play-state: paused !important; }
+/* Title-card windows drop their deep shadows (with dozens of windows they
+   dominate paint). Keyed on the window itself: a world-level attribute with
+   descendant selectors restyled every node on the canvas when it flipped. */
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) { box-shadow: none !important; }
 .dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
 .dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
 .dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }

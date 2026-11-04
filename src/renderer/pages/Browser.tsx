@@ -82,7 +82,7 @@ interface SavedPassword {
   id: string;
   domain: string;    // e.g. "google.com"
   username: string;
-  password: string;  // stored obfuscated in localStorage
+  password: string;  // always '' -- the secret is in the native key store (browser-login:<id>)
   createdAt: number;
   lastUsed: number;
 }
@@ -97,26 +97,28 @@ interface SavedCard {
   lastUsed: number;
 }
 
-// Password obfuscation — uses IPC encryption when available, falls back to Web Crypto.
-// Passwords are encrypted before storage; never stored as plaintext.
-const _ob = (s: string): string => {
-  try {
-    const encrypted = (window as any).dex?.ipcRenderer?.sendSync?.('security:encrypt', s);
-    if (encrypted && typeof encrypted === 'string') return encrypted;
-  } catch { /* main process unavailable */ }
-  // No fallback — refuse to store credentials without proper encryption
-  console.warn('[Browser] IPC encryption unavailable — credential not stored');
-  return '';
+// Saved logins and card numbers live in the native key store (DPAPI on
+// Windows, `secrets:*`). Only the entry metadata (site, user, label) is kept in
+// localStorage. Nothing is stored when secure storage is unavailable.
+type SecretInvoke = (ch: string, ...a: unknown[]) => Promise<any>;
+const secretBridge = (): SecretInvoke | null => {
+  const dex = (window as any).dex;
+  return dex?.invoke ? (ch, ...a) => dex.invoke(ch, ...a) : null;
 };
-const _de = (s: string): string => {
-  if (!s) return '';
-  try {
-    const decrypted = (window as any).dex?.ipcRenderer?.sendSync?.('security:decrypt', s);
-    if (decrypted && typeof decrypted === 'string') return decrypted;
-  } catch { /* main process unavailable */ }
-  // Refuse to decode without proper encryption -- stale credentials must be re-saved
-  return '';
-};
+async function putSecret(name: string, value: string): Promise<boolean> {
+  const inv = secretBridge();
+  if (!inv) return false;
+  try { const r = await inv('secrets:set', name, value); return !!r?.success; } catch { return false; }
+}
+async function getSecret(name: string): Promise<string> {
+  const inv = secretBridge();
+  if (!inv) return '';
+  try { const v = await inv('secrets:get', name); return typeof v === 'string' ? v : ''; } catch { return ''; }
+}
+function dropSecret(name: string): void {
+  const inv = secretBridge();
+  if (inv) void inv('secrets:delete', name).catch(() => {});
+}
 
 // ===========================================================================
 // BLOCKED DOMAINS - see src/renderer/config/blocked-domains.ts
@@ -911,40 +913,42 @@ export const Browser: React.FC = () => {
   }, []);
 
   // ---- Keychain CRUD ----
-  const savePassword = useCallback((domain: string, username: string, password: string) => {
+  const savePassword = useCallback(async (domain: string, username: string, password: string) => {
+    const prior = savedPasswords.find(p => p.domain === domain && p.username === username);
+    const id = prior?.id ?? crypto.randomUUID();
+    if (!(await putSecret(`browser-login:${id}`, password))) {
+      toast.error('Password not saved: secure storage is unavailable');
+      return;
+    }
     setSavedPasswords(prev => {
-      const existing = prev.findIndex(p => p.domain === domain && p.username === username);
+      const existing = prev.findIndex(p => p.id === id);
       const entry: SavedPassword = {
-        id: existing >= 0 ? prev[existing].id : crypto.randomUUID(),
-        domain,
-        username,
-        password: _ob(password),
+        id, domain, username, password: '',
         createdAt: existing >= 0 ? prev[existing].createdAt : Date.now(),
         lastUsed: Date.now(),
       };
       if (existing >= 0) { const next = [...prev]; next[existing] = entry; return next; }
       return [entry, ...prev];
     });
-  }, []);
+  }, [savedPasswords, toast]);
 
   const deletePassword = useCallback((id: string) => {
+    dropSecret(`browser-login:${id}`);
     setSavedPasswords(prev => prev.filter(p => p.id !== id));
   }, []);
 
-  const saveCard = useCallback((label: string, name: string, number: string, expiry: string) => {
-    const entry: SavedCard = {
-      id: Date.now().toString(),
-      label,
-      name,
-      number: _ob(number),
-      expiry,
-      createdAt: Date.now(),
-      lastUsed: Date.now(),
-    };
+  const saveCard = useCallback(async (label: string, name: string, number: string, expiry: string) => {
+    const id = Date.now().toString();
+    if (!(await putSecret(`browser-card:${id}`, number))) {
+      toast.error('Card not saved: secure storage is unavailable');
+      return;
+    }
+    const entry: SavedCard = { id, label, name, number: '', expiry, createdAt: Date.now(), lastUsed: Date.now() };
     setSavedCards(prev => [entry, ...prev]);
-  }, []);
+  }, [toast]);
 
   const deleteCard = useCallback((id: string) => {
+    dropSecret(`browser-card:${id}`);
     setSavedCards(prev => prev.filter(c => c.id !== id));
   }, []);
 
@@ -1025,8 +1029,11 @@ export const Browser: React.FC = () => {
       // Find saved password for this domain
       const match = savedPasswords.find(p => p.domain === domain);
       if (match) {
-        // Use JSON.stringify for safe data escaping — prevents XSS via credential values
-        const safeData = JSON.stringify({ user: match.username, pass: _de(match.password) });
+        // Read the password from the key store, then inject. JSON.stringify
+        // escapes the values, so credential text can't break out of the script.
+        void getSecret(`browser-login:${match.id}`).then(pass => {
+        if (!pass) return;
+        const safeData = JSON.stringify({ user: match.username, pass });
         webview.executeJavaScript(
           "(function(){" +
           "var d=" + safeData + ";" +
@@ -1038,6 +1045,7 @@ export const Browser: React.FC = () => {
         ).catch((e: unknown) => { console.warn('[DEX]', e); });
         // Update lastUsed
         setSavedPasswords(prev => prev.map(p => p.id === match.id ? { ...p, lastUsed: Date.now() } : p));
+        });
       }
 
       // Listen for form submit to detect credentials for save prompt
