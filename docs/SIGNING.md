@@ -52,6 +52,22 @@ Verify:
 signtool verify /pa "src-tauri\target\release\bundle\nsis\DEX_7.0.1_x64-setup.exe"
 ```
 
+## Option C — let the release workflow sign (CI)
+
+`.github/workflows/release.yml` signs automatically when two repository secrets
+exist (Settings › Secrets and variables › Actions):
+
+| Secret | Value |
+|---|---|
+| `WINDOWS_CERTIFICATE` | The `.pfx` file as base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('dex.pfx'))` |
+| `WINDOWS_CERTIFICATE_PASSWORD` | The `.pfx` password |
+
+The workflow imports the certificate, passes its thumbprint to Tauri through
+`TAURI_CONFIG` (nothing is committed), builds, and fails the run if the setup's
+signature is not `Valid`. Without the secrets it builds unsigned and prints a
+warning. An EV certificate on a hardware token cannot be exported as a `.pfx`;
+use Option B on the machine that holds the token.
+
 ## After signing
 
 Re-upload the signed installer to the release:
