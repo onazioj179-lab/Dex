@@ -276,3 +276,34 @@ describe('spatial store: zones, views, locks, bindings, layout files', () => {
     expect(useSpatialStore.getState().zones).toEqual([]);
   });
 });
+
+describe('nearestFreeSpot: windows keep their place, in any direction', () => {
+  it('keeps a free spot as is', async () => {
+    const { nearestFreeSpot } = await import('../../src/renderer/shell/spatial/spatialMath');
+    expect(nearestFreeSpot({ x: 100, y: 100, w: 300, h: 200 }, [])).toEqual({ x: 100, y: 100, w: 300, h: 200 });
+  });
+
+  it('moves a blocked window the shortest distance, not always to the right', async () => {
+    const { nearestFreeSpot, intersects } = await import('../../src/renderer/shell/spatial/spatialMath');
+    // A wide blocker with its nearest free edge ABOVE the wanted spot.
+    const blocker = { x: -2000, y: 0, w: 5000, h: 400 };
+    const got = nearestFreeSpot({ x: 0, y: 40, w: 300, h: 200 }, [blocker]);
+    expect(intersects(got, blocker)).toBe(false);
+    expect(got.y).toBeLessThan(0); // went up
+    expect(got.x).toBe(0);         // did not drift sideways
+  });
+
+  it('never stacks windows into one row when many are placed', async () => {
+    const { nearestFreeSpot, intersects } = await import('../../src/renderer/shell/spatial/spatialMath');
+    const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
+    for (let i = 0; i < 12; i++) placed.push(nearestFreeSpot({ x: 0, y: 0, w: 400, h: 300 }, placed));
+    for (let a = 0; a < placed.length; a++) {
+      for (let b = a + 1; b < placed.length; b++) expect(intersects(placed[a], placed[b])).toBe(false);
+    }
+    const rows = new Set(placed.map((r) => r.y));
+    expect(rows.size).toBeGreaterThan(1);
+    // Spread in both directions around the wanted spot.
+    expect(Math.min(...placed.map((r) => r.y))).toBeLessThan(0);
+    expect(Math.max(...placed.map((r) => r.y))).toBeGreaterThan(0);
+  });
+});

@@ -195,6 +195,31 @@ export function placeNewWindow(cam: Camera, vw: number, vh: number, size: { w: n
   return { x, y, w: size.w, h: size.h };
 }
 
+/**
+ * The free spot nearest `want` (same size), searching outward in every
+ * direction: up, down, left and right are equally good. Used when a window
+ * keeps the place you gave it unless another window is already there, so the
+ * canvas never grows into a one-directional strip.
+ */
+export function nearestFreeSpot(want: Rect, occupied: Rect[], gap = 24, step = 40, maxRings = 80): Rect {
+  const padded = (x: number, y: number) => ({ x: x - gap, y: y - gap, w: want.w + gap * 2, h: want.h + gap * 2 });
+  const free = (x: number, y: number) => !occupied.some((o) => intersects(padded(x, y), o));
+  if (free(want.x, want.y)) return { ...want };
+  for (let k = 1; k <= maxRings; k++) {
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let i = -k; i <= k; i++) {
+      // The four sides of the square ring at distance k.
+      for (const [dx, dy] of [[i, -k], [i, k], [-k, i], [k, i]]) {
+        const x = want.x + dx * step, y = want.y + dy * step;
+        const d = Math.hypot(dx, dy);
+        if ((!best || d < best.d) && free(x, y)) best = { x, y, d };
+      }
+    }
+    if (best) return { x: Math.round(best.x), y: Math.round(best.y), w: want.w, h: want.h };
+  }
+  return { ...want };
+}
+
 // ---- magnetic snapping + alignment guides ------------------------------------
 
 export interface Guide { axis: 'x' | 'y'; pos: number; from: number; to: number }

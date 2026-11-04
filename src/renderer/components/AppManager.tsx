@@ -74,7 +74,7 @@ import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, magneticSnap, gestureCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { placeNewWindow, snapToGrid, isOnScreen, magneticSnap, gestureCamera, nearestFreeSpot, screenToWorld, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
 import { ContactTracker } from '../shell/input/touchContacts';
 import { haptic } from '../shell/input/haptics';
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
@@ -3261,7 +3261,8 @@ export const AppManager: React.FC = () => {
     const max = getMaximizedWindowBounds();
     if (on) {
       // Enter: remember the screen layout (restored on exit), put each window at
-      // its remembered world place, and lay out the rest in a grid beside them.
+      // its remembered world place, and keep every other window where it was on
+      // screen (moved to the nearest free spot, in any direction, if taken).
       const pre: Record<string, SpatialRect> = {};
       const remembered: Record<string, SpatialRect> = {};
       const fresh: Array<SpatialRect & { id: string }> = [];
@@ -3282,11 +3283,14 @@ export const AppManager: React.FC = () => {
           h: Math.max(min.h, maxed ? Math.max(460, Math.round(ws.h * 0.72)) : b.h),
         });
       });
-      const taken = boundsOf(Object.values(remembered));
-      const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+      const placed: Record<string, SpatialRect> = { ...remembered };
+      for (const f of fresh) {
+        const at = screenToWorld(sp.camera, f.x, f.y);
+        placed[f.id] = nearestFreeSpot({ x: Math.round(at.x), y: Math.round(at.y), w: f.w, h: f.h }, Object.values(placed));
+      }
       sp.setPreSpatial(pre);
       sp.setEnabled(true);
-      applySpatialBounds({ ...remembered, ...arrange('grid', fresh, origin) });
+      applySpatialBounds(placed);
       pendingSpatialFitRef.current = true;
     } else {
       // Leave: remember the world layout, restore the screen layout.
