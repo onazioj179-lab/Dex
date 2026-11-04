@@ -11,7 +11,7 @@
  * stays here; "Copy report" puts a numbers-only summary on the clipboard when
  * you ask for it.
  */
-import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useUkiTasks } from '../store/ukiTasksStore';
 import {
@@ -19,7 +19,9 @@ import {
 } from '../services/diagnostics/localMetrics';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
-const invoke: Invoke | undefined = (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke;
+// Looked up when the view mounts, not at module load: in the packaged build this
+// module can be evaluated before the Tauri bridge (window.dex) is installed.
+const getInvoke = (): Invoke | undefined => (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke;
 
 interface Timeline { totalMs: number; phases: Array<{ name: string; durationMs: number; atMs: number }> }
 interface SelfSample { available: boolean; processCount: number; memoryMB: number; hostMemoryMB: number; cpuPercent: number }
@@ -28,6 +30,15 @@ interface CrashStats { totalCrashes: number; crashesThisSession: number; crashes
 interface CrashRecord { id: string; timestamp: number; type: string; message: string }
 
 const REFRESH_MS = 3000;
+const SAMPLE_TIMEOUT_MS = 8000;
+
+/** Resolves to the call's value, or null if it fails or takes longer than `ms`. */
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(null), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(null); });
+  });
+}
 
 function appName(id: string): string {
   return APP_DEFINITIONS[id]?.name ?? id;
@@ -60,6 +71,7 @@ function useVisible(): boolean {
 }
 
 const NexusDiagnostics: React.FC = () => {
+  const invoke = useMemo(getInvoke, []);
   const local = useLocalSnapshot();
   const visible = useVisible();
   const tasks = useUkiTasks((s) => s.tasks);
@@ -74,24 +86,39 @@ const NexusDiagnostics: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
-  // Live resource figures: only while this view is open and the window visible.
+  // Live resource figures. One sampler for the life of the view: it never stops
+  // on a visibility change (a hidden/visible flip used to tear it down and, in
+  // rare timing, leave it stopped), it skips its tick while the window is
+  // hidden, and samples never overlap.
+  const pullRef = useRef<() => Promise<void>>(async () => undefined);
   useEffect(() => {
-    if (!invoke || !visible) return;
+    if (!invoke) return;
     let alive = true;
+    let inFlight = false;
     const pull = async () => {
-      const [s, sys] = await Promise.all([
-        invoke('xenon:selfSample').catch(() => null),
-        invoke('xenon:systemSample').catch(() => null),
-      ]);
-      if (!alive) return;
-      if (s && (s as SelfSample).available) setSelf(s as SelfSample);
-      if (sys) setSystem(sys as SystemSample);
-      setTick((t) => t + 1);
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        // Each call is time-boxed: with the overlap guard, one reply that never
+        // arrived used to block every later tick, so the figures stayed empty
+        // for the life of the view.
+        const [s, sys] = await Promise.all([
+          withTimeout(invoke('xenon:selfSample'), SAMPLE_TIMEOUT_MS),
+          withTimeout(invoke('xenon:systemSample'), SAMPLE_TIMEOUT_MS),
+        ]);
+        if (!alive) return;
+        if (s && (s as SelfSample).available) setSelf(s as SelfSample);
+        if (sys) setSystem(sys as SystemSample);
+        setTick((t) => t + 1);
+      } finally {
+        inFlight = false;
+      }
     };
+    pullRef.current = pull;
     void pull();
-    const id = window.setInterval(pull, REFRESH_MS);
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void pull(); }, REFRESH_MS);
     return () => { alive = false; window.clearInterval(id); };
-  }, [visible]);
+  }, [invoke]);
 
   const loadOnce = useCallback(async () => {
     if (!invoke) return;
@@ -103,7 +130,7 @@ const NexusDiagnostics: React.FC = () => {
     if (tl) setTimeline(tl as Timeline);
     if (cs) setCrashes(cs as CrashStats);
     if (Array.isArray(rc)) setRecentCrashes((rc as CrashRecord[]).slice().reverse());
-  }, []);
+  }, [invoke]);
 
   const runFrames = useCallback(async () => {
     setMeasuring(true);
@@ -163,7 +190,7 @@ const NexusDiagnostics: React.FC = () => {
         <div style={S.note}>Measured on this computer. Nothing is uploaded.</div>
         <div style={S.barActions}>
           {status && <span role="status" style={S.status}>{status}</span>}
-          <button style={S.btn} onClick={() => { void loadOnce(); void runFrames(); }} disabled={measuring}>Refresh</button>
+          <button style={S.btn} onClick={() => { void loadOnce(); void runFrames(); void pullRef.current(); }} disabled={measuring}>Refresh</button>
           <button style={S.btn} onClick={() => void copyReport()}>Copy report</button>
         </div>
       </div>

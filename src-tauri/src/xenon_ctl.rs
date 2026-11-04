@@ -370,12 +370,44 @@ fn system_sample(app: &tauri::AppHandle) -> Value {
 // self_sample(): memory and CPU of DEX itself, i.e. this host process plus every
 // descendant (the WebView2 browser, renderer and GPU processes). Used by
 // Nexus > Diagnostics. Read on request only; nothing samples in the background.
+//
+// One sampler is kept between calls. Building a fresh `System` each time meant
+// two full process enumerations plus a sleep per call (1-1.5 s cold, seconds on
+// a busy machine), so the view's first figures depended on one slow call. Now
+// only the first call waits for a CPU baseline; later calls (the view asks every
+// 3 s) refresh once and measure CPU since the previous call.
+struct SelfSampler {
+    sys: sysinfo::System,
+    last: Option<std::time::Instant>,
+}
+static SELF_SAMPLER: std::sync::Mutex<Option<SelfSampler>> = std::sync::Mutex::new(None);
+
 fn self_sample() -> Value {
-    let mut sys = sysinfo::System::new();
-    sys.refresh_cpu();
-    sys.refresh_processes();
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_processes();
+    // CPU and memory only: a full refresh also reads every process's disk I/O
+    // and command line, which takes seconds on a busy machine.
+    let kind = sysinfo::ProcessRefreshKind::new().with_cpu().with_memory();
+    let mut guard = SELF_SAMPLER.lock().unwrap_or_else(|e| e.into_inner());
+    let sampler = guard.get_or_insert_with(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_cpu();
+        SelfSampler { sys, last: None }
+    });
+    let fresh_baseline = sampler
+        .last
+        .map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(60));
+    if fresh_baseline {
+        // No recent baseline: take one, then wait the minimum interval so CPU
+        // usage is a real delta rather than 0.
+        sampler.sys.refresh_processes_specifics(kind);
+        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    } else if let Some(wait) = sysinfo::MINIMUM_CPU_UPDATE_INTERVAL
+        .checked_sub(sampler.last.map(|t| t.elapsed()).unwrap_or_default())
+    {
+        std::thread::sleep(wait);
+    }
+    sampler.sys.refresh_processes_specifics(kind);
+    sampler.last = Some(std::time::Instant::now());
+    let sys = &sampler.sys;
     let Ok(me) = sysinfo::get_current_pid() else {
         return json!({ "available": false });
     };
@@ -461,5 +493,16 @@ mod tests {
         assert!(v["hostMemoryMB"].as_i64().unwrap() >= 1);
         let cpu = v["cpuPercent"].as_f64().unwrap();
         assert!((0.0..=100.0).contains(&cpu));
+    }
+
+    #[test]
+    fn self_sample_reuses_its_baseline() {
+        let _ = super::self_sample();
+        let t = std::time::Instant::now();
+        let v = super::self_sample();
+        assert_eq!(v["available"], true);
+        // A warm call refreshes once instead of rebuilding the process table and
+        // re-taking a CPU baseline.
+        assert!(t.elapsed() < std::time::Duration::from_millis(1500), "warm sample took {:?}", t.elapsed());
     }
 }
