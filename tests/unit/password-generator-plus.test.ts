@@ -100,3 +100,12 @@ describe('strengthFor', () => {
     expect(strengthFor(128).label).toBe('Very strong');
   });
 });
+
+describe('vault state from the native side', () => {
+  it('reads the native { exists, unlocked } shape and the legacy one', async () => {
+    const { normalizeVaultState } = await import('../../src/renderer/store/useVaultStore');
+    expect(normalizeVaultState({ exists: true, unlocked: false })).toEqual({ vaultExists: true, isUnlocked: false });
+    expect(normalizeVaultState({ vaultExists: true, isUnlocked: true })).toEqual({ vaultExists: true, isUnlocked: true });
+    expect(normalizeVaultState(null)).toEqual({ vaultExists: false, isUnlocked: false });
+  });
+});

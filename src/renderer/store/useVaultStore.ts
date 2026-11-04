@@ -150,6 +150,12 @@ interface VaultState {
 // Store
 // ===========================================================================
 
+/** Accept both the native ({ exists, unlocked }) and legacy state shapes. */
+export function normalizeVaultState(raw: unknown): { isUnlocked: boolean; vaultExists: boolean } {
+  const r = (raw ?? {}) as { isUnlocked?: boolean; unlocked?: boolean; vaultExists?: boolean; exists?: boolean };
+  return { isUnlocked: !!(r.isUnlocked ?? r.unlocked), vaultExists: !!(r.vaultExists ?? r.exists) };
+}
+
 export const useVaultStore = create<VaultState>((set, get) => ({
   // Initial State
   isUnlocked: false,
@@ -177,7 +183,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         return;
       }
       
-      const state = await window.dex.vault.getState();
+      // The native vault (core/dex-vault) reports { exists, unlocked }; older
+      // bridges used { vaultExists, isUnlocked }. Read either: with only the old
+      // names, DEX always believed there was no vault.
+      const state = normalizeVaultState(await window.dex.vault.getState());
       set({
         isUnlocked: state.isUnlocked,
         vaultExists: state.vaultExists,
@@ -193,7 +202,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       }
 
       // Listen for state changes
-      window.dex.vault.onStateChange((newState) => {
+      window.dex.vault.onStateChange((raw) => {
+        const newState = normalizeVaultState(raw);
         set({
           isUnlocked: newState.isUnlocked,
           vaultExists: newState.vaultExists,
