@@ -1017,7 +1017,7 @@ const exportSettings = (settings: Record<string, unknown>): void => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     window.dispatchEvent(new CustomEvent('dex-toast', { 
-      detail: { message: 'Settings exported successfully', type: 'success' } 
+      detail: { message: 'Settings exported', type: 'success' } 
     }));
   } catch (e) {
     window.dispatchEvent(new CustomEvent('dex-toast', { 
@@ -1042,7 +1042,7 @@ const importSettings = (onImport: (settings: typeof DEFAULT_SETTINGS) => void): 
         const merged = { ...DEFAULT_SETTINGS, ...data.settings };
         onImport(merged);
         window.dispatchEvent(new CustomEvent('dex-toast', { 
-          detail: { message: 'Settings imported successfully', type: 'success' } 
+          detail: { message: 'Settings imported', type: 'success' } 
         }));
       } else {
         throw new Error('Invalid settings format');
@@ -3336,7 +3336,7 @@ export const Settings: React.FC = () => {
           </div>
           {showRecoveryCodes && recoveryCodes.length > 0 && (
             <div style={{ padding: 'var(--space-4)', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
                   <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>

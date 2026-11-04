@@ -751,7 +751,7 @@ function tryMathCalculation(text: string): string | null {
   m = lower.match(calcPatterns[3]);
   if (m) {
     const b = parseFloat(m[2]);
-    if (b === 0) return "Can't divide by zero!";
+    if (b === 0) return "Cannot divide by zero.";
     return `${parseFloat(m[1])} ÷ ${b} = ${(parseFloat(m[1]) / b).toFixed(4).replace(/\.?0+$/, '')}`;
   }
   
@@ -821,36 +821,36 @@ function tryUnitConversion(text: string): string | null {
 
 // Fun responses / greetings
 const GREETINGS: Record<string, string[]> = {
-  hello: ['Hello! How can I help you today?', 'Hey there! What can I do for you?', 'Hi! Ready to assist.'],
-  hi: ['Hey! What do you need?', 'Hi there! How can I help?', 'Hello! What\'s up?'],
-  hey: ['Hey! What can I do for you?', 'Hey there!', 'Hello!'],
-  yo: ['Yo! What\'s good?', 'Hey! What\'s up?', 'Sup! How can I help?'],
-  sup: ['Not much! What can I help you with?', 'Hey! What do you need?', 'All good here! What\'s up?'],
-  hiya: ['Hiya! Ready to help!', 'Hey there! What can I do?'],
-  hola: ['¡Hola! How can I help?', 'Hey! What do you need?'],
-  morning: ['Good morning! Ready for a productive day?', 'Morning! How can I help you start your day?', 'Rise and shine! What can I do for you?'],
-  afternoon: ['Good afternoon! What can I help you with?', 'Afternoon! Need any assistance?'],
-  evening: ['Good evening! What can I do for you?', 'Evening! How can I help?'],
-  night: ['Good night! Need anything before you go?', 'Night! Sweet dreams when you get there!'],
-  thanks: ['You\'re welcome!', 'Happy to help!', 'Anytime!', 'No problem!', 'No worries!'],
-  'thank you': ['You\'re very welcome!', 'My pleasure!', 'Glad I could help!'],
-  'thank you so much': ['You\'re so welcome! Always happy to help!', 'Absolutely! Anytime!'],
-  bye: ['Goodbye! Have a great day!', 'See you later!', 'Bye! Call me anytime.', 'Peace out!'],
-  goodbye: ['Goodbye! Take care!', 'See you soon!', 'Farewell!'],
-  'see ya': ['Later! Take care!', 'Catch you later!', 'See ya!'],
-  'talk to you later': ['Sounds good! I\'ll be here!', 'Later! Have a good one!'],
-  'good job': ['Thanks! I try my best!', 'Appreciate that!'],
-  'nice work': ['Thank you! Happy to help!', 'Glad you think so!'],
-  'you rock': ['Aww thanks! You rock too!', 'That\'s sweet of you!'],
-  'love you': ['I appreciate you too!', 'Thanks! You\'re awesome!'],
-  sorry: ['No worries at all!', 'It\'s totally fine!', 'Don\'t worry about it!'],
-  'my bad': ['No problem! Happens to everyone!', 'All good!'],
-  'never mind': ['No problem! Let me know if you need anything else.', 'Got it! I\'m here when you need me.'],
-  ok: ['Got it! Anything else?', 'Okay! What\'s next?'],
-  okay: ['Alright! Need anything else?', 'Sure thing!'],
-  cool: ['Cool! Anything else I can help with?', 'Awesome!'],
-  nice: ['Glad you like it! Need anything else?', 'Thanks!'],
-  awesome: ['You\'re awesome too!', 'Right back at ya!'],
+  hello: ['Hello. How can I help?', 'Hi. What can I do for you?'],
+  hi: ['Hi. How can I help?', 'Hello. What do you need?'],
+  hey: ['Hi. What can I do for you?', 'Hello. How can I help?'],
+  yo: ['Hi. What can I do for you?'],
+  sup: ['Hi. What can I help you with?'],
+  hiya: ['Hi. How can I help?'],
+  hola: ['¡Hola! How can I help?'],
+  morning: ['Good morning. How can I help?', 'Good morning. What would you like to start with?'],
+  afternoon: ['Good afternoon. What can I help you with?'],
+  evening: ['Good evening. What can I do for you?'],
+  night: ['Good night. Is there anything you need before you go?'],
+  thanks: ["You're welcome.", 'Happy to help.', 'Any time.'],
+  'thank you': ["You're welcome.", 'Glad I could help.'],
+  'thank you so much': ["You're very welcome.", 'Happy to help any time.'],
+  bye: ['Goodbye.', 'See you later.', 'Goodbye. I am here when you need me.'],
+  goodbye: ['Goodbye. Take care.', 'See you soon.'],
+  'see ya': ['See you later.', 'Take care.'],
+  'talk to you later': ["Sounds good. I'll be here."],
+  'good job': ['Thank you.', 'Thanks, glad it helped.'],
+  'nice work': ['Thank you. Glad it helped.'],
+  'you rock': ['Thank you, that is kind of you.'],
+  'love you': ['Thank you, that is kind of you.'],
+  sorry: ['No problem at all.', "That's fine."],
+  'my bad': ['No problem.', "That's fine."],
+  'never mind': ['No problem. Let me know if you need anything else.'],
+  ok: ['Got it. Anything else?'],
+  okay: ['All right. Anything else?'],
+  cool: ['Anything else I can help with?'],
+  nice: ['Glad you like it. Anything else?'],
+  awesome: ['Glad to hear it. Anything else?'],
 };
 
 const JOKES = [
