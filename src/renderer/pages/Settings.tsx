@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
@@ -3546,6 +3547,14 @@ export const Settings: React.FC = () => {
     </div>
   );
 
+  /** "Windows · Desktop app" from the running environment, not a constant. */
+  const aboutPlatform = (): string => {
+    const uaPlatform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+    const os = uaPlatform || (/Windows/i.test(navigator.userAgent) ? 'Windows' : /Mac/i.test(navigator.userAgent) ? 'macOS' : /Linux/i.test(navigator.userAgent) ? 'Linux' : 'Unknown');
+    const host = isTauri() ? 'Desktop app' : 'Web preview';
+    return `${os} · ${host}`;
+  };
+
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
       <div style={{ ...styles.aboutHeader, marginTop: 'var(--space-3)' }}>
@@ -3580,6 +3589,18 @@ export const Settings: React.FC = () => {
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Version</span>
           <span style={styles.aboutValue}>{appVersion}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Build</span>
+          <span style={styles.aboutValue}>{import.meta.env.PROD ? 'Release' : 'Development'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Platform</span>
+          <span style={styles.aboutValue}>{aboutPlatform()}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Updates</span>
+          <span style={styles.aboutValue}>Install new versions from the Releases page</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Creator</span>
