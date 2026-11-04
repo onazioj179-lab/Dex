@@ -186,7 +186,7 @@ const VideoLayer: React.FC<{
           <React.Fragment key={clip.id}>
             {/* Title clip overlay */}
             {clip.type === 'title' && clip.titleData && isVisible && (
-              <div style={{
+              <div data-vinx-export-title style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 opacity: clip.opacity * transitionOpacity, pointerEvents: 'none', zIndex: 2,
               }}>

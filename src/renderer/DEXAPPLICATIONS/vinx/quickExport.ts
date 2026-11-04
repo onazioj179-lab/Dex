@@ -272,6 +272,8 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
       }
     }
 
+    // Titles are live DOM overlays, not part of the underlying video frames.
+    drawExportTitles(ctx, opts.programCanvas, width, height);
     const now = performance.now();
     const elapsed = now - startTs;
     const percent = Math.min(99, Math.round((elapsed / totalMs) * 100));
@@ -348,4 +350,27 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
   }
 
   return { stop, cancel };
+}
+
+/** Composite visible title overlays using their resolved preview typography. */
+export function drawExportTitles(ctx: CanvasRenderingContext2D, host: HTMLElement | null, width: number, height: number): void {
+  if (!host) return;
+  const scale = host.clientWidth > 0 ? width / host.clientWidth : 1;
+  for (const overlay of host.querySelectorAll<HTMLElement>('[data-vinx-export-title]')) {
+    const text = overlay.querySelector('span');
+    if (!text) continue;
+    const outer = getComputedStyle(overlay), style = getComputedStyle(text);
+    if (outer.display === 'none' || outer.visibility === 'hidden') continue;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0, Number(outer.opacity) || 0));
+    const fontSize = (parseFloat(style.fontSize) || 48) * scale;
+    ctx.font = style.fontWeight + ' ' + fontSize + 'px ' + style.fontFamily;
+    ctx.fillStyle = style.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8 * scale; ctx.shadowOffsetY = 2 * scale;
+    const lines = (text.textContent || '').split('\n');
+    lines.forEach((line, index) => ctx.fillText(line, width / 2, height / 2 + (index - (lines.length - 1) / 2) * fontSize * 1.2, width));
+    ctx.restore();
+  }
 }
