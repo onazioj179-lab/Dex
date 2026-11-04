@@ -12,7 +12,7 @@
  * ===========================================================================
  */
 
-import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
@@ -32,7 +32,6 @@ import { SpotlightSearch } from '../shell/SpotlightSearch';
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
 // The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
-import { setSoundEnabled, isSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
@@ -364,6 +363,14 @@ const getUsableFloatingBounds = (
 
 // Creative/pro apps that open maximized by default
 const CREATIVE_APPS: ReadonlySet<string> = new Set(['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl']);
+
+// Small utilities open as a compact floating window at their own size (like
+// Calculator on macOS), never as a full-screen tab with empty space around a
+// 340px keypad. A size the user resized to is remembered (floatingBounds).
+const COMPACT_APPS: ReadonlySet<string> = new Set([
+  'calculator', 'passwordgenerator', 'stopwatch', 'timer', 'unitconverter', 'pomodoro',
+  'qrcode', 'colorpicker', 'weather', 'worldclock', 'noisegenerator',
+]);
 
 // Platform detection for title bar overlay handling
 const IS_WINDOWS = navigator.platform.includes('Win');
@@ -782,8 +789,6 @@ export const AppManager: React.FC = () => {
   const [windowControls, setWindowControls] = useState<'system' | 'traffic'>(getWindowControlStyle);
   const nativeOverlayWidth = 0; // Custom buttons rendered; no native overlay padding needed
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
-  // Shared with Settings -> Sound; persisted by SpatialAudio itself.
-  const spatialAudioOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
 
   // Dock-reserved inset CSS variables are published in an effect lower down,
   // after `anyWindowMaximized` is declared (it is one of the dependencies).
@@ -829,7 +834,6 @@ export const AppManager: React.FC = () => {
   // no longer the center's source of truth; this store survives reloads and is
   // grouped + priority-ordered via the shared policy.
   const hubNotifications = useNotificationCenterStore(s => s.notifications);
-  const hubUnreadCount = useNotificationCenterStore(s => s.unreadCount);
   const hubLoadNotifications = useNotificationCenterStore(s => s.loadNotifications);
   const hubLoadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
   const hubMarkRead = useNotificationCenterStore(s => s.markRead);
@@ -1219,7 +1223,6 @@ export const AppManager: React.FC = () => {
     }
   }, [runningApps, currentAppId, setCurrentRunningApp]);
 
-  const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
 
   // -- CalmFocusEngine: record input activity so the engine can decide whether
   //    to suppress non-essential interruptions (hover glows, tips, badges)
@@ -1237,25 +1240,6 @@ export const AppManager: React.FC = () => {
     };
   }, []);
 
-  // Close the control-center dropdown on any outside click without painting a
-  // full-screen invisible overlay (which polluted the page with a fixed div).
-  useEffect(() => {
-    if (!titlebarMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest('[aria-label="Control center"]')) return;
-      if (target.closest('[aria-label="Open control center"]')) return;
-      setTitlebarMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setTitlebarMenuOpen(false); };
-    document.addEventListener('mousedown', onDown, true);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown, true);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [titlebarMenuOpen]);
 
   // Detect if any floating window is maximized (covers >85% of screen)
   const anyWindowMaximized = useMemo(() => {
@@ -1416,6 +1400,15 @@ export const AppManager: React.FC = () => {
   const currentApp: AppId = (currentAppId !== 'home' && !mountedAppsRef.current.has(currentAppId as AppId) && runningApps.length === 0)
     ? 'home'
     : currentAppId as AppId;
+
+  // A full-surface app (a tab, not a floating window) is in front. The DEX Bar
+  // auto-hides over it so the app fills the whole viewport (reveal it at the
+  // bottom edge), instead of every app reserving a strip under the bar.
+  const fullscreenFront = currentApp !== 'home' && !detachedApps.has(currentApp) && !spatialEnabled;
+  useEffect(() => {
+    (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront = fullscreenFront;
+    window.dispatchEvent(new CustomEvent('dex-fullscreen-front', { detail: fullscreenFront }));
+  }, [fullscreenFront]);
 
   // Also reset the store so subsequent renders stay consistent
   const didResetRef = useRef(false);
@@ -1870,11 +1863,54 @@ export const AppManager: React.FC = () => {
     requestAnimationFrame(() => detachApp(appId));
   }, [bringToFront, detachApp, detachedApps, launchApp, minimizedApps, restoreFloatingApp]);
 
+  // Compact apps the user docked into a tab on purpose stay tabs this session.
+  const userTabbedRef = useRef<Set<string>>(new Set());
   const reattachApp = useCallback((appId: AppId) => {
+    userTabbedRef.current.add(appId);
     restoredWindowBoundsRef.current.delete(appId);
     setDetachedApps(prev => { const n = new Map(prev); n.delete(appId); return n; });
     setCurrentApp(appId);
   }, [setCurrentApp]);
+
+  // A compact app brought to the front as a tab (DEX Bar, Home, Spotlight all
+  // launch through the store) floats instead, centred at its own size; the app
+  // that was in front stays in front behind it.
+  const lastTabFrontRef = useRef<AppId>('home');
+  useEffect(() => {
+    const id = currentApp;
+    if (!COMPACT_APPS.has(id)) {
+      if (!detachedApps.has(id)) lastTabFrontRef.current = id;
+      return;
+    }
+    if (detachedApps.has(id) || spatialEnabled || splitMode !== 'off' || userTabbedRef.current.has(id)) return;
+    const def = APP_WINDOW_SIZES[id];
+    if (!def) return;
+    if (!mountedAppsRef.current.has(id)) { mountedAppsRef.current.add(id); forceUpdate(n => n + 1); }
+    setDetachedApps(prev => {
+      if (prev.has(id)) return prev;
+      const ws = getShellWorkspace(0);
+      const remembered = getFloatingBounds(id);
+      let rect: { x: number; y: number; w: number; h: number };
+      if (remembered && !isMaximizedRect(remembered, ws)) {
+        rect = clampWindowToWorkspace({ x: remembered.x, y: remembered.y, w: remembered.w, h: remembered.h }, ws);
+      } else {
+        const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, ws);
+        const base = {
+          x: ws.x + Math.round((ws.w - fitted.w) / 2),
+          y: ws.y + Math.max(8, Math.round((ws.h - fitted.h) / 3)),
+          w: fitted.w, h: fitted.h,
+        };
+        rect = cascadeWindow(base, Array.from(prev.values()).map(b => ({ x: b.x, y: b.y })), ws);
+      }
+      const next = new Map(prev);
+      next.set(id, { ...rect, z: nextDetachZ() });
+      return next;
+    });
+    const back = lastTabFrontRef.current;
+    const backRunning = back !== 'home' && back !== id && useRunningApps.getState().isAppRunning(back);
+    setCurrentRunningApp(backRunning ? back : 'home');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentApp]);
 
   // Persist the live floating-window layout (geometry + z-order + minimized) to
   // the window manifest. The infra existed but scheduleWrite was NEVER called, so
@@ -2968,6 +3004,21 @@ export const AppManager: React.FC = () => {
   const handleMinimize = () => { window.dex?.window?.minimize?.(); };
   const handleMaximize = () => { window.dex?.window?.maximize?.(); };
   const handleClose = () => { window.dex?.invoke?.('window:hide').catch(() => {}); };
+
+  // Control Center drives volume and opens the Notification Center by event.
+  useEffect(() => {
+    const onVol = (e: Event) => {
+      const v = Number((e as CustomEvent<number>).detail);
+      if (Number.isFinite(v)) setSystemVolume(Math.max(0, Math.min(100, Math.round(v))));
+    };
+    const onNotif = () => setShowNotifCenter(true);
+    window.addEventListener('dex-set-system-volume', onVol);
+    window.addEventListener('dex-open-notification-center', onNotif);
+    return () => {
+      window.removeEventListener('dex-set-system-volume', onVol);
+      window.removeEventListener('dex-open-notification-center', onNotif);
+    };
+  }, []);
 
   // Stay maximized: only apply when user explicitly toggles it on
   // Persist system volume and broadcast to all audio elements
@@ -4581,7 +4632,8 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
-            paddingBottom: appId === 'home' ? 0 : barInset,
+            // No bottom reserve: the DEX Bar hides over a full-surface app.
+            // (A padded strip here painted a band under every app.)
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -4937,7 +4989,7 @@ export const AppManager: React.FC = () => {
         <button style={{...navBtnStyle, opacity: navIndex < navHistoryRef.current.length - 1 ? 1 : 0.4, cursor: navIndex < navHistoryRef.current.length - 1 ? 'pointer' : 'not-allowed'}} onClick={goForward} disabled={navIndex >= navHistoryRef.current.length - 1} data-tip="Forward" aria-label="Navigate forward" aria-disabled={navIndex >= navHistoryRef.current.length - 1}>
           {Icons.chevronRight}
         </button>
-        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
+        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
         <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--dex-focus-color, #fff)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
@@ -5008,8 +5060,6 @@ export const AppManager: React.FC = () => {
             essential window controls are never pushed off the right edge. It all
             stays reachable from the control-center popover. */}
         <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-          {/* WiFi indicator - compact dot */}
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
           {/* Quick Controls -- network mode + permission pills with popovers */}
           <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
@@ -5034,210 +5084,9 @@ export const AppManager: React.FC = () => {
           </svg>
         </button>
 
-        {/* Notification Center bell removed at the owner's request -- the top bar
-            stays minimal (system status + control center only). The hub-backed
-            notification center opens from the "Notifications" item in the
-            control-center menu (the dropdown below). */}
-        {/* Menu dropdown trigger */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setTitlebarMenuOpen(v => !v)}
-            onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }}
-            title="Controls"
-            aria-label="Open control center"
-            aria-expanded={titlebarMenuOpen}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 18, borderRadius: 4,
-              background: titlebarMenuOpen ? 'var(--color-border)' : 'transparent',
-              border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round">
-              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-            </svg>
-          </button>
-          {/* Dropdown panel */}
-          {titlebarMenuOpen && (
-            <>
-              <style>{`@keyframes titlebarDropIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
-              <div
-                role="menu"
-                aria-label="Control center"
-                style={{
-                  position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
-                  minWidth: 220, padding: '6px 0',
-                  // Master overhaul: glass control-center popover (Part 2.2 / Part 4 Pop UI).
-                  background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-                  backdropFilter: 'var(--glass-blur, blur(20px))',
-                  WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
-                  borderRadius: 10, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-                  boxShadow: 'var(--pg-shadow-modal)',
-                  animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
-                  transformOrigin: 'top right',
-                }}
-              >
-                {/* User Profile */}
-                <button
-                  role="menuitem"
-                  onClick={() => { setCurrentApp('settings' as AppId); setTitlebarMenuOpen(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
-                  </svg>
-                  Settings &amp; Profile
-                </button>
-                {/* Notifications -- opens the hub-backed Notification Center. This is
-                    the "reachable from the control-center menu" path the owner asked
-                    for (top bar stays bell-free); previously the center had no opener. */}
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowNotifCenter(true); setTitlebarMenuOpen(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                  </svg>
-                  <span style={{ flex: 1 }}>Notifications</span>
-                  {hubUnreadCount > 0 && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: '#fff',
-                      background: 'var(--color-error)', borderRadius: 10,
-                      minWidth: 16, height: 16, padding: '0 5px',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      lineHeight: 1,
-                    }}>
-                      {hubUnreadCount > 99 ? '99+' : hubUnreadCount}
-                    </span>
-                  )}
-                </button>
-                {/* Network Status */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: 'var(--space-2) 14px', fontSize: 13, color: 'var(--color-text-primary)',
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'}/>
-                  </svg>
-                  {navigator.onLine ? 'Wi-Fi: Connected' : 'Wi-Fi: Offline'}
-                </div>
-                {/* Volume */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 14px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>{systemVolume > 0 && <path d="M15.54 8.46a5 5 0 010 7.07"/>}{systemVolume > 40 && <path d="M19.07 4.93a10 10 0 010 14.14"/>}
-                  </svg>
-                  <input
-                    type="range" min={0} max={100} value={systemVolume}
-                    onChange={e => setSystemVolume(Number(e.target.value))}
-                    aria-label="System volume"
-                    style={{ flex: 1, height: 3, accentColor: '#fff', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 22, textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' as any }}>{systemVolume}</span>
-                </div>
-                <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 0' }} />
-                {/* Spatial Audio toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={spatialAudioOn ? 'var(--color-success)' : 'var(--color-text-secondary)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 10s3-4 10-4 10 4 10 4"/><path d="M2 14s3 4 10 4 10-4 10-4"/><circle cx="12" cy="12" r="2"/></svg>
-                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Spatial Audio</span>
-                  </div>
-                  <button
-                    onClick={() => setSoundEnabled(!spatialAudioOn)}
-                    aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
-                    style={{
-                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: spatialAudioOn ? 'var(--color-accent)' : 'var(--color-border)',
-                      position: 'relative', transition: 'background 0.2s ease', padding: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: 2, left: 2,
-                      transform: spatialAudioOn ? 'translateX(14px)' : 'translateX(0)',
-                      transition: 'transform 0.2s ease',
-                      boxShadow: 'var(--pg-shadow-chip)',
-                    }} />
-                  </button>
-                </div>
-                {/* Reduce Motion toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Reduce Motion</span>
-                  <button
-                    onClick={() => {
-                      const cur = isReduceMotion();
-                      try { localStorage.setItem('dex-reduce-motion', String(!cur)); } catch (e) { console.warn('[DEX]', e); }
-                      window.location.reload();
-                    }}
-                    aria-label="Toggle reduce motion"
-                    style={{
-                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: isReduceMotion() ? 'var(--color-accent)' : 'var(--color-border)',
-                      position: 'relative', transition: 'background 0.2s ease', padding: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: 2, left: 2,
-                      transform: isReduceMotion() ? 'translateX(14px)' : 'translateX(0)',
-                      transition: 'transform 0.2s ease',
-                      boxShadow: 'var(--pg-shadow-chip)',
-                    }} />
-                  </button>
-                </div>
-                <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 0' }} />
-                {/* Window Controls Toggle — only show on macOS where both styles make sense */}
-                {!IS_WINDOWS && (
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    const next = windowControls === 'traffic' ? 'system' : 'traffic';
-                    setWindowControls(next);
-                    try { localStorage.setItem('dex-window-controls', next); } catch (e) { console.warn('[DEX]', e); }
-                    window.dispatchEvent(new Event('dex-window-controls-changed'));
-                    setTitlebarMenuOpen(false);
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  {windowControls === 'traffic' ? (
-                    <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff5f57' }} />
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#febc2e' }} />
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#28c840' }} />
-                    </span>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="16" height="12" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
-                  )}
-                  {windowControls === 'traffic' ? 'Switch to System Controls' : 'Switch to Traffic Lights'}
-                </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        {/* One Control Center: notifications, sound, display, network and
+            settings all live in the panel (the old second "controls" dropdown
+            repeated half of it at a different size). */}
         {windowControls === 'system' && (
           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <div style={{ width: 1, height: 12, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
