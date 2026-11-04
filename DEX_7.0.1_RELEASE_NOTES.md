@@ -69,7 +69,7 @@
 
 ## Upgrading
 
-Run `DEX_7.0.1_x64-setup.exe`. It detects the installed version, replaces it, and keeps your notes, settings and files. To go back, uninstall 7.0.1 and run the 6.1.0 setup from the [v6.1.0 release](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0); your data folder is not removed by uninstalling unless you tick "Delete the application data".
+Run `DEX_7.0.1_x64-setup.exe`. It detects the installed version, replaces it, and keeps your notes, settings and files. On first start DEX asks you once to accept the updated Terms of Use and Privacy Policy; your apps and settings are not changed. To go back, uninstall 7.0.1 and run the 6.1.0 setup from the [v6.1.0 release](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0); your data folder is not removed by uninstalling unless you tick "Delete the application data".
 
 ## Security and integrity
 
