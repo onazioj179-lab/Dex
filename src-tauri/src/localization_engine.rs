@@ -28,7 +28,7 @@ use serde_json::{json, Map, Value};
 const ENGLISH_STRINGS: &[(&str, &str)] = &[
     // Global
     ("app.name", "DEX"),
-    ("app.tagline", "Personal Control Hub"),
+    ("app.tagline", "Desktop environment"),
     ("common.save", "Save"),
     ("common.cancel", "Cancel"),
     ("common.delete", "Delete"),

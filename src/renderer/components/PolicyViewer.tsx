@@ -48,17 +48,59 @@ const tabButton = (active: boolean): React.CSSProperties => ({
   cursor: 'pointer',
 });
 
-function renderPolicyBody(body: string): React.ReactNode {
-  return body.split('\n').map((line, index) => {
+/** Inline Markdown: `code` spans render as plain text in a mono face. */
+function inline(text: string): React.ReactNode {
+  const parts = text.split(/`([^`]+)`/);
+  return parts.map((p, i) => (i % 2 ? <code key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95em' }}>{p}</code> : p));
+}
+
+const cellStyle: React.CSSProperties = { padding: '5px 8px', borderBottom: '1px solid var(--color-border-subtle)', verticalAlign: 'top', textAlign: 'left' };
+
+/** Minimal Markdown for the bundled policies: headings, paragraphs, lists and tables. */
+export function renderPolicyBody(body: string): React.ReactNode {
+  const lines = body.split('\n');
+  const out: React.ReactNode[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('|')) {
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].startsWith('|')) {
+        const cells = lines[i].split('|').slice(1, -1).map(c => c.trim());
+        if (!cells.every(c => /^:?-{3,}:?$/.test(c))) rows.push(cells);
+        i++;
+      }
+      i--;
+      const [head, ...rest] = rows;
+      out.push(
+        <table key={i} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, lineHeight: 1.5, margin: '4px 0 10px', color: 'var(--pg-text-secondary, #cbd5e1)' }}>
+          <thead><tr>{head.map((c, k) => <th key={k} style={{ ...cellStyle, fontWeight: 600, color: 'var(--pg-text-primary)' }}>{inline(c)}</th>)}</tr></thead>
+          <tbody>{rest.map((r, k) => <tr key={k}>{r.map((c, j) => <td key={j} style={cellStyle}>{inline(c)}</td>)}</tr>)}</tbody>
+        </table>,
+      );
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].startsWith('- ')) { items.push(lines[i].slice(2)); i++; }
+      i--;
+      out.push(
+        <ul key={i} style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: 'var(--pg-text-secondary, #cbd5e1)' }}>
+          {items.map((t, k) => <li key={k}>{inline(t)}</li>)}
+        </ul>,
+      );
+      continue;
+    }
     if (line.startsWith('# ')) {
-      return <h2 key={index} style={{ fontSize: 18, margin: '0 0 10px', color: 'var(--pg-text-primary)' }}>{line.slice(2)}</h2>;
+      out.push(<h2 key={i} style={{ fontSize: 18, margin: '0 0 10px', color: 'var(--pg-text-primary)' }}>{line.slice(2)}</h2>);
+    } else if (line.startsWith('## ')) {
+      out.push(<h3 key={i} style={{ fontSize: 13, margin: 'var(--space-4) 0 6px', color: 'var(--color-accent, #4A9EFF)' }}>{line.slice(3)}</h3>);
+    } else if (!line.trim()) {
+      out.push(<div key={i} style={{ height: 6 }} />);
+    } else {
+      out.push(<p key={i} style={{ fontSize: 12, lineHeight: 1.6, margin: '0 0 7px', color: 'var(--pg-text-secondary, #cbd5e1)' }}>{inline(line)}</p>);
     }
-    if (line.startsWith('## ')) {
-      return <h3 key={index} style={{ fontSize: 13, margin: 'var(--space-4) 0 6px', color: 'var(--color-accent, #4A9EFF)' }}>{line.slice(3)}</h3>;
-    }
-    if (!line.trim()) return <div key={index} style={{ height: 6 }} />;
-    return <p key={index} style={{ fontSize: 12, lineHeight: 1.6, margin: '0 0 7px', color: 'var(--pg-text-secondary, #cbd5e1)' }}>{line}</p>;
-  });
+  }
+  return out;
 }
 
 const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy = 'terms', onClose, compact = false }) => {
@@ -73,7 +115,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
         <div>
           <div style={{ fontSize: 15, fontWeight: 700 }}>DEX Legal & Privacy</div>
           <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', marginTop: 3 }}>
-            Required diagnostics, optional analytics, local personalization, and strict user rules.
+            What DEX stores and sends, and the rules for using it.
           </div>
         </div>
         {onClose && (

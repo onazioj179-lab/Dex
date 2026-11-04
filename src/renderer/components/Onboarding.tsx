@@ -144,7 +144,7 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
       Welcome to DEX
     </h1>
     <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: '0 0 var(--space-10)', lineHeight: 1.6 }}>
-      Your personal control hub for desktop automation.
+      Your apps, files and creative tools in one workspace.
     </p>
     <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
       <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext} aria-label="Get started with setup">Get Started</Button>
@@ -253,7 +253,7 @@ const PolicyAcceptanceScreen: React.FC<{
           style={{ marginTop: 2, accentColor: 'var(--color-accent, #4A9EFF)' }}
         />
         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics, optional analytics, and the data use for product improvement and model and system training described in those policies. DEX is free for everyone — no ads, no paid tiers, and your private files and secrets are never collected.
+          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>. DEX is free, keeps your data on this computer, and sends nothing in the background. Your files, passwords and clipboard are never collected.
         </span>
       </label>
 

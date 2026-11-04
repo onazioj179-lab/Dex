@@ -1,130 +1,80 @@
-# DEX -- Privacy Policy
+# DEX Privacy Policy
 
-**Effective date:** 2026-06-13  
-**Contact:** onazi75@gmail.com  
-**Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
+Effective date: 2026-11-04
+Contact: onazi75@gmail.com
 
-> This document is a working draft and is not a substitute for professional legal advice. It should be reviewed and finalized by qualified counsel before public commercial release.
+DEX is a desktop environment that runs on your computer. It is free, has no advertising and needs no account. This policy describes what DEX stores, what it sends and when, and the controls you have. It reflects what the software does in version 7.0.1.
 
-DEX is free for everyone: every feature is available to all users at no cost, with no paid plans, no paid tiers, no in-app purchases, and no advertising. In exchange, DEX may use limited data to operate and improve the product.
+## 1. The short version
 
-DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement. Be aware that some minimal diagnostics do leave your device, and DEX uses permitted data to improve the system; DEX does not claim that nothing ever leaves your machine. Some features may connect third-party service providers or integration partners, as described below.
+- DEX keeps your data on your computer.
+- DEX sends nothing in the background. It has no analytics, no telemetry, no crash upload and no advertising.
+- DEX contacts an online service only when you use a feature that needs one, and only that service receives the request. Section 3 lists them.
+- Passwords, Vault items, clipboard contents, your files and your documents are never collected by DEX.
 
-This policy explains what DEX may process, why, and what controls users should have.
+## 2. Data stored on your computer
 
----
+| What | Where | How to remove it |
+|---|---|---|
+| Notes, tasks, calendar, settings and other app data | The DEX data folder (`%APPDATA%\com.onazioj.dex`) | Delete items in the apps, or Settings › Reset DEX |
+| Search index of your Documents, Desktop and Downloads folders, notes and clipboard history | The DEX data folder | Rebuilt automatically if removed |
+| Clipboard history | The DEX data folder | Clipboard history › Clear. Copies made inside DEX are kept; copies from other programs are kept only if you turn on "Include copies from other apps" |
+| Vault (passwords) | `vault.dex`, encrypted with AES-256-GCM using a key derived from your master password (Argon2id). The master password is never stored | Vault |
+| Assistant (UKI) conversations and memory | The DEX data folder, encrypted | UKI settings: turn off Memory Recording, set Retention, forget items, export, or Clear All Memory |
+| AI provider keys | Encrypted for your Windows account (DPAPI) | AI Providers settings |
+| Diagnostics: crash log, startup and app-launch timings, frame timing, interface errors | The DEX data folder and the interface storage | Shown in Nexus › Diagnostics. They contain numbers, app names and error messages, never document contents |
+| Startup log (version, WebView2 runtime, errors) | `%LOCALAPPDATA%\com.onazioj.dex\logs` | Settings › Storage › Clear caches |
+| Interface state and web caches | The WebView2 profile in `%LOCALAPPDATA%\com.onazioj.dex` | Settings › Storage › Clear caches |
 
-## 1. Summary
+When you uninstall DEX with the .exe installer, it offers to delete this data.
 
-| Category | Default | Purpose | User control |
-|---|---|---|---|
-| Required diagnostics | Required | Reliability, security, compatibility, updates, recovery | View category; cannot disable minimum needed signals |
-| Optional product analytics | Off | Product improvement, performance, UX, feature direction | Toggle in Settings |
-| Local personalization | Local | Improve the user's own experience on-device | Clear local data / disable related features |
-| Feedback submissions | User-submitted | Support, troubleshooting, improvement, model/system evaluation | Review before sending |
-| User content samples | User-submitted or opt-in | Improve AI, automation, search, recommendations, safety | Submit/opt in intentionally |
-| Sensitive content | Never by default | Protect secrets and private material | Warning before diagnostic capture when risk exists |
-| Plugin data | Feature-controlled | Plugin operation | Review/revoke plugin permissions |
-| Cloud/sync data | Off by default | Sync, backup, cloud features | Enable/disable and delete where supported |
-| Partner/service-provider sharing | As needed | Operate hosting, analytics, crash reporting, support, integrations | Disable connected integrations; California opt-out of sale/sharing |
+## 3. Online services DEX uses, and when
 
-## 2. Required Diagnostics
+DEX makes these requests only when you use the feature. Each service receives the request and your IP address, and handles it under its own privacy policy.
 
-DEX may process minimum diagnostics needed to keep the product secure, reliable, compatible, updated, and recoverable. Examples include:
+| Feature | Service | What is sent |
+|---|---|---|
+| Weather | Open-Meteo (`open-meteo.com`) | The city you search for, or the coordinates of a place you choose |
+| Maps | OpenFreeMap; Esri ArcGIS and OpenTopoMap for the Satellite and Topo styles; Open-Meteo for place search | Map tiles for the area you view; your search text |
+| Maps › My location | Windows location service | Used only on your computer to center the map. Location is off until you turn it on in Settings |
+| Assistant answers without an AI provider | DuckDuckGo, Wikipedia, WorldTimeAPI, Free Dictionary API, ExchangeRate-API | Your question, or the time zone, word or currency you ask about |
+| Assistant with an AI provider | The provider whose API key you add: OpenAI, Anthropic, Google Gemini or OpenRouter | Your message, recent conversation and the DEX context the request needs; file text (up to 64 KB) only with your file-read permission; one screen image only after you pick a window or screen in the Windows picker |
+| Voice input | The WebView2 speech service, which can use Microsoft's online speech recognition | Your voice while the microphone control is on |
+| Browser | The websites you visit | Normal web traffic. Sites may set their own cookies |
+| Link previews | The linked website | A request for the page's title and preview |
+| Git | The remote repositories you configure | Git traffic |
+| File sharing on your network | Devices on your local network | Only the files you choose to share, while sharing is on |
 
-- App version, build channel, platform, device class, and compatibility state.
-- Crash category, error class, startup timing, update/install state, and health status.
-- Security event category, blocked operation category, and abuse/failure indicators.
+The assistant's Processing setting controls where requests can go. "Local only" never sends requests to a cloud provider.
 
-Required diagnostics are not intended to include private file contents, passwords, vault secrets, clipboard contents, full screenshots, or full crash dumps.
+## 4. Permissions
 
-## 3. Optional Product Analytics
+Settings › Permissions lists what DEX itself may use (clipboard, microphone, camera, location, notifications and others), with Allow, Ask or Block for each and when each was last requested. Websites in the Browser ask for permissions separately. The assistant's own access (files, network, screen) is listed on the same page and can be revoked at any time.
 
-Optional analytics are off by default. If enabled, DEX may collect product interaction and performance signals such as:
+## 5. What DEX does not do
 
-- Feature usage counts and workflow usage statistics.
-- Render, startup, memory, and performance traces.
-- Non-content interaction patterns and reliability indicators.
+- It does not sell or share personal information.
+- It does not show advertising or use advertising identifiers.
+- It does not send analytics, usage statistics, diagnostics or crash reports.
+- It does not record your screen, camera or microphone in the background.
+- It does not set tracking cookies.
 
-DEX uses optional analytics to improve product quality, prioritize features, improve performance, train/evaluate product systems, and design better user experiences.
+## 6. Sending information to the developer
 
-## 4. Local Personalization
+DEX sends nothing to the developer. If you email the developer or open an issue on GitHub, you choose what to include, and that message is used only to answer you and fix problems. Nexus › Diagnostics › Copy report copies a summary that contains numbers, app names and statuses only, so you can review it before sharing.
 
-DEX may learn usage patterns on your device to personalize your own experience, such as frequent apps, layout preferences, command patterns, local automation suggestions, and workflow timing. Local personalization does not send those patterns out by default.
+## 7. Your rights
 
-## 5. Feedback and User-Submitted Samples
+All DEX data is on your computer and under your control: you can view, export and delete it with the tools in section 2. The developer holds no personal data about DEX users unless you send it. To ask a privacy question or exercise a right under laws such as the GDPR or the CCPA, contact onazi75@gmail.com.
 
-When you intentionally submit feedback, logs, screenshots, crash details, prompts, files, snippets, workflow examples, or other samples, DEX may use them to:
+## 8. Children
 
-- Provide support and diagnose problems.
-- Improve DEX features, reliability, safety, and performance.
-- Train, evaluate, tune, and test models, automation, recommendations, search, classification, and safety systems.
-- Develop new product capabilities.
+DEX is not directed to children under 13, or the minimum age required where you live.
 
-Review submissions before sending. Do not submit material you do not have the right to share.
+## 9. Changes
 
-## 6. Sensitive Content
+If this policy changes in a way that affects your data, DEX shows the new version and asks you to accept it before you continue. Earlier versions are in the project's history on GitHub.
 
-Passwords, vault items, private files, clipboard content, chats, screenshots, and crash dumps are not collected or shared by default. If a diagnostic, support, cloud, AI, or feedback feature may include sensitive content, DEX should warn you or require your action before submission.
+## 10. Contact
 
-## 7. Network, Cloud, Sync, and Plugins
-
-Network requests occur when needed for enabled features such as updates, browser navigation, plugins with network permission, cloud/sync features, support submissions, required diagnostics, or optional analytics.
-
-Plugins and third-party services may have their own privacy practices. You are responsible for permissions you grant and third-party services you connect.
-
-## 8. How DEX Uses Data
-
-DEX may use permitted data to:
-
-- Provide, maintain, secure, update, troubleshoot, and support the product.
-- Improve reliability, performance, compatibility, accessibility, battery use, and UX.
-- Personalize the experience.
-- Train, evaluate, tune, test, and improve models and automation systems.
-- Detect abuse, protect users, enforce policies, and investigate security incidents.
-- Respond to requests and operate the product.
-
-DEX is free for everyone and does not collect or share data to deliver advertising.
-
-### Sharing with service providers and partners
-
-DEX may share data with service providers who process it on our behalf (hosting, analytics, crash reporting, customer support), with integration partners you choose to connect, and where required for legal, safety, or business-transfer reasons. Providers and partners may use the data only for the purposes DEX authorizes.
-
-## 9. Data Storage and Retention
-
-Local app data may be stored on your device in application storage, IndexedDB, SQLite catalogs, caches, logs, plugin storage, and encrypted stores. Retention depends on the feature and your settings. Optional submissions may be retained as needed for support, security, legal, product improvement, and model/system development unless deletion is required by law or honored through available controls.
-
-## 10. Your Choices and Rights
-
-DEX should provide controls to:
-
-- View data categories.
-- Toggle optional analytics.
-- Disable cloud/sync.
-- Export local data.
-- Delete local data.
-- Review policy versions and acceptance state.
-- Contact DEX at onazi75@gmail.com for privacy requests.
-
-Depending on where you live, you may have additional rights under laws such as the **GDPR** (EU/UK) and the **CCPA/CPRA** (California) -- including access, correction, deletion, and portability. **California residents** may exercise the right to opt out of the "sale" or "sharing" of personal information by contacting onazi75@gmail.com; DEX honors recognized opt-out preference signals where required by law.
-
-Some minimum diagnostics may be required for reliability, security, compatibility, and updates.
-
-## 11. Children
-
-DEX is not directed to children under 13 or the minimum age required in your jurisdiction. Do not use DEX if you are not legally allowed to accept the Terms and Privacy Policy.
-
-## 12. Changes
-
-Material changes may require re-acceptance. The latest policies are always available in Settings and in the bundled policy viewer.
-
-## 13. Contact
-
-Privacy requests and questions:
-
-- **Email:** onazi75@gmail.com
-- **Repository:** https://github.com/onazioj179-lab/Dex
-
----
-
-**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ**.
+onazi75@gmail.com · https://github.com/onazioj179-lab/Dex
