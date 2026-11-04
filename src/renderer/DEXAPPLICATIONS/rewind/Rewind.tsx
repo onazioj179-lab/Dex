@@ -196,6 +196,7 @@ function formatDate(ts: number): string {
 }
 
 import { formatBytes } from '../../../shared/format/units';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 function todayStr(): string {
   const d = new Date();
@@ -389,13 +390,6 @@ const Rewind: React.FC = () => {
   });
   const [backgroundErrorBanner, setBackgroundErrorBanner] = useState<{ message: string; timestamp: number } | null>(null);
   const [todayLogs, setTodayLogs] = useState('');
-  const [updateState, setUpdateState] = useState<{
-    visible: boolean;
-    version?: string;
-    downloading?: boolean;
-    progress?: number;
-    error?: string;
-  }>({ visible: false });
   const [releaseNotesModal, setReleaseNotesModal] = useState<{ version: string; notes: string } | null>(null);
 
   // Overview sub-state (lifted from renderOverview to avoid hooks-in-conditional-function)
@@ -634,6 +628,7 @@ const Rewind: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'rewind')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setCommandPaletteOpen(prev => !prev);
@@ -672,45 +667,8 @@ const Rewind: React.FC = () => {
     return () => dex.rewind.offBackgroundError?.(cb);
   }, []);
 
-  useEffect(() => {
-    const updates = window.dex?.updates;
-    if (!updates) return;
-
-    let active = true;
-    const run = async () => {
-      try {
-        const checkResult = await updates.check();
-        if (!active) return;
-        if (checkResult?.updateAvailable) {
-          setUpdateState({ visible: true, version: checkResult?.info?.version, downloading: false, progress: 0 });
-        }
-      } catch {
-        return;
-      }
-    };
-
-    run().catch((e: unknown) => { console.warn('[DEX]', e); });
-
-    const timer = setInterval(async () => {
-      if (!active || !updateState.visible) return;
-      try {
-        const info = await updates.getInfo();
-        setUpdateState(prev => ({
-          ...prev,
-          version: info.latestVersion || prev.version,
-          downloading: !!info.isDownloading,
-          progress: info.downloadProgress || 0,
-        }));
-      } catch {
-        return;
-      }
-    }, 2000);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [updateState.visible]);
+  // No update check here: the shell's update notice and Settings > Updates own
+  // that (this one ran a network check on every open and rendered nothing).
 
   useEffect(() => {
     const updates = window.dex?.updates;

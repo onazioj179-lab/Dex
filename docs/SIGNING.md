@@ -43,13 +43,13 @@ If you'd rather not put the thumbprint in config (e.g. EV cert on a hardware tok
 ```powershell
 & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign `
   /sha1 YOUR_THUMBPRINT /fd sha256 /tr http://timestamp.digicert.com /td sha256 `
-  "src-tauri\target\release\bundle\nsis\DEX_6.0.0_x64-setup.exe"
+  "src-tauri\target\release\bundle\nsis\DEX_7.0.1_x64-setup.exe"
 ```
 
 Verify:
 
 ```powershell
-signtool verify /pa "src-tauri\target\release\bundle\nsis\DEX_6.0.0_x64-setup.exe"
+signtool verify /pa "src-tauri\target\release\bundle\nsis\DEX_7.0.1_x64-setup.exe"
 ```
 
 ## After signing
@@ -57,7 +57,7 @@ signtool verify /pa "src-tauri\target\release\bundle\nsis\DEX_6.0.0_x64-setup.ex
 Re-upload the signed installer to the release:
 
 ```bash
-gh release upload v6.0.0 "src-tauri/target/release/bundle/nsis/DEX_6.0.0_x64-setup.exe" --clobber
+gh release upload v7.0.1 "src-tauri/target/release/bundle/nsis/DEX_7.0.1_x64-setup.exe" --clobber
 ```
 
 EV certificates clear SmartScreen immediately; OV certificates build reputation

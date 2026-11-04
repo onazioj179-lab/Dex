@@ -25,12 +25,6 @@ import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
 
-// Child effects run before the parent's, so the last value is also kept on
-// window for AppManager to read when its listener attaches.
-function publishBarInset(px: number): void {
-  (window as { __dexBarInset?: number }).__dexBarInset = px;
-  window.dispatchEvent(new CustomEvent('dex-bar-inset', { detail: px }));
-}
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
 
@@ -222,11 +216,8 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
 
   useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
 
-  // Publish how much of the bottom edge the bar covers, so app content and
-  // maximized windows can stop above it. Only when docked in the lower part of
-  // the screen, and only after a drag settles (no per-frame layout churn).
   // Docked = against the bottom edge (like the macOS Dock). A bar left floating
-  // higher up overlays content and never reserves space.
+  // higher up stays put. Nothing reserves space: the bar floats over apps.
   const vhNow = typeof window !== 'undefined' ? window.innerHeight : 800;
   const docked = enabled && vhNow - (pos.y + sizeRef.current.h) <= 64;
 
@@ -262,14 +253,6 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   }, [autoHide]);
   const hidden = autoHide && !revealed && !dragging;
 
-  useEffect(() => {
-    if (dragging) return;
-    // Only a docked, always-shown bar takes space; an auto-hidden one overlays
-    // the app when revealed (reserving for it left a band under every app).
-    const inset = docked && !autoHide ? Math.max(0, Math.round(vhNow - pos.y + EDGE_PAD)) : 0;
-    publishBarInset(inset);
-  }, [pos.y, dragging, docked, autoHide, vhNow]);
-  useEffect(() => () => publishBarInset(0), []);
   useEffect(() => {
     window.addEventListener('resize', clampNow);
     return () => window.removeEventListener('resize', clampNow);

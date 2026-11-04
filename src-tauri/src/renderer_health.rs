@@ -214,7 +214,7 @@ fn monitor(app: &tauri::AppHandle) -> Value {
     let already = MONITOR_STARTED.swap(true, Ordering::SeqCst);
     if !already {
         let app2 = app.clone();
-        std::thread::spawn(move || loop {
+        crate::util::spawn_named("renderer_health", move || loop {
             std::thread::sleep(std::time::Duration::from_secs(60));
             monitor_tick(&app2);
         });

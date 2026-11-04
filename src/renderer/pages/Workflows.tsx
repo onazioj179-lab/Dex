@@ -331,7 +331,7 @@ const ACTION_BLOCKS: ActionBlock[] = [
     configFields: [{ key: 'name', label: 'Process Name', type: 'text' }] },
   { id: 'a48', name: 'Schedule Task', category: 'System', description: 'Run at a scheduled time',
     configFields: [{ key: 'time', label: 'Time (HH:MM)', type: 'text' }, { key: 'repeat', label: 'Repeat', type: 'select', options: ['once', 'daily', 'weekly'] }] },
-  { id: 'a49', name: 'Empty Trash', category: 'System', description: 'Empty the system recycle bin',
+  { id: 'a49', name: 'Empty Trash', category: 'System', description: 'Empty the Windows Recycle Bin',
     configFields: [] },
 
   // Web (4 actions)
@@ -370,7 +370,7 @@ const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNo
     nodes: [
       { id: 't1n1', actionId: 'a1', name: 'Get Files', category: 'Files', x: 80, y: 60, config: { path: '/documents', filter: '*' } },
       { id: 't1n2', actionId: 'a2', name: 'Copy File', category: 'Files', x: 80, y: 200, config: { source: '{input}', dest: '/backup' } },
-      { id: 't1n3', actionId: 'a5', name: 'Send Message', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Files backed up successfully' } },
+      { id: 't1n3', actionId: 'a5', name: 'Send Message', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Files backed up' } },
     ],
     connections: [{ from: 't1n1', to: 't1n2' }, { from: 't1n2', to: 't1n3' }],
   },

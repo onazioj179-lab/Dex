@@ -32,7 +32,7 @@ export function DevicesPane(props: DevicesPaneProps): React.JSX.Element {
   return (
     <SettingsPaneShell
       title="Devices"
-      description="Where you are signed in. Revoke any session you no longer recognise."
+      description="Where you are signed in. Revoke any session you do not recognize."
       testId="settings-pane-devices"
     >
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

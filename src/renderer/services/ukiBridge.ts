@@ -407,7 +407,7 @@ export function initUkiRendererBridge(): void {
           && window.confirm(`Move this to the Recycle Bin?
 
 ${c.target}`)) {
-          Promise.resolve(dex?.invoke?.('files:trash', c.target)).catch(() => notify('Move to Recycle Bin failed'));
+          Promise.resolve(dex?.invoke?.('files:trash', c.target)).catch(() => notify('Could not move it to the Recycle Bin'));
         }
         break;
       case 'rename':

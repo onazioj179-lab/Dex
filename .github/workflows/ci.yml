@@ -1,8 +1,7 @@
 # =============================================================================
 # DEX - CI Pipeline
-# Lint, type-check, unit tests, and renderer/main build on every push/PR.
-# Heavy package/release jobs only run on tags or manual dispatch so the
-# default `main` workflow stays green and fast.
+# Lint, type-check, unit tests, and renderer build on every push/PR.
+# Packaging and publishing live in release.yml (one official setup).
 # =============================================================================
 
 name: CI
@@ -89,8 +88,5 @@ jobs:
       - name: Build
         run: npm run build
 
-  # ---------------------------------------------------------------------------
-  # Package desktop installers (only on tags or manual dispatch)
-  # ---------------------------------------------------------------------------
-
-# Installers (MSI + NSIS) are built and published by release.yml (Tauri).
+  # Installers are NOT built here. The one official Windows setup (Tauri NSIS)
+  # is built and published by .github/workflows/release.yml on a v* tag.

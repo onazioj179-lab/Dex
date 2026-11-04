@@ -1,30 +1,25 @@
 /**
- * DEX Platform - Password Generator
+ * DEX Platform - Password Generator+
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * Secure password generation and management
+ *
+ * Random passwords and passphrases from the platform CSPRNG (see passwordGen.ts).
+ * Generated values are never logged, never sent anywhere, and never written to
+ * disk by this app: recent values live in memory for this session only, and
+ * "Save to Vault" hands one to the encrypted Vault.
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
-import { useToastHelpers } from '../../components/Toast';
-
-// ===========================================================================
-// DEX PASSWORD GENERATOR - Secure Password Management
-// Professional, minimal, secure password generation
-// ===========================================================================
-
-interface PasswordEntry {
-  id: string;
-  password: string;
-  maskedPassword: string;
-  strength: string;
-  date: string;
-  label?: string;
-}
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { useVaultStore } from '../../store/useVaultStore';
+import {
+  generatePassword, generatePassphrase, strengthFor,
+  MIN_LENGTH, MIN_WORDS, MAX_WORDS,
+  type PasswordOptions, type PassphraseOptions, type Generated,
+} from './passwordGen';
 
 // Shannon entropy in bits = length * log2(poolSize), with the pool inferred from
-// the character classes actually present. Bits is the precise security measure
-// behind the categorical strength bar (60+ = strong, 80+ = excellent). Pure +
-// unit-tested.
+// the character classes present. Used for strings this app did not generate
+// (the generator reports its own exact search space). Pure + unit-tested.
 export function passwordEntropyBits(pwd: string): number {
   if (!pwd) return 0;
   let pool = 0;
@@ -35,635 +30,452 @@ export function passwordEntropyBits(pwd: string): number {
   return pool > 0 ? pwd.length * Math.log2(pool) : 0;
 }
 
-const PasswordGenerator: React.FC = () => {
-  // ===== PATTERN LEARNING =====
-  useAppTracking('password');
-  const toast = useToastHelpers();
+type Mode = 'password' | 'passphrase';
 
-  const [password, setPassword] = useState('');
-  const [length, setLength] = useState(16);
-  const [options, setOptions] = useState({
-    uppercase: true,
-    lowercase: true,
-    numbers: true,
-    symbols: true,
-  });
-  const [history, setHistory] = useState<PasswordEntry[]>([]);
-  const [copied, setCopied] = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout>>();
+interface RecentEntry {
+  id: number;
+  value: string;
+  strength: string;
+  at: number;
+}
 
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+const APP_ID = 'passwordgenerator';
+const LEGACY_KEY = 'dex-pwd-history'; // pre-7.0.1 plaintext history
+const PREFS_KEY = 'dex-pwgen-prefs'; // options only, never a generated value
+const CLEAR_AFTER_MS = 30_000;
+const MAX_SLIDER = 64;
+
+interface Prefs { mode: Mode; password: PasswordOptions; passphrase: PassphraseOptions }
+
+const DEFAULT_PREFS: Prefs = {
+  mode: 'password',
+  password: { length: 20, upper: true, lower: true, digits: true, symbols: true, excludeAmbiguous: false },
+  passphrase: { words: 6, separator: '-', capitalize: false, includeNumber: false },
+};
+
+function loadPrefs(): Prefs {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null') as Partial<Prefs> | null;
+    if (!raw) return DEFAULT_PREFS;
+    return {
+      mode: raw.mode === 'passphrase' ? 'passphrase' : 'password',
+      password: { ...DEFAULT_PREFS.password, ...raw.password },
+      passphrase: { ...DEFAULT_PREFS.passphrase, ...raw.passphrase },
     };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+function loadLegacy(): Array<{ password?: string }> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
+    return Array.isArray(raw) ? raw.filter(e => e && typeof e.password === 'string' && e.password) : [];
+  } catch {
+    return [];
+  }
+}
+
+type NativeClipboard = { writeText?: (t: string) => Promise<unknown>; readText?: () => Promise<unknown> };
+function nativeClipboard(): NativeClipboard | undefined {
+  return (window as unknown as { dex?: { clipboard?: NativeClipboard } }).dex?.clipboard;
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  const native = nativeClipboard();
+  if (native?.writeText) {
+    const res = (await native.writeText(text)) as { success?: boolean; error?: string } | undefined;
+    if (res && res.success === false) throw new Error(res.error || 'Clipboard unavailable');
+    return;
+  }
+  if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+  await navigator.clipboard.writeText(text);
+}
+
+/** Clear the clipboard only if it still holds what we put there. */
+async function clearIfStill(text: string): Promise<void> {
+  const native = nativeClipboard();
+  if (native?.readText) {
+    const current = await native.readText().catch(() => null);
+    if (current === text) await native.writeText?.('');
+    return;
+  }
+  // Web fallback: reading would prompt for permission, so clear unconditionally.
+  await navigator.clipboard?.writeText('').catch(() => undefined);
+}
+
+function mask(v: string): string {
+  return v.length <= 4 ? '•'.repeat(v.length) : `${v.slice(0, 2)}${'•'.repeat(Math.min(12, v.length - 4))}${v.slice(-2)}`;
+}
+
+const TIER_COLOR = ['var(--color-error)', 'var(--color-warning)', 'var(--color-accent)', 'var(--color-accent)'];
+
+const PasswordGenerator: React.FC = () => {
+  useAppTracking('password');
+
+  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const [result, setResult] = useState<Generated | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [recent, setRecent] = useState<RecentEntry[]>([]);
+  const [legacy, setLegacy] = useState(loadLegacy);
+  const vaultExists = useVaultStore(s => s.vaultExists);
+  const addCredential = useVaultStore(s => s.addCredential);
+  const [vaultForm, setVaultForm] = useState<{ pending: string[]; master: string; confirm: string; error: string | null } | null>(null);
+  const hasNativeVault = !!(window as unknown as { dex?: { vault?: unknown } }).dex?.vault;
+  const clearTimer = useRef<ReturnType<typeof setTimeout>>();
+  const statusTimer = useRef<ReturnType<typeof setTimeout>>();
+  const nextId = useRef(1);
+
+  useEffect(() => () => {
+    clearTimeout(clearTimer.current);
+    clearTimeout(statusTimer.current);
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('dex-pwd-history');
-      if (saved) setHistory(JSON.parse(saved));
-    } catch (e) {
-      console.warn('[PasswordGenerator] Failed to load history:', e);
-    }
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* private mode */ }
+  }, [prefs]);
+
+  // Learn whether a Vault exists / is unlocked (native app only).
+  useEffect(() => {
+    if (hasNativeVault) void useVaultStore.getState().initialize();
+  }, [hasNativeVault]);
+
+  const flash = useCallback((msg: string) => {
+    setStatus(msg);
+    clearTimeout(statusTimer.current);
+    statusTimer.current = setTimeout(() => setStatus(null), 2500);
   }, []);
 
-  useEffect(() => {
+  const generate = useCallback(() => {
     try {
-      localStorage.setItem('dex-pwd-history', JSON.stringify(history));
+      const next = prefs.mode === 'password' ? generatePassword(prefs.password) : generatePassphrase(prefs.passphrase);
+      setResult(next);
+      setError(null);
+      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'passwordsGenerated', amount: 1 } }));
     } catch (e) {
-      console.warn('[PasswordGenerator] Failed to save history:', e);
+      setResult(null);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, [history]);
+  }, [prefs]);
 
-  const generate = useCallback((nextLength = length, nextOptions = options) => {
-    let chars = '';
-    if (nextOptions.uppercase) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    if (nextOptions.lowercase) chars += 'abcdefghijklmnopqrstuvwxyz';
-    if (nextOptions.numbers) chars += '0123456789';
-    if (nextOptions.symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
+  // Regenerate whenever an option changes.
+  useEffect(() => { generate(); }, [generate]);
 
-    const array = new Uint32Array(nextLength);
-    crypto.getRandomValues(array);
-    setPassword(Array.from(array, v => chars[v % chars.length]).join(''));
-    setCopied(false);
-    window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'passwordsGenerated', amount: 1 } }));
-  }, [length, options]);
+  const value = result?.value ?? '';
+  const strength = strengthFor(result?.entropyBits ?? 0);
 
-  useEffect(() => {
-    generate();
-  }, [generate]);
-
-  const getStrength = (pwd: string) => {
-    let score = 0;
-    if (pwd.length >= 8) score++;
-    if (pwd.length >= 12) score++;
-    if (pwd.length >= 16) score++;
-    if (/[a-z]/.test(pwd)) score++;
-    if (/[A-Z]/.test(pwd)) score++;
-    if (/[0-9]/.test(pwd)) score++;
-    if (/[^a-zA-Z0-9]/.test(pwd)) score += 2;
-
-    if (score <= 3) return { label: 'Weak', pct: 25, tier: 1, color: 'var(--color-error)' };
-    if (score <= 5) return { label: 'Fair', pct: 50, tier: 2, color: 'var(--color-warning)' };
-    if (score <= 7) return { label: 'Good', pct: 75, tier: 3, color: 'var(--color-success)' };
-    return { label: 'Strong', pct: 100, tier: 4, color: 'var(--color-accent)' };
-  };
-
-  const copy = async () => {
-    if (copying || !password) return;
-    if (!navigator.clipboard?.writeText) {
-      toast.error('Clipboard unavailable');
-      return;
-    }
-    setCopying(true);
+  const copy = useCallback(async (text = value) => {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(password);
-    } catch (e: unknown) {
-      console.warn('[PasswordGenerator] copy failed:', e);
-      toast.error('Could not copy to clipboard');
-      setCopying(false);
+      await writeClipboard(text);
+    } catch {
+      flash('Could not copy to the clipboard.');
       return;
     }
-    setCopied(true);
-    setCopying(false);
-    toast.success('Copied to clipboard', 'Password will be cleared from clipboard in 30s');
-    // Clear copied indicator
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
-    // Auto-clear clipboard after 30 seconds for security
-    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
-    clipboardTimerRef.current = setTimeout(() => {
-      navigator.clipboard?.writeText('').catch((e: unknown) => { console.warn('[DEX]', e); });
-    }, 30000);
-  };
+    flash('Copied. The clipboard clears in 30 seconds.');
+    clearTimeout(clearTimer.current);
+    clearTimer.current = setTimeout(() => { void clearIfStill(text); }, CLEAR_AFTER_MS);
+    setRecent(prev => (prev.some(r => r.value === text) ? prev : [
+      { id: nextId.current++, value: text, strength: strengthFor(result?.entropyBits ?? passwordEntropyBits(text)).label, at: Date.now() },
+      ...prev,
+    ].slice(0, 10)));
+  }, [value, result, flash]);
 
-  const maskPassword = (pwd: string): string => {
-    if (pwd.length <= 4) return '*'.repeat(pwd.length);
-    return pwd[0] + '*'.repeat(pwd.length - 2) + pwd[pwd.length - 1];
-  };
+  const storeInVault = useCallback(async (text: string) => {
+    const id = await addCredential({
+      type: 'custom',
+      title: `Generated ${new Date().toLocaleString()}`,
+      password: text,
+      category: 'personal',
+      tags: ['generated'],
+      favorite: false,
+    });
+    return !!id;
+  }, [addCredential]);
 
-  const save = () => {
-    const strength = getStrength(password);
-    setHistory(prev => [{
-      id: Date.now().toString(),
-      password: password,
-      maskedPassword: maskPassword(password),
-      strength: strength.label,
-      date: new Date().toISOString(),
-    }, ...prev.slice(0, 49)]);
-  };
+  const legacyValues = useRef<string[]>([]);
+  legacyValues.current = legacy.map(e => e.password ?? '');
 
-  const deleteEntry = (id: string) => setHistory(prev => prev.filter(h => h.id !== id));
-  const clearAll = () => setHistory([]);
+  /** Save values to the Vault, or ask for the master password first. */
+  const saveAll = useCallback(async (values: string[]) => {
+    const list = values.filter(Boolean);
+    if (list.length === 0) return;
+    if (!useVaultStore.getState().isUnlocked) {
+      setVaultForm({ pending: list, master: '', confirm: '', error: null });
+      return;
+    }
+    let saved = 0;
+    for (const v of list) if (await storeInVault(v)) saved++;
+    if (list === legacyValues.current && saved === list.length) {
+      try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
+      setLegacy([]);
+    }
+    flash(saved === list.length ? (list.length === 1 ? 'Saved to the Vault.' : `Moved ${saved} passwords to the Vault.`) : `Saved ${saved} of ${list.length}. The rest could not be saved.`);
+  }, [storeInVault, flash]);
 
-  const strength = getStrength(password);
+  const submitVaultForm = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vaultForm) return;
+    const store = useVaultStore.getState();
+    if (!store.vaultExists) {
+      if (vaultForm.master.length < 8) { setVaultForm({ ...vaultForm, error: 'Use at least 8 characters.' }); return; }
+      if (vaultForm.master !== vaultForm.confirm) { setVaultForm({ ...vaultForm, error: 'The passwords do not match.' }); return; }
+    }
+    const ok = store.vaultExists ? await store.unlockVault(vaultForm.master) : await store.createVault(vaultForm.master);
+    if (!ok) { setVaultForm({ ...vaultForm, master: '', confirm: '', error: useVaultStore.getState().error || 'Incorrect master password.' }); return; }
+    const pending = vaultForm.pending;
+    setVaultForm(null);
+    await saveAll(pending);
+  }, [vaultForm, saveAll]);
 
-  const Toggle: React.FC<{ label: string; active: boolean; onToggle: () => void }> = ({ label, active, onToggle }) => (
-    <div
-      className="pwgen-toggle"
-      style={{ ...styles.toggle, ...(active ? { borderColor: 'var(--color-success)' } : {}) }}
-      onClick={onToggle}
-      role="switch"
-      aria-checked={active}
-      aria-label={label}
-      tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
-    >
-      <span style={{ ...styles.toggleLabel, ...(active ? { color: 'var(--color-text-primary)' } : {}) }}>{label}</span>
-      <div style={{ ...styles.toggleTrack, background: active ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>
-        <div style={{ ...styles.toggleKnob, transform: active ? 'translateX(20px)' : 'translateX(0)' }} />
-      </div>
-    </div>
-  );
+  const deleteLegacy = useCallback(() => {
+    try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
+    setLegacy([]);
+  }, []);
+
+  // Keyboard: Enter or R regenerates, Ctrl+C (with nothing selected) copies.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, APP_ID)) return; // key meant for another app
+      if (isTypingTarget(e.target)) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod && !e.altKey && (e.key === 'Enter' || e.key.toLowerCase() === 'r')) {
+        if ((e.target as HTMLElement)?.tagName === 'BUTTON' && e.key === 'Enter') return; // let the button act
+        e.preventDefault();
+        generate();
+      } else if (mod && e.key.toLowerCase() === 'c' && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        void copy();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [generate, copy]);
+
+  const setPw = (patch: Partial<PasswordOptions>) => setPrefs(p => ({ ...p, password: { ...p.password, ...patch } }));
+  const setPp = (patch: Partial<PassphraseOptions>) => setPrefs(p => ({ ...p, passphrase: { ...p.passphrase, ...patch } }));
+
+  const pw = prefs.password;
+  const pp = prefs.passphrase;
 
   return (
-    <div style={styles.container} role="region" aria-label="Password Generator">
+    <div style={S.container} role="region" aria-label="Password Generator">
       <style>{`
-        .pwgen-btn { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
-        .pwgen-btn:hover { filter: brightness(1.12); }
-        .pwgen-btn:active { transform: scale(0.97); }
-        .pwgen-action:hover { background: var(--color-border-subtle) !important; }
-        .pwgen-history-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; transform: translateY(-1px); }
-        .pwgen-toggle:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
-        .pwgen-clear:hover { background: var(--color-error-muted, rgba(255,69,58,0.12)) !important; }
-        .pwgen-history-btn:hover { filter: brightness(1.1); border-color: var(--color-border) !important; }
-        .pwgen-copy-icon:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
-        .pwgen-copy-icon:active { transform: scale(0.92); }
-        .pwgen-btn:focus-visible,
-        .pwgen-action:focus-visible,
-        .pwgen-toggle:focus-visible,
-        .pwgen-clear:focus-visible,
-        .pwgen-history-btn:focus-visible,
-        .pwgen-copy-icon:focus-visible {
-          outline: 2px solid var(--color-accent, #0a84ff);
-          outline-offset: 2px;
-        }
-        .pwgen-slider { -webkit-appearance: none; appearance: none; outline: none; }
-        .pwgen-slider::-webkit-slider-thumb {
-          -webkit-appearance: none; appearance: none;
-          width: 18px; height: 18px; border-radius: 50%;
-          background: var(--color-bg-elevated, #fff);
-          border: 2px solid var(--color-accent, #0a84ff);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-          cursor: pointer;
-          transition: transform 0.12s ease, box-shadow 0.12s ease;
-        }
-        .pwgen-slider::-webkit-slider-thumb:hover { transform: scale(1.12); }
-        .pwgen-slider::-moz-range-thumb {
-          width: 18px; height: 18px; border-radius: 50%;
-          background: var(--color-bg-elevated, #fff);
-          border: 2px solid var(--color-accent, #0a84ff);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-          cursor: pointer;
-        }
-        .pwgen-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(10,132,255,0.3); }
-        .pwgen-pwbox { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-        .pwgen-toggle { -webkit-tap-highlight-color: transparent; }
+        .pwg-btn:hover:not(:disabled) { background: var(--color-bg-hover); }
+        .pwg-btn:focus-visible, .pwg-seg:focus-visible, .pwg-check:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+        .pwg-primary:hover:not(:disabled) { filter: brightness(1.08); }
+        .pwg-range { width: 100%; accent-color: var(--color-accent); }
       `}</style>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>Password</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button className="pwgen-history-btn" style={{ ...styles.historyBtn, background: showHistory ? 'var(--color-accent-fill)' : 'var(--color-border)' }} onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" aria-pressed={showHistory} title="Saved passwords">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </button>
 
+      <div style={S.header}>
+        <h1 style={S.title}>Password Generator</h1>
+        <div role="tablist" aria-label="Type" style={S.segmented}>
+          {(['password', 'passphrase'] as Mode[]).map(m => (
+            <button
+              key={m}
+              role="tab"
+              aria-selected={prefs.mode === m}
+              className="pwg-seg"
+              style={{ ...S.seg, ...(prefs.mode === m ? S.segOn : {}) }}
+              onClick={() => setPrefs(p => ({ ...p, mode: m }))}
+            >
+              {m === 'password' ? 'Password' : 'Passphrase'}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div style={styles.main}>
-        {/* Password Display */}
-        <div className="dex-liquid-glass" style={styles.displayCard}>
-          <div className="pwgen-pwbox" style={{ ...styles.passwordBox, ...(copied ? { borderColor: 'var(--color-success)', boxShadow: '0 0 0 1px var(--color-success)' } : {}) }}>
-            <span style={styles.passwordText}>{password}</span>
-            <button
-              className="pwgen-copy-icon"
-              style={styles.inlineCopyBtn}
-              onClick={copy}
-              disabled={copying}
-              aria-label={copied ? 'Copied to clipboard' : 'Copy password'}
-              title={copied ? 'Copied' : 'Copy password'}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {copied ? <polyline points="20 6 9 17 4 12"/> : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>}
-              </svg>
-            </button>
-          </div>
-          
-          {/* Strength Bar */}
-          <div style={styles.strengthRow} role="meter" aria-label="Password strength" aria-valuenow={strength.tier} aria-valuemin={0} aria-valuemax={4} aria-valuetext={strength.label}>
-            <div style={styles.strengthSegments}>
-              {[1, 2, 3, 4].map(seg => (
-                <div
-                  key={seg}
-                  style={{
-                    ...styles.strengthSegment,
-                    background: seg <= strength.tier ? strength.color : 'var(--color-bg-surface)',
-                    boxShadow: seg <= strength.tier ? `0 0 6px ${strength.color}` : 'none',
-                  }}
-                />
+      <div style={S.main}>
+        <section style={S.card}>
+          <output aria-live="polite" aria-label="Generated value" style={S.value}>
+            {error ? <span style={{ color: 'var(--color-error)', fontFamily: 'var(--dex-font-ui)' }}>{error}</span> : value}
+          </output>
+
+          <div style={S.strengthRow} role="meter" aria-label="Strength" aria-valuemin={0} aria-valuemax={4} aria-valuenow={error ? 0 : strength.tier} aria-valuetext={error ? 'None' : strength.label}>
+            <div style={S.segments}>
+              {[1, 2, 3, 4].map(t => (
+                <div key={t} style={{ ...S.segment, background: !error && t <= strength.tier ? TIER_COLOR[strength.tier - 1] : 'var(--color-bg-hover)' }} />
               ))}
             </div>
-            <span style={{ ...styles.strengthLabel, color: strength.color }}>{strength.label}</span>
-            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }} title="Estimated entropy (length x log2 of the character pool)">~{Math.round(passwordEntropyBits(password))} bits</span>
+            <span style={S.strengthLabel}>{error ? '' : strength.label}</span>
+            <span style={S.bits} title="Size of the space this was chosen from">
+              {error ? '' : `${Math.round(result?.entropyBits ?? 0)} bits`}
+            </span>
           </div>
 
-          {/* Action Buttons */}
-          <div style={styles.actions}>
-            <button className="pwgen-btn" style={{ ...styles.actionBtn, ...(copied ? styles.copiedBtn : {}), ...(copying ? { opacity: 0.6, cursor: 'wait' } : {}) }} onClick={copy} disabled={copying} aria-label={copied ? 'Copied to clipboard' : 'Copy password'}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {copied ? <polyline points="20 6 9 17 4 12"/> : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>}
-              </svg>
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-            <button className="pwgen-btn" style={{ ...styles.actionBtn, ...styles.generateBtn }} onClick={() => generate()} aria-label="Generate new password">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-              </svg>
-              <span>Generate</span>
-            </button>
-            <button className="pwgen-btn" style={styles.actionBtn} onClick={save} aria-label="Save password to history">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-              </svg>
-              <span>Save</span>
+          <div style={S.actions}>
+            <button className="pwg-btn pwg-primary" style={{ ...S.btn, ...S.primary }} onClick={generate} title="Enter or R">Generate</button>
+            <button className="pwg-btn" style={S.btn} onClick={() => void copy()} disabled={!value} title="Ctrl+C">Copy</button>
+            <button
+              className="pwg-btn"
+              style={S.btn}
+              onClick={() => void saveAll([value])}
+              disabled={!value || !hasNativeVault}
+              title={hasNativeVault ? 'Save to the encrypted Vault' : 'Available in the installed app'}
+            >
+              Save to Vault
             </button>
           </div>
-        </div>
-
-        {/* Length Slider */}
-        <div className="dex-liquid-glass" style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <span className="dex-label-caps" style={styles.sectionTitle}>Length</span>
-            <span style={styles.lengthValue}>{length}</span>
-          </div>
-          <div style={styles.sliderContainer}>
-            <input
-              className="pwgen-slider"
-              type="range"
-              min="6"
-              max="48"
-              value={length}
-              onChange={e => setLength(Number(e.target.value))}
-              aria-label="Password length"
-              style={{ ...styles.slider, background: `linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent) ${((length - 6) / 42) * 100}%, var(--color-bg-surface) ${((length - 6) / 42) * 100}%, var(--color-bg-surface) 100%)` }}
-            />
-            <div style={styles.sliderLabels}>
-              <span>6</span>
-              <span>48</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Options */}
-        <div className="dex-liquid-glass" style={styles.section}>
-          <span className="dex-label-caps" style={styles.sectionTitle}>Characters</span>
-          <div style={styles.optionsGrid}>
-            <Toggle label="Uppercase A-Z" active={options.uppercase} onToggle={() => setOptions(p => ({ ...p, uppercase: !p.uppercase }))} />
-            <Toggle label="Lowercase a-z" active={options.lowercase} onToggle={() => setOptions(p => ({ ...p, lowercase: !p.lowercase }))} />
-            <Toggle label="Numbers 0-9" active={options.numbers} onToggle={() => setOptions(p => ({ ...p, numbers: !p.numbers }))} />
-            <Toggle label="Symbols !@#" active={options.symbols} onToggle={() => setOptions(p => ({ ...p, symbols: !p.symbols }))} />
-          </div>
-        </div>
-
-        {/* History Panel */}
-        {showHistory && (
-          <div className="dex-liquid-glass-strong" style={styles.historyPanel}>
-            <div style={styles.historyHeader}>
-              <span className="dex-label-caps" style={styles.sectionTitle}>History</span>
-              {history.length > 0 && (
-                <button className="pwgen-clear" style={styles.clearBtn} onClick={clearAll} aria-label="Clear all history">Clear All</button>
+          {vaultForm && (
+            <form onSubmit={submitVaultForm} style={S.vaultForm} aria-label={vaultExists ? 'Unlock the Vault' : 'Create a Vault'}>
+              <div style={S.note}>
+                {vaultExists ? 'Enter your Vault master password.' : 'Create a Vault. Choose a master password; it cannot be recovered if you forget it.'}
+              </div>
+              <input
+                type="password"
+                autoComplete="off"
+                autoFocus
+                placeholder="Master password"
+                aria-label="Master password"
+                value={vaultForm.master}
+                onChange={e => setVaultForm({ ...vaultForm, master: e.target.value, error: null })}
+                style={S.input}
+              />
+              {!vaultExists && (
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Confirm master password"
+                  aria-label="Confirm master password"
+                  value={vaultForm.confirm}
+                  onChange={e => setVaultForm({ ...vaultForm, confirm: e.target.value, error: null })}
+                  style={S.input}
+                />
               )}
+              {vaultForm.error && <div role="alert" style={{ fontSize: 12, color: 'var(--color-error)' }}>{vaultForm.error}</div>}
+              <div style={S.actions}>
+                <button type="submit" className="pwg-btn pwg-primary" style={{ ...S.btn, ...S.primary }} disabled={!vaultForm.master}>
+                  {vaultExists ? 'Unlock and Save' : 'Create and Save'}
+                </button>
+                <button type="button" className="pwg-btn" style={S.btn} onClick={() => setVaultForm(null)}>Cancel</button>
+              </div>
+            </form>
+          )}
+          <div style={S.status} aria-live="polite">{status ?? ''}</div>
+        </section>
+
+        {prefs.mode === 'password' ? (
+          <section style={S.card} aria-label="Password options">
+            <label style={S.rowLabel}>
+              <span>Length</span>
+              <input
+                type="number"
+                min={MIN_LENGTH}
+                max={128}
+                value={pw.length}
+                onChange={e => setPw({ length: Math.max(MIN_LENGTH, Math.min(128, Number(e.target.value) || MIN_LENGTH)) })}
+                style={S.number}
+                aria-label="Length"
+              />
+            </label>
+            <input className="pwg-range" type="range" min={MIN_LENGTH} max={MAX_SLIDER} value={Math.min(pw.length, MAX_SLIDER)} onChange={e => setPw({ length: Number(e.target.value) })} aria-label="Length slider" />
+            <div style={S.checks}>
+              <Check label="Uppercase (A-Z)" checked={pw.upper} onChange={v => setPw({ upper: v })} />
+              <Check label="Lowercase (a-z)" checked={pw.lower} onChange={v => setPw({ lower: v })} />
+              <Check label="Numbers (0-9)" checked={pw.digits} onChange={v => setPw({ digits: v })} />
+              <Check label="Symbols (!@#$)" checked={pw.symbols} onChange={v => setPw({ symbols: v })} />
+              <Check label="Avoid look-alikes (0 O o 1 l I)" checked={pw.excludeAmbiguous} onChange={v => setPw({ excludeAmbiguous: v })} />
             </div>
-            <div style={styles.historyList}>
-              {history.length === 0 ? (
-                <div style={styles.emptyHistory}>
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, marginBottom: 10 }}>
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                  </svg>
-                  <div style={{ fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 4 }}>No saved passwords</div>
-                  <div style={{ fontSize: 11, opacity: 0.8 }}>Generate one and tap Save to keep it here</div>
-                </div>
-              ) : (
-                history.map(entry => (
-                  <div key={entry.id} className="pwgen-history-item" style={styles.historyItem}>
-                    <div style={styles.historyPassword}>{entry.maskedPassword || '********'}</div>
-                    <div style={styles.historyMeta}>
-                      <span>{entry.strength && <span style={{ marginRight: 6, opacity: 0.7 }}>{entry.strength}</span>}{new Date(entry.date).toLocaleDateString()}</span>
-                      <div style={styles.historyActions}>
-                        <button className="pwgen-action" style={{ ...styles.historyActionBtn, color: 'var(--color-accent, #0a84ff)' }} onClick={() => { if (entry.password) { navigator.clipboard?.writeText(entry.password).then(() => toast.success('Copied to clipboard')).catch(() => {}); } }} aria-label="Copy password">Copy</button>
-                        <button className="pwgen-action" style={{ ...styles.historyActionBtn, color: 'var(--color-error)' }} onClick={() => deleteEntry(entry.id)} aria-label="Delete password">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
+          </section>
+        ) : (
+          <section style={S.card} aria-label="Passphrase options">
+            <label style={S.rowLabel}>
+              <span>Words</span>
+              <span style={S.count}>{pp.words}</span>
+            </label>
+            <input className="pwg-range" type="range" min={MIN_WORDS} max={MAX_WORDS} value={pp.words} onChange={e => setPp({ words: Number(e.target.value) })} aria-label="Number of words" />
+            <label style={S.rowLabel}>
+              <span>Separator</span>
+              <select value={pp.separator} onChange={e => setPp({ separator: e.target.value })} style={S.select} aria-label="Separator">
+                <option value="-">Hyphen (-)</option>
+                <option value=" ">Space</option>
+                <option value=".">Period (.)</option>
+                <option value="_">Underscore (_)</option>
+                <option value="">None</option>
+              </select>
+            </label>
+            <div style={S.checks}>
+              <Check label="Capitalize words" checked={pp.capitalize} onChange={v => setPp({ capitalize: v })} />
+              <Check label="Include a number" checked={pp.includeNumber} onChange={v => setPp({ includeNumber: v })} />
             </div>
-          </div>
+          </section>
+        )}
+
+        {legacy.length > 0 && (
+          <section style={{ ...S.card, borderColor: 'var(--color-warning)' }} aria-label="Passwords saved by an earlier version">
+            <div style={S.note}>
+              {legacy.length} {legacy.length === 1 ? 'password' : 'passwords'} saved by an earlier version {legacy.length === 1 ? 'is' : 'are'} stored unencrypted on this computer.
+            </div>
+            <div style={S.actions}>
+              <button className="pwg-btn" style={S.btn} onClick={() => void saveAll(legacyValues.current)} disabled={!hasNativeVault}>Move to Vault</button>
+              <button className="pwg-btn" style={{ ...S.btn, color: 'var(--color-error)' }} onClick={deleteLegacy}>Delete</button>
+            </div>
+          </section>
+        )}
+
+        {recent.length > 0 && (
+          <section style={S.card} aria-label="Copied this session">
+            <div style={S.rowLabel}>
+              <span>Copied this session</span>
+              <button className="pwg-btn" style={S.link} onClick={() => setRecent([])}>Clear</button>
+            </div>
+            {recent.map(r => (
+              <div key={r.id} style={S.recentRow}>
+                <span style={S.recentValue}>{mask(r.value)}</span>
+                <span style={S.recentMeta}>{r.strength}</span>
+                <button className="pwg-btn" style={S.link} onClick={() => void copy(r.value)} aria-label="Copy again">Copy</button>
+                <button className="pwg-btn" style={S.link} onClick={() => setRecent(prev => prev.filter(x => x.id !== r.id))} aria-label="Remove">Remove</button>
+              </div>
+            ))}
+            <div style={S.hint}>Kept in memory only. Closing the app clears this list.</div>
+          </section>
         )}
       </div>
     </div>
   );
 };
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    background: 'var(--color-bg-base)',
-    color: 'var(--color-text-primary)',
-    fontFamily: 'var(--dex-font-ui)',
-    transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 'var(--space-3) var(--space-4)',
-    height: 'var(--app-header-height, 44px)',
-    borderBottom: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface-solid, #1C1C1E)',
-  },
-  title: {
-    fontSize: '14px',
-    fontWeight: 600,
-    margin: 0,
-    letterSpacing: '-0.2px',
-  },
-  historyBtn: {
-    width: '32px',
-    height: '32px',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
-    color: 'var(--color-text-primary)',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.15s ease',
-    boxShadow: 'var(--shadow-sm)',
-  },
-  main: {
-    flex: 1,
-    overflow: 'auto',
-    padding: 'var(--space-4)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--space-4)',
-  },
-  displayCard: {
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-5)',
-  },
-  passwordBox: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-3)',
-    background: 'var(--color-bg-surface)',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-4)',
-    marginBottom: 'var(--space-4)',
-    border: '1px solid var(--color-border-subtle)',
-  },
-  inlineCopyBtn: {
-    flexShrink: 0,
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'transparent',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
-    color: 'var(--color-text-tertiary)',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-  },
-  passwordText: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: 'var(--font-mono)',
-    fontSize: '14px',
-    letterSpacing: '1px',
-    wordBreak: 'break-all',
-    lineHeight: 1.6,
-    color: 'var(--color-text-primary)',
-  },
-  strengthRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-3)',
-    marginBottom: 'var(--space-4)',
-  },
-  strengthBar: {
-    flex: 1,
-    height: '6px',
-    background: 'var(--color-bg-surface)',
-    borderRadius: '4px',
-    overflow: 'hidden',
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: '2px',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 0 8px currentColor',
-  },
-  strengthLabel: {
-    fontSize: '11px',
-    fontWeight: 700,
-    minWidth: '50px',
-    textAlign: 'right',
-    letterSpacing: '0.3px',
-    textTransform: 'uppercase' as const,
-  },
-  actions: {
-    display: 'flex',
-    gap: 'var(--space-2)',
-  },
-  actionBtn: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 'var(--space-2)',
-    padding: '10px',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
-    color: 'var(--color-text-primary)',
-    fontSize: '11px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    fontFamily: 'var(--dex-font-ui)',
-  },
-  generateBtn: {
-    background: 'var(--color-accent-fill)',
-    color: 'var(--color-accent-text)',
-    border: 'none',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-  },
-  copiedBtn: {
-    background: 'var(--color-success)',
-    color: 'var(--color-text-inverse)',
-    border: 'none',
-    boxShadow: '0 2px 8px rgba(48,209,88,0.4)',
-  },
-  section: {
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-4)',
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 'var(--space-3)',
-  },
-  sectionTitle: {},
-  lengthValue: {
-    fontSize: '24px',
-    fontWeight: 700,
-    color: 'var(--color-accent)',
-  },
-  sliderContainer: {
-    padding: '0 4px',
-  },
-  slider: {
-    width: '100%',
-    height: '6px',
-    borderRadius: '4px',
-    background: 'var(--color-bg-surface)',
-    appearance: 'none',
-    cursor: 'pointer',
-    accentColor: 'var(--color-accent)',
-  },
-  sliderLabels: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: 'var(--space-2)',
-    fontSize: '10px',
-    color: 'var(--color-text-muted)',
-    fontWeight: 600,
-  },
-  optionsGrid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--space-2)',
-    marginTop: 'var(--space-3)',
-  },
-  toggle: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 'var(--space-3) 14px',
-    background: 'var(--color-bg-surface)',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    border: '1px solid var(--color-border-subtle)',
-  },
-  toggleLabel: {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-  },
-  toggleTrack: {
-    width: '40px',
-    height: '22px',
-    borderRadius: '10px',
-    padding: '2px',
-    transition: 'all 0.2s ease',
-  },
-  toggleKnob: {
-    width: '18px',
-    height: '18px',
-    borderRadius: '10px',
-    background: 'var(--color-bg-elevated)',
-    transition: 'transform 0.2s ease',
-    boxShadow: 'var(--shadow-sm)',
-  },
-  historyPanel: {
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-4)',
-  },
-  historyHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 'var(--space-3)',
-  },
-  clearBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--color-error)',
-    fontSize: '11px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    padding: '4px var(--space-2)',
-    borderRadius: '10px',
-    transition: 'all 0.15s ease',
-    fontFamily: 'var(--dex-font-ui)',
-  },
-  historyList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--space-2)',
-    maxHeight: '260px',
-    overflow: 'auto',
-  },
-  emptyHistory: {
-    textAlign: 'center',
-    color: 'var(--color-text-muted)',
-    padding: 'var(--space-6)',
-    fontSize: '12px',
-    fontWeight: 500,
-  },
-  historyItem: {
-    background: 'var(--color-bg-surface)',
-    borderRadius: '10px',
-    padding: 'var(--space-3)',
-    border: '1px solid var(--color-border-subtle)',
-    transition: 'all 0.15s ease',
-  },
-  historyPassword: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '11px',
-    wordBreak: 'break-all',
-    marginBottom: 'var(--space-2)',
-    lineHeight: 1.5,
-    color: 'var(--color-text-secondary)',
-  },
-  historyMeta: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    fontSize: '10px',
-    color: 'var(--color-text-muted)',
-    fontWeight: 500,
-  },
-  historyActions: {
-    display: 'flex',
-    gap: '10px',
-  },
-  historyActionBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--color-accent)',
-    fontSize: '11px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    fontFamily: 'var(--dex-font-ui)',
-  },
+const Check: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
+  <label style={S.check}>
+    <input className="pwg-check" type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ accentColor: 'var(--color-accent)', width: 16, height: 16, margin: 0 }} />
+    <span>{label}</span>
+  </label>
+);
+
+const S: Record<string, React.CSSProperties> = {
+  container: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--dex-font-ui)' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '0 var(--space-4)', height: 'var(--app-header-height, 44px)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
+  title: { fontSize: 14, fontWeight: 600, margin: 0 },
+  segmented: { display: 'flex', padding: 2, gap: 2, borderRadius: 10, background: 'var(--color-bg-hover)' },
+  seg: { minHeight: 28, padding: '0 12px', border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  segOn: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', boxShadow: 'var(--shadow-sm)' },
+  main: { flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' },
+  card: { display: 'flex', flexDirection: 'column', gap: 10, padding: 'var(--space-4)', borderRadius: 10, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)' },
+  value: { display: 'block', minHeight: 48, padding: '12px 14px', borderRadius: 6, background: 'var(--color-bg-base)', border: '1px solid var(--color-border-subtle)', fontFamily: 'var(--font-mono)', fontSize: 15, lineHeight: 1.5, wordBreak: 'break-all', userSelect: 'all' },
+  strengthRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  segments: { display: 'flex', gap: 4, flex: 1 },
+  segment: { flex: 1, height: 4, borderRadius: 4 },
+  strengthLabel: { fontSize: 12, fontWeight: 600, minWidth: 72, textAlign: 'right' },
+  bits: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' },
+  actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  btn: { flex: 1, minHeight: 32, minWidth: 96, padding: '0 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  primary: { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', border: '1px solid transparent' },
+  status: { minHeight: 16, fontSize: 11, color: 'var(--color-text-secondary)' },
+  rowLabel: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' },
+  number: { width: 64, minHeight: 28, padding: '0 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
+  count: { fontSize: 13, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' },
+  select: { minHeight: 28, padding: '0 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit' },
+  checks: { display: 'flex', flexDirection: 'column', gap: 2 },
+  check: { display: 'flex', alignItems: 'center', gap: 10, minHeight: 32, fontSize: 13, cursor: 'pointer' },
+  note: { fontSize: 12, color: 'var(--color-text-primary)' },
+  recentRow: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 32, borderTop: '1px solid var(--color-border-subtle)' },
+  recentValue: { flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  recentMeta: { fontSize: 11, color: 'var(--color-text-tertiary)' },
+  link: { minHeight: 28, padding: '0 8px', border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--color-accent)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  vaultForm: { display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10, borderTop: '1px solid var(--color-border-subtle)' },
+  input: { minHeight: 32, padding: '0 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit' },
+  hint: { fontSize: 11, color: 'var(--color-text-tertiary)' },
 };
 
 PasswordGenerator.displayName = 'PasswordGenerator';

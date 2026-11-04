@@ -3195,9 +3195,9 @@ const ACHIEVEMENTS_RAW: Achievement[] = [
     condition: s => s.itemsRecycled >= 100, points: 30, rarity: 'rare' },
   { id: 'recycle-1000', title: 'Recycling Master', description: 'Recycle 1000 items', icon: 'trash', category: 'discovery',
     condition: s => s.itemsRecycled >= 1000, points: 80, rarity: 'epic' },
-  { id: 'recycle-restore-10', title: 'Restorer', description: 'Restore 10 items from Recycle Bin', icon: 'rotate-ccw', category: 'discovery',
+  { id: 'recycle-restore-10', title: 'Restorer', description: 'Restore 10 items from Trash', icon: 'rotate-ccw', category: 'discovery',
     condition: s => s.itemsRestored >= 10, points: 15, rarity: 'common' },
-  { id: 'recycle-restore-100', title: 'Rescue Hero', description: 'Restore 100 items from Recycle Bin', icon: 'rotate-ccw', category: 'discovery',
+  { id: 'recycle-restore-100', title: 'Rescue Hero', description: 'Restore 100 items from Trash', icon: 'rotate-ccw', category: 'discovery',
     condition: s => s.itemsRestored >= 100, points: 50, rarity: 'rare' },
 
   // Activity Monitor / System
@@ -4003,7 +4003,7 @@ const ACHIEVEMENTS_RAW: Achievement[] = [
   })),
   ...Array.from({ length: 10 }, (_, i) => ({
     id: `restore-deep-${i + 1}`, title: `Restorer ${i + 1}`,
-    description: `Restore ${(i + 1) * 50} items from Recycle Bin`,
+    description: `Restore ${(i + 1) * 50} items from Trash`,
     icon: 'rotate-ccw', category: 'discovery' as AchievementCategory, points: 10, rarity: 'common' as AchievementRarity,
     condition: (s: UserStats) => s.itemsRestored >= (i + 1) * 50,
     secret: true,

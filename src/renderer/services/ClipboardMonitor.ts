@@ -5,31 +5,25 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * DEX Omni Clipboard -- Background Monitor
+ * DEX Omni Clipboard -- Capture
  * -----------------------------------------------------------------------------
- * Continuously feeds the clipboard history store so the Omni Clipboard already
- * holds what you copied while working -- not just whatever happens to be on the
- * clipboard at the instant you open the panel (the old behaviour, which made
- * the history almost always empty).
+ * Feeds the clipboard history store so the Omni Clipboard already holds what you
+ * copied while working.
  *
- * Two capture paths funnel into the same store (deduped there):
- *   1. The `copy`/`cut` DOM events -- instant capture of in-app copies, with
- *      accurate source-app attribution.
- *   2. A SharedTick poll -- catches copies made in OTHER apps while DEX is
- *      focused (SharedTick already pauses while the window is hidden, and we
- *      additionally gate on document focus so we never spam clipboard reads).
+ *   1. `copy`/`cut` DOM events -- instant capture of copies made inside DEX, with
+ *      source-app attribution. Needs no permission.
+ *   2. Copies made in OTHER programs -- only when the user turns on "Include
+ *      copies from other apps". Read once when DEX regains focus, through the
+ *      native clipboard channel.
  *
- * Capture is silent and opt-out-able; the panel itself stays user-invoked
- * (Ctrl+Shift+V), consistent with DEX's "never nag" shell philosophy.
+ * There is no background polling, and this module never calls
+ * `navigator.clipboard.readText()`: in WebView2 every such read shows a
+ * "wants to see text and images copied to the clipboard" prompt.
  */
 
-import { sharedTick } from './SharedTick';
 import { useClipboardStore, migrateLegacyClipboard } from '../store/clipboardStore';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { contextEngine } from '../../shared/uki/contextEngine';
-
-const TICK_ID = 'clipboard-monitor';
-const POLL_MS = 4000;
 
 let started = false;
 let lastSeen = '';
@@ -48,27 +42,30 @@ function currentSource(): { sourceAppId?: string; sourceAppName?: string } {
 
 /** Route a candidate string into the store (the store handles dedupe/typing) and
  *  feed the Context Engine so copies surface in the "Now" activity stream. */
-function ingest(text: string | null | undefined): void {
+function ingest(text: string | null | undefined, source = currentSource()): void {
   if (!text) return;
   if (text === lastSeen) return;
   lastSeen = text;
-  const entry = useClipboardStore.getState().add(text, currentSource());
+  const entry = useClipboardStore.getState().add(text, source);
   if (entry) { try { contextEngine.recordActivity('clip', entry.preview); } catch { /* optional */ } }
 }
 
-async function readClipboard(): Promise<void> {
-  // Reading requires focus + a secure context; bail quietly otherwise.
-  if (typeof document !== 'undefined' && !document.hasFocus()) return;
+/** Native clipboard read (`clipboard:readText`); null outside the installed app. */
+async function readNativeClipboard(): Promise<string | null> {
+  const native = (window as unknown as { dex?: { clipboard?: { readText?: () => Promise<unknown> } } }).dex?.clipboard;
+  if (!native?.readText) return null;
   try {
-    const text = await navigator.clipboard.readText();
-    ingest(text);
+    const text = await native.readText();
+    return typeof text === 'string' ? text : null;
   } catch {
-    /* permission denied / not focused / unsupported -- the copy-event path still works */
+    return null;
   }
 }
 
 function onFocus(): void {
-  void readClipboard();
+  if (!useClipboardStore.getState().captureOtherApps) return;
+  // Copied while DEX was in the background, so not from a DEX app.
+  void readNativeClipboard().then(t => ingest(t, { sourceAppName: 'Other app' }));
 }
 
 function onCopyEvent(e: ClipboardEvent): void {
@@ -107,11 +104,12 @@ function onCopyEvent(e: ClipboardEvent): void {
     ingest(sel);
     return;
   }
-  // Programmatic copies expose nothing synchronously -- poll once shortly after.
-  setTimeout(() => { void readClipboard(); }, 0);
+  // Programmatic copies expose nothing synchronously -- read DEX's own copy once
+  // it has been committed (native read only, so no permission prompt).
+  setTimeout(() => { void readNativeClipboard().then(t => ingest(t)); }, 0);
 }
 
-/** Start background clipboard capture. Idempotent. */
+/** Start clipboard capture. Idempotent. */
 export function startClipboardMonitor(): void {
   if (started || typeof window === 'undefined') return;
   started = true;
@@ -120,18 +118,14 @@ export function startClipboardMonitor(): void {
 
   window.addEventListener('copy', onCopyEvent as EventListener, true);
   window.addEventListener('cut', onCopyEvent as EventListener, true);
-  // Capture the current clipboard once on focus return (cheap, focus-gated).
+  // Copies from other programs: one read when DEX regains focus, if enabled.
   window.addEventListener('focus', onFocus);
-
-  sharedTick.subscribe(TICK_ID, () => { void readClipboard(); }, POLL_MS);
-  void readClipboard();
 }
 
 /** Stop background capture (used in teardown/tests). */
 export function stopClipboardMonitor(): void {
   if (!started) return;
   started = false;
-  sharedTick.unsubscribe(TICK_ID);
   window.removeEventListener('copy', onCopyEvent as EventListener, true);
   window.removeEventListener('cut', onCopyEvent as EventListener, true);
   window.removeEventListener('focus', onFocus);

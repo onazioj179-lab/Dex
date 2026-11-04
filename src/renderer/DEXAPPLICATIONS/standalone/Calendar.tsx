@@ -12,6 +12,7 @@ import DexIcon from '../../components/DexIcon';
 import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 interface CalendarEvent {
   id: string;
@@ -426,6 +427,7 @@ const Calendar: React.FC = () => {
   // while typing in an input/textarea or when the editor modal is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'calendar')) return; // key meant for another app
       if (showEventModal) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;

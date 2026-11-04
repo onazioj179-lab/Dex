@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   type BoardObject, STICKY_COLORS, MIN_SIZE, connectorEnds, paintOrder, removeObjects, snapValue, textOn, newObjectId,
 } from './canvasObjects';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 interface Props {
   objects: BoardObject[];
@@ -45,6 +46,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
   useEffect(() => {
     if (!selectedId) return;
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'canvas')) return; // key meant for another app
       if (editing) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
@@ -198,7 +200,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
             border: '1px solid var(--color-border)', boxShadow: '0 6px 18px rgba(0,0,0,0.25)', pointerEvents: 'auto',
           }}>
             {colors.slice(0, 8).map((c) => (
-              <button key={c} aria-label={`Colour ${c}`} aria-pressed={selected.color === c} onClick={() => patchSelected({ color: c })}
+              <button key={c} aria-label={`Color ${c}`} aria-pressed={selected.color === c} onClick={() => patchSelected({ color: c })}
                 style={{ width: 20, height: 20, borderRadius: 9999, background: c, border: selected.color === c ? '2px solid var(--color-accent)' : '1px solid var(--color-border-control)', cursor: 'pointer', padding: 0 }} />
             ))}
             <span style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 2px' }} />

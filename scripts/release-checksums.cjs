@@ -5,9 +5,10 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Writes SHA256SUMS next to the Tauri bundle outputs for the CURRENT version
-// only (package.json), so stale installers from earlier builds are never
-// listed. Verify later with:  node scripts/release-checksums.cjs --verify
+// Writes SHA256SUMS for the official installer (NSIS setup) of the CURRENT
+// version only (package.json), so stale installers from earlier builds are
+// never listed. DEX ships one Windows setup; MSI is not a release format.
+// Verify later with:  node scripts/release-checksums.cjs --verify
 // Checksums detect corruption and tampering in transit; they are not a
 // substitute for code signing (see docs/SIGNING.md).
 
@@ -22,11 +23,10 @@ const sumsFile = path.join(bundleDir, 'SHA256SUMS');
 
 function artifacts() {
   const out = [];
-  for (const sub of ['nsis', 'msi']) {
-    const dir = path.join(bundleDir, sub);
-    if (!fs.existsSync(dir)) continue;
+  const dir = path.join(bundleDir, 'nsis');
+  if (fs.existsSync(dir)) {
     for (const f of fs.readdirSync(dir)) {
-      if (/\.(exe|msi)$/i.test(f) && f.includes(`_${version}_`)) out.push(path.join(sub, f));
+      if (/-setup\.exe$/i.test(f) && f.includes(`_${version}_`)) out.push(path.join('nsis', f));
     }
   }
   return out.sort();

@@ -19,6 +19,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import NexusUkiPanel from '../components/NexusUkiPanel';
 import ScheduledTasksPanel from '../components/ScheduledTasksPanel';
 import SystemIntegrityPanel from '../components/SystemIntegrityPanel';
+import NexusDiagnostics from '../components/NexusDiagnostics';
+import { appLifecycle, type AppPhase } from '../services/AppLifecycle';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
@@ -26,11 +28,12 @@ import { useElementSize } from '../utils/motionHooksExtended';
 
 // -- types + persisted preferences --------------------------------------------
 
-type View = 'processes' | 'performance' | 'apps' | 'system';
+type View = 'processes' | 'performance' | 'apps' | 'diagnostics' | 'system';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'processes', label: 'Processes' },
   { id: 'performance', label: 'Performance' },
   { id: 'apps', label: 'DEX Apps' },
+  { id: 'diagnostics', label: 'Diagnostics' },
   { id: 'system', label: 'System' },
 ];
 type Resource = 'cpu' | 'memory' | 'disk' | 'network' | 'battery' | 'dex';
@@ -129,12 +132,31 @@ const readHeapMB = (): { used: number; limit: number } | null => {
 
 // -- chart ------------------------------------------------------------------------
 
-/** Resolve a CSS colour token to a concrete colour for canvas drawing. */
-const cssColor = (el: Element | null, token: string, fallback: string): string => {
-  if (!el) return fallback;
-  const v = getComputedStyle(el).getPropertyValue(token).trim();
-  return v || fallback;
-};
+/**
+ * A colour the canvas can use, with alpha. Accepts hex, rgb()/rgba() or a CSS
+ * variable such as var(--color-accent), resolved against `el` so the charts
+ * follow the theme. (Appending hex alpha to "var(...)" made an invalid colour,
+ * and addColorStop threw.)
+ */
+export function canvasColor(color: string, alpha: number, el?: Element | null): string {
+  let c = color.trim();
+  const m = /^var\((--[\w-]+)(?:\s*,\s*([^)]+))?\)$/.exec(c);
+  if (m) {
+    const resolved = typeof getComputedStyle === 'function'
+      ? getComputedStyle(el ?? document.documentElement).getPropertyValue(m[1]).trim()
+      : '';
+    c = resolved || (m[2] ?? 'var(--color-accent)').trim();
+  }
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].split('').map((x) => x + x).join('') : hex[1];
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c);
+  if (rgb) return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`;
+  return c; // named colour: no alpha, but still valid
+}
 
 interface LineChartProps {
   series: number[];
@@ -164,9 +186,10 @@ const LineChart: React.FC<LineChartProps> = ({ series, series2, max, height, ari
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const accent = cssColor(canvas, '--color-accent', '#0A84FF');
-    const grid = cssColor(canvas, '--color-border-subtle', 'rgba(128,128,128,0.18)');
-    const label = cssColor(canvas, '--color-text-tertiary', '#8e8e93');
+    const accent = canvasColor('var(--color-accent, #0A84FF)', 1, canvas);
+    const fillTone = canvasColor('var(--color-accent, #0A84FF)', 0.12, canvas);
+    const grid = canvasColor('var(--color-text-primary, #ffffff)', 0.08, canvas);
+    const label = canvasColor('var(--color-text-tertiary, #8e8e93)', 1, canvas);
 
     ctx.strokeStyle = grid;
     ctx.lineWidth = 1;
@@ -193,8 +216,7 @@ const LineChart: React.FC<LineChartProps> = ({ series, series2, max, height, ari
         ctx.lineTo(x0 + (s.length - 1) * stepX, h);
         ctx.lineTo(x0, h);
         ctx.closePath();
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle = accent;
+        ctx.fillStyle = fillTone;
         ctx.fill();
         ctx.restore();
         ctx.beginPath();
@@ -488,6 +510,9 @@ const TaskManager: React.FC = () => {
             onFocus={id => setCurrentApp(id)}
             onQuit={id => closeApp(id)}
           />
+        )}
+        {view === 'diagnostics' && (
+          <div style={S.scroll}><NexusDiagnostics /></div>
         )}
         {view === 'system' && (
           <div style={S.scroll}>
@@ -855,7 +880,18 @@ interface AppsViewProps {
   onQuit: (id: string) => void;
 }
 
+// Live AppLifecycle phase per app (the phases the shell broadcasts). Suspend is
+// offered only for apps that listen for it and so really release their GPU,
+// audio and timers.
+const PHASE_LABEL: Record<AppPhase, string> = { foreground: 'In front', background: 'Background', suspended: 'Suspended' };
+function useAppPhases(): Record<string, AppPhase> {
+  const [phases, setPhases] = useState<Record<string, AppPhase>>(() => appLifecycle.snapshot());
+  useEffect(() => appLifecycle.subscribeAll((id, phase) => setPhases((p) => (p[id] === phase ? p : { ...p, [id]: phase }))), []);
+  return phases;
+}
+
 const AppsView: React.FC<AppsViewProps> = ({ apps, currentAppId, onFocus, onQuit }) => {
+  const phases = useAppPhases();
   const [, tick] = useState(0);
   useEffect(() => { const t = window.setInterval(() => tick(n => n + 1), 15000); return () => window.clearInterval(t); }, []);
   if (apps.length === 0) return <div style={S.empty}>No DEX apps are open.</div>;
@@ -871,15 +907,29 @@ const AppsView: React.FC<AppsViewProps> = ({ apps, currentAppId, onFocus, onQuit
         {apps.map(app => {
           const def = APP_DEFINITIONS[app.id];
           const active = app.id === currentAppId;
+          const phase: AppPhase = phases[app.id] ?? appLifecycle.getPhase(app.id);
+          const canSuspend = !active && phase !== 'foreground' && appLifecycle.handles(app.id);
+          const label = def?.name || app.name;
           return (
             <div role="row" key={app.id} style={{ ...S.tr, gridTemplateColumns: APP_COLS, height: 36 }}>
               <span style={S.cellName}>
                 <DexIcon name={def?.icon || app.icon || app.id} size={15} color="var(--color-text-secondary)" />
                 {def?.name || app.name}
               </span>
-              <span style={{ fontSize: 12, color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{active ? 'In front' : 'Background'}</span>
+              <span style={{ fontSize: 12, color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{active ? 'In front' : PHASE_LABEL[phase]}</span>
               <span style={{ ...S.cellNum, color: 'var(--color-text-tertiary)' }}>{fmtAge(app.launchedAt)}</span>
               <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                {canSuspend && (
+                  <button
+                    type="button"
+                    style={S.btnSm}
+                    onClick={() => appLifecycle.setPhase(app.id, phase === 'suspended' ? 'background' : 'suspended')}
+                    aria-label={`${phase === 'suspended' ? 'Resume' : 'Suspend'} ${label}`}
+                    title={phase === 'suspended' ? 'Let it run in the background again' : 'Release its GPU, audio and timers until you open it'}
+                  >
+                    {phase === 'suspended' ? 'Resume' : 'Suspend'}
+                  </button>
+                )}
                 {!active && <button type="button" style={S.btnSm} onClick={() => onFocus(app.id)}>Show</button>}
                 <button type="button" style={S.btnSm} onClick={() => onQuit(app.id)} aria-label={`Quit ${def?.name || app.name}`}>Quit</button>
               </span>
@@ -894,12 +944,12 @@ const AppsView: React.FC<AppsViewProps> = ({ apps, currentAppId, onFocus, onQuit
 // -- styles -----------------------------------------------------------------------
 
 const PROC_COLS = 'minmax(140px, 1fr) 72px 72px 92px';
-const APP_COLS = 'minmax(160px, 1fr) 110px 90px 130px';
+const APP_COLS = 'minmax(160px, 1fr) 110px 90px 200px';
 
 const S: Record<string, React.CSSProperties> = {
   root: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', color: 'var(--color-text-primary)', background: 'var(--color-bg-base)', overflow: 'hidden', fontSize: 12 },
   toolbar: { display: 'flex', alignItems: 'center', gap: 8, height: 44, flexShrink: 0, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)' },
-  segment: { display: 'inline-flex', padding: 2, gap: 2, borderRadius: 8, background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-subtle)' },
+  segment: { display: 'inline-flex', padding: 2, gap: 2, borderRadius: 10, background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-subtle)' },
   segBtn: { height: 24, padding: '0 12px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' },
   segBtnOn: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' },
   updated: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
@@ -938,7 +988,7 @@ const S: Record<string, React.CSSProperties> = {
   btnSm: { height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 11.5, cursor: 'pointer' },
   hint: { margin: 0, fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 },
   resList: { width: 210, flexShrink: 0, overflow: 'auto', borderRight: '1px solid var(--color-border-subtle)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 },
-  resItem: { display: 'grid', gridTemplateColumns: '64px 1fr', gap: 10, alignItems: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid transparent', background: 'transparent', color: 'var(--color-text-primary)', textAlign: 'left', cursor: 'pointer' },
+  resItem: { display: 'grid', gridTemplateColumns: '64px 1fr', gap: 10, alignItems: 'center', padding: '7px 8px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: 'var(--color-text-primary)', textAlign: 'left', cursor: 'pointer' },
   resItemOn: { background: 'var(--color-bg-elevated)', borderColor: 'var(--color-border-subtle)' },
   resSpark: { height: 30, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' },
   resName: { fontSize: 12, fontWeight: 600 },

@@ -42,6 +42,7 @@ export type AppPhaseListener = (phase: AppPhase, prev: AppPhase) => void;
 class AppLifecycleService {
   private phases = new Map<string, AppPhase>();
   private listeners = new Map<string, Set<AppPhaseListener>>();
+  private anyListeners = new Set<(appId: string, phase: AppPhase) => void>();
 
   /** Current phase for an app (defaults to 'background' before first set). */
   getPhase(appId: string): AppPhase {
@@ -53,6 +54,7 @@ class AppLifecycleService {
     const prev = this.getPhase(appId);
     if (prev === phase) return;
     this.phases.set(appId, phase);
+    this.anyListeners.forEach((l) => { try { l(appId, phase); } catch { /* observer only */ } });
     const set = this.listeners.get(appId);
     if (!set) return;
     set.forEach((l) => {
@@ -80,6 +82,17 @@ class AppLifecycleService {
       s.delete(listener);
       if (s.size === 0) this.listeners.delete(appId);
     };
+  }
+
+  /** Whether the app listens for phase changes (i.e. actually releases work when suspended). */
+  handles(appId: string): boolean {
+    return (this.listeners.get(appId)?.size ?? 0) > 0;
+  }
+
+  /** Subscribe to every app's phase changes (Task Manager's live phase column). */
+  subscribeAll(listener: (appId: string, phase: AppPhase) => void): () => void {
+    this.anyListeners.add(listener);
+    return () => { this.anyListeners.delete(listener); };
   }
 
   /** Test/debug helper — current snapshot of all known phases. */

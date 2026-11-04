@@ -28,6 +28,7 @@ import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
+import { keyEventForApp, isTypingTarget } from '../shell/input/appKeyScope';
 
 // ===========================================================================
 // TYPES
@@ -755,6 +756,7 @@ export const Files: React.FC = () => {
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'files')) return; // key meant for another app
       const target = e.target as HTMLElement | null;
       // Don't hijack typing in inputs (rename, search, etc.)
       const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -897,7 +899,8 @@ export const Files: React.FC = () => {
   // Keyboard shortcuts for file operations
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard) {
+      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard && !isTypingTarget(e.target)) {
         e.preventDefault();
         handlePasteFile();
       }
@@ -914,7 +917,7 @@ export const Files: React.FC = () => {
     setContextMenu(null);
     const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move to Trash?',
-      message: `"${file.name}" will be moved to the recycle bin.`,
+      message: `"${file.name}" will be moved to the Recycle Bin.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
@@ -974,7 +977,7 @@ export const Files: React.FC = () => {
     const count = selectedFiles.size;
     const confirmed = !confirmDeleteSetting || await confirm({
       title: 'Move selected to Trash?',
-      message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
+      message: `${count} item${count === 1 ? '' : 's'} will be moved to the Recycle Bin.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
@@ -1290,6 +1293,7 @@ export const Files: React.FC = () => {
   // hijacked, and gated on there being a selection (or a staged batch).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'files')) return; // key meant for another app
       const t = e.target as HTMLElement | null;
       const inEditable = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
       if (inEditable) return;

@@ -163,7 +163,7 @@ fn ensure_sampler(app: &tauri::AppHandle) {
         let _ = start_time_ms(&app);
         // Take an initial sample synchronously (Electron does an immediate sample).
         sample_memory(&app);
-        std::thread::spawn(move || loop {
+        crate::util::spawn_named("reliability", move || loop {
             std::thread::sleep(std::time::Duration::from_secs(MEMORY_SAMPLE_INTERVAL_SECS));
             sample_memory(&app);
         });

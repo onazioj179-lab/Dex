@@ -57,7 +57,9 @@ async function runMotionTrack(direction: 'forward' | 'backward', frames: number)
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
 export const VINX_BUILD_DATE = '2026-04-11';
@@ -328,6 +330,17 @@ const VinxEditor: React.FC = () => {
   const undoStack = useVinxStore(s => s.undoStack);
   const redoStack = useVinxStore(s => s.redoStack);
   const markSaved = useVinxStore(s => s.markSaved);
+  // Saved versions of the project (listed and restored from Collab Hub).
+  const checkpoints = useAppCheckpoints({
+    appId: 'videoeditor',
+    appName: 'Vinx',
+    getSnapshot: () => JSON.stringify(useVinxStore.getState().project),
+    onRestore: (data) => {
+      const restored = JSON.parse(data);
+      if (!restored || typeof restored !== 'object' || !Array.isArray(restored.sequences)) throw new Error('not a Vinx project');
+      useVinxStore.setState({ project: restored, isDirty: true });
+    },
+  });
   const setShowExportDialog = useVinxStore(s => s.setShowExportDialog);
   const isPlaying = useVinxStore(s => s.isPlaying);
   const setIsPlaying = useVinxStore(s => s.setIsPlaying);
@@ -812,8 +825,7 @@ const VinxEditor: React.FC = () => {
   // -- Keyboard shortcuts (space, J/K/L, tools, undo/redo, etc.) --
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') return;
+      if (!keyEventForApp(e, 'vinx') || isTypingTarget(e.target)) return;
 
       // Play/Pause
       if (e.key === ' ') {
@@ -1027,6 +1039,7 @@ const VinxEditor: React.FC = () => {
     {
       id: 'file', label: 'File', items: [
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: () => markSaved() },
+        { label: 'Save Checkpoint', onSelect: () => { const res = checkpoints.saveNow(); window.dispatchEvent(new CustomEvent('dex-toast', { detail: res.ok ? { type: 'success', message: 'Checkpoint saved' } : { type: 'error', message: res.error } })); } },
         { separator: true },
         { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setShowExportDialog(true) },
         { label: quickExport.active ? 'Cancel Quick Export' : 'Quick Export (WebM)', onSelect: () => (quickExport.active ? handleCancelQuickExport() : handleQuickExport()) },

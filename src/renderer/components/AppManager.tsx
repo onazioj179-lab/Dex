@@ -74,7 +74,9 @@ import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, fitRect, magneticSnap, pinchCamera, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, fitRect, magneticSnap, gestureCamera, nearestFreeSpot, screenToWorld, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { ContactTracker } from '../shell/input/touchContacts';
+import { haptic } from '../shell/input/haptics';
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
@@ -840,6 +842,7 @@ export const AppManager: React.FC = () => {
   const hubLoadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
   const hubMarkRead = useNotificationCenterStore(s => s.markRead);
   const hubClearAll = useNotificationCenterStore(s => s.clearAll);
+  const hubDelete = useNotificationCenterStore(s => s.deleteNotification);
   const hubGetOrdered = useNotificationCenterStore(s => s.getOrdered);
 
   // Refresh hub state whenever the center opens; keep the badge count warm.
@@ -989,16 +992,6 @@ export const AppManager: React.FC = () => {
 
 
   // -- App Tab Bar -- persistent running-app tabs, toggle in Settings ------
-  // Space the DEX Bar takes at the bottom of the screen (published by
-  // FloatingLauncher). Apps and maximized windows stop above it.
-  const [barInset, setBarInset] = useState(() => (window as { __dexBarInset?: number }).__dexBarInset ?? 0);
-  useEffect(() => {
-    const onInset = (e: Event) => setBarInset(Math.max(0, Number((e as CustomEvent<number>).detail) || 0));
-    window.addEventListener('dex-bar-inset', onInset);
-    setBarInset((window as { __dexBarInset?: number }).__dexBarInset ?? 0);
-    return () => window.removeEventListener('dex-bar-inset', onInset);
-  }, []);
-
   const [showAppTabBar, setShowAppTabBar] = useState(() => {
     try { return localStorage.getItem('dex-app-tab-bar') !== 'false'; } catch { return true; }
   });
@@ -1033,13 +1026,13 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
-    // The DEX Bar reserves the strip it occupies when it sits along the bottom
-    // edge, so maximized / snapped windows end above it instead of under it.
+    // The DEX Bar floats over apps; it reserves no strip, so maximized and
+    // snapped windows use the full height (no blank band along the bottom).
     return getWorkspaceBounds(
       { width: w, height: h },
       {
         topReserve: 0,
-        dockReserve: barInset,
+        dockReserve: 0,
         leftReserve: stageOffset,
         rightReserve: 0,
         padding,
@@ -1047,7 +1040,7 @@ export const AppManager: React.FC = () => {
         minHeight: 260,
       },
     );
-  }, [stageOffset, showAppTabBar, runningApps.length, barInset]);
+  }, [stageOffset, showAppTabBar, runningApps.length]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -3070,12 +3063,15 @@ export const AppManager: React.FC = () => {
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
-    const unsubPinch = gestureRecognizer.on('two-finger-pinch', () => {
-      if (onCanvas()) return;
+    // Pinch/spread only drive the overview when started on the bare desktop: a
+    // pinch inside an app (zooming a photo, a map, a canvas) is the app's, and on
+    // the spatial desktop it zooms the camera instead.
+    const unsubPinch = gestureRecognizer.on('two-finger-pinch', (g) => {
+      if (!g.onDesktop || isSpatialEnabled()) return;
       setShowOverview(false);
     });
-    const unsubSpread = gestureRecognizer.on('two-finger-spread', () => {
-      if (onCanvas()) return;
+    const unsubSpread = gestureRecognizer.on('two-finger-spread', (g) => {
+      if (!g.onDesktop || isSpatialEnabled()) return;
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
@@ -3229,6 +3225,8 @@ export const AppManager: React.FC = () => {
     const sp = useSpatialStore.getState();
     const others = Object.values(sp.windows).filter((w) => w.id !== appId && !w.minimized);
     const out = magneticSnap(r, others, 8 / sp.camera.z);
+    // One pulse as the snap engages (supported hardware + setting only).
+    if (out.guides.length && !sp.guides.length) haptic('snap');
     sp.setGuides(out.guides);
     return out;
   }, []);
@@ -3261,7 +3259,8 @@ export const AppManager: React.FC = () => {
     const max = getMaximizedWindowBounds();
     if (on) {
       // Enter: remember the screen layout (restored on exit), put each window at
-      // its remembered world place, and lay out the rest in a grid beside them.
+      // its remembered world place, and keep every other window where it was on
+      // screen (moved to the nearest free spot, in any direction, if taken).
       const pre: Record<string, SpatialRect> = {};
       const remembered: Record<string, SpatialRect> = {};
       const fresh: Array<SpatialRect & { id: string }> = [];
@@ -3286,16 +3285,26 @@ export const AppManager: React.FC = () => {
       // workspace shows every open app (it used to show only floating ones).
       const fromTabs = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
       spatialFromTabsRef.current = new Set(fromTabs);
+      const tabFresh: Array<SpatialRect & { id: string }> = [];
       fromTabs.forEach(id => {
         const mem = sp.layout[id];
         const collides = mem && Object.values(remembered).some((r) =>
           mem.x < r.x + r.w && mem.x + mem.w > r.x && mem.y < r.y + r.h && mem.y + mem.h > r.y);
         if (mem && !collides) { remembered[id] = mem; return; }
-        fresh.push({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) });
+        tabFresh.push({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) });
       });
-      const taken = boundsOf(Object.values(remembered));
-      const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
-      const placed: Record<string, SpatialRect> = { ...remembered, ...arrange('grid', fresh, origin) };
+      // Floating windows stay where they were on screen (nearest free spot);
+      // former tabs are laid out in a grid beside everything else.
+      const placed: Record<string, SpatialRect> = { ...remembered };
+      for (const f of fresh) {
+        const at = screenToWorld(sp.camera, f.x, f.y);
+        placed[f.id] = nearestFreeSpot({ x: Math.round(at.x), y: Math.round(at.y), w: f.w, h: f.h }, Object.values(placed));
+      }
+      if (tabFresh.length > 0) {
+        const taken = boundsOf(Object.values(placed));
+        const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+        Object.assign(placed, arrange('grid', tabFresh, origin));
+      }
       sp.setPreSpatial(pre);
       // Start at the fitted view so the first frame already uses the right
       // level of detail (rendering every app live at 100% first cost seconds
@@ -3621,24 +3630,25 @@ export const AppManager: React.FC = () => {
       el.addEventListener('pointerup', up);
       el.addEventListener('lostpointercapture', up);
     };
-    // Touch screens: two fingers on the desktop pan and pinch-zoom the canvas.
-    const touches = new Map<number, { x: number; y: number }>();
+    // Touch screens: two or more fingers on the desktop pan and pinch-zoom the
+    // canvas about their centroid (any number of contacts, up to ten). One
+    // finger is left alone so it can still tap and drag windows and icons.
+    const touches = new ContactTracker();
     const onTouchDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || inWindow(e.target) || inHud(e.target)) return;
-      touches.set(e.pointerId, local(e));
+      const p = local(e);
+      touches.down({ pointerId: e.pointerId, pointerType: 'touch', clientX: p.x, clientY: p.y, isPrimary: e.isPrimary });
     };
     const onTouchMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
-      const ids = Array.from(touches.keys());
-      if (ids.length !== 2) { touches.set(e.pointerId, local(e)); return; }
+      const p = local(e);
+      const d = touches.move({ pointerId: e.pointerId, pointerType: 'touch', clientX: p.x, clientY: p.y });
+      if (!d || d.count < 2) return;
       e.preventDefault();
-      const prev: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
-      touches.set(e.pointerId, local(e));
-      const next: [{ x: number; y: number }, { x: number; y: number }] = [touches.get(ids[0])!, touches.get(ids[1])!];
       const s = st();
-      s.setCamera(pinchCamera(s.camera, prev, next, s.limits));
+      s.setCamera(gestureCamera(s.camera, d, s.limits));
     };
-    const onTouchUp = (e: PointerEvent) => { touches.delete(e.pointerId); };
+    const onTouchUp = (e: PointerEvent) => { touches.up(e.pointerId); };
     // Tabbing into a window that is off-screen pans it into view (same zoom).
     const onFocusIn = (e: FocusEvent) => {
       const win = (e.target as Element | null)?.closest?.('[data-floating-window]') as HTMLElement | null;
@@ -5178,7 +5188,7 @@ export const AppManager: React.FC = () => {
                 never moves it to another parent (which would remount it). */}
             {keepAliveElements.filter(el => el && el.key !== 'home')}
           </div>
-          {spatialEnabled && <SpatialHud onExit={() => setSpatial(false)} />}
+          {spatialEnabled && <SpatialHud />}
         </div>
       ) : (
         <div ref={splitContainerRef} style={{
@@ -5608,6 +5618,7 @@ export const AppManager: React.FC = () => {
         notifications={centerNotifications}
         onClearAll={() => { void hubClearAll(); }}
         onMarkAsRead={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubMarkRead(n); }}
+        onDismiss={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubDelete(n); }}
         onActivate={(item) => {
           // Revive the persisted deep-link: route through the same
           // dex-spotlight-navigate contract Quick Actions / Spotlight use, then

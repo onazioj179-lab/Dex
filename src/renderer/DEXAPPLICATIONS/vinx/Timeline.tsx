@@ -23,6 +23,7 @@ import {
   createRemoveClipCommand, createRippleDeleteCommand, createAddClipCommand,
 } from './VinxCommands';
 import { buildClipFromMedia, resolveDropTrack } from './mediaClip';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
 // CONSTANTS
@@ -997,8 +998,7 @@ export const Timeline: React.FC<{
       // Ignore shortcuts while typing in a field, otherwise Delete/Backspace and the
       // single-letter tool keys (v/c/y/u/h/n) fire while editing text (e.g. the project
       // name input or any clip text field), silently deleting clips or switching tools.
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      if (!keyEventForApp(e, 'vinx') || isTypingTarget(e.target)) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const clips = useVinxStore.getState().getSelectedClips();

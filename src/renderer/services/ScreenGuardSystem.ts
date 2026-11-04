@@ -286,23 +286,12 @@ class ScreenGuardSystem {
 // Instant visual feedback for all interactive elements
 // ---------------------------------------------------------------------------
 
+// CSS only. (A document-wide MutationObserver used to attach a touchstart
+// vibrate to every button: per-touch haptics are noise, and the observer ran on
+// every DOM insertion. Meaningful haptics go through shell/input/haptics.)
 class ButtonResponsivenessSystem {
-  private observer: MutationObserver | null = null;
-  private processedElements = new WeakSet<Element>();
-
-  /**
-   * Initialize the button responsiveness system
-   */
   initialize(): void {
-    // Inject global styles
     this.injectStyles();
-
-    // Process existing buttons
-    this.processExistingButtons();
-
-    // Watch for new buttons
-    this.startObserving();
-
   }
 
   /**
@@ -414,68 +403,6 @@ class ButtonResponsivenessSystem {
     document.head.appendChild(style);
   }
 
-  /**
-   * Process existing buttons
-   */
-  private processExistingButtons(): void {
-    const buttons = document.querySelectorAll('button, [role="button"], .dex-btn');
-    buttons.forEach(btn => this.enhanceButton(btn));
-  }
-
-  /**
-   * Enhance a button with additional feedback
-   */
-  private enhanceButton(element: Element): void {
-    if (this.processedElements.has(element)) return;
-    this.processedElements.add(element);
-
-    const htmlEl = element as HTMLElement;
-
-    // Add haptic feedback on touch devices
-    htmlEl.addEventListener('touchstart', () => {
-      if ('vibrate' in navigator) {
-        navigator.vibrate(5);
-      }
-    }, { passive: true });
-
-    // Add audio feedback (optional - can be disabled)
-    htmlEl.addEventListener('pointerdown', () => {
-      // Could play a subtle click sound here
-    }, { passive: true });
-  }
-
-  /**
-   * Start observing for new buttons
-   */
-  private startObserving(): void {
-    this.observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof Element) {
-            if (node.matches('button, [role="button"], .dex-btn')) {
-              this.enhanceButton(node);
-            }
-            // Check children
-            node.querySelectorAll('button, [role="button"], .dex-btn').forEach(
-              btn => this.enhanceButton(btn)
-            );
-          }
-        }
-      }
-    });
-
-    this.observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  /**
-   * Clean up
-   */
-  destroy(): void {
-    this.observer?.disconnect();
-  }
 }
 
 // ---------------------------------------------------------------------------

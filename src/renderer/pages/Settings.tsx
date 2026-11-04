@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
@@ -21,7 +22,7 @@ import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../s
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
-import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
+import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled, getSoundVolume, setSoundVolume, playToggle } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
@@ -48,9 +49,9 @@ import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settin
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
+import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
-import { isOptionalAnalyticsEnabled, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 
@@ -172,6 +173,11 @@ const Icons = {
       <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8"/>
     </svg>
   ),
+  touch: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M9 11V5a2 2 0 0 1 4 0v6"/><path d="M13 10.5V9a2 2 0 0 1 4 0v3.5"/><path d="M9 11l-1.6-1.6a2 2 0 0 0-2.8 2.8L9 17c1.2 1.6 2.6 3 5 3h1a5 5 0 0 0 5-5v-2"/>
+    </svg>
+  ),
   storage: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
@@ -236,6 +242,7 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   permissions: Icons.privacy,
   creator: Icons.account,
   keyboard: Icons.keyboard,
+  touch: Icons.touch,
   files: Icons.files,
   storage: Icons.storage,
   browser: Icons.browser,
@@ -260,7 +267,7 @@ const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
+  { label: 'Productivity', ids: ['notifications', 'keyboard', 'touch', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
   { label: 'AI', ids: ['aiproviders', 'uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
@@ -1009,7 +1016,7 @@ const exportSettings = (settings: Record<string, unknown>): void => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     window.dispatchEvent(new CustomEvent('dex-toast', { 
-      detail: { message: 'Settings exported successfully', type: 'success' } 
+      detail: { message: 'Settings exported', type: 'success' } 
     }));
   } catch (e) {
     window.dispatchEvent(new CustomEvent('dex-toast', { 
@@ -1034,7 +1041,7 @@ const importSettings = (onImport: (settings: typeof DEFAULT_SETTINGS) => void): 
         const merged = { ...DEFAULT_SETTINGS, ...data.settings };
         onImport(merged);
         window.dispatchEvent(new CustomEvent('dex-toast', { 
-          detail: { message: 'Settings imported successfully', type: 'success' } 
+          detail: { message: 'Settings imported', type: 'success' } 
         }));
       } else {
         throw new Error('Invalid settings format');
@@ -1889,13 +1896,13 @@ export const Settings: React.FC = () => {
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
-  const [optionalAnalytics, setOptionalAnalytics] = useState(() => isOptionalAnalyticsEnabled());
   // Hoist shell-prefs hook to component top-level so the hook count stays
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
   const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
   const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
+  const uiSoundVolume = useSyncExternalStore(subscribeSoundEnabled, getSoundVolume);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
   const dnd = useNotificationCenterStore((s) => s.doNotDisturb);
@@ -2113,11 +2120,6 @@ export const Settings: React.FC = () => {
     setPolicyViewerOpen(true);
   }, []);
 
-  const toggleOptionalAnalytics = useCallback((enabled: boolean) => {
-    setOptionalAnalyticsEnabled(enabled);
-    setOptionalAnalytics(enabled);
-    toast.info(enabled ? 'Optional analytics enabled' : 'Optional analytics disabled');
-  }, [toast]);
 
   
   // Authentication state
@@ -3305,7 +3307,7 @@ export const Settings: React.FC = () => {
           </div>
           {showRecoveryCodes && recoveryCodes.length > 0 && (
             <div style={{ padding: 'var(--space-4)', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
                   <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
@@ -3516,6 +3518,23 @@ export const Settings: React.FC = () => {
     </div>
   );
 
+  /** "Windows · Desktop app" from the running environment, not a constant. */
+  const aboutPlatform = (): string => {
+    const uaPlatform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+    const os = uaPlatform || (/Windows/i.test(navigator.userAgent) ? 'Windows' : /Mac/i.test(navigator.userAgent) ? 'macOS' : /Linux/i.test(navigator.userAgent) ? 'Linux' : 'Unknown');
+    const host = isTauri() ? 'Desktop app' : 'Web preview';
+    return `${os} · ${host}`;
+  };
+
+  const DATA_STATE_LABEL: Record<string, string> = {
+    local: 'Stays on this computer',
+    'when-used': 'Only when you use the feature',
+    off: 'Off until you turn it on',
+    'user-submitted': 'Only what you send',
+    'feature-controlled': 'Only with your permission',
+    never: 'Never collected',
+  };
+
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
       <div style={{ ...styles.aboutHeader, marginTop: 'var(--space-3)' }}>
@@ -3550,6 +3569,18 @@ export const Settings: React.FC = () => {
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Version</span>
           <span style={styles.aboutValue}>{appVersion}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Build</span>
+          <span style={styles.aboutValue}>{import.meta.env.PROD ? 'Release' : 'Development'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Platform</span>
+          <span style={styles.aboutValue}>{aboutPlatform()}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Updates</span>
+          <span style={styles.aboutValue}>Install new versions from the Releases page</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Creator</span>
@@ -3593,30 +3624,11 @@ export const Settings: React.FC = () => {
           ))}
         </div>
 
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Optional Product Analytics</span>
-            <span style={styles.settingDesc}>Feature usage and performance signals used to improve DEX. Off by default.</span>
-          </div>
-          <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={optionalAnalytics}
-              onChange={e => toggleOptionalAnalytics(e.target.checked)}
-              style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-              aria-label="Toggle optional product analytics"
-            />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
-              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
-            </span>
-          </label>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 'var(--space-2)', marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
             <div key={category.id} style={{ padding: '10px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
               <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{category.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{DATA_STATE_LABEL[category.defaultState]}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
             </div>
           ))}
@@ -3785,13 +3797,31 @@ export const Settings: React.FC = () => {
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Interface sounds</span>
-          <span style={styles.settingDesc}>Short tones for toggles, notifications, copy and errors. Off means DEX stays silent; media apps are unaffected.</span>
+          <span style={styles.settingDesc}>Tones for toggles, notifications, copy and errors. Media apps are unaffected.</span>
         </div>
         <input
           type="checkbox"
           checked={uiSoundsOn}
           onChange={(e) => setSoundEnabled(e.target.checked)}
           aria-label="Interface sounds"
+        />
+      </div>
+      <div style={{ ...styles.settingRow, opacity: uiSoundsOn ? 1 : 0.5 }}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Interface volume</span>
+          <span style={styles.settingDesc}>{Math.round(uiSoundVolume * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(uiSoundVolume * 100)}
+          disabled={!uiSoundsOn}
+          onChange={(e) => setSoundVolume(Number(e.target.value) / 100)}
+          onPointerUp={(e) => playToggle(e.currentTarget.getBoundingClientRect().left + e.currentTarget.offsetWidth / 2)}
+          aria-label="Interface sound volume"
+          style={{ width: 160, accentColor: 'var(--color-accent)' }}
         />
       </div>
       {renderWindowsLink('Output, input & volume', 'Speakers, headphones, microphones, balance and spatial sound are managed by Windows.', 'ms-settings:sound')}
@@ -4393,6 +4423,7 @@ export const Settings: React.FC = () => {
       case 'permissions': return <PermissionsPanel />;
       case 'creator': return <CreatorAccessPanel />;
       case 'keyboard': return renderKeyboardSettings();
+      case 'touch': return <TouchInputPanel />;
       case 'files': return renderFilesSettings();
       case 'storage': return renderStorageSettings();
       case 'browser': return renderBrowserSettings();

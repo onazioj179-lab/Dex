@@ -1,6 +1,6 @@
 # DEX -- Terms of Use
 
-**Effective date:** 2026-06-13  
+**Effective date:** 2026-11-04  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
@@ -60,11 +60,11 @@ This includes permitted diagnostics, product analytics, interaction patterns, fe
 
 DEX may use permitted data to train, evaluate, tune, test, and improve models, automation systems, recommendations, search, classification, safety systems, abuse detection, ranking, performance systems, and product quality.
 
-Sensitive content is not collected or shared by default. If you intentionally submit content, enable optional analytics, use cloud/AI features, grant plugin permissions, or join a data-improvement program, DEX may process that data as described in the Privacy Policy.
+Sensitive content is not collected or shared by default. If you intentionally submit content to DEX or its developer, or grant plugin permissions, that data is handled as described in the Privacy Policy.
 
-## 8. Diagnostics and Product Analytics
+## 8. Diagnostics
 
-Minimum diagnostics may be required to keep DEX secure, reliable, compatible, updated, and recoverable. Optional product analytics are off by default unless you enable them. Required diagnostics and optional analytics may be used to identify failures, improve performance, prioritize features, protect users, detect abuse, and develop DEX.
+DEX keeps diagnostics (crash log, timings, errors) on your device and does not send diagnostics or analytics. If that ever changes, the Privacy Policy will describe it and DEX will ask for your consent first.
 
 ## 9. Feedback and Submissions
 
@@ -78,7 +78,7 @@ Plugins are independent software. You are responsible for plugins you install, p
 
 DEX may review, reject, block, quarantine, disable, delist, remove, rate-limit, or restrict plugins, integrations, accounts, features, workflows, or developers that create risk, violate policy, infringe rights, harm users, threaten infrastructure, or undermine DEX.
 
-DEX is free for everyone and does not include advertising, sponsored content, in-app purchases, or paid features. As described in the Privacy Policy, DEX may share limited data with service providers (such as hosting, analytics, crash reporting, and support) and with integration partners you choose to connect, in order to operate, secure, and improve the product.
+DEX is free for everyone and does not include advertising, sponsored content, in-app purchases, or paid features. Features you use may contact third-party online services, which are listed in the Privacy Policy; those services handle requests under their own terms.
 
 ## 11. Updates, Changes, and Feature Control
 

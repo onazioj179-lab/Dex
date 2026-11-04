@@ -25,6 +25,7 @@ import { useNowPlaying } from '../services/nowPlaying';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { keyEventForApp } from '../shell/input/appKeyScope';
 
 // ===========================================================================
 // TYPES
@@ -1025,6 +1026,7 @@ export const Audio: React.FC = () => {
   // Keyboard shortcuts for playback control
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'audio')) return; // key meant for another app
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       if (e.key === ' ') { e.preventDefault(); togglePlayPause(); }

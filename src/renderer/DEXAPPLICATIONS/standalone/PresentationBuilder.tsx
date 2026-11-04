@@ -12,6 +12,7 @@ import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -448,6 +449,7 @@ const PresentationBuilder: React.FC = () => {
   useEffect(() => {
     if (!presenting) return;
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'presentation')) return; // key meant for another app
       if (e.key === 'Escape') exitPresent();
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
         e.preventDefault();

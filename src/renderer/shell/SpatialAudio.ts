@@ -62,6 +62,28 @@ export function isSoundEnabled(): boolean {
   return _enabled;
 }
 
+// Interface sound volume (0..1), applied to every tone. Persisted.
+const VOLUME_KEY = 'dex-ui-sound-volume';
+function readVolume(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? '');
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  } catch { return 1; }
+}
+let _volume = readVolume();
+
+export function getSoundVolume(): number {
+  return _volume;
+}
+
+export function setSoundVolume(v: number): void {
+  const next = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1));
+  if (next === _volume) return;
+  _volume = next;
+  try { localStorage.setItem(VOLUME_KEY, String(next)); } catch { /* storage blocked */ }
+  _listeners.forEach((cb) => cb());
+}
+
 /**
  * Compute stereo pan from an element's screen-center x.
  * Maps left edge to -1, right edge to +1.
@@ -87,6 +109,8 @@ export function playSpatialTone(
   decay: number,
   volume: number,
 ): void {
+  const level = volume * _volume;
+  if (level <= 0) return;
   const ctx = getContext();
   if (!ctx) return;
   if (ctx.state === 'suspended') {
@@ -101,7 +125,7 @@ export function playSpatialTone(
   osc.frequency.value = frequency;
   pan.pan.value = panFromX(x);
   gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(volume, now + attack);
+  gain.gain.linearRampToValueAtTime(level, now + attack);
   gain.gain.exponentialRampToValueAtTime(0.001, now + attack + decay);
 
   osc.connect(gain);

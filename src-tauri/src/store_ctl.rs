@@ -119,12 +119,10 @@ fn write_array(app: &tauri::AppHandle, name: &str, arr: &[Value]) {
 // `{ ok:false, reason }` shape. No I/O beyond reading installed.json for context.
 // ---------------------------------------------------------------------------
 
-// Host runtime version reported to the planner. Electron used app.getVersion();
-// the renderer never inspects the literal value beyond the verify-host gate, and
-// keeping it in sync with the shipping build belongs to the build, not this data
-// module, so we report a permissive host that satisfies any sane minRuntime. A
-// real minRuntime > this would still correctly fail the host check below.
-const HOST_RUNTIME: &str = "6.0.0";
+// Host runtime version reported to the planner: the version of this build
+// (Cargo.toml, kept in step with package.json and tauri.conf.json), so a
+// package's minRuntime is checked against what is actually installed.
+const HOST_RUNTIME: &str = env!("CARGO_PKG_VERSION");
 
 fn semver_parts(v: &str) -> [i64; 3] {
     let mut out = [0i64; 3];

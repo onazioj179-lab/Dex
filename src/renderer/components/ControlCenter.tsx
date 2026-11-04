@@ -339,7 +339,7 @@ const ccFooterBtn: React.CSSProperties = {
   background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
 };
 const ccBadge: React.CSSProperties = {
-  minWidth: 16, height: 16, padding: '0 5px', borderRadius: 8, background: 'var(--color-accent)',
+  minWidth: 16, height: 16, padding: '0 5px', borderRadius: 10, background: 'var(--color-accent)',
   color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 

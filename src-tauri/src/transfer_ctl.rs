@@ -371,7 +371,7 @@ fn initiate(app: &tauri::AppHandle, args: &Value) -> Value {
         .get("chunkSize")
         .and_then(|v| v.as_u64())
         .unwrap_or(65536) as usize;
-    std::thread::spawn(move || {
+    crate::util::spawn_named("transfer", move || {
         let result = if is_dir {
             copy_dir_chunked(&app2, &id2, &src_path, &PathBuf::from(&dest2), chunk, 0, total)
         } else {

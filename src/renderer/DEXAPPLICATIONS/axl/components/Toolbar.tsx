@@ -51,9 +51,11 @@ interface ToolbarProps {
   onAddFeature: () => void;
   onImport?: () => void;
   sendToMenu?: React.ReactNode;
+  /** Save a checkpoint of the project (restored from Collab Hub). */
+  onSaveCheckpoint?: () => void;
 }
 
-const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFeature, onImport, sendToMenu }) => {
+const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFeature, onImport, sendToMenu, onSaveCheckpoint }) => {
   const { project, undo, redo, undoStack, redoStack, toggleExplodedView, generateBOM, addPrimitive } = useProjectStore();
   const { tool, setTool } = useViewportStore();
   const ui = useUIStore();
@@ -234,6 +236,10 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           {CARET}
         </button>
         <Flyout id="export">
+          {onSaveCheckpoint && (
+            <MenuItem onClick={onSaveCheckpoint} label="Checkpoint" sub="Saved version"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /></svg>} />
+          )}
           {([
             ['stl', '3D Print'], ['gltf', 'PBR/Web3D'], ['dxf', 'CNC/CAD'],
             ['pdf', 'Drawing'], ['json', 'Project'], ['png', 'Image'],

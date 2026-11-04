@@ -30,14 +30,13 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "publisher": "Onazi Oj",
     "copyright": "Copyright (c) 2026 Onazi Treasure OJ. DEX OS created by Onazi Oj.",
     "category": "Productivity",
     "shortDescription": "DEX OS",
-    "longDescription": "DEX OS: a personal desktop environment and control hub. Created by Onazi Oj.",
+    "longDescription": "DEX OS: a desktop environment for Windows. Created by Onazi Oj.",
     "icon": [
       "../assets/icon.ico",
       "../assets/icon.png"
@@ -52,6 +51,10 @@
       "timestampUrl": "http://timestamp.digicert.com",
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "../assets/icon.ico"
       }
     }
   }

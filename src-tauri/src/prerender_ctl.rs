@@ -226,7 +226,7 @@ fn request_prerender(app: &tauri::AppHandle, route: &str, priority: i64) -> bool
 // state so concurrent enqueues converge), then emits a renderer event so the UI
 // can pick up the freshly available route (analog of webContents.send).
 fn spawn_process_tick(app: tauri::AppHandle, route: String) {
-    std::thread::spawn(move || {
+    crate::util::spawn_named("prerender", move || {
         std::thread::sleep(std::time::Duration::from_secs(PROCESS_DELAY_SECS));
 
         let (mut queue, mut cache) = load_state(&app);

@@ -33,6 +33,7 @@ import {
 } from './transcode';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -1310,7 +1311,7 @@ const Forge: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if (!keyEventForApp(e, 'forge') || isTypingTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       switch (e.code) {
         case 'Enter':

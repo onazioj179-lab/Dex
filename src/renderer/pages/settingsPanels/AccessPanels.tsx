@@ -86,30 +86,31 @@ const TEXTAREA: React.CSSProperties = {
 // ===========================================================================
 // 1. Permissions Panel
 // ===========================================================================
-interface Grant {
-  capability: string;
-  origin: string;
-  decision: 'allow' | 'deny';
-  grantedAt: number;
-  expiresAt: number;
-  reason?: string;
-  fromGroup?: boolean;
+/** One row of `webPermissions:list` (src-tauri/src/webview_permissions.rs). */
+type WebPolicy = 'allow' | 'ask' | 'deny';
+interface WebPermission {
+  id: string;
+  label: string;
+  description: string;
+  policy: WebPolicy;
+  default: WebPolicy;
+  lastRequestedAt: number | null;
+  lastDecision: WebPolicy | null;
 }
 
-const PRETTY_CAP: Record<string, string> = {
-  'screen-record': 'Screen recording',
-  'camera': 'Camera',
-  'microphone': 'Microphone',
-  'location': 'Location',
-  'clipboard-read': 'Clipboard read',
-  'clipboard-cloud-sync': 'Clipboard cloud sync',
-  'files-read': 'Files read',
-  'files-write': 'Files write',
-  'network-request': 'Network',
-  'notifications': 'Notifications',
-  'biometric': 'Biometric',
-  'system-events': 'System events',
-};
+const POLICY_LABEL: Record<WebPolicy, string> = { allow: 'Allow', ask: 'Ask', deny: 'Block' };
+
+function dexInvoke(): ((channel: string, ...args: unknown[]) => Promise<unknown>) | undefined {
+  return (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex?.invoke;
+}
+
+function ago(ts: number): string {
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? `${hrs} h ago` : `${Math.round(hrs / 24)} d ago`;
+}
 
 function timeLeft(expiresAt: number): string {
   if (!expiresAt) return 'Never expires';
@@ -224,109 +225,88 @@ const UkiAccessSection: React.FC = () => {
 };
 
 export const PermissionsPanel: React.FC = () => {
-  const [grants, setGrants] = useState<Grant[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<WebPermission[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const invoke = dexInvoke();
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    if (!invoke) return;
     try {
-      const native = (window as any).dexNative?.permissions;
-      if (!native) throw new Error('Permissions bridge unavailable');
-      const list: Grant[] = await native.list();
-      setGrants(Array.isArray(list) ? list : []);
-    } catch (err: any) {
-      setError(err?.message ?? String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  const revoke = useCallback(async (cap: string, origin: string) => {
-    try {
-      await (window as any).dexNative?.permissions?.revoke(cap, origin);
-      await refresh();
+      const list = await invoke('webPermissions:list');
+      setRows(Array.isArray(list) ? (list as WebPermission[]) : []);
+      setError(null);
     } catch (err) {
-      console.warn('[permissions] revoke failed', err);
+      setError(err instanceof Error ? err.message : String(err));
     }
-  }, [refresh]);
+  }, [invoke]);
 
-  const revokeAll = useCallback(async () => {
-    if (!confirm('Revoke every saved permission grant?')) return;
-    try {
-      await (window as any).dexNative?.permissions?.revokeAll();
-      await refresh();
-    } catch (err) {
-      console.warn('[permissions] revoke-all failed', err);
-    }
-  }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
-  const allowed = grants.filter(g => g.decision === 'allow');
-  const denied = grants.filter(g => g.decision === 'deny');
+  const setPolicy = useCallback(async (id: string, policy: WebPolicy) => {
+    if (!invoke) return;
+    setRows(prev => prev.map(r => (r.id === id ? { ...r, policy } : r)));
+    const res = (await invoke('webPermissions:set', id, policy).catch(() => null)) as { success?: boolean; error?: string } | null;
+    if (!res?.success) setError(res?.error ?? 'Could not save the change.');
+    void refresh();
+  }, [invoke, refresh]);
+
+  const resetAll = useCallback(async () => {
+    if (!invoke) return;
+    await invoke('webPermissions:reset').catch(() => null);
+    void refresh();
+  }, [invoke, refresh]);
+
+  const changed = rows.some(r => r.policy !== r.default);
 
   return (
     <div style={PANEL}>
       <div>
         <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Permissions</h2>
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-          Saved decisions for screen recording, camera, microphone, location, clipboard, files, and more —
-          plus what the UKI assistant may access, below. Related capabilities are batched into a single
-          prompt; revoking here clears the whole batch.
+          What DEX itself may use. Allow and Block apply without a prompt; Ask shows the system prompt.
+          Websites in the Browser always ask separately. What the UKI assistant may access is listed below.
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <button style={BTN} onClick={refresh} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
-        <button style={BTN_DANGER} onClick={revokeAll} disabled={!grants.length}>
-          Revoke all
-        </button>
-      </div>
-
-      {error && (
-        <div style={{ color: 'var(--color-error)', fontSize: 12 }}>Error: {error}</div>
+      {!invoke && (
+        <div style={DESC}>Available in the installed app.</div>
       )}
+      {error && <div style={{ color: 'var(--color-error)', fontSize: 12 }}>{error}</div>}
 
-      <h3 style={TITLE}>Allowed ({allowed.length})</h3>
-      <div style={SECTION}>
-        {allowed.length === 0 ? (
-          <div style={{ ...DESC, padding: '14px 0' }}>No permissions granted yet.</div>
-        ) : (
-          allowed.map((g, i) => (
-            <div key={`${g.capability}|${g.origin}|${i}`} style={ROW}>
-              <div>
-                <div style={LABEL}>{PRETTY_CAP[g.capability] ?? g.capability}</div>
+      {invoke && (
+        <div style={SECTION}>
+          {rows.map(r => (
+            <div key={r.id} style={ROW}>
+              <div style={{ minWidth: 0 }}>
+                <div style={LABEL}>{r.label}</div>
                 <div style={DESC}>
-                  {g.origin} · {timeLeft(g.expiresAt)}
-                  {g.fromGroup ? ' · batched' : ''}
+                  {r.description}
+                  {r.lastRequestedAt ? ` · Last requested ${ago(r.lastRequestedAt)}` : ''}
                 </div>
               </div>
-              <button style={BTN_DANGER} onClick={() => revoke(g.capability, g.origin)}>Revoke</button>
-            </div>
-          ))
-        )}
-      </div>
-
-      <h3 style={TITLE}>Denied ({denied.length})</h3>
-      <div style={SECTION}>
-        {denied.length === 0 ? (
-          <div style={{ ...DESC, padding: '14px 0' }}>No active denials.</div>
-        ) : (
-          denied.map((g, i) => (
-            <div key={`d|${g.capability}|${g.origin}|${i}`} style={ROW}>
-              <div>
-                <div style={LABEL}>{PRETTY_CAP[g.capability] ?? g.capability}</div>
-                <div style={DESC}>{g.origin} · {timeLeft(g.expiresAt)}</div>
+              <div role="radiogroup" aria-label={`${r.label} permission`} style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                {(['allow', 'ask', 'deny'] as WebPolicy[]).map(p => (
+                  <button
+                    key={p}
+                    role="radio"
+                    aria-checked={r.policy === p}
+                    style={r.policy === p ? BTN_PRIMARY : BTN}
+                    onClick={() => { if (r.policy !== p) void setPolicy(r.id, p); }}
+                  >
+                    {POLICY_LABEL[p]}
+                  </button>
+                ))}
               </div>
-              <button style={BTN} onClick={() => revoke(g.capability, g.origin)}>Clear</button>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {invoke && (
+        <div>
+          <button style={BTN} onClick={resetAll} disabled={!changed}>Restore defaults</button>
+        </div>
+      )}
 
       <UkiAccessSection />
     </div>

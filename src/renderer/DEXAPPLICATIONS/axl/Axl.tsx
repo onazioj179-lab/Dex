@@ -90,6 +90,7 @@ import { importCadFile } from './AxlImport';
 import type { InterferencePair, NamedView } from './types';
 import { exportProject as doExport } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useViewportStore } from './stores/viewportStore';
 import { useUIStore } from './stores/uiStore';
 import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel, solveTrussModes } from './engine';
@@ -99,6 +100,7 @@ import SketchOverlay from './components/SketchOverlay';
 import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
 import { ResizablePanel } from '../../components/ResizablePanel';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 // ==================== APP IDENTITY ====================
 export const AXL_VERSION = '1.0.0';
@@ -127,6 +129,17 @@ const AXL: React.FC = () => {
   useAutoSave('axl', useCallback(() => ({ project }), [project]), isDirty, 30_000);
   const simResults = useProjectStore(s => s.simResults);
   const pStore = useProjectStore();
+  // Saved versions of the project (listed and restored from Collab Hub).
+  const checkpoints = useAppCheckpoints({
+    appId: 'axl',
+    appName: 'AXL',
+    getSnapshot: () => JSON.stringify(useProjectStore.getState().project),
+    onRestore: (data) => {
+      const restored = JSON.parse(data);
+      if (!restored || typeof restored !== 'object' || !restored.assembly) throw new Error('not an AXL project');
+      useProjectStore.getState().loadProject(restored);
+    },
+  });
   const { tool, selectedPartId, hoveredPartId, gridVisible, snapEnabled } = useViewportStore();
   const vStore = useViewportStore();
   const ui = useUIStore();
@@ -1603,7 +1616,7 @@ const AXL: React.FC = () => {
   // ─── Keyboard shortcuts ───────────────────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (!keyEventForApp(e, 'axl') || isTypingTarget(e.target)) return;
       const k = e.key.toLowerCase();
 
       // ── Ctrl+Shift combos ──
@@ -1723,6 +1736,7 @@ const AXL: React.FC = () => {
       <div data-testid="axl-tools">
         <AXLToolbar
           onExport={handleExport}
+          onSaveCheckpoint={() => { const res = checkpoints.saveNow(); window.dispatchEvent(new CustomEvent('dex-toast', { detail: res.ok ? { type: 'success', message: 'Checkpoint saved' } : { type: 'error', message: res.error } })); }}
           onRunSimulation={runSimulation}
           onImport={triggerImport}
           onAddFeature={addFeatureToSelected}

@@ -43,6 +43,7 @@ import {
 } from './store/appSubsystem';
 import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
 import { startClipboardMonitor } from './services/ClipboardMonitor';
+import { startLocalMetrics, markShellReady } from './services/diagnostics/localMetrics';
 import FlowSendMenu from './components/FlowSendMenu';
 import { wireFlowIntakes } from './services/flowIntakes';
 import ContextNowPanel from './components/ContextNowPanel';
@@ -224,6 +225,8 @@ export const App: React.FC = () => {
   // the moment the panel opens). Idempotent; runs once for the app's lifetime.
   // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
+  // Local diagnostics (Nexus > Diagnostics): counters only, nothing leaves this computer.
+  useEffect(() => { startLocalMetrics(); requestAnimationFrame(() => requestAnimationFrame(markShellReady)); }, []);
   // Background scheduler: fire due recurring UKI tasks on the shared heartbeat.
   useEffect(() => { scheduledTaskRunner.start(); return () => scheduledTaskRunner.stop(); }, []);
   

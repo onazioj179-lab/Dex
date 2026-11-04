@@ -37,6 +37,7 @@ import {
   type DexProject, type WorkspaceHit, type ProjectSymbol, type ProjectFile,
 } from './dexCode/project';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -569,6 +570,7 @@ const DexCode: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'dexcode')) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         runCode();
@@ -1440,7 +1442,7 @@ const DexCode: React.FC = () => {
             </div>
             {/* In plain mode, choose whether UKI writes code or just acts. */}
             {langMode === 'plain' && (
-              <div role="tablist" aria-label="Plain-English behaviour" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
+              <div role="tablist" aria-label="Plain-English behavior" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-inset, rgba(255,255,255,0.05))', borderRadius: 10, padding: 2, gap: 2 }}>
                 {(['code', 'doit'] as const).map(m => (
                   <button
                     key={m}

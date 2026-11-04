@@ -174,3 +174,54 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | Real profile untouched | `%APPDATA%\com.onazioj.dex` 39 files SHA-256 identical before/after. `%LOCALAPPDATA%` identical except `logs/startup.log` (+129 bytes): the startup log ignored `DEX_DATA_DIR`. Fixed after this build (`webview2.rs`), 3/3 native tests |
 | Not run | Installing the MSI/NSIS (would replace the installed DEX on this machine; needs a VM or your go-ahead), upgrade over 6.x, uninstall |
 
+
+## Part 9 (spatial UX, multitouch, haptics, search)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | exit 0 |
+| Full `vitest run` | **530 files passed, 0 failed** (2 skipped); 5444 tests |
+| `multitouch-contacts.test.ts` | 13 passed: N-contact translation/scale/rotation; 10 simultaneous contacts tracked by id, an 11th refused; stale contacts dropped on a new primary touch; palm rejection; N-finger camera equals the old 2-finger pinch; haptics never fire on desktop hardware, rate-limited and switchable on mobile hardware; global recognizer fires one desktop pinch per gesture, marks pinches inside an app, and still sees a pointerup an app stopped |
+| `part9-spatial-touch-ui.test.tsx` | 6 passed: no toolbar, no minimap by default, overlay top-right not bottom; Windows panel opens from the shortcut, Layout tab has Arrange; desktop menu carries every former toolbar action; minimap migration v1 → off; Touch & Pen reports "No touch screen" honestly with haptics disabled, and on a 10-point screen the pad counts 5 contacts then 4, peak 5 |
+| `part9-spotlight-windows.test.ts` | 3 passed: open window found and switched to; on the spatial desktop groups/zones/views found and the camera moved; none when spatial is off |
+| `spatial-desktop.test.ts` | 23 passed (unchanged behaviour) |
+| `part9-maps-honest-errors.test.ts` | 5 passed: results mapped, malformed rows dropped; empty answer = no results; HTTP 503 / network error = error, not "no places"; blank query makes no request; each geolocation failure explained |
+| `part9-nexus-app-phases.test.tsx` | 2 passed: lifecycle `handles()` / `subscribeAll()`; Task Manager renders no governance select, offers Suspend only for an app that listens, Suspend → `suspended`, Resume → `background` |
+| `part9-browser-address.test.ts` | 5 passed: URLs kept, bare domains get https (ports/paths kept), localhost/IP/IPv6 open over http, text/numbers searched, 8 dangerous schemes refused, `about:blank` allowed |
+| Second pass | `tsc` exit 0; full `vitest run` **533 files passed, 0 failed**; Browser files re-run after the last edit: 3 files / 46 tests passed |
+| `part9-app-key-scope.test.ts` | 5 passed: a key typed in another app's editor is not FLUX's; with page focus the last-clicked app gets it; else the current app; apps mounted outside the shell keep their keys; typing-target detection |
+| Creative-app regression | 103 test files that mention the changed apps: 1091 tests passed. Third pass: `tsc` exit 0; full `vitest run` **535 files passed, 0 failed** |
+| Fourth pass | `tsc` exit 0; full `vitest run` **536 files passed, 0 failed**; Imosion files re-run after the last edit: 25 files / 244 tests passed |
+| `part9-app-key-scope-ratchet.test.ts` | 1 passed: every `window`/`document` keydown handler under `DEXAPPLICATIONS/` and `pages/` calls `keyEventForApp`, except 8 listed Escape-closers / one-shot / unmounted handlers |
+| Rendered preview | NOT RUN: the preview stops at the Terms & Privacy acceptance, which the owner accepts, not an agent |
+| Real multitouch hardware | NOT TESTED: no touch screen here. Mouse/synthetic events cannot prove 5- or 10-point support; use Settings › Touch & Pen on the device |
+
+## Part 10 (permissions, Password Generator+, spatial layout, docs, 2026-11-03, `claude/dex-part10`)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | exit 0 (after every batch, including the last edit) |
+| Full `vitest run` | **539 files passed, 0 failed** (2 skipped); 5,492 tests. Edits made after this run (wording, About rows) were followed by a re-run of the UKI, Settings, Workflows and clipboard tests: 25 files / 182 tests passed |
+| `cargo test --bin dex-tauri` | **96 passed, 0 failed**, including 4 new `webview_permissions` tests: only the bundled origin is trusted (look-alike hosts refused), clipboard allowed and SysEx blocked by default, other permissions left to WebView2, stored choice overrides the default |
+| `password-generator-plus.test.ts` | 12 passed: rejection sampling drops the biased tail; every selected class present; only selected classes used; look-alikes excluded; length clamped 8-128; exact search-space entropy; passphrase word count, capitalisation, single digit; 1,179 unique words; strength tiers |
+| `spatial-desktop.test.ts` | 26 passed, 3 new: a free spot is kept; a blocked window moves the shortest way (up here, not right); 12 windows placed around one spot never overlap and spread both up and down |
+| Watermark gate | `add-watermarks.js --check` OK after stamping 8 Part 9 test files that failed it on `main` |
+| Rendered preview (Vite, throwaway localhost profile) | Password Generator: password mode 128 bits "Very strong"; passphrase mode 6 words, 61 bits "Fair", two amber segments; R regenerates; options persist across reload; Save to Vault disabled with "Available in the installed app" (no native vault in a browser). Omni Clipboard: "Include copies from other apps" off by default, persists when turned on (turned off again afterwards). Window title "DEX OS". The preview's own first-run Terms screen was accepted to reach the shell; this is a disposable localhost origin, not the owner's profile |
+| GitHub repository metadata | Description and topics updated with `gh repo edit` and read back with `gh repo view` |
+| Not run | Installed-app check that the clipboard and MIDI prompts are gone (#87, #88); Settings › Permissions and Save to Vault in the desktop app (#89, #90); 7.0.1 installer build, install test and checksums (#97); frame timing with many windows (#91). Nothing was published to GitHub Releases |
+
+## Part 12 (one installer, release build, full-height apps, 2026-11-04, `claude/dex-os-final-release-27d6d4`)
+
+| Check | Result |
+|---|---|
+| Release build on `main` | **Was BROKEN** since #78: the chunk-cycle guard failed `vite build` (`app-axl -> dex-app-core -> app-axl`), which also turned CI "Build" red. Cause: `shell/input/appKeyScope.ts` landed in `app-axl`. Fixed by pinning `renderer/shell/input` to `dex-app-core`; `vite build` and `npm run build:tauri` pass |
+| One official installer | **VERIFIED**: `bundle.targets` = `nsis` only; the build produces exactly one file, `nsis/DEX_7.0.1_x64-setup.exe` (14.4 MB, MSVC, WebView2 loader statically linked, no source maps/env/tests, `NotSigned`). No `bundle/msi` folder. `release.yml`, `release-checksums.cjs` and `verify-tauri-bundle.js` handle NSIS only; the stale Electron `electron-builder` package/release jobs that ran on every `v*` tag were removed from `ci.yml` |
+| Upgrade path | **CHECKED (config), NOT RUN**: 6.1.0 on this machine is a per-user NSIS install at `%LOCALAPPDATA%\DEX`, key `HKCU\...\Uninstall\DEX`, data `%LOCALAPPDATA%\com.onazioj.dex`; 7.0.1 keeps productName `DEX`, identifier `com.onazioj.dex` and per-user mode, so it installs over 6.1.0 in place. The Tauri NSIS template offers to remove a prior MSI install. The setup was not run on this machine, because it would replace the owner's working 6.1.0 |
+| SHA-256 | `3088ab70ff4f13faaa2191e87b3b40bbf28bcab6f3eff3bbe6a4813485558cfe  DEX_7.0.1_x64-setup.exe` (local build; a CI build will differ) |
+| Packaged smoke (release exe over CDP, `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in a throwaway folder) | **6/6 passed**: store ready 4.9 s after launch; `app:getVersion` = `7.0.1`; 31 built-in apps opened one by one (files, browser, notes, tasks, settings, taskmanager, nexus, calculator, calendar, passwordgenerator, workflows, gallery, audio, power, maps, videoeditor, imosion, prism, flux, forge, axl, canvas, creativehub, pixelart, presentation, dexcode, pdfviewer, kanban, recyclebin, store, git) with no crash screen; 0 uncaught exceptions; host working set 97 MB; every write landed in the test folder |
+| Single-instance and test isolation | With `DEX_DATA_DIR` set, the single-instance guard is skipped (the profile shares no `dex.db`), so the packaged test ran beside the owner's running DEX instead of focusing it |
+| DEX Bar strip | **FIXED (owner request)**: apps no longer stop above a blank band along the bottom. Preview at 1440x900: active app container 66 to 900 px, `padding-bottom: 0`; maximized/snapped windows get `dockReserve: 0`. The bar floats over app content |
+| Version | App version constants read `package.json` at build time (`runningApps.ts` was hard-coded, `appSubsystem.ts` still said 3.6.0) |
+| `tsc --noEmit` | exit 0 |
+| Full `vitest run` | 539 passed, 2 failed while cargo LTO saturated the CPU (10 s import timeouts in `part7-honest-controls` and `renderer-pages`); both files re-run idle: 37/37 passed |
+| Not run | Installing the setup (clean VM, over 6.1.0, uninstall/reinstall), because it would replace the owner's working install. `cargo test` was not re-run after the single-instance change (the release build compiled it) |

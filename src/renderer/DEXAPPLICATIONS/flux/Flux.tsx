@@ -35,6 +35,12 @@ import {
 } from './FluxFeatures';
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+
+/** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
+const FLUX_ACCENT = '#bf5af2';
+/** The accent at `pct` percent opacity. */
+const fluxTint = (pct: number) => `color-mix(in srgb, ${FLUX_ACCENT} ${pct}%, transparent)`;
 
 // ===========================================================================
 // DEX FLUX - Professional Motion Graphics
@@ -698,7 +704,7 @@ const Flux: React.FC = () => {
   const [maskExpansion, setMaskExpansion] = useState(0);
   const [maskOpacity, setMaskOpacity] = useState(100);
   const [shaderCode, setShaderCode] = useState(`precision mediump float;\nuniform float u_time;\nuniform vec2 u_resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / u_resolution;\n  vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0,2,4));\n  gl_FragColor = vec4(col, 1.0);\n}`);
-  const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' });
+  const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' }); // hex: the shader parses it
   // 2. Precompose
   const [showPrecompose, setShowPrecompose] = useState(false);
   const [precompName, setPrecompName] = useState('Pre-comp 1');
@@ -876,37 +882,41 @@ const Flux: React.FC = () => {
   }, [layers]);
 
   // ===== UNDO/REDO KEYBOARD SHORTCUTS =====
+  // Only for keys aimed at FLUX (it stays mounted in the background) and never
+  // inside a text field, whose own undo / select-all must keep working. History
+  // is read from refs so no state updater has side effects (StrictMode runs
+  // updaters twice, which pushed two redo entries per undo).
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const redoRef = useRef(redoStack);
+  redoRef.current = redoStack;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'flux') || isTypingTarget(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        setHistory(prev => {
-          if (prev.length <= 1) return prev;
+        const prev = historyRef.current;
+        if (prev.length > 1) {
           const undone = prev[prev.length - 1];
           const restored = prev[prev.length - 2];
           if (restored?.layers) {
             isRestoringRef.current = true;
             setLayers(restored.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
           }
-          // Push undone state to redo stack
-          if (undone) {
-            setRedoStack(rs => [...rs, undone]);
-          }
-          return prev.slice(0, -1);
-        });
+          setRedoStack(rs => [...rs, undone]);
+          setHistory(prev.slice(0, -1));
+        }
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
-        setRedoStack(rs => {
-          if (rs.length === 0) return rs;
-          const redone = rs[rs.length - 1];
-          if (redone?.layers) {
-            isRestoringRef.current = true;
-            setLayers(redone.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
-            setHistory(prev => [...prev, redone]);
-          }
-          return rs.slice(0, -1);
-        });
+        const rs = redoRef.current;
+        const redone = rs[rs.length - 1];
+        if (redone?.layers) {
+          isRestoringRef.current = true;
+          setLayers(redone.layers.map(l => ({ ...l, content: l.content || '' })) as typeof layers);
+          setHistory(prev => [...prev, redone]);
+          setRedoStack(rs.slice(0, -1));
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
@@ -1437,7 +1447,7 @@ const Flux: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if (!keyEventForApp(e, 'flux') || isTypingTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       // Ctrl+S — save project
       if (mod && e.key === 's') {
@@ -2356,14 +2366,14 @@ const Flux: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
-    logo: { fontSize: '12px', fontWeight: 700, color: '#bf5af2', letterSpacing: '-0.2px' },
+    logo: { fontSize: '12px', fontWeight: 700, color: FLUX_ACCENT, letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: '#bf5af2', color: '#fff', border: '1px solid #bf5af2', borderRadius: '9999px' },
+    btnPrimary: { background: FLUX_ACCENT, color: '#fff', border: `1px solid ${FLUX_ACCENT}`, borderRadius: '9999px' },
     workspace: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px' },
     toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer' },
-    toolBtnActive: { background: '#bf5af2', color: '#fff' },
+    toolBtnActive: { background: FLUX_ACCENT, color: '#fff' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     canvasArea: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     canvasContainer: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-inset)', position: 'relative' },
@@ -2377,7 +2387,7 @@ const Flux: React.FC = () => {
     timelineHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)' },
     transportControls: { display: 'flex', alignItems: 'center', gap: '4px' },
     transportBtn: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer' },
-    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: '9999px', color: '#bf5af2', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
+    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: '9999px', color: FLUX_ACCENT, border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     timelineTracks: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     layerList: { width: '170px', flexShrink: 0, minHeight: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin' } as any,
     layerItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px var(--space-2)', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' },
@@ -2386,7 +2396,7 @@ const Flux: React.FC = () => {
     layerName: { flex: 1, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 },
     trackArea: { flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
     track: { height: '28px', position: 'relative', borderBottom: '1px solid var(--color-border-subtle)' },
-    trackClip: { position: 'absolute', top: '3px', height: '22px', background: '#bf5af2', borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
+    trackClip: { position: 'absolute', top: '3px', height: '22px', background: FLUX_ACCENT, borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
     playhead: { position: 'absolute', top: 0, width: '1px', background: 'var(--color-error)', zIndex: 50 },
     ruler: { height: '20px', background: 'var(--color-bg-inset)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end' },
     behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '10px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
@@ -2476,18 +2486,18 @@ const Flux: React.FC = () => {
 
   return (
     <div className="flux-root" style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
-      <CreativeMenuBar menus={fluxMenus} accent="#bf5af2" />
+      <CreativeMenuBar menus={fluxMenus} accent={FLUX_ACCENT} />
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
         button { font-family: inherit; transition: all 0.12s ease; }
         button:active { transform: scale(0.97); }
-        .flux-ctx-item:hover { background: rgba(191,90,242,0.15) !important; }
-        .flux-ctx-item:active { background: rgba(191,90,242,0.25) !important; }
+        .flux-ctx-item:hover { background: ${fluxTint(15)} !important; }
+        .flux-ctx-item:active { background: ${fluxTint(25)} !important; }
         .flux-btn-primary:hover { background: #c96ef5 !important; }
-        .flux-layer-item:hover { background: rgba(191,90,242,0.06) !important; border-color: rgba(191,90,242,0.2) !important; }
-        .flux-tool-btn:hover { background: rgba(191,90,242,0.1) !important; color: #bf5af2 !important; }
-        .flux-behavior-item:hover { border-color: rgba(191,90,242,0.2) !important; background: rgba(191,90,242,0.04) !important; }
+        .flux-layer-item:hover { background: ${fluxTint(6)} !important; border-color: ${fluxTint(20)} !important; }
+        .flux-tool-btn:hover { background: ${fluxTint(10)} !important; color: ${FLUX_ACCENT} !important; }
+        .flux-behavior-item:hover { border-color: ${fluxTint(20)} !important; background: ${fluxTint(4)} !important; }
         * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -2496,14 +2506,14 @@ const Flux: React.FC = () => {
         input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
         input[type="range"]::-webkit-slider-thumb { 
           -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; 
-          background: #bf5af2; cursor: pointer; margin-top: -4px; border: none;
+          background: ${FLUX_ACCENT}; cursor: pointer; margin-top: -4px; border: none;
         }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(191,90,242,0.15); border-radius: 2px; }
-        .flux-tab:hover { color: #bf5af2 !important; background: rgba(191,90,242,0.04) !important; }
-        .flux-transport-btn:hover { background: rgba(191,90,242,0.12) !important; border-color: rgba(191,90,242,0.2) !important; }
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: ${fluxTint(15)}; border-radius: 2px; }
+        .flux-tab:hover { color: ${FLUX_ACCENT} !important; background: ${fluxTint(4)} !important; }
+        .flux-transport-btn:hover { background: ${fluxTint(12)} !important; border-color: ${fluxTint(20)} !important; }
         .flux-dropdown-item { transition: background 0.12s ease; }
-        .flux-dropdown-item:hover { background: rgba(191,90,242,0.12) !important; }
-        .flux-dropdown-item:active { background: rgba(191,90,242,0.2) !important; }
+        .flux-dropdown-item:hover { background: ${fluxTint(12)} !important; }
+        .flux-dropdown-item:active { background: ${fluxTint(20)} !important; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>
@@ -2631,10 +2641,10 @@ const Flux: React.FC = () => {
                             alignItems: 'center',
                             gap: 'var(--space-2)',
                             padding: '6px var(--space-2)',
-                            background: activeTool === toolId ? 'rgba(191,90,242,0.15)' : 'transparent',
+                            background: activeTool === toolId ? fluxTint(15) : 'transparent',
                             border: 'none',
                             borderRadius: 4,
-                            color: activeTool === toolId ? '#bf5af2' : 'var(--color-text-primary)',
+                            color: activeTool === toolId ? FLUX_ACCENT : 'var(--color-text-primary)',
                             cursor: 'pointer',
                             fontSize: 11,
                             textAlign: 'left',
@@ -2689,8 +2699,8 @@ const Flux: React.FC = () => {
                 </div>
               )}
               {isDragOver && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(191,90,242,0.1)', border: '2px dashed rgba(191,90,242,0.5)', borderRadius: '6px', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                  <span style={{ color: '#bf5af2', fontSize: '14px', fontWeight: 600 }}>Drop media here</span>
+                <div style={{ position: 'absolute', inset: 0, background: fluxTint(10), border: `2px dashed ${fluxTint(50)}`, borderRadius: '6px', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                  <span style={{ color: FLUX_ACCENT, fontSize: '14px', fontWeight: 600 }}>Drop media here</span>
                 </div>
               )}
               <canvas
@@ -2717,7 +2727,7 @@ const Flux: React.FC = () => {
                   max="200" 
                   value={viewScale} 
                   onChange={(e) => setViewScale(Number(e.target.value))} 
-                  style={{ width: '100px', accentColor: '#bf5af2', cursor: 'pointer' }}
+                  style={{ width: '100px', accentColor: FLUX_ACCENT, cursor: 'pointer' }}
                 />
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
@@ -2890,12 +2900,12 @@ const Flux: React.FC = () => {
                                       gap: '4px',
                                       cursor: selectedLayerId ? 'pointer' : 'not-allowed',
                                       opacity: selectedLayerId ? 1 : 0.5,
-                                      ...(isActive ? { borderColor: '#bf5af2', background: 'rgba(191,90,242,0.1)' } : {}),
+                                      ...(isActive ? { borderColor: FLUX_ACCENT, background: fluxTint(10) } : {}),
                                     }}
                                   >
                                     <span style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                       {preset.name}
-                                      {isActive && <span style={{ fontSize: '11px', color: '#bf5af2', fontWeight: 700 }}>ON</span>}
+                                      {isActive && <span style={{ fontSize: '11px', color: FLUX_ACCENT, fontWeight: 700 }}>ON</span>}
                                     </span>
                                     <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>cubic-bezier({preset.bezier.join(', ')})</span>
                                   </div>
@@ -2992,11 +3002,11 @@ const Flux: React.FC = () => {
                 {activeTab === 'inspector' && selectedLayer && (
                   <div>
                     <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Transform</div>
-                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Position X" min={0} max={canvasSize.width} value={selectedLayer.transform.x} displayValue={Math.round(selectedLayer.transform.x)} onChange={(v) => updateLayerTransform({ x: v })} />
-                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Position Y" min={0} max={canvasSize.height} value={selectedLayer.transform.y} displayValue={Math.round(selectedLayer.transform.y)} onChange={(v) => updateLayerTransform({ y: v })} />
-                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Scale" min={0} max={400} value={selectedLayer.transform.scaleX} unit="%" onChange={(v) => updateLayerTransform({ scaleX: v, scaleY: v })} />
-                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
-                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Position X" min={0} max={canvasSize.width} value={selectedLayer.transform.x} displayValue={Math.round(selectedLayer.transform.x)} onChange={(v) => updateLayerTransform({ x: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Position Y" min={0} max={canvasSize.height} value={selectedLayer.transform.y} displayValue={Math.round(selectedLayer.transform.y)} onChange={(v) => updateLayerTransform({ y: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Scale" min={0} max={400} value={selectedLayer.transform.scaleX} unit="%" onChange={(v) => updateLayerTransform({ scaleX: v, scaleY: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
                     
                     {/* Easing curve editor */}
                     <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
@@ -3129,13 +3139,13 @@ const Flux: React.FC = () => {
               </div>
               <div style={styles.timeDisplay}>{formatTime(currentTime)}</div>
               <span style={{ color: 'var(--color-border-subtle)' }}>|</span>
-              <button style={{ ...styles.iconBtn, color: loopEnabled ? '#bf5af2' : undefined, background: loopEnabled ? 'rgba(191,90,242,0.12)' : undefined }} onClick={() => setLoopEnabled(v => !v)} aria-label="Toggle loop">{Icons.loop}</button>
+              <button style={{ ...styles.iconBtn, color: loopEnabled ? FLUX_ACCENT : undefined, background: loopEnabled ? fluxTint(12) : undefined }} onClick={() => setLoopEnabled(v => !v)} aria-label="Toggle loop">{Icons.loop}</button>
               <button style={styles.iconBtn} onClick={() => { ['x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'opacity'].forEach(p => addKeyframeAtTime(p)); }} aria-label="Add keyframe">{Icons.keyframe}</button>
               <div style={{ flex: 1 }} />
               {/* Timeline Zoom */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <button style={{ ...styles.iconBtn, fontSize: '11px' }} onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} aria-label="Zoom out timeline">-</button>
-                <input type="range" min="25" max="400" value={zoom * 100} onChange={(e) => setZoom(Number(e.target.value) / 100)} style={{ width: '80px', accentColor: '#bf5af2' }} />
+                <input type="range" min="25" max="400" value={zoom * 100} onChange={(e) => setZoom(Number(e.target.value) / 100)} style={{ width: '80px', accentColor: FLUX_ACCENT }} />
                 <button style={{ ...styles.iconBtn, fontSize: '11px' }} onClick={() => setZoom(z => Math.min(4, z + 0.25))} aria-label="Zoom in timeline">+</button>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', minWidth: '32px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
               </div>
@@ -3343,7 +3353,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Graph Editor</span>
-              <select value={graphProperty} onChange={e => setGraphProperty(e.target.value)} aria-label="Graph property" style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
+              <select value={graphProperty} onChange={e => setGraphProperty(e.target.value)} aria-label="Graph property" style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: FLUX_ACCENT, fontSize: 11, fontWeight: 600 }}>
                 {props.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               {selLayer && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{selLayer.name} — {kfs.length} keyframe{kfs.length !== 1 ? 's' : ''}</span>}
@@ -3385,12 +3395,12 @@ const Flux: React.FC = () => {
               {[0, 35, 70, 105, 140].map(y => <line key={y} x1="0" y1={y} x2={svgW} y2={y} stroke="#202024" strokeWidth="0.5"/>)}
               {[0, 100, 200, 300, 400, 500, 600, 700, 800].map(x => <line key={x} x1={x} y1="0" x2={x} y2={svgH} stroke="#202024" strokeWidth="0.5"/>)}
               {/* Playhead */}
-              <line x1={toX(currentTime)} y1="0" x2={toX(currentTime)} y2={svgH} stroke="#bf5af2" strokeWidth="1" opacity="0.6"/>
+              <line x1={toX(currentTime)} y1="0" x2={toX(currentTime)} y2={svgH} stroke={FLUX_ACCENT} strokeWidth="1" opacity="0.6"/>
               {/* Curve */}
-              {curvePath && <path d={curvePath} fill="none" stroke="#bf5af2" strokeWidth="2"/>}
+              {curvePath && <path d={curvePath} fill="none" stroke={FLUX_ACCENT} strokeWidth="2"/>}
               {/* Keyframe points */}
               {kfs.map((k, i) => (
-                <circle key={i} cx={toX(k.time)} cy={toY(k.value)} r={draggingKfIdx === i ? 6 : 4.5} fill={draggingKfIdx === i ? '#fff' : '#bf5af2'} stroke="#fff" strokeWidth={1} style={{ cursor: 'ns-resize' }} onPointerDown={e => handleKfDrag(i, e)} />
+                <circle key={i} cx={toX(k.time)} cy={toY(k.value)} r={draggingKfIdx === i ? 6 : 4.5} fill={draggingKfIdx === i ? '#fff' : FLUX_ACCENT} stroke="#fff" strokeWidth={1} style={{ cursor: 'ns-resize' }} onPointerDown={e => handleKfDrag(i, e)} />
               ))}
               {/* No keyframes message */}
               {kfs.length === 0 && <text x={svgW / 2} y={svgH / 2} textAnchor="middle" fill="#505050" fontSize="12">No keyframes for "{graphProperty}"</text>}
@@ -3410,14 +3420,14 @@ const Flux: React.FC = () => {
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Target</span>
-              <select value={expressionTarget} onChange={e => setExpressionTarget(e.target.value)} aria-label="Expression target property" style={{ flex: 1, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
+              <select value={expressionTarget} onChange={e => setExpressionTarget(e.target.value)} aria-label="Expression target property" style={{ flex: 1, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: FLUX_ACCENT, fontSize: 11, fontWeight: 600 }}>
                 {['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'z', 'scaleZ', 'rotationX', 'rotationY'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
             <textarea value={expressionCode} onChange={e => { const v = e.target.value; setExpressionCode(v); setExpressionError(v.trim() ? validateExpression(v) : null); }} placeholder="// time (sec), value, index, frame, fps&#10;// helpers: Math, wiggle(freq,amp), random(seed),&#10;//          noise(x), clamp, lerp, smoothstep&#10;value + wiggle(2, 30)" style={{ width: '100%', height: 100, padding: 'var(--space-2)', borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
             {expressionError && <div style={{ fontSize: 11, color: '#ff375f', marginTop: 4, fontFamily: 'var(--font-mono)' }}>{expressionError}</div>}
             {!expressionError && selectedLayer?.expressions?.[expressionTarget] && (
-              <div style={{ fontSize: 11, color: '#bf5af2', marginTop: 4, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              <div style={{ fontSize: 11, color: FLUX_ACCENT, marginTop: 4, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <span>Live on {expressionTarget}: {selectedLayer.expressions[expressionTarget]}</span>
                 <button aria-label="Remove live expression" onClick={() => {
                   if (!selectedLayerId) return;
@@ -3444,7 +3454,7 @@ const Flux: React.FC = () => {
                   : l));
                 setExpressionError(null);
                 window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Live expression applied to ${expressionTarget}` } }));
-              }} style={{ flex: 1, padding: '6px 0', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.4)', background: 'rgba(191,90,242,0.18)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Live</button>
+              }} style={{ flex: 1, padding: '6px 0', borderRadius: 9999, border: `1px solid ${fluxTint(40)}`, background: fluxTint(18), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Live</button>
               <button onClick={() => {
                 if (!selectedLayerId || !expressionCode.trim()) return;
                 const err = validateExpression(expressionCode);
@@ -3489,7 +3499,7 @@ const Flux: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
               <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
-                <span style={{ color: '#bf5af2', fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
+                <span style={{ color: FLUX_ACCENT, fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
               </button>
             ))}
           </div>
@@ -3510,7 +3520,7 @@ const Flux: React.FC = () => {
               ))}
             </div>
             <div style={{ height: 100, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="90" height="90" viewBox="0 0 90 90">{repeaterType === 'grid' ? [...Array(repeaterCount)].map((_, i) => { const cols = Math.ceil(Math.sqrt(repeaterCount)); const r = Math.floor(i / cols); const c = i % cols; return <rect key={i} x={10 + c * 22} y={10 + r * 22} width={16} height={16} rx={2} fill="var(--color-accent)" opacity={0.3 + i * 0.07} />; }) : repeaterType === 'radial' ? [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 2; return <circle key={i} cx={45 + Math.cos(a) * 30} cy={45 + Math.sin(a) * 30} r={6} fill="#bf5af2" opacity={0.4 + i * 0.06} />; }) : [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 4; const r = 10 + i * 3; return <circle key={i} cx={45 + Math.cos(a) * r} cy={45 + Math.sin(a) * r} r={4} fill="#30d158" opacity={0.3 + i * 0.07} />; })}</svg>
+              <svg width="90" height="90" viewBox="0 0 90 90">{repeaterType === 'grid' ? [...Array(repeaterCount)].map((_, i) => { const cols = Math.ceil(Math.sqrt(repeaterCount)); const r = Math.floor(i / cols); const c = i % cols; return <rect key={i} x={10 + c * 22} y={10 + r * 22} width={16} height={16} rx={2} fill="var(--color-accent)" opacity={0.3 + i * 0.07} />; }) : repeaterType === 'radial' ? [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 2; return <circle key={i} cx={45 + Math.cos(a) * 30} cy={45 + Math.sin(a) * 30} r={6} fill={FLUX_ACCENT} opacity={0.4 + i * 0.06} />; }) : [...Array(repeaterCount)].map((_, i) => { const a = (i / repeaterCount) * Math.PI * 4; const r = 10 + i * 3; return <circle key={i} cx={45 + Math.cos(a) * r} cy={45 + Math.sin(a) * r} r={4} fill="#30d158" opacity={0.3 + i * 0.07} />; })}</svg>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Count</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{repeaterCount}</span></div>
             <input type="range" min="2" max="36" value={repeaterCount} onChange={e => setRepeaterCount(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
@@ -3555,7 +3565,7 @@ const Flux: React.FC = () => {
             <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: '#404050', textShadow: '2px 2px 0px #202030, -1px -1px 0px #606070' }}>Aa</span>
             </div>
-            {[{ label: 'Extrude Depth', value: extrudeDepth, set: setExtrudeDepth, max: 200, color: 'var(--color-accent)' }, { label: 'Bevel Size', value: bevelSize, set: setBevelSize, max: 20, color: '#bf5af2' }].map(s => (
+            {[{ label: 'Extrude Depth', value: extrudeDepth, set: setExtrudeDepth, max: 200, color: 'var(--color-accent)' }, { label: 'Bevel Size', value: bevelSize, set: setBevelSize, max: 20, color: FLUX_ACCENT }].map(s => (
               <div key={s.label} style={{ marginBottom: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</span></div>
                 <input type="range" min="0" max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: s.color }} />
@@ -3804,35 +3814,35 @@ const Flux: React.FC = () => {
                 <line x1="150" y1="0" x2="150" y2="160" stroke="var(--color-border-subtle)" />
                 <line x1="0" y1="80" x2="300" y2="80" stroke="var(--color-border-subtle)" />
                 {/* Path */}
-                <path d="M40,120 C80,40 180,40 260,100" fill="none" stroke="#bf5af2" strokeWidth="2" />
+                <path d="M40,120 C80,40 180,40 260,100" fill="none" stroke={FLUX_ACCENT} strokeWidth="2" />
                 {/* Control points */}
-                <circle cx="40" cy="120" r="5" fill="#bf5af2" stroke="#fff" strokeWidth="1" style={{ cursor: 'grab' }} />
-                <circle cx="80" cy="40" r="3" fill="transparent" stroke="#bf5af2" strokeWidth="1" strokeDasharray="2,2" />
-                <line x1="40" y1="120" x2="80" y2="40" stroke="#bf5af2" strokeWidth="0.5" strokeDasharray="2,2" />
-                <circle cx="180" cy="40" r="3" fill="transparent" stroke="#bf5af2" strokeWidth="1" strokeDasharray="2,2" />
-                <circle cx="260" cy="100" r="5" fill="#bf5af2" stroke="#fff" strokeWidth="1" style={{ cursor: 'grab' }} />
-                <line x1="260" y1="100" x2="180" y2="40" stroke="#bf5af2" strokeWidth="0.5" strokeDasharray="2,2" />
+                <circle cx="40" cy="120" r="5" fill={FLUX_ACCENT} stroke="#fff" strokeWidth="1" style={{ cursor: 'grab' }} />
+                <circle cx="80" cy="40" r="3" fill="transparent" stroke={FLUX_ACCENT} strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="40" y1="120" x2="80" y2="40" stroke={FLUX_ACCENT} strokeWidth="0.5" strokeDasharray="2,2" />
+                <circle cx="180" cy="40" r="3" fill="transparent" stroke={FLUX_ACCENT} strokeWidth="1" strokeDasharray="2,2" />
+                <circle cx="260" cy="100" r="5" fill={FLUX_ACCENT} stroke="#fff" strokeWidth="1" style={{ cursor: 'grab' }} />
+                <line x1="260" y1="100" x2="180" y2="40" stroke={FLUX_ACCENT} strokeWidth="0.5" strokeDasharray="2,2" />
               </svg>
             </div>
             <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Ease Curve</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {([['linear', 'Linear'], ['easeIn', 'Ease In'], ['easeOut', 'Ease Out'], ['easeInOut', 'Ease Both']] as const).map(([val, label]) => (
-                  <button key={val} aria-label={`${label} easing`} aria-pressed={motionPathEase === val} onClick={() => setMotionPathEase(val)} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: motionPathEase === val ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: motionPathEase === val ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+                  <button key={val} aria-label={`${label} easing`} aria-pressed={motionPathEase === val} onClick={() => setMotionPathEase(val)} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: motionPathEase === val ? fluxTint(12) : 'var(--color-border-subtle)', color: motionPathEase === val ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
                 ))}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" checked={motionPathOrient} onChange={e => setMotionPathOrient(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
+                <input type="checkbox" checked={motionPathOrient} onChange={e => setMotionPathOrient(e.target.checked)} style={{ accentColor: FLUX_ACCENT }} />
                 Orient Along Path
               </label>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" checked={motionPathClosed} onChange={e => setMotionPathClosed(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
+                <input type="checkbox" checked={motionPathClosed} onChange={e => setMotionPathClosed(e.target.checked)} style={{ accentColor: FLUX_ACCENT }} />
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotation', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotation', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -4008,7 +4018,7 @@ const Flux: React.FC = () => {
                   {u.name === 'u_color' ? (
                     <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
                   ) : (
-                    <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#bf5af2', marginTop: 2 }} />
+                    <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: FLUX_ACCENT, marginTop: 2 }} />
                   )}
                 </div>
               ))}
@@ -4044,7 +4054,7 @@ const Flux: React.FC = () => {
               <option value="">None</option>
               {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
+            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
           </div>
         </div>
       )}
@@ -4060,11 +4070,11 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Composition Name</span>
             <input type="text" value={precompName} onChange={e => setPrecompName(e.target.value)} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#ccc', fontSize: 11, marginBottom: 10, boxSizing: 'border-box' }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
-              <input type="checkbox" checked={precompMoveAttrs} onChange={e => setPrecompMoveAttrs(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
+              <input type="checkbox" checked={precompMoveAttrs} onChange={e => setPrecompMoveAttrs(e.target.checked)} style={{ accentColor: FLUX_ACCENT }} />
               Move all attributes into new composition
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
-              <input type="checkbox" checked={precompAdjustDuration} onChange={e => setPrecompAdjustDuration(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
+              <input type="checkbox" checked={precompAdjustDuration} onChange={e => setPrecompAdjustDuration(e.target.checked)} style={{ accentColor: FLUX_ACCENT }} />
               Adjust composition duration to selected layers
             </label>
             <button aria-label="Create pre-composition" onClick={() => {
@@ -4087,7 +4097,7 @@ const Flux: React.FC = () => {
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
               setSelectedLayerId(groupLayer.id);
               setShowPrecompose(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
           </div>
         </div>
       )}
@@ -4102,21 +4112,21 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
               <div style={{ flex: 1, padding: 'var(--space-4)', borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
-                <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#bf5af2" strokeWidth="2" /></svg>
+                <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke={FLUX_ACCENT} strokeWidth="2" /></svg>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Source Shape</div>
               </div>
               <span style={{ color: 'var(--color-text-tertiary)' }}><DexIcon name="arrow-right" size={16} /></span>
               <div style={{ flex: 1, padding: 'var(--space-4)', borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
-                <svg width="40" height="40" viewBox="0 0 40 40"><rect x="6" y="6" width="28" height="28" fill="none" stroke="#bf5af2" strokeWidth="2" rx="2" /></svg>
+                <svg width="40" height="40" viewBox="0 0 40 40"><rect x="6" y="6" width="28" height="28" fill="none" stroke={FLUX_ACCENT} strokeWidth="2" rx="2" /></svg>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Target Shape</div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Progress</span>
-              <input type="range" min="0" max="100" value={morphProgress} onChange={e => setMorphProgress(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="0" max="100" value={morphProgress} onChange={e => setMorphProgress(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{morphProgress}%</span>
             </div>
-            <button aria-label="Apply shape morph" onClick={() => { if (!selectedLayerId) return; const circle = MORPH_SHAPES.circle(0, 0, 40); const square = MORPH_SHAPES.square(0, 0, 80); const morphed = morphPaths(circle, square, morphProgress / 100); const shapeLayer: Layer = { id: `layer-morph-${Date.now()}`, name: `Morph ${morphProgress}%`, type: 'shape', visible: true, locked: false, solo: false, startTime: 0, duration: duration, inPoint: 0, outPoint: duration, transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 }, behaviors: [], filters: [], shapeStyle: { fill: '#bf5af2', stroke: '#bf5af2', strokeWidth: 2, type: 'ellipse' }, content: JSON.stringify(morphed.points) }; setLayers(prev => [shapeLayer, ...prev]); setShowMorphShapes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Morph Animation</button>
+            <button aria-label="Apply shape morph" onClick={() => { if (!selectedLayerId) return; const circle = MORPH_SHAPES.circle(0, 0, 40); const square = MORPH_SHAPES.square(0, 0, 80); const morphed = morphPaths(circle, square, morphProgress / 100); const shapeLayer: Layer = { id: `layer-morph-${Date.now()}`, name: `Morph ${morphProgress}%`, type: 'shape', visible: true, locked: false, solo: false, startTime: 0, duration: duration, inPoint: 0, outPoint: duration, transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 }, behaviors: [], filters: [], shapeStyle: { fill: FLUX_ACCENT, stroke: FLUX_ACCENT, strokeWidth: 2, type: 'ellipse' }, content: JSON.stringify(morphed.points) }; setLayers(prev => [shapeLayer, ...prev]); setShowMorphShapes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Morph Animation</button>
           </div>
         </div>
       )}
@@ -4132,14 +4142,14 @@ const Flux: React.FC = () => {
             {[{ label: 'Start', val: trimStart, set: setTrimStart }, { label: 'End', val: trimEnd, set: setTrimEnd }, { label: 'Offset', val: trimOffset, set: setTrimOffset }].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 35 }}>{s.label}</span>
-                <input type="range" min={s.label === 'Offset' ? -180 : 0} max={s.label === 'Offset' ? 180 : 100} value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+                <input type="range" min={s.label === 'Offset' ? -180 : 0} max={s.label === 'Offset' ? 180 : 100} value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 28, textAlign: 'right' }}>{s.val}{s.label === 'Offset' ? '°' : '%'}</span>
               </div>
             ))}
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>Mode</div>
             <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
               {(['Simultaneously', 'Individually'] as const).map(m => (
-                <button key={m} aria-label={`${m} trim mode`} aria-pressed={trimPathMode === m} onClick={() => { setTrimPathMode(m); setIsDirty(true); }} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: trimPathMode === m ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: trimPathMode === m ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} trim mode`} aria-pressed={trimPathMode === m} onClick={() => { setTrimPathMode(m); setIsDirty(true); }} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: trimPathMode === m ? fluxTint(12) : 'var(--color-border-subtle)', color: trimPathMode === m ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
@@ -4157,17 +4167,17 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Property</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {(['position', 'rotation', 'scale', 'opacity'] as const).map(p => (
-                <button key={p} onClick={() => setWiggleProperty(p)} aria-label={`Wiggle ${p}`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (wiggleProperty === p ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: wiggleProperty === p ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: wiggleProperty === p ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{p}</button>
+                <button key={p} onClick={() => setWiggleProperty(p)} aria-label={`Wiggle ${p}`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (wiggleProperty === p ? fluxTint(30) : 'var(--color-bg-hover)'), background: wiggleProperty === p ? fluxTint(10) : 'var(--color-border-subtle)', color: wiggleProperty === p ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{p}</button>
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 55 }}>Frequency</span>
-              <input type="range" min="1" max="30" value={wiggleFreq} onChange={e => setWiggleFreq(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="1" max="30" value={wiggleFreq} onChange={e => setWiggleFreq(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 20, textAlign: 'right' }}>{wiggleFreq}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 55 }}>Amplitude</span>
-              <input type="range" min="1" max="200" value={wiggleAmp} onChange={e => setWiggleAmp(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="1" max="200" value={wiggleAmp} onChange={e => setWiggleAmp(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{wiggleAmp}</span>
             </div>
             <button aria-label="Apply wiggle expression" onClick={() => {
@@ -4180,7 +4190,7 @@ const Flux: React.FC = () => {
                   : b),
               } : l));
               setShowAutoWiggle(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
           </div>
         </div>
       )}
@@ -4202,38 +4212,38 @@ const Flux: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)' }}>
                         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 12 }}>{i + 1}</span>
                         <span onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { const fl = layer.filters.find(ff => ff.id === f.id); if (fl) { (fl as any)._expanded = !(fl as any)._expanded; setLayers(nl); } } }} style={{ fontSize: 11, color: f.enabled ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)', flex: 1, textTransform: 'capitalize', cursor: 'pointer' }}>{f.type}</span>
-                        <button aria-label={`Toggle ${f.type} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, enabled: !ff.enabled } : ff); setLayers(nl); } }} style={{ background: 'none', border: 'none', color: f.enabled ? '#bf5af2' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center' }}>{f.enabled ? <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg> : <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="5"/></svg>}</button>
+                        <button aria-label={`Toggle ${f.type} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, enabled: !ff.enabled } : ff); setLayers(nl); } }} style={{ background: 'none', border: 'none', color: f.enabled ? FLUX_ACCENT : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center' }}>{f.enabled ? <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg> : <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="5"/></svg>}</button>
                         <button aria-label={`Remove ${f.type} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.filter(ff => ff.id !== f.id); setLayers(nl); } }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11 }}><DexIcon name="close" size={11} /></button>
                       </div>
                       {(f as any)._expanded && (
                         <div style={{ padding: '4px var(--space-2) var(--space-2)', borderTop: '1px solid var(--color-bg-hover)' }}>
                           {f.type === 'blur' && (
                             <><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}><span>Radius</span><span>{(f.settings as any).radius ?? 10}px</span></div>
-                            <input type="range" min="0" max="100" value={(f.settings as any).radius ?? 10} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, radius: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} /></>
+                            <input type="range" min="0" max="100" value={(f.settings as any).radius ?? 10} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, radius: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} /></>
                           )}
                           {f.type === 'glow' && (
                             <><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}><span>Intensity</span><span>{(f.settings as any).intensity ?? 50}%</span></div>
-                            <input type="range" min="0" max="100" value={(f.settings as any).intensity ?? 50} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, intensity: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} />
+                            <input type="range" min="0" max="100" value={(f.settings as any).intensity ?? 50} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, intensity: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2, marginTop: 4 }}><span>Radius</span><span>{(f.settings as any).radius ?? 20}px</span></div>
-                            <input type="range" min="0" max="100" value={(f.settings as any).radius ?? 20} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, radius: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} /></>
+                            <input type="range" min="0" max="100" value={(f.settings as any).radius ?? 20} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, radius: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} /></>
                           )}
                           {f.type === 'colorCorrect' && (
                             <>{['brightness', 'contrast', 'saturation'].map(param => (
                               <div key={param}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2, marginTop: 4 }}><span style={{ textTransform: 'capitalize' }}>{param}</span><span>{(f.settings as any)[param] ?? 0}</span></div>
-                                <input type="range" min="-100" max="100" value={(f.settings as any)[param] ?? 0} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, [param]: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} />
+                                <input type="range" min="-100" max="100" value={(f.settings as any)[param] ?? 0} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, [param]: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} />
                               </div>
                             ))}</>
                           )}
                           {f.type === 'sharpen' && (
                             <><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}><span>Amount</span><span>{(f.settings as any).amount ?? 50}%</span></div>
-                            <input type="range" min="0" max="100" value={(f.settings as any).amount ?? 50} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, amount: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} /></>
+                            <input type="range" min="0" max="100" value={(f.settings as any).amount ?? 50} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, amount: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} /></>
                           )}
                           {f.type === 'vignette' && (
                             <>{['amount', 'radius'].map(param => (
                               <div key={param}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2, marginTop: 4 }}><span style={{ textTransform: 'capitalize' }}>{param}</span><span>{(f.settings as any)[param] ?? (param === 'amount' ? 50 : 80)}</span></div>
-                                <input type="range" min="0" max="100" value={(f.settings as any)[param] ?? (param === 'amount' ? 50 : 80)} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, [param]: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} />
+                                <input type="range" min="0" max="100" value={(f.settings as any)[param] ?? (param === 'amount' ? 50 : 80)} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, [param]: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: FLUX_ACCENT }} />
                               </div>
                             ))}</>
                           )}
@@ -4267,22 +4277,22 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Rig Type</span>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['orbit', 'twoNode', 'poi'] as const).map(t => (
-                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid ' + (cameraRigType === t ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: cameraRigType === t ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: cameraRigType === t ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
+                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid ' + (cameraRigType === t ? fluxTint(30) : 'var(--color-bg-hover)'), background: cameraRigType === t ? fluxTint(12) : 'var(--color-border-subtle)', color: cameraRigType === t ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30 }}>FOV</span>
-              <input type="range" min="10" max="120" value={cameraFov} onChange={e => setCameraFov(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="10" max="120" value={cameraFov} onChange={e => setCameraFov(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{cameraFov}°</span>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
-              <input type="checkbox" checked={cameraDof} onChange={e => setCameraDof(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
+              <input type="checkbox" checked={cameraDof} onChange={e => setCameraDof(e.target.checked)} style={{ accentColor: FLUX_ACCENT }} />
               Depth of Field
             </label>
             {cameraDof && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Focus D</span>
-                <input type="range" min="0" max="5000" value={cameraFocusDistance} onChange={e => setCameraFocusDistance(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+                <input type="range" min="0" max="5000" value={cameraFocusDistance} onChange={e => setCameraFocusDistance(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{cameraFocusDistance}</span>
               </div>
             )}
@@ -4299,7 +4309,7 @@ const Flux: React.FC = () => {
               setSelectedLayerId(rigLayer.id);
               window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? `, DOF @ ${cameraFocusDistance}` : ''})`, type: 'success' } }));
               setShowCameraRig(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>
         </div>
       )}
@@ -4312,18 +4322,18 @@ const Flux: React.FC = () => {
             <button aria-label="Close Render Queue panel" onClick={() => setShowRenderQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
+            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {renderQueue.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>Queue is empty</div>}
               {renderQueue.map(job => (
                 <div key={job.id} style={{ padding: 'var(--space-2)', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{job.name}</span>
-                    <span style={{ fontSize: 11, color: job.status === 'done' ? 'var(--color-success)' : job.status === 'rendering' ? '#bf5af2' : job.status === 'error' ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{job.status}</span>
+                    <span style={{ fontSize: 11, color: job.status === 'done' ? 'var(--color-success)' : job.status === 'rendering' ? FLUX_ACCENT : job.status === 'error' ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{job.status}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{job.format}</div>
                   <div style={{ height: 3, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${job.progress}%`, background: job.status === 'done' ? 'var(--color-success)' : '#bf5af2', borderRadius: 2, transition: 'width 180ms cubic-bezier(0.4,0,0.2,1)' }} />
+                    <div style={{ height: '100%', width: `${job.progress}%`, background: job.status === 'done' ? 'var(--color-success)' : FLUX_ACCENT, borderRadius: 2, transition: 'width 180ms cubic-bezier(0.4,0,0.2,1)' }} />
                   </div>
                 </div>
               ))}
@@ -4363,7 +4373,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Markers panel" onClick={() => setShowMarkers(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Marker at Frame {currentTime}</button>
+            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', FLUX_ACCENT, '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Marker at Frame {currentTime}</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {markers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No markers</div>}
               {markers.map(m => (
@@ -4440,9 +4450,9 @@ const Flux: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Guide layers are visible in editor but not rendered in final output.</div>
             {layers.map(l => (
               <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={guideLayers.has(l.id)} onChange={() => setGuideLayers(prev => { const n = new Set(prev); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })} style={{ accentColor: '#bf5af2' }} />
+                <input type="checkbox" checked={guideLayers.has(l.id)} onChange={() => setGuideLayers(prev => { const n = new Set(prev); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })} style={{ accentColor: FLUX_ACCENT }} />
                 {l.name}
-                {guideLayers.has(l.id) && <span style={{ fontSize: 11, color: '#bf5af2', marginLeft: 'auto' }}>GUIDE</span>}
+                {guideLayers.has(l.id) && <span style={{ fontSize: 11, color: FLUX_ACCENT, marginLeft: 'auto' }}>GUIDE</span>}
               </label>
             ))}
             {layers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No layers</div>}
@@ -4458,7 +4468,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Snapshots panel" onClick={() => setShowSnapshot(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString(), layers }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
+            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString(), layers }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {snapshots.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No snapshots taken</div>}
               {snapshots.map(s => (
@@ -4518,13 +4528,13 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Offset</span>
-              <input type="range" min="1" max="60" value={staggerOffset} onChange={e => setStaggerOffset(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="1" max="60" value={staggerOffset} onChange={e => setStaggerOffset(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 35, textAlign: 'right' }}>{staggerOffset} fr</span>
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Order</span>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['top-down', 'bottom-up', 'random'] as const).map(o => (
-                <button key={o} onClick={() => setStaggerOrder(o)} aria-label={`Stagger ${o}`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (staggerOrder === o ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: staggerOrder === o ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: staggerOrder === o ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{o.replace('-', ' ')}</button>
+                <button key={o} onClick={() => setStaggerOrder(o)} aria-label={`Stagger ${o}`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (staggerOrder === o ? fluxTint(30) : 'var(--color-bg-hover)'), background: staggerOrder === o ? fluxTint(10) : 'var(--color-border-subtle)', color: staggerOrder === o ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{o.replace('-', ' ')}</button>
               ))}
             </div>
             <button aria-label="Apply stagger to layers" onClick={() => {
@@ -4538,7 +4548,7 @@ const Flux: React.FC = () => {
                 startTime: l.startTime + staggerOffset * i,
               })));
               setShowStagger(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
           </div>
         </div>
       )}
@@ -4554,7 +4564,7 @@ const Flux: React.FC = () => {
             {[{ label: 'Dash', val: strokeDash, set: setStrokeDash, max: 50 }, { label: 'Gap', val: strokeGap, set: setStrokeGap, max: 50 }].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30 }}>{s.label}</span>
-                <input type="range" min="0" max={s.max} value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+                <input type="range" min="0" max={s.max} value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 18, textAlign: 'right' }}>{s.val}</span>
               </div>
             ))}
@@ -4583,12 +4593,12 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Samples</span>
-              <input type="range" min="2" max="32" value={motionBlurSamples} onChange={e => setMotionBlurSamples(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="2" max="32" value={motionBlurSamples} onChange={e => setMotionBlurSamples(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 18, textAlign: 'right' }}>{motionBlurSamples}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Shutter°</span>
-              <input type="range" min="0" max="720" value={motionBlurShutter} onChange={e => setMotionBlurShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
+              <input type="range" min="0" max="720" value={motionBlurShutter} onChange={e => setMotionBlurShutter(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{motionBlurShutter}°</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 4, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>180° = standard film.</div>

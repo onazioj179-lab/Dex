@@ -48,17 +48,18 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       # Builds the Vite renderer (via tauri's beforeBuildCommand) then compiles
-      # the Rust backbone and bundles NSIS + MSI (bundle.targets in
-      # src-tauri/tauri.conf.json). Tauri fetches WiX/NSIS automatically.
-      - name: Build Tauri bundles (MSI + NSIS)
+      # the Rust backbone and bundles the one official Windows setup (NSIS;
+      # bundle.targets in src-tauri/tauri.conf.json). Tauri fetches NSIS.
+      - name: Build Tauri setup (NSIS)
         run: npm run build:tauri
 
       - name: Collect release assets
         shell: bash
         run: |
           mkdir -p release-assets
-          cp src-tauri/target/release/bundle/msi/*.msi release-assets/ 2>/dev/null || true
           cp src-tauri/target/release/bundle/nsis/*-setup.exe release-assets/ 2>/dev/null || true
+          # SHA-256 checksums for this version's installers.
+          node scripts/release-checksums.cjs && cp src-tauri/target/release/bundle/SHA256SUMS release-assets/
           echo "Release assets:"
           ls -lh release-assets
           # Fail loudly if the bundle step produced nothing (better than a green
@@ -97,6 +98,10 @@ jobs:
             }
             fs.writeFileSync('release-notes.md', notes.join('\n').trim() + '\n');
           " "$VER"
+          # A dedicated release-notes file, when present, is the release text.
+          if [ -f "DEX_${VER}_RELEASE_NOTES.md" ]; then
+            cp "DEX_${VER}_RELEASE_NOTES.md" release-notes.md
+          fi
           # Fallback so gh always has non-empty notes.
           if [ ! -s release-notes.md ] || [ "$(tr -d '[:space:]' < release-notes.md)" = "" ]; then
             printf '## DEX %s\n\nSee docs/CHANGELOG.md for details.\n' "$TAG" > release-notes.md
@@ -115,9 +120,9 @@ jobs:
           # exists, so upload/clobber onto it; otherwise create it fresh.
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
-            gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --title "DEX $TAG"
+            gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --title "DEX OS ${TAG#v}"
           else
-            gh release create "$TAG" --repo "$REPO" --title "DEX $TAG" --notes-file release-notes.md release-assets/*
+            gh release create "$TAG" --repo "$REPO" --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
           fi
 
       - name: Prune old Dex releases (keep newest 3)
@@ -140,7 +145,7 @@ jobs:
           if gh release view "$UPDATES_TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release upload "$UPDATES_TAG" --repo "$REPO" release-assets/* --clobber
           else
-            gh release create "$UPDATES_TAG" --repo "$REPO" --title "DEX $TAG" --notes-file release-notes.md release-assets/*
+            gh release create "$UPDATES_TAG" --repo "$REPO" --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
           fi
           # NOTE: do NOT run scripts/prune-releases.js here. It is COUNT-based and
           # not product-aware; on the shared dex-updates repo it would delete

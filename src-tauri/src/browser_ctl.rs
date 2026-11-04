@@ -163,7 +163,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
     }
 
     let app_for_thread = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("browser", move || {
         loop {
             if SERVER_STOP.load(Ordering::SeqCst) {
                 break;

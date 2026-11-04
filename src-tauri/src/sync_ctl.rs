@@ -368,7 +368,7 @@ fn start_server(app: &tauri::AppHandle, port: u16) -> Value {
     set_server_kv(app, true, port);
 
     let app_for_thread = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("sync", move || {
         loop {
             if SERVER_STOP.load(Ordering::SeqCst) {
                 break;

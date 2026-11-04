@@ -303,6 +303,7 @@ const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 
 
 // Seconds -> clock via the shared canonical; keep the empty-string guard for images.
 import { formatClock } from '../../shared/format/units';
+import { keyEventForApp } from '../shell/input/appKeyScope';
 const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
@@ -875,6 +876,7 @@ export const Gallery: React.FC = () => {
   useEffect(() => {
     if (!selectedMedia) return;
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'gallery')) return; // key meant for another app
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
       if (selectedMedia.type === 'video') {
@@ -1063,6 +1065,7 @@ export const Gallery: React.FC = () => {
   useEffect(() => {
     if (!selectedMedia) return;
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'gallery')) return; // key meant for another app
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.key === 'Escape') setSelectedMedia(null);
@@ -1081,6 +1084,7 @@ export const Gallery: React.FC = () => {
   // is focused so it never eats typing.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'gallery')) return; // key meant for another app
       if (selectedMedia) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -2138,11 +2142,11 @@ export const Gallery: React.FC = () => {
                   {[
                     { color: 'var(--color-error)', name: 'Red' },
                     { color: 'var(--color-warning)', name: 'Orange' },
-                    { color: 'var(--color-warning)', name: 'Yellow' },
+                    { color: 'var(--color-tag-yellow, #FFD60A)', name: 'Yellow' },
                     { color: 'var(--color-success)', name: 'Green' },
                     { color: 'var(--color-accent)', name: 'Blue' },
                     { color: 'var(--color-tag-purple, #BF5AF2)', name: 'Purple' },
-                    { color: 'var(--color-text-tertiary)', name: 'Grey' },
+                    { color: 'var(--color-text-tertiary)', name: 'Gray' },
                   ].map(({ color, name }) => (
                     <button
                       key={color}

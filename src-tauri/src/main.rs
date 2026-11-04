@@ -49,6 +49,7 @@ mod voice_notes;
 mod log_manager;
 mod notes_metadata;
 mod permissions_manager;
+mod webview_permissions;
 mod pattern_tracking;
 mod accessibility_ctl;
 mod adaptive_ctl;
@@ -1720,7 +1721,7 @@ fn start_index_watcher(app: tauri::AppHandle) {
     // directory-level changes/overflow and spaced at least MIN_FULL_GAP apart.
     const MIN_FULL_GAP: std::time::Duration = std::time::Duration::from_secs(30);
     const MAX_BATCH: usize = 200;
-    std::thread::spawn(move || {
+    crate::util::spawn_named("main", move || {
         let _keep_alive = watcher; // own the watcher so it stays active
         let mut last_full: Option<std::time::Instant> = None;
         let add = |work: &mut IndexWork, msg: Option<Vec<std::path::PathBuf>>| match (msg, &mut *work) {
@@ -2347,6 +2348,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("logs:get" | "logs:clear") => log_manager::dispatch(&app, ch, &args),
         ch @ ("notes:start-server" | "notes:stop-server") => notes_metadata::dispatch(&app, ch, &args),
         ch @ ("permissions:getAll" | "permissions:grant" | "permissions:revoke") => permissions_manager::dispatch(&app, ch, &args),
+        ch @ ("webPermissions:list" | "webPermissions:set" | "webPermissions:reset") => webview_permissions::dispatch(&app, ch, &args),
         ch @ ("patterns:recordAppOpen" | "patterns:recordAppClose" | "patterns:recordFileOpen" | "patterns:recordToolUse" | "patterns:recordAction" | "patterns:recordToolCombo" | "patterns:getSuggestions" | "patterns:getFrequent" | "patterns:getRecent" | "patterns:getToolCombos" | "patterns:getDayPatterns" | "patterns:getHourlyPatterns" | "patterns:getPreferredApp" | "patterns:getSessionStats" | "patterns:getAllPatterns" | "patterns:cleanup") => pattern_tracking::dispatch(&app, ch, &args),
         ch @ ("contract:getConfig" | "contract:getGuarantees" | "contract:getViolations") => contract_ctl::dispatch(&app, ch, &args),
         ch @ ("device:getThisDevice" | "device:getAll") => device_ctl::dispatch(&app, ch, &args),
@@ -2687,6 +2689,11 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             let _ = window.minimize();
             json!({ "success": true })
         }
+        "window:toggleFullscreen" => {
+            let next = !window.is_fullscreen().unwrap_or(false);
+            let ok = window.set_fullscreen(next).is_ok();
+            json!({ "success": ok, "fullscreen": next })
+        }
         "window:maximize" => {
             // The renderer treats this as a toggle.
             match window.is_maximized() {
@@ -2909,6 +2916,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 }
 
 fn main() {
+    startup_timeline::anchor();
     webview2::install_panic_logger();
     // Must run before WebView2 opens its cache files (see storage_ctl.rs).
     storage_ctl::run_pending_cache_clear();
@@ -2917,20 +2925,28 @@ fn main() {
     if !webview2::preflight() {
         std::process::exit(1);
     }
+    startup_timeline::mark("WebView2 check");
     webview2::start_load_watchdog(std::time::Duration::from_secs(30));
-    let result = tauri::Builder::default()
-        // MUST be the first plugin. A second launch focuses the running window
-        // and exits instead of starting a duplicate shell: a duplicate would
-        // double-run the reminder/autobackup schedulers and file watchers on the
-        // same dex.db, and if launched with different WebView2 options it hangs
-        // with an empty window (the profile is locked by the first instance).
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    let builder = tauri::Builder::default();
+    // MUST be the first plugin. A second launch focuses the running window and
+    // exits instead of starting a duplicate shell: a duplicate would double-run
+    // the reminder/autobackup schedulers and file watchers on the same dex.db,
+    // and if launched with different WebView2 options it hangs with an empty
+    // window (the profile is locked by the first instance). An isolated test
+    // profile (DEX_DATA_DIR, own WebView2 folder) shares none of that, so it is
+    // exempt; otherwise a packaged test run would just focus the user's DEX.
+    let builder = if paths::data_dir_override().is_none() {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
             }
         }))
+    } else {
+        builder
+    };
+    let result = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -3002,9 +3018,16 @@ fn main() {
             native_ops::start_reminder_scheduler(app.handle().clone());
             // Automatic backup scheduler (honors backup_settings; catchup on boot).
             native_ops::start_autobackup_scheduler(app.handle().clone());
+            // Answer DEX's own clipboard/MIDI/camera permission requests from the
+            // saved policy instead of a WebView2 prompt every time.
+            webview_permissions::install(app.handle());
+            startup_timeline::mark("Native setup complete");
             Ok(())
         })
-        .on_page_load(|_webview, _payload| webview2::mark_page_loaded())
+        .on_page_load(|_webview, _payload| {
+            webview2::mark_page_loaded();
+            startup_timeline::mark("Interface page loaded");
+        })
         .invoke_handler(tauri::generate_handler![smart_router_route, dex_ipc])
         .run(tauri::generate_context!());
     if let Err(e) = result {

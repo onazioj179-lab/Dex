@@ -21,11 +21,13 @@ import { useStageStore, STAGE_KIND_META, type StageKind } from '../store/stageSt
 import { buildDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces';
+import { useSpatialStore } from '../store/spatialStore';
 
 export type SpotlightCategory =
   | 'top'
   | 'recent'
   | 'apps'
+  | 'windows'
   | 'settings'
   | 'notes'
   | 'tasks'
@@ -1375,6 +1377,9 @@ export class SpotlightEngine {
     const indexResults = this._searchIndex(q);
     results.push(...indexResults);
 
+    // 3b. Live: open windows and, on the spatial desktop, groups / zones / saved views.
+    results.push(...this._searchWindows(q));
+
     // 4. Typo suggestions ("did you mean?") if no good matches
     if (indexResults.length === 0 || (indexResults.length > 0 && indexResults[0].score < 50)) {
       const typoResults = this._getTypoSuggestions(q);
@@ -1679,6 +1684,33 @@ export class SpotlightEngine {
     }
 
     return null;
+  }
+
+  /** Open windows plus spatial groups, zones and saved views, read live from
+   *  their stores (nothing indexed, so nothing goes stale). Picking one brings
+   *  it forward; on the spatial desktop the camera moves to it. */
+  private _searchWindows(query: string): SpotlightResult[] {
+    const out: SpotlightResult[] = [];
+    const sp = useSpatialStore.getState();
+    const add = (id: string, title: string, subtitle: string, icon: string, action: () => void, bonus = 0) => {
+      const m = fuzzyMatch(query, title);
+      if (!m || m.score <= 20) return;
+      out.push({ id, category: 'windows', title, subtitle, icon, color: 'var(--color-accent)', highlights: m.highlights, score: m.score + bonus, action });
+    };
+    for (const app of useRunningApps.getState().runningApps) {
+      if (!app?.id || app.id === 'home') continue;
+      const onCanvas = sp.enabled && !!sp.windows[app.id];
+      add(`window-${app.id}`, app.name || app.id, onCanvas ? 'Open window · on the canvas' : app.isMinimized ? 'Open window · minimized' : 'Open window', app.icon || app.id, () => {
+        if (onCanvas) { useSpatialStore.getState().focusWindow(app.id); return; }
+        window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: app.id } }));
+      }, 12);
+    }
+    if (sp.enabled) {
+      for (const g of sp.groups) add(`spatial-group-${g.id}`, g.name, `Window group · ${g.appIds.length} window${g.appIds.length === 1 ? '' : 's'}`, 'grid', () => useSpatialStore.getState().focusGroup(g.id));
+      for (const z of sp.zones) add(`spatial-zone-${z.id}`, z.name, 'Zone on the canvas', 'grid', () => useSpatialStore.getState().focusZone(z.id));
+      for (const v of sp.views) add(`spatial-view-${v.id}`, v.name, `Saved view · ${Math.round(v.camera.z * 100)}%`, 'grid', () => useSpatialStore.getState().goToView(v.id));
+    }
+    return out;
   }
 
   private _searchIndex(query: string): SpotlightResult[] {

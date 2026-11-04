@@ -19,7 +19,7 @@
 
 import React, { useMemo } from 'react';
 import { useUkiStore, type UkiUIState } from '../store/ukiStore';
-import { useUkiTasks, isTaskControllable, FINISHED_STATUSES, type UkiTaskStatus } from '../store/ukiTasksStore';
+import { useUkiTasks, isTaskControllable, FINISHED_STATUSES, isResumable, buildResumeRequest, type UkiTaskStatus } from '../store/ukiTasksStore';
 import { CollapsibleSection } from './CollapsibleSection';
 
 const STATE_LABEL: Record<UkiUIState, string> = {
@@ -96,6 +96,7 @@ const NexusUkiPanel: React.FC = () => {
   const pauseTask = useUkiTasks((s) => s.pauseTask);
   const resumeTask = useUkiTasks((s) => s.resumeTask);
   const cancelTask = useUkiTasks((s) => s.cancelTask);
+  const markResumed = useUkiTasks((s) => s.markResumed);
 
   // Full history (newest first), capped for perf. Nexus "houses UKI histories":
   // the user scrolls this to see past turns / what was worked on over time.
@@ -187,6 +188,17 @@ const NexusUkiPanel: React.FC = () => {
                         : <button style={taskBtn} onClick={() => pauseTask(t.id)} aria-label={`Pause task: ${t.title}`}>Pause</button>}
                       <button style={taskBtn} onClick={() => cancelTask(t.id)} aria-label={`Cancel task: ${t.title}`}>Cancel</button>
                     </>
+                  )}
+                  {isResumable(t) && (
+                    <button
+                      style={taskBtn}
+                      aria-label={`Resume interrupted task: ${t.title}`}
+                      onClick={() => {
+                        markResumed(t.id);
+                        // Runs through UKI's full pipeline (tools, confirmations, ledger).
+                        window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query: buildResumeRequest(t) } }));
+                      }}
+                    >Resume</button>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, paddingLeft: 12, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' as any }}>{detail}</div>

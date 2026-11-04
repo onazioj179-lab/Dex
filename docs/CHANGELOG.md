@@ -5,10 +5,27 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-This file documents the **current release only**. For the full history of
-prior releases, see the git tag history (`git tag --list`) and the GitHub
-Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
-public document short and focused on what has actually shipped to users now.
+Newest release first. Releases before v6.1.0 are recorded in the git tag
+history (`git tag --list`) and on the GitHub Releases page.
+
+---
+
+## v7.0.1 — DEX Blue Modern (unreleased)
+
+The full notes are in [DEX_7.0.1_RELEASE_NOTES.md](../DEX_7.0.1_RELEASE_NOTES.md);
+the GitHub release uses that file. Highlights:
+
+- System blue is the default accent again, with an Interface Transparency
+  slider, blur strength and a Refined or Liquid glass style.
+- A spatial canvas you can pan and zoom in every direction, Spotlight that finds
+  open windows, and touch input with up to ten fingers.
+- Password Generator+ with passphrases and the encrypted Vault; Calculator rebuilt.
+- One permissions page in Settings, and no more repeated clipboard or MIDI prompts.
+- Every app's keyboard shortcuts apply only to that app.
+- Local AI is opt-in; DEX never installs or starts an AI runtime.
+- One official Windows installer (`DEX_7.0.1_x64-setup.exe`); MSI is no longer
+  built, and the leftover Electron packaging job is gone.
+- Installers are not code-signed yet, and in-app updates are not available.
 
 ---
 

@@ -6,10 +6,11 @@
 // =============================================================================
 //
 // Spatial desktop chrome, in SCREEN space:
-//   - SpatialHud: zoom controls, arrange menu, minimap, and the Windows panel
-//     (a searchable, keyboard-operable list of every window + groups -- the
-//     non-spatial way to navigate the canvas, for keyboard and screen-reader
-//     users).
+//   - SpatialHud: the on-demand Windows panel (a searchable, keyboard-operable
+//     list of every window + groups, zones, views and arrange -- the non-spatial
+//     way to navigate the canvas), the opt-in minimap and a transient zoom
+//     readout. No persistent toolbar: actions live in the desktop context menu
+//     (spatialMenuActions) and the Ctrl+Alt shortcuts.
 //   - SpatialGroupFrames: rendered INSIDE the world layer (world space); a
 //     labelled frame behind each group's windows; drag the label to move the
 //     whole group.
@@ -38,13 +39,6 @@ const Icon: React.FC<{ d: string; size?: number }> = ({ d, size = 14 }) => (
   </svg>
 );
 const I = {
-  minus: 'M5 12h14',
-  plus: 'M12 5v14M5 12h14',
-  fit: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
-  back: 'M15 18l-6-6 6-6',
-  map: 'M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z M9 3v15 M15 6v15',
-  grid: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
-  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   close: 'M6 6l12 12M18 6L6 18',
   lock: 'M6 11h12v9H6z M8 11V8a4 4 0 0 1 8 0v3',
   unlock: 'M6 11h12v9H6z M8 11V8a4 4 0 0 1 7.5-2',
@@ -55,62 +49,58 @@ const KEY = (k: string) => (typeof navigator !== 'undefined' && /Mac/i.test(navi
 
 // ---------------------------------------------------------------------------
 
-export const SpatialHud: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+/** Spatial actions, shared by the desktop context menu (Home) and anything else
+ *  that wants to offer them. The canvas has no persistent toolbar: these live in
+ *  the right-click / long-press menu, the shortcuts and the Windows panel. */
+export interface SpatialMenuAction { id: string; label: string; shortcut?: string; disabled?: boolean; run: () => void }
+
+export function spatialMenuActions(): SpatialMenuAction[] {
+  const s = useSpatialStore.getState();
+  if (!s.enabled) {
+    return [{ id: 'enter', label: 'Spatial Desktop', shortcut: KEY('S'), run: () => window.dispatchEvent(new CustomEvent('dex-spatial-toggle', { detail: { enabled: true } })) }];
+  }
+  return [
+    { id: 'fit', label: 'Show All Windows', shortcut: KEY('F'), run: () => s.fitAll() },
+    { id: 'zoom-in', label: 'Zoom In', shortcut: KEY('='), run: () => s.zoomStep(1) },
+    { id: 'zoom-out', label: 'Zoom Out', shortcut: KEY('-'), run: () => s.zoomStep(-1) },
+    { id: 'actual', label: `Actual Size (${Math.round(s.camera.z * 100)}%)`, shortcut: KEY('0'), run: () => s.setZoom(1) },
+    { id: 'back', label: 'Previous View', shortcut: KEY('Backspace'), disabled: s.history.length === 0, run: () => s.back() },
+    { id: 'windows', label: 'Windows, Zones & Layout…', shortcut: KEY('W'), run: () => window.dispatchEvent(new CustomEvent('dex-spatial-windows')) },
+    { id: 'minimap', label: s.minimap ? 'Hide Minimap' : 'Show Minimap', shortcut: KEY('M'), run: () => s.toggleMinimap() },
+    { id: 'leave', label: 'Leave Spatial Desktop', shortcut: KEY('S'), run: () => window.dispatchEvent(new CustomEvent('dex-spatial-toggle', { detail: { enabled: false } })) },
+  ];
+}
+
+/** Screen-space spatial overlays: the Windows panel and minimap (both opened on
+ *  demand), a zoom readout that shows only while the zoom changes, and a live
+ *  region announcing the zoom for screen readers. Nothing here is persistent. */
+export const SpatialHud: React.FC = () => {
   const zoom = useSpatialStore((s) => s.camera.z);
   const minimap = useSpatialStore((s) => s.minimap);
-  const canBack = useSpatialStore((s) => s.history.length > 0);
-  const canUndo = useSpatialStore((s) => !!s.undoArrange);
-  const snapGrid = useSpatialStore((s) => s.snapGrid);
-  const st = useSpatialStore.getState;
-  const [menu, setMenu] = useState<null | 'arrange' | 'windows'>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [showZoom, setShowZoom] = useState(false);
   const pct = Math.round(zoom * 100);
-  // Sit above the DEX bar when it is docked along the bottom edge (it reserves
-  // that strip and publishes the height), instead of underneath it.
-  const [barInset, setBarInset] = useState(() => (window as { __dexBarInset?: number }).__dexBarInset ?? 0);
+  const firstZoom = useRef(true);
   useEffect(() => {
-    const on = (e: Event) => setBarInset(Number((e as CustomEvent<number>).detail) || 0);
-    window.addEventListener('dex-bar-inset', on);
-    return () => window.removeEventListener('dex-bar-inset', on);
-  }, []);
-  useEffect(() => {
-    const open = () => setMenu((m) => (m === 'windows' ? null : 'windows'));
+    const open = () => setPanelOpen((o) => !o);
     window.addEventListener('dex-spatial-windows', open);
     return () => window.removeEventListener('dex-spatial-windows', open);
   }, []);
-
-  const arrangeItems: Array<[ArrangeKind, string]> = [['grid', 'Grid'], ['masonry', 'Masonry'], ['row', 'Presentation row'], ['cascade', 'Cascade']];
+  useEffect(() => {
+    if (firstZoom.current) { firstZoom.current = false; return; }
+    setShowZoom(true);
+    const t = setTimeout(() => setShowZoom(false), 900);
+    return () => clearTimeout(t);
+  }, [pct]);
 
   return (
-    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, bottom: 16 + barInset, zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
-      {menu === 'windows' && <WindowsPanel onClose={() => setMenu(null)} />}
-      {menu === 'arrange' && (
-        <div role="menu" aria-label="Arrange windows" style={{ ...panel, padding: 6, display: 'flex', flexDirection: 'column', minWidth: 180, pointerEvents: 'auto' }}>
-          {arrangeItems.map(([k, label]) => (
-            <button key={k} role="menuitem" style={{ ...btn, justifyContent: 'flex-start' }} className="dex-spatial-btn"
-              onClick={() => { st().arrangeWindows(k); setMenu(null); }}>{label}</button>
-          ))}
-          <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 2px' }} />
-          <button role="menuitemcheckbox" aria-checked={snapGrid} style={{ ...btn, justifyContent: 'space-between' }} className="dex-spatial-btn"
-            onClick={() => st().setSnapGrid(!snapGrid)}>Snap to grid <span aria-hidden="true">{snapGrid ? '✓' : ''}</span></button>
-          <button role="menuitem" disabled={!canUndo} style={{ ...btn, justifyContent: 'flex-start', opacity: canUndo ? 1 : 0.45 }} className="dex-spatial-btn"
-            onClick={() => { st().undoArrangement(); setMenu(null); }}>Undo arrange</button>
-        </div>
-      )}
+    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, top: 16, zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
+      <div aria-hidden="true" style={{
+        ...panel, padding: '4px 10px', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+        opacity: showZoom ? 1 : 0, transition: 'opacity 160ms var(--ease-standard, ease)',
+      }}>{pct}%</div>
+      {panelOpen && <WindowsPanel onClose={() => setPanelOpen(false)} />}
       {minimap && <Minimap />}
-      <div role="toolbar" aria-label="Spatial desktop" style={{ ...panel, padding: 4, display: 'flex', alignItems: 'center', gap: 2, pointerEvents: 'auto' }}>
-        <button style={btn} className="dex-spatial-btn" onClick={() => st().zoomStep(-1)} aria-label="Zoom out" title={`Zoom out (${KEY('-')})`}><Icon d={I.minus} /></button>
-        <button style={{ ...btn, minWidth: 52, fontVariantNumeric: 'tabular-nums' }} className="dex-spatial-btn" onClick={() => st().setZoom(1)}
-          aria-label={`Zoom ${pct} percent. Reset to 100 percent`} title={`Actual size (${KEY('0')})`}>{pct}%</button>
-        <button style={btn} className="dex-spatial-btn" onClick={() => st().zoomStep(1)} aria-label="Zoom in" title={`Zoom in (${KEY('=')})`}><Icon d={I.plus} /></button>
-        <span style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 4px' }} />
-        <button style={btn} className="dex-spatial-btn" onClick={() => st().fitAll()} aria-label="Show all windows" title={`Show all (${KEY('F')})`}><Icon d={I.fit} /></button>
-        <button style={{ ...btn, opacity: canBack ? 1 : 0.45 }} disabled={!canBack} className="dex-spatial-btn" onClick={() => st().back()} aria-label="Previous view" title={`Previous view (${KEY('Backspace')})`}><Icon d={I.back} /></button>
-        <button style={btn} className="dex-spatial-btn" aria-pressed={menu === 'arrange'} aria-haspopup="menu" onClick={() => setMenu(menu === 'arrange' ? null : 'arrange')} aria-label="Arrange windows" title="Arrange"><Icon d={I.grid} /></button>
-        <button style={btn} className="dex-spatial-btn" aria-pressed={menu === 'windows'} onClick={() => setMenu(menu === 'windows' ? null : 'windows')} aria-label="Windows and groups" title={`Windows (${KEY('W')})`}><Icon d={I.list} /></button>
-        <button style={btn} className="dex-spatial-btn" aria-pressed={minimap} onClick={() => st().toggleMinimap()} aria-label="Minimap" title={`Minimap (${KEY('M')})`}><Icon d={I.map} /></button>
-        <span style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 4px' }} />
-        <button style={btn} className="dex-spatial-btn" onClick={onExit} aria-label="Leave spatial desktop" title={`Leave spatial desktop (${KEY('S')})`}><Icon d={I.close} /></button>
-      </div>
       <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{`Zoom ${pct}%`}</span>
     </div>
   );
@@ -149,7 +139,9 @@ const Minimap: React.FC = () => {
 
   const v = toMM(view.x, view.y);
   return (
-    <div style={{ ...panel, padding: 6, pointerEvents: 'auto' }}>
+    <div style={{ ...panel, padding: 6, pointerEvents: 'auto', position: 'relative' }}>
+      <button className="dex-spatial-btn" onClick={() => useSpatialStore.getState().toggleMinimap()} aria-label="Hide minimap" title={`Hide minimap (${KEY('M')})`}
+        style={{ ...btn, position: 'absolute', top: 8, right: 8, height: 22, minWidth: 22, padding: 0, background: 'var(--color-bg-glass-strong)' }}><Icon d={I.close} size={12} /></button>
       <svg ref={ref} width={MM_W} height={MM_H} role="img" aria-label={`Minimap: ${visible.length} windows`} style={{ display: 'block', cursor: 'pointer', touchAction: 'none' }}
         onPointerDown={(e) => { (e.currentTarget as Element).setPointerCapture(e.pointerId); navigate(e); }}
         onPointerMove={(e) => { if (e.buttons & 1) navigate(e); }}>
@@ -192,6 +184,8 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const zones = useSpatialStore((s) => s.zones);
   const views = useSpatialStore((s) => s.views);
   const locked = useSpatialStore((s) => s.locked);
+  const snapGrid = useSpatialStore((s) => s.snapGrid);
+  const canUndo = useSpatialStore((s) => !!s.undoArrange);
   const st = useSpatialStore.getState;
   const [tab, setTab] = useState<PanelTab>('windows');
   const [q, setQ] = useState('');
@@ -379,7 +373,15 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} onClick={() => fileRef.current?.click()}>Import layout…</button>
           <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Layout file to import" style={{ display: 'none' }}
             onChange={(e) => { void importLayout(e.target.files?.[0]); e.target.value = ''; }} />
-          <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} onClick={() => { st().undoArrangement(); }}>Undo last arrange / align</button>
+          <div style={sectionLabel}>Arrange</div>
+          <div role="group" aria-label="Arrange windows" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {([['grid', 'Grid'], ['masonry', 'Masonry'], ['row', 'Presentation row'], ['cascade', 'Cascade']] as Array<[ArrangeKind, string]>).map(([k, label]) => (
+              <button key={k} className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} onClick={() => st().arrangeWindows(k)}>{label}</button>
+            ))}
+          </div>
+          <button role="switch" aria-checked={snapGrid} className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)', justifyContent: 'space-between' }}
+            onClick={() => st().setSnapGrid(!snapGrid)}>Snap to grid <span aria-hidden="true">{snapGrid ? 'On' : 'Off'}</span></button>
+          <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)', opacity: canUndo ? 1 : 0.45 }} disabled={!canUndo} onClick={() => { st().undoArrangement(); }}>Undo last arrange / align</button>
         </div>
       )}
       {msg && <div role="status" style={{ fontSize: 12, padding: '6px 10px', borderTop: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>{msg}</div>}

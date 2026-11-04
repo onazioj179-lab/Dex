@@ -7,6 +7,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { computeLapStats } from '../../../shared/format/lapStats';
 import { useTimerStore, stopwatchElapsed } from '../../store/timerStore';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 const Stopwatch: React.FC = () => {
   const stopwatch = useTimerStore(s => s.stopwatch);
@@ -37,6 +38,7 @@ const Stopwatch: React.FC = () => {
   // running, R resets when stopped. Ignored while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'stopwatch')) return; // key meant for another app
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.code === 'Space') { e.preventDefault(); running ? stop() : start(); }

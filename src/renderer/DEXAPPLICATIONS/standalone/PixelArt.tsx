@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassToolbar } from '../../styles/glassMenu';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'replace' | 'line' | 'rect' | 'eyedropper';
 type GridSize = 8 | 16 | 32 | 64;
@@ -442,8 +443,7 @@ const PixelArt: React.FC = () => {
     (Object.keys(TOOL_HOTKEY) as Tool[]).forEach(t => { byKey[TOOL_HOTKEY[t].toLowerCase()] = t; });
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) return;
+      if (!keyEventForApp(e, 'pixelart') || isTypingTarget(e.target)) return;
       if (e.key.toLowerCase() === 'm') { e.preventDefault(); setMirror(m => !m); return; }
       const next = byKey[e.key.toLowerCase()];
       if (next) {

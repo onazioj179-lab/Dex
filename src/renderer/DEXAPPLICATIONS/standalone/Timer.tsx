@@ -103,7 +103,7 @@ const TimerCard: React.FC<{ timer: TimerEntry }> = ({ timer }) => {
           <span style={{ ...s.time, color: isComplete ? 'var(--color-accent)' : 'var(--color-text-primary)' }}>
             {fmtTime(remaining)}
           </span>
-          {isComplete && <span style={s.completeText}>Done!</span>}
+          {isComplete && <span style={s.completeText}>Done</span>}
         </div>
       </div>
 

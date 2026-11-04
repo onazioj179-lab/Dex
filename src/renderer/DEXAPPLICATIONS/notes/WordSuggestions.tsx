@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
 // Trie Node
@@ -200,6 +201,7 @@ export const SuggestionBar: React.FC<SuggestionBarProps> = memo(({
   useEffect(() => {
     if (!visible) return;
     const handler = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'notes')) return; // key meant for another app
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex(i => Math.min(i + 1, suggestions.length - 1));

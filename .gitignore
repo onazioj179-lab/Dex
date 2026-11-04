@@ -39,6 +39,7 @@ src/native/dex-core/node_modules/
 # DEX 6.0 native core (Tauri) build artifacts
 core/target/
 src-tauri/target/
+src-tauri/target-*/
 src-tauri/gen/
 coverage/
 playwright-report/

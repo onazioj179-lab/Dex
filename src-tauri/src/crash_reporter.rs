@@ -205,6 +205,10 @@ fn get_stats(app: &tauri::AppHandle) -> Value {
         .filter(|c| c.get("version").and_then(|v| v.as_str()) == Some(version.as_str()))
         .count() as i64;
 
+    // This process started `elapsed` ago (the startup timeline is anchored in main()).
+    let session_start = now - crate::startup_timeline::anchor().elapsed().as_millis() as i64;
+    let crashes_this_session = crashes.iter().filter(|c| timestamp(c) >= session_start).count() as i64;
+
     let last_crash = if crashes.is_empty() {
         0
     } else {
@@ -220,7 +224,7 @@ fn get_stats(app: &tauri::AppHandle) -> Value {
     json!({
         "totalCrashes": crashes.len(),
         // Session-only counter is unavailable in a stateless dispatch (see header).
-        "crashesThisSession": 0,
+        "crashesThisSession": crashes_this_session,
         "crashesSinceUpdate": crashes_since_update,
         "lastCrash": last_crash,
         "recentCrashes": recent_tail,
