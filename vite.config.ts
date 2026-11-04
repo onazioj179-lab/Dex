@@ -164,6 +164,10 @@ export default defineConfig({
           // nearly every app AND by shared code (WordSuggestions). Left unpinned,
           // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // The shared NativeWebview imports a constant from the ad-block content
+          // script; keep that module shared so app-browser (and the ad-block
+          // engine) is not pulled into startup.
+          if (id.includes('DEXAPPLICATIONS/browser/adblockContentScript')) return 'dex-app-core';
           // Standalone apps (Calculator, Calendar, Nexus, DexCode, …) are each
           // lazy-imported separately by AppManager, but were all collapsed into one
           // ~370K `app-standalone` chunk — so opening any one downloaded all of them.
