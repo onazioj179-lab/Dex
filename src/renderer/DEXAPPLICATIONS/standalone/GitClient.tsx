@@ -49,7 +49,7 @@ interface GitBridge {
 
 const getBridge = (): GitBridge | null => {
   const w = window as any;
-  return (w.dex?.git ?? w.electron?.git ?? null) as GitBridge | null;
+  return (w.dex?.git ?? null) as GitBridge | null;
 };
 
 const LS_PATH = 'dex-git-repo-path';

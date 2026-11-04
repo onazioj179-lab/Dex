@@ -26,8 +26,12 @@ use std::path::PathBuf;
 const FILE: &str = "uki-secrets.json";
 const MAX_VALUE: usize = 8 * 1024;
 
+/// Scopes a secret may live under: AI provider keys, and the Browser's saved
+/// logins and card numbers (which used to rely on an Electron-only IPC).
+const SCOPES: &[&str] = &["uki-provider:", "browser-login:", "browser-card:"];
+
 pub fn valid_name(name: &str) -> bool {
-    let Some(id) = name.strip_prefix("uki-provider:") else { return false };
+    let Some(id) = SCOPES.iter().find_map(|p| name.strip_prefix(p)) else { return false };
     !id.is_empty() && id.len() <= 40 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
@@ -188,6 +192,11 @@ mod tests {
         assert!(!valid_name("uki-provider:"));
         assert!(!valid_name("uki-provider:../x"));
         assert!(!valid_name("uki-provider:OpenAI"));
+        assert!(valid_name("browser-login:3f2a9c1e-7b4d-4c2a-9e1f-0a1b2c3d4e5f"));
+        assert!(valid_name("browser-card:1793717339689"));
+        assert!(!valid_name("browser-login:"));
+        assert!(!valid_name("browser-login:../../x"));
+        assert!(!valid_name("browser:abc"));
     }
 
     #[cfg(windows)]

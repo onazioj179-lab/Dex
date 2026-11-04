@@ -664,11 +664,25 @@
    (the app keeps running; DOM and state are untouched). At low zoom the deep
    window shadows are dropped -- with dozens of windows they dominate paint. */
 [data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
-[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] { box-shadow: none !important; }
-/* Zoomed far out, window contents are thumbnails: pause their decorative CSS
-   animations (spinners, pulses) so 50 windows don't repaint every frame. Apps
-   keep running and re-animate as soon as you zoom back in. */
-[data-spatial-world="on"][data-spatial-lod="low"] [data-floating-window] * { animation-play-state: paused !important; }
+/* Title cards: a canvas window is live only when it is on screen and big
+   enough to use (decided in AppManager's cull, capped at 12 live); otherwise
+   its body skips rendering (the app stays mounted and keeps its state) and it
+   shows its name. Sizes are large because the window itself is scaled down. */
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) [data-window-body] { content-visibility: hidden; }
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"])::after {
+  content: attr(data-window-title);
+  position: absolute; inset: 36px 0 0 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+  font-size: 56px; font-weight: 600; letter-spacing: -0.02em;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  pointer-events: none;
+}
+/* Title-card windows drop their deep shadows (with dozens of windows they
+   dominate paint). Keyed on the window itself: a world-level attribute with
+   descendant selectors restyled every node on the canvas when it flipped. */
+[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) { box-shadow: none !important; }
 .dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
 .dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
 .dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
@@ -8836,3 +8850,25 @@ input[type="search"]:focus-visible {
 /* ═══════════════════════════════════════════════════════════════════════════
    END OF DESIGN SYSTEM
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ===========================================================================
+   App window material (dark). The desktop sits on --color-bg-base (#111215);
+   an app window is one step lighter, like a macOS window over its desktop,
+   with its cards/inputs one step above that. Before this, every app painted
+   its whole window in the desktop tone and read as flat black.
+   Scoped to app windows only (not Home), dark theme only; creative studios
+   keep their own palettes; Dark-room and High Contrast keep their overrides.
+   =========================================================================== */
+html:not([data-theme="light"]):not([data-darkroom="on"]):not([data-high-contrast="true"])
+  [data-app-id]:not([data-app-id="home"]):not([data-app-id="imosion"]):not([data-app-id="prism"]):not([data-app-id="flux"]):not([data-app-id="forge"]):not([data-app-id="videoeditor"]):not([data-app-id="axl"]) {
+  --color-bg-base: #1C1C1E;
+  --color-bg-secondary: #19191B;
+  --color-bg-inset: #18181A;
+  --color-bg-surface: #252527;
+  --color-bg-surface-solid: #252527;
+  --color-bg-elevated: #2C2C2E;
+  --color-bg-tertiary: #2C2C2E;
+  --color-bg-hover: #303033;
+  --color-bg-active: #38383B;
+  background-color: var(--color-bg-base);
+}

@@ -339,7 +339,7 @@ Breadcrumb.displayName = 'Breadcrumb';
  * copy/move/delete/rename/mkdir through this: it throws on a reported failure.
  */
 async function fileOp(channel: string, ...args: unknown[]): Promise<unknown> {
-  const r = await window.electron!.invoke(channel, ...args);
+  const r = await window.dex!.invoke(channel, ...args);
   if (r && typeof r === 'object' && (r as { success?: boolean }).success === false) {
     throw new Error((r as { error?: string }).error || `${channel} failed`);
   }
@@ -650,9 +650,9 @@ export const Files: React.FC = () => {
     setColumnData({});
     setColumnLoading(new Set());
     try {
-      if (window.electron?.invoke) {
-        const result = await window.electron.invoke('files:list', location);
-        if (result.success) {
+      if (window.dex?.invoke) {
+        const result = await window.dex.invoke('files:list', location);
+        if (result?.success && Array.isArray(result.files)) {
           const filesWithCategory = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
             ...f,
             modified: new Date(f.modified),
@@ -678,6 +678,10 @@ export const Files: React.FC = () => {
             .sort((a: FileItem, b: FileItem) => b.modified.getTime() - a.modified.getTime())
             .slice(0, 20);
           setRecentFiles(recent);
+        } else {
+          setFiles([]);
+          setAllFiles([]);
+          setLoadError(result?.error ? `Couldn't open this folder: ${result.error}` : "Couldn't open this folder.");
         }
       } else {
         // No files available - show empty state
@@ -696,10 +700,10 @@ export const Files: React.FC = () => {
   // files:list bridge as the main view, caching results per path so each pushed
   // Miller column populates instead of rendering blank.
   const loadColumn = useCallback(async (location: string) => {
-    if (!window.electron?.invoke) return;
+    if (!window.dex?.invoke) return;
     setColumnLoading(prev => { const next = new Set(prev); next.add(location); return next; });
     try {
-      const result = await window.electron.invoke('files:list', location);
+      const result = await window.dex.invoke('files:list', location);
       if (result?.success) {
         const filesWithCategory: FileItem[] = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
           ...f,
@@ -735,7 +739,7 @@ export const Files: React.FC = () => {
     setDragOverPath(null);
     if (!dragFile || !targetDir.isDirectory) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:move', dragFile.path, targetDir.path);
         loadFiles(currentPath);
       }
@@ -825,8 +829,8 @@ export const Files: React.FC = () => {
       trackFileOpen(file.path);
       addRecent({ path: file.path, name: file.name, appId: 'files' });
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'filesOpened', amount: 1 } }));
-      if (window.electron?.invoke) {
-        const res = await window.electron.invoke('shell:openPath', file.path);
+      if (window.dex?.invoke) {
+        const res = await window.dex.invoke('shell:openPath', file.path);
         if (res && res.success === false) {
           toast.error(res.error ? `Can't open ${file.name}: ${res.error}` : `Can't open ${file.name}`);
         }
@@ -858,7 +862,7 @@ export const Files: React.FC = () => {
   const handlePasteFile = async () => {
     if (!clipboard) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         const dest = currentPath;
         if (clipboard.mode === 'copy') {
           await fileOp('files:copy', clipboard.file.path, dest);
@@ -883,7 +887,7 @@ export const Files: React.FC = () => {
     setFolderNameDraft(null);
     if (!name) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:mkdir', `${currentPath}/${name}`);
         loadFiles(currentPath);
       }
@@ -920,7 +924,7 @@ export const Files: React.FC = () => {
     if (!confirmed) return;
     try {
       // The OS Recycle Bin (restorable), never a permanent delete.
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:trash', file.path);
         loadFiles(currentPath);
       }
@@ -984,7 +988,7 @@ export const Files: React.FC = () => {
     for (const path of paths) {
       try {
         // The OS Recycle Bin (restorable), never a permanent delete.
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           await fileOp('files:trash', path);
           done++;
         } else {
@@ -1012,7 +1016,7 @@ export const Files: React.FC = () => {
     setRenamingPath(null);
     if (!next || next === file.name) return;
     try {
-      if (window.electron?.invoke) {
+      if (window.dex?.invoke) {
         await fileOp('files:rename', file.path, next);
         loadFiles(currentPath);
       }
@@ -1030,8 +1034,8 @@ export const Files: React.FC = () => {
   const handleShowInExplorer = async (file: FileItem) => {
     setContextMenu(null);
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('shell:showItemInFolder', file.path);
+      if (window.dex?.invoke) {
+        await window.dex.invoke('shell:showItemInFolder', file.path);
       }
     } catch (err) {
       console.error('Show in explorer failed:', err);
@@ -1144,7 +1148,7 @@ export const Files: React.FC = () => {
     let ok = 0;
     for (const src of paths) {
       try {
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           if (mode === 'copy') await fileOp('files:copy', src, currentPath);
           else await fileOp('files:move', src, currentPath);
           ok++;
@@ -1167,9 +1171,9 @@ export const Files: React.FC = () => {
   const pickDestinationFolder = useCallback(async (): Promise<string | null> => {
     const opts = { properties: ['openDirectory'] as string[], defaultPath: currentPath || undefined };
     try {
-      let result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('files:openDialog', opts);
+      let result = await window.dex?.invoke<{ canceled?: boolean; filePaths?: string[] }>('files:openDialog', opts);
       if (!result || (!result.filePaths && !result.canceled)) {
-        result = await window.electron?.invoke<{ canceled?: boolean; filePaths?: string[] }>('dialog:showOpenDialog', opts);
+        result = await window.dex?.invoke<{ canceled?: boolean; filePaths?: string[] }>('dialog:showOpenDialog', opts);
       }
       const dest = result?.filePaths?.[0];
       return dest || null;
@@ -1205,7 +1209,7 @@ export const Files: React.FC = () => {
     let failed = 0;
     for (const src of paths) {
       try {
-        if (window.electron?.invoke) {
+        if (window.dex?.invoke) {
           await fileOp(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
           done++;
         } else {
@@ -1235,13 +1239,13 @@ export const Files: React.FC = () => {
   // into the folder being viewed through files:copy, with live progress.
   const handleAddFiles = useCallback(async () => {
     const dest = currentPath;
-    if (!dest || !window.electron?.invoke) {
+    if (!dest || !window.dex?.invoke) {
       toast.error('Adding files needs the DEX desktop app');
       return;
     }
     let picked: string[] = [];
     try {
-      const result = await window.electron.invoke<{ canceled?: boolean; filePaths?: string[] }>(
+      const result = await window.dex.invoke<{ canceled?: boolean; filePaths?: string[] }>(
         'files:openDialog', { properties: ['openFile', 'multiSelections'] },
       );
       picked = result?.canceled ? [] : (result?.filePaths ?? []);
@@ -1525,9 +1529,7 @@ export const Files: React.FC = () => {
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <span style={styles.sidebarTitle}>Files</span>
-        </div>
+        <div style={styles.sidebarHeader} />
         
         <div style={styles.sidebarSection}>
           <div className="dex-label-caps" style={styles.sectionLabel}>Favorites</div>
@@ -1645,12 +1647,13 @@ export const Files: React.FC = () => {
                 style={{
                   ...styles.sidebarItem,
                   background: isActive ? 'var(--color-accent-soft)' : 'transparent',
-                  color: isActive ? collection.color : 'var(--color-text-primary)',
+                  color: 'var(--color-text-primary)',
                 }}
                 onClick={() => setActiveCollection(collection.id)}
                 aria-label={collection.name}
               >
-                <div style={{ color: collection.color }}><Icon size={16} /></div>
+                {/* Monochrome sidebar glyphs (Finder): accent only when selected. */}
+                <div style={{ color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}><Icon size={16} /></div>
                 <span>{collection.name}</span>
                 {count > 0 && <span style={styles.badge}>{count}</span>}
               </button>
@@ -1840,8 +1843,8 @@ export const Files: React.FC = () => {
                 const ok = await confirm({ title: 'Organize folder?', message: 'Organize files in this folder into Audio, Video, Images, Documents, Archives, and Other subfolders?', confirmLabel: 'Organize' });
                 if (!ok) return;
                 try {
-                  if (window.electron?.invoke) {
-                    const ops = await window.electron.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
+                  if (window.dex?.invoke) {
+                    const ops = await window.dex.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
                     loadFiles(currentPath);
                     const list = Array.isArray(ops) ? ops : [];
                     const moved = list.filter(o => o.success).length;
@@ -1860,6 +1863,25 @@ export const Files: React.FC = () => {
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             </button>
+
+            {/* Pin / unpin the current folder to Favorites */}
+            {currentPath && (() => {
+              const folderName = currentPath.split(/[\\/]/).filter(Boolean).pop() || currentPath;
+              const matchingPin = pinnedFolders.find(p => (p as any).path === currentPath);
+              const isPinned = !!matchingPin;
+              return (
+                <button
+                  className="dex-toolbtn"
+                  style={{ ...styles.navBtn, color: isPinned ? 'var(--color-accent)' : undefined }}
+                  onClick={() => { if (isPinned && matchingPin) unpinRegistry(matchingPin.id); else pinFolder(currentPath, folderName); }}
+                  aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}
+                  aria-pressed={isPinned}
+                  title={isPinned ? 'Unpin from Favorites' : 'Pin to Favorites'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 7 4 3H6l4-3z"/></svg>
+                </button>
+              );
+            })()}
 
             {/* Paste */}
             {clipboard && (
@@ -1898,29 +1920,6 @@ export const Files: React.FC = () => {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/></svg>
               </button>
             </div>
-          </div>
-        </div>
-
-        <div style={styles.summaryStrip}>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Path</span>
-            <span style={styles.summaryValue}>{activeCollection ? (activeCollection === 'recent' ? 'Recent files' : SMART_COLLECTIONS.find(collection => collection.id === activeCollection)?.name || activeCollection) : (currentPath || `/${selectedLocation}`)}</span>
-          </div>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Folders</span>
-            <span style={styles.summaryValue}>{workspaceMetrics.visibleDirectories}</span>
-          </div>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Files</span>
-            <span style={styles.summaryValue}>{workspaceMetrics.visibleDocuments}</span>
-          </div>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Visible Size</span>
-            <span style={styles.summaryValue}>{workspaceMetrics.visibleSize}</span>
-          </div>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Tagged</span>
-            <span style={styles.summaryValue}>{workspaceMetrics.taggedItems}</span>
           </div>
         </div>
 
@@ -1978,57 +1977,27 @@ export const Files: React.FC = () => {
           </div>
         )}
 
-        {/* Quick Actions row (v2): Pin current folder + new folder + paste, always visible. */}
-        {currentPath && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-4)', background: 'var(--pg-toolbar, var(--color-bg-secondary))', borderBottom: '1px solid var(--pg-border, var(--color-border-subtle))', fontSize: 11 }}>
-            <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 600, marginRight: 4 }}>Quick Actions</span>
-            {(() => {
-              const folderName = currentPath.split(/[\\/]/).filter(Boolean).pop() || currentPath;
-              const matchingPin = pinnedFolders.find(p => (p as any).path === currentPath);
-              const isPinned = !!matchingPin;
-              return (
-                <button
-                  onClick={() => {
-                    if (isPinned && matchingPin) {
-                      unpinRegistry(matchingPin.id);
-                    } else {
-                      pinFolder(currentPath, folderName);
-                    }
-                  }}
-                  aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}
-                  style={{ padding: '3px 10px', borderRadius: 4, background: isPinned ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: isPinned ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
-                >
-                  {isPinned ? 'Unpin folder' : 'Pin folder'}
-                </button>
-              );
-            })()}
+        {/* Pending multi-item paste (Ctrl+C/Ctrl+X on a selection). Pin and New
+            Folder live in the toolbar; single-file paste too. */}
+        {currentPath && batchClipboard && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px var(--space-4)', background: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12 }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>
+              {batchClipboard.paths.length} item{batchClipboard.paths.length === 1 ? '' : 's'} ready to {batchClipboard.mode === 'cut' ? 'move' : 'copy'}
+            </span>
             <button
-              onClick={() => handleCreateFolder()}
-              style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
-              aria-label="New folder"
+              onClick={() => handleBatchPaste()}
+              style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-accent-fill)', border: 'none', color: 'var(--color-accent-text, #fff)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              aria-label={`Paste ${batchClipboard.paths.length} items here`}
             >
-              New folder
+              Paste here
             </button>
-            {clipboard && (
-              <button
-                onClick={() => handlePasteFile()}
-                style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
-                aria-label={`Paste ${clipboard.file.name}`}
-              >
-                Paste "{clipboard.file.name}"
-              </button>
-            )}
-            {batchClipboard && (
-              <button
-                onClick={() => handleBatchPaste()}
-                style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}
-                aria-label={`Paste ${batchClipboard.paths.length} items here`}
-              >
-                Paste {batchClipboard.paths.length} item{batchClipboard.paths.length === 1 ? '' : 's'} ({batchClipboard.mode === 'cut' ? 'move' : 'copy'})
-              </button>
-            )}
-            <div style={{ flex: 1 }} />
-            <span style={{ color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{filteredFiles.length} item{filteredFiles.length === 1 ? '' : 's'}</span>
+            <button
+              onClick={() => setBatchClipboard(null)}
+              style={{ padding: '3px 10px', borderRadius: 6, background: 'transparent', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+              aria-label="Cancel paste"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
@@ -2568,12 +2537,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 14px',
     borderBottom: '1px solid var(--pg-border)',
   },
-  sidebarTitle: {
-    fontSize: '12px',
-    fontWeight: 600,
-    letterSpacing: '-0.01em',
-    color: 'var(--color-text-primary)',
-  },
   sidebarSection: {
     padding: 'var(--space-2)',
   },
@@ -2717,38 +2680,6 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: 'auto',
     background: 'var(--color-bg-secondary)',
-  },
-  summaryStrip: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: 'var(--space-3)',
-    padding: '14px var(--space-4)',
-    borderBottom: '1px solid var(--color-border)',
-    background: 'var(--color-bg-secondary)',
-  },
-  summaryCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    padding: 'var(--space-3) 14px',
-    borderRadius: '10px',
-    background: 'var(--color-bg-surface-solid)',
-    border: '1px solid var(--color-border)',
-    minWidth: 0,
-  },
-  summaryLabel: {
-    fontSize: '11px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: 'var(--color-text-secondary)',
-  },
-  summaryValue: {
-    fontSize: '13px',
-    fontWeight: 700,
-    color: 'var(--color-text-primary)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
   },
   loading: {
     display: 'flex',

@@ -28,7 +28,7 @@ export function installConsoleBridge(): void {
   installed = true;
   if (typeof window === 'undefined') return;
 
-  const api: any = (globalThis as any).dexAPI?.diagnostics;
+  const api: any = (globalThis as any).dex?.diagnostics;
   if (!api?.log) return; // no IPC bridge — leave console untouched
 
   let forwarding = false;

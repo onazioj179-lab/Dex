@@ -177,7 +177,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         return;
       }
       
-      const state = await window.dex.vault.getState();
+      const state = await window.dex!.vault.getState();
       set({
         isUnlocked: state.isUnlocked,
         vaultExists: state.vaultExists,
@@ -193,7 +193,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       }
 
       // Listen for state changes
-      window.dex.vault.onStateChange((newState) => {
+      window.dex!.vault.onStateChange((newState) => {
         set({
           isUnlocked: newState.isUnlocked,
           vaultExists: newState.vaultExists,
@@ -218,7 +218,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.create(masterPassword);
+      const result = await window.dex!.vault.create(masterPassword);
       
       if (result.success) {
         set({ isUnlocked: true, vaultExists: true });
@@ -241,7 +241,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.unlock(masterPassword);
+      const result = await window.dex!.vault.unlock(masterPassword);
       
       if (result.success) {
         set({ isUnlocked: true });
@@ -264,7 +264,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   lockVault: async () => {
     try {
-      await window.dex.vault.lock();
+      await window.dex!.vault.lock();
       set({
         isUnlocked: false,
         credentials: [],
@@ -281,7 +281,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.changeMasterPassword(current, newPass);
+      const result = await window.dex!.vault.changeMasterPassword(current, newPass);
       
       if (!result.success) {
         set({ error: result.error || 'Failed to change password' });
@@ -303,7 +303,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   loadCredentials: async () => {
     try {
-      const credentials = await window.dex.vault.getCredentials();
+      const credentials = await window.dex!.vault.getCredentials();
       set({ credentials });
     } catch (error) {
       set({ error: String(error) });
@@ -312,7 +312,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   getCredential: async (id: string) => {
     try {
-      return await window.dex.vault.getCredential(id);
+      return await window.dex!.vault.getCredential(id);
     } catch (error) {
       set({ error: String(error) });
       return null;
@@ -323,7 +323,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.addCredential(credential);
+      const result = await window.dex!.vault.addCredential(credential);
       
       if (result.success && result.id) {
         await get().loadCredentials();
@@ -344,7 +344,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.updateCredential(id, updates);
+      const result = await window.dex!.vault.updateCredential(id, updates);
       
       if (result) {
         await get().loadCredentials();
@@ -365,7 +365,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.deleteCredential(id);
+      const result = await window.dex!.vault.deleteCredential(id);
       
       if (result) {
         await get().loadCredentials();
@@ -392,7 +392,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         return;
       }
       
-      const credentials = await window.dex.vault.searchCredentials(query);
+      const credentials = await window.dex!.vault.searchCredentials(query);
       set({ credentials });
     } catch (error) {
       set({ error: String(error) });
@@ -405,7 +405,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   loadAuthenticators: async () => {
     try {
-      const authenticators = await window.dex.vault.getAuthenticators();
+      const authenticators = await window.dex!.vault.getAuthenticators();
       set({ authenticators });
     } catch (error) {
       set({ error: String(error) });
@@ -416,7 +416,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.addAuthenticator(entry);
+      const result = await window.dex!.vault.addAuthenticator(entry);
       
       if (result.success && result.id) {
         await get().loadAuthenticators();
@@ -437,7 +437,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.updateAuthenticator(id, updates);
+      const result = await window.dex!.vault.updateAuthenticator(id, updates);
       
       if (result) {
         await get().loadAuthenticators();
@@ -458,7 +458,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.deleteAuthenticator(id);
+      const result = await window.dex!.vault.deleteAuthenticator(id);
       
       if (result) {
         await get().loadAuthenticators();
@@ -480,7 +480,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   generateTOTP: async (id: string) => {
     try {
-      return await window.dex.vault.generateTOTP(id);
+      return await window.dex!.vault.generateTOTP(id);
     } catch (error) {
       set({ error: String(error) });
       return null;
@@ -489,7 +489,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   parseOTPUri: async (uri: string) => {
     try {
-      return await window.dex.vault.parseOTPUri(uri);
+      return await window.dex!.vault.parseOTPUri(uri);
     } catch (error) {
       set({ error: String(error) });
       return null;
@@ -502,7 +502,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   generatePassword: async (options) => {
     try {
-      return await window.dex.vault.generatePassword(options);
+      return await window.dex!.vault.generatePassword(options);
     } catch (error) {
       set({ error: String(error) });
       return '';
@@ -513,7 +513,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       // Convert boolean to number (30 seconds if true, undefined if false)
       const clearTimeout = autoClear ? 30 : undefined;
-      await window.dex.vault.copyToClipboard(text, clearTimeout);
+      await window.dex!.vault.copyToClipboard(text, clearTimeout);
     } catch (error) {
       set({ error: String(error) });
     }
@@ -525,7 +525,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   auditPasswords: async () => {
     try {
-      return await window.dex.vault.auditPasswords();
+      return await window.dex!.vault.auditPasswords();
     } catch (error) {
       set({ error: String(error) });
       return { weak: [], reused: [], old: [] };
@@ -538,7 +538,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await window.dex.vault.getSettings();
+      const settings = await window.dex!.vault.getSettings();
       set({ settings });
     } catch (error) {
       set({ error: String(error) });
@@ -547,7 +547,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   updateSettings: async (updates: Partial<VaultSettings>) => {
     try {
-      const result = await window.dex.vault.updateSettings(updates);
+      const result = await window.dex!.vault.updateSettings(updates);
       
       if (result) {
         await get().loadSettings();
@@ -564,7 +564,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   loadCategories: async () => {
     try {
-      const categories = await window.dex.vault.getCategories();
+      const categories = await window.dex!.vault.getCategories();
       set({ categories });
     } catch (error) {
       set({ error: String(error) });
@@ -573,7 +573,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   addCategory: async (category: { name: string; icon?: string }) => {
     try {
-      const result = await window.dex.vault.addCategory(category);
+      const result = await window.dex!.vault.addCategory(category);
       
       if (result.success && result.id) {
         await get().loadCategories();
@@ -594,7 +594,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   exportVault: async (password: string) => {
     try {
-      return await window.dex.vault.export(password);
+      return await window.dex!.vault.export(password);
     } catch (error) {
       set({ error: String(error) });
       return null;
@@ -605,7 +605,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const result = await window.dex.vault.import(data, password);
+      const result = await window.dex!.vault.import(data, password);
       
       if (result.success) {
         await get().loadCredentials();

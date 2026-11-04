@@ -145,7 +145,7 @@ function saveState(s: Partial<WallpaperState>) {
       tint: s.tint,
     });
     localStorage.setItem(STORAGE_KEY, data);
-    (window as any).electron?.invoke?.('capability:storage:set', STORAGE_KEY, data).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, data).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch { /* */ }
 }
 
@@ -188,7 +188,7 @@ export const useWallpaperStore = create<WallpaperState>((set) => {
   const saved = migrateState(loadState());
 
   // Async load from IPC backend on startup (overrides localStorage)
-  (window as any).electron?.invoke?.('capability:storage:get', STORAGE_KEY).then((raw: string | null) => {
+  (window as any).dex?.invoke?.('capability:storage:get', STORAGE_KEY).then((raw: string | null) => {
     if (raw) {
       try {
         const parsed = migrateState(JSON.parse(raw));

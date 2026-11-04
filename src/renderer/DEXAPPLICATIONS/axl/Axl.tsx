@@ -96,7 +96,6 @@ import { useUIStore } from './stores/uiStore';
 import { AXLRenderer, solveTruss, deriveTrussFromParts, defaultTrussModel, solveTrussModes } from './engine';
 import type { RenderState, FEResult } from './engine';
 import AXLToolbar from './components/Toolbar';
-import CreativeCommandBar from '../../components/CreativeCommandBar';
 import SketchOverlay from './components/SketchOverlay';
 import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -1643,7 +1642,6 @@ const AXL: React.FC = () => {
         if (k === 'b') { e.preventDefault(); ui.toggleBOM(); return; }         // Ctrl+B  toggle BOM
         if (k === 'p') { e.preventDefault(); ui.togglePartsLibrary(); return; }// Ctrl+P  parts library
         if (k === 'f') { e.preventDefault(); ui.toggleFeatureCreate(); return; }// Ctrl+F  feature creator
-        if (k === 'i') { e.preventDefault(); ui.toggleAI(); return; }          // Ctrl+I  AI copilot
         if (k === ',') { e.preventDefault(); ui.toggleSettings(); return; }    // Ctrl+,  settings
         if (k === 'a') {                                                        // Ctrl+A  select all (first part)
           e.preventDefault();
@@ -2641,70 +2639,6 @@ const AXL: React.FC = () => {
           </div>
         )}
 
-        {/* ─── AI Design Copilot Panel (overlay) ─────────────────────── */}
-        {ui.showAI && (
-          <div className="dex-axl-panel-strong" style={{ position: 'absolute', top: 42, right: 0, width: 'min(320px, calc(100% - 24px))', bottom: 0, borderRadius: 0, boxShadow: 'none', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '10px var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>AI Design Copilot</span>
-              </div>
-              <button onClick={ui.toggleAI} aria-label="Close AI panel" className="axl-close">&times;</button>
-            </div>
-
-            {/* UKI command bar — natural-language CAD actions (real store ops) */}
-            <div style={{ padding: '10px', borderBottom: '1px solid var(--color-border-subtle)' }}>
-              <CreativeCommandBar
-                appId="axl"
-                facts={{ partId: selectedPartId, partCount: project.assembly.parts.length }}
-                onApplyOp={handleAxlOp}
-                examples={axlAiExamples}
-                placeholder="e.g. add a cylinder, shell it 2mm"
-              />
-            </div>
-
-            <div style={{ padding: 'var(--space-2) 10px', display: 'flex', gap: 4, flexWrap: 'wrap', borderBottom: '1px solid var(--color-border-subtle)' }}>
-              {['Recommend material', 'Check tolerances', 'Weight breakdown', 'Assembly review', 'What can you do?'].map(q => (
-                <button key={q} onClick={() => {
-                  setAiInput(q);
-                  ui.addAIMessage({ role: 'user', content: q, timestamp: Date.now() });
-                  setTimeout(() => ui.addAIMessage({ role: 'assistant', content: aiAnalyze(q), timestamp: Date.now() }), 300);
-                }}
-                  style={{ fontSize: 8, padding: '3px 8px', borderRadius: 9999, background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {q}
-                </button>
-              ))}
-            </div>
-
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-2) 10px', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {ui.aiMessages.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
-                  <div>Ask about materials, tolerances,<br/>simulation, or assembly.</div>
-                </div>
-              )}
-              {ui.aiMessages.map((msg, i) => (
-                <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', padding: 'var(--space-2) 10px', borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px', background: msg.role === 'user' ? 'var(--color-accent-light)' : 'var(--color-bg-hover)', fontSize: 11, color: 'var(--color-text-primary)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ padding: 'var(--space-2) 10px', borderTop: '1px solid var(--color-bg-hover)', display: 'flex', gap: 6 }}>
-              <input
-                value={aiInput}
-                onChange={e => setAiInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') sendAIMessage(); }}
-                placeholder="Ask about your design..."
-                style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '6px 10px', color: 'var(--color-text-primary)', fontSize: 11, outline: 'none' }}
-              />
-              <button onClick={sendAIMessage}
-                style={{ padding: '6px 12px', background: 'var(--color-accent-light)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>
-                Send
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ─── BOM Table Overlay ────────────────────────────────────────── */}

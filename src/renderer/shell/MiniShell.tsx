@@ -34,9 +34,16 @@ interface CompactModeState {
 const COMPACT_WIDTH = 380;
 const COMPACT_HEIGHT = 96;
 
-const win = () => (window as unknown as {
-  electron?: { window?: { enterCompact?: (o?: object) => Promise<unknown>; exitCompact?: () => Promise<unknown> } };
-}).electron?.window;
+// Native compact window (src-tauri/src/compact_window.rs): resizes the shell
+// to a small always-on-top panel and restores the previous bounds on exit.
+const win = () => {
+  const dex = (window as unknown as { dex?: { invoke?: (ch: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+  if (!dex?.invoke) return null;
+  return {
+    enterCompact: (o?: object) => dex.invoke!('window:enterCompact', o),
+    exitCompact: () => dex.invoke!('window:exitCompact'),
+  };
+};
 
 export const useCompactMode = create<CompactModeState>((set, get) => ({
   compact: false,

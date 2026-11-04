@@ -10,14 +10,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 describe('SystemTier (K1)', () => {
   beforeEach(() => {
     vi.resetModules();
-    (globalThis as any).dexAPI = undefined;
+    (globalThis as any).dex = undefined;
     if (typeof document !== 'undefined') {
       try { delete document.documentElement.dataset.tier; } catch { /* jsdom */ }
     }
   });
 
   it('classifies <=2 cores as low tier', async () => {
-    (globalThis as any).dexAPI = {
+    (globalThis as any).dex = {
       diagnostics: {
         getSystemInfo: async () => ({
           cpu: { cores: 2 },
@@ -33,7 +33,7 @@ describe('SystemTier (K1)', () => {
   });
 
   it('classifies <=4GB RAM as low tier', async () => {
-    (globalThis as any).dexAPI = {
+    (globalThis as any).dex = {
       diagnostics: {
         getSystemInfo: async () => ({
           cpu: { cores: 8 },
@@ -48,7 +48,7 @@ describe('SystemTier (K1)', () => {
   });
 
   it('classifies discrete GPU + 16GB+ + 8 cores as high tier', async () => {
-    (globalThis as any).dexAPI = {
+    (globalThis as any).dex = {
       diagnostics: {
         getSystemInfo: async () => ({
           cpu: { cores: 16 },
@@ -64,7 +64,7 @@ describe('SystemTier (K1)', () => {
   });
 
   it('falls back to mid tier for typical hardware', async () => {
-    (globalThis as any).dexAPI = {
+    (globalThis as any).dex = {
       diagnostics: {
         getSystemInfo: async () => ({
           cpu: { cores: 8 },

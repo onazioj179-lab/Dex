@@ -263,9 +263,9 @@ export function parseID3(buffer: ArrayBuffer): AudioMetadata | null {
  */
 export async function loadAudioMetadata(filePath: string): Promise<AudioMetadata | null> {
   try {
-    if (window.electron?.invoke) {
+    if (window.dex?.invoke) {
       // Read first 512KB for ID3v2 header
-      const buffer = await window.electron.invoke('fs:readFileHead', filePath, 524288);
+      const buffer = await window.dex.invoke('fs:readFileHead', filePath, 524288);
       if (buffer) {
         const ab = buffer instanceof ArrayBuffer ? buffer : buffer.buffer || buffer;
         const result = parseID3(ab);

@@ -35,7 +35,7 @@ interface HeartbeatPayload {
 }
 
 function getBridge(): { invoke?: (ch: string, p?: unknown) => Promise<unknown> } | null {
-  return (window as any).dex || (window as any).electron || (window as any).dexAPI || null;
+  return (window as any).dex || null;
 }
 
 function getHeapMB(): number {

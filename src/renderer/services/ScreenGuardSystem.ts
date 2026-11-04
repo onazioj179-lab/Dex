@@ -65,7 +65,6 @@ class ScreenGuardSystem {
     window.addEventListener('pageshow', this.handlePageShow);
 
     // 4. Electron IPC events (sleep/wake/resume)
-    this.attachIPCListeners();
 
     // 5. Start continuous health monitoring
     this.startHealthMonitoring();
@@ -117,24 +116,6 @@ class ScreenGuardSystem {
       this.metrics.consecutiveBlankFrames = 0;
     }
   };
-
-  /**
-   * Attach Electron IPC listeners
-   */
-  private attachIPCListeners(): void {
-    const ipc = (window as any).electron?.ipcRenderer;
-    if (!ipc) return;
-
-    const events = ['dex:resume', 'dex:wake', 'dex:unlock'];
-    for (const event of events) {
-      ipc.on?.(event, () => {
-        // Just suppress our own intervention; resume already triggers a
-        // natural compositor repaint and our flicker only adds visual jank.
-        this.suppressUntil = Date.now() + 1500;
-        this.metrics.consecutiveBlankFrames = 0;
-      });
-    }
-  }
 
   /**
    * Start continuous health monitoring

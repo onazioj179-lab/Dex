@@ -15,7 +15,7 @@ const invokeCalls: Array<{ ch: string; args: unknown[] }> = [];
 let invokeImpl: (ch: string, ...args: unknown[]) => Promise<unknown> = async () => ({ success: true });
 
 (globalThis as unknown as { window: unknown }).window = {
-  electron: {
+  dex: {
     invoke: (ch: string, ...args: unknown[]) => {
       invokeCalls.push({ ch, args });
       return invokeImpl(ch, ...args);

@@ -664,7 +664,7 @@ export const useAppSubsystem = create<AppSubsystemState>()(
 
         // Pattern Learning: Record app close with duration (background, no UI)
         try {
-          window.electron?.invoke('patterns:recordAppClose', instance.appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
+          window.dex?.invoke('patterns:recordAppClose', instance.appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
         } catch { /* state save failed */ }
 
         // Update work session immutably
@@ -1058,25 +1058,9 @@ export const useWorkSession = () => useAppSubsystem(s => s.currentWorkSession);
 // ===========================================================================
 
 export const initAppSubsystemIPC = () => {
-  if (typeof window !== 'undefined' && window.electronAPI) {
-    window.electronAPI?.onAppEvent?.((event: string, data: unknown) => {
-      const { launchApp, closeApp, focusApp } = useAppSubsystem.getState();
-      const d = data as Record<string, any>;
-      
-      switch (event) {
-        case 'app:launch':
-          launchApp(d?.appId, d?.path, d?.windowId);
-          break;
-        case 'app:close':
-          closeApp(d?.instanceId);
-          break;
-        case 'app:focus':
-          focusApp(d?.instanceId);
-          break;
-      }
-    });
-  }
-  
+  // App launch/close requests from Electron's main process (onAppEvent) have
+  // no Tauri counterpart; the store-sync bridge below is what keeps state aligned.
+
   // ===========================================================================
   // SYNC BRIDGE -- Keep useAppSubsystem in sync with useRunningApps (item 85)
   // useRunningApps is the source of truth for the dock / AppManager UI.

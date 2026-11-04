@@ -20,11 +20,11 @@ describe('consoleBridge (Track D)', () => {
   afterEach(() => {
     console.warn = originalWarn;
     console.error = originalError;
-    (globalThis as any).dexAPI = undefined;
+    (globalThis as any).dex = undefined;
   });
 
-  it('is a no-op when dexAPI.diagnostics.log is unavailable', async () => {
-    (globalThis as any).dexAPI = undefined;
+  it('is a no-op when dex.diagnostics.log is unavailable', async () => {
+    (globalThis as any).dex = undefined;
     const before = console.error;
     const { installConsoleBridge } = await import('../../src/renderer/utils/consoleBridge');
     installConsoleBridge();
@@ -33,7 +33,7 @@ describe('consoleBridge (Track D)', () => {
 
   it('forwards console.warn to diagnostics.log with level "warn"', async () => {
     const log = vi.fn(async () => undefined);
-    (globalThis as any).dexAPI = { diagnostics: { log } };
+    (globalThis as any).dex = { diagnostics: { log } };
     const { installConsoleBridge } = await import('../../src/renderer/utils/consoleBridge');
     installConsoleBridge();
     console.warn('hello', { code: 42 });
@@ -43,7 +43,7 @@ describe('consoleBridge (Track D)', () => {
 
   it('forwards console.error and serializes Error stacks', async () => {
     const log = vi.fn(async () => undefined);
-    (globalThis as any).dexAPI = { diagnostics: { log } };
+    (globalThis as any).dex = { diagnostics: { log } };
     const { installConsoleBridge } = await import('../../src/renderer/utils/consoleBridge');
     installConsoleBridge();
     console.error(new Error('boom'));
@@ -53,7 +53,7 @@ describe('consoleBridge (Track D)', () => {
 
   it('does not recurse if diagnostics.log itself throws', async () => {
     const log = vi.fn(async () => { throw new Error('ipc-fail'); });
-    (globalThis as any).dexAPI = { diagnostics: { log } };
+    (globalThis as any).dex = { diagnostics: { log } };
     const { installConsoleBridge } = await import('../../src/renderer/utils/consoleBridge');
     installConsoleBridge();
     expect(() => console.warn('x')).not.toThrow();
@@ -61,7 +61,7 @@ describe('consoleBridge (Track D)', () => {
 
   it('install is idempotent', async () => {
     const log = vi.fn(async () => undefined);
-    (globalThis as any).dexAPI = { diagnostics: { log } };
+    (globalThis as any).dex = { diagnostics: { log } };
     const { installConsoleBridge } = await import('../../src/renderer/utils/consoleBridge');
     installConsoleBridge();
     const wrappedOnce = console.warn;

@@ -45,7 +45,7 @@ function rendererCacheKeys(): string[] {
 }
 
 function invoke<T>(channel: string): Promise<T | null> {
-  const api = (window as unknown as { electron?: { invoke?: (c: string) => Promise<T> } }).electron;
+  const api = (window as unknown as { dex?: { invoke?: (c: string) => Promise<T> } }).dex;
   return api?.invoke ? api.invoke(channel) : Promise.resolve(null);
 }
 

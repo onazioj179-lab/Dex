@@ -127,9 +127,9 @@ export function startThermalAdaptiveMonitor(): void {
   // Main-process thermal events override renderer detection
   try {
     const w = window as any;
-    const ipc = w.electron || w.api;
+    const ipc = w.dex;
     if (ipc && typeof ipc.on === 'function') {
-      const handler = (_: any, state: { state: ThermalLevel }) => {
+      const handler = (state: { state: ThermalLevel }) => {
         if (state && state.state) setLevel(state.state, 'main-process');
       };
       ipc.on('dex:thermal-state', handler);

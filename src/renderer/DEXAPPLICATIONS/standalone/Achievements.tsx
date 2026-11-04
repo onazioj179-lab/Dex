@@ -28,14 +28,18 @@ import {
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
 
-// True-black SOLID theme (no glass, no translucency). Gold accent for trophies.
-const GOLD = '#f5b942';
-const GOLD_DEEP = '#d97706';
-const PANEL = '#101012';
-const PANEL_2 = '#16161a';
-const BORDER = '#26262b';
-const TXT = '#f1ece5';
-const TXT_DIM = '#8a8a90';
+// DEX Blue Modern tokens, so Trophies follows light/dark and the window
+// material like every other app (it used to be hard-coded near-black + gold).
+// Monochrome by design (owner: minimal, no accent): icons, rings and bars use
+// the text tones; surfaces carry the hierarchy.
+const GOLD = 'var(--color-text-primary)';
+const GOLD_DEEP = 'var(--color-text-primary)';
+const MONO_FILL = 'var(--color-bg-elevated)';
+const PANEL = 'var(--color-bg-surface)';
+const PANEL_2 = 'var(--color-bg-elevated)';
+const BORDER = 'var(--color-border-subtle)';
+const TXT = 'var(--color-text-primary)';
+const TXT_DIM = 'var(--color-text-secondary)';
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -116,7 +120,7 @@ const Achievements: React.FC = () => {
       const inCat = ACHIEVEMENTS.filter(a => a.category === k);
       const total = inCat.length;
       const got = inCat.reduce((n, a) => n + (unlocked.has(a.id) ? 1 : 0), 0);
-      return { key: k, title: meta.title, icon: meta.icon, color: meta.color, total, got, pct: total ? (got / total) * 100 : 0 };
+      return { key: k, title: meta.title, icon: meta.icon, color: 'var(--color-text-secondary)', total, got, pct: total ? (got / total) * 100 : 0 };
     }).sort((a, b) => b.pct - a.pct);
   }, [unlocked]);
 
@@ -162,22 +166,22 @@ const Achievements: React.FC = () => {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', color: TXT, overflow: 'hidden' }}>
       <style>{`
         .tr-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
-        .tr-scroll::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 6px; }
+        .tr-scroll::-webkit-scrollbar-thumb { background: var(--color-bg-active); border-radius: 6px; }
         .tr-card { transition: transform .15s ease, border-color .15s ease; }
-        .tr-card:hover { transform: translateY(-2px); border-color: #3a3a42; }
+        .tr-card:hover { transform: translateY(-2px); border-color: var(--color-border); }
       `}</style>
 
       <div className="tr-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 26px 30px' }}>
 
         {/* Greeting header */}
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20, position: 'sticky', top: -20, zIndex: 2, background: 'var(--color-bg-base)', padding: '20px 0 12px', margin: '-20px 0 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
             <div style={{
               width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-              background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`,
+              background: MONO_FILL,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <DexIcon name="trophy" size={22} color="#1a0f08" />
+              <DexIcon name="trophy" size={22} color="var(--color-text-primary)" />
             </div>
             <div>
               <div style={{ fontSize: 12, color: TXT_DIM, fontWeight: 500 }}>{timeGreeting()}, champion</div>
@@ -201,9 +205,9 @@ const Achievements: React.FC = () => {
             <button onClick={shareProgress} title="Copy progress summary" style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-              background: `linear-gradient(140deg, ${GOLD}, ${GOLD_DEEP})`, color: '#1a0f08',
+              background: MONO_FILL, color: 'var(--color-text-primary)',
             }}>
-              <DexIcon name="share" size={14} color="#1a0f08" />
+              <DexIcon name="share" size={14} color="var(--color-text-primary)" />
               Share
             </button>
           </div>
@@ -231,19 +235,19 @@ const Achievements: React.FC = () => {
               return (
                 <div key={c.key} className="tr-card" style={{ padding: 15, borderRadius: 14, background: PANEL, border: `1px solid ${BORDER}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: `${c.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <DexIcon name={c.icon} size={18} color={c.color} />
+                    <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: MONO_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={c.icon} size={18} color="var(--color-text-secondary)" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
                       <div style={{ fontSize: 11, color: TXT_DIM, marginTop: 1 }}>{c.got} / {c.total} unlocked</div>
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: done ? '#30d158' : c.color, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: done ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                       {Math.round(c.pct)}%
                     </div>
                   </div>
                   <div style={{ height: 7, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-                    <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 4, background: done ? '#30d158' : `linear-gradient(90deg, ${c.color}99, ${c.color})`, transition: 'width .2s ease' }} />
+                    <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 4, background: done ? 'var(--color-text-primary)' : 'var(--color-text-primary)', transition: 'width .2s ease' }} />
                   </div>
                 </div>
               );
@@ -260,17 +264,17 @@ const Achievements: React.FC = () => {
                 const meta = RARITY_META[ach.rarity];
                 return (
                   <div key={ach.id} className="tr-card" title={ach.description} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, background: PANEL, border: `1px solid ${BORDER}` }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0, background: `${meta.color}1f`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <DexIcon name={ach.icon} size={20} color={meta.color} />
+                    <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0, background: MONO_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={ach.icon} size={20} color="var(--color-text-secondary)" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.title}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, flexShrink: 0 }}>{Math.round(pct)}%</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', flexShrink: 0 }}>{Math.round(pct)}%</span>
                       </div>
                       <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, height: 5, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+                          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: 'var(--color-text-primary)' }} />
                         </div>
                         <span style={{ fontSize: 10, color: TXT_DIM, flexShrink: 0 }}>{cur.toLocaleString()}/{tgt.toLocaleString()}</span>
                       </div>
@@ -290,13 +294,13 @@ const Achievements: React.FC = () => {
               {recentUnlocks.map(({ ach, ts }) => {
                 const meta = RARITY_META[ach.rarity];
                 return (
-                  <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 14, background: PANEL_2, border: `1px solid ${meta.color}33` }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, marginBottom: 9, background: `${meta.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <DexIcon name={ach.icon} size={20} color={meta.color} />
+                  <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 14, background: PANEL_2, border: `1px solid ${BORDER}` }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, marginBottom: 9, background: MONO_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DexIcon name={ach.icon} size={20} color="var(--color-text-secondary)" />
                     </div>
                     <div style={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.title}</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: meta.color }}>{ach.points} pts</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-secondary)' }}>{ach.points} pts</span>
                       <span style={{ fontSize: 10, color: TXT_DIM }}>{relTime(ts)}</span>
                     </div>
                   </div>
@@ -337,22 +341,22 @@ const HeroSpotlight: React.FC<{
     <div style={{
       position: 'relative', borderRadius: 18, padding: 24, minHeight: 188, overflow: 'hidden',
       background: PANEL, border: `1px solid ${BORDER}`,
-      borderLeft: `3px solid ${meta.color}`,
+      borderLeft: `1px solid ${BORDER}`,
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
     }}>
       {/* Faint oversized glyph */}
       <div style={{ position: 'absolute', right: -16, bottom: -28, opacity: 0.06, pointerEvents: 'none' }}>
-        <DexIcon name={ach.icon} size={180} color={meta.color} />
+        <DexIcon name={ach.icon} size={180} color="var(--color-text-secondary)" />
       </div>
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1a0f08', background: GOLD, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: meta.color, background: `${meta.color}1f`, padding: '4px 9px', borderRadius: 6 }}>{ach.rarity}</span>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>{ach.rarity}</span>
           <span style={{ fontSize: 11, color: TXT_DIM }}>{isUnlocked ? `Unlocked ${relTime(ts)}` : 'Next up'}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 18, flexShrink: 0, background: `${meta.color}1f`, border: `1px solid ${meta.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DexIcon name={isUnlocked ? ach.icon : 'lock'} size={28} color={meta.color} />
+          <div style={{ width: 56, height: 56, borderRadius: 18, flexShrink: 0, background: MONO_FILL, border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <DexIcon name={isUnlocked ? ach.icon : 'lock'} size={28} color="var(--color-text-secondary)" />
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{ach.title}</div>
@@ -368,13 +372,13 @@ const HeroSpotlight: React.FC<{
         {!isUnlocked && prog ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
             <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+              <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: 'var(--color-text-primary)' }} />
             </div>
             <span style={{ fontSize: 11, color: TXT_DIM, flexShrink: 0 }}>{prog.current.toLocaleString()}/{prog.target.toLocaleString()}</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-success)', fontSize: 12, fontWeight: 700 }}>
-            <DexIcon name="check-circle" size={14} color="#30d158" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 700 }}>
+            <DexIcon name="check-circle" size={14} color="var(--color-text-primary)" />
             Earned · {totalUnlocked.toLocaleString()} total
           </div>
         )}
@@ -400,7 +404,7 @@ const StatsRing: React.FC<{
       <div style={{ fontSize: 14, fontWeight: 700 }}>Your statistics</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
         <div style={{ position: 'relative', width: 104, height: 104, flexShrink: 0 }}>
-          <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: `conic-gradient(${GOLD} ${pct}%, #1f1f24 ${pct}%)` }} />
+          <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: `conic-gradient(${GOLD} ${pct}%, var(--color-bg-active) ${pct}%)` }} />
           <div style={{ position: 'absolute', inset: 11, borderRadius: '50%', background: PANEL, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{pct}%</div>
             <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 2 }}>complete</div>
@@ -466,17 +470,17 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
           const threshold = ch.condition?.threshold || 0;
           const pct = threshold > 0 ? Math.min(100, (ch.progress / threshold) * 100) : 0;
           return (
-            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 10, background: ch.completed ? 'rgba(48,209,88,0.12)' : PANEL_2, border: `1px solid ${ch.completed ? 'rgba(48,209,88,0.3)' : BORDER}` }}>
+            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 10, background: PANEL_2, border: `1px solid ${BORDER}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                  <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? '#30d158' : GOLD} />
+                  <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? 'var(--color-text-primary)' : GOLD} />
                   <span style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.title}</span>
                 </div>
                 <span style={{ fontSize: 10, fontWeight: 700, color: GOLD, flexShrink: 0 }}>+{ch.xpReward}</span>
               </div>
               <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: ch.completed ? '#30d158' : GOLD, transition: 'width .18s' }} />
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: ch.completed ? 'var(--color-text-primary)' : GOLD, transition: 'width .18s' }} />
                 </div>
                 <span style={{ fontSize: 9, color: TXT_DIM, flexShrink: 0 }}>{ch.progress}/{ch.condition.threshold}</span>
               </div>

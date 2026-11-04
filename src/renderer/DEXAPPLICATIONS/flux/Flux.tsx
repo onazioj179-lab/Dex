@@ -770,7 +770,7 @@ const Flux: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const status = await (window as any).electron?.invoke?.('resource-governor:getStatus');
+        const status = await (window as any).dex?.invoke?.('resource-governor:getStatus');
         if (mounted && status?.hardwareProfile?.tier) setHardwareTier(status.hardwareProfile.tier);
       } catch { /* not in Electron or governor unavailable */ }
     })();
@@ -809,7 +809,7 @@ const Flux: React.FC = () => {
     // Async IPC load (overrides localStorage if available)
     (async () => {
       try {
-        const ipcData = await (window as any).electron?.invoke?.('capability:storage:get', 'flux-workspace');
+        const ipcData = await (window as any).dex?.invoke?.('capability:storage:get', 'flux-workspace');
         if (mounted && ipcData) {
           const data = typeof ipcData === 'string' ? JSON.parse(ipcData) : ipcData;
           if (data.activeTool) setActiveTool(data.activeTool);
@@ -838,7 +838,7 @@ const Flux: React.FC = () => {
         };
         const json = JSON.stringify(data);
         localStorage.setItem('flux-workspace', json);
-        (window as any).electron?.invoke?.('capability:storage:set', 'flux-workspace', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+        (window as any).dex?.invoke?.('capability:storage:set', 'flux-workspace', json).catch((e: unknown) => { console.warn('[DEX]', e); });
       } catch (e) { console.warn('[Flux] Failed to save workspace:', e); }
     }, 500);
     return () => { if (fluxSaveTimerRef.current) clearTimeout(fluxSaveTimerRef.current); };

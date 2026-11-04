@@ -695,6 +695,17 @@ const DexCode: React.FC = () => {
   // --- Project awareness: open a folder, browse + search its source files ---
   const [project, setProject] = useState<DexProject | null>(null);
   const [showProject, setShowProject] = useState(true);
+  // File / Stats sections fold like Project, Outline and Templates; remembered.
+  const [openSections, setOpenSections] = useState<{ file: boolean; stats: boolean }>(() => {
+    try { return { file: true, stats: true, ...JSON.parse(localStorage.getItem('dex-code-sections') || '{}') }; } catch { return { file: true, stats: true }; }
+  });
+  const toggleSection = useCallback((key: 'file' | 'stats') => {
+    setOpenSections(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem('dex-code-sections', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [workspaceHits, setWorkspaceHits] = useState<WorkspaceHit[]>([]);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
@@ -1105,7 +1116,19 @@ const DexCode: React.FC = () => {
 
         {/* File Actions */}
         <div style={S.sidebarBlock}>
-          <div style={S.sectionHeading}>File</div>
+          <div
+            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={() => toggleSection('file')}
+            role="button"
+            tabIndex={0}
+            aria-expanded={openSections.file}
+            aria-label="Toggle File section"
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('file'); } }}
+          >
+            <DexIcon name={openSections.file ? 'chevron-down' : 'chevron-right'} size={10} />
+            File
+          </div>
+          {openSections.file && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <button
               onClick={handleNewFile}
@@ -1148,6 +1171,7 @@ const DexCode: React.FC = () => {
               <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+Shift+S</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* Project — open a folder, browse + search its source files */}
@@ -1357,12 +1381,25 @@ const DexCode: React.FC = () => {
         </div>
 
         <div style={S.sidebarBlock}>
-          <div style={S.sectionHeading}>Stats</div>
+          <div
+            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={() => toggleSection('stats')}
+            role="button"
+            tabIndex={0}
+            aria-expanded={openSections.stats}
+            aria-label="Toggle Stats section"
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('stats'); } }}
+          >
+            <DexIcon name={openSections.stats ? 'chevron-down' : 'chevron-right'} size={10} />
+            Stats
+          </div>
+          {openSections.stats && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
             <div style={S.statCard}><span style={S.statLabel}>L</span><span style={S.statValue}>{stats.lines}</span></div>
             <div style={S.statCard}><span style={S.statLabel}>W</span><span style={S.statValue}>{stats.words}</span></div>
             <div style={S.statCard}><span style={S.statLabel}>C</span><span style={S.statValue}>{stats.chars}</span></div>
           </div>
+          )}
         </div>
       </aside>
       )}

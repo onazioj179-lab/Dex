@@ -99,7 +99,7 @@ export async function detectSystemTier(): Promise<SystemTierInfo> {
   if (detectionPromise) return detectionPromise;
   detectionPromise = (async () => {
     try {
-      const api = (globalThis as any).dexAPI?.diagnostics;
+      const api = (globalThis as any).dex?.diagnostics;
       const info: any = api?.getSystemInfo ? await api.getSystemInfo() : null;
       if (!info) {
         applyTier({ ...cached, reason: 'no-diagnostics-api' });

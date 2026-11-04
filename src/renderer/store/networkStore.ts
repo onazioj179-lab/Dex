@@ -39,9 +39,8 @@ interface NetworkStoreState {
 }
 
 const bridge = (): { invoke: (ch: string, ...args: unknown[]) => Promise<unknown> } | null => {
-  // electron.invoke is exposed via preload; tests run in jsdom without it.
-  const w = (typeof window !== 'undefined' ? (window as unknown as { electron?: { invoke?: (ch: string, ...args: unknown[]) => Promise<unknown> } }) : null);
-  return w?.electron?.invoke ? { invoke: w.electron.invoke.bind(w.electron) } : null;
+  const w = (typeof window !== 'undefined' ? (window as unknown as { dex?: { invoke?: (ch: string, ...args: unknown[]) => Promise<unknown> } }) : null);
+  return w?.dex?.invoke ? { invoke: w.dex.invoke.bind(w.dex) } : null;
 };
 
 export const useNetworkStore = create<NetworkStoreState>((set, get) => ({

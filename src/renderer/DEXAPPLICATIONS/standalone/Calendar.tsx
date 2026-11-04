@@ -57,6 +57,7 @@ const Calendar: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>('month');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Id of the event currently being edited (inline editor reuses the modal). null = new.
   const [editingId, setEditingId] = useState<string | null>(null);
   // Live search query matched against event titles.
@@ -97,8 +98,8 @@ const Calendar: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        if ((window as any).electron?.invoke) {
-          const stored = await (window as any).electron.invoke('capability:storage:get', 'dex-calendar-events');
+        if ((window as any).dex?.invoke) {
+          const stored = await (window as any).dex.invoke('capability:storage:get', 'dex-calendar-events');
           if (stored && Array.isArray(stored)) { setEvents(stored); return; }
         }
       } catch (e) { console.warn('[DEX]', e); }
@@ -126,8 +127,8 @@ const Calendar: React.FC = () => {
     } catch (e) { console.warn('[DEX]', e); }
     (async () => {
       try {
-        if ((window as any).electron?.invoke) {
-          await (window as any).electron.invoke('capability:storage:set', 'dex-calendar-events', events);
+        if ((window as any).dex?.invoke) {
+          await (window as any).dex.invoke('capability:storage:set', 'dex-calendar-events', events);
         }
       } catch (e) { console.warn('[DEX]', e); }
     })();
@@ -752,6 +753,12 @@ const Calendar: React.FC = () => {
       {/* Header */}
       <div className="dex-liquid-glass" style={styles.header}>
         <div style={styles.headerLeft}>
+          {/* Sidebar toggle lives in the toolbar (it used to float over the sidebar). */}
+          <button className="cal-icon-btn" style={styles.navBtn} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" aria-pressed={!sidebarCollapsed} title="Toggle sidebar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </button>
           <button className="cal-pill" style={styles.todayBtn} onClick={goToToday} aria-label="Go to today">Today</button>
           <div style={styles.navBtns}>
             <button className="cal-icon-btn" style={styles.navBtn} onClick={() => navigate(-1)} aria-label={view === 'week' ? 'Previous week' : 'Previous month'} title={view === 'week' ? 'Previous week' : 'Previous month'}>
@@ -822,9 +829,33 @@ const Calendar: React.FC = () => {
               Hours
             </button>
           )}
-          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 4 }} onClick={exportVisibleRange} aria-label="Export visible range to ICS" title="Export the events you're currently viewing">Export</button>
-          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={exportICS} aria-label="Export all events to ICS" title="Export every event">Export All</button>
-          <button className="cal-pill" style={{ ...styles.todayBtn, marginLeft: 2 }} onClick={importICS} aria-label="Import ICS">Import</button>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button className="cal-icon-btn" style={styles.navBtn} onClick={() => setMoreOpen(v => !v)} aria-label="More" aria-haspopup="menu" aria-expanded={moreOpen} title="Import / export">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+            </button>
+            {moreOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMoreOpen(false)} />
+                <div role="menu" className="dex-liquid-glass-strong" style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, minWidth: 200, padding: 4,
+                  borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--shadow-md, 0 8px 24px rgba(0,0,0,0.35))',
+                  display: 'flex', flexDirection: 'column',
+                }}>
+                  {[
+                    { label: 'Export visible range…', run: exportVisibleRange },
+                    { label: 'Export all events…', run: exportICS },
+                    { label: 'Import .ics…', run: importICS },
+                  ].map(it => (
+                    <button key={it.label} role="menuitem" className="cal-cat-row"
+                      onClick={() => { setMoreOpen(false); it.run(); }}
+                      style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 12.5, cursor: 'pointer' }}>
+                      {it.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
 
         </div>
       </div>
@@ -850,8 +881,8 @@ const Calendar: React.FC = () => {
                       style={{
                         ...styles.miniDay,
                         ...(day && isWeekend(day) && !isToday(day) && !isSelected(day) ? { color: 'var(--color-text-muted)' } : {}),
-                        ...(day && isToday(day) ? styles.miniDayToday : {}),
                         ...(day && isSelected(day) ? styles.miniDaySelected : {}),
+                        ...(day && isToday(day) ? styles.miniDayToday : {}),
                       }}
                       onClick={() => day && setSelectedDate(day)}
                     >
@@ -942,13 +973,6 @@ const Calendar: React.FC = () => {
             </>
           )}
         </div>
-
-        {/* Toggle Sidebar */}
-        <button className="cal-mini-action" style={styles.sidebarToggle} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle sidebar" title="Toggle sidebar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
-          </svg>
-        </button>
 
         {/* Calendar Grid */}
         <div key={view} className="cal-view-anim" style={styles.calendarArea}>
@@ -1425,11 +1449,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 'var(--space-3)',
+    minWidth: 0,
+    flexShrink: 1,
   },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
     gap: 'var(--space-2)',
+    flexShrink: 0,
   },
   todayBtn: {
     padding: '6px 14px',
@@ -1457,10 +1484,12 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
+    flexShrink: 0,
     transition: 'all 0.15s ease',
   },
   title: {
-    fontSize: '14px',
+    whiteSpace: 'nowrap',
+    fontSize: '15px',
     fontWeight: 600,
     margin: 0,
     letterSpacing: '-0.3px',
@@ -1535,10 +1564,11 @@ const styles: Record<string, React.CSSProperties> = {
   addBtn: {
     width: '32px',
     height: '32px',
-    background: 'var(--color-success)',
+    background: 'var(--color-accent-fill)',
     border: 'none',
     borderRadius: '10px',
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
+    flexShrink: 0,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1555,21 +1585,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 0,
     overflow: 'hidden',
     transition: 'all 0.18s ease',
-  },
-  sidebarToggle: {
-    position: 'absolute',
-    left: '0',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-default)',
-    borderLeft: 'none',
-    borderRadius: '0 4px 4px 0',
-    padding: 'var(--space-2) 4px',
-    color: 'var(--color-text-tertiary)',
-    cursor: 'pointer',
-    zIndex: 10,
-    boxShadow: 'var(--shadow-md)',
   },
   miniCal: {
     marginBottom: 'var(--space-4)',
@@ -1617,7 +1632,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   miniDayToday: {
     background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
+    fontWeight: 600,
   },
   miniDaySelected: {
     background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
@@ -1795,7 +1811,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '14px',
+    borderRadius: '6px',
     padding: '8px 10px',
     minHeight: '60px',
     cursor: 'pointer',

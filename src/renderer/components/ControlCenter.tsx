@@ -19,13 +19,15 @@
  * Zustand stores, services, or browser APIs) — nothing is faked.
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { CollapsibleSection } from './CollapsibleSection';
 import { isReduceMotion } from '../utils/MotionController';
 import { useNetworkStore, NETWORK_MODE_LABELS, type NetworkMode } from '../store/networkStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { InterfaceTransparencySlider } from './InterfaceTransparencySlider';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
+import { setSoundEnabled, isSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import {
   getStoredTier,
   setManualOverride,
@@ -111,7 +113,7 @@ applyBrightness(loadBrightness());
 // ---------------------------------------------------------------------------
 
 const COLLAPSE_KEY = 'dex-control-center-collapsed-v2';
-type SectionId = 'network' | 'display' | 'performance' | 'battery';
+type SectionId = 'sound' | 'network' | 'display' | 'performance' | 'battery';
 
 function loadCollapsed(): Set<SectionId> {
   try {
@@ -120,7 +122,7 @@ function loadCollapsed(): Set<SectionId> {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((id): id is SectionId =>
-      id === 'network' || id === 'display' || id === 'performance' || id === 'battery'));
+      id === 'sound' || id === 'network' || id === 'display' || id === 'performance' || id === 'battery'));
   } catch {
     return new Set();
   }
@@ -331,6 +333,16 @@ const QuickTile = ({
 
 const PANEL_WIDTH = 360;
 
+const ccFooterBtn: React.CSSProperties = {
+  flex: 1, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--color-border-subtle)',
+  background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
+};
+const ccBadge: React.CSSProperties = {
+  minWidth: 16, height: 16, padding: '0 5px', borderRadius: 10, background: 'var(--color-accent)',
+  color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+};
+
 const ControlCenter: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -356,6 +368,33 @@ const ControlCenter: React.FC = () => {
   const [tierManual, setTierManual] = useState<boolean>(() => isManualOverride());
 
   const battery = useBattery(open);
+
+  // Sound: DEX output volume (applied by the shell to every media element and
+  // Web Audio graph) and UI sounds. The shell owns the value; we mirror it.
+  const [volume, setVolume] = useState<number>(() => {
+    try { const v = Number(localStorage.getItem('dex-system-volume') ?? '80'); return Number.isFinite(v) ? v : 80; } catch { return 80; }
+  });
+  useEffect(() => {
+    const on = (e: Event) => { const f = Number((e as CustomEvent<number>).detail); if (Number.isFinite(f)) setVolume(Math.round(f * 100)); };
+    window.addEventListener('dex-system-volume', on);
+    return () => window.removeEventListener('dex-system-volume', on);
+  }, []);
+  const onVolume = useCallback((v: number) => {
+    setVolume(v);
+    window.dispatchEvent(new CustomEvent('dex-set-system-volume', { detail: v }));
+  }, []);
+  const uiSounds = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
+  const unread = useNotificationCenterStore((s) => s.unreadCount);
+  const launchApp = useRunningApps((s) => s.launchApp);
+  const openSettings = useCallback(() => {
+    const def = APP_DEFINITIONS.settings;
+    if (def) launchApp({ id: 'settings', name: def.name, icon: def.icon, color: def.color });
+    setOpen(false);
+  }, [launchApp]);
+  const openNotifications = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('dex-open-notification-center'));
+    setOpen(false);
+  }, []);
 
   // Listen for the global toggle event.
   useEffect(() => {
@@ -468,6 +507,45 @@ const ControlCenter: React.FC = () => {
       ),
     },
     {
+      id: 'sound' as SectionId,
+      name: 'Sound Volume Audio UI Sounds Spatial',
+      node: (
+        <CollapsibleSection
+          key="sound"
+          label="Sound"
+          collapsed={!isOpen('sound')}
+          onToggle={() => toggleSection('sound')}
+          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>}
+        >
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Volume</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={volume}
+              onChange={(e) => onVolume(parseInt(e.target.value, 10))}
+              aria-label="DEX volume"
+              style={{ flex: 1, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', minWidth: 36, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{volume}%</span>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+            Interface sounds
+            <input
+              type="checkbox"
+              role="switch"
+              checked={uiSounds}
+              onChange={(e) => setSoundEnabled(e.target.checked)}
+              aria-label="Interface sounds"
+              style={{ accentColor: 'var(--color-accent)', width: 16, height: 16, cursor: 'pointer' }}
+            />
+          </label>
+        </CollapsibleSection>
+      ),
+    },
+    {
       id: 'display' as SectionId,
       name: 'Display Brightness Screen Dimmer Liquid Glass Material Transparency Appearance',
       node: (
@@ -552,7 +630,7 @@ const ControlCenter: React.FC = () => {
         </CollapsibleSection>
       ),
     },
-  ]), [isOpen, toggleSection, networkMode, setNetworkMode, brightness, onBrightness, tier, tierManual, applyTier, battery]);
+  ]), [isOpen, toggleSection, networkMode, setNetworkMode, brightness, onBrightness, tier, tierManual, applyTier, battery, volume, onVolume, uiSounds]);
   const visibleSections = sections.filter((s) => matches(s.name));
 
   if (!open) return null;
@@ -581,7 +659,7 @@ const ControlCenter: React.FC = () => {
         aria-label="Control Center"
         style={{
           position: 'fixed',
-          top: 30,
+          top: 40,
           right: 8,
           bottom: 8,
           width: PANEL_WIDTH,
@@ -651,6 +729,15 @@ const ControlCenter: React.FC = () => {
               {visibleSections.map((s) => s.node)}
             </>
           )}
+        </div>
+
+        {/* Footer: the two places the panel hands off to. */}
+        <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: '1px solid var(--color-border-subtle)' }}>
+          <button type="button" onClick={openNotifications} style={ccFooterBtn}>
+            Notifications
+            {unread > 0 && <span aria-label={`${unread} unread`} style={ccBadge}>{unread > 99 ? '99+' : unread}</span>}
+          </button>
+          <button type="button" onClick={openSettings} style={ccFooterBtn}>Settings…</button>
         </div>
       </div>
     </>

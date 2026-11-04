@@ -27,14 +27,9 @@ describe('platform capabilities (the blend layer)', () => {
     expect(caps.nativeSubsystems).toEqual([]);
   });
 
-  it('electron: full backend, everything available', () => {
+  it('a bare window.dex without Tauri is not treated as a native shell', () => {
     g.dex = {};
-    const caps = getCapabilities();
-    expect(caps.shell).toBe('electron');
-    expect(caps.full).toBe(true);
-    expect(caps.has('vault')).toBe(true);
-    expect(caps.has('anything-at-all')).toBe(true);
-    expect(caps.nativeSubsystems).toEqual(['*']);
+    expect(getCapabilities().shell).toBe('web');
   });
 
   it('tauri: native where ported, graceful elsewhere', () => {
@@ -52,7 +47,7 @@ describe('platform capabilities (the blend layer)', () => {
 
   it('hasNative reflects the active shell', () => {
     expect(hasNative('vault')).toBe(false); // web by default
-    g.dex = {};
-    expect(hasNative('vault')).toBe(true); // electron
+    g.__TAURI__ = { core: { invoke: () => {} } };
+    expect(hasNative('vault')).toBe(true); // tauri
   });
 });

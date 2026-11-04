@@ -1287,7 +1287,7 @@ export class SpotlightEngine {
 
   private async _fetchFilesFromBackend(): Promise<void> {
     try {
-      const result = await (window as any).electron?.invoke?.('files:recent', { limit: 50 });
+      const result = await (window as any).dex?.invoke?.('files:recent', { limit: 50 });
       if (result?.success && Array.isArray(result.files)) {
         const newFiles: IndexedItem[] = [];
         for (const file of result.files) {
@@ -1893,7 +1893,7 @@ export class SpotlightEngine {
   private async _searchFilesAsync(query: string): Promise<void> {
     const seq = ++this._fileSearchSeq;
     try {
-      const result = await (window as any).electron?.invoke?.('files:search', { query, limit: 10 });
+      const result = await (window as any).dex?.invoke?.('files:search', { query, limit: 10 });
       if (seq !== this._fileSearchSeq) return; // stale
       if (result?.success && Array.isArray(result.files)) {
         let added = false;

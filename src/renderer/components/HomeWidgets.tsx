@@ -65,7 +65,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
   useEffect(() => {
     (async () => {
       try {
-        const info = await (window as any).electron?.invoke?.('system:getUserInfo');
+        const info = await (window as any).dex?.invoke?.('system:getUserInfo');
         if (info?.username) {
           const name = info.displayName || info.username;
           setUserName(name.split(/[\s_]/)[0].replace(/^\w/, (c: string) => c.toUpperCase()));
@@ -411,7 +411,7 @@ const SystemStatusWidget: React.FC = () => {
     // Try to get real system stats via IPC, fallback to estimation
     const fetchStats = async () => {
       try {
-        const ipc = (window as any).electron;
+        const ipc = (window as any).dex;
         if (ipc?.invoke) {
           const stats = await ipc.invoke('system:getStats');
           if (stats?.cpuUsage !== undefined) {
@@ -461,7 +461,7 @@ const SystemStatusWidget: React.FC = () => {
   useEffect(() => {
     const fetchDisk = async () => {
       try {
-        const ipc = (window as any).electron;
+        const ipc = (window as any).dex;
         if (ipc?.invoke) {
           const s = await ipc.invoke('system:getStorage');
           if (s?.total) setDisk(Math.round((s.used / s.total) * 100));
@@ -636,7 +636,7 @@ const WeatherWidget: React.FC = () => {
       // Prefer a native weather bridge if one is ever wired; otherwise fall back
       // to the Weather app's cached real data. Never fabricate.
       try {
-        const ipc = (window as any).electron;
+        const ipc = (window as any).dex;
         if (ipc?.invoke) {
           const data = await ipc.invoke('weather:get');
           if (data?.temp !== undefined) {
@@ -675,7 +675,7 @@ const BatteryWidget: React.FC = () => {
     const fetchBattery = async () => {
       try {
         // Try IPC first
-        const ipc = (window as any).electron;
+        const ipc = (window as any).dex;
         if (ipc?.invoke) {
           const data = await ipc.invoke('system:getBattery');
           if (data?.level !== undefined) {
@@ -732,7 +732,7 @@ const StorageWidget: React.FC = () => {
   useEffect(() => {
     const fetchStorage = async () => {
       try {
-        const ipc = (window as any).electron;
+        const ipc = (window as any).dex;
         if (ipc?.invoke) {
           const data = await ipc.invoke('system:getStorage');
           if (data?.total) {
@@ -1491,7 +1491,7 @@ interface DashTask {
 
 async function loadDashTasks(): Promise<DashTask[]> {
   try {
-    const stored = await (window as any).electron?.invoke?.('capability:storage:get', 'dex-tasks');
+    const stored = await (window as any).dex?.invoke?.('capability:storage:get', 'dex-tasks');
     if (Array.isArray(stored)) return stored as DashTask[];
   } catch { /* fall through to localStorage */ }
   try {

@@ -226,6 +226,9 @@ const DexMaps: React.FC = () => {
   const searchPhrase = useWorkingPhrase(searching, 'search');
   const [place, setPlace] = useState('San Francisco');
   const [failed, setFailed] = useState(false);
+  // First paint of the basemap can take a few seconds (style + tiles over the
+  // network); show that instead of a blank canvas.
+  const [mapReady, setMapReady] = useState(false);
   const [searchError, setSearchError] = useState<GeocodeOutcome['error']>(null);
   /** Base-map tiles failing to load (offline, provider down): shown, not just logged. */
   const [tilesFailing, setTilesFailing] = useState(false);
@@ -367,6 +370,7 @@ const DexMaps: React.FC = () => {
       return;
     }
     mapRef.current = map;
+    map.once('idle', () => setMapReady(true));
     map.on('error', (e) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
       if ((e as { tile?: unknown; sourceId?: string }).tile || (e as { sourceId?: string }).sourceId || /fetch|network|load/i.test(String(e?.error?.message ?? ''))) {
@@ -554,6 +558,14 @@ const DexMaps: React.FC = () => {
     <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
       <style>{MAPS_STYLE}</style>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {!mapReady && (
+        <div role="status" aria-live="polite" style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--color-bg-base)', color: 'var(--color-text-secondary)', fontSize: 13, pointerEvents: 'none',
+        }}>
+          Loading map…
+        </div>
+      )}
       {tilesFailing && (
         <div role="status" className="dex-liquid-glass-strong" style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
           <DexIcon name="alert-triangle" size={14} color="var(--color-text-tertiary)" />

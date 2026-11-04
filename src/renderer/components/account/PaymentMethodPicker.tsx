@@ -193,7 +193,7 @@ const cryptoLabel: React.CSSProperties = { fontSize: fontSize.xs, color: 'var(--
 const monoText: React.CSSProperties = {
   fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
   fontSize: fontSize.xs,
-  background: 'var(--color-bg, #0A0A0B)',
+  background: 'var(--color-bg-base)',
   padding: '4px var(--space-2)',
   borderRadius: radius.sm,
   wordBreak: 'break-all',

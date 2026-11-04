@@ -2894,7 +2894,7 @@ const Imosion: React.FC = () => {
     try {
       const json = JSON.stringify(customMasteringPresets);
       localStorage.setItem('imosion-custom-mastering-presets', json);
-      (window as any).electron?.invoke?.('capability:storage:set', 'imosion-custom-mastering-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'imosion-custom-mastering-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     } catch (e) { console.warn('[Imosion] Failed to save custom mastering presets:', e); }
   }, [customMasteringPresets]);
 
@@ -2902,7 +2902,7 @@ const Imosion: React.FC = () => {
     try {
       const json = JSON.stringify(customPluginPresets);
       localStorage.setItem('imosion-custom-plugin-presets', json);
-      (window as any).electron?.invoke?.('capability:storage:set', 'imosion-custom-plugin-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'imosion-custom-plugin-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     } catch (e) { console.warn('[Imosion] Failed to save custom plugin presets:', e); }
   }, [customPluginPresets]);
 
@@ -2910,9 +2910,9 @@ const Imosion: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const mp = await (window as any).electron?.invoke?.('capability:storage:get', 'imosion-custom-mastering-presets');
+        const mp = await (window as any).dex?.invoke?.('capability:storage:get', 'imosion-custom-mastering-presets');
         if (mp) setCustomMasteringPresets(typeof mp === 'string' ? JSON.parse(mp) : mp);
-        const pp = await (window as any).electron?.invoke?.('capability:storage:get', 'imosion-custom-plugin-presets');
+        const pp = await (window as any).dex?.invoke?.('capability:storage:get', 'imosion-custom-plugin-presets');
         if (pp) setCustomPluginPresets(typeof pp === 'string' ? JSON.parse(pp) : pp);
       } catch (e) { console.warn('[Imosion] IPC preset load unavailable:', e); }
     })();
@@ -4019,7 +4019,7 @@ const Imosion: React.FC = () => {
     loadLocal();
     (async () => {
       try {
-        const ipcData = await (window as any).electron?.invoke?.('capability:storage:get', 'imosion-data');
+        const ipcData = await (window as any).dex?.invoke?.('capability:storage:get', 'imosion-data');
         if (ipcData) {
           const d = typeof ipcData === 'string' ? JSON.parse(ipcData) : ipcData;
           if (d.bpm) setBpm(d.bpm);
@@ -4042,7 +4042,7 @@ const Imosion: React.FC = () => {
     const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
     const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
     localStorage.setItem('imosion-data', json);
-    (window as any).electron?.invoke?.('capability:storage:set', 'imosion-data', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', 'imosion-data', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     setIsDirty(false);
     if (showToast) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));

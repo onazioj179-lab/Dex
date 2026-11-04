@@ -586,7 +586,7 @@ const WorldClock: React.FC = () => {
                 border: isHome
                   ? '1px solid var(--color-accent)'
                   : working
-                    ? '1px solid var(--color-success, #30D158)'
+                    ? '1px solid var(--color-accent)'
                     : '1px solid var(--color-border, var(--color-bg-hover))',
                 opacity: dragId === zone.id ? 0.5 : 1,
                 cursor: 'grab',
@@ -766,8 +766,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   workBadge: {
     fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
-    color: 'var(--color-success, #30D158)',
-    border: '1px solid var(--color-success, #30D158)',
+    color: 'var(--color-accent)',
+    border: '1px solid var(--color-accent)',
     borderRadius: 10, padding: '1px 5px',
   },
   emptyState: {

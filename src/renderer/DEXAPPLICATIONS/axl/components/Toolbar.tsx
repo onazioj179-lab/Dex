@@ -252,11 +252,6 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {sendToMenu}
 
-      <Divider />
-
-      {/* AI copilot — bare icon */}
-      <IconButton onClick={ui.toggleAI} aria-label="AI Copilot" active={ui.showAI}
-        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z" /><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z" /></svg>} />
     </div>
   );
 };

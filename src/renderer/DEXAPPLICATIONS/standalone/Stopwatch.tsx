@@ -96,21 +96,18 @@ const Stopwatch: React.FC = () => {
         <div style={s.time}>{fmt(elapsed)}</div>
       </div>
 
+      {/* Clock-app layout: secondary action left (Lap / Reset), primary right
+          (Start / Stop). Both always present so nothing jumps when state changes. */}
       <div style={s.controls}>
-        {!running && elapsed === 0 && (
-          <button style={{ ...s.btn, ...s.btnStart }} onClick={start}>Start</button>
+        {running || elapsed === 0 ? (
+          <button style={{ ...s.btn, ...s.btnLap, opacity: running ? 1 : 0.45 }} onClick={lap} disabled={!running} aria-label="Lap">Lap</button>
+        ) : (
+          <button style={{ ...s.btn, ...s.btnReset }} onClick={reset} aria-label="Reset">Reset</button>
         )}
-        {running && (
-          <>
-            <button style={{ ...s.btn, ...s.btnLap }} onClick={lap}>Lap</button>
-            <button style={{ ...s.btn, ...s.btnStop }} onClick={stop}>Stop</button>
-          </>
-        )}
-        {!running && elapsed > 0 && (
-          <>
-            <button style={{ ...s.btn, ...s.btnReset }} onClick={reset}>Reset</button>
-            <button style={{ ...s.btn, ...s.btnStart }} onClick={start}>Resume</button>
-          </>
+        {running ? (
+          <button style={{ ...s.btn, ...s.btnStop }} onClick={stop} aria-label="Stop">Stop</button>
+        ) : (
+          <button style={{ ...s.btn, ...s.btnStart }} onClick={start} aria-label={elapsed > 0 ? 'Resume' : 'Start'}>{elapsed > 0 ? 'Resume' : 'Start'}</button>
         )}
       </div>
 
@@ -136,7 +133,7 @@ const Stopwatch: React.FC = () => {
               return (
                 <div key={i} className="sw-lap-row" style={{
                   ...s.lapRow,
-                  color: isBest ? 'var(--color-success)' : isWorst ? 'var(--color-error)' : 'var(--color-text-primary)',
+                  color: isBest ? 'var(--color-accent)' : isWorst ? 'var(--color-error)' : 'var(--color-text-primary)',
                 }}>
                   <span style={s.lapNum}>Lap {laps.length - i}</span>
                   <span style={s.lapSplit}>{fmt(split)}</span>
@@ -172,19 +169,20 @@ const s: Record<string, React.CSSProperties> = {
     height: '100%', display: 'flex', flexDirection: 'column',
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)', overflow: 'hidden',
+    width: '100%', maxWidth: 640, margin: '0 auto',
   },
   displayArea: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 'var(--space-10) var(--space-5) var(--space-6)', flexShrink: 0,
   },
   time: {
-    fontSize: 56, fontWeight: 200, letterSpacing: '-0.02em',
+    fontSize: 'clamp(56px, 11vw, 104px)', fontWeight: 200, letterSpacing: '-0.03em',
     fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
   },
   controls: {
-    display: 'flex', justifyContent: 'center', gap: 'var(--space-4)',
-    padding: '0 var(--space-5) var(--space-6)', flexShrink: 0,
+    display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)',
+    padding: '0 var(--space-6) var(--space-5)', flexShrink: 0,
   },
   btn: {
     width: 80, height: 80, borderRadius: '50%', border: 'none',
@@ -193,12 +191,12 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   btnStart: {
-    background: 'var(--color-success-muted, rgba(52,199,89,0.15))', color: 'var(--color-success)',
-    boxShadow: 'inset 0 0 0 2px rgba(52,199,89,0.3)',
+    background: 'color-mix(in srgb, var(--color-accent) 18%, transparent)', color: 'var(--color-accent)',
+    boxShadow: 'inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent)',
   },
   btnStop: {
-    background: 'var(--color-error-muted, rgba(255,69,58,0.15))', color: 'var(--color-error)',
-    boxShadow: 'inset 0 0 0 2px rgba(255,69,58,0.3)',
+    background: 'color-mix(in srgb, var(--color-error) 18%, transparent)', color: 'var(--color-error)',
+    boxShadow: 'inset 0 0 0 2px color-mix(in srgb, var(--color-error) 35%, transparent)',
   },
   btnLap: {
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',

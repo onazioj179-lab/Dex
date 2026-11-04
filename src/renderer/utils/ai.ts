@@ -529,7 +529,7 @@ export class EmbeddingEngine {
     // local hash embedding if the bridge is unavailable (renderer-only tests,
     // dev hot-reload before main is ready, etc.).
     let vector: number[];
-    const bridge = (globalThis as { dexAPI?: { embedding?: { compute?: (t: string) => Promise<{ vector: number[] } | null> } } }).dexAPI;
+    const bridge = (globalThis as { dex?: { embedding?: { compute?: (t: string) => Promise<{ vector: number[] } | null> } } }).dex;
     try {
       const dto = await bridge?.embedding?.compute?.(text);
       vector = dto?.vector ?? localHashEmbed(text);
@@ -547,7 +547,7 @@ export class EmbeddingEngine {
 
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
     // Try one round-trip via the batch IPC; fall back to per-text on failure.
-    const bridge = (globalThis as { dexAPI?: { embedding?: { computeBatch?: (t: string[]) => Promise<Array<{ vector: number[] }> | null> } } }).dexAPI;
+    const bridge = (globalThis as { dex?: { embedding?: { computeBatch?: (t: string[]) => Promise<Array<{ vector: number[] }> | null> } } }).dex;
     try {
       const dtos = await bridge?.embedding?.computeBatch?.(texts);
       if (dtos && dtos.length === texts.length) {

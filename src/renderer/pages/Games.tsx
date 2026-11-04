@@ -89,7 +89,7 @@ const actionButton = (disabled: boolean): React.CSSProperties => ({
 
 const ipc = (): IpcBridge => {
   const w = window as any;
-  const bridge = w.dexAPI ?? w.electronAPI ?? w.electron;
+  const bridge = w.dex;
   if (!bridge?.invoke) throw new Error('DEX IPC bridge is unavailable');
   return bridge;
 };

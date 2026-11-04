@@ -122,7 +122,7 @@ export const Power: React.FC = () => {
     setLog(prev => {
       const now = Date.now();
       if (prev[0] && prev[0].label === label && now - prev[0].at < 2000) return prev;
-      const next = [{ id: `${now}`, label, at: now }, ...prev].slice(0, LOG_MAX);
+      const next = [{ id: `${now}-${Math.random().toString(36).slice(2, 7)}`, label, at: now }, ...prev].slice(0, LOG_MAX);
       try { localStorage.setItem(LOG_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
       return next;
     });
@@ -339,8 +339,8 @@ export const Power: React.FC = () => {
             </div>
             <div style={S.list}>
               {log.length === 0 && <div style={{ ...S.listRow, ...S.muted }}>No events yet</div>}
-              {log.slice(0, 15).map(e => (
-                <div key={e.id + e.label} style={S.listRow}>
+              {log.slice(0, 15).map((e, i) => (
+                <div key={`${e.id}-${i}`} style={S.listRow}>
                   <span>{e.label}</span>
                   <span style={S.muted}>{new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>

@@ -16,13 +16,6 @@
 
 import { SpringConfig, SPRING_PRESETS, isReduceMotion } from './MotionController';
 
-declare global {
-  interface Window {
-    dexAPI?: {
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-    };
-  }
-}
 
 interface BatchSpring {
   id: number;       // Rust-side ID, or -1 if fallback
@@ -61,7 +54,7 @@ export class NativeSpringBatch {
     let nativeId = -1;
     if (await this.checkNative()) {
       try {
-        nativeId = (await window.dexAPI!.invoke(
+        nativeId = (await window.dex!.invoke(
           'native-core:physics-create',
           config.stiffness,
           config.damping,
@@ -110,7 +103,7 @@ export class NativeSpringBatch {
 
     if (spring.id >= 0) {
       try {
-        await window.dexAPI!.invoke('native-core:physics-set-target', spring.id, target);
+        await window.dex!.invoke('native-core:physics-set-target', spring.id, target);
       } catch {
         // Fall through to JS fallback
       }
@@ -144,7 +137,7 @@ export class NativeSpringBatch {
 
     if (spring.id >= 0) {
       try {
-        await window.dexAPI!.invoke('native-core:physics-release', spring.id);
+        await window.dex!.invoke('native-core:physics-release', spring.id);
       } catch {
         // Ignore release errors
       }
@@ -191,12 +184,12 @@ export class NativeSpringBatch {
 
   private async checkNative(): Promise<boolean> {
     if (this.nativeAvailable !== null) return this.nativeAvailable;
-    if (!window.dexAPI?.invoke) {
+    if (!window.dex?.invoke) {
       this.nativeAvailable = false;
       return false;
     }
     try {
-      const available = await window.dexAPI.invoke('native-core:available');
+      const available = await window.dex.invoke('native-core:available');
       this.nativeAvailable = !!available;
     } catch {
       this.nativeAvailable = false;

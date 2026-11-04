@@ -515,9 +515,9 @@ export const useSearchService = create<SearchServiceState>((set, get) => ({
     
     // Query the main process file search index via IPC
     try {
-      const electron = (window as any).electron;
-      if (electron?.invoke) {
-        const results = await electron.invoke('search:query', query, filters);
+      const bridge = (window as any).dex;
+      if (bridge?.invoke) {
+        const results = await bridge.invoke('search:query', query, filters);
         if (Array.isArray(results)) return results;
       }
     } catch {

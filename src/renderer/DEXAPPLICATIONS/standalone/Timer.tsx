@@ -93,14 +93,14 @@ const TimerCard: React.FC<{ timer: TimerEntry }> = ({ timer }) => {
           <circle cx="100" cy="100" r={radius} fill="none" stroke="var(--color-border)" strokeWidth="6" />
           <circle
             cx="100" cy="100" r={radius} fill="none"
-            stroke={isComplete ? 'var(--color-success, #30D158)' : 'var(--color-accent)'}
+            stroke={isComplete ? 'var(--color-accent)' : 'var(--color-accent)'}
             strokeWidth="6" strokeLinecap="round"
             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
             style={{ transition: 'stroke-dashoffset 0.18s cubic-bezier(0.4,0,0.2,1)' }}
           />
         </svg>
         <div style={s.timeDisplay}>
-          <span style={{ ...s.time, color: isComplete ? 'var(--color-success, #30D158)' : 'var(--color-text-primary)' }}>
+          <span style={{ ...s.time, color: isComplete ? 'var(--color-accent)' : 'var(--color-text-primary)' }}>
             {fmtTime(remaining)}
           </span>
           {isComplete && <span style={s.completeText}>Done</span>}
@@ -217,7 +217,9 @@ const s: Record<string, React.CSSProperties> = {
   container: {
     height: '100%', display: 'flex', flexDirection: 'column',
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
-    fontFamily: 'var(--font-family)', overflow: 'auto', padding: 'var(--space-5)', gap: 'var(--space-5)',
+    fontFamily: 'var(--font-family)', overflow: 'auto', gap: 'var(--space-5)',
+    // Centered column like the macOS Clock app instead of edge-to-edge rows.
+    padding: 'var(--space-6) max(var(--space-5), calc((100% - 640px) / 2))',
   },
   composer: {
     display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
@@ -282,7 +284,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center', justifyContent: 'center', textAlign: 'center',
   },
   time: { fontSize: 34, fontWeight: 300, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' },
-  completeText: { display: 'block', fontSize: 12, color: 'var(--color-success, #30D158)', fontWeight: 600, marginTop: 2 },
+  completeText: { display: 'block', fontSize: 12, color: 'var(--color-accent)', fontWeight: 600, marginTop: 2 },
   cardControls: { display: 'flex', gap: 'var(--space-2)', alignItems: 'center', width: '100%' },
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

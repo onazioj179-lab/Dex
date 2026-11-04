@@ -8,10 +8,10 @@
  * Electron->Tauri IPC compatibility shim (GOAL-6A migration).
  *
  * The renderer talks to the backend through `window.dex.<namespace>.<method>()`
- * and `window.electron.invoke(channel, ...args)` — both of which are thin
+ * and `window.dex.invoke(channel, ...args)` — both of which are thin
  * wrappers over Electron's `ipcRenderer.invoke('<namespace>:<method>', ...args)`
  * (see src/main/preload.ts). Under Tauri none of that exists, so this installs a
- * drop-in `window.dex` / `window.electron` that route EVERY call through a single
+ * drop-in `window.dex` that routes EVERY call through a single
  * native command, `dex_ipc(channel, args)`, implemented in src-tauri.
  *
  * A Proxy derives the channel from the access path
@@ -253,7 +253,7 @@ function namespaceProxy(prefix: string): unknown {
 let installed = false;
 
 /**
- * Install the `window.dex` + `window.electron` compatibility layer. No-op unless
+ * Install the `window.dex` bridge. No-op unless
  * running under Tauri (so the Electron build is completely unaffected). Call this
  * once, as early as possible, before the app reads `window.dex`.
  */
@@ -278,12 +278,6 @@ export function installTauriCompat(): void {
 
   const w = globalThis as Record<string, unknown>;
   w.dex = root;
-  // Several call sites use window.electron.invoke/on/off(channel, ...) directly.
-  w.electron = {
-    invoke: (channel: string, ...args: unknown[]) => dexIpc(channel, args),
-    on: dexOn,
-    off: dexOff,
-  };
   // Expose the migration telemetry for live inspection from devtools.
   w.__dexDegradeReport = dexDegradeReport;
   console.info('[dex] Tauri IPC compatibility layer installed (degraded backend; channels port incrementally). Run __dexDegradeReport() to see what to port next.');

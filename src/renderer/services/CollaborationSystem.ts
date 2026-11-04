@@ -286,7 +286,7 @@ export const useCollaborationStore = create<CollaborationState>()(
         get().sendMessage(projectId, `${currentUser.name} invited ${email} as ${role}`);
 
         // Queue email invitation via main process IPC
-        window.dexAPI?.invoke?.('collaboration:send-invite', {
+        window.dex?.invoke?.('collaboration:send-invite', {
           type: 'collaboration_invite',
           to: email,
           projectName: project.name,

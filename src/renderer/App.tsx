@@ -55,7 +55,6 @@ import { scheduledTaskRunner } from './services/scheduledTaskRunner';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
-import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
 import { SystemFeatures } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
@@ -138,20 +137,8 @@ const initializeTheme = () => {
 // Theme is initialized in the main useEffect to avoid double calls
 // initializeTheme() removed from module scope (was duplicate)
 
-// Item 78: Sync system accent color from OS (async, non-blocking)
-(async () => {
-  try {
-    const hasUserAccent = localStorage.getItem('dex-accent-color');
-    if (hasUserAccent) return; // User has manually set accent -- respect it
-    const api = (window as any).electronAPI;
-    const osColor = await api?.theme?.getSystemAccentColor?.();
-    if (osColor && /^#[0-9a-f]{6}$/i.test(osColor)) {
-      applyAccentFamily(osColor);
-    }
-  } catch {
-    // OS accent detection unavailable
-  }
-})();
+// The accent is DEX Blue unless the user picks one; the OS accent is not
+// adopted automatically.
 
 // Startup budget enforcement (item 152): track first paint + interactive milestones
 const STARTUP_MARK = performance.now();
@@ -245,9 +232,6 @@ export const App: React.FC = () => {
   
   // Picture-in-Picture video state
   const pipState = usePiPState();
-
-  // First-run onboarding
-  const { needsOnboarding, markOnboardingComplete } = useOnboardingCheck();
 
   // System Diagnostics overlay (Ctrl+Shift+D)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -538,15 +522,6 @@ export const App: React.FC = () => {
         Skip to content
       </a>
       
-      {/* First-run onboarding wizard */}
-      {needsOnboarding && (
-        <AppErrorBoundary instanceId="onboarding" appId="onboarding" appName="Onboarding" appColor="#0a84ff">
-        <Suspense fallback={null}>
-          <OnboardingWizard onComplete={markOnboardingComplete} onSkip={markOnboardingComplete} />
-        </Suspense>
-        </AppErrorBoundary>
-      )}
-
       {/* Lock Screen - blocks all interaction when locked */}
       <AppErrorBoundary instanceId="lockscreen" appId="lockscreen" appName="Lock Screen" appColor="#ff453a">
       <Suspense fallback={null}>
@@ -721,20 +696,7 @@ export const App: React.FC = () => {
           bleed because every non-home app surface is opaque. */}
       <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'transparent' }}>
         <AppErrorBoundary instanceId="appmanager" appId="appmanager" appName="App Shell" appColor="var(--color-accent, #0a84ff)">
-        <Suspense fallback={(
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(180deg, rgba(12,12,14,0.36), rgba(12,12,14,0.18))',
-            color: 'var(--color-text-secondary)',
-            fontSize: 14,
-            letterSpacing: '0.01em',
-          }}>
-            Restoring home...
-          </div>
-        )}>
+        <Suspense fallback={<div style={{ flex: 1 }} />}>
           <AppManager />
         </Suspense>
         </AppErrorBoundary>

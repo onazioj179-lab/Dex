@@ -84,7 +84,7 @@ interface SavedPassword {
   id: string;
   domain: string;    // e.g. "google.com"
   username: string;
-  password: string;  // stored obfuscated in localStorage
+  password: string;  // always '' -- the secret is in the native key store (browser-login:<id>)
   createdAt: number;
   lastUsed: number;
 }
@@ -99,26 +99,28 @@ interface SavedCard {
   lastUsed: number;
 }
 
-// Password obfuscation — uses IPC encryption when available, falls back to Web Crypto.
-// Passwords are encrypted before storage; never stored as plaintext.
-const _ob = (s: string): string => {
-  try {
-    const encrypted = (window as any).electron?.ipcRenderer?.sendSync?.('security:encrypt', s);
-    if (encrypted && typeof encrypted === 'string') return encrypted;
-  } catch { /* main process unavailable */ }
-  // No fallback — refuse to store credentials without proper encryption
-  console.warn('[Browser] IPC encryption unavailable — credential not stored');
-  return '';
+// Saved logins and card numbers live in the native key store (DPAPI on
+// Windows, `secrets:*`). Only the entry metadata (site, user, label) is kept in
+// localStorage. Nothing is stored when secure storage is unavailable.
+type SecretInvoke = (ch: string, ...a: unknown[]) => Promise<any>;
+const secretBridge = (): SecretInvoke | null => {
+  const dex = (window as any).dex;
+  return dex?.invoke ? (ch, ...a) => dex.invoke(ch, ...a) : null;
 };
-const _de = (s: string): string => {
-  if (!s) return '';
-  try {
-    const decrypted = (window as any).electron?.ipcRenderer?.sendSync?.('security:decrypt', s);
-    if (decrypted && typeof decrypted === 'string') return decrypted;
-  } catch { /* main process unavailable */ }
-  // Refuse to decode without proper encryption -- stale credentials must be re-saved
-  return '';
-};
+async function putSecret(name: string, value: string): Promise<boolean> {
+  const inv = secretBridge();
+  if (!inv) return false;
+  try { const r = await inv('secrets:set', name, value); return !!r?.success; } catch { return false; }
+}
+async function getSecret(name: string): Promise<string> {
+  const inv = secretBridge();
+  if (!inv) return '';
+  try { const v = await inv('secrets:get', name); return typeof v === 'string' ? v : ''; } catch { return ''; }
+}
+function dropSecret(name: string): void {
+  const inv = secretBridge();
+  if (inv) void inv('secrets:delete', name).catch(() => {});
+}
 
 // ===========================================================================
 // BLOCKED DOMAINS - see src/renderer/config/blocked-domains.ts
@@ -703,7 +705,7 @@ export const Browser: React.FC = () => {
     localStorage.removeItem('dex-browser-settings');
 
     let mounted = true;
-    const ipc = (window as any).electron?.invoke;
+    const ipc = (window as any).dex?.invoke;
     if (!ipc) return;
     ipc('capability:storage:get', 'dex-browser-bookmarks').then((r: string | null) => {
       if (!mounted) return;
@@ -736,8 +738,8 @@ export const Browser: React.FC = () => {
       const bf = JSON.stringify(bookmarkFolders);
       localStorage.setItem('dex-browser-bookmarks', bk);
       localStorage.setItem('dex-browser-bookmark-folders', bf);
-      (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-bookmarks', bk).catch((e: unknown) => { console.warn('[DEX]', e); });
-      (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-bookmark-folders', bf).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'dex-browser-bookmarks', bk).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'dex-browser-bookmark-folders', bf).catch((e: unknown) => { console.warn('[DEX]', e); });
     }, 500);
   }, [bookmarks, bookmarkFolders]);
 
@@ -841,7 +843,7 @@ export const Browser: React.FC = () => {
     historySaveRef.current = setTimeout(() => {
       const json = JSON.stringify(history.slice(0, HISTORY_LIMIT));
       localStorage.setItem('dex-browser-history', json);
-      (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-history', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', 'dex-browser-history', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     }, 1000);
   }, [history]);
 
@@ -882,8 +884,8 @@ export const Browser: React.FC = () => {
       const pw = JSON.stringify(savedPasswords);
       const cd = JSON.stringify(savedCards);
       // Credentials stored ONLY via IPC to main process secure storage — never in localStorage
-      (window as any).electron?.invoke?.('capability:storage:set', KEYCHAIN_STORAGE_KEY, pw).catch((e: unknown) => { console.warn('[DEX]', e); });
-      (window as any).electron?.invoke?.('capability:storage:set', CARDS_STORAGE_KEY, cd).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', KEYCHAIN_STORAGE_KEY, pw).catch((e: unknown) => { console.warn('[DEX]', e); });
+      (window as any).dex?.invoke?.('capability:storage:set', CARDS_STORAGE_KEY, cd).catch((e: unknown) => { console.warn('[DEX]', e); });
     }, 500);
   }, [savedPasswords, savedCards]);
 
@@ -914,40 +916,42 @@ export const Browser: React.FC = () => {
   }, []);
 
   // ---- Keychain CRUD ----
-  const savePassword = useCallback((domain: string, username: string, password: string) => {
+  const savePassword = useCallback(async (domain: string, username: string, password: string) => {
+    const prior = savedPasswords.find(p => p.domain === domain && p.username === username);
+    const id = prior?.id ?? crypto.randomUUID();
+    if (!(await putSecret(`browser-login:${id}`, password))) {
+      toast.error('Password not saved: secure storage is unavailable');
+      return;
+    }
     setSavedPasswords(prev => {
-      const existing = prev.findIndex(p => p.domain === domain && p.username === username);
+      const existing = prev.findIndex(p => p.id === id);
       const entry: SavedPassword = {
-        id: existing >= 0 ? prev[existing].id : crypto.randomUUID(),
-        domain,
-        username,
-        password: _ob(password),
+        id, domain, username, password: '',
         createdAt: existing >= 0 ? prev[existing].createdAt : Date.now(),
         lastUsed: Date.now(),
       };
       if (existing >= 0) { const next = [...prev]; next[existing] = entry; return next; }
       return [entry, ...prev];
     });
-  }, []);
+  }, [savedPasswords, toast]);
 
   const deletePassword = useCallback((id: string) => {
+    dropSecret(`browser-login:${id}`);
     setSavedPasswords(prev => prev.filter(p => p.id !== id));
   }, []);
 
-  const saveCard = useCallback((label: string, name: string, number: string, expiry: string) => {
-    const entry: SavedCard = {
-      id: Date.now().toString(),
-      label,
-      name,
-      number: _ob(number),
-      expiry,
-      createdAt: Date.now(),
-      lastUsed: Date.now(),
-    };
+  const saveCard = useCallback(async (label: string, name: string, number: string, expiry: string) => {
+    const id = Date.now().toString();
+    if (!(await putSecret(`browser-card:${id}`, number))) {
+      toast.error('Card not saved: secure storage is unavailable');
+      return;
+    }
+    const entry: SavedCard = { id, label, name, number: '', expiry, createdAt: Date.now(), lastUsed: Date.now() };
     setSavedCards(prev => [entry, ...prev]);
-  }, []);
+  }, [toast]);
 
   const deleteCard = useCallback((id: string) => {
+    dropSecret(`browser-card:${id}`);
     setSavedCards(prev => prev.filter(c => c.id !== id));
   }, []);
 
@@ -1028,8 +1032,11 @@ export const Browser: React.FC = () => {
       // Find saved password for this domain
       const match = savedPasswords.find(p => p.domain === domain);
       if (match) {
-        // Use JSON.stringify for safe data escaping — prevents XSS via credential values
-        const safeData = JSON.stringify({ user: match.username, pass: _de(match.password) });
+        // Read the password from the key store, then inject. JSON.stringify
+        // escapes the values, so credential text can't break out of the script.
+        void getSecret(`browser-login:${match.id}`).then(pass => {
+        if (!pass) return;
+        const safeData = JSON.stringify({ user: match.username, pass });
         webview.executeJavaScript(
           "(function(){" +
           "var d=" + safeData + ";" +
@@ -1041,6 +1048,7 @@ export const Browser: React.FC = () => {
         ).catch((e: unknown) => { console.warn('[DEX]', e); });
         // Update lastUsed
         setSavedPasswords(prev => prev.map(p => p.id === match.id ? { ...p, lastUsed: Date.now() } : p));
+        });
       }
 
       // Listen for form submit to detect credentials for save prompt
@@ -1173,7 +1181,7 @@ export const Browser: React.FC = () => {
         const fileName = url.split('/').pop()?.split('?')[0] || 'download';
         setDownloads(prev => [...prev, { id: Date.now().toString(), url, fileName, progress: 0, status: 'downloading' }]);
         setShowDownloads(true);
-        window.electron?.invoke?.('download:start', url).then((result: any) => {
+        window.dex?.invoke?.('download:start', url).then((result: any) => {
           if (result?.success) {
             setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'completed', progress: 100, path: result.path } : d));
           }
@@ -1277,16 +1285,17 @@ export const Browser: React.FC = () => {
 
   // Listen for download progress
   useEffect(() => {
-    const handleProgress = (_: any, data: any) => {
+    const handleProgress = (data: any) => {
+      if (!data?.url) return;
       setDownloads(prev => prev.map(d => 
         d.url === data.url 
           ? { ...d, progress: data.percent, fileName: data.fileName }
           : d
       ));
     };
-    window.electron?.ipcRenderer?.on?.('download:progress', handleProgress);
+    window.dex?.on?.('download:progress', handleProgress);
     return () => {
-      window.electron?.ipcRenderer?.off?.('download:progress', handleProgress);
+      window.dex?.off?.('download:progress', handleProgress);
     };
   }, []);
 
@@ -1339,7 +1348,7 @@ export const Browser: React.FC = () => {
     setShowDownloads(true);
     
     try {
-      const result = await window.electron?.invoke?.('download:start', url);
+      const result = await window.dex?.invoke?.('download:start', url);
       if (result?.success) {
         setDownloads(prev => prev.map(d => 
           d.id === id 
@@ -1640,7 +1649,7 @@ export const Browser: React.FC = () => {
 
   // Listen for new-tab requests from main process (target="_blank" links, popups)
   useEffect(() => {
-    const handler = (_event: any, url: string) => {
+    const handler = (url: string) => {
       if (url && typeof url === 'string') {
         // Create a new tab and navigate to the URL
         const newTab: Tab = {
@@ -1657,8 +1666,8 @@ export const Browser: React.FC = () => {
         setUrlInput(url);
       }
     };
-    window.electronAPI?.on?.('browser:new-tab', handler);
-    return () => { window.electronAPI?.off?.('browser:new-tab', handler); };
+    window.dex?.on?.('browser:new-tab', handler);
+    return () => { window.dex?.off?.('browser:new-tab', handler); };
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

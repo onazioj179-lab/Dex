@@ -31,16 +31,16 @@ import { sendToNotes } from '../services/sendTo';
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
 // ---------------------------------------------------------------------------
-interface ElectronBridge {
+interface NativeBridge {
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
   on?: (channel: string, listener: (...args: unknown[]) => void) => () => void;
   removeListener?: (channel: string, listener: (...args: unknown[]) => void) => void;
 }
 
-const bridge = (): ElectronBridge | null => {
+const bridge = (): NativeBridge | null => {
   if (typeof window === 'undefined') return null;
-  const w = window as unknown as { electron?: ElectronBridge };
-  return w.electron && typeof w.electron.invoke === 'function' ? w.electron : null;
+  const w = window as unknown as { dex?: NativeBridge };
+  return w.dex && typeof w.dex.invoke === 'function' ? w.dex : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   useEffect(() => {
     const b = bridge();
     if (!b) {
-      setError('Terminal IPC unavailable (running outside Electron).');
+      setError('The terminal needs the DEX desktop app.');
       return;
     }
     let mounted = true;

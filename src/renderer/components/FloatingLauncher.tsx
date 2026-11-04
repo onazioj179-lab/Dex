@@ -216,6 +216,43 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
 
   useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
 
+  // Docked = against the bottom edge (like the macOS Dock). A bar left floating
+  // higher up stays put. Nothing reserves space: the bar floats over apps.
+  const vhNow = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const docked = enabled && vhNow - (pos.y + sizeRef.current.h) <= 64;
+
+  // Over a full-surface app the docked bar auto-hides so the app fills the
+  // viewport; the pointer at the bottom edge (or keyboard focus) reveals it.
+  const [fullscreenFront, setFullscreenFront] = useState(
+    () => (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront === true,
+  );
+  useEffect(() => {
+    const on = (e: Event) => setFullscreenFront((e as CustomEvent<boolean>).detail === true);
+    window.addEventListener('dex-fullscreen-front', on);
+    return () => window.removeEventListener('dex-fullscreen-front', on);
+  }, []);
+  const autoHide = docked && fullscreenFront;
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (!autoHide) { setRevealed(false); return; }
+    let hideTimer: number | null = null;
+    const clearHide = () => { if (hideTimer != null) { window.clearTimeout(hideTimer); hideTimer = null; } };
+    const onPointer = (e: PointerEvent) => {
+      const vh = window.innerHeight;
+      if (e.clientY >= vh - 6) { clearHide(); setRevealed(true); return; }
+      const el = containerRef.current;
+      const r = el?.getBoundingClientRect();
+      const near = !!r && e.clientY >= r.top - 32;
+      const focused = !!el && el.contains(document.activeElement);
+      if (near || focused || dragRef.current) { clearHide(); return; }
+      if (hideTimer == null) hideTimer = window.setTimeout(() => { hideTimer = null; setRevealed(false); }, 280);
+    };
+    window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('pointerdown', onPointer, { passive: true });
+    return () => { clearHide(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onPointer); };
+  }, [autoHide]);
+  const hidden = autoHide && !revealed && !dragging;
+
   useEffect(() => {
     window.addEventListener('resize', clampNow);
     return () => window.removeEventListener('resize', clampNow);
@@ -298,6 +335,8 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
       role="region"
       aria-label="DEX menu"
       data-dex-nook
+      data-autohidden={hidden ? '' : undefined}
+      onFocusCapture={() => { if (autoHide) setRevealed(true); }}
       className="dex-liquid-glass"
       style={{
         // IMPORTANT: position via left/top, NOT transform. DEX has global rules
@@ -307,7 +346,11 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         // position wiped the instant you touch it -> it snaps to the corner and
         // "glitches back and forth". left/top is immune. This is the root cause
         // of the long-standing drag glitch across every prior launcher design.
-        position: 'fixed', left: pos.x, top: pos.y, zIndex: 'var(--z-dock)' as unknown as number,
+        // Auto-hidden: parked just below the bottom edge (top, not transform --
+        // see above), faded, and click-through until revealed.
+        position: 'fixed', left: pos.x, top: hidden ? vhNow + 4 : pos.y, zIndex: 'var(--z-dock)' as unknown as number,
+        opacity: hidden ? 0 : 1,
+        pointerEvents: hidden ? 'none' : undefined,
         boxSizing: 'border-box',
         // Liquid glass via the .dex-liquid-glass class (real backdrop blur +
         // saturation + specular rim; auto-solid in lite mode / reduced-transparency).
@@ -329,11 +372,14 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         userSelect: 'none',
         // Premium one-time entrance: opacity-only (no transform) so it never
         // fights the left/top drag positioning. Plays once on mount.
-        animation: 'dexBarIn 0.34s ease both',
+        // backwards, not both: a held final keyframe would pin opacity at 1 and
+        // defeat the auto-hide fade.
+        animation: 'dexBarIn 0.34s ease backwards',
         // No position transition: the bar tracks the pointer 1:1 while dragging
         // and settles exactly where released -- no ease that could read as a
         // snap-back. Only the chrome (shadow/radius) eases.
-        transition: dragging ? 'none' : 'box-shadow 0.16s ease, border-radius 0.16s ease',
+        transition: dragging ? 'none' : 'box-shadow 0.16s ease, border-radius 0.16s ease'
+          + (autoHide ? ', top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease' : ''),
       }}
     >
       {/* The bar -- always visible. The whole row is the drag handle; the

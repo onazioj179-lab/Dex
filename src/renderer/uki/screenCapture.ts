@@ -22,7 +22,7 @@ interface CaptureSource {
 
 function bridge(): { invoke?: (c: string) => Promise<unknown> } | undefined {
   if (typeof window === 'undefined') return undefined;
-  return (window as unknown as { electron?: { invoke?: (c: string) => Promise<unknown> } }).electron;
+  return (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex;
 }
 
 type DisplayMediaFn = (opts: { video: boolean | Record<string, unknown>; audio: boolean }) => Promise<MediaStream>;

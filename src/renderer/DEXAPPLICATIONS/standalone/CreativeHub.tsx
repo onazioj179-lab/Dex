@@ -108,7 +108,7 @@ export const CreativeHub: React.FC = () => {
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)' }}>
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '24px 24px 40px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <header style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 2, background: 'var(--color-bg-base)', padding: '12px 0', margin: '-12px 0 0' }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>Creative Hub</h1>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>Your recent work, your creative apps, and a quick start.</p>

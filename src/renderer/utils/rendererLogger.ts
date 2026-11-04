@@ -15,7 +15,7 @@ const isDev = import.meta.env?.DEV === true
   || (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.hostname === 'localhost'));
 
 function getElectronBridge(): any {
-  return (window as any).electron || (window as any).dexAPI;
+  return (window as any).dex;
 }
 
 function sendToMain(level: string, message: string, data?: unknown): void {

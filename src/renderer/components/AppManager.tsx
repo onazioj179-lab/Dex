@@ -12,7 +12,8 @@
  * ===========================================================================
  */
 
-import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
 import { useInstalledAppsStore } from '../store/installedAppsStore';
@@ -31,7 +32,6 @@ import { SpotlightSearch } from '../shell/SpotlightSearch';
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
 // The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
-import { setSoundEnabled, isSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
@@ -74,7 +74,7 @@ import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { getFloatingBounds, saveFloatingBounds, isMaximizedRect } from '../shell/floatingBounds';
 import { useSpatialStore, spatialDeltaScale, isSpatialEnabled, isWindowLocked, type SpatialWindow, type SpatialAction } from '../store/spatialStore';
-import { placeNewWindow, snapToGrid, isOnScreen, magneticSnap, gestureCamera, nearestFreeSpot, screenToWorld, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
+import { placeNewWindow, snapToGrid, isOnScreen, arrange, boundsOf, fitRect, magneticSnap, gestureCamera, nearestFreeSpot, screenToWorld, type Rect as SpatialRect } from '../shell/spatial/spatialMath';
 import { ContactTracker } from '../shell/input/touchContacts';
 import { haptic } from '../shell/input/haptics';
 import { SpatialHud, SpatialGroupFrames, SpatialZones, SpatialGuides } from '../shell/spatial/SpatialHud';
@@ -266,8 +266,10 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   games: { w: 900, h: 640 },
   calendar: { w: 680, h: 480 },
   kanban: { w: 720, h: 500 },
-  calculator: { w: 340, h: 480 },
-  passwordgenerator: { w: 440, h: 480 },
+  // Compact utilities: sized to their measured content (preview, 2026-11-04)
+  // so nothing opens clipped; fitWindowToWorkspace shrinks them on small screens.
+  calculator: { w: 360, h: 610 },
+  passwordgenerator: { w: 440, h: 720 },
   achievements: { w: 600, h: 460 },
   recyclebin: { w: 600, h: 460 },
   powerrename: { w: 940, h: 620 },
@@ -275,13 +277,13 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   power: { w: 500, h: 440 },
   axl: { w: 1000, h: 650, maximized: true },
   stopwatch: { w: 340, h: 480 },
-  unitconverter: { w: 400, h: 520 },
+  unitconverter: { w: 440, h: 780 },
   pomodoro: { w: 360, h: 520 },
-  qrcode: { w: 400, h: 560 },
-  colorpicker: { w: 360, h: 520 },
+  qrcode: { w: 400, h: 664 },
+  colorpicker: { w: 360, h: 610 },
   weather: { w: 400, h: 600 },
-  worldclock: { w: 500, h: 520 },
-  noisegenerator: { w: 420, h: 580 },
+  worldclock: { w: 500, h: 744 },
+  noisegenerator: { w: 420, h: 710 },
   dexcode: { w: 900, h: 620 },
   nexus: { w: 900, h: 650 },
   learn: { w: 600, h: 520 },
@@ -365,6 +367,14 @@ const getUsableFloatingBounds = (
 
 // Creative/pro apps that open maximized by default
 const CREATIVE_APPS: ReadonlySet<string> = new Set(['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl']);
+
+// Small utilities open as a compact floating window at their own size (like
+// Calculator on macOS), never as a full-screen tab with empty space around a
+// 340px keypad. A size the user resized to is remembered (floatingBounds).
+const COMPACT_APPS: ReadonlySet<string> = new Set([
+  'calculator', 'passwordgenerator', 'stopwatch', 'timer', 'unitconverter', 'pomodoro',
+  'qrcode', 'colorpicker', 'weather', 'worldclock', 'noisegenerator',
+]);
 
 // Platform detection for title bar overlay handling
 const IS_WINDOWS = navigator.platform.includes('Win');
@@ -783,72 +793,18 @@ export const AppManager: React.FC = () => {
   const [windowControls, setWindowControls] = useState<'system' | 'traffic'>(getWindowControlStyle);
   const nativeOverlayWidth = 0; // Custom buttons rendered; no native overlay padding needed
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
-  // Shared with Settings -> Sound; persisted by SpatialAudio itself.
-  const spatialAudioOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
 
   // Dock-reserved inset CSS variables are published in an effect lower down,
   // after `anyWindowMaximized` is declared (it is one of the dependencies).
 
-  // -- Suspend/Resume & Crash Recovery toasts --
+  // -- Crash recovery --
+  // Native suspend/resume/lock pushes came from Electron's main process; the
+  // Tauri shell doesn't emit them, so only the crash-recovery check remains
+  // (it used to sit behind an Electron-only ipcRenderer guard and never ran).
   useEffect(() => {
-    const ipcRenderer = (window as any).electron?.ipcRenderer;
-    if (!ipcRenderer) return;
-
-    const onResume = () => {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'System resumed — restoring session' } }));
-      // Force repaint to fix blank/black screen after sleep
-      requestAnimationFrame(() => {
-        document.body.style.opacity = '0.999';
-        requestAnimationFrame(() => { document.body.style.opacity = '1'; });
-      });
-    };
-    const onLock = () => {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Session locked' } }));
-    };
-    // System suspend/OS-lock events: do not force a Dex lock overlay. Only lock when
-    // the user has explicitly enabled `lockOnSleep`. Always flush autosave + park work.
-    const onSystemSuspend = () => {
-      // Auto-snapshot workspace before suspend for crash/resume recovery.
-      try {
-        const snap = _wsStore.capture('auto-suspend', [], null);
-        _wsStore.saveAuto(snap);
-        _persistWsStore();
-      } catch { /* never block suspend */ }
-      window.dispatchEvent(new CustomEvent('dex-system-suspend'));
-      try {
-        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
-        if (cfg?.lockOnSleep) {
-          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
-        }
-      } catch { /* ignore */ }
-    };
-    const onSystemLock = () => {
-      // Auto-snapshot workspace before locking for post-unlock continuity.
-      try {
-        const snap = _wsStore.capture('auto-lock', [], null);
-        _wsStore.saveAuto(snap);
-        _persistWsStore();
-      } catch { /* never block lock */ }
-      window.dispatchEvent(new CustomEvent('dex-system-lock'));
-      try {
-        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
-        if (cfg?.lockOnSleep) {
-          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
-        }
-      } catch { /* ignore */ }
-    };
-    ipcRenderer.on?.('dex:resume', onResume);
-    ipcRenderer.on?.('dex:lock-screen', onLock);
-    ipcRenderer.on?.('dex:system-suspend', onSystemSuspend);
-    ipcRenderer.on?.('dex:system-lock', onSystemLock);
-
-    // Repaint on idle/sleep return is handled by ScreenGuardSystem (single source
-    // of truth). AppManager no longer flickers body opacity on visibility change
-    // — that caused the wallpaper to flash when returning from idle.
-
     // Check for crash recovery state — gate toast through calm engine so it
     // never interrupts deep-flow focus unnecessarily (warnings always pass through).
-    (window as any).electron?.invoke?.('recovery:savedState').then((state: any) => {
+    (window as any).dex?.invoke?.('recovery:savedState')?.then((state: any) => {
       if (state?.timestamp) {
         const ago = Math.round((Date.now() - state.timestamp) / 60000);
         const decision = _calmEngine.decide('notification');
@@ -864,12 +820,6 @@ export const AppManager: React.FC = () => {
       }
     }).catch((e: unknown) => { console.warn('[DEX] recovery:', e); });
 
-    return () => {
-      ipcRenderer.removeListener?.('dex:resume', onResume);
-      ipcRenderer.removeListener?.('dex:lock-screen', onLock);
-      ipcRenderer.removeListener?.('dex:system-suspend', onSystemSuspend);
-      ipcRenderer.removeListener?.('dex:system-lock', onSystemLock);
-    };
   }, []);
   // Launchpad context menu (right-click on apps in grid)
   const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
@@ -888,7 +838,6 @@ export const AppManager: React.FC = () => {
   // no longer the center's source of truth; this store survives reloads and is
   // grouped + priority-ordered via the shared policy.
   const hubNotifications = useNotificationCenterStore(s => s.notifications);
-  const hubUnreadCount = useNotificationCenterStore(s => s.unreadCount);
   const hubLoadNotifications = useNotificationCenterStore(s => s.loadNotifications);
   const hubLoadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
   const hubMarkRead = useNotificationCenterStore(s => s.markRead);
@@ -1269,7 +1218,6 @@ export const AppManager: React.FC = () => {
     }
   }, [runningApps, currentAppId, setCurrentRunningApp]);
 
-  const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
 
   // -- CalmFocusEngine: record input activity so the engine can decide whether
   //    to suppress non-essential interruptions (hover glows, tips, badges)
@@ -1287,25 +1235,6 @@ export const AppManager: React.FC = () => {
     };
   }, []);
 
-  // Close the control-center dropdown on any outside click without painting a
-  // full-screen invisible overlay (which polluted the page with a fixed div).
-  useEffect(() => {
-    if (!titlebarMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest('[aria-label="Control center"]')) return;
-      if (target.closest('[aria-label="Open control center"]')) return;
-      setTitlebarMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setTitlebarMenuOpen(false); };
-    document.addEventListener('mousedown', onDown, true);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown, true);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [titlebarMenuOpen]);
 
   // Detect if any floating window is maximized (covers >85% of screen)
   const anyWindowMaximized = useMemo(() => {
@@ -1466,6 +1395,15 @@ export const AppManager: React.FC = () => {
   const currentApp: AppId = (currentAppId !== 'home' && !mountedAppsRef.current.has(currentAppId as AppId) && runningApps.length === 0)
     ? 'home'
     : currentAppId as AppId;
+
+  // A full-surface app (a tab, not a floating window) is in front. The DEX Bar
+  // auto-hides over it so the app fills the whole viewport (reveal it at the
+  // bottom edge), instead of every app reserving a strip under the bar.
+  const fullscreenFront = currentApp !== 'home' && !detachedApps.has(currentApp) && !spatialEnabled;
+  useEffect(() => {
+    (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront = fullscreenFront;
+    window.dispatchEvent(new CustomEvent('dex-fullscreen-front', { detail: fullscreenFront }));
+  }, [fullscreenFront]);
 
   // Also reset the store so subsequent renders stay consistent
   const didResetRef = useRef(false);
@@ -1652,25 +1590,6 @@ export const AppManager: React.FC = () => {
     const handler = () => setWindowControls(getWindowControlStyle());
     window.addEventListener('dex-window-controls-changed', handler);
     return () => window.removeEventListener('dex-window-controls-changed', handler);
-  }, []);
-
-  // Sync titlebar overlay with window controls preference on Windows
-  useEffect(() => {
-    if (!IS_WINDOWS) return;
-    const electron = (window as any).electron;
-    if (electron?.window?.setTitleBarOverlay) {
-      // Custom buttons rendered in-app; hide native overlay
-      electron.window.setTitleBarOverlay(false);
-    }
-  }, [windowControls]);
-
-  // On mount, ensure native overlay is disabled (custom buttons used instead)
-  useEffect(() => {
-    if (!IS_WINDOWS) return;
-    const electron = (window as any).electron;
-    if (electron?.window?.setTitleBarOverlay) {
-      electron.window.setTitleBarOverlay(false);
-    }
   }, []);
 
   // Auto-close open menus/overlays after 30s idle to save resources
@@ -1939,11 +1858,54 @@ export const AppManager: React.FC = () => {
     requestAnimationFrame(() => detachApp(appId));
   }, [bringToFront, detachApp, detachedApps, launchApp, minimizedApps, restoreFloatingApp]);
 
+  // Compact apps the user docked into a tab on purpose stay tabs this session.
+  const userTabbedRef = useRef<Set<string>>(new Set());
   const reattachApp = useCallback((appId: AppId) => {
+    userTabbedRef.current.add(appId);
     restoredWindowBoundsRef.current.delete(appId);
     setDetachedApps(prev => { const n = new Map(prev); n.delete(appId); return n; });
     setCurrentApp(appId);
   }, [setCurrentApp]);
+
+  // A compact app brought to the front as a tab (DEX Bar, Home, Spotlight all
+  // launch through the store) floats instead, centred at its own size; the app
+  // that was in front stays in front behind it.
+  const lastTabFrontRef = useRef<AppId>('home');
+  useEffect(() => {
+    const id = currentApp;
+    if (!COMPACT_APPS.has(id)) {
+      if (!detachedApps.has(id)) lastTabFrontRef.current = id;
+      return;
+    }
+    if (detachedApps.has(id) || spatialEnabled || splitMode !== 'off' || userTabbedRef.current.has(id)) return;
+    const def = APP_WINDOW_SIZES[id];
+    if (!def) return;
+    if (!mountedAppsRef.current.has(id)) { mountedAppsRef.current.add(id); forceUpdate(n => n + 1); }
+    setDetachedApps(prev => {
+      if (prev.has(id)) return prev;
+      const ws = getShellWorkspace(0);
+      const remembered = getFloatingBounds(id);
+      let rect: { x: number; y: number; w: number; h: number };
+      if (remembered && !isMaximizedRect(remembered, ws)) {
+        rect = clampWindowToWorkspace({ x: remembered.x, y: remembered.y, w: remembered.w, h: remembered.h }, ws);
+      } else {
+        const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, ws);
+        const base = {
+          x: ws.x + Math.round((ws.w - fitted.w) / 2),
+          y: ws.y + Math.max(8, Math.round((ws.h - fitted.h) / 3)),
+          w: fitted.w, h: fitted.h,
+        };
+        rect = cascadeWindow(base, Array.from(prev.values()).map(b => ({ x: b.x, y: b.y })), ws);
+      }
+      const next = new Map(prev);
+      next.set(id, { ...rect, z: nextDetachZ() });
+      return next;
+    });
+    const back = lastTabFrontRef.current;
+    const backRunning = back !== 'home' && back !== id && useRunningApps.getState().isAppRunning(back);
+    setCurrentRunningApp(backRunning ? back : 'home');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentApp]);
 
   // Persist the live floating-window layout (geometry + z-order + minimized) to
   // the window manifest. The infra existed but scheduleWrite was NEVER called, so
@@ -2442,6 +2404,9 @@ export const AppManager: React.FC = () => {
 
   useEffect(() => {
     const onResize = () => {
+      // On the canvas, rects are WORLD coordinates: clamping them to the screen
+      // piled every window into one screen-sized box on any resize.
+      if (isSpatialEnabled()) return;
       const workspace = getShellWorkspace(0);
       setDetachedApps(prev => {
         let changed = false;
@@ -3035,6 +3000,21 @@ export const AppManager: React.FC = () => {
   const handleMaximize = () => { window.dex?.window?.maximize?.(); };
   const handleClose = () => { window.dex?.invoke?.('window:hide').catch(() => {}); };
 
+  // Control Center drives volume and opens the Notification Center by event.
+  useEffect(() => {
+    const onVol = (e: Event) => {
+      const v = Number((e as CustomEvent<number>).detail);
+      if (Number.isFinite(v)) setSystemVolume(Math.max(0, Math.min(100, Math.round(v))));
+    };
+    const onNotif = () => setShowNotifCenter(true);
+    window.addEventListener('dex-set-system-volume', onVol);
+    window.addEventListener('dex-open-notification-center', onNotif);
+    return () => {
+      window.removeEventListener('dex-set-system-volume', onVol);
+      window.removeEventListener('dex-open-notification-center', onNotif);
+    };
+  }, []);
+
   // Stay maximized: only apply when user explicitly toggles it on
   // Persist system volume and broadcast to all audio elements
   useEffect(() => {
@@ -3057,8 +3037,13 @@ export const AppManager: React.FC = () => {
     // Attach multi-touch pointer gesture recognizer to document body
     gestureRecognizer.attach(document.body);
 
+    // On the Spatial canvas, pinch and swipe belong to the canvas (zoom / pan).
+    // Treating a canvas pinch as "show/hide the app overview" re-rendered the
+    // whole shell on every zoom step.
+    const onCanvas = () => useSpatialStore.getState().enabled;
     // Map touch gestures → app navigation
     const unsub3L = gestureRecognizer.on('three-finger-swipe-left', () => {
+      if (onCanvas()) return;
       const ids = runningApps.map(a => a.id);
       const curIdx = ids.indexOf(currentAppId);
       if (curIdx < ids.length - 1) {
@@ -3066,6 +3051,7 @@ export const AppManager: React.FC = () => {
       }
     });
     const unsub3R = gestureRecognizer.on('three-finger-swipe-right', () => {
+      if (onCanvas()) return;
       const ids = runningApps.map(a => a.id);
       const curIdx = ids.indexOf(currentAppId);
       if (curIdx > 0) {
@@ -3073,6 +3059,7 @@ export const AppManager: React.FC = () => {
       }
     });
     const unsub3U = gestureRecognizer.on('three-finger-swipe-up', () => {
+      if (onCanvas()) return;
       setShowOverview(true);
       setCurrentRunningApp('home' as AppId);
     });
@@ -3100,6 +3087,7 @@ export const AppManager: React.FC = () => {
         }));
         return;
       }
+      if (onCanvas() && g.type !== 'edge-swipe-left' && g.type !== 'edge-swipe-right') return;
       if (!g.active) {
         // Gesture completed — cycle running apps or trigger overview
         switch (g.type) {
@@ -3244,6 +3232,25 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const pendingSpatialFitRef = useRef(false);
+  // Apps that were tabs (not floating) when the canvas opened, or that were
+  // launched while on it. They become canvas windows and go back to being
+  // tabs when the canvas closes.
+  const spatialFromTabsRef = useRef<Set<string>>(new Set());
+  // Size each app had as a canvas window. After leaving the canvas a hidden tab
+  // keeps that size until it is shown, so dozens of apps don't all re-lay out
+  // (and re-run their resize handlers) at once.
+  const spatialTabSizeRef = useRef<Map<string, { w: number; h: number }>>(new Map());
+  // True while leaving the canvas (tabs are committed before the store flips).
+  const leavingSpatialRef = useRef(false);
+  /** Natural canvas size for an app: its window size, or a roomy default. */
+  const spatialSizeFor = useCallback((id: string, ws: { w: number; h: number }) => {
+    const def = APP_WINDOW_SIZES[id];
+    const min = APP_WINDOW_MIN_SIZES[id] ?? { w: 360, h: 280 };
+    const base = def && !def.maximized
+      ? { w: def.w, h: def.h }
+      : { w: Math.max(def?.w ?? 0, 680, Math.round(ws.w * 0.62)), h: Math.max(def?.h ?? 0, 460, Math.round(ws.h * 0.72)) };
+    return { w: Math.max(min.w, base.w), h: Math.max(min.h, base.h) };
+  }, []);
   const setSpatial = useCallback((on: boolean) => {
     const sp = useSpatialStore.getState();
     if (on === sp.enabled) return;
@@ -3274,14 +3281,52 @@ export const AppManager: React.FC = () => {
           h: Math.max(min.h, maxed ? Math.max(460, Math.round(ws.h * 0.72)) : b.h),
         });
       });
+      // Open tabs join the canvas too, each at its own natural size, so the
+      // workspace shows every open app (it used to show only floating ones).
+      const fromTabs = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
+      spatialFromTabsRef.current = new Set(fromTabs);
+      const tabFresh: Array<SpatialRect & { id: string }> = [];
+      fromTabs.forEach(id => {
+        const mem = sp.layout[id];
+        const collides = mem && Object.values(remembered).some((r) =>
+          mem.x < r.x + r.w && mem.x + mem.w > r.x && mem.y < r.y + r.h && mem.y + mem.h > r.y);
+        if (mem && !collides) { remembered[id] = mem; return; }
+        tabFresh.push({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) });
+      });
+      // Floating windows stay where they were on screen (nearest free spot);
+      // former tabs are laid out in a grid beside everything else.
       const placed: Record<string, SpatialRect> = { ...remembered };
       for (const f of fresh) {
         const at = screenToWorld(sp.camera, f.x, f.y);
         placed[f.id] = nearestFreeSpot({ x: Math.round(at.x), y: Math.round(at.y), w: f.w, h: f.h }, Object.values(placed));
       }
+      if (tabFresh.length > 0) {
+        const taken = boundsOf(Object.values(placed));
+        const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+        Object.assign(placed, arrange('grid', tabFresh, origin));
+      }
       sp.setPreSpatial(pre);
+      // Start at the fitted view so the first frame already uses the right
+      // level of detail (rendering every app live at 100% first cost seconds
+      // with many windows open).
+      const all = boundsOf(Object.values(placed));
+      if (all) sp.setCamera(fitRect(all, sp.viewport.w || ws.w, sp.viewport.h || ws.h, 48, sp.limits), { animate: false });
       sp.setEnabled(true);
-      applySpatialBounds(placed);
+      if (fromTabs.length > 0) {
+        fromTabs.forEach(id => mountedAppsRef.current.add(id as AppId));
+        const front = currentApp;
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          for (const [id, r] of Object.entries(placed)) {
+            const z = id === front ? nextDetachZ() + 50 : (next.get(id)?.z ?? nextDetachZ());
+            next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z });
+          }
+          return next;
+        });
+        setCurrentApp('home' as AppId);
+      } else {
+        applySpatialBounds(placed);
+      }
       pendingSpatialFitRef.current = true;
     } else {
       // Leave: remember the world layout, restore the screen layout.
@@ -3290,14 +3335,78 @@ export const AppManager: React.FC = () => {
       sp.rememberLayout(world);
       const pre = sp.preSpatial ?? {};
       const restore: Record<string, SpatialRect> = {};
+      const backToTabs = Array.from(spatialFromTabsRef.current).filter(id => detachedApps.has(id as AppId));
       detachedApps.forEach((b, id) => {
+        if (spatialFromTabsRef.current.has(id)) return;
         restore[id] = clampWindowToWorkspace(pre[id] ?? { x: ws.x + 40, y: ws.y + 40, w: b.w, h: b.h }, ws);
       });
       sp.setPreSpatial(null);
-      sp.setEnabled(false);
-      applySpatialBounds(restore);
+      if (backToTabs.length > 0) {
+        backToTabs.forEach(id => { const b = detachedApps.get(id as AppId); if (b) spatialTabSizeRef.current.set(id, { w: b.w, h: b.h }); });
+        // The front-most canvas window that came from a tab becomes the current tab.
+        const front = backToTabs.reduce((a, b) => ((detachedApps.get(a as AppId)?.z ?? 0) >= (detachedApps.get(b as AppId)?.z ?? 0) ? a : b));
+        // Commit "windows -> tabs" BEFORE switching the canvas off. Otherwise
+        // the store change renders first on its own, turning every card back
+        // into a live full-layout window for one pass (seconds with many apps).
+        leavingSpatialRef.current = true;
+        flushSync(() => {
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          backToTabs.forEach(id => next.delete(id));
+          for (const [id, r] of Object.entries(restore)) {
+            const b = next.get(id);
+            if (b) next.set(id, { ...b, ...r });
+          }
+          return next;
+        });
+        setMinimizedApps(prev => { if (!backToTabs.some(id => prev.has(id))) return prev; const n = new Set(prev); backToTabs.forEach(id => n.delete(id)); return n; });
+        // Focus the tab directly: the shell's setCurrentApp() would float the
+        // app again on the next frame (apps opened from the UI are windows).
+        setCurrentRunningApp(front as AppId);
+        });
+        sp.setEnabled(false);
+        leavingSpatialRef.current = false;
+      } else {
+        sp.setEnabled(false);
+        applySpatialBounds(restore);
+      }
+      spatialFromTabsRef.current = new Set();
     }
-  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode]);
+  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, setCurrentApp, setCurrentRunningApp, spatialSizeFor]);
+
+  // On the canvas every app is a window: an app launched (or switched to) as a
+  // tab while the canvas is open is placed on it instead of covering it.
+  useEffect(() => {
+    // Live check, not the render value: while leaving the canvas, the tabs are
+    // committed before the store flips, and must not be put back on it.
+    if (!spatialEnabled || splitMode !== 'off' || leavingSpatialRef.current || !useSpatialStore.getState().enabled) return;
+    const missing = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
+    if (missing.length === 0) return;
+    missing.forEach(id => { spatialFromTabsRef.current.add(id); mountedAppsRef.current.add(id as AppId); });
+    const focus = currentApp && missing.includes(currentApp) ? currentApp : null;
+    const ws = getShellWorkspace(0);
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      const todo = missing.filter(id => !next.has(id));
+      if (todo.length === 1) {
+        // One new window: the free spot in the current view.
+        const id = todo[0];
+        const rect = spatialPlaceFor(id, next) ?? { x: 0, y: 0, ...spatialSizeFor(id, ws) };
+        next.set(id, { ...rect, z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+      } else if (todo.length > 1) {
+        // A burst (e.g. a restored session): a tidy grid beside what is there.
+        const taken = boundsOf(Array.from(next.values()));
+        const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
+        const placed = arrange('grid', todo.map(id => ({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) })), origin);
+        for (const [id, r] of Object.entries(placed)) {
+          next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+        }
+        pendingSpatialFitRef.current = true;
+      }
+      return next;
+    });
+    if (focus) setCurrentApp('home' as AppId);
+  }, [spatialEnabled, splitMode, runningApps, currentApp, detachedApps, spatialPlaceFor, setCurrentApp, getShellWorkspace, spatialSizeFor]);
 
   // Mirror real windows into the spatial store (HUD, minimap, list, groups).
   useEffect(() => {
@@ -3356,20 +3465,37 @@ export const AppManager: React.FC = () => {
       const s = useSpatialStore.getState();
       const root = worldRef.current;
       const next = new Set<string>();      // culled: off-screen, not painted
-      const distant = new Set<string>();   // on-screen but zoomed far out
+      const distant = new Set<string>();   // on-screen but shown as a title card
       if (s.enabled) {
         let front: SpatialWindow | null = null;
         for (const w of Object.values(s.windows)) if (!w.minimized && (!front || w.z > front.z)) front = w;
-        const lowLod = s.camera.z < 0.35;
+        // Level of detail per window, by its size ON SCREEN: a window is live
+        // when it is visible and big enough to use (>= ~360px wide), capped at
+        // LIVE_MAX at once (front window first, then the largest). Everything
+        // else is a title card. A single global zoom threshold flipped every
+        // window at once, which made zooming stutter with many windows.
+        const LIVE_MIN_PX = 360;
+        const LIVE_MAX = 12;
+        const onScreen: SpatialWindow[] = [];
         for (const w of Object.values(s.windows)) {
           if (w.minimized) continue;
           if (!isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, 400)) next.add(w.id);
-          else if (lowLod && w.id !== front?.id) distant.add(w.id);
+          else onScreen.push(w);
         }
+        const candidates = onScreen
+          .filter((w) => w.id === front?.id || w.w * s.camera.z >= LIVE_MIN_PX)
+          .sort((a, b) => (a.id === front?.id ? -1 : b.id === front?.id ? 1 : b.w * b.h - a.w * a.h));
+        const live = new Set(candidates.slice(0, LIVE_MAX).map((w) => w.id));
+        for (const w of onScreen) if (!live.has(w.id)) distant.add(w.id);
       }
       root?.querySelectorAll<HTMLElement>('[data-floating-window]').forEach((el) => {
-        if (next.has(el.dataset.floatingWindow || '')) el.setAttribute('data-spatial-offscreen', 'true');
+        const id = el.dataset.floatingWindow || '';
+        if (next.has(id)) el.setAttribute('data-spatial-offscreen', 'true');
         else el.removeAttribute('data-spatial-offscreen');
+        // Set here, not in render, so a zoom never re-renders the shell. On the
+        // canvas a window is a card until marked live (new windows start cheap).
+        if (s.enabled && !next.has(id) && !distant.has(id)) el.setAttribute('data-spatial-live', 'true');
+        else el.removeAttribute('data-spatial-live');
       });
       // Off-screen and zoomed-out ("distant") windows both drop to the
       // background lifecycle phase: apps that support it pause heavy work.
@@ -3378,8 +3504,13 @@ export const AppManager: React.FC = () => {
       const prev = spatialOffscreenRef.current;
       spatialOffscreenRef.current = next;
       for (const id of next) if (!prev.has(id)) appLifecycle.setPhase(id, 'background');
-      for (const id of prev) {
-        if (!next.has(id) && s.windows[id] && !s.windows[id].minimized) appLifecycle.setPhase(id, 'foreground');
+      // Only while the canvas is on: after leaving it the tab logic owns each
+      // app's phase, and re-foregrounding every former window here woke all
+      // the hidden tabs at once (seconds of work with many apps open).
+      if (s.enabled) {
+        for (const id of prev) {
+          if (!next.has(id) && s.windows[id] && !s.windows[id].minimized) appLifecycle.setPhase(id, 'foreground');
+        }
       }
     };
     const apply = (s: ReturnType<typeof useSpatialStore.getState>) => {
@@ -3405,13 +3536,14 @@ export const AppManager: React.FC = () => {
           if (motionTimer) clearTimeout(motionTimer);
           motionTimer = setTimeout(() => { motionTimer = null; el.style.willChange = ''; }, 180);
         }
-        el.dataset.spatialLod = z < 0.35 ? 'low' : 'normal';
       } else {
         el.style.removeProperty('transform');
         el.style.removeProperty('transition');
-        delete el.dataset.spatialLod;
       }
-      if (!cullTimer) cullTimer = setTimeout(cull, 120);
+      // Debounced: decide level of detail once the camera settles, so a zoom or
+      // pan gesture never flips windows between card and live mid-motion.
+      if (cullTimer) clearTimeout(cullTimer);
+      cullTimer = setTimeout(cull, 120);
     };
     apply(useSpatialStore.getState());
     const unsub = useSpatialStore.subscribe(apply);
@@ -3422,9 +3554,16 @@ export const AppManager: React.FC = () => {
   useEffect(() => {
     const el = contentRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight));
+    // Also published as CSS vars: tabs live inside the zero-size world layer
+    // (see the render below) and size themselves from these.
+    const publish = () => {
+      el.style.setProperty('--dex-content-w', `${el.clientWidth}px`);
+      el.style.setProperty('--dex-content-h', `${el.clientHeight}px`);
+      useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
+    };
+    const ro = new ResizeObserver(publish);
     ro.observe(el);
-    useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
+    publish();
     return () => ro.disconnect();
   }, [splitMode]);
 
@@ -3446,14 +3585,19 @@ export const AppManager: React.FC = () => {
       const dx = e.deltaX * unit, dy = e.deltaY * unit;
       // Alt+wheel zooms anywhere; Ctrl+wheel (also trackpad pinch) zooms over the
       // desktop and is left to the app when over a window.
+      // When the canvas takes the wheel it also stops it here: apps listen for
+      // Ctrl+wheel on window to zoom their own canvases, and every mounted app
+      // re-rendered (and zoomed itself) on each step of a workspace zoom.
       if (e.altKey || (e.ctrlKey && !inWindow(e.target))) {
         e.preventDefault();
+        e.stopPropagation();
         const p = local(e);
         st().zoomAtPoint(p.x, p.y, Math.min(1.25, Math.max(0.8, Math.exp(-dy * 0.0025))));
         return;
       }
       if (!inWindow(e.target)) {
         e.preventDefault();
+        e.stopPropagation();
         st().pan(-(e.shiftKey ? dy : dx), e.shiftKey ? 0 : -dy);
       }
     };
@@ -3643,6 +3787,7 @@ export const AppManager: React.FC = () => {
           <div
             key={appId}
             data-floating-window={appId}
+            data-window-title={getLabel(appId)}
             data-testid={`app-instance-${appId}`}
             data-app-state="foreground"
             data-window-glass={useGlass ? 'on' : 'off'}
@@ -3993,7 +4138,7 @@ export const AppManager: React.FC = () => {
                 </div>
               )}
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
+            <div data-window-body="" style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
               <AppBody appId={appId} />
             </div>
             {/* Resize handles -- all 4 edges + corners for proper OS-like resizing */}
@@ -4479,7 +4624,17 @@ export const AppManager: React.FC = () => {
           aria-hidden={!showInline}
           style={{
             position: 'absolute',
-            inset: 0,
+            // Home sits in the content layer; every other tab sits in the world
+            // layer (a 0x0 anchor), so it takes the content size explicitly.
+            ...(appId === 'home'
+              ? { inset: 0 }
+              : (() => {
+                  const kept = !showInline ? spatialTabSizeRef.current.get(appId) : undefined;
+                  if (showInline) spatialTabSizeRef.current.delete(appId);
+                  return kept
+                    ? { left: 0, top: 0, width: kept.w, height: kept.h }
+                    : { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
+                })()),
             display: 'flex',
             opacity: showInline ? 1 : 0,
             pointerEvents: showInline ? 'auto' : 'none',
@@ -4489,6 +4644,8 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
+            // No bottom reserve: the DEX Bar hides over a full-surface app.
+            // (A padded strip here painted a band under every app.)
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -4498,6 +4655,10 @@ export const AppManager: React.FC = () => {
           }}
           className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
         >
+          {/* Slot 0 is the floating window's title bar; keeping the app body in
+              slot 1 in both modes means switching tab <-> window (or entering
+              the Spatial canvas) keeps the app mounted with its state. */}
+          {false}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
             <AppBody appId={appId} />
           </div>
@@ -4695,25 +4856,21 @@ export const AppManager: React.FC = () => {
       return aIdx - bIdx;
     });
 
+    // The open-app tabs live INSIDE the top bar (one row of chrome, macOS
+    // style). The container is itself a drag region, so empty space between
+    // tabs still moves the window; the tabs are not.
     return (
       <>
       <div
         ref={tabContainerRef}
+        data-tauri-drag-region
+        role="tablist"
+        aria-label="Open apps"
         style={{
-          height: 32, display: 'flex', alignItems: 'center',
-          padding: '0 var(--space-2)', gap: 2,
-          // Tier 2 shares the SAME tone as the title bar above (no #0E0E11 seam)
-          // so the two tiers read as one continuous, seamless top bar.
-          background: 'var(--glass-bg, rgba(20,20,24,0.66))',
-          backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-          WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-          // The single hairline of the whole top chrome -- a crisp content edge,
-          // with NO inner gloss line and NO drop-shadow gap (owner: seamless).
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          position: 'relative', zIndex: 2,
-          flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
-          scrollbarWidth: 'none',
-        }}
+          flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', margin: '0 12px', gap: 2,
+          overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none',
+        } as React.CSSProperties}
       >
         {sortedTabs.map(app => {
           const def = APP_DEFINITIONS[app.id];
@@ -4743,7 +4900,7 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 12px', height: 26, borderRadius: 10, /* pill-shaped tabs (owner request) */
+                padding: '0 10px', height: 24, borderRadius: 6, /* pill-shaped tabs (owner request) */
                 background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'var(--color-bg-elevated, #1C1C20)' : 'transparent',
                 border: isDragging ? '1px solid var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
@@ -4844,13 +5001,14 @@ export const AppManager: React.FC = () => {
         <button style={{...navBtnStyle, opacity: navIndex < navHistoryRef.current.length - 1 ? 1 : 0.4, cursor: navIndex < navHistoryRef.current.length - 1 ? 'pointer' : 'not-allowed'}} onClick={goForward} disabled={navIndex >= navHistoryRef.current.length - 1} data-tip="Forward" aria-label="Navigate forward" aria-disabled={navIndex >= navHistoryRef.current.length - 1}>
           {Icons.chevronRight}
         </button>
-        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
+        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
         <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--dex-focus-color, #fff)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
+      {renderAppTabBar() ?? (
       <span style={{
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
         // Truly CENTERED in the bar -- was pinned at a hardcoded left:280, which
@@ -4905,6 +5063,7 @@ export const AppManager: React.FC = () => {
           );
         })()}
       </span>
+      )}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Date + time live in the draggable Clock widget on Home (user-placed).
             Keeping the topbar minimal -- only system status indicators here. */}
@@ -4913,8 +5072,6 @@ export const AppManager: React.FC = () => {
             essential window controls are never pushed off the right edge. It all
             stays reachable from the control-center popover. */}
         <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-          {/* WiFi indicator - compact dot */}
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
           {/* Quick Controls -- network mode + permission pills with popovers */}
           <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
@@ -4939,210 +5096,9 @@ export const AppManager: React.FC = () => {
           </svg>
         </button>
 
-        {/* Notification Center bell removed at the owner's request -- the top bar
-            stays minimal (system status + control center only). The hub-backed
-            notification center opens from the "Notifications" item in the
-            control-center menu (the dropdown below). */}
-        {/* Menu dropdown trigger */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setTitlebarMenuOpen(v => !v)}
-            onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }}
-            title="Controls"
-            aria-label="Open control center"
-            aria-expanded={titlebarMenuOpen}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 18, borderRadius: 4,
-              background: titlebarMenuOpen ? 'var(--color-border)' : 'transparent',
-              border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round">
-              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-            </svg>
-          </button>
-          {/* Dropdown panel */}
-          {titlebarMenuOpen && (
-            <>
-              <style>{`@keyframes titlebarDropIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
-              <div
-                role="menu"
-                aria-label="Control center"
-                style={{
-                  position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
-                  minWidth: 220, padding: '6px 0',
-                  // Master overhaul: glass control-center popover (Part 2.2 / Part 4 Pop UI).
-                  background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-                  backdropFilter: 'var(--glass-blur, blur(20px))',
-                  WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
-                  borderRadius: 10, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-                  boxShadow: 'var(--pg-shadow-modal)',
-                  animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
-                  transformOrigin: 'top right',
-                }}
-              >
-                {/* User Profile */}
-                <button
-                  role="menuitem"
-                  onClick={() => { setCurrentApp('settings' as AppId); setTitlebarMenuOpen(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
-                  </svg>
-                  Settings &amp; Profile
-                </button>
-                {/* Notifications -- opens the hub-backed Notification Center. This is
-                    the "reachable from the control-center menu" path the owner asked
-                    for (top bar stays bell-free); previously the center had no opener. */}
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowNotifCenter(true); setTitlebarMenuOpen(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                  </svg>
-                  <span style={{ flex: 1 }}>Notifications</span>
-                  {hubUnreadCount > 0 && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: '#fff',
-                      background: 'var(--color-error)', borderRadius: 10,
-                      minWidth: 16, height: 16, padding: '0 5px',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      lineHeight: 1,
-                    }}>
-                      {hubUnreadCount > 99 ? '99+' : hubUnreadCount}
-                    </span>
-                  )}
-                </button>
-                {/* Network Status */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: 'var(--space-2) 14px', fontSize: 13, color: 'var(--color-text-primary)',
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'}/>
-                  </svg>
-                  {navigator.onLine ? 'Wi-Fi: Connected' : 'Wi-Fi: Offline'}
-                </div>
-                {/* Volume */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 14px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>{systemVolume > 0 && <path d="M15.54 8.46a5 5 0 010 7.07"/>}{systemVolume > 40 && <path d="M19.07 4.93a10 10 0 010 14.14"/>}
-                  </svg>
-                  <input
-                    type="range" min={0} max={100} value={systemVolume}
-                    onChange={e => setSystemVolume(Number(e.target.value))}
-                    aria-label="System volume"
-                    style={{ flex: 1, height: 3, accentColor: '#fff', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 22, textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' as any }}>{systemVolume}</span>
-                </div>
-                <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 0' }} />
-                {/* Spatial Audio toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={spatialAudioOn ? 'var(--color-success)' : 'var(--color-text-secondary)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 10s3-4 10-4 10 4 10 4"/><path d="M2 14s3 4 10 4 10-4 10-4"/><circle cx="12" cy="12" r="2"/></svg>
-                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Spatial Audio</span>
-                  </div>
-                  <button
-                    onClick={() => setSoundEnabled(!spatialAudioOn)}
-                    aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
-                    style={{
-                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: spatialAudioOn ? 'var(--color-accent)' : 'var(--color-border)',
-                      position: 'relative', transition: 'background 0.2s ease', padding: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: 2, left: 2,
-                      transform: spatialAudioOn ? 'translateX(14px)' : 'translateX(0)',
-                      transition: 'transform 0.2s ease',
-                      boxShadow: 'var(--pg-shadow-chip)',
-                    }} />
-                  </button>
-                </div>
-                {/* Reduce Motion toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Reduce Motion</span>
-                  <button
-                    onClick={() => {
-                      const cur = isReduceMotion();
-                      try { localStorage.setItem('dex-reduce-motion', String(!cur)); } catch (e) { console.warn('[DEX]', e); }
-                      window.location.reload();
-                    }}
-                    aria-label="Toggle reduce motion"
-                    style={{
-                      width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: isReduceMotion() ? 'var(--color-accent)' : 'var(--color-border)',
-                      position: 'relative', transition: 'background 0.2s ease', padding: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: 2, left: 2,
-                      transform: isReduceMotion() ? 'translateX(14px)' : 'translateX(0)',
-                      transition: 'transform 0.2s ease',
-                      boxShadow: 'var(--pg-shadow-chip)',
-                    }} />
-                  </button>
-                </div>
-                <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 0' }} />
-                {/* Window Controls Toggle — only show on macOS where both styles make sense */}
-                {!IS_WINDOWS && (
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    const next = windowControls === 'traffic' ? 'system' : 'traffic';
-                    setWindowControls(next);
-                    try { localStorage.setItem('dex-window-controls', next); } catch (e) { console.warn('[DEX]', e); }
-                    window.dispatchEvent(new Event('dex-window-controls-changed'));
-                    setTitlebarMenuOpen(false);
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
-                    textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  {windowControls === 'traffic' ? (
-                    <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff5f57' }} />
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#febc2e' }} />
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#28c840' }} />
-                    </span>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="16" height="12" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
-                  )}
-                  {windowControls === 'traffic' ? 'Switch to System Controls' : 'Switch to Traffic Lights'}
-                </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        {/* One Control Center: notifications, sound, display, network and
+            settings all live in the panel (the old second "controls" dropdown
+            repeated half of it at a different size). */}
         {windowControls === 'system' && (
           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <div style={{ width: 1, height: 12, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
@@ -5200,7 +5156,6 @@ export const AppManager: React.FC = () => {
       ) : (
         <>
           {renderTitleBar()}
-          {renderAppTabBar()}
         </>
       )}
 
@@ -5220,7 +5175,7 @@ export const AppManager: React.FC = () => {
           borderRadius: 0,
           contain: 'layout style',
         }}>
-          {keepAliveElements.filter(el => !(el && detachedApps.has(el.key as AppId)))}
+          {keepAliveElements.filter(el => el && el.key === 'home')}
           {/* World layer: floating windows live here. With the spatial desktop off
               it has no transform, so it is layout-transparent (fixed windows still
               anchor to this content surface); on, it carries the camera. */}
@@ -5229,7 +5184,9 @@ export const AppManager: React.FC = () => {
             {spatialEnabled && <SpatialZones />}
             {spatialEnabled && <SpatialGroupFrames />}
             {spatialEnabled && <SpatialGuides />}
-            {keepAliveElements.filter(el => el && detachedApps.has(el.key as AppId))}
+            {/* Every non-Home app lives here, tab or window, so changing mode
+                never moves it to another parent (which would remount it). */}
+            {keepAliveElements.filter(el => el && el.key !== 'home')}
           </div>
           {spatialEnabled && <SpatialHud />}
         </div>

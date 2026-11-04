@@ -23,7 +23,7 @@ interface ThemeState {
 
 export const useThemeStore = create<ThemeState>((set, get) => {
   // Async load from IPC backend on startup
-  (window as any).electron?.invoke?.('capability:storage:get', 'dex-theme').then((saved: string | null) => {
+  (window as any).dex?.invoke?.('capability:storage:get', 'dex-theme').then((saved: string | null) => {
     if (saved === 'light' || saved === 'dark') {
       document.documentElement.setAttribute('data-theme', saved);
       set({ theme: saved });
@@ -35,7 +35,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   
   setTheme: (theme) => {
     localStorage.setItem('dex-theme', theme);
-    (window as any).electron?.invoke?.('capability:storage:set', 'dex-theme', theme).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', theme).catch((e: unknown) => { console.warn('[DEX]', e); });
     document.documentElement.setAttribute('data-theme', theme);
     set({ theme });
   },
@@ -43,7 +43,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   toggleTheme: () => {
     const newTheme = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('dex-theme', newTheme);
-    (window as any).electron?.invoke?.('capability:storage:set', 'dex-theme', newTheme).catch((e: unknown) => { console.warn('[DEX]', e); });
+    (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', newTheme).catch((e: unknown) => { console.warn('[DEX]', e); });
     document.documentElement.setAttribute('data-theme', newTheme);
     set({ theme: newTheme });
   },

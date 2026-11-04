@@ -194,7 +194,7 @@ export const useSpatialStore = create<SpatialState>()(
         camera: HOME_CAMERA,
         limits: DEFAULT_LIMITS,
         history: [],
-        minimap: false,
+        minimap: false, // off by default (owner): M or the HUD button shows it
         snapGrid: false,
         groups: [],
         layout: {},
@@ -462,7 +462,9 @@ export const useSpatialStore = create<SpatialState>()(
           ...current,
           enabled: p.enabled === true,
           camera: sanitizeCamera(p.camera, current.limits),
-          minimap: p.minimap === true,
+          // Starts hidden every session; the persisted flag used to bring the
+          // box back on each launch.
+          minimap: false,
           snapGrid: p.snapGrid === true,
           groups: clean.groups,
           layout: clean.layout,

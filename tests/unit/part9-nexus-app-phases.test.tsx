@@ -40,6 +40,8 @@ describe('Nexus / Task Manager: open apps show real phases', () => {
     });
     try {
       render(<TaskManager />);
+      // Open apps live in the DEX Apps view (Processes is the default view).
+      act(() => { fireEvent.click(screen.getByRole('tab', { name: 'DEX Apps' })); });
       expect(screen.queryByLabelText(/Set governance/)).toBeNull();
       expect(screen.queryByRole('button', { name: /Suspend Calculator/ })).toBeNull();
       const suspend = screen.getByRole('button', { name: /Suspend Prism/i });

@@ -148,7 +148,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8 checks.
 | 63 | "Add Files" in an empty folder called a channel that doesn't exist | FIXED | Picks files and copies them in with live progress | `Files.tsx` | — | — | — |
 | 64 | Closed apps kept running | FIXED | Every close path now unmounts (was only the window's close button) | `AppManager.tsx` | — | — | — |
 | 65 | Launch latency grows with open windows | FIXED (p50 29 ms with 59 open, was 172 ms) | p50 48 ms (10 open) → 172 ms (59 open); each launch re-renders work proportional to open windows | `AppManager.tsx` | Profile a launch with 30 open; memoise per-window chrome | — | P2 |
-| 66 | Theme switch cost | OPEN | 152 ms p50 per light/dark switch with 10 apps (full restyle) | design-system CSS | Profile style recalc; check the `[data-theme]` selectors' breadth | — | P3 |
+| 66 | Theme switch cost | OPEN (unchanged) | 152 ms p50 per light/dark switch with 10 apps (full restyle) | design-system CSS | Profile style recalc; check the `[data-theme]` selectors' breadth | — | P3 |
 | 67 | 100+ windows | NOT APPLICABLE | DEX apps are single-instance; 59 is the maximum | — | Only relevant if multi-instance apps are added | — | — |
 
 
@@ -211,3 +211,25 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
 | 103 | Blank strip above the DEX Bar in every app | FIXED (owner request) | Apps and maximized windows use the full height; the bar floats | `AppManager.tsx`, `FloatingLauncher.tsx` | Check in the installed app that no app has essential controls under the bar | Installed build | P2 |
 | 104 | Product name "DEX" vs "DEX OS" in the installer and Start menu | KEPT "DEX" | Renaming changes the install folder and uninstall key, so 7.0.1 would install beside 6.1.0 (two entries). Window title is "DEX OS" | `tauri.conf.json` | Rename only with a migration that removes the old entry | Owner | P3 |
 | 105 | Per-app completion pass (Part 12 §2–5) | NOT DONE this pass | This pass fixed release blockers. Packaged smoke opened 31 apps without a crash; workflow-level checks per app remain as in #54, #77, #99 | Apps | Continue app by app | — | P2 |
+
+## Part 8 follow-up (2026-11-03, PR #77)
+
+| # | Requirement | Status | Detail | Next action | Priority |
+|---|---|---|---|---|---|
+| 106 | First-run Welcome/Terms popup | REMOVED (owner) | Boots straight to Home; policies readable in Settings > About | See #2 | — |
+| 107 | Electron leftovers | REMOVED | Renderer uses the Tauri `window.dex` bridge only; revived UKI native events, Browser download progress, Forge watch folders, crash-recovery check; compact window is real (`compact_window.rs`) | Native suspend/resume/lock events don't exist in Tauri yet (old Electron listeners deleted) | P3 |
+| 108 | Spatial Workspace with many windows | DONE | All open apps become canvas windows at natural sizes; apps keep DOM/state across tab <-> canvas; zoomed-out windows are title cards; 59 apps enter 0.8-1.1 s / exit 0.4-0.9 s (preview) | Packaged-app numbers in DEX_7.0.1_VERIFICATION.md | — |
+| 109 | Browser saved passwords | DONE (6c3c9e9) | Logins/cards now stored via `secrets:*` (DPAPI); packaged round-trip checked | — | — |
+| 110 | UKI inside apps | REMOVED (owner) | PRISM/VINX assistant bars, AXL AI Copilot, Notes AI row | UKI stays system-wide | — |
+
+## Part 13: refinement (2026-11-04, `claude/dex-part8-followup`)
+
+| # | Requirement | Status | Detail | Next action | Priority |
+|---|---|---|---|---|---|
+| 111 | Black strip under fullscreen apps | FIXED (not yet seen in the packaged app) | Cause: every full-surface app got `paddingBottom` = the docked DEX Bar's reserve (~80 px), painted in `--color-bg-base`, while the bar is ~240 px wide. Now the docked bar auto-hides over a full-surface app (bottom-edge hover / pointer-down / keyboard focus reveals it), the app fills the viewport, and nothing is reserved. Floating windows and Home keep the reserve. | Packaged check at 100% and 150% scale, maximized + native fullscreen | P1 |
+| 112 | Small apps open oversized | FIXED | Calculator, Password Generator+, Stopwatch, Timer, Unit Converter, Pomodoro, QR Code, Color Picker, Weather, World Clock and Noise open as a compact floating window at their own size (remembered size wins); the app that was in front stays in front. Docking one into a tab keeps it a tab for the session. | Extend the list if more utilities are added | — |
+| 113 | Telemetry / Task Manager redesign | DONE | One toolbar, four views (Processes, Performance, DEX Apps, System); Performance = resource list + one chart with axes (one minute), real values only; DEX renderer heap + long tasks; update speed 1/2/5 s or paused with a real "Updated hh:mm:ss"; error bar with Retry; process list polled only while visible. Removed: hero stat, donut, glow chart, avatar card, the "governance" dropdown (did nothing). | Click-through in the packaged app | P2 |
+| 114 | Top bar duplicate controls | FIXED | Two buttons both labelled "Open control center": the hamburger dropdown (network, volume, spatial audio, reduce motion) is gone; Sound, Notifications (with unread count) and Settings moved into Control Center. Control Center no longer overlaps the 34 px bar. Static Wi-Fi dot removed (it never updated). | — | — |
+| 115 | Live preview verification of 111-114 | DONE (headless Chromium on the Vite preview, 1440x900) | Files tab: app box 34-900 px, no bottom padding, bar parked off-screen, reveals at the bottom edge and hides again; Calculator floats over Files at its own size with Files kept in front; Task Manager views render; one Control Center button, panel starts at 40 px with Sound/Notifications/Settings. The check found the compact sizes clipped (Calculator lost two keypad rows, Password Generator+ hid its options); defaults are now measured content sizes. Native metrics (CPU/processes) need the packaged app. | Packaged-app pass | P1 |
+| 116 | Remaining Part 13 batches | OPEN | Not started this pass: dock/system-surface geometry, per-app control consolidation beyond the top bar, creative/engineering app passes, multi-monitor/high-DPI tests, installer re-verification and old-executable cleanup | Next sessions | P2 |
+

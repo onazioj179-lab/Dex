@@ -29,7 +29,7 @@ export function writeDexSetting(key: string, value: unknown): void {
   try { all = JSON.parse(localStorage.getItem('dex-settings') || '{}') || {}; } catch { /* corrupt: start over */ }
   all[key] = value;
   try { localStorage.setItem('dex-settings', JSON.stringify(all)); } catch { /* storage blocked */ }
-  try { void (window as any).electron?.invoke?.('capability:storage:set', 'dex-settings', all); } catch { /* bridge absent */ }
+  try { void (window as any).dex?.invoke?.('capability:storage:set', 'dex-settings', all); } catch { /* bridge absent */ }
   try { window.dispatchEvent(new CustomEvent('dex-settings-changed', { detail: { source: key } })); } catch { /* noop */ }
 }
 

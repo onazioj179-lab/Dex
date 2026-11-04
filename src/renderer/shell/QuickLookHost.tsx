@@ -64,11 +64,11 @@ function toFileUrl(path: string): string {
 }
 
 async function readText(path: string): Promise<string | null> {
-  const electron = (window as any).electron;
-  if (!electron?.invoke) return null;
+  const bridge = (window as any).dex;
+  if (!bridge?.invoke) return null;
   try {
     // Canonical contract: files:read({ path, encoding }) -> { content, bytes }.
-    const res = await electron.invoke('files:read', { path, encoding: 'utf-8' });
+    const res = await bridge.invoke('files:read', { path, encoding: 'utf-8' });
     if (typeof res === 'string') return res;
     if (res && typeof res.content === 'string') return res.content;
     return null;

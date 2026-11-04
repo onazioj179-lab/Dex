@@ -892,36 +892,36 @@ const DexNotes: React.FC = () => {
                     }
                   } catch { /* picker cancelled */ }
                 }}
-                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Import file"
-              ><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M2 11v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"/></svg>Import</button>
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M2 11v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"/></svg></button>
               <button
                 aria-label="Open daily note"
                 onClick={() => store.getDailyNote()}
-                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Open daily note"
-              ><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v2M11 2v2"/></svg>Daily</button>
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v2M11 2v2"/></svg></button>
               <button
                 aria-label="Open templates"
                 onClick={() => setShowTemplates(true)}
-                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Templates"
-              ><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M6 2v12M2 6h12"/></svg>Templates</button>
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M6 2v12M2 6h12"/></svg></button>
               <button
                 aria-label="View statistics"
                 onClick={() => setShowStats(true)}
-                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Statistics"
-              ><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="3" y="8" width="2" height="6"/><rect x="7" y="4" width="2" height="10"/><rect x="11" y="2" width="2" height="12"/></svg>Stats</button>
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="3" y="8" width="2" height="6"/><rect x="7" y="4" width="2" height="10"/><rect x="11" y="2" width="2" height="12"/></svg></button>
               <button
                 aria-label="Open Trash"
                 onClick={() => {
                   const dex = (window as any).dex;
                   if (dex?.invoke) dex.invoke('app:launch', 'recyclebin');
                 }}
-                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', gap: 4 }}
+                style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Open Trash"
-              ><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><polyline points="2 4 3.5 4 14 4"/><path d="M12.5 4l-.7 9.3a1.3 1.3 0 0 1-1.3 1.2H5.5a1.3 1.3 0 0 1-1.3-1.2L3.5 4"/><path d="M6.5 7v4M9.5 7v4"/><path d="M5.5 4V2.7a.7.7 0 0 1 .7-.7h3.6a.7.7 0 0 1 .7.7V4"/></svg>Trash</button>
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><polyline points="2 4 3.5 4 14 4"/><path d="M12.5 4l-.7 9.3a1.3 1.3 0 0 1-1.3 1.2H5.5a1.3 1.3 0 0 1-1.3-1.2L3.5 4"/><path d="M6.5 7v4M9.5 7v4"/><path d="M5.5 4V2.7a.7.7 0 0 1 .7-.7h3.6a.7.7 0 0 1 .7.7V4"/></svg></button>
             </div>
           </div>
           {/* Sidebar resizer */}
@@ -999,9 +999,7 @@ const DexNotes: React.FC = () => {
                     })}
                   </div>
                 ) : (
-                  <div style={{ flex: 1, fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    Add <span style={{ color: '#64d2ff' }}>#tags</span> in notes to filter here
-                  </div>
+                  <div style={{ flex: 1 }} />
                 )}
                 {/* New-from-template menu */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>

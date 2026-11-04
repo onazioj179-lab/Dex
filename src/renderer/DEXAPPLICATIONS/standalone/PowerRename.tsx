@@ -89,10 +89,10 @@ const PowerRename: React.FC = () => {
   const loadFolder = useCallback(async (path: string) => {
     const p = path.trim();
     if (!p) return;
-    const electron = (window as any).electron;
-    if (!electron?.invoke) { info('Folder loading needs the desktop app'); return; }
+    const bridge = (window as any).dex;
+    if (!bridge?.invoke) { info('Folder loading needs the desktop app'); return; }
     try {
-      const list = await electron.invoke('files:list', p);
+      const list = await bridge.invoke('files:list', p);
       const files = Array.isArray(list) ? list.filter((f: any) => !f.isDirectory) : [];
       if (files.length === 0) { info('No files found in that folder'); return; }
       addNames(files.map((f: any) => ({ path: f.path as string, original: f.name as string })));
@@ -119,8 +119,8 @@ const PowerRename: React.FC = () => {
 
   // ── Apply ─────────────────────────────────────────────────────
   const apply = useCallback(async () => {
-    const electron = (window as any).electron;
-    if (!electron?.invoke) { info('Renaming needs the desktop app'); return; }
+    const bridge = (window as any).dex;
+    if (!bridge?.invoke) { info('Renaming needs the desktop app'); return; }
     setApplying(true);
     let ok = 0, fail = 0;
     const survivors: SourceItem[] = [];
@@ -129,7 +129,7 @@ const PowerRename: React.FC = () => {
       const r = results[i];
       if (!it.path || !r.changed || r.error) { survivors.push(it); continue; }
       try {
-        const res = await electron.invoke('files:rename', it.path, r.next);
+        const res = await bridge.invoke('files:rename', it.path, r.next);
         if (res && res.success === false) throw new Error(res.error || 'rename failed');
         ok++;
         // Reflect the new name so a second pass operates on the renamed file.
@@ -147,7 +147,7 @@ const PowerRename: React.FC = () => {
   }, [items, results, info, success, toastError]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg, #0a0a0c)', color: '#fff', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #FF375F, #FF6482)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
