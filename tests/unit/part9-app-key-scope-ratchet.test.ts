@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 // Ratchet: every window/document keydown handler in an app must check that the
 // key is meant for that app (apps stay mounted in the background). Handlers that
 // only close their own open menu/modal on Escape, or are not mounted, are listed.

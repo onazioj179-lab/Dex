@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContactTracker, multiDelta, MAX_CONTACTS } from '../../src/renderer/shell/input/touchContacts';
 import { gestureCamera, pinchCamera } from '../../src/renderer/shell/spatial/spatialMath';
