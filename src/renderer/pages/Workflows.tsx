@@ -370,7 +370,7 @@ const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNo
     nodes: [
       { id: 't1n1', actionId: 'a1', name: 'Get Files', category: 'Files', x: 80, y: 60, config: { path: '/documents', filter: '*' } },
       { id: 't1n2', actionId: 'a2', name: 'Copy File', category: 'Files', x: 80, y: 200, config: { source: '{input}', dest: '/backup' } },
-      { id: 't1n3', actionId: 'a5', name: 'Send Message', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Files backed up successfully' } },
+      { id: 't1n3', actionId: 'a5', name: 'Send Message', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Files backed up' } },
     ],
     connections: [{ from: 't1n1', to: 't1n2' }, { from: 't1n2', to: 't1n3' }],
   },

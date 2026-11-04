@@ -289,7 +289,7 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
     };
     let app_listen = app.clone();
     let id_listen = self_id.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("dtp", move || {
         let mut buf = [0u8; 2048];
         while discovery_running().load(Ordering::SeqCst) {
             match listen_sock.recv_from(&mut buf) {
@@ -328,7 +328,7 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
     // Broadcast + cleanup thread.
     let app_bc = app.clone();
     let id_bc = self_id;
-    std::thread::spawn(move || {
+    crate::util::spawn_named("dtp", move || {
         // Immediate first broadcast (mirrors the TS setTimeout(500)).
         std::thread::sleep(Duration::from_millis(500));
         broadcast_packet(&socket, &id_bc);

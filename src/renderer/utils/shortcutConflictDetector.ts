@@ -126,7 +126,7 @@ export const BUILTIN_SHORTCUTS: Omit<ShortcutRegistration, 'id'>[] = [
   { keys: 'Ctrl+Shift+Q', action: 'Close All Apps', source: 'AppManager', priority: 80, enabled: true },
   { keys: 'Alt+Left', action: 'Navigate Back', source: 'AppManager', priority: 80, enabled: true },
   { keys: 'Alt+Right', action: 'Navigate Forward', source: 'AppManager', priority: 80, enabled: true },
-  { keys: 'F11', action: 'Toggle Dock Auto-hide', source: 'AppManager', priority: 70, enabled: true },
+  { keys: 'F11', action: 'Toggle Fullscreen', source: 'CommandPalette', priority: 70, enabled: true },
 
   { keys: 'Ctrl+\\', action: 'Toggle Dock', source: 'AppManager', priority: 70, enabled: true },
   { keys: 'Ctrl+1', action: 'Go to Home', source: 'AppManager', priority: 60, enabled: true },
@@ -150,7 +150,9 @@ export const BUILTIN_SHORTCUTS: Omit<ShortcutRegistration, 'id'>[] = [
   // Spotlight quick-access
   { keys: 'Ctrl+E', action: 'Open Files', source: 'Spotlight', priority: 60, enabled: true },
   { keys: 'Ctrl+N', action: 'Open Notes', source: 'Spotlight', priority: 60, enabled: true },
-  { keys: 'Ctrl+,', action: 'Open Settings', source: 'Spotlight', priority: 60, enabled: true },
+  { keys: 'Ctrl+,', action: 'Open Settings', source: 'CommandPalette', priority: 60, enabled: true },
+  { keys: 'Ctrl+Shift+B', action: 'Show / Hide DEX Bar', source: 'CommandPalette', priority: 60, enabled: true },
+  { keys: 'Ctrl+Shift+L', action: 'Lock Screen', source: 'CommandPalette', priority: 60, enabled: true },
   
   // App shortcuts
   { keys: 'Alt+H', action: 'Open Home', source: 'runningApps', priority: 40, enabled: true },

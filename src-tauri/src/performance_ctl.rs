@@ -270,7 +270,7 @@ fn start_gc_scheduler(app: &tauri::AppHandle, interval_ms: i64) {
 
     let app = app.clone();
     let interval = std::time::Duration::from_millis(interval_ms.max(1000) as u64);
-    std::thread::spawn(move || {
+    crate::util::spawn_named("performance", move || {
         // Initial GC ~5s after (re)start, matching setTimeout(..., 5000).
         std::thread::sleep(std::time::Duration::from_millis(5000));
         if crate::kv_get(&app, SCHED_GEN_KEY).as_i64().unwrap_or(0) != gen {

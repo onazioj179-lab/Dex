@@ -322,7 +322,7 @@ fn arm_monitor(app: &tauri::AppHandle) {
         return; // already running
     }
     let app = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("idle", move || {
         let mut prev: Option<String> = None;
         loop {
             let (status, state) = build_status(&app);

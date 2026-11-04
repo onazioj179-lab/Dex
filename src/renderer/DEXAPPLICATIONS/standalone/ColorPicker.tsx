@@ -233,7 +233,7 @@ const ColorPicker: React.FC = () => {
         </button>
       </div>
 
-      {copied && <div style={s.copiedToast}>Copied!</div>}
+      {copied && <div style={s.copiedToast}>Copied</div>}
 
       {/* HEX input */}
       <div style={s.hexRow}>

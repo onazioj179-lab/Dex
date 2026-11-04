@@ -2528,18 +2528,24 @@ const Imosion: React.FC = () => {
   const midiActiveNotesRef = useRef<Map<number, { osc: OscillatorNode; gain: GainNode }>>(new Map());
   const selectedTrackRef = useRef<string | null>(null);
 
+  // MIDI is requested only once you open the MIDI panel (each request can show a
+  // permission prompt). After a successful connection it reconnects on later
+  // launches without waiting for the panel. Never asks for SysEx.
+  const [midiWanted, setMidiWanted] = useState<boolean>(() => {
+    try { return localStorage.getItem('dex.imosion.midi') === '1'; } catch { return false; }
+  });
+  useEffect(() => { if (showMidiPanel) setMidiWanted(true); }, [showMidiPanel]);
+
   // Connect to Web MIDI API
   useEffect(() => {
-    if (!navigator.requestMIDIAccess) return;
+    if (!midiWanted || !navigator.requestMIDIAccess) return;
     let access: any = null;
     let cancelled = false;
-    // Defer MIDI access to idle: requesting it on mount can show a permission
-    // prompt and stalls first paint. Imosion stays interactive immediately;
-    // MIDI devices wire up a beat later once the UI is on screen.
     const requestMidi = () => navigator.requestMIDIAccess!({ sysex: false }).then((ma: any) => {
       if (cancelled) return;
       access = ma;
       setMidiAccess(ma);
+      try { localStorage.setItem('dex.imosion.midi', '1'); } catch { /* private mode */ }
       const inputs: Array<{ id: string; name: string; connected: boolean }> = [];
       ma.inputs.forEach((input: any) => {
         inputs.push({ id: input.id, name: input.name || 'Unknown MIDI Device', connected: input.state === 'connected' });
@@ -2554,15 +2560,12 @@ const Imosion: React.FC = () => {
         });
         setMidiInputs(newInputs);
       };
-    }).catch(() => { /* MIDI not available */ });
+    }).catch(() => { /* MIDI not available or not allowed */ });
 
-    const ric: typeof requestIdleCallback | undefined = (window as any).requestIdleCallback;
-    const idleId = ric ? ric(() => requestMidi(), { timeout: 2500 }) : window.setTimeout(requestMidi, 400);
+    void requestMidi();
 
     return () => {
       cancelled = true;
-      const cic: ((id: number) => void) | undefined = (window as any).cancelIdleCallback;
-      if (ric && cic) cic(idleId as number); else clearTimeout(idleId as number);
       if (access) {
         access.inputs.forEach((input: any) => { input.onmidimessage = null; });
       }
@@ -2572,7 +2575,7 @@ const Imosion: React.FC = () => {
       });
       midiActiveNotesRef.current.clear();
     };
-  }, []);
+  }, [midiWanted]);
 
   // Bind MIDI input messages
   useEffect(() => {
@@ -10809,7 +10812,7 @@ const Imosion: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6, letterSpacing: '0.5px' }}>DEVICES</div>
             {midiInputs.length === 0 ? (
               <div style={{ padding: 'var(--space-3)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 10 }}>
-                {'requestMIDIAccess' in navigator ? 'No MIDI devices detected. Connect a controller and refresh.' : 'Web MIDI not supported in this browser.'}
+                {'requestMIDIAccess' in navigator ? 'No MIDI devices found. Connect a controller and it will appear here.' : 'MIDI is not available on this system.'}
               </div>
             ) : (
               midiInputs.map(inp => (

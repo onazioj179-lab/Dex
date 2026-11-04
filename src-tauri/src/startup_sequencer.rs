@@ -562,7 +562,7 @@ fn start_heartbeat(app: &tauri::AppHandle) {
     write_heartbeat(app);
 
     let app = app.clone();
-    std::thread::spawn(move || loop {
+    crate::util::spawn_named("startup_sequencer", move || loop {
         std::thread::sleep(std::time::Duration::from_secs(30));
         write_heartbeat(&app);
     });

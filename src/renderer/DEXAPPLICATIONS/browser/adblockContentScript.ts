@@ -87,7 +87,7 @@ export function buildAdblockScript(
     }
     function report(){
       if (reportTimer) return;
-      reportTimer = setTimeout(function(){ reportTimer = 0; try { console.log(PREFIX + blocked); } catch(e){} }, 400);
+      reportTimer = setTimeout(function(){ reportTimer = 0; try { console.log(PREFIX + blocked); } catch(e){} try { (window.__dexOutbox = window.__dexOutbox || []).push({ t: 'adblock', n: blocked }); } catch(e){} }, 400);
     }
     function hit(){ blocked++; report(); }
 

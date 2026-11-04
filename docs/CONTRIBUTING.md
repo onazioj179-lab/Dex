@@ -2,56 +2,42 @@
 
 Thank you for your interest in contributing to DEX! This document provides guidelines and instructions for contributing.
 
-## Pick Up Where Someone Left Off
+## Before you open a pull request
 
-DEX is built in **independent tracks** (A–P). Each track is self-contained: a focused area of work with its own files, verification gates, and a `docs/handoff/<track>.md` doc that any contributor can read in under five minutes to resume mid-flight. Read docs/handoff/INDEX.md (retired; see ROADMAP.md and TAURI-MIGRATION.md) for the current state of every track.
-
-**To resume a track:**
-1. Read `docs/handoff/<track>.md` — has scope, files touched, what's done, what's next, blockers.
-2. Run `npm run validate` (tsc + vitest + lint + vite build) to confirm a clean baseline.
-3. Pick the next sub-item from the "Next" list.
-4. When you stop, **update the same handoff doc** in the same PR. Keep it under 100 lines.
-
-**To start a new track:**
-1. Add an entry to `docs/handoff/INDEX.md`.
-2. Create `docs/handoff/<id>.md` from the template at the bottom of `INDEX.md`.
-3. Open a milestone-tagged tracking issue (`track:<id>`).
-4. Sub-PRs reference the issue.
-
-**Verification gates** (every PR):
-- `npx tsc --noEmit` exits 0
-- `npm run test` passes (currently 3471 tests)
-- `npm run build` succeeds with no new warnings
-- For UI changes, manual smoke against the affected page on Windows + at least one non-Windows target if available
+- `npm run lint` passes (TypeScript and the attribution-header check).
+- `npm test` passes.
+- `npm run build` succeeds with no new warnings.
+- For interface changes, check the affected screen in light and dark mode.
+- Track open work in [DEX_REMAINING_WORK.md](../DEX_REMAINING_WORK.md) and
+  [ROADMAP.md](ROADMAP.md) rather than in new Markdown files.
 
 **No bloat rule:** every change must replace, strengthen, or directly extend existing code. New parallel systems are rejected unless an ADR justifies the duplication.
-
-**Visual quality is sacred:** any optimization track (K, L) must be invisible to the eye. Adaptive scaling adjusts magnitudes within DEX's premium aesthetic — never removes effects.
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
-- Python 3.8+ (optional, for advanced system features)
+
+- Windows 10 or 11 (x64)
+- Node.js 20 LTS (18 or later) and npm 9 or later
+- Rust stable with the MSVC toolchain, and Visual Studio Build Tools with the C++ workload
 - Git
 
 ### Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/onazioj/dex.git
-cd dex
+git clone https://github.com/onazioj179-lab/Dex.git
+```
 
-# Install dependencies
-npm install
+```bash
+npm ci
+```
 
-# Install Python dependencies (optional)
-pip install -r src/python/requirements.txt
-
-# Run in development mode
+```bash
 npm run dev
 ```
+
+`npm run dev` starts the desktop app. `npm run dev:renderer` starts only the
+interface in a browser, without native features.
 
 ## Development Workflow
 
@@ -90,26 +76,14 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 ```
 src/
-  main/           # Electron main process
-    controllers/  # Business logic controllers
-    core/         # Core system services
-    engine/       # Rule engine
-    monitors/     # System event monitoring
-    runtime/      # Runtime services
-    security/     # Permission and security management
-    store/        # Data persistence
-    utils/        # Logging utilities
-  renderer/       # React frontend
-    components/   # UI components
-    pages/        # Page views
-    services/     # Frontend services
-    store/        # Zustand state management
-    styles/       # Tailwind CSS
-    types/        # TypeScript type definitions
-    utils/        # Frontend utilities
+  renderer/          # React interface: shell, pages, apps, stores, styles
     DEXAPPLICATIONS/ # Built-in DEX applications
-  python/         # Python backend for deep system control
-  shared/         # Shared type definitions
+  shared/            # Code shared by the interface and the UKI assistant
+src-tauri/           # Desktop host in Rust (Tauri 2): windows, IPC, storage, native services
+core/                # Rust libraries (search, audio, vault, scanner, cache, ...)
+native/              # Optional Node native module (Rust)
+dex-os/              # Experimental bootable image (Buildroot)
+tests/               # Vitest unit tests and Playwright end-to-end tests
 ```
 
 ## Code Style
@@ -124,10 +98,10 @@ src/
 - Use functional components with hooks
 - Use `React.FC` for component typing
 - Lazy load pages and heavy components
-- Wrap app components in `ProcessIsolation` for fault containment
+- Apps are wrapped in `AppErrorBoundary` (in `AppManager.tsx`) so one failing app cannot take down the shell
 
 ### CSS
-- Use Tailwind CSS utility classes
+- Utility class names come from a hand-written layer in `styles/design-system.css` (not full Tailwind); an undefined class does nothing
 - Use CSS variables for theming (`var(--color-*)`)
 - Avoid inline styles where possible
 - Support both light and dark themes
@@ -176,7 +150,7 @@ npm run test:e2e
 - Respect the user's power profile settings
 
 ### Fault Isolation
-- Wrap apps in `ProcessIsolation`
+- New apps are mounted through `AppManager`, which wraps each in `AppErrorBoundary`
 - Use error boundaries for UI components
 - Log errors with context for debugging
 - Never let one subsystem crash the entire app

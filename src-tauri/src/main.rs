@@ -48,6 +48,7 @@ mod voice_notes;
 mod log_manager;
 mod notes_metadata;
 mod permissions_manager;
+mod webview_permissions;
 mod pattern_tracking;
 mod accessibility_ctl;
 mod adaptive_ctl;
@@ -1719,7 +1720,7 @@ fn start_index_watcher(app: tauri::AppHandle) {
     // directory-level changes/overflow and spaced at least MIN_FULL_GAP apart.
     const MIN_FULL_GAP: std::time::Duration = std::time::Duration::from_secs(30);
     const MAX_BATCH: usize = 200;
-    std::thread::spawn(move || {
+    crate::util::spawn_named("main", move || {
         let _keep_alive = watcher; // own the watcher so it stays active
         let mut last_full: Option<std::time::Instant> = None;
         let add = |work: &mut IndexWork, msg: Option<Vec<std::path::PathBuf>>| match (msg, &mut *work) {
@@ -2346,6 +2347,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch @ ("logs:get" | "logs:clear") => log_manager::dispatch(&app, ch, &args),
         ch @ ("notes:start-server" | "notes:stop-server") => notes_metadata::dispatch(&app, ch, &args),
         ch @ ("permissions:getAll" | "permissions:grant" | "permissions:revoke") => permissions_manager::dispatch(&app, ch, &args),
+        ch @ ("webPermissions:list" | "webPermissions:set" | "webPermissions:reset") => webview_permissions::dispatch(&app, ch, &args),
         ch @ ("patterns:recordAppOpen" | "patterns:recordAppClose" | "patterns:recordFileOpen" | "patterns:recordToolUse" | "patterns:recordAction" | "patterns:recordToolCombo" | "patterns:getSuggestions" | "patterns:getFrequent" | "patterns:getRecent" | "patterns:getToolCombos" | "patterns:getDayPatterns" | "patterns:getHourlyPatterns" | "patterns:getPreferredApp" | "patterns:getSessionStats" | "patterns:getAllPatterns" | "patterns:cleanup") => pattern_tracking::dispatch(&app, ch, &args),
         ch @ ("contract:getConfig" | "contract:getGuarantees" | "contract:getViolations") => contract_ctl::dispatch(&app, ch, &args),
         ch @ ("device:getThisDevice" | "device:getAll") => device_ctl::dispatch(&app, ch, &args),
@@ -2686,6 +2688,11 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             let _ = window.minimize();
             json!({ "success": true })
         }
+        "window:toggleFullscreen" => {
+            let next = !window.is_fullscreen().unwrap_or(false);
+            let ok = window.set_fullscreen(next).is_ok();
+            json!({ "success": ok, "fullscreen": next })
+        }
         "window:maximize" => {
             // The renderer treats this as a toggle.
             match window.is_maximized() {
@@ -2999,6 +3006,9 @@ fn main() {
             native_ops::start_reminder_scheduler(app.handle().clone());
             // Automatic backup scheduler (honors backup_settings; catchup on boot).
             native_ops::start_autobackup_scheduler(app.handle().clone());
+            // Answer DEX's own clipboard/MIDI/camera permission requests from the
+            // saved policy instead of a WebView2 prompt every time.
+            webview_permissions::install(app.handle());
             Ok(())
         })
         .on_page_load(|_webview, _payload| webview2::mark_page_loaded())

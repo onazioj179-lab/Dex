@@ -217,7 +217,7 @@ fn schedule_auto_revert(app: &tauri::AppHandle, scheduled_end_ms: i64, started_a
         return; // Already past; leave state as enabled, matching "no auto-revert ran".
     }
     let app = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("maintenance", move || {
         std::thread::sleep(std::time::Duration::from_millis(delay as u64));
         let still_armed = read_store(&app)
             .get(MAINTENANCE_KEY)

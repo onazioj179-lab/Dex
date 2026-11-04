@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCollaborationStore, hasPermission, CollaboratorRole } from '../services/CollaborationSystem';
+import { openCollabHub } from '../services/appCheckpoints';
 
 interface UseCollaborationOptions {
   appId: string;
@@ -54,9 +55,6 @@ export function useCollaborationFeatures(options: UseCollaborationOptions): Coll
     createProject,
     setActiveProject,
     createCheckpoint,
-    toggleShareDialog,
-    toggleChatPanel,
-    toggleCheckpointPanel,
   } = useCollaborationStore();
   
   // Get or create project for this app
@@ -124,18 +122,20 @@ export function useCollaborationFeatures(options: UseCollaborationOptions): Coll
     return () => clearTimeout(timer);
   }, [lastAutoCheckpointData, projectId, autoCheckpointInterval, createCheckpoint]);
   
-  // UI toggles
+  // The Share dialog, chat and checkpoint list are rendered by Collab Hub;
+  // these open it on this project's panel (the store flags they used to flip
+  // were rendered nowhere).
   const openShareDialog = useCallback(() => {
-    if (projectId) toggleShareDialog();
-  }, [projectId, toggleShareDialog]);
-  
+    if (projectId) openCollabHub('share', projectId);
+  }, [projectId]);
+
   const openChatPanel = useCallback(() => {
-    if (projectId) toggleChatPanel();
-  }, [projectId, toggleChatPanel]);
-  
+    if (projectId) openCollabHub('chat', projectId);
+  }, [projectId]);
+
   const openCheckpointPanel = useCallback(() => {
-    if (projectId) toggleCheckpointPanel();
-  }, [projectId, toggleCheckpointPanel]);
+    openCollabHub('checkpoints', projectId);
+  }, [projectId]);
   
   return {
     projectId,

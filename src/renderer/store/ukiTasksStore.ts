@@ -48,6 +48,29 @@ export interface UkiBackgroundTask {
   steps: UkiTaskStep[];
   result?: string;
   error?: string;
+  /** The full request (agent tasks), so an interrupted run can be resumed. */
+  request?: string;
+  /** Set when DEX restarted while this task was running. */
+  interrupted?: boolean;
+  /** Set once the user resumed it (a new task carries the work on). */
+  resumedAt?: number;
+}
+
+/**
+ * The request that continues an interrupted agent task. The agent is told
+ * what it had already finished and to check the current state before acting,
+ * so completed side effects are not blindly repeated.
+ */
+export function buildResumeRequest(task: Pick<UkiBackgroundTask, 'title' | 'request' | 'steps'>): string {
+  const goal = (task.request || task.title).trim();
+  const done = task.steps.map((s) => s.label.trim()).filter(Boolean).slice(-12);
+  const doneBlock = done.length ? `\nSteps already completed before DEX restarted:\n${done.map((d) => `- ${d}`).join('\n')}` : '';
+  return `Resume this task, which was interrupted when DEX restarted: "${goal}".${doneBlock}\nCheck the current state first and do not repeat finished steps.`;
+}
+
+/** An interrupted agent task the user can resume. */
+export function isResumable(task: UkiBackgroundTask): boolean {
+  return task.status === 'failed' && !!task.interrupted && !task.resumedAt && task.source === 'uki-agent';
 }
 
 const MAX_TASKS = 50;
@@ -59,7 +82,9 @@ const NOTIFY_MIN_RUNTIME_MS = 8_000;
 
 interface UkiTasksState {
   tasks: UkiBackgroundTask[];
-  startTask: (title: string, source: string) => string;
+  startTask: (title: string, source: string, request?: string) => string;
+  /** Mark an interrupted task as resumed (its continuation is a new task). */
+  markResumed: (id: string) => void;
   logTaskStep: (id: string, label: string) => void;
   completeTask: (id: string, result?: string) => void;
   failTask: (id: string, error?: string) => void;
@@ -144,12 +169,13 @@ export const useUkiTasks = create<UkiTasksState>()(
     (set, get) => ({
       tasks: [],
 
-      startTask: (title, source) => {
+      startTask: (title, source, request) => {
         const id = nextId();
         const now = Date.now();
         const task: UkiBackgroundTask = {
           id,
           title: title.slice(0, 120),
+          ...(request ? { request: request.slice(0, 4000) } : {}),
           source,
           status: 'running',
           createdAt: now,
@@ -158,6 +184,11 @@ export const useUkiTasks = create<UkiTasksState>()(
         };
         set(s => ({ tasks: capTasks([...s.tasks, task]) }));
         return id;
+      },
+
+      markResumed: (id) => {
+        const now = Date.now();
+        set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, resumedAt: now, updatedAt: now } : t) }));
       },
 
       logTaskStep: (id, label) => {
@@ -253,7 +284,7 @@ export const useUkiTasks = create<UkiTasksState>()(
         const now = Date.now();
         state.tasks = state.tasks.map(t =>
           t.status === 'running' || t.status === 'pending' || t.status === 'stalled' || t.status === 'paused'
-            ? { ...t, status: 'failed' as const, finishedAt: t.finishedAt ?? now, error: t.error ?? 'Interrupted by app restart' }
+            ? { ...t, status: 'failed' as const, interrupted: true, finishedAt: t.finishedAt ?? now, error: t.error ?? 'Interrupted by app restart' }
             : t);
       },
     }

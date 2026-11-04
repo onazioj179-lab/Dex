@@ -188,7 +188,7 @@ pub fn mark_page_loaded() {
 /// `Builder::run`'s Result — the app just sits with an empty window and no
 /// WebView2 processes. Turn that silent hang into a logged, explained error.
 pub fn start_load_watchdog(timeout: std::time::Duration) {
-    std::thread::spawn(move || {
+    crate::util::spawn_named("webview2", move || {
         std::thread::sleep(timeout);
         if PAGE_LOADED.load(std::sync::atomic::Ordering::SeqCst) {
             return;

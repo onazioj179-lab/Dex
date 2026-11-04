@@ -275,14 +275,14 @@ fn stop_listening(app: &tauri::AppHandle) -> bool {
 // still on that same generation (i.e. the same session is still live).
 fn arm_timeouts(app: &tauri::AppHandle, my_gen: u64, max_ms: u64, silence_ms: u64) {
     let app_a = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("voice", move || {
         std::thread::sleep(Duration::from_millis(max_ms.max(1)));
         if engine().lock().unwrap().timer_gen == my_gen {
             stop_listening(&app_a);
         }
     });
     let app_b = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("voice", move || {
         std::thread::sleep(Duration::from_millis(silence_ms.max(1)));
         if engine().lock().unwrap().timer_gen == my_gen {
             stop_listening(&app_b);

@@ -527,7 +527,7 @@ fn launch(app: &tauri::AppHandle, game_id: &str, overlay: bool) -> Value {
             // Electron's `child.on('exit', ...)` (no UI block; detached-equivalent).
             let app2 = app.clone();
             let gid = game_id.to_string();
-            std::thread::spawn(move || {
+            crate::util::spawn_named("games", move || {
                 let mut child = child;
                 let _ = child.wait();
                 let sec = ((now_ms() - start_ms) as f64 / 1000.0).round() as i64;

@@ -600,7 +600,7 @@ fn quick_boost(app: &tauri::AppHandle, duration_minutes: u64) -> Value {
         // native_ops reminder scheduler). NOTE: like power.rs we do not cancel a
         // prior pending revert, so overlapping boosts may revert early.
         let app2 = app.clone();
-        std::thread::spawn(move || {
+        crate::util::spawn_named("hardware", move || {
             std::thread::sleep(std::time::Duration::from_secs(duration_minutes * 60));
             let _ = set_power_profile(&app2, "balanced");
         });

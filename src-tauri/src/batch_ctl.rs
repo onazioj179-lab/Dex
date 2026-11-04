@@ -721,7 +721,7 @@ fn execute_batch(app: &tauri::AppHandle, preview_id: &str) -> Value {
     // Worker thread: real fs loop with cancellation polling + progress events.
     let app_thread = app.clone();
     let preview_id_owned = preview_id.to_string();
-    let handle = std::thread::spawn(move || -> Value {
+    let handle = crate::util::spawn_named("batch", move || -> Value {
         let mut processed: u64 = 0;
         let mut errors: Vec<Value> = Vec::new();
         let mut cancelled = false;

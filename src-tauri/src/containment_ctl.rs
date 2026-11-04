@@ -240,7 +240,7 @@ fn restore_in_state(state: &mut Value, domain: &str) -> bool {
 // shared timer map needed.
 fn schedule_auto_revert(app: &tauri::AppHandle, domain: String, timeout: u64, stamp: u64) {
     let app = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("containment", move || {
         std::thread::sleep(std::time::Duration::from_millis(timeout));
         let mut state = load_state(&app);
         let still = state["domainStatus"][domain.as_str()]

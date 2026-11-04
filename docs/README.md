@@ -5,7 +5,7 @@ Use this folder for all project documentation. DEX OS is currently **v7.0.1** (u
 **Start here (repository root)**
 - [DEX_REMAINING_WORK.md](../DEX_REMAINING_WORK.md) -- the active backlog (everything unfinished, with blockers)
 - [DEX_7.0.1_RELEASE_NOTES.md](../DEX_7.0.1_RELEASE_NOTES.md) -- user-facing changes
-- [DEX_7.0.1_VERIFICATION.md](../DEX_7.0.1_VERIFICATION.md) (includes the Part 4 evidence), [DEX_PART5_IMPLEMENTATION_REPORT.md](../DEX_PART5_IMPLEMENTATION_REPORT.md) -- latest program reports
+- [DEX_7.0.1_VERIFICATION.md](../DEX_7.0.1_VERIFICATION.md) -- test and release evidence for 7.0.1 (the Part 5 report is in git history)
 - [reports/](reports/README.md) -- engineering evidence (architecture, performance, privacy, audits)
 
 **Product**

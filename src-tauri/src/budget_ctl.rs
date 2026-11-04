@@ -415,7 +415,7 @@ fn start_monitoring(app: &tauri::AppHandle) {
         return; // already running
     }
     let app = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("budget", move || {
         let mut sys = sysinfo::System::new();
         loop {
             std::thread::sleep(std::time::Duration::from_secs(5));

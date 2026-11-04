@@ -1,67 +1,145 @@
-# DEX — your calm, all-in-one desktop
+# DEX OS
 
-> By Onazi Treasure OJ · v6.0.1 · © 2026 · [DEX Software License v1.0](LICENSE)
+A desktop environment for Windows that brings notes, files, a web browser,
+creative tools and an AI assistant into one workspace.
 
-**One free app that replaces a dozen.** Notes, files, a browser, a calendar,
-drawing, photo/video/music editing, a knowledge graph, and a built-in AI
-assistant — all in one fast, private desktop that runs on your machine. No
-account, no subscription, every feature unlocked for everyone.
+**Version:** 7.0.1 · **Creator:** Onazi Oj · **License:** [DEX Software License v1.0](LICENSE)
+
+> **Release status.** The source in this repository is version 7.0.1. The 7.0.1
+> installer has not been published yet; the newest published installer is
+> [v6.1.0](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0). What
+> remains before 7.0.1 ships is listed in [DEX_REMAINING_WORK.md](DEX_REMAINING_WORK.md).
 
 ---
 
 ## Download
 
-**Latest: [v6.0.1 →](https://github.com/onazioj179-lab/Dex/releases/latest)**
-
-| Platform | |
+| Platform | Package |
 |---|---|
-| **Windows 10/11 (64-bit)** — most people | [Installer →](https://github.com/onazioj179-lab/Dex/releases/latest) |
-| **Windows on ARM** | [Installer →](https://github.com/onazioj179-lab/Dex/releases/latest) |
-| **Windows — portable** (no install) | [Portable build →](https://github.com/onazioj179-lab/Dex/releases/latest) |
-| **macOS / Linux** | Coming later |
+| Windows 10 or 11, 64-bit (x64) | Installer (`.exe`) or Windows Installer package (`.msi`) from [Releases](https://github.com/onazioj179-lab/Dex/releases) |
+| macOS, Linux, Windows on ARM | Not available |
 
-The installer shows the License before writing anything, and updates are
-verified against the publisher key. The Windows build isn't OS code-signed yet,
-so SmartScreen may warn — choose *More info → Run anyway* (see
-[docs/SIGNING.md](docs/SIGNING.md)).
+The installers are not code-signed yet, so Windows SmartScreen may show a
+warning. Select **More info**, then **Run anyway**. Each release lists SHA-256
+checksums so you can verify the download (see [Verifying a download](#verifying-a-download)).
 
----
+### System requirements
 
-## Why DEX
-
-- **One assistant for everything.** Press `Ctrl+Space`, tell **UKI** what you
-  want in plain words — it drafts, summarizes, opens things, and runs short
-  workflows, always showing a plan first for anything that changes your data.
-- **Apps that work together.** Every tool lives inside DEX and shares context,
-  so your work follows you instead of getting stranded across apps.
-- **Real windows.** Drag, snap, tile, and maximize to fill the frame; floating
-  windows remember where you left them. Zoom out to see every app at once.
-- **Yours, on your machine.** No required account. Analytics off by default.
-  Private content (passwords, files, clipboard, screenshots) is never collected.
-- **Free and light.** Every feature, for everyone — no trial, no quotas, no
-  paywall. Heavy apps load only when opened.
+- Windows 10 or Windows 11, 64-bit
+- Microsoft Edge WebView2 Runtime. It is part of Windows 11; on Windows 10 the
+  installer downloads it if it is missing.
 
 ---
 
-## What's inside
+## Features
 
-- **Daily** — Home · Notes · Tasks · Files · Browser · Calendar · Workflows
-- **Knowledge** — Nexus (graph) · Learn · Rewind · Reader
-- **Creative** — Vinx (video) · Imosion (music) · Prism · Flux · Forge · AXL
-  (CAD) · Canvas · PixelArt · DexCode · Kanban · Presentations
-- **More** — Store (install/remove apps) · Games · the **UKI** assistant
+- **Desktop shell.** Movable, resizable windows with snapping and tiling, a
+  spatial canvas you can pan and zoom in every direction, Spotlight search
+  (`Ctrl+K`), a launcher bar, notifications and Do Not Disturb.
+- **Everyday apps.** Notes, Tasks, Files, Browser, Calendar, Calculator,
+  Password Generator (with an encrypted vault), clipboard history and Workflows.
+- **Creative apps.** VINX (video), Imosion (music), PRISM (photo), FLUX
+  (motion), FORGE (3D), AXL (CAD), Canvas, Pixel Art, Presentation and DexCode.
+- **Nexus.** System overview and task manager with live CPU, memory, disk and
+  network figures.
+- **UKI assistant.** Answers questions and runs actions across DEX apps. Changes
+  to your data are shown for confirmation first. Cloud models need your own API
+  key; a local model through Ollama is optional.
+- **Local first.** No account is required. Data is stored on your computer.
+  Analytics are off by default. See [PRIVACY.md](PRIVACY.md).
 
-Open anything from the launcher, `Ctrl+K`, or the Store.
+### Known limitations
+
+- Installers are unsigned, and updates are not delivered automatically.
+- Cloud AI features require an API key from a supported provider.
+- Speech recognition uses the system Web Speech service, which may process audio online.
+- The bootable DEX OS image in [`dex-os/`](dex-os/README.md) is experimental and has not been boot-tested for this release.
 
 ---
 
-## Links
+## Building from source
 
-[Docs](docs/APP_DOCUMENTATION.md) · [Changelog](docs/CHANGELOG.md) ·
-[Privacy](PRIVACY.md) · [Terms](TERMS.md) · [Security](docs/SECURITY.md) ·
-[All releases](https://github.com/onazioj179-lab/Dex/releases)
+### Prerequisites
+
+- Windows 10 or 11 (x64)
+- [Node.js](https://nodejs.org/) 20 LTS (18 or later works) and npm 9 or later
+- [Rust](https://rustup.rs/) stable with the **MSVC** toolchain
+  (`rustup default stable-x86_64-pc-windows-msvc`)
+- Visual Studio Build Tools with the **Desktop development with C++** workload
+
+Release builds must use the MSVC toolchain. A GNU build depends on
+`WebView2Loader.dll`, which the installer does not include, so `src-tauri/build.rs`
+refuses to produce one.
+
+### Commands
+
+```bash
+npm ci
+```
+
+```bash
+npm run dev
+```
+
+`npm run dev` starts the desktop app with live reload. `npm run dev:renderer`
+starts only the web interface in a browser at `http://localhost:5173`; native
+features (files, clipboard, system information) are unavailable there.
+
+| Task | Command |
+|---|---|
+| Type-check and attribution check | `npm run lint` |
+| Unit tests | `npm test` |
+| End-to-end tests | `npm run test:e2e` |
+| Installers (NSIS and MSI) | `npm run build:tauri` |
+| SHA-256 checksums for the installers | `npm run release:checksums` |
+
+`npm run build:tauri` writes the installers to
+`src-tauri/target/release/bundle/nsis/` and `src-tauri/target/release/bundle/msi/`,
+then checks that the executable does not depend on DLLs the installer does not ship.
+
+### Verifying a download
+
+```powershell
+Get-FileHash .\DEX_7.0.1_x64-setup.exe -Algorithm SHA256
+```
+
+Compare the result with the checksum listed on the release page.
 
 ---
 
-**DEX** — designed, built, and maintained by **Onazi Treasure OJ**
-<onazi75@gmail.com>. © 2026. All rights reserved.
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `src/renderer/` | User interface (React and TypeScript): shell, apps, settings |
+| `src/shared/` | Code shared by the interface and the assistant: UKI, commands, policies |
+| `src-tauri/` | Desktop host in Rust (Tauri 2): windows, IPC, storage, native services |
+| `core/` | Rust libraries: search index, audio analysis, vault, scanner, cache |
+| `native/` | Optional Node native module (Rust) used by tooling |
+| `dex-os/` | Experimental bootable image (Buildroot) |
+| `tests/` | Unit tests (Vitest) and end-to-end tests (Playwright) |
+| `scripts/` | Build, release and maintenance scripts |
+| `docs/` | Documentation; start at [docs/README.md](docs/README.md) |
+
+---
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Changelog](docs/CHANGELOG.md) and [7.0.1 release notes](DEX_7.0.1_RELEASE_NOTES.md)
+- [Release procedure](docs/RELEASE.md) and [code signing](docs/SIGNING.md)
+- [Keyboard shortcuts](docs/SHORTCUTS.md)
+- [Contributing](docs/CONTRIBUTING.md)
+
+## Security
+
+Report security issues privately to onazi75@gmail.com. Do not open a public
+issue for a vulnerability. See [docs/SECURITY.md](docs/SECURITY.md).
+
+## License
+
+DEX is proprietary software distributed under the
+[DEX Software License Agreement v1.0](LICENSE). See also [TERMS.md](TERMS.md),
+[PRIVACY.md](PRIVACY.md) and [NOTICE](NOTICE) for third-party components.
+
+© 2026 Onazi Treasure OJ. DEX OS is created by Onazi Oj.

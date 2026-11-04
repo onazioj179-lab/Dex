@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
@@ -21,7 +22,7 @@ import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../s
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
-import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled } from '../shell/SpatialAudio';
+import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled, getSoundVolume, setSoundVolume, playToggle } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
@@ -1016,7 +1017,7 @@ const exportSettings = (settings: Record<string, unknown>): void => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     window.dispatchEvent(new CustomEvent('dex-toast', { 
-      detail: { message: 'Settings exported successfully', type: 'success' } 
+      detail: { message: 'Settings exported', type: 'success' } 
     }));
   } catch (e) {
     window.dispatchEvent(new CustomEvent('dex-toast', { 
@@ -1041,7 +1042,7 @@ const importSettings = (onImport: (settings: typeof DEFAULT_SETTINGS) => void): 
         const merged = { ...DEFAULT_SETTINGS, ...data.settings };
         onImport(merged);
         window.dispatchEvent(new CustomEvent('dex-toast', { 
-          detail: { message: 'Settings imported successfully', type: 'success' } 
+          detail: { message: 'Settings imported', type: 'success' } 
         }));
       } else {
         throw new Error('Invalid settings format');
@@ -1904,6 +1905,7 @@ export const Settings: React.FC = () => {
   const shellPrefs = useShellPreferences();
   const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
   const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
+  const uiSoundVolume = useSyncExternalStore(subscribeSoundEnabled, getSoundVolume);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
   const dnd = useNotificationCenterStore((s) => s.doNotDisturb);
@@ -3334,7 +3336,7 @@ export const Settings: React.FC = () => {
           </div>
           {showRecoveryCodes && recoveryCodes.length > 0 && (
             <div style={{ padding: 'var(--space-4)', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
                   <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
@@ -3545,6 +3547,14 @@ export const Settings: React.FC = () => {
     </div>
   );
 
+  /** "Windows · Desktop app" from the running environment, not a constant. */
+  const aboutPlatform = (): string => {
+    const uaPlatform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+    const os = uaPlatform || (/Windows/i.test(navigator.userAgent) ? 'Windows' : /Mac/i.test(navigator.userAgent) ? 'macOS' : /Linux/i.test(navigator.userAgent) ? 'Linux' : 'Unknown');
+    const host = isTauri() ? 'Desktop app' : 'Web preview';
+    return `${os} · ${host}`;
+  };
+
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
       <div style={{ ...styles.aboutHeader, marginTop: 'var(--space-3)' }}>
@@ -3579,6 +3589,18 @@ export const Settings: React.FC = () => {
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Version</span>
           <span style={styles.aboutValue}>{appVersion}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Build</span>
+          <span style={styles.aboutValue}>{import.meta.env.PROD ? 'Release' : 'Development'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Platform</span>
+          <span style={styles.aboutValue}>{aboutPlatform()}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Updates</span>
+          <span style={styles.aboutValue}>Install new versions from the Releases page</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Creator</span>
@@ -3827,13 +3849,31 @@ export const Settings: React.FC = () => {
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Interface sounds</span>
-          <span style={styles.settingDesc}>Short tones for toggles, notifications, copy and errors. Off means DEX stays silent; media apps are unaffected.</span>
+          <span style={styles.settingDesc}>Tones for toggles, notifications, copy and errors. Media apps are unaffected.</span>
         </div>
         <input
           type="checkbox"
           checked={uiSoundsOn}
           onChange={(e) => setSoundEnabled(e.target.checked)}
           aria-label="Interface sounds"
+        />
+      </div>
+      <div style={{ ...styles.settingRow, opacity: uiSoundsOn ? 1 : 0.5 }}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Interface volume</span>
+          <span style={styles.settingDesc}>{Math.round(uiSoundVolume * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(uiSoundVolume * 100)}
+          disabled={!uiSoundsOn}
+          onChange={(e) => setSoundVolume(Number(e.target.value) / 100)}
+          onPointerUp={(e) => playToggle(e.currentTarget.getBoundingClientRect().left + e.currentTarget.offsetWidth / 2)}
+          aria-label="Interface sound volume"
+          style={{ width: 160, accentColor: 'var(--color-accent)' }}
         />
       </div>
       {renderWindowsLink('Output, input & volume', 'Speakers, headphones, microphones, balance and spatial sound are managed by Windows.', 'ms-settings:sound')}

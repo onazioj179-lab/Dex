@@ -341,7 +341,7 @@ export const APP_REGISTRY: AppDefinition[] = [
   },
   {
     id: 'passwordgenerator',
-    name: 'Password Gen',
+    name: 'Password Generator',
     icon: 'lock',
     color: '#007aff',
     description: 'Secure password generator',

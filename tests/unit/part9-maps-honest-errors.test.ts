@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, vi } from 'vitest';
 vi.mock('maplibre-gl', () => ({ default: {}, Map: class {}, Marker: class {} }));
 import { geocode, locationErrorMessage } from '../../src/renderer/DEXAPPLICATIONS/standalone/Maps';

@@ -15,7 +15,7 @@
  * code, and attributed to the DEX app it was copied from -- so the history
  * becomes a searchable, cross-app memory of what you've been working with.
  *
- * Pure store: capture (background polling + in-app copy events) lives in
+ * Pure store: capture (in-app copy events + an opt-in focus read) lives in
  * services/ClipboardMonitor.ts, and the panel/Spotlight read from here. This
  * keeps the data model decoupled from DOM/clipboard APIs so it is testable and
  * consumable from any surface (panel, command palette, Spotlight, UKI).
@@ -83,6 +83,12 @@ interface ClipboardState {
   clearUnpinned: () => void;
   /** Clear everything, pinned included. */
   clearAll: () => void;
+  /**
+   * Also capture what you copied in other programs (read once when DEX regains
+   * focus). Off by default: copies made inside DEX are always captured.
+   */
+  captureOtherApps: boolean;
+  setCaptureOtherApps: (on: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +230,8 @@ export const useClipboardStore = create<ClipboardState>()(
   persist(
     (set, get) => ({
       entries: [],
+      captureOtherApps: false,
+      setCaptureOtherApps: (on) => set({ captureOtherApps: on }),
 
       add: (content, opts) => {
         if (!content) return null;
@@ -288,7 +296,10 @@ export const useClipboardStore = create<ClipboardState>()(
       version: 1,
       // Image clips hold large base64 data URLs -- keep them session-only so they
       // never blow the localStorage quota. Everything else persists.
-      partialize: (state) => ({ entries: state.entries.filter(e => e.kind !== 'image') }),
+      partialize: (state) => ({
+        entries: state.entries.filter(e => e.kind !== 'image'),
+        captureOtherApps: state.captureOtherApps,
+      }),
     },
   ),
 );

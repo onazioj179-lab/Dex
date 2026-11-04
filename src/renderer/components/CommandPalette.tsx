@@ -30,6 +30,14 @@ import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexComm
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { DexSearchInput } from '../styles/components';
 
+/** Real window fullscreen in the app (DOM fullscreen only fills the window). */
+function toggleWindowFullscreen(): void {
+  const invoke = (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex?.invoke;
+  if (invoke) { void invoke('window:toggleFullscreen'); return; }
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen?.();
+}
+
 // Catalog ACTION commands the palette does NOT already cover (split / arrange /
 // lock / fullscreen exist above). Adding only the gaps keeps the catalog the one
 // source without duplicating commands. Each runs through the single executor.
@@ -263,12 +271,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },
     { id: 'new-task', title: 'Create New Task', subtitle: 'Add a new task', icon: Icons.newTask, category: 'action', action: () => { openApp('tasks'); }, keywords: ['add', 'todo'] },
     { id: 'new-workflow', title: 'Create New Workflow', subtitle: 'Build automation', icon: Icons.workflows, category: 'action', action: () => { openApp('workflows'); }, keywords: ['automate', 'create'] },
-    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { void useAuthStore.getState().lock(); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
+    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { void useAuthStore.getState().lock(); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+Shift+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
     { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { useClipboardStore.getState().clearAll(); }, keywords: ['clean', 'privacy'] },
     { id: 'toggle-dex-bar', title: 'Show / Hide DEX Bar', subtitle: 'Toggle the floating launcher bar', icon: Icons.home, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-toggle-bar')); }, keywords: ['bar', 'launcher', 'dock', 'floating', 'show', 'hide', 'restore'], shortcut: `${_M}+Shift+B` },
     { id: 'save-diagnostics', title: 'Save Diagnostics Report', subtitle: 'Download crash + environment info', icon: Icons.files, category: 'action', action: () => { exportDiagnostics(); }, keywords: ['diagnostics', 'crash', 'report', 'debug', 'support', 'recovery', 'logs'] },
-    { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
+    { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { toggleWindowFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
     { id: 'arrange-windows', title: 'Arrange Windows', subtitle: 'Tile open windows into a grid', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), keywords: ['tile', 'grid', 'arrange', 'organize', 'windows', 'layout', 'cascade'] },
     { id: 'tile-all-apps', title: 'Use All Apps at Once', subtitle: 'Open every running app into a window and tile them together', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows', { detail: { includeAll: true } })), keywords: ['tile', 'all', 'apps', 'multitask', 'everything', 'side by side', 'windows', 'spread', 'mission control', 'expose', 'arrange'] },
     { id: 'workspace-timeline', title: 'Workspace Time Machine', subtitle: 'Restore your desktop layout to an earlier moment', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-open-workspace-timeline')), keywords: ['time machine', 'snapshot', 'history', 'layout', 'restore', 'workspace', 'rewind', 'undo'] },
@@ -690,6 +698,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
 export const useCommandPalette = (enabled: boolean = true) => {
   const [isOpen, setIsOpen] = useState(false);
+  const launchApp = useRunningApps(s => s.launchApp);
+  const openApp = useCallback((appId: string) => {
+    const def = APP_DEFINITIONS[appId];
+    if (def) launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
+  }, [launchApp]);
 
   useEffect(() => {
     if (!enabled) {
@@ -697,16 +710,33 @@ export const useCommandPalette = (enabled: boolean = true) => {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
       // Ctrl+K opens the command palette
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'k') {
+      if (mod && !e.shiftKey && key === 'k') {
         e.preventDefault();
         setIsOpen(prev => !prev);
+        return;
+      }
+      // The shortcuts the palette advertises (they were labels only).
+      if (mod && !e.shiftKey && !e.altKey && e.key === ',') {
+        e.preventDefault();
+        openApp('settings');
+      } else if (mod && e.shiftKey && !e.altKey && key === 'b') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('dex-toggle-bar'));
+      } else if (mod && e.shiftKey && !e.altKey && key === 'l') {
+        e.preventDefault();
+        void useAuthStore.getState().lock();
+      } else if (e.key === 'F11' && !mod && !e.altKey) {
+        e.preventDefault();
+        toggleWindowFullscreen();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled]);
+  }, [enabled, openApp]);
 
   useEffect(() => {
     if (!enabled && isOpen) {

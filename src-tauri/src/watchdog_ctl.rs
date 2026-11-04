@@ -158,7 +158,7 @@ fn ensure_monitor(app: &tauri::AppHandle) {
         return;
     }
     let app = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("watchdog", move || {
         // Initial check (Electron runs runHealthCheck() immediately in start()).
         crate::native_ops::emit_event(&app, "watchdog:healthUpdate", &get_status());
         loop {

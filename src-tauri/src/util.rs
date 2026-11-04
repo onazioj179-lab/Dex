@@ -6,6 +6,27 @@
 //! must use these rather than growing local copies (Refinement initiative:
 //! no duplicate functionality).
 
+/// Stack for DEX's background threads. Rust's default is 2 MiB; DEX's workers
+/// call into sysinfo/WMI, SQLite and serde on large payloads, and an earlier
+/// packaged run died with "thread '<unknown>' has overflowed its stack".
+pub const WORKER_STACK_BYTES: usize = 8 * 1024 * 1024;
+
+/// Spawn a background thread with a name (so a crash report says which one)
+/// and an 8 MiB stack.
+pub fn spawn_named<F, T>(name: &str, f: F) -> std::thread::JoinHandle<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let builder = std::thread::Builder::new()
+        .name(format!("dex-{name}"))
+        .stack_size(WORKER_STACK_BYTES);
+    // `spawn` consumes the closure, so a failed Builder spawn cannot retry
+    // with the same one; it only fails when the OS is out of threads/memory,
+    // where a plain spawn would fail too.
+    builder.spawn(f).expect("failed to spawn DEX worker thread")
+}
+
 /// A UUIDv4-shaped identifier seeded from the wall clock, process id, and a
 /// per-process monotonic counter, mixed through SplitMix64. Used where Electron
 /// used `crypto.randomUUID()` for local row ids / session labels — collision
@@ -109,3 +130,22 @@ mod tests {
     }
 }
 
+
+#[cfg(test)]
+mod spawn_named_tests {
+    use super::spawn_named;
+
+    // ~4 MiB of stack: overflows Rust's default 2 MiB thread stack.
+    fn deep(n: u32) -> u64 {
+        let pad = [n as u8; 1024];
+        if n == 0 { return pad[0] as u64; }
+        deep(n - 1) + pad[(n % 1024) as usize] as u64
+    }
+
+    #[test]
+    fn worker_threads_are_named_and_have_room() {
+        let h = spawn_named("probe", || (std::thread::current().name().map(String::from), deep(3_500)));
+        let (name, _) = h.join().expect("worker panicked");
+        assert_eq!(name.as_deref(), Some("dex-probe"));
+    }
+}

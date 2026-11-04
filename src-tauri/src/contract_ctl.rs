@@ -395,7 +395,7 @@ fn start_monitoring(app: &tauri::AppHandle) {
         return; // already running
     }
     let app = app.clone();
-    std::thread::spawn(move || loop {
+    crate::util::spawn_named("contract", move || loop {
         std::thread::sleep(std::time::Duration::from_secs(10));
         let _ = check_compliance(&app);
     });

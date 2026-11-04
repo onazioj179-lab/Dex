@@ -14,10 +14,18 @@
 
 - **Touch & Pen settings.** Shows how many fingers your screen supports and has a test pad that draws every live contact. Up to ten fingers are tracked at once where the screen supports it.
 - **Spotlight finds open windows**, and on the spatial desktop also your window groups, zones and saved views.
+- **Password Generator+.** Passwords and passphrases (4 to 12 words), an option to leave out look-alike characters (0 O o 1 l I), strength from the real size of the space the value was chosen from, Enter or R to generate and Ctrl+C to copy. Save to Vault stores a value in the encrypted Vault, unlocking it (or creating one) on the spot.
+- **Permissions in one place.** Settings › Permissions lists what DEX itself may use (clipboard, microphone, camera, location and more) with Allow, Ask or Block for each, and when each was last requested.
+- **Checkpoints you can restore.** VINX and AXL save checkpoints of the whole project (also automatically when it changes); Collab Hub lists them with Restore and Delete.
+- **Resume interrupted assistant tasks.** A UKI task cut off by closing DEX can be resumed once from the UKI panel.
+- **Interface sound volume** in Settings › Sound.
 
 ## Changed
 
 - **Spatial desktop: no more corner toolbar or default minimap.** Right-click or long-press the desktop for zoom, arrange and window options (shortcuts unchanged). The minimap is off unless you turn it on.
+- **Turning on the spatial canvas keeps your layout.** Windows stay where they were on screen; one that would overlap another moves to the nearest free spot in any direction. Before, they were lined up to the right of earlier windows, so the canvas grew into a long strip.
+- **Clipboard history from other programs is opt-in.** Copies made inside DEX are always kept. Turn on "Include copies from other apps" in the clipboard history panel to also keep copies from other programs.
+- **Keyboard shortcuts that were only labels now work:** Ctrl+, opens Settings, Ctrl+Shift+B shows or hides the DEX Bar, Ctrl+Shift+L locks DEX (was Ctrl+L, which the Browser address bar uses), and F11 makes the DEX window full screen.
 - **Haptics only where there is a motor.** DEX no longer calls vibrate on every button press; a short pulse marks a snap on supported phones/tablets, and you can turn it off.
 
 - **Local AI is opt-in.** DEX no longer checks for Ollama on every start or uses it just because it is running. Turn on "Connect to a local AI service (Ollama)" in Settings › AI Providers if you want it. DEX never installs or starts an AI runtime.
@@ -27,6 +35,13 @@
 
 ## Fixed
 
+- DEX no longer asks again and again for permission to "see text and images copied to the clipboard": it used to read the clipboard every 4 seconds. Imosion no longer asks to "control and reprogram your MIDI devices"; it asks for ordinary MIDI access only when you open its MIDI panel.
+- Passwords saved in Password Generator were stored unencrypted on disk. Recent passwords are now kept in memory for the session only, and passwords saved by an earlier version can be moved to the Vault or deleted. The clipboard is cleared 30 seconds after a copy only if it still holds the password.
+- Settings › Permissions always showed an error under the current app framework.
+- Unchecked checkboxes were hard to see in dark mode; their border now has at least 3:1 contrast.
+- Browser: the saved-password prompt, the blocked-request count and full-screen video work with the native browser view.
+- Rewind no longer checks for updates over the network every time it opens.
+- A background task can no longer crash DEX with a stack overflow: background threads are named and get an 8 MB stack.
 - Turning off Windows animation effects no longer turns off glass.
 - Fewer pop-ups: redundant toasts removed (pin/unpin in Files, "wallpaper applied", per-frame Forge export messages).
 - Hover feedback came back in about a dozen apps (it was switched off whenever glass was off).

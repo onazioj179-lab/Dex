@@ -138,3 +138,37 @@ describe('Flux distribute', () => {
     expect(distributePositions([5, 9])).toEqual([5, 9]);
   });
 });
+
+describe('Native browser view: page -> host outbox', () => {
+  it('maps queued page messages to the <webview> events the Browser handles', async () => {
+    const { outboxToEvent } = await import('../../src/renderer/components/NativeWebview');
+    const { ADBLOCK_CONSOLE_PREFIX } = await import('../../src/renderer/DEXAPPLICATIONS/browser/adblockContentScript');
+    expect(outboxToEvent({ t: 'adblock', n: 7 })).toEqual({ type: 'console-message', data: { level: 0, message: ADBLOCK_CONSOLE_PREFIX + 7 } });
+    expect(outboxToEvent({ t: 'cred', u: 'ada', p: 'pw' })).toEqual({ type: 'ipc-message', data: { channel: 'dex-cred-capture', args: [{ username: 'ada', password: 'pw' }] } });
+    expect(outboxToEvent({ t: 'fs', on: true })?.type).toBe('enter-html-full-screen');
+    expect(outboxToEvent({ t: 'fs', on: false })?.type).toBe('leave-html-full-screen');
+  });
+  it('drops malformed, empty or oversized messages', async () => {
+    const { outboxToEvent } = await import('../../src/renderer/components/NativeWebview');
+    expect(outboxToEvent(null)).toBeNull();
+    expect(outboxToEvent({ t: 'cred', u: '', p: 'x' })).toBeNull();
+    expect(outboxToEvent({ t: 'cred', u: 'a'.repeat(600), p: 'x' })).toBeNull();
+    expect(outboxToEvent({ t: 'adblock', n: '7' })).toBeNull();
+    expect(outboxToEvent({ t: 'run', code: 'x' })).toBeNull();
+  });
+});
+
+describe('Interface sound volume', () => {
+  it('is clamped, persisted and notifies subscribers', async () => {
+    const audio = await import('../../src/renderer/shell/SpatialAudio');
+    const seen = vi.fn();
+    const off = audio.subscribeSoundEnabled(seen);
+    audio.setSoundVolume(0.4);
+    expect(audio.getSoundVolume()).toBe(0.4);
+    expect(localStorage.getItem('dex-ui-sound-volume')).toBe('0.4');
+    audio.setSoundVolume(7);
+    expect(audio.getSoundVolume()).toBe(1);
+    expect(seen).toHaveBeenCalledTimes(2);
+    off();
+  });
+});
