@@ -2912,6 +2912,22 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
     workflows::ensure_schema(c);
 }
 
+/// One DEX per data folder. The guard protects the shared dex.db and WebView2
+/// profile; an instance started with `DEX_DATA_DIR` (test isolation, see
+/// paths.rs) uses its own data, so it may run beside the normal one.
+fn single_instance_guard() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    if std::env::var_os("DEX_DATA_DIR").is_some() {
+        return tauri::plugin::Builder::new("dex-isolated-instance").build();
+    }
+    tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    })
+}
+
 fn main() {
     startup_timeline::anchor();
     webview2::install_panic_logger();
@@ -2930,13 +2946,7 @@ fn main() {
         // double-run the reminder/autobackup schedulers and file watchers on the
         // same dex.db, and if launched with different WebView2 options it hangs
         // with an empty window (the profile is locked by the first instance).
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
-        }))
+        .plugin(single_instance_guard())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
