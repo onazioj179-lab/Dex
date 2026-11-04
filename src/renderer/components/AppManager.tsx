@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
 import { useInstalledAppsStore } from '../store/installedAppsStore';
@@ -3177,6 +3178,12 @@ export const AppManager: React.FC = () => {
   // launched while on it. They become canvas windows and go back to being
   // tabs when the canvas closes.
   const spatialFromTabsRef = useRef<Set<string>>(new Set());
+  // Size each app had as a canvas window. After leaving the canvas a hidden tab
+  // keeps that size until it is shown, so dozens of apps don't all re-lay out
+  // (and re-run their resize handlers) at once.
+  const spatialTabSizeRef = useRef<Map<string, { w: number; h: number }>>(new Map());
+  // True while leaving the canvas (tabs are committed before the store flips).
+  const leavingSpatialRef = useRef(false);
   /** Natural canvas size for an app: its window size, or a roomy default. */
   const spatialSizeFor = useCallback((id: string, ws: { w: number; h: number }) => {
     const def = APP_WINDOW_SIZES[id];
@@ -3265,10 +3272,15 @@ export const AppManager: React.FC = () => {
         restore[id] = clampWindowToWorkspace(pre[id] ?? { x: ws.x + 40, y: ws.y + 40, w: b.w, h: b.h }, ws);
       });
       sp.setPreSpatial(null);
-      sp.setEnabled(false);
       if (backToTabs.length > 0) {
+        backToTabs.forEach(id => { const b = detachedApps.get(id as AppId); if (b) spatialTabSizeRef.current.set(id, { w: b.w, h: b.h }); });
         // The front-most canvas window that came from a tab becomes the current tab.
         const front = backToTabs.reduce((a, b) => ((detachedApps.get(a as AppId)?.z ?? 0) >= (detachedApps.get(b as AppId)?.z ?? 0) ? a : b));
+        // Commit "windows -> tabs" BEFORE switching the canvas off. Otherwise
+        // the store change renders first on its own, turning every card back
+        // into a live full-layout window for one pass (seconds with many apps).
+        leavingSpatialRef.current = true;
+        flushSync(() => {
         setDetachedApps(prev => {
           const next = new Map(prev);
           backToTabs.forEach(id => next.delete(id));
@@ -3280,7 +3292,11 @@ export const AppManager: React.FC = () => {
         });
         setMinimizedApps(prev => { if (!backToTabs.some(id => prev.has(id))) return prev; const n = new Set(prev); backToTabs.forEach(id => n.delete(id)); return n; });
         setCurrentApp(front as AppId);
+        });
+        sp.setEnabled(false);
+        leavingSpatialRef.current = false;
       } else {
+        sp.setEnabled(false);
         applySpatialBounds(restore);
       }
       spatialFromTabsRef.current = new Set();
@@ -3290,7 +3306,9 @@ export const AppManager: React.FC = () => {
   // On the canvas every app is a window: an app launched (or switched to) as a
   // tab while the canvas is open is placed on it instead of covering it.
   useEffect(() => {
-    if (!spatialEnabled || splitMode !== 'off') return;
+    // Live check, not the render value: while leaving the canvas, the tabs are
+    // committed before the store flips, and must not be put back on it.
+    if (!spatialEnabled || splitMode !== 'off' || leavingSpatialRef.current || !useSpatialStore.getState().enabled) return;
     const missing = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
     if (missing.length === 0) return;
     missing.forEach(id => { spatialFromTabsRef.current.add(id); mountedAppsRef.current.add(id as AppId); });
@@ -4516,7 +4534,13 @@ export const AppManager: React.FC = () => {
             // layer (a 0x0 anchor), so it takes the content size explicitly.
             ...(appId === 'home'
               ? { inset: 0 }
-              : { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' }),
+              : (() => {
+                  const kept = !showInline ? spatialTabSizeRef.current.get(appId) : undefined;
+                  if (showInline) spatialTabSizeRef.current.delete(appId);
+                  return kept
+                    ? { left: 0, top: 0, width: kept.w, height: kept.h }
+                    : { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
+                })()),
             display: 'flex',
             opacity: showInline ? 1 : 0,
             pointerEvents: showInline ? 'auto' : 'none',
