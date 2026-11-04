@@ -41,13 +41,6 @@ const BORDER = 'var(--color-border-subtle)';
 const TXT = 'var(--color-text-primary)';
 const TXT_DIM = 'var(--color-text-secondary)';
 
-function timeGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return 'Good night';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
 
 function relTime(ts: number): string {
   const s = Math.max(0, (Date.now() - ts) / 1000);
@@ -160,7 +153,6 @@ const Achievements: React.FC = () => {
     }
   }, [stats, challenges.currentStreak]);
 
-  const rankProgress = rank.pointsNeeded > 0 ? (stats.points / (stats.points + rank.pointsNeeded)) * 100 : 100;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', color: TXT, overflow: 'hidden' }}>
@@ -184,8 +176,10 @@ const Achievements: React.FC = () => {
               <DexIcon name="trophy" size={22} color="var(--color-text-primary)" />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: TXT_DIM, fontWeight: 500 }}>{timeGreeting()}, champion</div>
-              <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>Your Trophies</h1>
+              <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>Trophies</h1>
+              <div style={{ fontSize: 12, color: TXT_DIM, fontWeight: 500, marginTop: 2 }}>
+                {rank.title}{rank.pointsNeeded > 0 ? ` · ${rank.pointsNeeded.toLocaleString()} points to ${rank.next}` : ''}
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -195,13 +189,6 @@ const Achievements: React.FC = () => {
                 {engagement.stats.currentStreak}d streak
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 10, background: PANEL, border: `1px solid ${BORDER}` }}>
-              <DexIcon name={rank.icon} size={16} color={GOLD} />
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{rank.title}</span>
-              <div style={{ width: 52, height: 4, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', background: GOLD }} />
-              </div>
-            </div>
             <button onClick={shareProgress} title="Copy progress summary" style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
@@ -222,7 +209,7 @@ const Achievements: React.FC = () => {
             totalAchievements={stats.totalAchievements}
             points={stats.points}
             streak={engagement.stats.currentStreak}
-            level={getChallengeLevel(challenges.totalXP)}
+            level={{ level: rank.level, title: rank.title }}
           />
         </div>
 
@@ -397,7 +384,7 @@ const StatsRing: React.FC<{
   const tiles = [
     { icon: 'star', label: 'Points', value: points.toLocaleString() },
     { icon: 'flame', label: 'Streak', value: `${streak}d` },
-    { icon: 'award', label: 'Level', value: `${level.level}` },
+    { icon: 'award', label: 'Rank', value: `${level.level}` },
   ];
   return (
     <div style={{ borderRadius: 18, padding: 20, minHeight: 188, background: PANEL, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
