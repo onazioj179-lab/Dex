@@ -247,7 +247,7 @@ export const App: React.FC = () => {
   const pipState = usePiPState();
 
   // First-run onboarding
-  const { needsOnboarding, markOnboardingComplete } = useOnboardingCheck();
+  const { needsOnboarding, policyReviewOnly, markOnboardingComplete } = useOnboardingCheck();
 
   // System Diagnostics overlay (Ctrl+Shift+D)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -542,7 +542,7 @@ export const App: React.FC = () => {
       {needsOnboarding && (
         <AppErrorBoundary instanceId="onboarding" appId="onboarding" appName="Onboarding" appColor="#0a84ff">
         <Suspense fallback={null}>
-          <OnboardingWizard onComplete={markOnboardingComplete} onSkip={markOnboardingComplete} />
+          <OnboardingWizard onComplete={markOnboardingComplete} onSkip={markOnboardingComplete} policyReviewOnly={policyReviewOnly} />
         </Suspense>
         </AppErrorBoundary>
       )}

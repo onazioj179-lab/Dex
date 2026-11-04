@@ -156,7 +156,9 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
 // ==================== SCREEN: REQUIRED POLICIES ====================
 const PolicyAcceptanceScreen: React.FC<{
   onAccept: () => void;
-}> = ({ onAccept }) => {
+  /** A returning user whose accepted policy versions are out of date. */
+  updated?: boolean;
+}> = ({ onAccept, updated = false }) => {
   const [accepted, setAccepted] = useState(false);
   const [viewerSlug, setViewerSlug] = useState<PolicySlug | null>(null);
   const requiredPolicies = useMemo(() => POLICY_METADATA.filter(p => p.requiredForUse), []);
@@ -165,10 +167,12 @@ const PolicyAcceptanceScreen: React.FC<{
   return (
     <div style={{ padding: 'var(--space-5) 0' }}>
       <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 6px', textAlign: 'center' }}>
-        Terms & Privacy
+        {updated ? 'Updated Terms & Privacy' : 'Terms & Privacy'}
       </h2>
       <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 var(--space-5)', textAlign: 'center', lineHeight: 1.55 }}>
-        Review and accept the required policies to continue.
+        {updated
+          ? 'The Terms of Use or Privacy Policy changed since you last accepted them. Review and accept them to continue. Your apps, settings and data are unchanged.'
+          : 'Review and accept the required policies to continue.'}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
@@ -286,8 +290,16 @@ const PolicyAcceptanceScreen: React.FC<{
 export const OnboardingWizard: React.FC<{
   onComplete: () => void;
   onSkip?: () => void;
-}> = ({ onComplete }) => {
-  const screens: OnboardingScreen[] = ['welcome', 'terms'];
+  /**
+   * A returning user (already set up) whose accepted policy versions are out
+   * of date, e.g. after an upgrade. Shows only the policy screen and, on
+   * accept, records the new acceptance and nothing else: first-run defaults
+   * (installed-apps essentials, onboarding prefs) must not touch an existing
+   * setup.
+   */
+  policyReviewOnly?: boolean;
+}> = ({ onComplete, policyReviewOnly = false }) => {
+  const screens: OnboardingScreen[] = policyReviewOnly ? ['terms'] : ['welcome', 'terms'];
   const [screenIndex, setScreenIndex] = useState(0);
   const [exiting, setExiting] = useState(false);
   // Sensible defaults are applied silently. The dedicated privacy/preferences
@@ -341,8 +353,13 @@ export const OnboardingWizard: React.FC<{
 
   const handleAcceptPolicies = useCallback(() => {
     acceptCurrentPolicies();
+    if (policyReviewOnly) {
+      setExiting(true);
+      setTimeout(onComplete, 300);
+      return;
+    }
     finishOnboarding();
-  }, [finishOnboarding]);
+  }, [finishOnboarding, onComplete, policyReviewOnly]);
 
   // Required policies cannot be skipped; "Skip Setup" jumps straight to them.
   const handleSkip = useCallback(() => {
@@ -400,7 +417,7 @@ export const OnboardingWizard: React.FC<{
         width: '100%', maxWidth: 'min(600px, calc(100vw - 48px))', padding: '0 var(--space-8)',
         animation: 'onboardFadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
-        <StepIndicator current={screenIndex} total={screens.length} />
+        {screens.length > 1 && <StepIndicator current={screenIndex} total={screens.length} />}
 
         <div key={screenIndex} style={{
           animation: `${slideDir === 'next' ? 'onboardSlideNext' : 'onboardSlideBack'} 200ms cubic-bezier(0.4, 0, 0.2, 1)`,
@@ -415,7 +432,7 @@ export const OnboardingWizard: React.FC<{
         )}
 
         {current === 'welcome' && <WelcomeScreen onNext={goNext} onSkip={handleSkip} />}
-        {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} />}
+        {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} updated={policyReviewOnly} />}
         </div>
 
         {/* Persistent quit footer -- always visible during setup */}
@@ -425,11 +442,11 @@ export const OnboardingWizard: React.FC<{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           fontSize: 11, color: 'var(--color-text-tertiary, #888)',
         }}>
-          <span>Setup can be re-run from Settings any time.</span>
+          <span>{policyReviewOnly ? 'You can read both documents any time in Settings.' : 'Setup can be re-run from Settings any time.'}</span>
           <button
             type="button"
             onClick={handleQuit}
-            aria-label="Quit DEX setup"
+            aria-label={policyReviewOnly ? 'Quit DEX' : 'Quit DEX setup'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'transparent',
@@ -460,7 +477,7 @@ export const OnboardingWizard: React.FC<{
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-            Quit Setup
+            {policyReviewOnly ? 'Quit DEX' : 'Quit Setup'}
           </button>
         </div>
       </div>
@@ -629,6 +646,10 @@ export const useOnboardingCheck = () => {
   const [needsOnboarding, setNeedsOnboarding] = useState(() => {
     try { return !localStorage.getItem('dex-welcomed') || !hasAcceptedCurrentPolicies(); } catch { return true; }
   });
+  // Already set up before (e.g. upgrading): only the changed policies need accepting.
+  const [policyReviewOnly] = useState(() => {
+    try { return !!localStorage.getItem('dex-welcomed'); } catch { return false; }
+  });
   const markOnboardingComplete = useCallback(() => {
     try {
       if (!hasAcceptedCurrentPolicies()) acceptCurrentPolicies();
@@ -636,7 +657,7 @@ export const useOnboardingCheck = () => {
       setNeedsOnboarding(false);
     } catch (e) { console.warn('[DEX]', e); }
   }, []);
-  return { needsOnboarding, markOnboardingComplete };
+  return { needsOnboarding, policyReviewOnly, markOnboardingComplete };
 };
 
 export default OnboardingWizard;
