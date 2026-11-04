@@ -30,6 +30,20 @@ interface CrashStats { totalCrashes: number; crashesThisSession: number; crashes
 interface CrashRecord { id: string; timestamp: number; type: string; message: string }
 
 const REFRESH_MS = 3000;
+
+interface SamplerStats {
+  pulls: number; ok: number; failed: number; overlapped: number; skippedHidden: number;
+  lastResult: 'ok' | 'no reply' | 'unavailable' | null; lastAt: number | null;
+}
+const EMPTY_SAMPLER: SamplerStats = { pulls: 0, ok: 0, failed: 0, overlapped: 0, skippedHidden: 0, lastResult: null, lastAt: null };
+
+/** Card hint for the live figures: what the sampler is doing right now. */
+export function samplerHint(st: SamplerStats, hasFigures: boolean, visible: boolean): string {
+  if (!visible) return 'Paused while hidden';
+  if (hasFigures || st.ok > 0) return `Updates every ${REFRESH_MS / 1000} s while open`;
+  if (st.failed > 0) return `No reading yet (${st.failed} ${st.failed === 1 ? 'attempt' : 'attempts'}: ${st.lastResult}); retrying`;
+  return 'Waiting for the first reading…';
+}
 const SAMPLE_TIMEOUT_MS = 8000;
 
 /** Resolves to the call's value, or null if it fails or takes longer than `ms`. */
@@ -91,13 +105,17 @@ const NexusDiagnostics: React.FC = () => {
   // rare timing, leave it stopped), it skips its tick while the window is
   // hidden, and samples never overlap.
   const pullRef = useRef<() => Promise<void>>(async () => undefined);
+  // What the sampler has done so far, so an empty card says why instead of a
+  // silent dash (and automated checks can read it from data-* attributes).
+  const [sampler, setSampler] = useState<SamplerStats>(EMPTY_SAMPLER);
   useEffect(() => {
     if (!invoke) return;
     let alive = true;
     let inFlight = false;
     const pull = async () => {
-      if (inFlight) return;
+      if (inFlight) { setSampler((st) => ({ ...st, overlapped: st.overlapped + 1 })); return; }
       inFlight = true;
+      setSampler((st) => ({ ...st, pulls: st.pulls + 1 }));
       try {
         // Each call is time-boxed: with the overlap guard, one reply that never
         // arrived used to block every later tick, so the figures stayed empty
@@ -107,8 +125,16 @@ const NexusDiagnostics: React.FC = () => {
           withTimeout(invoke('xenon:systemSample'), SAMPLE_TIMEOUT_MS),
         ]);
         if (!alive) return;
-        if (s && (s as SelfSample).available) setSelf(s as SelfSample);
+        const selfOk = !!(s && (s as SelfSample).available);
+        if (selfOk) setSelf(s as SelfSample);
         if (sys) setSystem(sys as SystemSample);
+        setSampler((st) => ({
+          ...st,
+          ok: st.ok + (selfOk ? 1 : 0),
+          failed: st.failed + (selfOk ? 0 : 1),
+          lastResult: selfOk ? 'ok' : s === null ? 'no reply' : 'unavailable',
+          lastAt: Date.now(),
+        }));
         setTick((t) => t + 1);
       } finally {
         inFlight = false;
@@ -116,7 +142,10 @@ const NexusDiagnostics: React.FC = () => {
     };
     pullRef.current = pull;
     void pull();
-    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void pull(); }, REFRESH_MS);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void pull();
+      else setSampler((st) => ({ ...st, skippedHidden: st.skippedHidden + 1 }));
+    }, REFRESH_MS);
     return () => { alive = false; window.clearInterval(id); };
   }, [invoke]);
 
@@ -196,7 +225,11 @@ const NexusDiagnostics: React.FC = () => {
       </div>
 
       <div style={S.grid}>
-        <Card title="DEX resource use" hint={visible ? `Updates every ${REFRESH_MS / 1000} s while open` : 'Paused while hidden'}>
+        <Card
+          title="DEX resource use"
+          hint={invoke ? samplerHint(sampler, !!self, visible) : undefined}
+          data={invoke ? { 'data-sampler-pulls': sampler.pulls, 'data-sampler-ok': sampler.ok, 'data-sampler-failed': sampler.failed, 'data-sampler-overlapped': sampler.overlapped, 'data-sampler-skipped-hidden': sampler.skippedHidden, 'data-sampler-last': sampler.lastResult ?? 'none' } : undefined}
+        >
           {invoke ? (
             <>
               <Stat label="Memory (all DEX processes)" value={self ? `${self.memoryMB.toLocaleString()} MB` : '–'} />
@@ -299,8 +332,8 @@ const NexusDiagnostics: React.FC = () => {
   );
 };
 
-const Card: React.FC<{ title: string; hint?: string; wide?: boolean; children: React.ReactNode }> = ({ title, hint, wide, children }) => (
-  <section style={{ ...S.card, ...(wide ? { gridColumn: '1 / -1' } : null) }} aria-label={title}>
+const Card: React.FC<{ title: string; hint?: string; wide?: boolean; data?: Record<string, string | number>; children: React.ReactNode }> = ({ title, hint, wide, data, children }) => (
+  <section style={{ ...S.card, ...(wide ? { gridColumn: '1 / -1' } : null) }} aria-label={title} {...data}>
     <div style={S.cardHead}>
       <h3 style={S.cardTitle}>{title}</h3>
       {hint && <span style={S.cardHint}>{hint}</span>}

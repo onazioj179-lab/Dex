@@ -656,6 +656,7 @@ const ControlCenter: React.FC = () => {
         ref={panelRef}
         className="dex-liquid-glass-strong"
         role="dialog"
+        data-dex-chrome="control-center"
         aria-label="Control Center"
         style={{
           position: 'fixed',

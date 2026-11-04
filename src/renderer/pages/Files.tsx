@@ -1132,15 +1132,14 @@ export const Files: React.FC = () => {
   // ----- Batch copy / cut / paste over the existing files:copy / files:move -----
   const handleBatchCopy = useCallback(() => {
     if (selectedFiles.size === 0) return;
+    // The "N items ready to copy · Paste" bar is the confirmation.
     setBatchClipboard({ paths: [...selectedFiles], mode: 'copy' });
-    toast.info(`Copied ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
-  }, [selectedFiles, toast]);
+  }, [selectedFiles]);
 
   const handleBatchCut = useCallback(() => {
     if (selectedFiles.size === 0) return;
     setBatchClipboard({ paths: [...selectedFiles], mode: 'cut' });
-    toast.info(`Cut ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
-  }, [selectedFiles, toast]);
+  }, [selectedFiles]);
 
   const handleBatchPaste = useCallback(async () => {
     if (!batchClipboard || !currentPath) return;

@@ -31,6 +31,7 @@ import {
   encodeWav,
   type AudioPeaks,
 } from './transcode';
+import { loadWatermarkImage, type SubtitleSpec, type WatermarkPosition } from './videoComposite';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
@@ -196,6 +197,19 @@ const Icons = {
  * only changed when a native encoder runs. This note stops the panel from
  * masquerading as a working in-browser edit.
  */
+/** Short labels for the settings a job will apply when encoded (shown on its card). */
+export function jobEffectTags(job: unknown): string[] {
+  const j = (job ?? {}) as Record<string, any>;
+  const tags: string[] = [];
+  const tIn = typeof j.trimIn === 'number' ? j.trimIn : 0;
+  const tOut = typeof j.trimOut === 'number' ? j.trimOut : 1;
+  if (tIn > 0 || tOut < 1) tags.push(`Trim ${Math.round(tIn * 100)}–${Math.round(tOut * 100)}%`);
+  if (j.cropAspect && j.cropAspect !== 'free') tags.push(`${j.cropMode === 'pad' ? 'Pad' : 'Crop'} ${j.cropAspect}`);
+  if (j.watermark) tags.push(j.watermark.type === 'image' ? 'Image watermark' : 'Watermark');
+  if (j.subtitleBurnIn && Array.isArray(j.subtitleCues) && j.subtitleCues.length) tags.push(`Subtitles (${j.subtitleCues.length})`);
+  return tags;
+}
+
 const NativeEncoderNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '7px 9px', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.18))', borderRadius: 'var(--radius-lg)', marginBottom: 10 }}>
     <span style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: 1, display: 'inline-flex' }}>{Icons.alert}</span>
@@ -405,6 +419,8 @@ const Forge: React.FC = () => {
   const [showCropPad, setShowCropPad] = useState(false);
   const [cropAspect, setCropAspect] = useState<'free' | '16:9' | '4:3' | '1:1' | '9:16'>('free');
   const [padColor, setPadColor] = useState('#000000');
+  const [cropMode, setCropMode] = useState<'crop' | 'pad'>('crop');
+  const [watermarkImageUrl, setWatermarkImageUrl] = useState<string | null>(null);
   const [showSubBurnIn, setShowSubBurnIn] = useState(false);
   const [subBurnFont, setSubBurnFont] = useState('Arial');
   const [subBurnSize, setSubBurnSize] = useState(24);
@@ -750,9 +766,23 @@ const Forge: React.FC = () => {
         } else if (preset?.width && preset?.height) {
           width = preset.width; height = preset.height;
         }
+        // Settings from the Trim, Crop & Pad, Watermark and Subtitle panels.
+        const wmJob = jobAny?.watermark as { type: 'text' | 'image'; text?: string; imageUrl?: string; opacity: number; position: WatermarkPosition } | undefined;
+        const wmImage = wmJob?.type === 'image' && wmJob.imageUrl ? await loadWatermarkImage(wmJob.imageUrl).catch(() => undefined) : undefined;
+        const subJob = jobAny?.subtitleBurnIn as Omit<SubtitleSpec, 'cues'> | undefined;
+        const cues = (jobAny?.subtitleCues as SubtitleSpec['cues'] | undefined) ?? [];
         const result = await transcodeVideoToWebm(file, {
           width,
           height,
+          trimIn: jobAny?.trimIn,
+          trimOut: jobAny?.trimOut,
+          composite: {
+            aspect: jobAny?.cropAspect,
+            mode: jobAny?.cropMode,
+            padColor: jobAny?.padColor,
+            watermark: wmJob ? { type: wmJob.type, text: wmJob.text, image: wmImage, opacity: wmJob.opacity, position: wmJob.position } : null,
+            subtitles: subJob && cues.length ? { ...subJob, cues } : null,
+          },
           videoBitsPerSecond: preset?.bitrate ? preset.bitrate * 1000 : 8_000_000,
           onProgress: (frac) => {
             if (!mountedRef.current) return;
@@ -1731,6 +1761,13 @@ const Forge: React.FC = () => {
                       <span>~{formatBytes(estimateOutputFileSize(job.duration, (job as any).overrideBitrate || presets.find(p => p.id === job.preset)?.bitrate || 8000, 0))}</span>
                     )}
                   </div>
+                  {jobEffectTags(job).length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }} aria-label="Applied when encoded">
+                      {jobEffectTags(job).map(t => (
+                        <span key={t} style={{ fontSize: 10, lineHeight: '16px', padding: '0 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)' }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={styles.jobProgress}>
                   <div style={styles.progressBar}>
@@ -2104,8 +2141,21 @@ const Forge: React.FC = () => {
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            <NativeEncoderNote>Recorded on the job. Compositing a watermark into video frames runs in the native encoder (not in this build).</NativeEncoderNote>
+            <NativeEncoderNote>Burned into the frames when the job is encoded to WebM. Other output formats need the native encoder (not in this build).</NativeEncoderNote>
             <SegmentedControl options={(['text', 'image'] as const).map(t => ({ value: t, label: t === 'text' ? 'Text' : 'Image' }))} value={watermarkType} onChange={setWatermarkType} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 10, width: '100%' }} />
+            {watermarkType === 'image' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                <span style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)' }}>{watermarkImageUrl ? 'Change image' : 'Choose image'}</span>
+                {watermarkImageUrl && <img src={watermarkImageUrl} alt="" style={{ height: 22, maxWidth: 80, objectFit: 'contain' }} />}
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{ display: 'none' }} onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setWatermarkImageUrl(String(reader.result));
+                  reader.readAsDataURL(f);
+                }} />
+              </label>
+            )}
             {watermarkType === 'text' && (
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 'var(--space-2)' }} />
             )}
@@ -2123,8 +2173,9 @@ const Forge: React.FC = () => {
             <CreativeSlider label="Opacity" min={5} max={100} step={1} value={watermarkOpacity} onChange={setWatermarkOpacity} unit="%" accentColor="var(--color-accent)" layout="stacked" style={{ marginBottom: 10 }} />
             <button aria-label="Apply watermark" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
-              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, watermark: { type: watermarkType, text: watermarkText, opacity: watermarkOpacity, position: watermarkPosition } } as any : j));
-              toast.success('Watermark applied to job'); setShowWatermark(false);
+              if (watermarkType === 'image' && !watermarkImageUrl) { toast.warning('Choose an image first'); return; }
+              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, watermark: { type: watermarkType, text: watermarkText, imageUrl: watermarkType === 'image' ? watermarkImageUrl : undefined, opacity: watermarkOpacity, position: watermarkPosition } } as any : j));
+              setShowWatermark(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Watermark</button>
           </div>
         </div>
@@ -2186,7 +2237,7 @@ const Forge: React.FC = () => {
               <button aria-label="Trim video" onClick={() => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, trimIn: trimIn / 100, trimOut: trimOut / 100 } as any : j));
-                toast.success(`Trim set: ${trimIn}% → ${trimOut}%`); setShowTrimSplit(false);
+                setShowTrimSplit(false);
               }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Trim</button>
               <button aria-label="Split video at intervals" onClick={() => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
@@ -2211,7 +2262,8 @@ const Forge: React.FC = () => {
             <button aria-label="Close Crop and Pad panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropPad(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            <NativeEncoderNote>Crop/pad settings are recorded on the job. Re-framing video pixels runs in the native encoder (not in this build).</NativeEncoderNote>
+            <NativeEncoderNote>Applied when the job is encoded to WebM. Other output formats need the native encoder (not in this build).</NativeEncoderNote>
+            <SegmentedControl options={[{ value: 'crop', label: 'Crop to fill' }, { value: 'pad', label: 'Pad to fit' }]} value={cropMode} onChange={(v) => setCropMode(v as 'crop' | 'pad')} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 'var(--space-2)' }} />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '9:16'] as const).map(a => (
@@ -2230,8 +2282,8 @@ const Forge: React.FC = () => {
             </div>
             <button aria-label="Apply crop and pad" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
-              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, cropAspect, padColor } as any : j));
-              toast.success(`Crop set to ${cropAspect}`); setShowCropPad(false);
+              setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, cropAspect, cropMode, padColor } as any : j));
+              setShowCropPad(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Crop & Pad</button>
           </div>
         </div>
@@ -2245,7 +2297,7 @@ const Forge: React.FC = () => {
             <button aria-label="Close Subtitle Burn-in" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSubBurnIn(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <NativeEncoderNote>Cues and style are parsed and recorded on the job. Burning subtitles into the video runs in the native encoder (not in this build).</NativeEncoderNote>
+            <NativeEncoderNote>Burned into the frames when the job is encoded to WebM. Other output formats need the native encoder (not in this build).</NativeEncoderNote>
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Subtitle File</div>
               <label style={{ padding: '6px var(--space-3)', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
@@ -2288,7 +2340,7 @@ const Forge: React.FC = () => {
             <button aria-label="Apply subtitle burn-in" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleBurnIn: { font: subBurnFont, size: subBurnSize, position: subBurnPosition, style: subBurnStyle } } as any : j));
-              toast.success('Subtitle burn-in configured'); setShowSubBurnIn(false);
+              setShowSubBurnIn(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
           </div>
         </div>

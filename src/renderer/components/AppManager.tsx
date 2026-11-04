@@ -5025,7 +5025,7 @@ export const AppManager: React.FC = () => {
     // data-tauri-drag-region: makes the bar draggable under Tauri (the Electron
     // -webkit-app-region below only works in Electron). Tauri starts a drag only
     // for mousedowns directly on this element, so the child buttons are unaffected.
-    <div data-tauri-drag-region style={{
+    <div data-tauri-drag-region data-dex-chrome="topbar" style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
       // Top chrome bar -- liquid glass (master overhaul): translucent --glass-bg
