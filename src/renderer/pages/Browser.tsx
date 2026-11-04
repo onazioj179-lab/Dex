@@ -1054,6 +1054,10 @@ export const Browser: React.FC = () => {
         "var p=form.querySelector('input[type=\"password\"]');" +
         "if(u&&p&&u.value&&p.value){" +
         "window.postMessage({type:'" + sentinel + "',username:u.value,password:p.value},'*');" +
+        // Native view (Tauri): queue for the host; sessionStorage survives the
+        // same-origin navigation the submit triggers.
+        "try{var m={t:'cred',u:u.value,p:p.value};(window.__dexOutbox=window.__dexOutbox||[]).push(m);" +
+        "var s=JSON.parse(sessionStorage.getItem('__dexOutbox')||'[]');s.push(m);sessionStorage.setItem('__dexOutbox',JSON.stringify(s));}catch(x){}" +
         "}" +
         "},true);" +
         "})()"

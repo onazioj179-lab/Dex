@@ -374,7 +374,7 @@ fn start(app: &tauri::AppHandle) -> Value {
     }
 
     let app2 = app.clone();
-    std::thread::spawn(move || loop {
+    crate::util::spawn_named("monitor", move || loop {
         std::thread::sleep(std::time::Duration::from_millis(HEALTH_CHECK_INTERVAL_MS));
         let running = load(&app2)
             .get("running")

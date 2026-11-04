@@ -271,7 +271,7 @@ pub fn quick_boost(app: &tauri::AppHandle, duration_minutes: Option<u64>) -> Val
         // Revert to balanced after the window. NOTE: unlike Electron we do not
         // cancel a prior pending revert, so overlapping boosts may revert early.
         let app2 = app.clone();
-        std::thread::spawn(move || {
+        crate::util::spawn_named("power", move || {
             std::thread::sleep(std::time::Duration::from_secs(minutes * 60));
             let _ = set_profile(&app2, "balanced");
         });

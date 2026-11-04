@@ -506,7 +506,7 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
     let server_t = server.clone();
     let data_t = data.clone();
     let app_t = app.clone();
-    let thread = std::thread::spawn(move || {
+    let thread = crate::util::spawn_named("http_transfer", move || {
         while let Ok(request) = server_t.recv() {
             handle_request(&app_t, &data_t, request);
         }

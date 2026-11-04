@@ -337,7 +337,7 @@ fn organize(app: &tauri::AppHandle, skip_pinned: bool) -> Value {
 
     let queued = plans.len();
     let app_bg = app.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("mediaorg", move || {
         // Ensure the by-type subfolders exist (mirrors initialize()).
         for sub in ["images", "audio", "video", "documents", "other"] {
             let _ = std::fs::create_dir_all(media_root.join(sub));

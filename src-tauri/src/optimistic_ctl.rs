@@ -169,7 +169,7 @@ fn submit(app: &tauri::AppHandle, args: &Value) -> Value {
     // 'Operation timed out' exactly like Electron's setTimeout callback.
     let app2 = app.clone();
     let timeout_id = id.clone();
-    std::thread::spawn(move || {
+    crate::util::spawn_named("optimistic", move || {
         std::thread::sleep(std::time::Duration::from_millis(DEFAULT_TIMEOUT_MS as u64));
         let mut ops = load(&app2);
         if let Some(i) = index_of(&ops, &timeout_id) {

@@ -17,6 +17,7 @@
 // elementFromPoint, which only sees the DOM, i.e. the placeholder).
 //
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { ADBLOCK_CONSOLE_PREFIX } from '../DEXAPPLICATIONS/browser/adblockContentScript';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<any>;
 const invoke: Invoke = (channel, ...args) =>
@@ -51,6 +52,43 @@ export function isExpression(js: string): boolean {
   } catch {
     return false;
   }
+}
+
+// --- Page -> host messages without IPC --------------------------------------
+// Remote pages get no DEX IPC. Scripts DEX injects queue messages on
+// `window.__dexOutbox` (mirrored to sessionStorage so a login submit survives
+// the same-origin redirect after it), and the host drains the queue with an
+// evaluated script. A page can only ever fill its own queue.
+
+/** Installed once per document: reports HTML fullscreen changes. */
+const PAGE_HOOKS = "(function(){if(window.__dexHooks)return;window.__dexHooks=1;" +
+  "document.addEventListener('fullscreenchange',function(){try{(window.__dexOutbox=window.__dexOutbox||[]).push({t:'fs',on:!!document.fullscreenElement});}catch(e){}});})()";
+
+/** Returns and clears the queue (in-memory + sessionStorage). */
+export const DRAIN_OUTBOX = "(function(){var q=[];try{q=(window.__dexOutbox||[]).slice();window.__dexOutbox=[];}catch(e){}" +
+  "try{var s=sessionStorage.getItem('__dexOutbox');if(s){sessionStorage.removeItem('__dexOutbox');q=JSON.parse(s).concat(q);}}catch(e){}return q;})()";
+
+export type OutboxMessage =
+  | { t: 'adblock'; n: number }
+  | { t: 'cred'; u: string; p: string }
+  | { t: 'fs'; on: boolean };
+
+/** Map one queued page message to the <webview> event the Browser expects. */
+export function outboxToEvent(m: unknown): { type: string; data: Record<string, unknown> } | null {
+  const msg = m as Partial<OutboxMessage> & { t?: string };
+  if (!msg || typeof msg !== 'object') return null;
+  if (msg.t === 'adblock' && typeof (msg as { n?: unknown }).n === 'number') {
+    return { type: 'console-message', data: { level: 0, message: ADBLOCK_CONSOLE_PREFIX + (msg as { n: number }).n } };
+  }
+  if (msg.t === 'cred' && typeof (msg as { u?: unknown }).u === 'string' && typeof (msg as { p?: unknown }).p === 'string') {
+    const c = msg as { u: string; p: string };
+    if (!c.u || !c.p || c.u.length > 512 || c.p.length > 512) return null;
+    return { type: 'ipc-message', data: { channel: 'dex-cred-capture', args: [{ username: c.u, password: c.p }] } };
+  }
+  if (msg.t === 'fs' && typeof (msg as { on?: unknown }).on === 'boolean') {
+    return { type: (msg as { on: boolean }).on ? 'enter-html-full-screen' : 'leave-html-full-screen', data: {} };
+  }
+  return null;
 }
 
 // --- One event subscription and one stale-view sweep per page load ----------
@@ -277,6 +315,37 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
   }, [sync, alive]);
 
   useEffect(() => { sync(); }, [active, sync]);
+
+  // Drain page messages: right after each load, then every second while the
+  // tab is the active one (credential submits, ad-block counts, fullscreen).
+  useEffect(() => {
+    if (!alive) return;
+    const el = elRef.current;
+    if (!el) return;
+    let busy = false;
+    const drain = async () => {
+      if (busy || !created.current) return;
+      busy = true;
+      try {
+        const res = await invoke('browserView:evalResult', tabId, DRAIN_OUTBOX);
+        const list = res?.success && typeof res.result === 'string' ? JSON.parse(res.result) : [];
+        if (Array.isArray(list)) {
+          for (const m of list) {
+            const ev = outboxToEvent(m);
+            if (ev) el.__dexEmit?.(ev.type, ev.data);
+          }
+        }
+      } catch { /* page navigating */ }
+      busy = false;
+    };
+    const onLoaded = () => {
+      void invoke('browserView:eval', tabId, PAGE_HOOKS);
+      void drain();
+    };
+    el.addEventListener('did-finish-load', onLoaded);
+    const timer = window.setInterval(() => { if (activeRef.current) void drain(); }, 1000);
+    return () => { el.removeEventListener('did-finish-load', onLoaded); window.clearInterval(timer); };
+  }, [alive, tabId]);
 
   return (
     <div

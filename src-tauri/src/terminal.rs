@@ -198,7 +198,7 @@ fn spawn_reader<R: Read + Send + 'static>(
     mut reader: R,
     finalize_on_eof: bool,
 ) {
-    std::thread::spawn(move || {
+    crate::util::spawn_named("terminal", move || {
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {

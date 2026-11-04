@@ -1719,7 +1719,7 @@ fn start_index_watcher(app: tauri::AppHandle) {
     // directory-level changes/overflow and spaced at least MIN_FULL_GAP apart.
     const MIN_FULL_GAP: std::time::Duration = std::time::Duration::from_secs(30);
     const MAX_BATCH: usize = 200;
-    std::thread::spawn(move || {
+    crate::util::spawn_named("main", move || {
         let _keep_alive = watcher; // own the watcher so it stays active
         let mut last_full: Option<std::time::Instant> = None;
         let add = |work: &mut IndexWork, msg: Option<Vec<std::path::PathBuf>>| match (msg, &mut *work) {
@@ -2685,6 +2685,11 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "window:minimize" => {
             let _ = window.minimize();
             json!({ "success": true })
+        }
+        "window:toggleFullscreen" => {
+            let next = !window.is_fullscreen().unwrap_or(false);
+            let ok = window.set_fullscreen(next).is_ok();
+            json!({ "success": ok, "fullscreen": next })
         }
         "window:maximize" => {
             // The renderer treats this as a toggle.

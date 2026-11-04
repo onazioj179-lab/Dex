@@ -349,7 +349,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
       const argPreview = Object.keys(call.args).length ? ` ${JSON.stringify(call.args).slice(0, 80)}` : '';
       pushStep(`Tool: ${call.name}${argPreview}`);
       if (!taskId) {
-        taskId = tasks.startTask(opts.userText, 'uki-agent');
+        taskId = tasks.startTask(opts.userText, 'uki-agent', opts.userText);
         taskIdRef.id = taskId;
         registerTaskController(taskId, controller);
       }
