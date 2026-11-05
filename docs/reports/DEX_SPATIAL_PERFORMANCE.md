@@ -1,6 +1,6 @@
 # DEX Spatial Desktop — Performance
 
-**Date:** 2026-11-02 · **Creator:** Onazi Oj
+**Date:** 2026-11-02 · **Creator:** Onazi oJ
 
 ## Method
 

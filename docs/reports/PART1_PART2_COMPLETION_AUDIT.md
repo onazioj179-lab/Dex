@@ -1,6 +1,6 @@
 # DEX — Part 1 & Part 2 Completion Audit
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · **Code:** `main` (PR #60 merged) + PR #61 (open) + PR #62 (open)
+**Date:** 2026-11-01 · **Creator:** Onazi oJ · **Code:** `main` (PR #60 merged) + PR #61 (open) + PR #62 (open)
 
 Statuses: **VERIFIED COMPLETE** (implemented and tested; evidence given) · **PARTIAL** · **BROKEN** · **MISSING** · **NOT APPLICABLE** · **BLOCKED** · **NOT TESTED**. PARTIAL, BLOCKED and NOT TESTED are not counted as complete.
 

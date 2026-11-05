@@ -96,6 +96,8 @@ export interface ShellPreferences {
   miniPulseEnabled: boolean;
   /** Automatically recover crashed apps (bounded retries, then crash card). */
   autoRecoverApps: boolean;
+  /** Subtle "Onazi oJ" creator mark in the desktop's lower-left corner. */
+  showCreatorMark: boolean;
 }
 
 export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
@@ -118,6 +120,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   clipboardCloudSync: false,
   miniPulseEnabled: false,
   autoRecoverApps: true,
+  showCreatorMark: true,
 };
 
 interface ShellPreferencesActions {
@@ -138,6 +141,7 @@ interface ShellPreferencesActions {
   setClipboardCloudSync: (enabled: boolean) => void;
   setMiniPulseEnabled: (enabled: boolean) => void;
   setAutoRecoverApps: (enabled: boolean) => void;
+  setShowCreatorMark: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -205,6 +209,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.clipboardCloudSync = o.clipboardCloudSync === true;
   base.miniPulseEnabled = o.miniPulseEnabled === true;
   base.autoRecoverApps = o.autoRecoverApps !== false; // default true
+  base.showCreatorMark = o.showCreatorMark !== false; // default true
   return base;
 }
 
@@ -498,6 +503,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
     setClipboardCloudSync: (enabled) => update({ clipboardCloudSync: enabled }),
     setMiniPulseEnabled: (enabled) => update({ miniPulseEnabled: enabled }),
     setAutoRecoverApps: (enabled) => update({ autoRecoverApps: enabled }),
+    setShowCreatorMark: (enabled) => update({ showCreatorMark: enabled }),
 
     reset: () => {
       const next = { ...DEFAULT_SHELL_PREFERENCES };

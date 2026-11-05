@@ -1,18 +1,22 @@
 // =============================================================================
-// DEX 6.0 — Terminal / PTY service (Electron PtyService parity, native)
+// DEX 7.0.1 — Terminal / PTY service (real pseudoterminal)
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // =============================================================================
-//! In-app shell-session manager for the terminal panel (DexCode + Nexus). A
-//! faithful port of `src/main/core/PtyService.ts`: like the Electron version it
-//! uses piped stdio over `std::process::Command` (NOT a real PTY / node-pty), so
-//! it works on every platform with no native build tools. Output is streamed to
-//! the renderer with the same event contract.
+//! Shell sessions for the Terminal panel (DexCode). Each session is a REAL
+//! pseudoterminal via `portable-pty`: ConPTY on Windows, openpty on unix. The
+//! shell sees a TTY, so prompts, line editing (PSReadLine / readline), colours,
+//! cursor movement, full-screen programs and interactive REPLs behave as they do
+//! in Windows Terminal. The renderer is a terminal emulator (xterm.js) that sends
+//! raw keystrokes and reports its geometry; `pty:resize` resizes the pseudoconsole.
 //!
-//! IPC surface (routed by the `pty:` prefix in `dex_ipc`):
-//!   pty:spawn / pty:create ({ shell?, cwd?, cols?, rows? }) -> { sessionId } | { error }
+//! Replaces the 6.x piped-stdio port of Electron's PtyService (no TTY: no prompt
+//! from many tools, no colour detection, resize was a no-op).
+//!
+//! IPC surface (routed by the `pty:` prefix in `dex_ipc`, contract unchanged):
+//!   pty:spawn / pty:create ({ shell?, cwd?, cols?, rows? }) -> { sessionId, shell, cwd, pty:true } | { error }
 //!   pty:write     ({ sessionId, data })         -> { success } | { success:false, error }
 //!   pty:read      ({ sessionId })               -> { success, alive, data, code? }  (pull-drain output)
-//!   pty:resize    ({ sessionId, cols, rows })   -> { success }   (no-op; geometry only)
+//!   pty:resize    ({ sessionId, cols, rows })   -> { success, cols, rows }  (resizes the pseudoconsole)
 //!   pty:kill / pty:destroy ({ sessionId })      -> { success }
 //!   pty:getSize   ({ sessionId })               -> { found, cols, rows }
 //!   pty:getStatus ({ sessionId })               -> { alive, exists, code?, shell?, cwd?, cols?, rows? }
@@ -20,31 +24,39 @@
 //! Events emitted to the renderer (via `native_ops::emit_event`):
 //!   "pty:data" { sessionId, data }
 //!   "pty:exit" { sessionId, code }
+//!
+//! Teardown: a waiter thread owns the child and blocks in `wait()`. On exit it
+//! removes the session from the map and drops the master OUTSIDE the state lock
+//! (on Windows `ClosePseudoConsole` can wait for the output pipe to drain, and the
+//! reader thread takes the same lock to buffer output, so dropping under the lock
+//! could deadlock). Closing the master ends the reader. Whichever of the two
+//! threads finishes second emits `pty:exit`, so trailing output always arrives
+//! before the exit event.
 
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 const MAX_SESSIONS: usize = 16;
+const MIN_COLS: u16 = 2;
+const MIN_ROWS: u16 = 1;
+const MAX_DIM: u16 = 1000;
 
-/// One live shell session. The `Child` is kept so `kill`/exit-reaping can act on
-/// it; `stdin` is split out so `pty:write` can feed keystrokes without locking
-/// the child handle.
+/// One live pseudoterminal session.
 pub struct Session {
     id: String,
     shell: String,
     cwd: String,
-    cols: u32,
-    rows: u32,
-    child: Child,
-    stdin: Option<ChildStdin>,
-    /// Pending output for the pull-based `pty:read` channel. The reader threads
-    /// append decoded chunks here in addition to emitting `pty:data` events, so a
-    /// renderer can either subscribe to events OR poll `pty:read` (or both).
-    /// Capped at `MAX_BUFFER` bytes — oldest data is dropped to bound memory.
+    cols: u16,
+    rows: u16,
+    master: Box<dyn MasterPty + Send>,
+    writer: Box<dyn Write + Send>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
+    /// Pending output for the pull-based `pty:read` channel (capped at MAX_BUFFER).
     buffer: String,
 }
 
@@ -58,20 +70,24 @@ struct ExitRecord {
 #[derive(Default)]
 pub struct Inner {
     sessions: HashMap<String, Session>,
-    /// Recently-exited sessions (bounded), keyed by id. Lets a renderer that
-    /// polls observe the exit + any final output it had not yet read.
     recent_exits: HashMap<String, ExitRecord>,
     next_id: u32,
 }
 
-/// Hard cap on a session's retained output buffer (bytes). Keeps a long-lived
-/// session from growing unbounded when the renderer never drains via `pty:read`.
+/// Hard cap on a session's retained output buffer (bytes).
 const MAX_BUFFER: usize = 256 * 1024;
 /// Cap on retained exit records so a churny session list cannot leak memory.
 const MAX_RECENT_EXITS: usize = 32;
 
 /// Tauri-managed terminal state (registered in `setup()`).
 pub type TerminalState = Mutex<Inner>;
+
+/// Shared between a session's reader and waiter threads.
+struct Teardown {
+    /// How many of the two threads (reader, waiter) have finished.
+    done: AtomicU8,
+    code: Mutex<Option<i32>>,
+}
 
 fn home_dir() -> String {
     #[cfg(windows)]
@@ -166,10 +182,18 @@ fn args_for(shell: &str) -> Vec<String> {
     }
 }
 
-/// Append a chunk to a session's pull buffer (for `pty:read`), capped at
-/// MAX_BUFFER with oldest bytes dropped on a UTF-8 boundary. Kept as a free fn so
-/// the `State` guard is cleanly scoped (avoids an NLL borrow issue in the reader
-/// thread loop).
+fn cap_buffer(buf: &mut String) {
+    if buf.len() > MAX_BUFFER {
+        let mut cut = buf.len() - MAX_BUFFER;
+        while cut < buf.len() && !buf.is_char_boundary(cut) {
+            cut += 1;
+        }
+        buf.drain(..cut);
+    }
+}
+
+/// Append a chunk to a session's pull buffer (for `pty:read`). After the session
+/// has been torn down, trailing output lands in its exit record instead.
 fn push_session_buffer(app: &tauri::AppHandle, id: &str, data: &str) {
     let state = app.state::<TerminalState>();
     let mut inner = match state.lock() {
@@ -178,88 +202,156 @@ fn push_session_buffer(app: &tauri::AppHandle, id: &str, data: &str) {
     };
     if let Some(s) = inner.sessions.get_mut(id) {
         s.buffer.push_str(data);
-        if s.buffer.len() > MAX_BUFFER {
-            let overflow = s.buffer.len() - MAX_BUFFER;
-            let mut cut = overflow;
-            while cut < s.buffer.len() && !s.buffer.is_char_boundary(cut) {
-                cut += 1;
+        cap_buffer(&mut s.buffer);
+    } else if let Some(rec) = inner.recent_exits.get_mut(id) {
+        rec.buffer.push_str(data);
+        cap_buffer(&mut rec.buffer);
+    }
+}
+
+/// Split `bytes` into the longest valid-UTF-8 prefix (decoded) and an incomplete
+/// trailing sequence to carry into the next read. A multi-byte character split
+/// across two reads would otherwise decode as two U+FFFD replacement chars
+/// (box-drawing, emoji and non-Latin output from ConPTY hit this constantly).
+pub(crate) fn decode_utf8_stream(carry: &mut Vec<u8>, bytes: &[u8]) -> String {
+    carry.extend_from_slice(bytes);
+    let mut out = String::new();
+    loop {
+        match std::str::from_utf8(carry) {
+            Ok(s) => {
+                out.push_str(s);
+                carry.clear();
+                return out;
             }
-            s.buffer.drain(..cut);
+            Err(e) => {
+                let valid = e.valid_up_to();
+                out.push_str(std::str::from_utf8(&carry[..valid]).unwrap_or(""));
+                match e.error_len() {
+                    // Incomplete sequence at the end: keep it for the next read.
+                    None => {
+                        carry.drain(..valid);
+                        return out;
+                    }
+                    // Genuinely invalid bytes: replace and continue after them.
+                    Some(bad) => {
+                        out.push('\u{FFFD}');
+                        carry.drain(..valid + bad);
+                    }
+                }
+            }
         }
     }
 }
 
-/// Stream a child's stdout/stderr to the renderer as `pty:data` events. The
-/// primary (stdout) reader finalizes the session on EOF — reaps the child for its
-/// exit code and emits `pty:exit`.
-fn spawn_reader<R: Read + Send + 'static>(
-    app: tauri::AppHandle,
-    id: String,
-    mut reader: R,
-    finalize_on_eof: bool,
-) {
-    crate::util::spawn_named("terminal", move || {
-        let mut buf = [0u8; 8192];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    // Append to the session's pull buffer (for `pty:read`) before
-                    // emitting the push event, so a poller never misses a chunk.
-                    push_session_buffer(&app, &id, &data);
-                    crate::native_ops::emit_event(
-                        &app,
-                        "pty:data",
-                        &json!({ "sessionId": id, "data": data }),
-                    );
-                }
-                Err(_) => break,
-            }
-        }
-        if finalize_on_eof {
-            finalize(&app, &id);
-        }
-    });
-}
-
-/// Remove a session and emit its `pty:exit` (with the reaped exit code). Idempotent
-/// — if it was already removed (e.g. a concurrent `pty:kill` then this EOF), this
-/// is a no-op.
-fn finalize(app: &tauri::AppHandle, id: &str) {
-    let state = app.state::<TerminalState>();
-    let session = match state.lock() {
-        Ok(mut inner) => inner.sessions.remove(id),
-        Err(_) => return,
-    };
-    if let Some(mut s) = session {
-        let code = s.child.wait().ok().and_then(|st| st.code());
-        // Retain the exit code + any undrained output so a polling renderer can
-        // still observe them via `pty:getStatus` / `pty:read` after teardown.
-        if let Ok(mut inner) = state.lock() {
-            if inner.recent_exits.len() >= MAX_RECENT_EXITS {
-                // Evict an arbitrary old record to keep the map bounded.
-                if let Some(k) = inner.recent_exits.keys().next().cloned() {
-                    inner.recent_exits.remove(&k);
-                }
-            }
-            inner.recent_exits.insert(
-                id.to_string(),
-                ExitRecord { code, buffer: std::mem::take(&mut s.buffer) },
-            );
-        }
+fn finish_part(app: &tauri::AppHandle, id: &str, td: &Teardown) {
+    // fetch_add returns the previous value: 1 means this thread finished second.
+    if td.done.fetch_add(1, Ordering::AcqRel) == 1 {
+        let code = td.code.lock().ok().and_then(|c| *c);
         crate::native_ops::emit_event(app, "pty:exit", &json!({ "sessionId": id, "code": code }));
     }
 }
 
+/// Stream the pseudoterminal's output to the renderer as `pty:data` events.
+fn spawn_reader(app: tauri::AppHandle, id: String, mut reader: Box<dyn Read + Send>, td: Arc<Teardown>) {
+    crate::util::spawn_named("terminal-read", move || {
+        let mut buf = [0u8; 16384];
+        let mut carry: Vec<u8> = Vec::new();
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let data = decode_utf8_stream(&mut carry, &buf[..n]);
+                    if data.is_empty() {
+                        continue;
+                    }
+                    push_session_buffer(&app, &id, &data);
+                    crate::native_ops::emit_event(&app, "pty:data", &json!({ "sessionId": id, "data": data }));
+                }
+                Err(_) => break,
+            }
+        }
+        finish_part(&app, &id, &td);
+    });
+}
+
+/// Wait for the shell to exit, then tear the session down (see module docs).
+fn spawn_waiter(
+    app: tauri::AppHandle,
+    id: String,
+    mut child: Box<dyn portable_pty::Child + Send + Sync>,
+    td: Arc<Teardown>,
+) {
+    crate::util::spawn_named("terminal-wait", move || {
+        let code = child.wait().ok().map(|st| st.exit_code() as i32);
+        if let Ok(mut c) = td.code.lock() {
+            *c = code;
+        }
+        let state = app.state::<TerminalState>();
+        let session = match state.lock() {
+            Ok(mut inner) => {
+                let s = inner.sessions.remove(&id);
+                if let Some(ref sess) = s {
+                    if inner.recent_exits.len() >= MAX_RECENT_EXITS {
+                        if let Some(k) = inner.recent_exits.keys().next().cloned() {
+                            inner.recent_exits.remove(&k);
+                        }
+                    }
+                    inner.recent_exits.insert(id.clone(), ExitRecord { code, buffer: sess.buffer.clone() });
+                }
+                s
+            }
+            Err(_) => None,
+        };
+        // Lock released: closing the pseudoconsole may wait for the reader.
+        drop(session);
+        finish_part(&app, &id, &td);
+    });
+}
+
+/// Make Ctrl+C reach programs run in the terminal.
+///
+/// Windows keeps an "ignore Ctrl+C" flag per process that children inherit.
+/// When DEX is started by something that set it (Git Bash, some launchers and
+/// scripts do), every shell DEX spawns inherits it and `CTRL_C_EVENT` from the
+/// pseudoconsole is dropped, so `^C` cannot stop `ping -t`, a dev server, etc.
+/// Restoring normal processing in DEX before the first spawn fixes all
+/// children. Runs once; harmless when the flag was not set.
+#[cfg(windows)]
+fn restore_ctrl_c_for_children() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn SetConsoleCtrlHandler(
+                handler: Option<unsafe extern "system" fn(u32) -> i32>,
+                add: i32,
+            ) -> i32;
+        }
+        // SAFETY: NULL handler + FALSE only clears the process's ignore-Ctrl+C
+        // flag; no callback is registered and no memory is passed.
+        unsafe {
+            SetConsoleCtrlHandler(None, 0);
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn restore_ctrl_c_for_children() {}
+
+fn clamp_dim(v: Option<u64>, default: u16, min: u16) -> u16 {
+    v.map(|n| n.min(MAX_DIM as u64) as u16).unwrap_or(default).max(min)
+}
+
 fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "error": "terminal state unavailable" }),
-    };
-    if inner.sessions.len() >= MAX_SESSIONS {
-        return json!({ "error": format!("Maximum {} terminal sessions reached.", MAX_SESSIONS) });
+    {
+        let state = app.state::<TerminalState>();
+        let inner = match state.lock() {
+            Ok(g) => g,
+            Err(_) => return json!({ "error": "terminal state unavailable" }),
+        };
+        if inner.sessions.len() >= MAX_SESSIONS {
+            return json!({ "error": format!("Maximum {} terminal sessions reached.", MAX_SESSIONS) });
+        }
     }
 
     let (def_shell, _) = resolve_shell();
@@ -274,64 +366,73 @@ fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let cwd = opts
         .get("cwd")
         .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && std::path::Path::new(s).is_dir())
         .map(|s| s.to_string())
         .unwrap_or_else(home_dir);
-    let cols = opts.get("cols").and_then(|v| v.as_u64()).unwrap_or(80).max(1) as u32;
-    let rows = opts.get("rows").and_then(|v| v.as_u64()).unwrap_or(24).max(1) as u32;
+    let cols = clamp_dim(opts.get("cols").and_then(|v| v.as_u64()), 80, MIN_COLS);
+    let rows = clamp_dim(opts.get("rows").and_then(|v| v.as_u64()), 24, MIN_ROWS);
 
-    let mut cmd = Command::new(&shell);
-    cmd.args(&args)
-        .current_dir(&cwd)
-        .env("TERM", "xterm-256color")
-        .env("COLORTERM", "truecolor")
-        .env("COLUMNS", cols.to_string())
-        .env("LINES", rows.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW (Electron windowsHide parity)
-    }
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        // ENOENT / unspawnable shell surfaces here synchronously; the renderer's
-        // spawn-failure path shows "terminal unavailable" instead of looping.
-        Err(e) => return json!({ "error": e.to_string() }),
+    restore_ctrl_c_for_children();
+    let pty = native_pty_system();
+    let pair = match pty.openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 }) {
+        Ok(p) => p,
+        Err(e) => return json!({ "error": format!("Could not open a pseudoterminal: {e}") }),
     };
 
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
-    let stdin = child.stdin.take();
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.args(&args);
+    cmd.cwd(&cwd);
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd.env("TERM_PROGRAM", "DEX");
 
-    inner.next_id += 1;
-    let id = format!("pty-{}", inner.next_id);
-    inner.sessions.insert(
-        id.clone(),
-        Session {
-            id: id.clone(),
-            shell: shell.clone(),
-            cwd,
-            cols,
-            rows,
-            child,
-            stdin,
-            buffer: String::new(),
-        },
-    );
-    drop(inner); // release the lock before starting the reader threads
+    let child = match pair.slave.spawn_command(cmd) {
+        Ok(c) => c,
+        Err(e) => return json!({ "error": format!("Could not start {shell}: {e}") }),
+    };
+    // The child holds its own handle to the slave side.
+    drop(pair.slave);
 
-    if let Some(out) = stdout {
-        spawn_reader(app.clone(), id.clone(), out, true);
-    }
-    if let Some(err) = stderr {
-        spawn_reader(app.clone(), id.clone(), err, false);
-    }
+    let reader = match pair.master.try_clone_reader() {
+        Ok(r) => r,
+        Err(e) => return json!({ "error": format!("terminal output unavailable: {e}") }),
+    };
+    let writer = match pair.master.take_writer() {
+        Ok(w) => w,
+        Err(e) => return json!({ "error": format!("terminal input unavailable: {e}") }),
+    };
+    let killer = child.clone_killer();
 
-    json!({ "sessionId": id })
+    let id = {
+        let state = app.state::<TerminalState>();
+        let mut inner = match state.lock() {
+            Ok(g) => g,
+            Err(_) => return json!({ "error": "terminal state unavailable" }),
+        };
+        inner.next_id += 1;
+        let id = format!("pty-{}", inner.next_id);
+        inner.sessions.insert(
+            id.clone(),
+            Session {
+                id: id.clone(),
+                shell: shell.clone(),
+                cwd: cwd.clone(),
+                cols,
+                rows,
+                master: pair.master,
+                writer,
+                killer,
+                buffer: String::new(),
+            },
+        );
+        id
+    };
+
+    let td = Arc::new(Teardown { done: AtomicU8::new(0), code: Mutex::new(None) });
+    spawn_reader(app.clone(), id.clone(), reader, td.clone());
+    spawn_waiter(app.clone(), id.clone(), child, td);
+
+    json!({ "sessionId": id, "shell": shell, "cwd": cwd, "pty": true })
 }
 
 fn write_session(app: &tauri::AppHandle, opts: &Value) -> Value {
@@ -343,20 +444,15 @@ fn write_session(app: &tauri::AppHandle, opts: &Value) -> Value {
         Err(_) => return json!({ "success": false, "error": "terminal state unavailable" }),
     };
     match inner.sessions.get_mut(sid) {
-        Some(s) => match s.stdin.as_mut() {
-            Some(stdin) => match stdin.write_all(data.as_bytes()).and_then(|_| stdin.flush()) {
-                Ok(_) => json!({ "success": true }),
-                Err(e) => json!({ "success": false, "error": e.to_string() }),
-            },
-            None => json!({ "success": false, "error": "session stdin closed" }),
+        Some(s) => match s.writer.write_all(data.as_bytes()).and_then(|_| s.writer.flush()) {
+            Ok(_) => json!({ "success": true }),
+            Err(e) => json!({ "success": false, "error": e.to_string() }),
         },
         None => json!({ "success": false, "error": "Unknown session" }),
     }
 }
 
 fn resize_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    // Pipe-based stdio has no real TTY, so this only records geometry (matches
-    // Electron, which keeps cols/rows for fit-addon and best-effort SIGWINCH).
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
     let mut inner = match state.lock() {
@@ -365,17 +461,19 @@ fn resize_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     };
     match inner.sessions.get_mut(sid) {
         Some(s) => {
-            if let Some(c) = opts.get("cols").and_then(|v| v.as_u64()) {
-                if c > 0 {
-                    s.cols = c as u32;
-                }
+            let cols = clamp_dim(opts.get("cols").and_then(|v| v.as_u64()), s.cols, MIN_COLS);
+            let rows = clamp_dim(opts.get("rows").and_then(|v| v.as_u64()), s.rows, MIN_ROWS);
+            if cols == s.cols && rows == s.rows {
+                return json!({ "success": true, "cols": cols, "rows": rows });
             }
-            if let Some(r) = opts.get("rows").and_then(|v| v.as_u64()) {
-                if r > 0 {
-                    s.rows = r as u32;
+            match s.master.resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 }) {
+                Ok(_) => {
+                    s.cols = cols;
+                    s.rows = rows;
+                    json!({ "success": true, "cols": cols, "rows": rows })
                 }
+                Err(e) => json!({ "success": false, "error": e.to_string() }),
             }
-            json!({ "success": true })
         }
         None => json!({ "success": false }),
     }
@@ -388,11 +486,11 @@ fn kill_session(app: &tauri::AppHandle, opts: &Value) -> Value {
         Ok(g) => g,
         Err(_) => return json!({ "success": false }),
     };
-    // Kill but leave the entry; the stdout reader hits EOF and `finalize` reaps it
-    // and emits `pty:exit` (single source of truth for session teardown).
+    // Kill but leave the entry; the waiter reaps the child, tears the session
+    // down and (with the reader) emits `pty:exit` — one teardown path.
     match inner.sessions.get_mut(sid) {
         Some(s) => {
-            let _ = s.child.kill();
+            let _ = s.killer.kill();
             json!({ "success": true })
         }
         None => json!({ "success": false }),
@@ -413,9 +511,7 @@ fn list_sessions(app: &tauri::AppHandle) -> Value {
     json!({ "sessions": sessions })
 }
 
-/// Return the recorded geometry for a session. Pipe-based stdio has no real TTY,
-/// so cols/rows are the values last set by `pty:resize`/spawn (what the fit-addon
-/// drives). Reports `found:false` for an unknown/exited session.
+/// Return the pseudoconsole geometry for a session (last spawn/`pty:resize`). Reports `found:false` for an unknown/exited session.
 fn get_size(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
@@ -489,5 +585,39 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "pty:getStatus" => get_status(app, &opts),
         "pty:list" => list_sessions(app),
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_utf8_stream;
+
+    #[test]
+    fn utf8_split_across_reads_is_reassembled() {
+        let bytes = "a─b😀c".as_bytes();
+        let mut carry = Vec::new();
+        let mut out = String::new();
+        for chunk in bytes.chunks(1) {
+            out.push_str(&decode_utf8_stream(&mut carry, chunk));
+        }
+        assert_eq!(out, "a─b😀c");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn invalid_bytes_are_replaced_not_stuck() {
+        let mut carry = Vec::new();
+        let out = decode_utf8_stream(&mut carry, &[b'x', 0xFF, b'y']);
+        assert_eq!(out, "x\u{FFFD}y");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn incomplete_tail_is_carried() {
+        let mut carry = Vec::new();
+        let euro = "€".as_bytes();
+        assert_eq!(decode_utf8_stream(&mut carry, &euro[..2]), "");
+        assert_eq!(carry.len(), 2);
+        assert_eq!(decode_utf8_stream(&mut carry, &euro[2..]), "€");
     }
 }

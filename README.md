@@ -3,7 +3,7 @@
 A desktop environment for Windows that brings notes, files, a web browser,
 creative tools and an AI assistant into one workspace.
 
-**Version:** 7.0.1 · **Creator:** Onazi Oj · **License:** [DEX Software License v1.0](LICENSE)
+**Version:** 7.0.1 · **Creator:** Onazi oJ · **License:** [DEX Software License v1.0](LICENSE)
 
 > **Release status.** The source in this repository is version 7.0.1. The 7.0.1
 > installer has not been published yet; the newest published installer is
@@ -148,4 +148,4 @@ DEX is proprietary software distributed under the
 [DEX Software License Agreement v1.0](LICENSE). See also [TERMS.md](TERMS.md),
 [PRIVACY.md](PRIVACY.md) and [NOTICE](NOTICE) for third-party components.
 
-© 2026 Onazi Treasure OJ. DEX OS is created by Onazi Oj.
+© 2026 Onazi Treasure OJ. DEX OS is created by Onazi oJ.

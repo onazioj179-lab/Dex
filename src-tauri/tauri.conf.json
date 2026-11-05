@@ -32,11 +32,11 @@
     "targets": [
       "nsis"
     ],
-    "publisher": "Onazi Oj",
-    "copyright": "Copyright (c) 2026 Onazi Treasure OJ. DEX OS created by Onazi Oj.",
+    "publisher": "Onazi oJ",
+    "copyright": "Copyright (c) 2026 Onazi Treasure OJ. DEX OS created by Onazi oJ.",
     "category": "Productivity",
     "shortDescription": "DEX OS",
-    "longDescription": "DEX OS: a desktop environment for Windows. Created by Onazi Oj.",
+    "longDescription": "DEX OS: a desktop environment for Windows. Created by Onazi oJ.",
     "icon": [
       "../assets/icon.ico",
       "../assets/icon.png"

@@ -1,6 +1,6 @@
 # DEX AI Assistant: Privacy
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 This describes what the code does today. It is engineering documentation, not the legal Privacy Policy. The `PRIVACY.md` rewrite still awaits the owner's approval (see `DEX_REMAINING_WORK.md`).
 
