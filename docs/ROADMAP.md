@@ -3539,3 +3539,9 @@ These need DSP/ML or native hosting we don't fake.
 - `npm run dev:tauri` — live dev window.
 - `npm run build:tauri` — installers in `src-tauri/target/release/bundle/`.
 - Native core crates: `cd core && cargo test`. Tauri shell: `cd src-tauri && cargo check`.
+
+## Checkpoint 2026-11-04 (Part 15: real terminal, Notes compact mode)
+
+- Terminal is a real pseudoterminal (ConPTY via `portable-pty`) under xterm.js, replacing piped stdio. Resize, Ctrl+C, interactive input, colours and exit codes verified in the native app over CDP. Details and the remaining checks: `DEX_REMAINING_WORK.md` #128–#133.
+- Notes compact mode (#134).
+- Already in place before this pass (checked, not rebuilt): window resize from all edges and corners, workspace layouts (Command Palette › Save/Restore Workspace Layout), Task Manager CPU rounding, fullscreen black strip (#123).
