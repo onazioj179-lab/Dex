@@ -5,146 +5,157 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * Smoke tests for the renderer Terminal component.
- * Exercises ANSI parsing, IPC spawn round-trip, input/output flow, and
- * keyboard shortcuts (Enter sends, Ctrl+L clears, ArrowUp recalls history).
+ * Renderer Terminal (xterm.js over a native pseudoterminal).
+ * xterm.js needs a real layout engine, so it is replaced with a small fake that
+ * records writes and lets the test emit keystrokes (onData) and resizes.
  */
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 
-// ----- IPC mock plumbing ---------------------------------------------------
-type Listener = (...args: unknown[]) => void;
-const listeners: Record<string, Listener[]> = {};
-const invokeCalls: Array<{ ch: string; args: unknown[] }> = [];
+type Fn = (...a: any[]) => void;
+const fake = vi.hoisted(() => ({
+  instances: [] as any[],
+}));
 
-function mockBridge(spawnResult: { sessionId?: string; error?: string } = { sessionId: 'pty-1' }) {
-  (window as unknown as { dex: unknown }).dex = {
-    invoke: vi.fn(async (ch: string, ...args: unknown[]) => {
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() { /* noop */ } } }));
+vi.mock('@xterm/addon-search', () => ({ SearchAddon: class { findNext() { return true; } findPrevious() { return true; } clearDecorations() { /* noop */ } } }));
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
+vi.mock('@xterm/xterm', () => ({
+  Terminal: class {
+    cols = 100; rows = 30;
+    written: string[] = [];
+    dataCb: Fn | null = null;
+    resizeCb: Fn | null = null;
+    buffer = { active: { length: 0, getLine: () => undefined } };
+    constructor() { fake.instances.push(this); }
+    loadAddon() { /* noop */ }
+    open() { /* noop */ }
+    write(d: string) { this.written.push(d); }
+    onData(cb: Fn) { this.dataCb = cb; return { dispose() { /* noop */ } }; }
+    onResize(cb: Fn) { this.resizeCb = cb; return { dispose() { /* noop */ } }; }
+    attachCustomKeyEventHandler() { /* noop */ }
+    hasSelection() { return false; }
+    getSelection() { return ''; }
+    clearSelection() { /* noop */ }
+    focus() { /* noop */ }
+    clear() { /* noop */ }
+    reset() { /* noop */ }
+    paste(t: string) { this.dataCb?.(t); }
+    dispose() { /* noop */ }
+  },
+}));
+
+const listeners: Record<string, Fn[]> = {};
+const invokeCalls: Array<{ ch: string; args: any[] }> = [];
+
+function mockBridge(spawnResult: { sessionId?: string; error?: string; shell?: string } = { sessionId: 'pty-1', shell: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' }) {
+  (window as any).dex = {
+    invoke: vi.fn(async (ch: string, ...args: any[]) => {
       invokeCalls.push({ ch, args });
       if (ch === 'pty:spawn') return spawnResult;
       return { success: true };
     }),
-    on: (ch: string, listener: Listener) => {
-      (listeners[ch] = listeners[ch] || []).push(listener);
-      return () => {
-        listeners[ch] = (listeners[ch] || []).filter(l => l !== listener);
-      };
+    on: (ch: string, l: Fn) => {
+      (listeners[ch] = listeners[ch] || []).push(l);
+      return () => { listeners[ch] = (listeners[ch] || []).filter(x => x !== l); };
     },
   };
 }
-
-function pushEvent(channel: string, payload: unknown) {
-  for (const l of listeners[channel] || []) l(payload);
-}
+const push = (ch: string, p: unknown) => { for (const l of listeners[ch] || []) l(p); };
+const tick = () => new Promise(r => setTimeout(r, 0));
+const term = () => fake.instances[fake.instances.length - 1];
+const writes = () => invokeCalls.filter(c => c.ch === 'pty:write').map(c => c.args[0].data);
 
 beforeEach(() => {
   invokeCalls.length = 0;
+  fake.instances.length = 0;
   for (const k of Object.keys(listeners)) delete listeners[k];
   mockBridge();
 });
 
-describe('Terminal', () => {
-  it('spawns a session on mount', async () => {
-    const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      // microtask for invoke promise
-      await new Promise(r => setTimeout(r, 0));
-    });
-    expect(invokeCalls.find(c => c.ch === 'pty:spawn')).toBeTruthy();
-    expect(screen.getByTestId('dex-terminal')).toBeTruthy();
+async function mount(props: Record<string, unknown> = {}) {
+  const { Terminal } = await import('../../src/renderer/components/Terminal');
+  await act(async () => { render(<Terminal {...props} />); await tick(); });
+}
+
+describe('Terminal (pseudoterminal)', () => {
+  it('spawns a session sized to the terminal grid', async () => {
+    await mount({ cwd: 'C:\\work' });
+    const spawn = invokeCalls.find(c => c.ch === 'pty:spawn');
+    expect(spawn?.args[0]).toMatchObject({ cwd: 'C:\\work', cols: 100, rows: 30 });
+    expect(screen.getByTestId('dex-terminal').getAttribute('data-session-id')).toBe('pty-1');
+    expect(screen.getByTestId('dex-terminal').textContent).toContain('pwsh');
   });
 
-  // Skipped: Terminal body rendering path is not exercised under JSDOM in this harness.
-  it.skip('renders incoming pty:data and strips ANSI color codes', async () => {
-    const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      await new Promise(r => setTimeout(r, 0));
-    });
-    await act(async () => {
-      pushEvent('pty:data', { sessionId: 'pty-1', data: '\x1b[32mhello\x1b[0m world\r\n' });
-    });
-    // The text content of the body should contain "hello world" without any \x1b chars
-    const term = screen.getByTestId('dex-terminal');
-    expect(term.textContent).toContain('hello');
-    expect(term.textContent).toContain('world');
-    expect(term.textContent).not.toContain('\x1b');
+  it('writes shell output into xterm unchanged (escape sequences included)', async () => {
+    await mount();
+    await act(async () => { push('pty:data', { sessionId: 'pty-1', data: '\x1b[32mhi\x1b[0m\r\n' }); });
+    await act(async () => { push('pty:data', { sessionId: 'other', data: 'not mine' }); });
+    expect(term().written).toEqual(['\x1b[32mhi\x1b[0m\r\n']);
   });
 
-  it('Enter on input sends pty:write with newline', async () => {
-    const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      await new Promise(r => setTimeout(r, 0));
-    });
-    const input = screen.getByLabelText('Terminal input') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'echo hi' } });
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-      await new Promise(r => setTimeout(r, 0));
-    });
-    const writeCall = invokeCalls.find(c => c.ch === 'pty:write');
-    expect(writeCall).toBeTruthy();
-    expect((writeCall!.args[0] as { data: string }).data.startsWith('echo hi')).toBe(true);
+  it('forwards every keystroke to the shell as typed', async () => {
+    await mount();
+    await act(async () => { for (const k of ['l', 's', '\x1b[A', '\r']) term().dataCb(k); await tick(); });
+    expect(writes()).toEqual(['l', 's', '\x1b[A', '\r']);
   });
 
-  // Skipped: Terminal body rendering path is not exercised under JSDOM in this harness.
-  it.skip('Ctrl+L clears the terminal output area', async () => {
-    const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      await new Promise(r => setTimeout(r, 0));
-    });
-    await act(async () => {
-      pushEvent('pty:data', { sessionId: 'pty-1', data: 'one\r\ntwo\r\n' });
-    });
-    const term = screen.getByTestId('dex-terminal');
-    expect(term.textContent).toContain('one');
-    const input = screen.getByLabelText('Terminal input') as HTMLInputElement;
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'l', ctrlKey: true });
-    });
-    expect(term.textContent).not.toContain('one');
+  it('resizes the pseudoconsole when xterm is refitted', async () => {
+    await mount();
+    await act(async () => { term().resizeCb({ cols: 132, rows: 40 }); await tick(); });
+    expect(invokeCalls.find(c => c.ch === 'pty:resize')?.args[0]).toEqual({ sessionId: 'pty-1', cols: 132, rows: 40 });
   });
 
-  it('ArrowUp recalls previous command from history', async () => {
-    const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      await new Promise(r => setTimeout(r, 0));
-    });
-    const input = screen.getByLabelText('Terminal input') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'first' } });
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-      await new Promise(r => setTimeout(r, 0));
-    });
-    fireEvent.change(input, { target: { value: 'second' } });
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-      await new Promise(r => setTimeout(r, 0));
-    });
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'ArrowUp' });
-    });
-    expect(input.value).toBe('second');
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'ArrowUp' });
-    });
-    expect(input.value).toBe('first');
+  it('runs a typed `dex` line locally and discards it from the shell', async () => {
+    await mount();
+    await act(async () => { for (const k of 'dex list') term().dataCb(k); term().dataCb('\r'); await tick(); });
+    const w = writes();
+    expect(w.join('')).toBe('dex list' + (/win/i.test(navigator.platform) ? '\x1b' : '\x15'));
+    expect(w).not.toContain('\r');
+    expect(screen.getByLabelText('DEX command result').textContent).toContain('dex list');
   });
 
-  it('shows error UI when spawn returns error', async () => {
-    mockBridge({ error: 'Maximum sessions reached.' });
+  it('reports the entered command for tab titles', async () => {
+    const onRunningCommand = vi.fn();
+    await mount({ onRunningCommand });
+    await act(async () => { for (const k of 'git status') term().dataCb(k); term().dataCb('\r'); await tick(); });
+    expect(onRunningCommand).toHaveBeenCalledWith('git status');
+  });
+
+  it('shows the exit code and offers a restart', async () => {
+    await mount();
+    await new Promise(r => setTimeout(r, 1600)); // past the fast-exit window
+    await act(async () => { push('pty:exit', { sessionId: 'pty-1', code: 0 }); await tick(); });
+    expect(term().written.join('')).toContain('exited with code 0');
+    expect(screen.getByLabelText('Restart terminal')).toBeTruthy();
+  });
+
+  it('shows the native error when the shell cannot start', async () => {
+    mockBridge({ error: 'Maximum 16 terminal sessions reached.' });
+    await mount();
+    expect(screen.getByTestId('dex-terminal').textContent).toContain('Maximum 16 terminal sessions reached.');
+  });
+
+  it('unsubscribes with dex.off when on() returns nothing (the real Tauri bridge)', async () => {
+    const off = vi.fn();
+    const dex = (window as any).dex;
+    dex.on = (ch: string, l: Fn) => { (listeners[ch] = listeners[ch] || []).push(l); return undefined; };
+    dex.off = off;
     const { Terminal } = await import('../../src/renderer/components/Terminal');
-    await act(async () => {
-      render(<Terminal />);
-      await new Promise(r => setTimeout(r, 0));
-    });
-    const term = screen.getByTestId('dex-terminal');
-    expect(term.textContent).toContain('Maximum sessions reached.');
+    let unmount!: () => void;
+    await act(async () => { ({ unmount } = render(<Terminal />)); await tick(); });
+    act(() => unmount());
+    expect(off.mock.calls.map(c => c[0]).sort()).toEqual(['pty:data', 'pty:exit']);
+  });
+
+  it('kills the session on unmount', async () => {
+    const { Terminal } = await import('../../src/renderer/components/Terminal');
+    let unmount!: () => void;
+    await act(async () => { ({ unmount } = render(<Terminal />)); await tick(); });
+    act(() => unmount());
+    expect(invokeCalls.find(c => c.ch === 'pty:kill')?.args[0]).toEqual({ sessionId: 'pty-1' });
   });
 });

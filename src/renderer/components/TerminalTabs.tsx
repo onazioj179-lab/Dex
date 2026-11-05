@@ -136,7 +136,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
   }, [running]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0, flex: 1, width: '100%', minWidth: 0 }}>
       {/* Tab strip */}
       <div
         role="tablist"
