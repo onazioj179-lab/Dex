@@ -44,16 +44,19 @@ function medianOf(runs: number, fn: () => number): number {
 
 /**
  * How much slower this machine is right now than the one the budgets were set
- * on: a fixed integer workload (~3 ms there), best of 5. Budgets scale by this
+ * on: a fixed integer workload (~6 ms there), best of 5. Budgets scale by this
  * ratio, between 1x and 4x, so a slow or loaded CI runner does not fail a
  * guard, while a real regression (an accidental quadratic, a per-item
  * allocation storm) still overshoots by far more than 4x.
  */
-const NOMINAL_CALIBRATION_MS = 3;
+// Measured on the owner's 8-thread dev machine: ~7 ms with the CPU 76% busy,
+// so an idle machine of that class scales budgets by 1x.
+const NOMINAL_CALIBRATION_MS = 6;
 function calibrate(): number {
   const work = () => measure(() => {
-    let x = 0;
-    for (let i = 0; i < 3_000_000; i++) x = (x + i * 2654435761) | 0;
+    // Pure 32-bit integer work (Math.imul): no float or allocation noise.
+    let x = 1;
+    for (let i = 0; i < 3_000_000; i++) x = (Math.imul(x, 1664525) + i) | 0;
     if (x === 42) throw new Error('unreachable');
   });
   work();
