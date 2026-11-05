@@ -48,18 +48,6 @@ export function emptyLedger(currency = 'USD'): LedgerDoc {
   return { version: 1, currency, accounts: [], categories: [], transactions: [], budgets: [] };
 }
 
-/** A small starter category set the user can rename or archive. */
-export function starterCategories(): Category[] {
-  const mk = (name: string, group: string, kind: Category['kind'] = 'expense'): Category => ({ id: newId('c'), name, group, kind, archived: false });
-  return [
-    mk('Salary', 'Income', 'income'), mk('Other income', 'Income', 'income'),
-    mk('Rent / mortgage', 'Bills'), mk('Utilities', 'Bills'), mk('Phone & internet', 'Bills'),
-    mk('Groceries', 'Everyday'), mk('Dining out', 'Everyday'), mk('Transport', 'Everyday'),
-    mk('Health', 'Everyday'), mk('Entertainment', 'Wants'), mk('Shopping', 'Wants'),
-    mk('Emergency fund', 'Savings goals'),
-  ];
-}
-
 // ---------------------------------------------------------------------------
 // Money
 // ---------------------------------------------------------------------------

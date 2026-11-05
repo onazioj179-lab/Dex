@@ -6,7 +6,7 @@
 // =============================================================================
 // Project awareness for DexCode: open a folder, list its source files, read
 // them, and search across them. Uses the same IPC bridge as fileIO (proven in
-// Forge's folder import): `dialog:showOpenDialog` + `fs:readdir` + `fs:read-file`.
+// Forge's folder import): `dialog:showOpenDialog` + `fs:readdir` + `fs:readText`.
 //
 // `fs:readdir` returns a flat list of entry NAMES (no stat/type), so this lists
 // the folder's top level and keeps only entries that look like source files. It
@@ -98,7 +98,7 @@ export async function pickProjectFolder(): Promise<DexProject | null> {
 export async function readProjectFile(path: string): Promise<string | null> {
   const dex = bridge();
   if (!dex) return null;
-  try { return await dex.invoke('fs:read-file', path); } catch { return null; }
+  try { const r = await dex.invoke('fs:readText', path); return r?.ok ? String(r.content) : null; } catch { return null; }
 }
 
 /**

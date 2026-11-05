@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { useRunningApps } from '../../store/runningApps';
 import { useLearningStore } from '../../store/learningStore';
 import { platform } from '../../utils';
 import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
@@ -41,23 +42,6 @@ interface FrequentItem { id: string; count: number }
 type Tab = 'overview' | 'courses' | 'shortcuts' | 'apps' | 'insights' | 'power';
 
 // -- Power mode definitions -------------------------------------------------
-interface PowerProfile {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  description: string;
-  cpuLimit: number;
-  gpuLimit: number;
-  screenBrightness: number;
-}
-
-const POWER_PROFILES: PowerProfile[] = [
-  { id: 'full', name: 'Full Power', icon: 'zap', color: '#FF453A', description: 'All systems running at maximum capacity', cpuLimit: 100, gpuLimit: 100, screenBrightness: 100 },
-  { id: 'balanced', name: 'Balanced', icon: 'scale', color: '#5AC8FA', description: 'Optimal balance of performance and efficiency', cpuLimit: 100, gpuLimit: 100, screenBrightness: 100 },
-  { id: 'conservative', name: 'Conservative', icon: 'battery', color: '#30D158', description: 'Reduced power use while keeping features active', cpuLimit: 80, gpuLimit: 80, screenBrightness: 80 },
-  { id: 'minimal', name: 'Power Saver', icon: 'battery-low', color: '#FF9500', description: 'Maximize battery life with core features only', cpuLimit: 60, gpuLimit: 50, screenBrightness: 60 },
-];
 
 // -- Keyboard shortcuts reference ------------------------------------------
 const _M = platform.isMac ? '⌘' : 'Ctrl';
@@ -504,12 +488,10 @@ const Learn: React.FC = () => {
   );
 
   // Power management state
-  const [powerProfile, setPowerProfile] = useState<string>('balanced');
-  const [batteryLevel, setBatteryLevel] = useState<number>(100);
-  const [isCharging, setIsCharging] = useState<boolean>(true);
-  const [cpuUsage, setCpuUsage] = useState<number>(0);
-  const [memoryUsage, setMemoryUsage] = useState<number>(0);
-  const [restrictedMode, setRestrictedMode] = useState<boolean>(false);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
+  const [cpuUsage, setCpuUsage] = useState<number | null>(null);
+  const [memoryUsage, setMemoryUsage] = useState<number | null>(null);
   
   // Real-time system monitoring
   const metricsInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -519,55 +501,39 @@ const Learn: React.FC = () => {
     const ipc = (window as any).dex;
     if (!ipc?.invoke) return;
     
-    // Initial power state
-    ipc.invoke('os:getBatteryInfo').then((info: any) => {
-      if (info) {
-        setBatteryLevel(info.level ?? 100);
-        setIsCharging(info.charging ?? true);
-      }
-    }).catch(() => {});
-    
-    // Get current power profile
-    ipc.invoke('battery:getProfile').then((profile: string) => {
-      if (profile) setPowerProfile(profile);
-    }).catch(() => {});
-    
-    // Get restriction status
-    ipc.invoke('battery:getRestrictions').then((restrictions: any) => {
-      setRestrictedMode(restrictions?.pauseNonEssentialTimers ?? false);
-    }).catch(() => {});
-    
+    // Battery: the browser Battery API (WebView2 reports real hardware; a
+    // desktop with no battery reports nothing useful and shows "No battery").
+    let bat: any = null;
+    const applyBat = () => {
+      if (!bat) return;
+      // Chromium reports "full, charging, 0 s to charge" both for a desktop with no
+      // battery and for a full laptop on AC; it can't tell them apart, so show AC only.
+      if (bat.charging && bat.level === 1 && bat.dischargingTime === Infinity && bat.chargingTime === 0) { setBatteryLevel(null); setIsCharging(true); return; }
+      setBatteryLevel(Math.round(bat.level * 100));
+      setIsCharging(!!bat.charging);
+    };
+    try {
+      const get = (navigator as any).getBattery;
+      if (typeof get === 'function') get.call(navigator).then((b: any) => { bat = b; applyBat(); b.addEventListener('levelchange', applyBat); b.addEventListener('chargingchange', applyBat); }).catch(() => {});
+    } catch { /* unavailable */ }
+
     // Real-time metrics -- only poll while document is visible.
     const updateMetrics = () => {
       if (document.hidden) return;
-      ipc.invoke('system:getCpuUsage').then((cpu: number) => setCpuUsage(cpu || 0)).catch(() => {});
-      ipc.invoke('system:getMemoryUsage').then((mem: number) => setMemoryUsage(mem || 0)).catch(() => {});
+      ipc.invoke('system:getStatus').then((st: any) => {
+        const cpu = st?.cpu?.usage; const mem = st?.memory?.percent;
+        setCpuUsage(typeof cpu === 'number' ? Math.round(cpu) : null);
+        setMemoryUsage(typeof mem === 'number' ? Math.round(mem) : null);
+      }).catch(() => {});
     };
     updateMetrics();
     metricsInterval.current = setInterval(() => frameScheduler.schedule(updateMetrics, { appId: 'learn', priority: 'idle' }), 2000);
     
     return () => {
       if (metricsInterval.current) clearInterval(metricsInterval.current);
+      if (bat) { bat.removeEventListener('levelchange', applyBat); bat.removeEventListener('chargingchange', applyBat); }
     };
   }, []);
-
-  // Handle power profile change
-  const changePowerProfile = useCallback((profileId: string) => {
-    const ipc = (window as any).dex;
-    setPowerProfile(profileId);
-    ipc?.invoke?.('battery:setProfile', profileId).catch(() => {});
-  }, []);
-  
-  // Toggle restriction mode
-  const toggleRestrictions = useCallback(() => {
-    const ipc = (window as any).dex;
-    const newState = !restrictedMode;
-    setRestrictedMode(newState);
-    // Update config to enable/disable non-essential timer pausing
-    ipc?.invoke?.('battery:setConfig', { 
-      enabled: newState 
-    }).catch(() => {});
-  }, [restrictedMode]);
 
   // Fetch data from main process pattern engine
   useEffect(() => {
@@ -1292,132 +1258,34 @@ const Learn: React.FC = () => {
         {/* ── POWER TAB ──────────────────────────────────────────────── */}
         {tab === 'power' && (
           <>
-            {/* System Status */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
-              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-                  background: isCharging ? '#30D158' : batteryLevel > 20 ? '#5AC8FA' : '#FF453A',
-                }} />
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{batteryLevel}%</div>
+            {/* Live readings only. Power plans are changed in the Power app, which
+                sets the real Windows plan; the old profile cards and "restricted
+                mode" stored a label that nothing applied. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div style={{ ...CARD, textAlign: 'center' as const }}>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{batteryLevel === null ? '—' : `${batteryLevel}%`}</div>
                 <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
-                  {isCharging ? 'Charging' : 'Battery'}
+                  {batteryLevel === null ? (isCharging ? 'On AC power' : 'No battery data') : isCharging ? 'Battery · charging' : 'Battery'}
                 </div>
               </div>
-              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-                  background: cpuUsage > 80 ? '#FF453A' : cpuUsage > 50 ? '#FF9500' : '#30D158',
-                }} />
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{cpuUsage}%</div>
+              <div style={{ ...CARD, textAlign: 'center' as const }}>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{cpuUsage === null ? '—' : `${cpuUsage}%`}</div>
                 <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>CPU</div>
               </div>
-              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-                  background: memoryUsage > 80 ? '#FF453A' : memoryUsage > 60 ? '#FF9500' : '#30D158',
-                }} />
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{memoryUsage}%</div>
+              <div style={{ ...CARD, textAlign: 'center' as const }}>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{memoryUsage === null ? '—' : `${memoryUsage}%`}</div>
                 <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Memory</div>
               </div>
-              <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-                  background: restrictedMode ? '#FF9500' : '#30D158',
-                }} />
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{restrictedMode ? 'ON' : 'OFF'}</div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Restrictions</div>
-              </div>
             </div>
-
-            {/* Power Profiles */}
-            <div style={CARD}>
-              <div style={CARD_TITLE}>Power Profile</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {POWER_PROFILES.map(profile => (
-                  <button
-                    key={profile.id}
-                    onClick={() => changePowerProfile(profile.id)}
-                    style={{
-                      padding: '14px var(--space-4)',
-                      borderRadius: 'var(--radius-lg)',
-                      border: powerProfile === profile.id ? `2px solid ${profile.color}` : '2px solid transparent',
-                      background: powerProfile === profile.id ? `${profile.color}15` : 'var(--color-bg-hover, rgba(255,255,255,.03))',
-                      cursor: 'pointer',
-                      textAlign: 'left' as const,
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <DexIcon name={profile.icon as any} size={18} color={profile.color} />
-                      <span style={{ fontWeight: 600, fontSize: 13, color: powerProfile === profile.id ? profile.color : 'inherit' }}>
-                        {profile.name}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>{profile.description}</div>
-                    {powerProfile === profile.id && (
-                      <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-2)', fontSize: 10, opacity: 0.6 }}>
-                        <span>CPU: {profile.cpuLimit}%</span>
-                        <span>GPU: {profile.gpuLimit}%</span>
-                      </div>
-                    )}
-                  </button>
-                ))}
+            <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={CARD_TITLE}>Power plan</div>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>Choose the Windows power plan, keep the screen awake and see which apps use the most energy in Power.</div>
               </div>
-            </div>
-
-            {/* Restriction Controls */}
-            <div style={CARD}>
-              <div style={CARD_TITLE}>Operation Mode</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>
-                    {restrictedMode ? 'Restricted Mode' : 'Unrestricted Mode'}
-                  </div>
-                  <div style={{ fontSize: 11, opacity: 0.5 }}>
-                    {restrictedMode 
-                      ? 'Some operations are limited to save power and resources'
-                      : 'All operations run at full capacity'}
-                  </div>
-                </div>
-                <button
-                  onClick={toggleRestrictions}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 600, borderRadius: 10,
-                    border: 'none', cursor: 'pointer',
-                    background: restrictedMode ? 'rgba(255,69,58,.15)' : 'rgba(48,209,88,.15)',
-                    color: restrictedMode ? '#FF453A' : '#30D158',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {restrictedMode ? 'Disable Restrictions' : 'Enable Restrictions'}
-                </button>
-              </div>
-              
-              {/* Quick actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
-                {[
-                  { label: 'Clear Cache', icon: 'trash', action: 'cache:clear' },
-                  { label: 'Optimize', icon: 'zap', action: 'system:optimize' },
-                  { label: 'Refresh', icon: 'refresh-cw', action: 'system:refresh' },
-                ].map(item => (
-                  <button
-                    key={item.label}
-                    onClick={() => (window as any).dex?.invoke?.(item.action)}
-                    style={{
-                      padding: '10px var(--space-3)', borderRadius: 10, border: 'none',
-                      background: 'var(--color-bg-hover, rgba(255,255,255,.05))', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      fontSize: 11, color: 'inherit', transition: 'background 0.15s ease',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,.1))')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,.05))')}
-                  >
-                    <DexIcon name={item.icon as any} size={14} />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+              <button
+                onClick={() => useRunningApps.getState().launchApp({ id: 'power', name: 'Power', icon: 'power' } as never)}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'inherit', cursor: 'pointer', fontSize: 12 }}
+              >Open Power</button>
             </div>
           </>
         )}

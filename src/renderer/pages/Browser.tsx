@@ -268,6 +268,8 @@ interface DownloadItem {
   status: 'downloading' | 'completed' | 'error';
   size?: number;
   path?: string;
+  /** Why it failed, from the native downloader. */
+  error?: string;
 }
 
 // ===============================================================================
@@ -1182,11 +1184,11 @@ export const Browser: React.FC = () => {
         setDownloads(prev => [...prev, { id: Date.now().toString(), url, fileName, progress: 0, status: 'downloading' }]);
         setShowDownloads(true);
         window.dex?.invoke?.('download:start', url).then((result: any) => {
-          if (result?.success) {
-            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'completed', progress: 100, path: result.path } : d));
-          }
-        }).catch(() => {
-          setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
+          setDownloads(prev => prev.map(d => d.url !== url || d.status !== 'downloading' ? d : result?.success
+            ? { ...d, status: 'completed', progress: 100, path: result.path, size: result.size, fileName: String(result.path).split(/[\/]/).pop() || d.fileName }
+            : { ...d, status: 'error', error: result?.error || 'Download failed.' }));
+        }).catch((e: unknown) => {
+          setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error', error: e instanceof Error ? e.message : 'Download failed.' } : d));
         });
       } else if (url.startsWith('http://') || url.startsWith('https://')) {
         // target=_blank / window.open -> a new foreground tab.
@@ -1287,11 +1289,10 @@ export const Browser: React.FC = () => {
   useEffect(() => {
     const handleProgress = (data: any) => {
       if (!data?.url) return;
-      setDownloads(prev => prev.map(d => 
-        d.url === data.url 
-          ? { ...d, progress: data.percent, fileName: data.fileName }
-          : d
-      ));
+      // Native shape: { url, received, total|null }. Without a total the
+      // percentage is unknown, so progress stays 0 (the bar is indeterminate).
+      const pct = typeof data.total === 'number' && data.total > 0 ? Math.min(100, Math.round((data.received / data.total) * 100)) : 0;
+      setDownloads(prev => prev.map(d => (d.url === data.url && d.status === 'downloading' ? { ...d, progress: pct, size: data.received } : d)));
     };
     window.dex?.on?.('download:progress', handleProgress);
     return () => {
@@ -1348,17 +1349,14 @@ export const Browser: React.FC = () => {
     setShowDownloads(true);
     
     try {
-      const result = await window.dex?.invoke?.('download:start', url);
-      if (result?.success) {
-        setDownloads(prev => prev.map(d => 
-          d.id === id 
-            ? { ...d, status: 'completed', progress: 100, path: result.path, size: result.size }
-            : d
-        ));
-      }
+      if (!window.dex?.invoke) throw new Error('Downloads need the DEX desktop app.');
+      const result = await window.dex.invoke('download:start', url);
+      setDownloads(prev => prev.map(d => d.id !== id ? d : result?.success
+        ? { ...d, status: 'completed', progress: 100, path: result.path, size: result.size, fileName: String(result.path).split(/[\/]/).pop() || d.fileName }
+        : { ...d, status: 'error', error: result?.error || 'Download failed.' }));
     } catch (err) {
       setDownloads(prev => prev.map(d => 
-        d.id === id ? { ...d, status: 'error' } : d
+        d.id === id ? { ...d, status: 'error', error: err instanceof Error ? err.message : 'Download failed.' } : d
       ));
     }
   }, []);
@@ -2238,7 +2236,7 @@ export const Browser: React.FC = () => {
                   }} />
                 </div>
                 <span style={styles.downloadStatus}>
-                  {d.status === 'downloading' ? `${d.progress}%` : d.status}
+                  {d.status === 'downloading' ? (d.progress > 0 ? `${d.progress}%` : d.size ? `${(d.size / 1048576).toFixed(1)} MB` : 'Starting…') : d.status === 'error' ? (d.error || 'Failed') : 'Saved to Downloads'}
                 </span>
               </div>
             ))

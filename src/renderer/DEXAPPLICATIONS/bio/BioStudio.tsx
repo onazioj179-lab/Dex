@@ -51,14 +51,14 @@ const th: React.CSSProperties = {
 };
 const td: React.CSSProperties = { padding: '5px 10px', borderBottom: hair, fontSize: 12, fontVariantNumeric: 'tabular-nums' };
 
-type Provenance = 'calculated' | 'measured' | 'sample';
-const PROV_LABEL: Record<Provenance, string> = { calculated: 'Calculated', measured: 'Measured (your input)', sample: 'Sample data' };
+type Provenance = 'calculated' | 'measured';
+const PROV_LABEL: Record<Provenance, string> = { calculated: 'Calculated', measured: 'Measured (your input)' };
 
 const Badge: React.FC<{ kind: Provenance }> = ({ kind }) => (
   <span style={{
     fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: radius.xs, whiteSpace: 'nowrap',
-    color: kind === 'measured' ? colors.semantic.warning : kind === 'sample' ? colors.text.secondary : colors.accent.default,
-    background: kind === 'measured' ? colors.semantic.warningMuted : kind === 'sample' ? 'var(--color-bg-hover)' : colors.accent.soft,
+    color: kind === 'measured' ? colors.semantic.warning : colors.accent.default,
+    background: kind === 'measured' ? colors.semantic.warningMuted : colors.accent.soft,
   }}>{PROV_LABEL[kind]}</span>
 );
 
@@ -86,7 +86,6 @@ const TABS: { id: Tab; label: string; key: string }[] = [
   { id: 'bench', label: 'Bench', key: '6' },
 ];
 
-const SAMPLE = 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAGGAATTCGGATCCATGAAAGCTAGCTTGCGGCCGCAAGCTTTAA';
 
 interface LogEntry { t: number; level: 'info' | 'warn' | 'error'; text: string }
 
@@ -298,7 +297,6 @@ const BioStudio: React.FC = () => {
         { id: 'new', items: [
           { id: 'file.newseq', label: 'New sequence', run: () => addSequences([{ name: `Sequence ${project.sequences.length + 1}`, raw: 'ATG', source: 'entered' }]) },
           { id: 'file.import', label: 'Import FASTA…', shortcut: 'Ctrl+O', run: () => fileInput.current?.click() },
-          { id: 'file.sample', label: 'Add sample sequence', run: () => addSequences([{ name: 'Sample construct', raw: SAMPLE, source: 'sample' }]) },
         ] },
         { id: 'export', label: 'Export', items: [
           { id: 'file.fasta', label: 'Active sequence as FASTA', disabled: !active, run: () => exportFasta(false) },
@@ -353,8 +351,7 @@ const BioStudio: React.FC = () => {
             </Field>
             <KV k="Type" v={active.kind === 'protein' ? 'Protein' : 'Nucleotide (DNA)'} />
             <KV k="Length" v={`${active.seq.length.toLocaleString()} ${isNuc ? 'nt' : 'aa'}`} />
-            <KV k="Source" v={<Badge kind={active.source === 'sample' ? 'sample' : 'calculated'} />} />
-            <KV k="Origin" v={{ entered: 'Typed in', imported: 'Imported file', sample: 'Built-in sample', derived: 'Derived' }[active.source]} />
+            <KV k="Origin" v={{ entered: 'Typed in', imported: 'Imported file', derived: 'Derived' }[active.source]} />
             <Field label="Notes">
               <textarea key={active.id + 'n'} defaultValue={active.notes} rows={3} style={{ ...input, width: '100%', height: 'auto', padding: 6, resize: 'vertical' }}
                 onBlur={(e) => e.target.value !== active.notes && dispatch({ type: 'update', id: active.id, patch: { notes: e.target.value } })} />
@@ -456,7 +453,6 @@ const BioStudio: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                     <button style={btn} onClick={() => fileInput.current?.click()}>Import FASTA…</button>
                     <button style={btn} onClick={() => addSequences([{ name: 'Sequence 1', raw: 'ATG', source: 'entered' }])}>New sequence</button>
-                    <button style={btn} onClick={() => addSequences([{ name: 'Sample construct', raw: SAMPLE, source: 'sample' }])}>Add sample</button>
                   </div>
                 </div>
               )}
@@ -493,7 +489,7 @@ const BioStudio: React.FC = () => {
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {tab === 'bench' ? <BenchPanel /> : !active ? (
-                <Empty title="Open or create a sequence" body="Import a FASTA file (Ctrl+O), paste a new sequence, or add the sample construct from the explorer." />
+                <Empty title="Open or create a sequence" body="Import a FASTA file (Ctrl+O), or create a new sequence and paste your own." />
               ) : tab === 'sequence' ? (
                 <SequencePanel key={active.id} seq={active} frame={frame}
                   onCommit={(raw) => {

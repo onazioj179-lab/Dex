@@ -283,20 +283,9 @@ export const useCollaborationStore = create<CollaborationState>()(
         set({ projects: newProjects });
 
         // Add system message
-        get().sendMessage(projectId, `${currentUser.name} invited ${email} as ${role}`);
-
-        // Queue email invitation via main process IPC
-        window.dex?.invoke?.('collaboration:send-invite', {
-          type: 'collaboration_invite',
-          to: email,
-          projectName: project.name,
-          inviterName: currentUser.name,
-          role,
-          projectId,
-        }).catch(() => {
-          // Email sending requires backend - invitation is still recorded locally
-          console.info(`[Collaboration] Invite recorded for ${email} (email delivery requires backend)`);
-        });
+        // Recorded locally only. DEX has no mail service, so nothing is emailed
+        // and the message says so rather than implying an invite was sent.
+        get().sendMessage(projectId, `${currentUser.name} added ${email} as ${role} (local record; no email is sent)`);
       },
 
       removeCollaborator: (projectId, collaboratorId) => {

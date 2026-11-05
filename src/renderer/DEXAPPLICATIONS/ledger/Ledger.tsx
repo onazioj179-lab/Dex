@@ -16,7 +16,7 @@ import { downloadText } from '../../improvements500/downloadBlob';
 import {
   ACCOUNT_TYPES, addMonths, addTransaction, addTransfer, accountBalance, budgetMonth, deleteAccount, deleteCategory,
   deleteTransaction, emptyLedger, exportTransactionsCsv, finishReconcile, formatMinor, importTransactionsCsv, isTransfer,
-  monthOf, monthSummary, netWorth, newId, parseAmount, reconcileState, setBudget, starterCategories, txnAmount,
+  monthOf, monthSummary, netWorth, newId, parseAmount, reconcileState, setBudget, txnAmount,
   updateTransaction, validateLedger, type Account, type AccountType, type Category, type LedgerDoc, type Split,
   type Transaction, type TxnStatus,
 } from './ledgerModel';
@@ -254,8 +254,8 @@ const Ledger: React.FC = () => {
             )}
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {!doc.accounts.length && section !== 'categories' ? (
-                <Welcome hasCategories={doc.categories.length > 0} onAddAccount={() => setAddingAccount(true)}
-                  onStarter={() => commit((d) => ({ ...d, categories: [...d.categories, ...starterCategories()] }), 'Added a starter set of categories. Rename or archive any of them in Categories.')}
+                <Welcome categoryCount={doc.categories.length} onAddAccount={() => setAddingAccount(true)}
+                  onCategories={() => setSection('categories')}
                   onCurrency={(c) => commit((d) => ({ ...d, currency: c }))} currency={cur} />
               ) : section === 'overview' ? <Overview doc={doc} month={month} onOpen={(id) => { setAccountFilter(id); setSection('transactions'); }} />
                 : section === 'budget' ? <BudgetView doc={doc} month={month} setMonth={setMonth} onSet={(cid, v) => commit((d) => setBudget(d, month, cid, v))} />
@@ -314,13 +314,13 @@ const AccountForm: React.FC<{ cur: string; onSave: (a: Account) => void; onCance
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'NGN'];
 
-const Welcome: React.FC<{ hasCategories: boolean; currency: string; onAddAccount: () => void; onStarter: () => void; onCurrency: (c: string) => void }> = ({ hasCategories, currency, onAddAccount, onStarter, onCurrency }) => (
+const Welcome: React.FC<{ categoryCount: number; currency: string; onAddAccount: () => void; onCategories: () => void; onCurrency: (c: string) => void }> = ({ categoryCount, currency, onAddAccount, onCategories, onCurrency }) => (
   <div style={{ maxWidth: 460, margin: '48px auto', padding: '0 20px', fontSize: 13, color: colors.text.secondary, lineHeight: 1.6 }}>
     <div style={{ fontSize: 16, fontWeight: 600, color: colors.text.primary, marginBottom: 6 }}>Set up your ledger</div>
     Your ledger is empty. Add the accounts you hold with today&rsquo;s balances; everything stays on this computer.
     <ol style={{ paddingLeft: 18, margin: '12px 0' }}>
       <li>Currency: <select aria-label="Currency" style={{ ...inp, marginLeft: 6 }} value={currency} onChange={(e) => onCurrency(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></li>
-      <li>Categories: {hasCategories ? 'ready.' : <button style={{ ...btn, marginLeft: 6 }} onClick={onStarter}>Add a starter set</button>}</li>
+      <li>Categories: {categoryCount ? `${categoryCount} set up. ` : 'none yet. '}<button style={{ ...btn, marginLeft: 6 }} onClick={onCategories}>Create categories</button></li>
       <li>Accounts: <button style={{ ...primary, marginLeft: 6 }} onClick={onAddAccount}>Add an account</button></li>
     </ol>
     Then import a bank CSV (File › Import CSV) or add transactions by hand.
@@ -677,7 +677,7 @@ const Categories: React.FC<{ doc: LedgerDoc; commit: Commit }> = ({ doc, commit 
   const groups = [...new Set(doc.categories.map((c) => c.group))];
   return (
     <div>
-      <Head title="Categories">{!doc.categories.length && <button style={btn} onClick={() => commit((d) => ({ ...d, categories: [...d.categories, ...starterCategories()] }))}>Add starter set</button>}</Head>
+      <Head title="Categories" />
       <form onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; commit((d) => ({ ...d, categories: [...d.categories, { id: newId('c'), name: name.trim(), group: group.trim(), kind, archived: false }] })); setName(''); }}
         style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: hair }} aria-label="New category">
         <input aria-label="Category name" placeholder="New category" style={{ ...inp, flex: 1 }} value={name} onChange={(e) => setName(e.target.value)} />

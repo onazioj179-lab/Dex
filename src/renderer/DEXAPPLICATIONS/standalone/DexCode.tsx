@@ -27,6 +27,7 @@ import {
   openFileDialog,
   saveFileDialog,
   saveFile,
+  readTextFile,
 } from './dexCode/fileIO';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
@@ -327,9 +328,15 @@ const DexCode: React.FC = () => {
     };
   }, []);
 
-  // File system handlers
+  // File system handlers. Failures are shown, never swallowed: a save that
+  // didn't reach the disk must not look like it did.
+  const fileError = useCallback((what: string, err: unknown) => {
+    const message = `${what}: ${err instanceof Error ? err.message : String(err)}`;
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message } }));
+  }, []);
   const handleOpenFile = useCallback(async () => {
-    const result = await openFileDialog();
+    let result: { path: string; content: string } | null = null;
+    try { result = await openFileDialog(); } catch (e) { fileError('Could not open the file', e); return; }
     if (result) {
       setCode(result.content);
       setCurrentFilePath(result.path);
@@ -339,7 +346,7 @@ const DexCode: React.FC = () => {
       addRecentFile(result.path);
       setRecentFiles(getRecentFiles());
     }
-  }, []);
+  }, [fileError]);
 
   const handleSaveFile = useCallback(async () => {
     if (currentFilePath) {
@@ -347,10 +354,13 @@ const DexCode: React.FC = () => {
       if (success) {
         originalCodeRef.current = code;
         setIsModified(false);
+      } else {
+        fileError('Not saved', new Error(`${currentFilePath} could not be written`));
       }
     } else {
       // Save As if no current file
-      const path = await saveFileDialog(code, fileName);
+      let path: string | null = null;
+      try { path = await saveFileDialog(code, fileName); } catch (e) { fileError('Not saved', e); return; }
       if (path) {
         setCurrentFilePath(path);
         setFileName(path.split(/[\\/]/).pop() || 'file.dex');
@@ -360,10 +370,11 @@ const DexCode: React.FC = () => {
         setRecentFiles(getRecentFiles());
       }
     }
-  }, [code, currentFilePath, fileName]);
+  }, [code, currentFilePath, fileName, fileError]);
 
   const handleSaveAs = useCallback(async () => {
-    const path = await saveFileDialog(code, fileName);
+    let path: string | null = null;
+    try { path = await saveFileDialog(code, fileName); } catch (e) { fileError('Not saved', e); return; }
     if (path) {
       setCurrentFilePath(path);
       setFileName(path.split(/[\\/]/).pop() || 'file.dex');
@@ -372,7 +383,7 @@ const DexCode: React.FC = () => {
       addRecentFile(path);
       setRecentFiles(getRecentFiles());
     }
-  }, [code, fileName]);
+  }, [code, fileName, fileError]);
 
   const handleNewFile = useCallback(() => {
     setCode(DEFAULT_CODE);
@@ -384,7 +395,7 @@ const DexCode: React.FC = () => {
 
   const handleOpenRecent = useCallback(async (filePath: string) => {
     try {
-      const content = await window.dex?.invoke('fs:read-file', filePath);
+      const content = await readTextFile(filePath);
       setCode(content);
       setCurrentFilePath(filePath);
       setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');

@@ -104,6 +104,79 @@ pub fn show_open_dialog(app: &tauri::AppHandle, args: &Value) -> Value {
     json!({ "canceled": paths.is_empty(), "filePaths": paths })
 }
 
+/// `dialog:showSaveDialog(opts)` — Electron shape: `{ defaultPath?, title?,
+/// filters?: [{ name, extensions }] }` -> `{ canceled, filePath }`. Only picks a
+/// path; writing is the caller's job (e.g. `code:saveFile`).
+pub fn show_save_dialog(app: &tauri::AppHandle, args: &Value) -> Value {
+    let opts = args.get(0).cloned().unwrap_or(Value::Null);
+    let mut builder = app.dialog().file();
+    if let Some(t) = opts.get("title").and_then(|v| v.as_str()) {
+        builder = builder.set_title(t);
+    }
+    if let Some(dp) = opts.get("defaultPath").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
+        let p = std::path::Path::new(dp);
+        match (p.parent().filter(|x| !x.as_os_str().is_empty()), p.file_name()) {
+            (Some(dir), Some(name)) => { builder = builder.set_directory(dir).set_file_name(name.to_string_lossy()); }
+            (None, Some(name)) => { builder = builder.set_file_name(name.to_string_lossy()); }
+            _ => {}
+        }
+    }
+    if let Some(filters) = opts.get("filters").and_then(|v| v.as_array()) {
+        for f in filters {
+            let name = f.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let exts: Vec<&str> = f.get("extensions").and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|x| x.as_str()).filter(|e| *e != "*").collect())
+                .unwrap_or_default();
+            if !exts.is_empty() { builder = builder.add_filter(name, &exts); }
+        }
+    }
+    match builder.blocking_save_file().and_then(fp_to_string) {
+        Some(p) => json!({ "canceled": false, "filePath": p }),
+        None => json!({ "canceled": true, "filePath": Value::Null }),
+    }
+}
+
+/// `fs:readText(path)` -> `{ ok: true, content }` | `{ ok: false, error }`.
+/// UTF-8 only; files over 50 MB are refused rather than freezing the UI.
+pub fn read_text(args: &Value) -> Value {
+    let path = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    if path.is_empty() { return json!({ "ok": false, "error": "No file path." }); }
+    match std::fs::metadata(path) {
+        Ok(m) if m.len() > 50 * 1024 * 1024 => return json!({ "ok": false, "error": "File is larger than 50 MB." }),
+        Ok(m) if m.is_dir() => return json!({ "ok": false, "error": "That path is a folder." }),
+        Err(e) => return json!({ "ok": false, "error": e.to_string() }),
+        _ => {}
+    }
+    match std::fs::read(path) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(content) => json!({ "ok": true, "content": content }),
+            Err(_) => json!({ "ok": false, "error": "The file is not UTF-8 text." }),
+        },
+        Err(e) => json!({ "ok": false, "error": e.to_string() }),
+    }
+}
+
+/// `fs:writeText(path, content)` -> `{ ok: true }` | `{ ok: false, error }`.
+/// Writes to a sibling temp file and renames it over the target, so a failed
+/// write never leaves a half-written file behind.
+pub fn write_text(args: &Value) -> Value {
+    let path = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    let content = match args.get(1).and_then(|v| v.as_str()) {
+        Some(c) => c,
+        None => return json!({ "ok": false, "error": "No content to write." }),
+    };
+    if path.is_empty() { return json!({ "ok": false, "error": "No file path." }); }
+    let target = std::path::Path::new(path);
+    let tmp = target.with_extension(format!("{}.dex-tmp", target.extension().and_then(|e| e.to_str()).unwrap_or("")));
+    if let Err(e) = std::fs::write(&tmp, content.as_bytes()) {
+        return json!({ "ok": false, "error": e.to_string() });
+    }
+    match std::fs::rename(&tmp, target) {
+        Ok(()) => json!({ "ok": true }),
+        Err(e) => { let _ = std::fs::remove_file(&tmp); json!({ "ok": false, "error": e.to_string() }) }
+    }
+}
+
 /// Fire an OS notification toast (best-effort, additive). Used after the DB
 /// insert for `notification-center:send` so the renderer's notification center
 /// (DB-backed) AND the OS surface both reflect the notification, matching the
@@ -820,3 +893,27 @@ pub fn backup_verify(app: &tauri::AppHandle, args: &Value) -> Value {
         }
     })
 }
+
+#[cfg(test)]
+mod text_file_tests {
+    use super::*;
+
+    #[test]
+    fn write_then_read_round_trips_and_reports_errors() {
+        let dir = std::env::temp_dir().join(format!("dex-text-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("a.txt");
+        let p = f.to_string_lossy().to_string();
+        assert_eq!(write_text(&json!([p, "héllo
+"]))["ok"], true);
+        assert_eq!(read_text(&json!([p]))["content"], "héllo
+");
+        assert_eq!(write_text(&json!([p, "second"]))["ok"], true);
+        assert_eq!(read_text(&json!([p]))["content"], "second");
+        assert_eq!(read_text(&json!([dir.join("missing.txt").to_string_lossy()]))["ok"], false);
+        assert_eq!(read_text(&json!([dir.to_string_lossy()]))["ok"], false);
+        assert_eq!(write_text(&json!([dir.join("no/such/dir/x.txt").to_string_lossy(), "x"]))["ok"], false);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+

@@ -174,6 +174,7 @@ mod workflow_ctl;
 mod changelog;
 mod color_labels;
 mod ledger;
+mod download;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -2466,6 +2467,10 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // --- Native dialogs (Tauri dialog plugin) --------------------------
         // Electron dialog.showOpenDialog parity: { canceled, filePaths }.
         "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
+        "dialog:showSaveDialog" => native_ops::show_save_dialog(&app, &args),
+        "fs:readText" => native_ops::read_text(&args),
+        "fs:writeText" => native_ops::write_text(&args),
+        "download:start" => download::start(&app, &args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
         // (project-archiver:* and media-library:* run their fs work inside

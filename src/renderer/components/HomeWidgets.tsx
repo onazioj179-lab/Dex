@@ -381,60 +381,24 @@ const QuickActionsWidget: React.FC = () => {
 };
 
 const SystemStatusWidget: React.FC = () => {
-  const [cpu, setCpu] = useState(0);
-  const [mem, setMem] = useState(0);
+  // null = not measured (web preview / native call failed): shown as "—", never estimated.
+  const [cpu, setCpu] = useState<number | null>(null);
+  const [mem, setMem] = useState<number | null>(null);
   const [network, setNetwork] = useState({ online: true, type: '' });
-  const [gpu, setGpu] = useState(0);
-  const [disk, setDisk] = useState(0);
-  
-  // CPU estimation via requestAnimationFrame frame budget. Higher load = longer frames.
-  const cpuEstimateRef = React.useRef<number>(0);
-  useEffect(() => {
-    let raf = 0;
-    let last = performance.now();
-    const samples: number[] = [];
-    const tick = (t: number) => {
-      const delta = t - last;
-      last = t;
-      // 16.67ms = 0% load on a 60Hz frame; >33ms means saturated
-      const load = Math.min(100, Math.max(0, ((delta - 16.67) / 16.67) * 50));
-      samples.push(load);
-      if (samples.length > 30) samples.shift();
-      cpuEstimateRef.current = samples.reduce((a, b) => a + b, 0) / samples.length;
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  const [disk, setDisk] = useState<number | null>(null);
 
   useEffect(() => {
-    // Try to get real system stats via IPC, fallback to estimation
+    // One native call (sysinfo): CPU, memory and system-drive usage.
     const fetchStats = async () => {
       try {
-        const ipc = (window as any).dex;
-        if (ipc?.invoke) {
-          const stats = await ipc.invoke('system:getStats');
-          if (stats?.cpuUsage !== undefined) {
-            setCpu(Math.round(stats.cpuUsage));
-            setMem(Math.round(stats.memoryUsage));
-            if (stats.gpuUsage !== undefined) setGpu(Math.round(stats.gpuUsage));
-            return;
-          }
-        }
-      } catch { /* fallback */ }
-      // Fallback: real metrics only (no fake data)
-      const navMem = (performance as any).memory;
-      if (navMem) {
-        const used = navMem.usedJSHeapSize / navMem.jsHeapSizeLimit * 100;
-        setMem(Math.round(Math.min(99, Math.max(1, used))));
-      } else {
-        // Last resort: heap-relative pseudo metric so the bar isn't dead
-        setMem(Math.round(15 + (cpuEstimateRef.current / 5)));
-      }
-      // Use rAF-based real CPU estimate (frame budget pressure)
-      setCpu(Math.max(1, Math.round(cpuEstimateRef.current)));
+        const st = await (window as any).dex?.invoke?.('system:getStatus');
+        const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null);
+        setCpu(n(st?.cpu?.usage));
+        setMem(n(st?.memory?.percent));
+        setDisk(n(st?.disk?.percent));
+      } catch { setCpu(null); setMem(null); setDisk(null); }
     };
-    
+
     // Network status
     const updateNetwork = () => {
       setNetwork({
@@ -458,21 +422,6 @@ const SystemStatusWidget: React.FC = () => {
 
   // Disk usage changes slowly -- poll it on its own relaxed cadence so the live
   // system surface shows CPU + Memory + GPU + Disk together (DEX Now / DEX 5.7).
-  useEffect(() => {
-    const fetchDisk = async () => {
-      try {
-        const ipc = (window as any).dex;
-        if (ipc?.invoke) {
-          const s = await ipc.invoke('system:getStorage');
-          if (s?.total) setDisk(Math.round((s.used / s.total) * 100));
-        }
-      } catch { /* best-effort */ }
-    };
-    fetchDisk();
-    const tickId = `system-status-disk-${Date.now()}`;
-    sharedTick.subscribe(tickId, fetchDisk, 30000);
-    return () => sharedTick.unsubscribe(tickId);
-  }, []);
   
   const StatBar: React.FC<{ label: string; value: number; warningAt?: number; errorAt?: number; color?: string }> = 
     ({ label, value, warningAt = 70, errorAt = 85, color }) => {
@@ -499,10 +448,13 @@ const SystemStatusWidget: React.FC = () => {
           <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{network.online ? 'Online' : 'Offline'}</span>
         </div>
       </div>
-      <StatBar label="CPU" value={cpu} />
-      <StatBar label="Memory" value={mem} warningAt={80} />
-      {gpu > 0 && <StatBar label="GPU" value={gpu} color="var(--color-accent)" />}
-      {disk > 0 && <StatBar label="Disk" value={disk} warningAt={80} />}
+      {cpu === null && mem === null
+        ? <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>System readings need the DEX desktop app.</div>
+        : <>
+          {cpu !== null && <StatBar label="CPU" value={cpu} />}
+          {mem !== null && <StatBar label="Memory" value={mem} warningAt={80} />}
+          {disk !== null && <StatBar label="Disk" value={disk} warningAt={80} />}
+        </>}
     </div>
   );
 };
@@ -670,27 +622,17 @@ const WeatherWidget: React.FC = () => {
 };
 
 const BatteryWidget: React.FC = () => {
-  const [battery, setBattery] = useState({ level: 100, charging: false, timeRemaining: '' });
+  const [battery, setBattery] = useState<{ level: number; charging: boolean; timeRemaining: string } | null>(null);
   useEffect(() => {
     const fetchBattery = async () => {
       try {
         // Try IPC first
-        const ipc = (window as any).dex;
-        if (ipc?.invoke) {
-          const data = await ipc.invoke('system:getBattery');
-          if (data?.level !== undefined) {
-            setBattery({ 
-              level: Math.round(data.level), 
-              charging: data.charging || false,
-              timeRemaining: data.timeRemaining || '',
-            });
-            return;
-          }
-        }
-        // Fallback: Web Battery API
+        // Web Battery API (real hardware in WebView2). Desktops without a battery
+        // report a full, charging battery; that's shown as "On AC power".
         if ('getBattery' in navigator) {
           const bat = await (navigator as any).getBattery();
-          setBattery({
+          const acOnly = bat.charging && bat.level === 1 && bat.chargingTime === 0 && bat.dischargingTime === Infinity;
+          setBattery(acOnly ? { level: -1, charging: true, timeRemaining: '' } : {
             level: Math.round(bat.level * 100),
             charging: bat.charging,
             timeRemaining: bat.charging ? '' : bat.dischargingTime !== Infinity ? `${Math.floor(bat.dischargingTime / 60)}m` : '',
@@ -703,7 +645,14 @@ const BatteryWidget: React.FC = () => {
     sharedTick.subscribe(tickId, fetchBattery, 30000);
     return () => sharedTick.unsubscribe(tickId);
   }, []);
-  const color = battery.level > 20 ? 'var(--color-success)' : 'var(--color-error)';
+  if (!battery || battery.level < 0) {
+    return (
+      <div style={{ padding: 'var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+        {battery ? 'On AC power' : 'No battery reported'}
+      </div>
+    );
+  }
+  const color = battery.level > 20 ? 'var(--color-accent)' : 'var(--color-error)';
   return (
     <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -732,22 +681,10 @@ const StorageWidget: React.FC = () => {
   useEffect(() => {
     const fetchStorage = async () => {
       try {
-        const ipc = (window as any).dex;
-        if (ipc?.invoke) {
-          const data = await ipc.invoke('system:getStorage');
-          if (data?.total) {
-            setStorage({ used: data.used || 0, total: data.total, free: data.free || (data.total - data.used) });
-            return;
-          }
-        }
-        // Fallback: estimate from Storage API
-        if ('storage' in navigator && 'estimate' in navigator.storage) {
-          const est = await navigator.storage.estimate();
-          const total = est.quota || 10 * 1024 * 1024 * 1024; // default 10GB
-          const used = est.usage || 0;
-          setStorage({ used, total, free: total - used });
-        }
-      } catch { /* defaults */ }
+        const st = await (window as any).dex?.invoke?.('system:getStatus');
+        const d = st?.disk;
+        if (d && typeof d.total === 'number' && d.total > 0) setStorage({ used: d.used || 0, total: d.total, free: d.total - (d.used || 0) });
+      } catch { /* stays "not available" */ }
     };
     fetchStorage();
     const tickId = `storage-widget-${Date.now()}`;
@@ -757,6 +694,13 @@ const StorageWidget: React.FC = () => {
   const formatBytes = (bytes: number) => sharedFormatBytes(bytes);
   const usedPercent = storage.total > 0 ? Math.round((storage.used / storage.total) * 100) : 0;
   const color = usedPercent > 90 ? 'var(--color-error)' : usedPercent > 70 ? 'var(--color-warning)' : 'var(--color-accent)';
+  if (storage.total <= 0) {
+    return (
+      <div style={{ padding: 'var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+        Drive usage needs the DEX desktop app.
+      </div>
+    );
+  }
   return (
     <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Storage</div>

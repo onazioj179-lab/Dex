@@ -6,7 +6,7 @@
 import type { SequenceKind } from './bioScience';
 
 /** Where a sequence came from — shown next to every value derived from it. */
-export type SequenceSource = 'entered' | 'imported' | 'sample' | 'derived';
+export type SequenceSource = 'entered' | 'imported' | 'derived';
 
 export interface BioSequence {
   id: string;
@@ -59,7 +59,7 @@ export function normalizeProject(input: unknown): BioProject {
   if (o.version !== 1) throw new Error(`Unsupported project version: ${String(o.version)}.`);
   if (!Array.isArray(o.sequences)) throw new Error('The project has no sequence list.');
   const kinds: SequenceKind[] = ['dna', 'rna', 'protein'];
-  const sources: SequenceSource[] = ['entered', 'imported', 'sample', 'derived'];
+  const sources: SequenceSource[] = ['entered', 'imported', 'derived'];
   const sequences: BioSequence[] = o.sequences.map((s, i) => {
     const r = (s ?? {}) as Record<string, unknown>;
     if (typeof r.seq !== 'string') throw new Error(`Sequence ${i + 1} has no residues.`);
