@@ -1,6 +1,6 @@
 # DEX — Security & Privacy Report
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 ## Security
 
@@ -35,7 +35,7 @@
 
 ## Creator attribution
 
-- The only creator credit is **Onazi Oj** (existing file headers read "Onazi Treasure OJ", the same person's full name; left unchanged).
+- The only creator credit is **Onazi oJ** (existing file headers read "Onazi Treasure OJ", the same person's full name; left unchanged).
 - AI-tool attribution removed from PR #60/#61 descriptions and `docs/archive/PR-DESCRIPTION.md` (since retired).
 - No AI co-author trailers exist in the history.
 - None will be added to commits, PRs, docs or release notes.

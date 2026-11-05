@@ -1,6 +1,6 @@
 # DEX Spatial Desktop — Architecture
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 The spatial desktop turns the existing DEX floating windows into a pannable, zoomable canvas. It is an **application-level** feature of the DEX shell (the Tauri/WebView2 renderer). It is not an OS compositor and does not embed other programs' native windows (see *Platform boundaries*).
 

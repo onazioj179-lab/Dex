@@ -9,6 +9,7 @@
  * Clean settings panel with sections
  */
 
+import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
 import { isTauri } from '../services/platform/tauriCompat';
@@ -2764,6 +2765,18 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Desktop creator mark</span>
+            <span style={styles.settingDesc}>Show a small &ldquo;{CREATOR_NAME}&rdquo; in the corner of the desktop. It sits behind windows and icons.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.showCreatorMark}
+            onChange={(e) => prefs.setShowCreatorMark(e.target.checked)}
+            aria-label="Show desktop creator mark"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Compact mode</span>
             <span style={styles.settingDesc}>Shrink DEX to an always-on-top mini pill to keep it beside other work. Toggle anytime with Ctrl+Shift+M.</span>
           </div>
@@ -3552,13 +3565,13 @@ export const Settings: React.FC = () => {
 
       {/* Official creator attribution (shown in every official DEX build). The
           legal copyright holder line stays alongside it. */}
-      <div data-dex-creator="Onazi Oj" style={{
+      <div data-dex-creator={CREATOR_NAME} style={{
         padding: 'var(--space-4) var(--space-5)', borderRadius: 'var(--radius-md, 10px)', marginBottom: 'var(--space-5)',
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>
-          Created by Onazi Oj
+          {CREATOR_CREDIT}
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
           DEX Blue Modern
@@ -3584,7 +3597,7 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Creator</span>
-          <span style={styles.aboutValue}>Onazi Oj</span>
+          <span style={styles.aboutValue}>{CREATOR_NAME}</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Copyright</span>

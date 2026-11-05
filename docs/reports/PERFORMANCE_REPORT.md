@@ -1,6 +1,6 @@
 # DEX — Performance Report
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · Machine: Windows 11 Pro 26300, 8 logical cores, WebView2 156. All numbers measured on the packaged release build. Where a comparison isn't like-for-like, it says so. No number here is estimated.
+**Date:** 2026-11-01 · **Creator:** Onazi oJ · Machine: Windows 11 Pro 26300, 8 logical cores, WebView2 156. All numbers measured on the packaged release build. Where a comparison isn't like-for-like, it says so. No number here is estimated.
 
 ## Headline results
 

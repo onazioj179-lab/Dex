@@ -1,6 +1,6 @@
 # DEX AI Assistant (UKI): Architecture
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 UKI is the DEX assistant. It is a modular userspace feature of the DEX shell: it is not part of boot, it is not needed for recovery, and DEX starts and runs normally with it disabled or with no model configured.
 

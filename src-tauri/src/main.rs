@@ -173,6 +173,7 @@ mod updates_ctl;
 mod workflow_ctl;
 mod changelog;
 mod color_labels;
+mod ledger;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -1943,6 +1944,9 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("color-labels:") {
         return color_labels::dispatch(conn, channel, args);
     }
+    if channel.starts_with("ledger:") {
+        return ledger::dispatch(conn, channel, args);
+    }
     if channel.starts_with("dashboard:") {
         return dashboard::dispatch(conn, channel, args);
     }
@@ -2786,6 +2790,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("activity-feed:")
             || ch.starts_with("changelog:")
             || ch.starts_with("color-labels:")
+            || ch.starts_with("ledger:")
             || ch.starts_with("dashboard:")
             || ch.starts_with("goal-system:")
             || ch.starts_with("help:")
@@ -2915,6 +2920,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
     activity_feed::ensure_schema(c);
     changelog::ensure_schema(c);
     color_labels::ensure_schema(c);
+    ledger::ensure_schema(c);
     content_expiry::ensure_schema(c);
     daily_note::ensure_schema(c);
     dashboard::ensure_schema(c);
