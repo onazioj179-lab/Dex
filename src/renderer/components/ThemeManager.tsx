@@ -10,6 +10,7 @@
  * active scheme. Accent choice lives in Settings > Appearance.
  */
 import { applyAccentFamily } from '../utils/accentFamily';
+import { withoutTransitions } from '../utils/theme';
 
 // Theme presets
 export interface ThemePreset {
@@ -85,13 +86,15 @@ export const applyTheme = (preset: ThemePreset) => {
   root.style.setProperty('--color-text-secondary', preset.textSecondary);
   root.style.setProperty('--color-border', preset.border);
   
-  if (preset.isDark) {
-    root.setAttribute('data-theme', 'dark');
-    document.body.classList.add('dark-mode');
-  } else {
-    root.setAttribute('data-theme', 'light');
-    document.body.classList.remove('dark-mode');
-  }
+  withoutTransitions(() => {
+    if (preset.isDark) {
+      root.setAttribute('data-theme', 'dark');
+      document.body.classList.add('dark-mode');
+    } else {
+      root.setAttribute('data-theme', 'light');
+      document.body.classList.remove('dark-mode');
+    }
+  });
   
   // Save to localStorage
   localStorage.setItem('dex-theme-preset', preset.id);

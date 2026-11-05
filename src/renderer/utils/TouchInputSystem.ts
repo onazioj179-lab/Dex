@@ -9,6 +9,7 @@
 
 import { Z_HELP_OVERLAY_MAX } from '../../shared/zIndex';
 import { MAX_CONTACTS } from '../shell/input/touchContacts';
+import { initTouchDensity } from './touchDensity';
 
 type GestureType =
   | 'tap'
@@ -707,6 +708,7 @@ class SoftKeyboardHandler {
   }
 }
 
+
 function injectTouchTargetCSS(): void {
   if (typeof document === 'undefined') return;
   const id = 'dex-touch-targets-css';
@@ -730,17 +732,28 @@ function injectTouchTargetCSS(): void {
     button, [role="button"], a, input[type="checkbox"], input[type="radio"], select {
       position: relative;
     }
-    @media (pointer: coarse) {
-      button::after, [role="button"]::after, a::after,
-      input[type="checkbox"]::after, input[type="radio"]::after, select::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        min-width: 44px;
-        min-height: 44px;
-        transform: translate(-50%, -50%);
-      }
+    /* Touch density (Settings > Touch & Pen; utils/touchDensity.ts): 44 px hit
+       areas on every control, and larger visible shell controls. */
+    [data-dex-density="touch"] button::after, [data-dex-density="touch"] [role="button"]::after,
+    [data-dex-density="touch"] a::after, [data-dex-density="touch"] input[type="checkbox"]::after,
+    [data-dex-density="touch"] input[type="radio"]::after, [data-dex-density="touch"] select::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      min-width: 44px;
+      min-height: 44px;
+      transform: translate(-50%, -50%);
+    }
+    [data-dex-density="touch"] [role="menuitem"], [data-dex-density="touch"] [role="menuitemcheckbox"],
+    [data-dex-density="touch"] [role="menuitemradio"], [data-dex-density="touch"] [role="option"] {
+      min-height: 40px !important;
+    }
+    [data-dex-density="touch"] [data-dex-chrome="control-center"] button,
+    [data-dex-density="touch"] [data-dex-chrome="control-center"] [role="switch"],
+    [data-dex-density="touch"] [data-dex-chrome="dex-bar"] button {
+      min-height: 40px !important;
+      min-width: 40px !important;
     }
   `;
   document.head.appendChild(style);
@@ -752,6 +765,7 @@ export const softKeyboardHandler = new SoftKeyboardHandler();
 
 export function initializeTouchSystem(): void {
   injectTouchTargetCSS();
+  initTouchDensity();
   softKeyboardHandler.initialize();
 }
 

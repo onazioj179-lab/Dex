@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { performanceManager } from '../utils/PerformanceManager';
+import { setThemeAttribute } from '../utils/theme';
 import type { DexAction, DexMode, DexRule, LogEntry, SystemStatus, DexPermissions } from '../../shared/types';
 
 // ===========================================================================
@@ -25,7 +26,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   // Async load from IPC backend on startup
   (window as any).dex?.invoke?.('capability:storage:get', 'dex-theme').then((saved: string | null) => {
     if (saved === 'light' || saved === 'dark') {
-      document.documentElement.setAttribute('data-theme', saved);
+      setThemeAttribute(saved);
       set({ theme: saved });
     }
   }).catch((e: unknown) => { console.warn('[DEX]', e); });
@@ -36,7 +37,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   setTheme: (theme) => {
     localStorage.setItem('dex-theme', theme);
     (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', theme).catch((e: unknown) => { console.warn('[DEX]', e); });
-    document.documentElement.setAttribute('data-theme', theme);
+    setThemeAttribute(theme);
     set({ theme });
   },
   
@@ -44,7 +45,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     const newTheme = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('dex-theme', newTheme);
     (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', newTheme).catch((e: unknown) => { console.warn('[DEX]', e); });
-    document.documentElement.setAttribute('data-theme', newTheme);
+    setThemeAttribute(newTheme);
     set({ theme: newTheme });
   },
   };
@@ -55,14 +56,14 @@ const initTheme = () => {
   try {
     const savedTheme = localStorage.getItem('dex-theme') as Theme;
     if (savedTheme === 'light' || savedTheme === 'dark') {
-      document.documentElement.setAttribute('data-theme', savedTheme);
+      setThemeAttribute(savedTheme);
     } else {
       // Default to dark theme
-      document.documentElement.setAttribute('data-theme', 'dark');
+      setThemeAttribute('dark');
     }
   } catch (e) {
     // Fallback to dark theme if localStorage fails
-    document.documentElement.setAttribute('data-theme', 'dark');
+    setThemeAttribute('dark');
   }
 };
 initTheme();

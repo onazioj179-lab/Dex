@@ -4,6 +4,7 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
+import { drawComposite, framedOutputSize, type CompositeSpec } from './videoComposite';
 /**
  * DEX Forge - Browser-native transcode core
  *
@@ -556,6 +557,11 @@ export interface VideoEncodeOptions {
   videoBitsPerSecond?: number;
   /** Progress 0..1 as the source plays through. */
   onProgress?: (fraction: number) => void;
+  /** Keep only this part of the source (0..1 fractions of its duration). */
+  trimIn?: number;
+  trimOut?: number;
+  /** Re-frame, watermark and burned-in subtitles (see videoComposite.ts). */
+  composite?: CompositeSpec;
 }
 
 /** Pick the best-supported WebM video mime the runtime can record. */
@@ -611,8 +617,20 @@ export async function transcodeVideoToWebm(
 
   const srcW = video.videoWidth || 1;
   const srcH = video.videoHeight || 1;
-  const { width, height } = computeScaledDimensions(srcW, srcH, opts.width, opts.height, true, true);
+  const scaled = computeScaledDimensions(srcW, srcH, opts.width, opts.height, true, true);
+  const comp = opts.composite;
+  const { width, height } = framedOutputSize(scaled.width, scaled.height, comp?.aspect);
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+  // Trim window in seconds. Without a known duration the whole source is used.
+  const tIn = duration > 0 ? Math.max(0, Math.min(1, opts.trimIn ?? 0)) * duration : 0;
+  const tOut = duration > 0 ? Math.max(tIn, Math.min(1, opts.trimOut ?? 1) * duration) : Infinity;
+  const span = Number.isFinite(tOut) ? Math.max(0.001, tOut - tIn) : duration;
+  if (tIn > 0) {
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      video.currentTime = tIn;
+    });
+  }
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -647,10 +665,17 @@ export async function transcodeVideoToWebm(
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
   let rafId = 0;
+  const finish = () => {
+    cancelAnimationFrame(rafId);
+    try { video.pause(); } catch { /* noop */ }
+    if (recorder.state === 'recording') recorder.stop();
+  };
   const draw = () => {
-    ctx.drawImage(video, 0, 0, width, height);
-    if (duration > 0 && opts.onProgress) {
-      try { opts.onProgress(Math.min(0.99, video.currentTime / duration)); } catch { /* noop */ }
+    if (video.currentTime >= tOut) { finish(); return; }
+    if (comp) drawComposite(ctx, video, srcW, srcH, width, height, comp, video.currentTime);
+    else ctx.drawImage(video, 0, 0, width, height);
+    if (span > 0 && opts.onProgress) {
+      try { opts.onProgress(Math.min(0.99, Math.max(0, video.currentTime - tIn) / span)); } catch { /* noop */ }
     }
     rafId = requestAnimationFrame(draw);
   };
@@ -658,10 +683,7 @@ export async function transcodeVideoToWebm(
   const blob = await new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
     recorder.onerror = () => reject(new Error('Video recorder failed mid-encode.'));
-    video.onended = () => {
-      cancelAnimationFrame(rafId);
-      if (recorder.state === 'recording') recorder.stop();
-    };
+    video.onended = finish;
     recorder.start(200);
     video.play().then(() => { rafId = requestAnimationFrame(draw); }).catch(reject);
   });

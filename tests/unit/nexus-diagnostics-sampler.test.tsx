@@ -10,7 +10,7 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, act, cleanup } from '@testing-library/react';
-import NexusDiagnostics, { withTimeout } from '../../src/renderer/components/NexusDiagnostics';
+import NexusDiagnostics, { withTimeout, samplerHint } from '../../src/renderer/components/NexusDiagnostics';
 
 const SELF = { available: true, processCount: 7, memoryMB: 912, hostMemoryMB: 60, cpuPercent: 3.2 };
 const SYSTEM = { cpuPercent: 20, memoryPercent: 50, memoryUsedMB: 8192, memoryTotalMB: 16384 };
@@ -29,6 +29,16 @@ describe('withTimeout', () => {
     const stalled = withTimeout(new Promise(() => undefined), 100);
     await vi.advanceTimersByTimeAsync(100);
     await expect(stalled).resolves.toBeNull();
+  });
+});
+
+describe('samplerHint', () => {
+  const base = { pulls: 0, ok: 0, failed: 0, overlapped: 0, skippedHidden: 0, lastResult: null, lastAt: null } as const;
+  it('says why the figures are empty instead of a silent dash', () => {
+    expect(samplerHint({ ...base }, false, true)).toBe('Waiting for the first reading…');
+    expect(samplerHint({ ...base, pulls: 2, failed: 2, lastResult: 'no reply' }, false, true)).toBe('No reading yet (2 attempts: no reply); retrying');
+    expect(samplerHint({ ...base, pulls: 1, ok: 1, lastResult: 'ok' }, true, true)).toBe('Updates every 3 s while open');
+    expect(samplerHint({ ...base }, false, false)).toBe('Paused while hidden');
   });
 });
 
@@ -55,5 +65,8 @@ describe('Diagnostics sampler', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
     expect(selfCalls).toBeGreaterThan(1);
     expect(memory()).toBe('912 MB');
+    const card = screen.getByLabelText('DEX resource use');
+    expect(Number(card.getAttribute('data-sampler-failed'))).toBe(1);
+    expect(Number(card.getAttribute('data-sampler-ok'))).toBeGreaterThan(0);
   });
 });

@@ -83,10 +83,10 @@ html[data-perf-tier="low"] [style*="backdropFilter"] {
   -webkit-backdrop-filter: var(--blur-md) saturate(140%) !important;
 }
 
-/* Mid-tier: reduce blur radius globally for all elements */
-html[data-perf-tier="mid"] * {
-  --dex-blur: 8px;
-}
+/* (A universal `--dex-blur` declaration lived here. Nothing reads it, and a
+   custom property declared on every element makes each one copy the whole
+   inherited variable set, which doubled theme-switch cost on mid-tier
+   machines. The [style*=backdrop-filter] cap below does the real work.) */
 html[data-perf-tier="mid"] [style*="backdrop-filter"] {
   backdrop-filter: var(--blur-md) !important;
   -webkit-backdrop-filter: var(--blur-md) !important;

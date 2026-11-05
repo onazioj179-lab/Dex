@@ -351,6 +351,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     <div
       ref={containerRef}
       role="region"
+      data-dex-chrome="dex-bar"
       aria-label="DEX menu"
       data-dex-nook
       data-autohidden={hidden ? '' : undefined}

@@ -1105,9 +1105,9 @@ export const Tasks: React.FC = () => {
       id: crypto.randomUUID(),
       dueDate: selectedList === 'today' ? new Date() : null,
     }));
+    // The new tasks appear at the top of the list; no popup needed.
     setTasks(prev => [...newTasks, ...prev]);
-    toast.success(`Applied "${template.name}" template (${newTasks.length} tasks)`);
-  }, [selectedList, toast]);
+  }, [selectedList]);
 
   const getListCount = (listId: string): number => {
     const now = new Date();
