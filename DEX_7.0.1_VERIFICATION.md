@@ -225,3 +225,18 @@ Live checks ran in the Vite preview on an isolated origin (fresh `localStorage`,
 | `tsc --noEmit` | exit 0 |
 | Full `vitest run` | 539 passed, 2 failed while cargo LTO saturated the CPU (10 s import timeouts in `part7-honest-controls` and `renderer-pages`); both files re-run idle: 37/37 passed |
 | Not run | Installing the setup (clean VM, over 6.1.0, uninstall/reinstall), because it would replace the owner's working install. `cargo test` was not re-run after the single-instance change (the release build compiled it) |
+
+## Part 10 (2): packaged-app verification, 2026-11-04 (`claude/dex-build-chunks`, PR #81)
+
+| Check | Result |
+|---|---|
+| `npm run build:tauri` (MSVC) | Exit 0 after fixing the chunk cycle that failed every installer build since #78. Bundle gate: WebView2 loader statically linked, no source maps/env/tests, NSIS 14.4 MB, MSI 18.0 MB, both NotSigned |
+| Packaged smoke test (release exe, `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in a throwaway folder, beside the owner's running DEX, over CDP) | **14/14**: version 7.0.1; native startup phases (WebView2 check → setup ~1.3 s → page ~1.3 s); `xenon:selfSample` 7 processes, ~0.9 GB; 0 crashes this session; **no clipboard request in 15 s idle**; a clipboard read from DEX's page resolves with decision `allow` (no prompt); **MIDI SysEx refused** (`NotAllowedError`, `deny`); Nexus, Password Generator, Settings, Notes open without errors; Nexus › Diagnostics shows live process figures; launch times recorded |
+| Permissions in the packaged app | Camera set to Block → `getUserMedia` refused at once; Restore defaults → Ask; Settings › Permissions lists 10 permissions |
+| Save to Vault through the UI (packaged) | Create Vault + save; restart; existing locked Vault recognised; wrong master password refused; right one unlocks and saves (2 credentials) |
+| Defects the packaged runs found (all fixed in #81) | Nexus Diagnostics showed "available in the installed app" inside the installed app; autosave version history, Plugin Marketplace, Nexus Biometrics did nothing (module-level `window.dex` captures); Vault store never saw an existing Vault; raw "decryption failed" text |
+| `tsc --noEmit` | exit 0 |
+| Full `vitest run` | 541 files passed, 1 failed, 2 skipped; 5,504 tests passed. The failure is `component-real` "Home page module exports a valid component" timing out at 10 s under full-suite load; alone the file passes 18/18 |
+| `cargo test --bin dex-tauri` | 98 passed, 0 failed |
+| Not run | Installing the MSI/NSIS on this machine (would replace the owner's installed DEX), clean-VM install, screen reader, multi-monitor, real touch hardware |
+| Final build (commit 2ad6322) | Bundle gate OK; SHA-256 verified (`release:checksums --verify`). Smoke test: 14/14 in 4 of 5 fresh-profile runs; the fifth missed only the Diagnostics live figures (backlog #103). Save to Vault UI test 7/7. Uploaded to a draft GitHub release; no tag created |

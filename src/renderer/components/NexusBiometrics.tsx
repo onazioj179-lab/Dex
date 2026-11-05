@@ -35,7 +35,9 @@ interface ListResponse {
   records: EnrolledRecord[];
 }
 
-const dex: any = (window as any).dex;
+// A getter, not a captured value: this module is evaluated before the Tauri
+// bridge (window.dex) is installed, so a module-level copy was undefined.
+const bridge = (): any => (window as any).dex;
 
 export const NexusBiometrics: React.FC = () => {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -47,7 +49,7 @@ export const NexusBiometrics: React.FC = () => {
 
   const refresh = useCallback(async () => {
     try {
-      const r: ListResponse = await dex?.nexusBio?.list?.();
+      const r: ListResponse = await bridge()?.nexusBio?.list?.();
       setCapabilities(r?.capabilities ?? []);
       setRecords(r?.records ?? []);
     } catch (e: any) { setStatus(`List failed: ${e?.message ?? e}`); }
@@ -69,7 +71,7 @@ export const NexusBiometrics: React.FC = () => {
     setBusy(kind);
     setStatus(`Enrolling ${kind}…`);
     try {
-      await dex?.nexusBio?.enroll?.({ kind, label });
+      await bridge()?.nexusBio?.enroll?.({ kind, label });
       setStatus(`Enrolled ${label}`);
       await refresh();
     } catch (e: any) { setStatus(`Enroll failed: ${e?.message ?? e}`); }
@@ -80,7 +82,7 @@ export const NexusBiometrics: React.FC = () => {
     setBusy(rec.id);
     setStatus(`Testing ${rec.label}…`);
     try {
-      const res = await dex?.nexusBio?.test?.(rec.id);
+      const res = await bridge()?.nexusBio?.test?.(rec.id);
       setStatus(`Test result: ${res?.result ?? 'unknown'}`);
       await refresh();
     } catch (e: any) { setStatus(`Test failed: ${e?.message ?? e}`); }
@@ -90,7 +92,7 @@ export const NexusBiometrics: React.FC = () => {
   const revoke = async (rec: EnrolledRecord) => {
     setBusy(rec.id);
     try {
-      await dex?.nexusBio?.revoke?.(rec.id);
+      await bridge()?.nexusBio?.revoke?.(rec.id);
       await refresh();
     } catch (e: any) { setStatus(`Revoke failed: ${e?.message ?? e}`); }
     setBusy(null);

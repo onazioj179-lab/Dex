@@ -19,6 +19,8 @@
 - **Checkpoints you can restore.** VINX and AXL save checkpoints of the whole project (also automatically when it changes); Collab Hub lists them with Restore and Delete.
 - **Resume interrupted assistant tasks.** A UKI task cut off by closing DEX can be resumed once from the UKI panel.
 - **Interface sound volume** in Settings › Sound.
+- **Nexus › Diagnostics.** How DEX itself is doing: memory and CPU of all DEX processes, startup phases, app launch times, frame rate, crashes and errors, and background task durations. Measured on your computer and never uploaded; Copy report copies numbers only.
+- **New Privacy Policy (3.0).** It describes what DEX actually does: your data stays on your computer, nothing is sent in the background, and every online service a feature can contact is listed with what it receives. You are asked to accept it once.
 
 ## Changed
 
@@ -39,6 +41,13 @@
 - Passwords saved in Password Generator were stored unencrypted on disk. Recent passwords are now kept in memory for the session only, and passwords saved by an earlier version can be moved to the Vault or deleted. The clipboard is cleared 30 seconds after a copy only if it still holds the password.
 - Settings › Permissions always showed an error under the current app framework.
 - Unchecked checkboxes were hard to see in dark mode; their border now has at least 3:1 contrast.
+- Right-click menus: the item the arrow keys are on is highlighted, submenus work from the keyboard and no longer run off the bottom of the screen, and menus no longer flash in the wrong place.
+- Spotlight: Home and End move the cursor in the search text again, Tab no longer gets stuck in the Home search, and scrolling no longer changes the selected result.
+- Notification Center: Escape closes it, each notification can be dismissed, and opening it no longer flashes a blur over the screen.
+- Nexus: its charts no longer fail to draw, and grid lines show in light mode.
+- AXL, FLUX, FORGE, Imosion and PRISM now keep their durable version-history snapshots; Plugin Marketplace and Nexus Biometrics work in the installed app (they reached the system too early and did nothing).
+- Gallery: choosing the Yellow label no longer labels the item Orange.
+- The "Optional Product Analytics" switch is gone: DEX has no analytics, so it did nothing.
 - Browser: the saved-password prompt, the blocked-request count and full-screen video work with the native browser view.
 - Rewind no longer checks for updates over the network every time it opens.
 - A background task can no longer crash DEX with a stack overflow: background threads are named and get an 8 MB stack.

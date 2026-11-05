@@ -78,3 +78,23 @@ export function isMaximizedRect(rect: FloatingRect, ws: { x: number; y: number; 
     && Math.abs(rect.w - ws.w) <= tol
     && Math.abs(rect.h - ws.h) <= tol;
 }
+
+/**
+ * A maximized window that was left short at the bottom: it sits at the work
+ * area's top-left, spans its full width, and stops up to `bottomSlack` px above
+ * its bottom. Older builds reserved a strip above the DEX Bar, and a maximized
+ * window sized then (or before the DEX window grew) kept that height, leaving a
+ * blank band under every app. Such a rect is treated as maximized.
+ */
+export function isShortMaximizedRect(
+  rect: FloatingRect,
+  ws: { x: number; y: number; w: number; h: number },
+  bottomSlack = 200,
+  tol = 6,
+): boolean {
+  return Math.abs(rect.x - ws.x) <= tol
+    && Math.abs(rect.y - ws.y) <= tol
+    && Math.abs(rect.w - ws.w) <= tol
+    && rect.h <= ws.h + tol
+    && rect.h >= ws.h - bottomSlack;
+}

@@ -15,7 +15,7 @@
  * Every number is measured on this computer and stays here; "Copy report"
  * puts a numbers-only summary on the clipboard when you ask for it.
  */
-import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useUkiTasks } from '../store/ukiTasksStore';
 import {
@@ -28,6 +28,8 @@ import {
 import { LineChart } from './telemetry/LineChart';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
+// Looked up when the view mounts, not at module load: in the packaged build this
+// module can be evaluated before the Tauri bridge (window.dex) is installed.
 const getInvoke = (): Invoke | undefined => (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke;
 
 interface Timeline { totalMs: number; phases: Array<{ name: string; durationMs: number; atMs: number }> }
@@ -46,6 +48,15 @@ const readPref = <T extends string>(key: string, allowed: readonly string[], fal
   return fallback;
 };
 const writePref = (key: string, v: string) => { try { localStorage.setItem(key, v); } catch { /* quota */ } };
+const SAMPLE_TIMEOUT_MS = 8000;
+
+/** Resolves to the call's value, or null if it fails or takes longer than `ms`. */
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(null), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(null); });
+  });
+}
 
 function appName(id: string): string {
   return APP_DEFINITIONS[id]?.name ?? id;
@@ -80,7 +91,7 @@ function useVisible(): boolean {
 }
 
 const NexusDiagnostics: React.FC = () => {
-  const invoke = getInvoke();
+  const invoke = useMemo(getInvoke, []);
   const local = useLocalSnapshot();
   const visible = useVisible();
   const tasks = useUkiTasks((s) => s.tasks);
@@ -101,34 +112,49 @@ const NexusDiagnostics: React.FC = () => {
   const [measuring, setMeasuring] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  // Live resource figures: only while this view is open and the window visible.
+  // Live resource figures. One sampler for the life of the view: it never stops
+  // on a visibility change (a hidden/visible flip used to tear it down and, in
+  // rare timing, leave it stopped), it skips its tick while the window is
+  // hidden, and samples never overlap.
+  const pullRef = useRef<() => Promise<void>>(async () => undefined);
   useEffect(() => {
-    if (!invoke || !visible) return;
+    if (!invoke) return;
     let alive = true;
+    let inFlight = false;
     const pull = async () => {
-      const [s, sys] = await Promise.all([
-        invoke('xenon:selfSample').catch(() => null),
-        invoke('xenon:systemSample').catch(() => null),
-      ]);
-      if (!alive) return;
-      const selfOk = !!s && (s as SelfSample).available;
-      if (selfOk) setSelf(s as SelfSample);
-      if (sys) setSystem(sys as SystemSample);
-      setSampleError(!selfOk && !sys);
-      if (selfOk) {
-        const ss = s as SelfSample;
-        setHistory(pushResourceSample({
-          at: Date.now(),
-          dexMemMB: ss.memoryMB,
-          dexCpu: ss.cpuPercent,
-          sysCpu: sys ? (sys as SystemSample).cpuPercent : 0,
-        }));
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        // Each call is time-boxed: with the overlap guard, one reply that never
+        // arrived used to block every later tick, so the figures stayed empty
+        // for the life of the view.
+        const [s, sys] = await Promise.all([
+          withTimeout(invoke('xenon:selfSample'), SAMPLE_TIMEOUT_MS),
+          withTimeout(invoke('xenon:systemSample'), SAMPLE_TIMEOUT_MS),
+        ]);
+        if (!alive) return;
+        const selfOk = !!s && (s as SelfSample).available;
+        if (selfOk) setSelf(s as SelfSample);
+        if (sys) setSystem(sys as SystemSample);
+        setSampleError(!selfOk && !sys);
+        if (selfOk) {
+          const ss = s as SelfSample;
+          setHistory(pushResourceSample({
+            at: Date.now(),
+            dexMemMB: ss.memoryMB,
+            dexCpu: ss.cpuPercent,
+            sysCpu: sys ? (sys as SystemSample).cpuPercent : 0,
+          }));
+        }
+      } finally {
+        inFlight = false;
       }
     };
+    pullRef.current = pull;
     void pull();
-    const id = window.setInterval(pull, SAMPLE_MS);
+    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void pull(); }, SAMPLE_MS);
     return () => { alive = false; window.clearInterval(id); };
-  }, [visible, invoke]);
+  }, [invoke]);
 
   const loadOnce = useCallback(async () => {
     if (!invoke) return;

@@ -22,6 +22,10 @@ jobs:
     # conditions (it fails the whole workflow at startup). `env` IS allowed.
     env:
       DEX_UPDATES_TOKEN: ${{ secrets.DEX_UPDATES_TOKEN }}
+      # Optional code signing (docs/SIGNING.md, Option C). Both unset = the
+      # setup is built unsigned, exactly as before.
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,8 +54,40 @@ jobs:
       # Builds the Vite renderer (via tauri's beforeBuildCommand) then compiles
       # the Rust backbone and bundles the one official Windows setup (NSIS;
       # bundle.targets in src-tauri/tauri.conf.json). Tauri fetches NSIS.
+      # When the WINDOWS_CERTIFICATE secret (base64 .pfx) is set, import it and
+      # hand its thumbprint to Tauri through TAURI_CONFIG, so the thumbprint is
+      # never committed. Tauri then signs dex-tauri.exe and the setup with
+      # bundle.windows.digestAlgorithm/timestampUrl from tauri.conf.json.
+      - name: Import code-signing certificate
+        if: ${{ env.WINDOWS_CERTIFICATE != '' }}
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'dex-signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $pw = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pw
+          Remove-Item $pfx -Force
+          if (-not $cert.HasPrivateKey) { Write-Error 'The certificate has no private key.'; exit 1 }
+          $cfg = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint } } } | ConvertTo-Json -Compress -Depth 5
+          "TAURI_CONFIG=$cfg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "DEX_EXPECT_SIGNED=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Signing with $($cert.Subject), expires $($cert.NotAfter)"
+
       - name: Build Tauri setup (NSIS)
         run: npm run build:tauri
+
+      - name: Check installer signature
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $sig = Get-AuthenticodeSignature -LiteralPath $setup.FullName
+          Write-Host "$($setup.Name): $($sig.Status) $($sig.SignerCertificate.Subject)"
+          if ($env:DEX_EXPECT_SIGNED -eq '1' -and $sig.Status -ne 'Valid') {
+            Write-Error "Signing was configured but the setup signature is $($sig.Status)."; exit 1
+          }
+          if ($env:DEX_EXPECT_SIGNED -ne '1') {
+            Write-Host '::warning::The setup is unsigned (no WINDOWS_CERTIFICATE secret). SmartScreen will warn on first run.'
+          }
 
       - name: Collect release assets
         shell: bash

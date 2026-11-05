@@ -39,6 +39,7 @@ tauri-plugin-single-instance = "2"  # second launch focuses the running window i
 ureq = { version = "2", features = ["tls"] }  # tiny blocking HTTP client for link-preview metadata fetch
 notify = "6"        # live filesystem watching (file-watcher:newFile auto-import/notify) — replaces Electron fs.watch
 tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link download + upload) — replaces Electron http.createServer
+portable-pty = "0.9"  # real pseudoterminal for the Terminal app (ConPTY on Windows, openpty on unix) — terminal.rs
 
 # WebView2 preflight (src/webview2.rs). Same versions wry already pulls in, so
 # these add no new crates to the build — they just make the loader API callable.

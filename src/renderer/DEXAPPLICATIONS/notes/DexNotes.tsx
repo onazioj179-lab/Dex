@@ -42,6 +42,11 @@ import { registerAppIntentHandler } from '../../services/appIntents';
 // Styles
 // ---------------------------------------------------------------------------
 
+/** Below this app width the folder sidebar auto-hides (compact mode). */
+const COMPACT_SIDEBAR_W = 820;
+/** Below this width the note list auto-hides too while a note is open. */
+const COMPACT_LIST_W = 600;
+
 const S: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex',
@@ -263,6 +268,55 @@ const DexNotes: React.FC = () => {
   // -- Refs -------------------------------------------------------------
 
   const editorAreaRef = useRef<HTMLDivElement>(null);
+
+  // -- Compact mode -------------------------------------------------------
+  // A narrow window hides the folder sidebar (< COMPACT_SIDEBAR_W) and then the
+  // note list (< COMPACT_LIST_W) so the editor keeps a usable width. The user's
+  // own collapse choices in the store are untouched; `peek` re-shows a pane
+  // while compact and is dropped once the window is wide again.
+  // Callback ref: the first renders are the loading/empty branches, which do
+  // not mount this root, so a plain ref + effect would never attach.
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
+  const [rootWidth, setRootWidth] = useState(0);
+  const [peek, setPeek] = useState<{ sidebar: boolean; list: boolean }>({ sidebar: false, list: false });
+  useEffect(() => {
+    const el = rootEl;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let raf = 0;
+    const ro = new ResizeObserver(entries => {
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setRootWidth(prev => (prev === w ? prev : w)));
+    });
+    ro.observe(el);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [rootEl]);
+  const compactSidebar = rootWidth > 0 && rootWidth < COMPACT_SIDEBAR_W;
+  const compactList = rootWidth > 0 && rootWidth < COMPACT_LIST_W && !!activeNote;
+  useEffect(() => {
+    setPeek(p => ({
+      sidebar: compactSidebar ? p.sidebar : false,
+      list: compactList ? p.list : false,
+    }));
+  }, [compactSidebar, compactList]);
+  const sidebarHidden = sidebarCollapsed || (compactSidebar && !peek.sidebar);
+  const listHidden = listCollapsed || (compactList && !peek.list);
+  const toggleSidebarPane = useCallback(() => {
+    if (compactSidebar) {
+      if (sidebarCollapsed) store.toggleSidebar();
+      setPeek(p => ({ ...p, sidebar: !p.sidebar || sidebarCollapsed }));
+    } else {
+      store.toggleSidebar();
+    }
+  }, [compactSidebar, sidebarCollapsed, store]);
+  const toggleListPane = useCallback(() => {
+    if (compactList) {
+      if (listCollapsed) store.toggleList();
+      setPeek(p => ({ ...p, list: !p.list || listCollapsed }));
+    } else {
+      store.toggleList();
+    }
+  }, [compactList, listCollapsed, store]);
 
   // -- State ------------------------------------------------------------
 
@@ -843,7 +897,7 @@ const DexNotes: React.FC = () => {
   }
 
   return (
-    <div style={S.root} className="dexnotes-app">
+    <div ref={setRootEl} style={S.root} className="dexnotes-app" data-compact={compactSidebar ? (compactList ? 'narrow' : 'compact') : undefined}>
       <style>{`
         /* === DEXNOTES - UI HOVER === */
         .dexnotes-app button { font-family: inherit; transition: all 0.12s ease; }
@@ -865,7 +919,7 @@ const DexNotes: React.FC = () => {
         .dexnotes-app ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
       `}</style>
       {/* -- Folder Sidebar ------------------------------------------ */}
-      {!sidebarCollapsed && (
+      {!sidebarHidden && (
         <>
           <div style={{ ...S.sidebar, width: sidebarResizer.width }}>
             <div style={S.sidebarHeader}>
@@ -873,8 +927,17 @@ const DexNotes: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <SendToMenu sourceApp="notes" assetKind="document" getAsset={() => ({ name: `${activeNote?.title || 'Note'}.md`, data: activeNote?.content || '', mimeType: 'text/markdown' })} />
                 <button
+                  aria-label={listHidden ? 'Show note list' : 'Hide note list'}
+                  aria-pressed={!listHidden}
+                  onClick={toggleListPane}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', padding: 2 }}
+                  title={listHidden ? 'Show note list' : 'Hide note list'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6.5 2.5v11"/></svg>
+                </button>
+                <button
                   aria-label="Collapse sidebar"
-                  onClick={store.toggleSidebar}
+                  onClick={toggleSidebarPane}
                   style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}
                   title="Collapse sidebar"
                 >
@@ -943,14 +1006,14 @@ const DexNotes: React.FC = () => {
           <div
             style={S.resizer}
             onMouseDown={sidebarResizer.onMouseDown}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.2)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-light, rgba(10,132,255,0.2))')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           />
         </>
       )}
 
       {/* Collapsed sidebar toggle */}
-      {sidebarCollapsed && (
+      {sidebarHidden && (
         <div
           style={{
             width: 32,
@@ -965,18 +1028,35 @@ const DexNotes: React.FC = () => {
         >
           <button
             aria-label="Show sidebar"
-            onClick={store.toggleSidebar}
+            onClick={toggleSidebarPane}
             style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}
             title="Show sidebar"
           >
             {'>'}
+          </button>
+          <button
+            aria-label={listHidden ? 'Show note list' : 'Hide note list'}
+            aria-pressed={!listHidden}
+            onClick={toggleListPane}
+            style={{ background: 'none', border: 'none', color: listHidden ? 'var(--color-text-tertiary)' : 'var(--color-accent, #0a84ff)', cursor: 'pointer', display: 'flex', padding: 2 }}
+            title={listHidden ? 'Show note list' : 'Hide note list'}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6.5 2.5v11"/></svg>
+          </button>
+          <button
+            aria-label="New note"
+            onClick={() => store.createNote(selectedFolderId || undefined)}
+            style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', padding: 2 }}
+            title="New note"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>
           </button>
 
         </div>
       )}
 
       {/* -- Note List ----------------------------------------------- */}
-      {!listCollapsed && (
+      {!listHidden && (
         <>
           <div style={{ ...S.listPane, width: listResizer.width }}>
             {/* Inline #tag filter chips + "New from template" menu. */}
@@ -1000,9 +1080,9 @@ const DexNotes: React.FC = () => {
                             display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
                             fontSize: 11, fontWeight: 500, cursor: 'pointer',
                             padding: '2px 8px', borderRadius: 10,
-                            border: `1px solid ${on ? '#64d2ff' : 'var(--color-border-subtle)'}`,
-                            background: on ? 'rgba(100,210,255,0.18)' : 'transparent',
-                            color: on ? '#64d2ff' : 'var(--color-text-tertiary)',
+                            border: `1px solid ${on ? 'var(--color-accent, #0a84ff)' : 'var(--color-border-subtle)'}`,
+                            background: on ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
+                            color: on ? 'var(--color-accent, #0a84ff)' : 'var(--color-text-tertiary)',
                             transition: 'all 0.12s ease',
                             whiteSpace: 'nowrap',
                           }}
@@ -1029,7 +1109,7 @@ const DexNotes: React.FC = () => {
                       border: '1px solid var(--color-border-subtle)', background: 'transparent',
                       color: 'var(--color-text-tertiary)', transition: 'all 0.12s ease',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#64d2ff'; e.currentTarget.style.borderColor = '#64d2ff'; }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-accent, #0a84ff)'; e.currentTarget.style.borderColor = 'var(--color-accent, #0a84ff)'; }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.borderColor = 'var(--color-border-subtle)'; }}
                   >
                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>
@@ -1089,7 +1169,7 @@ const DexNotes: React.FC = () => {
           <div
             style={S.resizer}
             onMouseDown={listResizer.onMouseDown}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.2)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-light, rgba(10,132,255,0.2))')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           />
         </>
@@ -1243,7 +1323,7 @@ const DexNotes: React.FC = () => {
                   aria-label={`Open backlink: ${bl.source_title || 'Untitled'}`}
                   style={{
                     fontSize: 12,
-                    color: '#64d2ff',
+                    color: 'var(--color-accent, #0a84ff)',
                     cursor: 'pointer',
                     padding: '3px 0',
                     overflow: 'hidden',
