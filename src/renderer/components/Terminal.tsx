@@ -520,7 +520,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       data-session-id={sessionId ?? undefined}
       style={{
         display: 'flex', flexDirection: 'column',
-        height: height ?? '100%', minHeight: 160,
+        // flex/width so it fills a split pane (a bare flex child shrinks to content).
+        height: height ?? '100%', minHeight: 80, flex: 1, minWidth: 0, width: '100%',
         background: THEME.background,
         color: THEME.foreground,
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',

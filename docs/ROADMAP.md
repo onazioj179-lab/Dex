@@ -3551,4 +3551,4 @@ These need DSP/ML or native hosting we don't fake.
 - Bioengineering rewritten as a three-pane workspace on a tested science module (`bio/bioScience.ts`, 27 tests).
 - Creator display name is "Onazi oJ" from `src/shared/creator.ts`; optional desktop mark (Settings › Shell & Dock).
 - Open: packaged run of Ledger's SQLite path, Terminal split panes, per-app passes, release build. Backlog rows #134–#144 in `DEX_REMAINING_WORK.md`.
-
+- Terminal: split panes (1–4 per tab, resizable, shortcuts) + standalone `terminal` app; App Menu no longer drops uncategorised apps (8 were hidden); Engineering group.
