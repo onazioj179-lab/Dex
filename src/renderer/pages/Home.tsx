@@ -27,6 +27,7 @@ import { useHomePinnedFilesStore, type HomePinnedFile } from '../store/homePinne
 import { useHomePinnedAppsStore, type HomePinnedApp } from '../store/homePinnedAppsStore';
 import { useSmoothDrag } from '../hooks/useSmoothDrag';
 import { spatialMenuActions } from '../shell/spatial/SpatialHud';
+import { CreatorMark } from '../shell/CreatorMark';
 
 const SPATIAL_MENU_ICONS: Record<string, string> = {
   enter: 'maximize', fit: 'maximize', 'zoom-in': 'zoom-in', 'zoom-out': 'minus', actual: 'search',
@@ -521,6 +522,8 @@ export const Home: React.FC = () => {
           transition: 'opacity 0.3s ease, background 0.3s ease',
         }} />
       )}
+
+      <CreatorMark />
 
       {/* Live Wallpaper Animation Layer */}
       {wpMode === 'live' && (

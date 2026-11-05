@@ -1,6 +1,6 @@
 # DEX OS 7.0.1 — Verification
 
-**Date:** 2026-11-02 · **Creator:** Onazi Oj · **Branch:** `claude/dex-part4` (contains `main` through PR #71 and #72; reconciled with the parallel 7.0.1 pass from `claude/cranky-hopper-4f196b`)
+**Date:** 2026-11-02 · **Creator:** Onazi oJ · **Branch:** `claude/dex-part4` (contains `main` through PR #71 and #72; reconciled with the parallel 7.0.1 pass from `claude/cranky-hopper-4f196b`)
 
 Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT APPLICABLE · NOT TESTED. Only VERIFIED COMPLETE counts as done.
 
@@ -11,7 +11,7 @@ Statuses: VERIFIED COMPLETE · PARTIAL · BROKEN · MISSING · BLOCKED · NOT AP
 | Requirement | Status | Evidence |
 |---|---|---|
 | Version 7.0.1 everywhere | VERIFIED COMPLETE | `package.json`, lockfile root, `tauri.conf.json`, `Cargo.toml`/`Cargo.lock`, `PLATFORM_VERSION`; installers named `DEX_7.0.1_*`; About shows the runtime version |
-| Creator attribution (Onazi Oj) | VERIFIED COMPLETE | About (creator card + rows), installer `publisher`/`copyright`, crate description; legal copyright line kept |
+| Creator attribution (Onazi oJ) | VERIFIED COMPLETE | About (creator card + rows), installer `publisher`/`copyright`, crate description; legal copyright line kept |
 | No coding-agent branding | VERIFIED COMPLETE | Repo-wide scan for agent/AI-generator strings: none in product code; no AI trailers in the last 200 commits |
 | Third-party notices intact | VERIFIED COMPLETE | `NOTICE` + `LICENSE` bundled as installer resources; license page in installer |
 | Battery out of the top bar | VERIFIED COMPLETE | Removed from `AppManager` (and its listener); Control Center keeps it and detects battery-less desktops; preview checked |
@@ -110,7 +110,7 @@ Kept as the record for the assistant work that ships in 7.0.1. Row numbers (#n) 
 | UKI boot integration | NOT APPLICABLE / BLOCKED | No UKI in `dex-os/`; assistant is never a boot dependency |
 | macOS Blue Modern UI + motion | VERIFIED COMPLETE (tokens) | `DEX_UI_UX_FINAL_AUDIT.md`. Light mode checked in the packaged app: fixed the glass-off shell staying near-black, plus 6 hard-coded dark surfaces and 71 low-contrast accent fills |
 | Accessibility (new controls labelled, keyboard reachable) | PARTIAL | Screen reader not run (#7) |
-| No AI-generator branding; creator Onazi Oj | VERIFIED COMPLETE | No such strings added; commits carry no AI trailers |
+| No AI-generator branding; creator Onazi oJ | VERIFIED COMPLETE | No such strings added; commits carry no AI trailers |
 
 ### Part 4 tests and checks
 

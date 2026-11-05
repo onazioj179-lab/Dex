@@ -3545,3 +3545,10 @@ These need DSP/ML or native hosting we don't fake.
 - Terminal is a real pseudoterminal (ConPTY via `portable-pty`) under xterm.js, replacing piped stdio. Resize, Ctrl+C, interactive input, colours and exit codes verified in the native app over CDP. Details and the remaining checks: `DEX_REMAINING_WORK.md` #128–#133.
 - Notes compact mode (#134).
 - Already in place before this pass (checked, not rebuilt): window resize from all edges and corners, workspace layouts (Command Palette › Save/Restore Workspace Layout), Task Manager CPU rounding, fullscreen black strip (#123).
+
+## Checkpoint 2026-11-04 (Part 17: Ledger, Bioengineering, creator identity)
+- NEW Ledger app (`DEXAPPLICATIONS/ledger/`, native `src-tauri/src/ledger.rs`): integer minor units, splits, linked transfers, budgets with carry-over, reconciliation, reports, CSV in/out, backup/restore, undo. 14 TS + 5 Rust tests; preview-verified.
+- Bioengineering rewritten as a three-pane workspace on a tested science module (`bio/bioScience.ts`, 27 tests).
+- Creator display name is "Onazi oJ" from `src/shared/creator.ts`; optional desktop mark (Settings › Shell & Dock).
+- Open: packaged run of Ledger's SQLite path, Terminal split panes, per-app passes, release build. Backlog rows #134–#144 in `DEX_REMAINING_WORK.md`.
+- Terminal: split panes (1–4 per tab, resizable, shortcuts) + standalone `terminal` app; App Menu no longer drops uncategorised apps (8 were hidden); Engineering group.

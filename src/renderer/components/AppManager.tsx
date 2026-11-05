@@ -213,7 +213,9 @@ const NoiseGenerator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Noi
 const DexCode = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/DexCode'));
 const Nexus = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Nexus'));
 const HealthStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/HealthStudio'));
-const BioStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/BioStudio'));
+const BioStudio = lazyRetry(() => import('../DEXAPPLICATIONS/bio/BioStudio'));
+const Ledger = lazyRetry(() => import('../DEXAPPLICATIONS/ledger/Ledger'));
+const TerminalApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/TerminalApp'));
 const SecurityCenter = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SecurityCenter'));
 const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
@@ -242,7 +244,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'creativehub' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'security';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'ledger' | 'terminal' | 'security';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -409,6 +411,8 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   backup: BackupSync, extensions: ExtensionsManager,
   health: HealthStudio,
   bio: BioStudio,
+  ledger: Ledger,
+  terminal: TerminalApp,
   security: SecurityCenter,
 };
 
@@ -545,6 +549,9 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'achievements', label: 'Trophies' },
   // Engineering
   { id: 'axl', label: 'AXL' },
+  { id: 'bio', label: 'Bio Studio' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'ledger', label: 'Ledger' },
   // New Apps
   { id: 'weather', label: 'Weather' },
   { id: 'worldclock', label: 'World Clock' },
@@ -577,10 +584,10 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
 const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }[] = (() => {
   const cats: { label: string; apps: typeof LAUNCHPAD_APPS }[] = [];
   const catMap: Record<string, typeof LAUNCHPAD_APPS> = {};
-  const catOrder = ['System', 'Productivity', 'Creative Suite', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards'];
+  const catOrder = ['System', 'Productivity', 'Creative Suite', 'Engineering', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards', 'Other'];
   const appToCat: Record<string, string> = {
     settings: 'System', power: 'System', recyclebin: 'System',
-    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
+    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Engineering', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
     videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
     calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
@@ -592,7 +599,9 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     learn: 'Tools',
     screenrecorder: 'Media', presentation: 'Productivity', pdfviewer: 'Productivity', pixelart: 'Creative Suite',
     kanban: 'Project Management',
-    axl: 'Entertainment',
+    taskmanager: 'System', liveactivity: 'System', spaces: 'System', backup: 'System', extensions: 'System',
+    inbox: 'Productivity', projectdash: 'Project Management', uki: 'Tools',
+    axl: 'Engineering', bio: 'Engineering', terminal: 'Engineering', ledger: 'Productivity',
     achievements: 'Rewards',
   };
   LAUNCHPAD_APPS.forEach(app => {

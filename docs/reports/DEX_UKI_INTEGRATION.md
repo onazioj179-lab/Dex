@@ -1,6 +1,6 @@
 # DEX: Unified Kernel Image (UKI) Integration
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 > Naming note: in this codebase **UKI is also the assistant's name**. This document is about the Linux boot artifact (Unified Kernel Image) in `dex-os/`. The assistant is a userspace feature and is documented in `DEX_AI_ARCHITECTURE.md`.
 

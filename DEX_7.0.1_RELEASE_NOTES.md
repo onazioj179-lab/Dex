@@ -1,6 +1,6 @@
 # DEX OS 7.0.1 — Release Notes
 
-**Creator:** Onazi Oj · **Theme:** DEX Blue Modern · Changes since 6.1.0 (the last published release).
+**Creator:** Onazi oJ · **Theme:** DEX Blue Modern · Changes since 6.1.0 (the last published release).
 
 ## New
 
@@ -33,7 +33,7 @@
 - **Local AI is opt-in.** DEX no longer checks for Ollama on every start or uses it just because it is running. Turn on "Connect to a local AI service (Ollama)" in Settings › AI Providers if you want it. DEX never installs or starts an AI runtime.
 - **Battery is no longer in the top bar.** It is in Control Center, which also says when a PC has no battery.
 - **The DEX Bar no longer covers app content.** Apps and maximized windows end above it.
-- **About** shows the version, the creator (Onazi Oj), the correct license, and where the open-source notices are.
+- **About** shows the version, the creator (Onazi oJ), the correct license, and where the open-source notices are.
 
 ## Fixed
 
@@ -84,7 +84,7 @@ Run `DEX_7.0.1_x64-setup.exe`. It detects the installed version, replaces it, an
 
 - No private keys or tokens in the source, the app bundle or the installers (scanned).
 - The release check refuses builds that would ship source maps, environment files or tests, and writes a SHA-256 checksum file for the installers (`npm run release:checksums` writes or verifies it on its own).
-- Installer metadata names the publisher (Onazi Oj) and ships the license and third-party notices.
+- Installer metadata names the publisher (Onazi oJ) and ships the license and third-party notices.
 
 ## Known limitations
 

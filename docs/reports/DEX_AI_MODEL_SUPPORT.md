@@ -1,6 +1,6 @@
 # DEX AI Assistant: Model Support
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · Code: `src/renderer/uki/providers/`
+**Date:** 2026-11-01 · **Creator:** Onazi oJ · Code: `src/renderer/uki/providers/`
 
 ## Providers
 

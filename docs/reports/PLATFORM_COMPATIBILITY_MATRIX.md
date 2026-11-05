@@ -1,6 +1,6 @@
 # DEX — Platform Compatibility Matrix
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 ## What DEX actually is
 

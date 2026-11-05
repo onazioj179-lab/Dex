@@ -1,6 +1,6 @@
 # DEX AI Assistant: Permissions, Approvals and Auditing
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · Code: `src/shared/uki/assistantPolicy.ts`, `src/renderer/uki/agentRunner.ts`, `src/renderer/uki/permissions.ts`
+**Date:** 2026-11-01 · **Creator:** Onazi oJ · Code: `src/shared/uki/assistantPolicy.ts`, `src/renderer/uki/agentRunner.ts`, `src/renderer/uki/permissions.ts`
 
 ## Capabilities
 
