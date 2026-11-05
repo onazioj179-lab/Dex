@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../components/DexIcon';
+import { openAppContextMenu } from '../components/AppContextMenu';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import NexusUkiPanel from '../components/NexusUkiPanel';
@@ -808,7 +809,8 @@ const AppsView: React.FC<AppsViewProps> = ({ apps, currentAppId, onFocus, onQuit
           const canSuspend = !active && phase !== 'foreground' && appLifecycle.handles(app.id);
           const label = def?.name || app.name;
           return (
-            <div role="row" key={app.id} style={{ ...S.tr, gridTemplateColumns: APP_COLS, height: 36 }}>
+            <div role="row" key={app.id} style={{ ...S.tr, gridTemplateColumns: APP_COLS, height: 36 }}
+              onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: app.id, x: e.clientX, y: e.clientY, source: 'taskmanager' }); }}>
               <span style={S.cellName}>
                 <DexIcon name={def?.icon || app.icon || app.id} size={15} color="var(--color-text-secondary)" />
                 {def?.name || app.name}

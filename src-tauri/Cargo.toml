@@ -24,6 +24,7 @@ dex-automation = { path = "../core/dex-automation" }
 dex-scanner = { path = "../core/dex-scanner" }
 dex-rewind = { path = "../core/dex-rewind" }
 dex-ai-runtime = { path = "../core/dex-ai-runtime" }
+dex-ledger = { path = "../core/dex-ledger" }  # DEX Ledger finance engine (own ledger.db)
 # Native backend ports (Electron->Tauri migration):
 sysinfo = "0.30"   # system status + process list/kill
 open = "5"          # shell: open path / external url with the OS default

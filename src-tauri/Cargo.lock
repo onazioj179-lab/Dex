@@ -927,6 +927,15 @@ name = "dex-cache"
 version = "6.0.0"
 
 [[package]]
+name = "dex-ledger"
+version = "6.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
 name = "dex-rewind"
 version = "6.0.0"
 dependencies = [
@@ -968,6 +977,7 @@ dependencies = [
  "dex-ai-runtime",
  "dex-audio",
  "dex-automation",
+ "dex-ledger",
  "dex-rewind",
  "dex-scanner",
  "dex-search",

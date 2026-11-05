@@ -1,0 +1,12 @@
+[package]
+name = "dex-ledger"
+description = "DEX Ledger — local-first personal finance engine (SQLite, integer minor units, audit trail)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled", "backup"] }
+serde_json = "1"
+base64 = "0.22"

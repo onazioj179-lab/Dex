@@ -20,12 +20,14 @@ import { useInstalledAppsStore } from '../store/installedAppsStore';
 import { useRecentFiles } from '../store/useRecentFiles';
 
 import { useAppTransition } from '../utils/motionHooks';
-import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
+import { APP_WINDOW_SIZES, rememberedWindowSize, rememberWindowSize, getAppEntry, QUICK_ACTIONS } from '../services/appRegistry';
+import { AppContextMenuHost, openAppContextMenu, runAppAction, type AppCommandDetail } from './AppContextMenu';
+import { AppMenuPanel } from './AppMenuPanel';
+import { dispatchAppIntent } from '../services/appIntents';
 import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
-import { clampEventToViewport } from '../utils/menuPosition';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
@@ -233,6 +235,7 @@ const SmartInbox = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SmartIn
 const ProjectDashboard = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ProjectDashboard'));
 const BackupSync = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/BackupSync'));
 const ExtensionsManager = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ExtensionsManager'));
+const LedgerApp = lazyRetry(() => import('../DEXAPPLICATIONS/ledger/Ledger'));
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
@@ -242,64 +245,10 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'creativehub' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'security';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'security' | 'ledger';
 
-// Default floating window sizes per app. New launches open in the full inner
-// workspace; these sizes are used when users explicitly restore/detach.
-const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boolean }> = {
-  browser: { w: 900, h: 600 },
-  files: { w: 800, h: 550 },
-  gallery: { w: 800, h: 550 },
-  settings: { w: 920, h: 620 },
-  taskmanager: { w: 880, h: 600 },
-  notes: { w: 700, h: 500 },
-  videoeditor: { w: 900, h: 600, maximized: true },
-  imosion: { w: 850, h: 580, maximized: true },
-  prism: { w: 850, h: 580, maximized: true },
-  flux: { w: 850, h: 580, maximized: true },
-  forge: { w: 850, h: 580, maximized: true },
-  audio: { w: 800, h: 550 },
-  rewind: { w: 720, h: 500 },
-  tasks: { w: 680, h: 480 },
-  workflows: { w: 720, h: 500 },
-  store: { w: 900, h: 640 },
-  games: { w: 900, h: 640 },
-  calendar: { w: 680, h: 480 },
-  kanban: { w: 720, h: 500 },
-  // Compact utilities: sized to their measured content (preview, 2026-11-04)
-  // so nothing opens clipped; fitWindowToWorkspace shrinks them on small screens.
-  calculator: { w: 360, h: 610 },
-  passwordgenerator: { w: 440, h: 720 },
-  achievements: { w: 600, h: 460 },
-  recyclebin: { w: 600, h: 460 },
-  powerrename: { w: 940, h: 620 },
-  transfers: { w: 600, h: 460 },
-  power: { w: 780, h: 520 },
-  axl: { w: 1000, h: 650, maximized: true },
-  stopwatch: { w: 340, h: 480 },
-  unitconverter: { w: 440, h: 780 },
-  pomodoro: { w: 360, h: 520 },
-  qrcode: { w: 400, h: 664 },
-  colorpicker: { w: 360, h: 610 },
-  weather: { w: 400, h: 600 },
-  worldclock: { w: 500, h: 744 },
-  noisegenerator: { w: 420, h: 710 },
-  dexcode: { w: 900, h: 620 },
-  nexus: { w: 900, h: 650 },
-  learn: { w: 600, h: 520 },
-  collabhub: { w: 900, h: 650 },
-  canvas: { w: 800, h: 600, maximized: true },
-  timer: { w: 360, h: 520 },
-  screenrecorder: { w: 720, h: 540 },
-  presentation: { w: 1100, h: 700, maximized: true },
-  pdfviewer: { w: 900, h: 650, maximized: true },
-  pixelart: { w: 900, h: 640, maximized: true },
-  maps: { w: 960, h: 660 },
-  git: { w: 820, h: 620 },
-  env: { w: 760, h: 600 },
-  ssh: { w: 760, h: 640 },
-  backup: { w: 760, h: 700 },
-};
+// Default floating window sizes per app live in the shared app registry
+// (shell/appRegistry.ts) so the window manager, launcher and app info agree.
 
 const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
   videoeditor: 'videoeditor',
@@ -410,6 +359,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   health: HealthStudio,
   bio: BioStudio,
   security: SecurityCenter,
+  ledger: LedgerApp,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -517,6 +467,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'tasks', label: 'Tasks' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'workflows', label: 'Workflows' },
+  { id: 'ledger', label: 'Ledger' },
   { id: 'store', label: 'Store' },
   { id: 'games', label: 'Games' },
   // Creative Suite
@@ -580,7 +531,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
   const catOrder = ['System', 'Productivity', 'Creative Suite', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards'];
   const appToCat: Record<string, string> = {
     settings: 'System', power: 'System', recyclebin: 'System',
-    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
+    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', ledger: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
     videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
     calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
@@ -770,9 +721,8 @@ export const AppManager: React.FC = () => {
   const sessionHistory = useRunningApps(s => s.sessionHistory);
   const sendAssetToApp = useCreativeSuite(s => s.sendToApp);
 
-  // App pinning store. The dock was removed in favour of the FloatingLauncher,
-  // but pin/unpin is still used by the Launchpad context menu ("Add to Dock").
-  const { pinApp, unpinApp, isPinned: isDockPinned } = useDockPins();
+  // Pinning lives in the shared service (services/appPinning.ts); the DEX Bar
+  // renders the Dock pins and the App Menu its own pinned section.
 
   // Ctrl+K -> CommandPalette (App.tsx). Ctrl+Space -> UKI panel. No legacy unified search overlay.
   const [showAppMenu, setShowAppMenu] = useState(false);
@@ -825,8 +775,6 @@ export const AppManager: React.FC = () => {
     }).catch((e: unknown) => { console.warn('[DEX] recovery:', e); });
 
   }, []);
-  // Launchpad context menu (right-click on apps in grid)
-  const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
 
   // -- Shell interaction layers --------------------------------------------
   const [showOverview, setShowOverview] = useState(false);
@@ -938,6 +886,19 @@ export const AppManager: React.FC = () => {
     detachZCounter.current = detachZCounter.current >= 4990 ? 200 : detachZCounter.current + 1;
     return detachZCounter.current;
   };
+
+  // Window size persistence: remember each floating window's size (not while
+  // it fills the workspace) so the app reopens at the size the user chose.
+  useEffect(() => {
+    if (isSpatialEnabled()) return;
+    let ws: { w: number; h: number } | null = null;
+    try { ws = getMaximizedWindowBoundsRef.current?.() ?? null; } catch { ws = null; }
+    detachedApps.forEach((b, id) => {
+      if (ws && b.w >= ws.w - 2 && b.h >= ws.h - 2) return;
+      rememberWindowSize(id, b.w, b.h);
+    });
+  }, [detachedApps]);
+  const getMaximizedWindowBoundsRef = useRef<(() => { w: number; h: number }) | null>(null);
 
   // -- Minimized floating windows (hidden but still running) ---------------
   const [minimizedApps, setMinimizedApps] = useState<Set<string>>(new Set());
@@ -1054,6 +1015,7 @@ export const AppManager: React.FC = () => {
     const ws = getShellWorkspace(0);
     return { x: ws.x, y: ws.y, w: ws.w, h: ws.h };
   }, [getShellWorkspace]);
+  getMaximizedWindowBoundsRef.current = getMaximizedWindowBounds;
 
   // Work area for floating-window drag/resize clamps. On the spatial desktop the
   // windows live on an unbounded canvas, so the clamp area is the whole world
@@ -1706,7 +1668,8 @@ export const AppManager: React.FC = () => {
           // Open at predefined size centered in workspace — keeps content "in frame".
           // Creative/heavy apps (videoeditor, imosion, etc.) open maximized.
           const workspace = getMaximizedWindowBounds();
-          const def = APP_WINDOW_SIZES[appId as string];
+          const remembered = rememberedWindowSize(appId as string);
+          const def = remembered ? { ...remembered, maximized: false } : APP_WINDOW_SIZES[appId as string];
           if (def?.maximized) {
             next.set(appId, { ...workspace, z });
           } else if (def) {
@@ -1870,6 +1833,56 @@ export const AppManager: React.FC = () => {
     setDetachedApps(prev => { const n = new Map(prev); n.delete(appId); return n; });
     setCurrentApp(appId);
   }, [setCurrentApp]);
+
+  // App commands from the shared app context menu / App Menu / Dock. AppManager
+  // owns the windows, so it is the one place these are carried out.
+  useEffect(() => {
+    const onCommand = (e: Event) => {
+      const d = (e as CustomEvent<AppCommandDetail>).detail;
+      if (!d?.appId || !APP_DEFINITIONS[d.appId]) return;
+      const id = d.appId as AppId;
+      const installed = useInstalledAppsStore.getState().isInstalled(id);
+      switch (d.command) {
+        case 'open':
+        case 'front':
+          if (!installed) {
+            window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `${APP_DEFINITIONS[id]?.name ?? id} is removed — reinstall it from the Store.` } }));
+            return;
+          }
+          if (minimizedApps.has(id)) restoreFloatingApp(id);
+          setCurrentApp(id);
+          setShowAppMenu(false);
+          break;
+        case 'open-window':
+          if (installed) { openAppInWindow(id); setShowAppMenu(false); }
+          break;
+        case 'minimize':
+          if (detachedApps.has(id)) minimizeFloatingApp(id);
+          else useRunningApps.getState().minimizeApp(id);
+          break;
+        case 'close-window':
+          if (detachedApps.has(id)) reattachApp(id);
+          break;
+        case 'quit':
+          handleCloseApp(id);
+          break;
+        case 'settings': {
+          const target = getAppEntry(id)?.settings;
+          if (!target) return;
+          if (target.kind === 'settings') {
+            window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'settings', contextId: target.section } }));
+          } else {
+            setCurrentApp(id);
+            dispatchAppIntent(id, target.action);
+          }
+          setShowAppMenu(false);
+          break;
+        }
+      }
+    };
+    window.addEventListener('dex-app-command', onCommand);
+    return () => window.removeEventListener('dex-app-command', onCommand);
+  }, [detachedApps, minimizedApps, restoreFloatingApp, minimizeFloatingApp, setCurrentApp, openAppInWindow, reattachApp, handleCloseApp]);
 
   // A compact app brought to the front as a tab (DEX Bar, Home, Spotlight all
   // launch through the store) floats instead, centred at its own size; the app
@@ -2965,6 +2978,19 @@ export const AppManager: React.FC = () => {
       icon: 'minimize-2',
       action: () => { void import('../shell/MiniShell').then(m => m.useCompactMode.getState().enter()); },
     });
+    // Registered app quick actions (app registry) — searchable from the DEX Bar.
+    for (const [appId, list] of Object.entries(QUICK_ACTIONS)) {
+      const appName = APP_DEFINITIONS[appId]?.name ?? appId;
+      for (const qa of list) {
+        actions.push({
+          id: `appaction-${appId}-${qa.id}`,
+          label: `${appName}: ${qa.label}`,
+          keywords: [qa.label, appName, ...qa.keywords],
+          icon: qa.icon,
+          action: () => runAppAction(appId, qa.id),
+        });
+      }
+    }
     spotlightEngine.registerActions(actions);
 
     const handleNavigate = (e: Event) => {
@@ -4046,12 +4072,21 @@ export const AppManager: React.FC = () => {
               {(() => {
                 const appDef = APP_DEFINITIONS[appId];
                 const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || 'var(--color-text-tertiary)';
+                // The window's app icon is its app menu (pin, quick actions,
+                // info, window commands) -- the shared AppContextMenu.
                 return (
-                  <div style={{ width: 22, height: 22, borderRadius: 4, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    aria-label={`${getLabel(appId)} app menu`}
+                    aria-haspopup="menu"
+                    title={`${getLabel(appId)} menu`}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openAppContextMenu({ appId, x: r.left, y: r.bottom + 4, source: 'titlebar', floating: true }); }}
+                    style={{ width: 22, height: 22, borderRadius: 4, padding: 0, border: 'none', cursor: 'pointer', background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                     {AppIconPngs[appId]
                       ? <AppIconImg appId={appId} size={22} />
                       : <span style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={16} color="#fff" />}</span>}
-                  </div>
+                  </button>
                 );
               })()}
               {/* Traffic light controls (left side, macOS style) */}
@@ -5386,199 +5421,28 @@ export const AppManager: React.FC = () => {
             <style>{`
               @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
-            {/* App search consolidated to the single dock search pill (+ the
-                universal overlay it opens) -- this panel is now a clean app grid
-                with no duplicate inline search bar. */}
-            {(() => {
-              const all = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
-              const byId = new Map(all.map(app => [app.id, app]));
-              const q = appMenuSearch.trim().toLowerCase();
-
-              const renderTile = (app: (typeof LAUNCHPAD_APPS)[number], keyPrefix: string) => {
-                const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={22} color="currentColor" />;
-                const isActive = currentApp === app.id;
-                const isRunning = runningApps.some(a => a.id === app.id);
-                return (
-                  <button
-                    key={`${keyPrefix}:${app.id}`}
-                    data-launchpad-app-id={app.id}
-                    onClick={() => { setCurrentApp(app.id as AppId); setShowAppMenu(false); }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const p = clampEventToViewport(e, { width: 200, height: 220 });
-                      setLaunchpadCtx({ appId: app.id, label: app.label, x: p.left, y: p.top });
-                    }}
-                    // Stable hover: a background tint only -- the icon never moves
-                    // under the cursor (no lift / scale / bounce). The target stays
-                    // exactly where the user aimed.
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'var(--color-bg-hover)' : 'transparent'; }}
-                    style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      padding: '8px 4px', borderRadius: 10, width: '100%',
-                      background: isActive ? 'var(--color-bg-hover)' : 'transparent',
-                      border: 'none', cursor: 'pointer',
-                      transition: 'background 0.12s ease',
-                    }}
-                  >
-                    {/* One neutral tile for every glyph icon: a different colour per
-                        app read as decoration (full-colour PNG icons keep theirs). */}
-                    <div style={{
-                      color: 'var(--color-text-primary)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: 40, height: 40,
-                      borderRadius: 10,
-                      background: AppIconPngs[app.id] ? 'transparent' : 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)',
-                      border: 'none',
-                      boxShadow: isActive ? '0 0 0 1.5px var(--color-accent)' : 'none',
-                      overflow: 'hidden',
-                    }}>
-                      {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={36} /> : icon}
-                    </div>
-                    <span style={{ fontSize: 10, color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: isActive ? 600 : 400, textAlign: 'center', lineHeight: 1.2, letterSpacing: '-0.01em' }}>{app.label}</span>
-                    {isRunning && (
-                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-text-secondary)', marginTop: -3 }} />
-                    )}
-                  </button>
-                );
-              };
-
-              const sectionHeader = (label: string, key: string) => (
-                <div key={key} role="presentation" style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', padding: 'var(--space-2) 4px 2px' }}>{label}</div>
-              );
-
-              let body: React.ReactNode;
-              if (q) {
-                // Flat, ranked filter across every app -- label first, then id.
-                const matches = all.filter(a => a.label.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
-                body = matches.length
-                  ? matches.map(a => renderTile(a, 'search'))
-                  : <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps match &ldquo;{appMenuSearch.trim()}&rdquo;</div>;
-              } else {
-                // Organized view: Recent (most-recently-used) then category sections.
-                const nodes: React.ReactNode[] = [];
-                const recent = sessionHistory.map(id => byId.get(id as AppId)).filter((a): a is (typeof LAUNCHPAD_APPS)[number] => !!a).slice(0, 6);
-                if (recent.length) {
-                  nodes.push(sectionHeader('Recent', 'sec-recent'));
-                  recent.forEach(a => nodes.push(renderTile(a, 'recent')));
-                }
-                APP_MENU_CATEGORIES.forEach(cat => {
-                  nodes.push(sectionHeader(cat.label, `sec-${cat.label}`));
-                  cat.apps.forEach(a => nodes.push(renderTile(a, cat.label)));
-                });
-                body = nodes;
-              }
-
-              return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }}
-              aria-label="Applications"
-              data-launchpad-grid=""
-              onKeyDown={(e) => {
-                // Grid arrow-key navigation. Columns are derived from the actual
-                // wrapped layout (tiles sharing the first row's offsetTop), so
-                // Up/Down move a true row regardless of viewport width. Section
-                // headers aren't buttons, so they're transparent to tile nav.
-                const btns = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button[data-launchpad-app-id]'));
-                const idx = btns.indexOf(document.activeElement as HTMLButtonElement);
-                if (idx < 0 || btns.length === 0) return;
-                const firstTop = btns[0].offsetTop;
-                const cols = Math.max(1, btns.filter(b => b.offsetTop === firstTop).length);
-                let next = idx;
-                if (e.key === 'ArrowRight') next = (idx + 1) % btns.length;
-                else if (e.key === 'ArrowLeft') next = (idx - 1 + btns.length) % btns.length;
-                else if (e.key === 'ArrowDown') next = Math.min(idx + cols, btns.length - 1);
-                else if (e.key === 'ArrowUp') {
-                  // From the top row, step back up into the search field.
-                  if (idx < cols) { e.preventDefault(); appMenuSearchRef.current?.focus(); return; }
-                  next = Math.max(idx - cols, 0);
-                }
-                else if (e.key === 'Home') next = 0;
-                else if (e.key === 'End') next = btns.length - 1;
-                else return;
-                e.preventDefault();
-                btns[next]?.focus();
-              }}
-            >
-              {body}
-            </div>
-              );
-            })()}
+            {/* Smart App Menu: Search (apps + registered actions) · Pinned ·
+                Recent · All Apps. Pins come from the shared pinning service. */}
+            <AppMenuPanel
+              apps={LAUNCHPAD_APPS.filter(a => useInstalledAppsStore.getState().isInstalled(a.id))}
+              categories={APP_MENU_CATEGORIES.map(c => ({ label: c.label, apps: c.apps.filter(a => useInstalledAppsStore.getState().isInstalled(a.id)) }))}
+              currentApp={currentApp}
+              runningIds={new Set(runningApps.map(a => a.id))}
+              history={sessionHistory}
+              renderIcon={(id, size) => AppIconPngs[id]
+                ? <AppIconImg appId={id} size={Math.round(size * 1.6)} />
+                : (size >= 20 && Icons[id]) || <DexIcon name={APP_DEFINITIONS[id]?.icon || id} size={size} color="currentColor" />}
+              onLaunch={(id) => { setCurrentApp(id as AppId); setShowAppMenu(false); }}
+              onClose={() => { setShowAppMenu(false); setAppMenuSearch(''); }}
+            />
           </div>
           </div>
         </>
       )}
 
-      {/* Launchpad App Context Menu (Add/Remove from Dock) */}
-      {launchpadCtx && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9800 }} onMouseDown={() => setLaunchpadCtx(null)} />
-          <div
-            role="menu"
-            className="dex-surface-overlay"
-            aria-label={`${launchpadCtx.label} options`}
-            onKeyDown={e => {
-              if (e.key === 'Escape') setLaunchpadCtx(null);
-              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                const items = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
-                const idx = items.indexOf(document.activeElement as HTMLButtonElement);
-                const next = e.key === 'ArrowDown' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
-                items[next]?.focus();
-              }
-            }}
-            style={{
-              // Coords are already kept on-screen at capture time via
-              // clampEventToViewport (see the launchpad onContextMenu handler),
-              // so no second magic-number clamp is needed here.
-              position: 'fixed', left: launchpadCtx.x, top: launchpadCtx.y,
-              // Material (background/border/shadow) now comes from the unified
-              // .dex-surface-overlay class — the canonical overlay surface for
-              // context menus. Blur is perf-tier/thermal gated automatically.
-              zIndex: 9801, minWidth: 180,
-              borderRadius: 10, padding: 4,
-              animation: 'fadeIn 0.12s ease-out',
-            } as React.CSSProperties}
-          >
-            {(() => {
-              const { appId, label } = launchpadCtx;
-              const pinned = isDockPinned(appId);
-              const isPermanent = PERMANENT_PINS.includes(appId);
-              const items: { label: string; action: () => void; danger?: boolean }[] = [];
-              items.push({ label: `Open ${label}`, action: () => { setCurrentApp(appId as AppId); setShowAppMenu(false); setLaunchpadCtx(null); } });
-              if (pinned && !isPermanent) {
-                items.push({ label: 'Remove from Dock', action: () => { unpinApp(appId); setLaunchpadCtx(null); } });
-              } else if (!pinned) {
-                items.push({ label: 'Add to Dock', action: () => { pinApp(appId); setLaunchpadCtx(null); } });
-              }
-              if (appId !== 'home') {
-                items.push({ label: 'Open in Window', action: () => { openAppInWindow(appId as AppId); setShowAppMenu(false); setLaunchpadCtx(null); } });
-              }
-              return items.map((item, i) => (
-                <button
-                  key={i}
-                  role="menuitem"
-                  onClick={item.action}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left',
-                    padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 6,
-                    background: 'transparent', border: 'none',
-                    color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
-                    cursor: 'pointer', transition: 'background 0.08s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {item.label}
-                </button>
-              ));
-            })()}
-          </div>
-        </>
-      )}
-
-
-
+      {/* Shared app context menu + App Information (Dock, App Menu, search,
+          title bars, Task Manager all open this one menu). */}
+      <AppContextMenuHost isFloating={(id) => detachedApps.has(id)} />
 
       {/* Achievement unlock toasts -- visible globally */}
 
