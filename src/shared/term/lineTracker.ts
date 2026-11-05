@@ -44,7 +44,17 @@ function isPrintable(s: string): boolean {
  * Pastes that contain a newline are treated as "unreliable + enter" so a pasted
  * multi-line script always goes to the shell.
  */
+/**
+ * Replies the terminal emulator sends on its own through the same input path:
+ * cursor-position reports (ConPTY asks with ESC[6n at startup), focus in/out
+ * (ConPTY enables focus reporting), device-attribute and OSC colour replies.
+ * They are not user editing and must not make the line unreliable.
+ */
+// eslint-disable-next-line no-control-regex
+const TERMINAL_REPLY = /^(?:\x1b\[\d+;\d+R|\x1b\[[IO]|\x1b\[[?>][\d;]*c|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\))+$/;
+
 export function trackInput(state: LineTrackerState, data: string): TrackResult {
+  if (TERMINAL_REPLY.test(data)) return { kind: 'forward' };
   if (data === '\r' || data === '\n') {
     const line = state.reliable ? state.line : null;
     state.line = '';

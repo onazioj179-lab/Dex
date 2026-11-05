@@ -29,6 +29,15 @@ describe('terminal line tracker', () => {
     expect(feed(['\x1b[A', '\r'])).toEqual({ kind: 'enter', line: null });
   });
 
+  it('ignores replies the terminal sends itself (cursor report, focus, DA, OSC)', () => {
+    // First command after ConPTY starts: xterm answers ESC[6n before the user types.
+    expect(feed(['\x1b[1;1R', 'dex list', '\r'])).toEqual({ kind: 'enter', line: 'dex list' });
+    expect(feed(['de', '\x1b[O', '\x1b[I', 'x', '\r'])).toEqual({ kind: 'enter', line: 'dex' });
+    expect(feed(['\x1b[?1;2c', '\x1b]11;rgb:0e0e/0f0f/1111\x07', 'dex', '\r'])).toEqual({ kind: 'enter', line: 'dex' });
+    // A real cursor key still makes the line unknown.
+    expect(feed(['dex', '\x1b[D', '\r'])).toEqual({ kind: 'enter', line: null });
+  });
+
   it('a multi-line paste is never treated as a known line', () => {
     expect(feed(['echo a\recho b', '\r'])).toEqual({ kind: 'enter', line: null });
   });
