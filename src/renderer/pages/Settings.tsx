@@ -54,6 +54,7 @@ import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/setting
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
+import { applyTheme } from '../utils/theme';
 
 // ===========================================================================
 // TYPES
@@ -1082,18 +1083,8 @@ const applySettings = (settings: Record<string, unknown>) => {
     
     // Apply selected theme (dark or light)
     const theme = settings.darkMode !== false ? 'dark' : 'light';
-    root.setAttribute('data-theme', theme);
-    if (theme === 'dark') {
-      body.classList.add('dark-mode');
-      root.classList.add('dark-mode');
-      body.classList.remove('light-mode');
-      root.classList.remove('light-mode');
-    } else {
-      body.classList.add('light-mode');
-      root.classList.add('light-mode');
-      body.classList.remove('dark-mode');
-      root.classList.remove('dark-mode');
-    }
+    // One style pass with transitions off (see utils/theme withoutTransitions).
+    applyTheme(theme);
     // When the user actually changes Dark Mode, pin it: utils/theme's boot code
     // otherwise ignores `darkMode` and follows the OS scheme, so a Light choice
     // was undone on restart.
