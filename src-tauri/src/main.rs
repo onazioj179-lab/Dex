@@ -174,6 +174,7 @@ mod updates_ctl;
 mod workflow_ctl;
 mod changelog;
 mod color_labels;
+mod ledger_legacy;
 mod content_expiry;
 mod daily_note;
 mod dashboard;

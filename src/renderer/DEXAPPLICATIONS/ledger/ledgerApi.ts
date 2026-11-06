@@ -169,6 +169,9 @@ export const ledger = {
   importBackup: () => mutate<{ canceled?: boolean; restored?: boolean; safetyBackup?: string }>('ledger:backup:importFile'),
   openBackupFolder: () => call('ledger:backup:openFolder'),
   recover: (action: 'restoreLatest' | 'startFresh') => mutate<{ damagedFileKeptAs: string | null; restoredFrom: string | null }>('ledger:recover', { action }),
+  /** An earlier DEX build's ledger (dex.db tables), if any. Read-only. */
+  legacyProbe: () => call<{ accounts: number; transactions: number; currency: string } | null>('ledger:legacy:probe'),
+  legacyImport: () => mutate<{ accounts: number; categories: number; transactions: number; budgets: number; skipped: number; skippedDetail: string[]; currency: string }>('ledger:legacy:import'),
   audit: (limit = 200) => call<AuditEntry[]>('ledger:audit:list', { limit }),
   integrity: () => call<{ sqlite: string; foreignKeyViolations: number; issues: unknown[]; ok: boolean }>('ledger:integrity'),
 };

@@ -29,6 +29,7 @@ pub mod schema;
 
 mod budget;
 mod io;
+mod legacy;
 mod reports;
 mod txns;
 

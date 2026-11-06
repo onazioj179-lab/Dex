@@ -164,6 +164,10 @@ export default defineConfig({
           // nearly every app AND by shared code (WordSuggestions). Left unpinned,
           // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // improvements500 helpers (downloadBlob, ...) are shared by shell code
+          // (SpatialHud) and apps (Bio Studio); left unpinned they landed in
+          // app-bio and made dex-app-core <-> app-bio a cycle.
+          if (/[\\/]renderer[\\/]improvements500[\\/]/.test(id)) return 'dex-app-core';
           // The shared NativeWebview imports a constant from the ad-block content
           // script; keep that module shared so app-browser (and the ad-block
           // engine) is not pulled into startup.

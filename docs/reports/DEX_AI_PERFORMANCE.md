@@ -1,6 +1,6 @@
 # DEX AI Assistant: Performance
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj · Machine: Windows 11 Pro 26300, 8 logical cores
+**Date:** 2026-11-01 · **Creator:** Onazi oJ · Machine: Windows 11 Pro 26300, 8 logical cores
 
 Only measured numbers appear here. Anything not measured says so.
 

@@ -407,3 +407,61 @@ fn attachments_are_stored_and_capped() {
     ok(&mut l, "ledger:txns:delete", json!({ "ids": [t] }));
     assert!(fail(&mut l, "ledger:attachments:get", json!({ "id": att["id"] })).contains("does not exist"));
 }
+
+#[test]
+fn imports_the_earlier_document_ledger() {
+    let mut l = Ledger::open_in_memory(&tmpdir("legacy")).unwrap();
+    // Setup screen ran first (seeded empty categories) - import still allowed.
+    ok(&mut l, "ledger:setup", json!({ "currency": "EUR" }));
+    let doc = json!({
+        "version": 1, "currency": "EUR",
+        "accounts": [
+            { "id": "a1", "name": "Checking", "type": "checking", "openingMinor": 100000, "openingDate": "2026-01-01" },
+            { "id": "a2", "name": "Savings", "type": "savings", "openingMinor": 0, "openingDate": "2026-01-01" },
+            { "id": "a3", "name": "Mortgage", "type": "loan", "openingMinor": -500000, "openingDate": "2026-01-01", "closed": false }
+        ],
+        "categories": [
+            { "id": "c1", "name": "Groceries", "group": "Everyday", "kind": "expense" },
+            { "id": "c2", "name": "Home", "group": "Everyday", "kind": "expense" },
+            { "id": "c3", "name": "Salary", "group": "Income", "kind": "income" }
+        ],
+        "transactions": [
+            { "id": "t1", "date": "2026-01-05", "accountId": "a1", "payee": "Market", "memo": "", "status": 2, "createdAt": 1,
+              "splits": [{ "categoryId": "c1", "amountMinor": -4210, "memo": "" }] },
+            { "id": "t2", "date": "2026-01-06", "accountId": "a1", "transferId": "x1", "transferAccountId": "a2", "status": 0, "createdAt": 2,
+              "splits": [{ "categoryId": null, "amountMinor": -10000, "memo": "" }] },
+            { "id": "t3", "date": "2026-01-06", "accountId": "a2", "transferId": "x1", "transferAccountId": "a1", "status": 0, "createdAt": 2,
+              "splits": [{ "categoryId": null, "amountMinor": 10000, "memo": "" }] },
+            { "id": "t4", "date": "2026-01-07", "accountId": "a1", "payee": "Shop", "memo": "", "status": 1, "createdAt": 3,
+              "splits": [{ "categoryId": "c1", "amountMinor": -2000, "memo": "" }, { "categoryId": "c2", "amountMinor": -1000, "memo": "bulbs" }] },
+            { "id": "t5", "date": "2026-01-08", "accountId": "a1", "payee": "Employer", "memo": "", "status": 0, "createdAt": 4,
+              "splits": [{ "categoryId": "c3", "amountMinor": 250000, "memo": "" }] },
+            { "id": "t6", "date": "2026-01-09", "accountId": "zz", "payee": "Ghost", "status": 0, "createdAt": 5,
+              "splits": [{ "categoryId": "c1", "amountMinor": -1, "memo": "" }] }
+        ],
+        "budgets": [ { "month": "2026-01", "categoryId": "c1", "amountMinor": 30000 } ]
+    });
+    let r = l.import_legacy(&doc).unwrap();
+    assert_eq!(r["accounts"], 3);
+    assert_eq!(r["transactions"], 5);
+    assert_eq!(r["skipped"], 1);
+    let accts = ok(&mut l, "ledger:accounts:list", json!({}));
+    let bal = |n: &str| accts.as_array().unwrap().iter().find(|a| a["name"] == n).unwrap()["balance"].as_i64().unwrap();
+    assert_eq!(bal("Checking"), 100000 - 4210 - 10000 - 3000 + 250000);
+    assert_eq!(bal("Savings"), 10000);
+    assert_eq!(accts.as_array().unwrap().iter().find(|a| a["name"] == "Mortgage").unwrap()["kind"], "other");
+    let ie = ok(&mut l, "ledger:reports:incomeExpense", json!({ "from": "2026-01-01", "to": "2026-01-31" }));
+    assert_eq!(ie["totals"]["income"], 250000);
+    assert_eq!(ie["totals"]["expenses"], 7210); // transfer excluded
+    let b = ok(&mut l, "ledger:budget:month", json!({ "month": "2026-01" }));
+    let g = &b["groups"][0];
+    assert_eq!(g["name"], "Everyday");
+    let groc = g["categories"].as_array().unwrap().iter().find(|c| c["name"] == "Groceries").unwrap();
+    assert_eq!(groc["assigned"], 30000);
+    assert_eq!(groc["activity"], -6210);
+    let t = ok(&mut l, "ledger:txns:list", json!({ "search": "Market" }));
+    assert_eq!(t["rows"][0]["status"], "reconciled");
+    assert_eq!(ok(&mut l, "ledger:integrity", json!({}))["ok"], true);
+    // Never into a ledger that already has data.
+    assert!(l.import_legacy(&doc).unwrap_err().contains("already has"));
+}

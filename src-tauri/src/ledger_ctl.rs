@@ -248,6 +248,42 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             okv(json!({ "damagedFileKeptAs": kept.file_name().map(|n| n.to_string_lossy().to_string()), "restoredFrom": restored }))
         }
 
+        // An earlier DEX build kept a ledger as tables in dex.db. Report it so
+        // setup can offer a one-time import; the old tables are only read.
+        "ledger:legacy:probe" => match read_legacy(app, false) {
+            Ok(v) => okv(v),
+            Err(e) => fail(e),
+        },
+        "ledger:legacy:import" => {
+            let doc = match read_legacy(app, true) {
+                Ok(v) if !v.is_null() => v,
+                Ok(_) => return fail("No earlier ledger was found"),
+                Err(e) => return fail(e),
+            };
+            with_ledger(app, |l| {
+                // Safety copy first, like every other bulk change.
+                if let Err(e) = l.backup_create("before-import") {
+                    return fail(e);
+                }
+                match l.import_legacy(&doc) {
+                    Ok(v) => okv(v),
+                    Err(e) => fail(e),
+                }
+            })
+        }
+
         _ => with_ledger(app, |l| l.dispatch(channel, args)),
     }
+}
+
+/// Probe (counts) or load (full document) the earlier dex.db ledger tables.
+fn read_legacy(app: &tauri::AppHandle, full: bool) -> Result<Value, String> {
+    let state = tauri::Manager::state::<crate::db::DbState>(app);
+    let guard = state.lock().map_err(|_| "database busy".to_string())?;
+    let Some(conn) = guard.as_ref() else { return Ok(Value::Null) };
+    let Some(probe) = crate::ledger_legacy::probe(conn) else { return Ok(Value::Null) };
+    if !full {
+        return Ok(probe);
+    }
+    crate::ledger_legacy::load(conn).map(|r| r.get("doc").cloned().unwrap_or(r))
 }

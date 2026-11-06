@@ -1,6 +1,6 @@
 [package]
 name = "dex-tauri"
-description = "DEX OS desktop shell (Tauri) by Onazi Oj"
+description = "DEX OS desktop shell (Tauri) by Onazi oJ"
 version = "7.0.1"
 edition = "2021"
 license = "MIT"

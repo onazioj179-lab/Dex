@@ -1,6 +1,6 @@
 # DEX — Part 3 Implementation Report
 
-**Date:** 2026-11-01 · **Creator:** Onazi Oj
+**Date:** 2026-11-01 · **Creator:** Onazi oJ
 
 Part 3 started with the completion gate (`PART1_PART2_COMPLETION_AUDIT.md`). Following the directive ("a smaller number of reliable, polished features over many incomplete ones"), the work went into the design system, attribution, security completion and verification, not into placeholder features.
 

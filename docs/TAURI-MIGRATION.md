@@ -1220,3 +1220,5 @@ The shell can't render headlessly (needs WebView2). Run `npm run dev:tauri` and
 confirm: UI boots · window buttons work · Files lists real folders · search/recent
 return results. **Add a degrade-log:** have `tauriCompat` count which unported
 channels get hit at runtime — that data orders P3 (port what's actually used).
+
+- 2026-11-04 (Part 17): new `ledger:load|save|stats` channels (`src-tauri/src/ledger.rs`, shared dex.db, atomic replace-all save, routed through `db_dispatch`, schema in `ensure_all_schemas`).
