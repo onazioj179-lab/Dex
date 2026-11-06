@@ -272,14 +272,18 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
 // ---------------------------------------------------------------------------
 // Permission popover content (mic / camera / location)
 // ---------------------------------------------------------------------------
-const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> = ({ id, onSettings }) => {
+/**
+ * Turn a DEX privacy permission on or off. Turning the microphone on also asks
+ * the OS (and reports a denial); shared by the top-bar popover and Control
+ * Center so both behave the same.
+ */
+export function usePermissionToggle(id: PermissionId) {
   const enabled = usePermissionStore(s => s.permissions[id].enabled);
   const setPermission = usePermissionStore(s => s.setPermission);
-  const grantedAt = usePermissionStore(s => s.permissions[id].grantedAt);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const togglePermission = useCallback(async () => {
+  const toggle = useCallback(async () => {
     setNotice(null);
     if (enabled) {
       setPermission(id, false);
@@ -311,6 +315,13 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
       setBusy(false);
     }
   }, [enabled, id, setPermission]);
+
+  return { enabled, busy, notice, toggle };
+}
+
+const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> = ({ id, onSettings }) => {
+  const grantedAt = usePermissionStore(s => s.permissions[id].grantedAt);
+  const { enabled, busy, notice, toggle: togglePermission } = usePermissionToggle(id);
 
   return (
     <div>
@@ -440,13 +451,19 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
   }, [onOpenSettings, close]);
 
   const networkOff = networkMode !== 'full';
+  // Status icons appear only when there is something to report: a restricted
+  // network, or a privacy permission that is on (a live "in use" cue). The
+  // default state needs no icon; Control Center holds every control. An icon
+  // also stays while its own popover is open so the popover keeps its anchor.
+  const show = (key: Exclude<OpenKey, null>, notable: boolean) => notable || open === key;
+  if (!show('network', networkOff) && !show('microphone', micEnabled) && !show('camera', cameraEnabled) && !show('gps', gpsEnabled)) return null;
 
   return (
     <span
       style={{ display: 'inline-flex', alignItems: 'center', gap: 0, flexShrink: 0 }}
       onMouseLeave={() => { /* stay open until click outside */ }}
     >
-      <Pill
+      {show('network', networkOff) && <Pill
         ref={el => { refs.current['network'] = el; }}
         active
         warning={networkOff}
@@ -455,8 +472,8 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ariaExpanded={open === 'network'}
         icon={networkIconFor(networkMode)}
         onClick={() => togglePop('network')}
-      />
-      <Pill
+      />}
+      {show('microphone', micEnabled) && <Pill
         ref={el => { refs.current['microphone'] = el; }}
         active={micEnabled}
         warning={micEnabled}
@@ -465,8 +482,8 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ariaExpanded={open === 'microphone'}
         icon={MicIcon}
         onClick={() => togglePop('microphone')}
-      />
-      <Pill
+      />}
+      {show('camera', cameraEnabled) && <Pill
         ref={el => { refs.current['camera'] = el; }}
         active={cameraEnabled}
         warning={cameraEnabled}
@@ -475,8 +492,8 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ariaExpanded={open === 'camera'}
         icon={CameraIcon}
         onClick={() => togglePop('camera')}
-      />
-      <Pill
+      />}
+      {show('gps', gpsEnabled) && <Pill
         ref={el => { refs.current['gps'] = el; }}
         active={gpsEnabled}
         warning={gpsEnabled}
@@ -485,7 +502,7 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ariaExpanded={open === 'gps'}
         icon={LocationIcon}
         onClick={() => togglePop('gps')}
-      />
+      />}
       {open === 'network' && (
         <Popover anchorRect={anchor} onClose={close}>
           <NetworkPopover onSettings={() => goSettings('network')} />

@@ -36,6 +36,7 @@ import {
 } from './WordSuggestions';
 import { deserializeDoc, extractHeadings } from './NotesDocumentModel';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { registerAppIntentHandler } from '../../services/appIntents';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -249,6 +250,20 @@ const DexNotes: React.FC = () => {
     });
     return () => unregisterUkiAppAction('notes.createNote');
   }, []);
+
+  // App Menu / search quick actions (registered in services/appRegistry.ts).
+  useEffect(() => registerAppIntentHandler('notes', (action) => {
+    const { store: s, selectedFolderId: folder } = notesCreateRef.current;
+    if (action === 'new-note') {
+      void s.createNote(folder || undefined).then(id => { if (id) s.selectNote(id); });
+      return true;
+    }
+    if (action === 'search-notes') {
+      setTimeout(() => document.querySelector<HTMLInputElement>('input[placeholder="Search notes..."]')?.focus(), 60);
+      return true;
+    }
+    return false;
+  }), []);
 
   // -- Refs -------------------------------------------------------------
 

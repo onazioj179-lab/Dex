@@ -38,6 +38,7 @@ import {
 } from './dexCode/project';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { registerAppIntentHandler } from '../../services/appIntents';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -777,6 +778,20 @@ const DexCode: React.FC = () => {
     const proj = await pickProjectFolder();
     if (proj) { setProject(proj); setWorkspaceHits([]); setWorkspaceQuery(''); }
   }, []);
+
+  // App Menu / search quick actions (registered in services/appRegistry.ts).
+  const intentRef = useRef({ handleNewFile, openFolder, isModified, fileName });
+  intentRef.current = { handleNewFile, openFolder, isModified, fileName };
+  useEffect(() => registerAppIntentHandler('dexcode', (action) => {
+    const r = intentRef.current;
+    if (action === 'new-file') {
+      if (r.isModified && !window.confirm(`Discard unsaved changes to ${r.fileName}?`)) return true;
+      r.handleNewFile();
+      return true;
+    }
+    if (action === 'open-project') { void r.openFolder(); return true; }
+    return false;
+  }), []);
 
   const closeProject = useCallback(() => {
     clearStoredProject();

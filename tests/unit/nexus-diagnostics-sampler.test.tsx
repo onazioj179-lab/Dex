@@ -58,8 +58,9 @@ describe('Diagnostics sampler', () => {
     (window as unknown as { dex: unknown }).dex = { invoke };
 
     render(<NexusDiagnostics />);
-    const memory = () => screen.getByText('Memory (all DEX processes)').nextElementSibling?.textContent;
-    expect(memory()).toBe('–');
+    // Resources pane (the default section): the "DEX memory" stat.
+    const memory = () => screen.getByText('DEX memory').nextElementSibling?.textContent;
+    expect(memory()).toBe('—');
 
     // Past the per-sample time box and the next 3 s tick.
     await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });

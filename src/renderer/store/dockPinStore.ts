@@ -5,11 +5,14 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * DEX Dock Pinning Store
- * Pin/unpin apps to dock, drag reorder, persistence via localStorage.
- * Home, Rewind, Settings are permanent (cannot be unpinned).
- * Dock modes: always-visible, auto-hide, floating.
- * Magnification: gaussian hover effect on dock icons.
+ * DEX App Pinning Store -- the ONE pinning service for apps.
+ * Two ordered pin lists, keyed by stable app id (APP_DEFINITIONS):
+ *   - pins      -> the Dock (the DEX Bar's pinned strip + Home "Pinned Apps")
+ *   - menuPins  -> the App Menu's Pinned section
+ * Every surface (App Menu, context menus, title-bar menu, search results,
+ * Home) pins through this store via services/appPinning.ts, so there are no
+ * competing pin systems. Any app may be pinned or unpinned; nothing is
+ * permanent. Persisted to localStorage and mirrored to native storage.
  */
 
 import { create } from 'zustand';
@@ -23,6 +26,8 @@ export type DockMode = 'always-visible' | 'auto-hide' | 'floating';
 
 interface DockPinState {
   pins: DockPin[];
+  /** App Menu pinned section, in display order. */
+  menuPins: string[];
   mode: DockMode;
   magnification: boolean;
   magnificationScale: number;
@@ -32,49 +37,77 @@ interface DockPinState {
   unpinApp: (appId: string) => void;
   reorder: (fromIndex: number, toIndex: number) => void;
   isPinned: (appId: string) => boolean;
+  /** Move (or insert) a dock pin at an index -- drag-to-reorder and drop-to-pin. */
+  moveTo: (appId: string, toIndex: number) => void;
+  pinToMenu: (appId: string) => void;
+  unpinFromMenu: (appId: string) => void;
+  reorderMenu: (fromIndex: number, toIndex: number) => void;
+  isMenuPinned: (appId: string) => boolean;
   setMode: (mode: DockMode) => void;
   setMagnification: (enabled: boolean) => void;
   setMagnificationScale: (scale: number) => void;
   setIconSize: (size: number) => void;
 }
 
-const PERMANENT_PINS = ['rewind', 'settings', 'taskmanager'];
+// Nothing is permanently pinned any more: users can unpin any app. Kept as an
+// (empty) export for older imports.
+const PERMANENT_PINS: string[] = [];
 const STORAGE_KEY = 'dex-dock-pins';
+const MENU_KEY = 'dex-menu-pins';
 const SETTINGS_KEY = 'dex-dock-settings';
-const MAX_PINS = 100;
+const MAX_PINS = 24;
+const MAX_MENU_PINS = 18;
 
+// A short default so the DEX Bar stays compact; users pin what they use.
 const DEFAULT_PINS: DockPin[] = [
-  { id: 'browser', position: 0 },
-  { id: 'files', position: 1 },
+  { id: 'files', position: 0 },
+  { id: 'browser', position: 1 },
   { id: 'notes', position: 2 },
-  { id: 'gallery', position: 3 },
-  { id: 'calendar', position: 4 },
-  { id: 'calculator', position: 5 },
-  { id: 'settings', position: 6 },
-  { id: 'taskmanager', position: 7 },
-  { id: 'rewind', position: 8 },
+  { id: 'settings', position: 3 },
 ];
+const DEFAULT_MENU_PINS = ['files', 'browser', 'notes', 'calendar', 'ledger', 'settings'];
+
+/** Dedupe by id and renumber positions, keeping the first occurrence. */
+function normalizePins(list: unknown): DockPin[] | null {
+  if (!Array.isArray(list)) return null;
+  const seen = new Set<string>();
+  const out: DockPin[] = [];
+  for (const p of [...list].sort((a: DockPin, b: DockPin) => (a?.position ?? 0) - (b?.position ?? 0))) {
+    if (!p || typeof p.id !== 'string' || !p.id || seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push({ id: p.id, position: out.length });
+  }
+  return out.slice(0, MAX_PINS);
+}
+
+function normalizeMenu(list: unknown): string[] | null {
+  if (!Array.isArray(list)) return null;
+  return Array.from(new Set(list.filter((x): x is string => typeof x === 'string' && !!x))).slice(0, MAX_MENU_PINS);
+}
 
 function loadPins(): DockPin[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure permanent pins exist
-        const ids = new Set(parsed.map((p: DockPin) => p.id));
-        let maxPos = Math.max(...parsed.map((p: DockPin) => p.position));
-        for (const permId of PERMANENT_PINS) {
-          if (!ids.has(permId)) {
-            maxPos++;
-            parsed.push({ id: permId, position: maxPos });
-          }
-        }
-        return parsed.sort((a: DockPin, b: DockPin) => a.position - b.position);
-      }
-    }
+    // An empty saved list is a real choice (the user unpinned everything).
+    if (raw !== null) return normalizePins(JSON.parse(raw)) ?? DEFAULT_PINS.map(p => ({ ...p }));
   } catch { /* ignore */ }
-  return DEFAULT_PINS;
+  return DEFAULT_PINS.map(p => ({ ...p }));
+}
+
+function loadMenuPins(): string[] {
+  try {
+    const raw = localStorage.getItem(MENU_KEY);
+    if (raw !== null) return normalizeMenu(JSON.parse(raw)) ?? [...DEFAULT_MENU_PINS];
+  } catch { /* ignore */ }
+  return [...DEFAULT_MENU_PINS];
+}
+
+function saveMenuPins(pins: string[]) {
+  try {
+    const json = JSON.stringify(pins);
+    localStorage.setItem(MENU_KEY, json);
+    (window as any).dex?.invoke?.('capability:storage:set', MENU_KEY, json)?.catch?.((e: unknown) => { console.warn('[DEX]', e); });
+  } catch { /* ignore */ }
 }
 
 function savePins(pins: DockPin[]) {
@@ -147,18 +180,16 @@ function saveSettings(s: DockSettings): void {
 async function loadPinsAsync(): Promise<DockPin[] | null> {
   try {
     const raw = await (window as any).dex?.invoke?.('capability:storage:get', STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const ids = new Set(parsed.map((p: DockPin) => p.id));
-        let maxPos = Math.max(...parsed.map((p: DockPin) => p.position));
-        for (const permId of PERMANENT_PINS) {
-          if (!ids.has(permId)) { maxPos++; parsed.push({ id: permId, position: maxPos }); }
-        }
-        return parsed.sort((a: DockPin, b: DockPin) => a.position - b.position);
-      }
-    }
+    if (typeof raw === 'string') return normalizePins(JSON.parse(raw));
   } catch { /* fallback to localStorage */ }
+  return null;
+}
+
+async function loadMenuPinsAsync(): Promise<string[] | null> {
+  try {
+    const raw = await (window as any).dex?.invoke?.('capability:storage:get', MENU_KEY);
+    if (typeof raw === 'string') return normalizeMenu(JSON.parse(raw));
+  } catch { /* fallback */ }
   return null;
 }
 
@@ -175,10 +206,12 @@ export const useDockPins = create<DockPinState>((set, get) => {
 
   // Load from IPC backend on startup (overrides localStorage)
   loadPinsAsync().then(pins => { if (pins) set({ pins }); }).catch((e: unknown) => { console.warn('[DEX]', e); });
+  loadMenuPinsAsync().then(menuPins => { if (menuPins) set({ menuPins }); }).catch((e: unknown) => { console.warn('[DEX]', e); });
   loadSettingsAsync().then(s => { if (s) set({ mode: s.mode, magnification: s.magnification, magnificationScale: s.magnificationScale, iconSize: s.iconSize }); }).catch((e: unknown) => { console.warn('[DEX]', e); });
 
   return {
     pins: loadPins(),
+    menuPins: loadMenuPins(),
     mode: initialSettings.mode,
     magnification: initialSettings.magnification,
     magnificationScale: initialSettings.magnificationScale,
@@ -195,8 +228,8 @@ export const useDockPins = create<DockPinState>((set, get) => {
   },
 
   unpinApp: (appId: string) => {
-    if (PERMANENT_PINS.includes(appId)) return;
     const { pins } = get();
+    if (!pins.some(p => p.id === appId)) return;
     const next = pins
       .filter(p => p.id !== appId)
       .map((p, i) => ({ ...p, position: i }));
@@ -218,6 +251,44 @@ export const useDockPins = create<DockPinState>((set, get) => {
   isPinned: (appId: string) => {
     return get().pins.some(p => p.id === appId);
   },
+
+  moveTo: (appId: string, toIndex: number) => {
+    const all = [...get().pins].sort((a, b) => a.position - b.position);
+    const wasPinned = all.some(p => p.id === appId);
+    if (!wasPinned && all.length >= MAX_PINS) return;
+    const rest = all.filter(p => p.id !== appId);
+    const at = Math.max(0, Math.min(toIndex, rest.length));
+    rest.splice(at, 0, { id: appId, position: 0 });
+    const next = rest.map((p, i) => ({ id: p.id, position: i }));
+    savePins(next);
+    set({ pins: next });
+  },
+
+  pinToMenu: (appId: string) => {
+    const { menuPins } = get();
+    if (menuPins.includes(appId) || menuPins.length >= MAX_MENU_PINS) return;
+    const next = [...menuPins, appId];
+    saveMenuPins(next);
+    set({ menuPins: next });
+  },
+
+  unpinFromMenu: (appId: string) => {
+    if (!get().menuPins.includes(appId)) return;
+    const next = get().menuPins.filter(id => id !== appId);
+    saveMenuPins(next);
+    set({ menuPins: next });
+  },
+
+  reorderMenu: (fromIndex: number, toIndex: number) => {
+    const list = [...get().menuPins];
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex >= list.length) return;
+    const [moved] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, moved);
+    saveMenuPins(list);
+    set({ menuPins: list });
+  },
+
+  isMenuPinned: (appId: string) => get().menuPins.includes(appId),
 
   setMode: (mode: DockMode) => {
     set({ mode });
@@ -251,6 +322,7 @@ export { PERMANENT_PINS };
 
 // Selector-based subscriptions (item 146)
 export const usePinnedApps = () => useDockPins(s => s.pins);
+export const useMenuPins = () => useDockPins(s => s.menuPins);
 export const useDockMode = () => useDockPins(s => s.mode);
 export const useDockMagnification = () => useDockPins(s => s.magnification);
 export const useDockIconSize = () => useDockPins(s => s.iconSize);

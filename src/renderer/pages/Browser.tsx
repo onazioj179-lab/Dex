@@ -28,6 +28,7 @@ import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
 import { normalizeAddress } from '../services/browserAddress';
 import { keyEventForApp } from '../shell/input/appKeyScope';
+import { registerAppIntentHandler } from '../services/appIntents';
 
 // ===========================================================================
 // TYPES
@@ -1412,6 +1413,20 @@ export const Browser: React.FC = () => {
     }
   }, []);
   createTabRef.current = createTab;
+
+  // App Menu / search quick actions (registered in services/appRegistry.ts).
+  useEffect(() => registerAppIntentHandler('browser', (action) => {
+    if (action === 'new-tab') {
+      createTabRef.current?.();
+      setTimeout(() => urlInputRef.current?.focus(), 60);
+      return true;
+    }
+    if (action === 'open-url') {
+      setTimeout(() => { urlInputRef.current?.focus(); urlInputRef.current?.select(); }, 60);
+      return true;
+    }
+    return false;
+  }), []);
 
   // Pin/unpin tab
   const pinTab = useCallback((id: string) => {

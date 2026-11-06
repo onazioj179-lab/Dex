@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { spotlightEngine, type SpotlightResult, type SpotlightCategory, type HighlightSpan } from './SpotlightEngine';
 import { SPRING_PRESETS, SpringAnimator, isReduceMotion } from '../utils/MotionController';
+import { openAppContextMenu } from '../components/AppContextMenu';
 import DexIcon from '../components/DexIcon';
 import { platform } from '../utils';
 
@@ -133,10 +134,13 @@ const ResultItem: React.FC<{
   onHover: () => void;
   id?: string;
 }> = memo(({ result, isSelected, onClick, onHover, id }) => {
+  // App results get the shared app menu (pin/unpin, quick actions, info).
+  const appId = result.id.startsWith('action-launch-') ? result.id.slice('action-launch-'.length) : null;
   return (
     <button
       id={id}
       onClick={onClick}
+      onContextMenu={appId ? (e) => { e.preventDefault(); e.stopPropagation(); openAppContextMenu({ appId, x: e.clientX, y: e.clientY, source: 'search' }); } : undefined}
       onMouseDown={e => e.preventDefault()}
       // mousemove, not mouseenter: a list scrolling under a still pointer must
       // not steal the keyboard selection.

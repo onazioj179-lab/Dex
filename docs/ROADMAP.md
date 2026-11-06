@@ -2267,6 +2267,25 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-04 (Part 16: DEX Ledger, universal pinning, smart App Menu)
+
+- **DEX Ledger** (`DEXAPPLICATIONS/ledger/`): local-first finance app. Engine is the new Rust crate `core/dex-ledger` (own `ledger.db`, separate from dex.db): integer minor units (i64, ISO 4217 exponents), versioned migrations (`PRAGMA user_version`), every write in one SQLite transaction with an audit row, FK integrity, transfers as linked pairs (never income/expense), splits must sum exactly, reconciled rows locked behind `confirmReconciled`, envelope budget with explicit rollover rules, CSV import (delimiter/header/date-order detection, duplicate detection by import id + pre-import counts, auto backup first), CSV export (formula-injection guarded), statement matching, reconcile/undo/history, reports (income vs expenses, cash flow, spending, balances, budget vs actual), backups (VACUUM INTO, validated restore with a safety backup, export/import file), integrity check, corrupt-file recovery that keeps the damaged file. 28 Rust tests (`cd core && cargo test -p dex-ledger`).
+- **One Ledger (owner decision, 2026-11-05):** #88 (Part 17) had landed a second, document-style Ledger (TS model + `ledger:load/save` over dex.db tables) under the same app id. Owner chose this native engine. #88's `ledgerModel.ts`/`ledgerStorage.ts` are removed; its `ledger.rs` is now the read-only `src-tauri/src/ledger_legacy.rs`, and setup offers **Import earlier ledger** (`ledger:legacy:probe/import` → `Ledger::import_legacy`, one transaction, only into an empty ledger, backup first). The old dex.db tables are never written or deleted.
+- Shell bridge `src-tauri/src/ledger_ctl.rs`: `ledger:*` channels; only a DEX window's own webview may call them (browser child webviews refused in `dex_ipc`); every user-file read/write goes through a native dialog opened in Rust — the renderer never passes a path.
+- **One pinning service**: `store/dockPinStore.ts` now holds Dock pins + App Menu pins (no permanent pins, deduped, persisted + native-mirrored); `services/appPinning.ts` is the API every surface uses. The DEX Bar shows the Dock (`components/DockPins.tsx`): pinned apps only (bar doesn't shift), running dots, drag reorder, drop-from-App-Menu to pin, Alt+←/→.
+- **App registry** `services/appRegistry.ts`: window sizes (moved from AppManager) + remembered per-app window size, pin eligibility, settings targets, registered quick actions (Ledger, Notes, DexCode, Browser — each implemented via `services/appIntents.ts`; a test asserts every advertised action has a handler), local app/action search (no fuzzy guessing).
+- **Smart App Menu** (`components/AppMenuPanel.tsx`): Search · Pinned · Recent · All Apps; Enter runs only the highlighted hit. **Shared app context menu** (`components/AppContextMenu.tsx`) from Dock, App Menu, DEX Bar search results, window title-bar icon and Task Manager rows: open / own window / quick actions / pin to Dock / pin to App Menu / app settings / App Information / bring to front / minimize / close window / quit — AppManager executes via `dex-app-command`.
+- Open: run the NSIS installer on the owner's machine (the release exe was verified on an isolated profile); drag a Dock icon by mouse (verified by keyboard + store tests, not a real mouse drag); multi-currency is intentionally unsupported (one book currency).
+
+## Checkpoint 2026-11-04 (Part 13: telemetry, top bar, control consolidation)
+
+- DEX telemetry (Task Manager › Diagnostics) rebuilt: section list + detail pane like the Performance view instead of a card grid; live DEX memory/CPU history from `xenon:selfSample` with 1/5/15-minute ranges (`services/diagnostics/resourceHistory.ts`, in-memory only, sampled only while open and visible); startup phase waterfall; crash/error log table; launch p95. Chart shared in `components/telemetry/LineChart.tsx`.
+- Settings › System Monitor no longer runs a second 3 s process poller; it opens Task Manager.
+- Top bar: network/mic/camera/location icons show only when notable (restricted network, permission on). The controls moved to a new Control Center › Privacy section (shared `usePermissionToggle`). Battery stays out of the top bar.
+- Fixed the React border shorthand/longhand bug on Task Manager's resource list and "Group by app" pill (deselected rows kept a white border).
+- Earlier on this branch: fullscreen black strip (#85 work), docked DEX Bar, Weather, Trophies, launcher icons.
+- Open: verify in the packaged build (preview pane was hidden: layout verified by measurement, not by eye); per-app sizing pass for remaining apps; creative/engineering app passes.
+
 ## Checkpoint 2026-11-04 (Part 12: one installer, release build)
 
 - The release build was broken on `main` since #78 (chunk cycle via `shell/input/appKeyScope.ts`); fixed here and, in parallel, by #81 (the merge keeps #81's version, which also keeps the Browser chunk out of startup).
@@ -3547,7 +3566,7 @@ These need DSP/ML or native hosting we don't fake.
 - Already in place before this pass (checked, not rebuilt): window resize from all edges and corners, workspace layouts (Command Palette › Save/Restore Workspace Layout), Task Manager CPU rounding, fullscreen black strip (#123).
 
 ## Checkpoint 2026-11-04 (Part 17: Ledger, Bioengineering, creator identity)
-- NEW Ledger app (`DEXAPPLICATIONS/ledger/`, native `src-tauri/src/ledger.rs`): integer minor units, splits, linked transfers, budgets with carry-over, reconciliation, reports, CSV in/out, backup/restore, undo. 14 TS + 5 Rust tests; preview-verified.
+- SUPERSEDED by Part 16's native Ledger (see that checkpoint; data importable). Was: Ledger app (`DEXAPPLICATIONS/ledger/`, native `src-tauri/src/ledger.rs`): integer minor units, splits, linked transfers, budgets with carry-over, reconciliation, reports, CSV in/out, backup/restore, undo. 14 TS + 5 Rust tests; preview-verified.
 - Bioengineering rewritten as a three-pane workspace on a tested science module (`bio/bioScience.ts`, 27 tests).
 - Creator display name is "Onazi oJ" from `src/shared/creator.ts`; optional desktop mark (Settings › Shell & Dock).
 - Open: packaged run of Ledger's SQLite path, Terminal split panes, per-app passes, release build. Backlog rows #134–#144 in `DEX_REMAINING_WORK.md`.

@@ -148,11 +148,12 @@ describe('useDockPins', () => {
     store = mod.useDockPins;
   });
 
-  it('has default pins including permanent ones', () => {
-    const { pins } = store.getState();
+  it('has a short default dock and default App Menu pins', () => {
+    const { pins, menuPins } = store.getState();
     expect(pins.length).toBeGreaterThan(0);
-    expect(pins.some((p: any) => p.id === 'settings')).toBe(true);
-    expect(pins.some((p: any) => p.id === 'rewind')).toBe(true);
+    expect(pins.length).toBeLessThanOrEqual(6);
+    expect(menuPins.length).toBeGreaterThan(0);
+    expect(new Set(pins.map((p: any) => p.id)).size).toBe(pins.length);
   });
 
   it('pinApp adds new app to dock', () => {
@@ -176,14 +177,14 @@ describe('useDockPins', () => {
     expect(store.getState().pins.some((p: any) => p.id === 'test-app')).toBe(false);
   });
 
-  it('unpinApp does not remove permanent pins', () => {
+  it('any app can be unpinned (no permanent pins)', () => {
+    store.getState().pinApp('settings');
     store.getState().unpinApp('settings');
-    expect(store.getState().pins.some((p: any) => p.id === 'settings')).toBe(true);
-    store.getState().unpinApp('rewind');
-    expect(store.getState().pins.some((p: any) => p.id === 'rewind')).toBe(true);
+    expect(store.getState().pins.some((p: any) => p.id === 'settings')).toBe(false);
   });
 
   it('isPinned returns correct boolean', () => {
+    store.getState().pinApp('settings');
     expect(store.getState().isPinned('settings')).toBe(true);
     expect(store.getState().isPinned('nonexistent-app')).toBe(false);
   });

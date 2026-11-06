@@ -14,6 +14,7 @@
 mod activity_feed;
 mod browser_view;
 mod paths;
+mod ledger_ctl;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -173,7 +174,7 @@ mod updates_ctl;
 mod workflow_ctl;
 mod changelog;
 mod color_labels;
-mod ledger;
+mod ledger_legacy;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -1944,9 +1945,6 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("color-labels:") {
         return color_labels::dispatch(conn, channel, args);
     }
-    if channel.starts_with("ledger:") {
-        return ledger::dispatch(conn, channel, args);
-    }
     if channel.starts_with("dashboard:") {
         return dashboard::dispatch(conn, channel, args);
     }
@@ -2210,7 +2208,22 @@ fn fit_main_webview(app: &tauri::AppHandle) {
 /// one subsystem at a time; anything not yet ported returns `null`, so the UI
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
-async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::Webview, channel: String, args: Value) -> Value {
+    // DEX Ledger holds financial data: only a DEX window's own webview (the
+    // main shell or a detached DEX app window, both loading the local bundle)
+    // may reach it — never a child webview such as a browser tab.
+    if channel.starts_with("ledger:") {
+        let own_webview = webview.label() == webview.window().label();
+        if !own_webview || webview.label().starts_with("dexbrowser-") {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ledger_ctl::dispatch(&app, &channel, &args)))
+                .unwrap_or_else(|_| json!({ "ok": false, "error": "The ledger hit an internal error; nothing was saved." }))
+        })
+        .await
+        .unwrap_or(Value::Null);
+    }
     // Run OFF the UI thread. A synchronous `#[tauri::command]` executes on the main
     // thread, so the renderer's boot-time flood of IPC calls — SQLite, filesystem,
     // sysinfo, all blocking — froze the webview ("DEX not responding"). Hopping onto
@@ -2790,7 +2803,6 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("activity-feed:")
             || ch.starts_with("changelog:")
             || ch.starts_with("color-labels:")
-            || ch.starts_with("ledger:")
             || ch.starts_with("dashboard:")
             || ch.starts_with("goal-system:")
             || ch.starts_with("help:")
@@ -2920,7 +2932,6 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
     activity_feed::ensure_schema(c);
     changelog::ensure_schema(c);
     color_labels::ensure_schema(c);
-    ledger::ensure_schema(c);
     content_expiry::ensure_schema(c);
     daily_note::ensure_schema(c);
     dashboard::ensure_schema(c);
@@ -3060,6 +3071,7 @@ fn main() {
             app.manage(db_state);
             // File-swap gate for backup:restore vs out-of-band dex.db connections.
             app.manage(db::DbGate::new(()));
+            app.manage(ledger_ctl::LedgerState::default());
             // Terminal/PTY session table (in-app shell; piped-stdio sessions).
             app.manage(terminal::TerminalState::default());
             // Live file-watcher table; start watchers for persisted folders now

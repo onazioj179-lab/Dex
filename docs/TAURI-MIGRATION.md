@@ -9,6 +9,12 @@
 
 ---
 
+## PART 16 — DEX Ledger native engine + pinning (2026-11-04)
+
+- New native subsystem: `ledger:*` → `src-tauri/src/ledger_ctl.rs` → `core/dex-ledger` (rusqlite + `backup` feature). Own file `<data>/databases/ledger.db`, backups in `<data>/backups/ledger/`. Not routed through `db_dispatch`/dex.db on purpose (financial data isolated; its own restore path). `dex_ipc` gained a `webview: tauri::Webview` param to refuse ledger calls from child webviews.
+- `ledger` added to `TAURI_NATIVE_SUBSYSTEMS`. In the web preview Ledger shows an honest "desktop app only" state (no sample data).
+- E2E recipe used: `cargo build --features custom-protocol` (embeds `dist/renderer`, no dev server), run with `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in scratch and a unique CDP port; never the owner's profile.
+
 ## PART 2 — idle CPU, privacy honesty, storage, tiers (2026-11-01)
 
 Full write-up: `reports/PART2_IMPROVEMENT_REPORT.md`. Resume facts:
