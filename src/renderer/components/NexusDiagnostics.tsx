@@ -48,6 +48,20 @@ const readPref = <T extends string>(key: string, allowed: readonly string[], fal
   return fallback;
 };
 const writePref = (key: string, v: string) => { try { localStorage.setItem(key, v); } catch { /* quota */ } };
+
+interface SamplerStats {
+  pulls: number; ok: number; failed: number; overlapped: number; skippedHidden: number;
+  lastResult: 'ok' | 'no reply' | 'unavailable' | null; lastAt: number | null;
+}
+const EMPTY_SAMPLER: SamplerStats = { pulls: 0, ok: 0, failed: 0, overlapped: 0, skippedHidden: 0, lastResult: null, lastAt: null };
+
+/** Resources header hint: what the sampler is doing right now. */
+export function samplerHint(st: SamplerStats, hasFigures: boolean, visible: boolean): string {
+  if (!visible) return 'Paused while hidden';
+  if (hasFigures || st.ok > 0) return `Updates every ${SAMPLE_MS / 1000} s while open`;
+  if (st.failed > 0) return `No reading yet (${st.failed} ${st.failed === 1 ? 'attempt' : 'attempts'}: ${st.lastResult}); retrying`;
+  return 'Waiting for the first reading…';
+}
 const SAMPLE_TIMEOUT_MS = 8000;
 
 /** Resolves to the call's value, or null if it fails or takes longer than `ms`. */
@@ -117,13 +131,17 @@ const NexusDiagnostics: React.FC = () => {
   // rare timing, leave it stopped), it skips its tick while the window is
   // hidden, and samples never overlap.
   const pullRef = useRef<() => Promise<void>>(async () => undefined);
+  // What the sampler has done so far, so an empty pane says why instead of a
+  // silent dash (and automated checks can read it from data-* attributes).
+  const [sampler, setSampler] = useState<SamplerStats>(EMPTY_SAMPLER);
   useEffect(() => {
     if (!invoke) return;
     let alive = true;
     let inFlight = false;
     const pull = async () => {
-      if (inFlight) return;
+      if (inFlight) { setSampler((st) => ({ ...st, overlapped: st.overlapped + 1 })); return; }
       inFlight = true;
+      setSampler((st) => ({ ...st, pulls: st.pulls + 1 }));
       try {
         // Each call is time-boxed: with the overlap guard, one reply that never
         // arrived used to block every later tick, so the figures stayed empty
@@ -133,10 +151,17 @@ const NexusDiagnostics: React.FC = () => {
           withTimeout(invoke('xenon:systemSample'), SAMPLE_TIMEOUT_MS),
         ]);
         if (!alive) return;
-        const selfOk = !!s && (s as SelfSample).available;
+        const selfOk = !!(s && (s as SelfSample).available);
         if (selfOk) setSelf(s as SelfSample);
         if (sys) setSystem(sys as SystemSample);
         setSampleError(!selfOk && !sys);
+        setSampler((st) => ({
+          ...st,
+          ok: st.ok + (selfOk ? 1 : 0),
+          failed: st.failed + (selfOk ? 0 : 1),
+          lastResult: selfOk ? 'ok' : s === null ? 'no reply' : 'unavailable',
+          lastAt: Date.now(),
+        }));
         if (selfOk) {
           const ss = s as SelfSample;
           setHistory(pushResourceSample({
@@ -152,7 +177,10 @@ const NexusDiagnostics: React.FC = () => {
     };
     pullRef.current = pull;
     void pull();
-    const id = window.setInterval(() => { if (document.visibilityState === 'visible') void pull(); }, SAMPLE_MS);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void pull();
+      else setSampler((st) => ({ ...st, skippedHidden: st.skippedHidden + 1 }));
+    }, SAMPLE_MS);
     return () => { alive = false; window.clearInterval(id); };
   }, [invoke]);
 
@@ -248,7 +276,8 @@ const NexusDiagnostics: React.FC = () => {
         </div>
       </nav>
 
-      <section style={S.main} aria-label={nav.find((n) => n.id === section)?.name}>
+      <section style={S.main} aria-label={nav.find((n) => n.id === section)?.name}
+        {...(invoke && section === 'resources' ? { 'data-sampler-pulls': sampler.pulls, 'data-sampler-ok': sampler.ok, 'data-sampler-failed': sampler.failed, 'data-sampler-overlapped': sampler.overlapped, 'data-sampler-skipped-hidden': sampler.skippedHidden, 'data-sampler-last': sampler.lastResult ?? 'none' } : {})}>
         {section === 'resources' && (
           <ResourcesPane
             available={!!invoke}
@@ -260,6 +289,7 @@ const NexusDiagnostics: React.FC = () => {
             onRange={setRange}
             heapMB={local.heapMB}
             sampleError={sampleError}
+            hint={samplerHint(sampler, !!self, visible)}
           />
         )}
 
@@ -405,9 +435,11 @@ interface ResourcesPaneProps {
   onRange: (r: RangeId) => void;
   heapMB: number | null;
   sampleError: boolean;
+  /** Sampler status, shown until the first reading arrives. */
+  hint: string;
 }
 
-const ResourcesPane: React.FC<ResourcesPaneProps> = ({ available, visible, self, system, history, range, onRange, heapMB, sampleError }) => {
+const ResourcesPane: React.FC<ResourcesPaneProps> = ({ available, visible, self, system, history, range, onRange, heapMB, sampleError, hint }) => {
   const r = RANGES.find((x) => x.id === range) ?? RANGES[1];
   const inRange = useMemo(() => samplesInRange(history, r.ms), [history, r.ms]);
   const mem = useMemo(() => inRange.map((s) => s.dexMemMB), [inRange]);
@@ -435,7 +467,7 @@ const ResourcesPane: React.FC<ResourcesPaneProps> = ({ available, visible, self,
     <>
       <Head
         title="DEX resource use"
-        sub={!visible ? 'Paused while hidden' : last ? `Every ${SAMPLE_MS / 1000} s · last sample ${fmtClock(last)}` : 'Reading…'}
+        sub={!visible ? 'Paused while hidden' : last ? `Every ${SAMPLE_MS / 1000} s · last sample ${fmtClock(last)}` : hint}
         action={
           <div role="radiogroup" aria-label="Time range" style={S.segment}>
             {RANGES.map((x) => (

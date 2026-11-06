@@ -42,6 +42,21 @@ const COLOR_MUTED = 'var(--color-text-tertiary)';
 const COLOR_PRO = '#ffd60a';
 const COLOR_DANGER = 'var(--color-error)';
 
+const AUTO_OPEN_KEY = 'dex-update-auto-opened';
+/**
+ * The panel opens by itself at most once per version and phase ("available",
+ * then "downloaded"). Update checks repeat, and each event used to force the
+ * panel open again, even after Skip or Remind me later.
+ */
+export function shouldAutoOpen(phase: 'available' | 'downloaded', version: string | undefined): boolean {
+  const key = `${phase}:${version ?? '?'}`;
+  try {
+    if (localStorage.getItem(AUTO_OPEN_KEY) === key) return false;
+    localStorage.setItem(AUTO_OPEN_KEY, key);
+  } catch { /* storage unavailable: fall back to opening */ }
+  return true;
+}
+
 export const UpdateNotificationDropdown: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -69,7 +84,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
     const onAvailable = (i: UpdateInfo) => {
       setInfo(i);
       setPhase('available');
-      setOpen(true);
+      if (shouldAutoOpen('available', i?.version)) setOpen(true);
     };
     const onProgress = (p: any) => {
       setPhase('downloading');
@@ -79,7 +94,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
       setInfo(i);
       setPhase('downloaded');
       setProgress(100);
-      setOpen(true);
+      if (shouldAutoOpen('downloaded', i?.version)) setOpen(true);
     };
     const onError = (msg: any) => {
       setError(typeof msg === 'string' ? msg : msg?.message || 'Update error');

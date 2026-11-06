@@ -453,7 +453,7 @@ function detectEmotion(text: string): EmotionType {
 function getEmpathyPrefix(emotion: EmotionType): string {
   switch (emotion) {
     case 'frustration': return "I hear you, that's frustrating. ";
-    case 'happiness': return "Glad to hear that! ";
+    case 'happiness': return "Glad to hear it. ";
     case 'sadness': return "I'm sorry you're feeling that way. ";
     case 'confusion': return "No worries, let me explain. ";
     default: return '';
@@ -871,21 +871,19 @@ const JOKES = [
 ];
 
 const COMPLIMENTS = [
-  "You're doing great! Keep it up!",
-  "You're awesome! Don't let anyone tell you otherwise.",
-  "Your dedication is inspiring!",
-  "You've got this! Believe in yourself.",
-  "You're smarter than you think!",
-  "Keep pushing forward - you're making progress!",
-  "You bring something unique to everything you do!",
-  "Your potential is limitless!",
+  "You're making steady progress.",
+  "That's careful, thoughtful work.",
+  "Your persistence shows in what you've built.",
+  "You ask good questions.",
+  "You're better at this than you give yourself credit for.",
+  "You keep moving forward, and it shows.",
 ];
 
 const AFFIRMATIONS = [
-  "I believe in you! You can do this.",
-  "Take it one step at a time. You've got this!",
-  "Every expert was once a beginner. Keep going!",
-  "Progress, not perfection. You're doing great!",
+  "You can do this. Take it one step at a time.",
+  "Break it into small pieces and start with the first one.",
+  "Every expert was once a beginner. Keep going.",
+  "Progress matters more than perfection.",
 ];
 
 function tryFunResponse(text: string): string | null {
@@ -944,13 +942,13 @@ function tryFunResponse(text: string): string | null {
     return "*does a little digital dance* There you go! What else can I help with?";
   }
   if (/meaning of life|42/.test(lower)) {
-    return "42! But more importantly, how can I help make YOUR day better?";
+    return "42, according to the classic answer. What can I help you with?";
   }
   if (/i love you/.test(lower)) {
-    return "Aww, I appreciate you too! You're pretty great yourself!";
+    return "Thank you. I'm glad I can help.";
   }
   if (/you'?re? (?:dumb|stupid|bad|useless)/.test(lower)) {
-    return "I'm always learning and trying to improve! If I misunderstood something, try rephrasing and I'll do my best to help.";
+    return "Sorry about that. If I misunderstood, try rephrasing and I'll try again.";
   }
   
   return null;

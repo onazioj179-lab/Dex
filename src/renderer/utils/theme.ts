@@ -37,14 +37,46 @@ export function toggleTheme(): void {
   localStorage.setItem('dex-theme-source', 'user');
 }
 
+/**
+ * Run a theme change with CSS transitions switched off for that one style
+ * pass. Without this, flipping light/dark started a colour transition on every
+ * element that declares one (thousands with a few apps open): measured in the
+ * packaged app with 7 apps, 2.2 s of style recalculation per switch, 125 ms
+ * with transitions suppressed. The suppressing <style> exists only for the
+ * flush, so it costs nothing at any other time.
+ */
+export function withoutTransitions(change: () => void): void {
+  if (typeof document === 'undefined') { change(); return; }
+  const style = document.createElement('style');
+  style.setAttribute('data-dex-theme-switch', '');
+  style.textContent = '*,*::before,*::after{transition:none!important}';
+  document.head.appendChild(style);
+  try {
+    change();
+    // Flush styles while transitions are off, so none start for the change.
+    void getComputedStyle(document.documentElement).color;
+  } finally {
+    style.remove();
+  }
+}
+
+/** Set data-theme (and nothing else) without starting colour transitions. */
+export function setThemeAttribute(theme: string): void {
+  const root = document.documentElement;
+  if (root.getAttribute('data-theme') === theme) return;
+  withoutTransitions(() => root.setAttribute('data-theme', theme));
+}
+
 /** Apply a theme (dark|light) to root + body without persisting. */
 export function applyTheme(theme: 'dark' | 'light'): void {
   const isDark = theme === 'dark';
-  document.documentElement.setAttribute('data-theme', theme);
-  document.body.classList.toggle('dark-mode', isDark);
-  document.body.classList.toggle('light-mode', !isDark);
-  document.documentElement.classList.toggle('dark-mode', isDark);
-  document.documentElement.classList.toggle('light-mode', !isDark);
+  withoutTransitions(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.classList.toggle('dark-mode', isDark);
+    document.body.classList.toggle('light-mode', !isDark);
+    document.documentElement.classList.toggle('dark-mode', isDark);
+    document.documentElement.classList.toggle('light-mode', !isDark);
+  });
 }
 
 /**
