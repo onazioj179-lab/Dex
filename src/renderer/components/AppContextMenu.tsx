@@ -18,6 +18,7 @@ import { getAppEntry, CATEGORY_LABEL, type AppEntry } from '../services/appRegis
 import { appPinning, usePinState } from '../services/appPinning';
 import { dispatchAppIntent } from '../services/appIntents';
 import { useRunningApps } from '../store/runningApps';
+import { formatDisplayVersion } from '../utils/appVersion';
 
 export type AppCommand = 'open' | 'open-window' | 'front' | 'minimize' | 'close-window' | 'quit' | 'settings';
 
@@ -215,7 +216,7 @@ export const AppInfoDialog: React.FC<{ entry: AppEntry; onClose: () => void }> =
           </div>
         </div>
         {entry.description && <p style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: '0 0 10px' }}>{entry.description}</p>}
-        {row('Version', entry.version || '—')}
+        {row('Version', entry.version ? formatDisplayVersion(entry.version) : '—')}
         {entry.buildDate && row('Build', entry.buildDate)}
         {row('App ID', <code style={{ fontSize: 12 }}>{entry.id}</code>)}
         {entry.shortcut && row('Shortcut', entry.shortcut)}

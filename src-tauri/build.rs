@@ -1,5 +1,6 @@
 fn main() {
     guard_windows_gnu_release();
+    emit_build_serial();
     tauri_build::build();
 }
 
@@ -27,4 +28,22 @@ fn guard_windows_gnu_release() {
         );
         std::process::exit(1);
     }
+}
+
+/// Expose package.json "dexBuild" (the build serial, e.g. "18a") as
+/// DEX_BUILD_SERIAL, so the native side reports "7.0.1 (18a)" like the UI.
+fn emit_build_serial() {
+    println!("cargo:rerun-if-changed=../package.json");
+    let serial = std::fs::read_to_string("../package.json")
+        .ok()
+        .and_then(|t| {
+            let i = t.find("\"dexBuild\"")?;
+            let rest = &t[i + 10..];
+            let start = rest.find('"')? + 1;
+            let end = rest[start..].find('"')? + start;
+            Some(rest[start..end].to_string())
+        })
+        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric()))
+        .unwrap_or_default();
+    println!("cargo:rustc-env=DEX_BUILD_SERIAL={serial}");
 }

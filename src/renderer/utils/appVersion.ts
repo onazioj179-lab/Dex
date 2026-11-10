@@ -20,3 +20,15 @@ export const getRuntimeAppVersion = async (): Promise<string> => {
   }
   return FALLBACK_VERSION;
 };
+
+/**
+ * Build serial (package.json "dexBuild", e.g. "18a"). The version number only
+ * moves when the owner bumps it; the serial marks every update in between.
+ */
+export const getBuildSerial = (): string => ((import.meta.env.VITE_DEX_BUILD as string) || '').trim();
+
+/** "7.0.1 (18a)" — or just the version when no serial is set. */
+export const formatDisplayVersion = (version: string, serial: string = getBuildSerial()): string =>
+  serial ? `${version} (${serial})` : version;
+
+export const getDisplayVersion = (): string => formatDisplayVersion(FALLBACK_VERSION);
