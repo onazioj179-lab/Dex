@@ -21,6 +21,7 @@ import { useToastHelpers } from '../components/Toast';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
+import { requestTerminalAt } from '../components/terminalProfiles';
 import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -1040,6 +1041,16 @@ export const Files: React.FC = () => {
     } catch (err) {
       console.error('Show in explorer failed:', err);
     }
+  };
+
+  // Open a Terminal tab in a folder (for a file: the folder that holds it).
+  const handleOpenInTerminal = (file: FileItem) => {
+    setContextMenu(null);
+    const dir = file.isDirectory ? file.path : file.path.replace(/[\\/][^\\/]*$/, '');
+    if (!dir) return;
+    requestTerminalAt(dir);
+    const def = APP_DEFINITIONS.terminal;
+    launchApp({ id: 'terminal', name: def.name, icon: def.icon || 'terminal', color: def.color });
   };
 
   // Copy a file's absolute path to the clipboard.
@@ -2418,6 +2429,9 @@ export const Files: React.FC = () => {
             })()}
             <button onClick={() => handleShowInExplorer(contextMenu.file)} aria-label={`Show ${contextMenu.file.name} in Explorer`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Show in Explorer
+            </button>
+            <button onClick={() => handleOpenInTerminal(contextMenu.file)} aria-label={contextMenu.file.isDirectory ? `Open ${contextMenu.file.name} in Terminal` : `Open the folder of ${contextMenu.file.name} in Terminal`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+              Open in Terminal
             </button>
             <div style={{ height: '1px', background: 'var(--color-border, var(--color-border-subtle))', margin: '4px 0' }} />
             <button onClick={() => handleCopyFile(contextMenu.file)} aria-label={`Copy ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>

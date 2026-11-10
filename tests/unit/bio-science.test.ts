@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import {
   parseSequence, detectKind, parseFasta, toFasta, transcribe, reverseComplement, translate, findOrfs,
   gcContent, slidingGc, ssDnaMolecularWeight, dsDnaMolecularWeight, meltingTemp, proteinMolecularWeight,
-  extinctionCoefficient, findRestrictionSites, digestFragments, molarityFromMass, massForMolarity,
+  extinctionCoefficient, findRestrictionSites, digestFragments, digestFragmentsCircular, nearestNeighborTm,
+  ENZYMES, molarityFromMass, massForMolarity,
   solveDilution, concentrationFromA260, purityNote, CODON_TABLE,
 } from '../../src/renderer/DEXAPPLICATIONS/bio/bioScience';
 
@@ -139,6 +140,69 @@ describe('bio science — restriction digest', () => {
     expect(digestFragments(10, [3])).toEqual([3, 7]);
     expect(digestFragments(10, [7, 3, 3])).toEqual([3, 4, 3]);
     expect(digestFragments(10, [])).toEqual([10]);
+  });
+
+  it('finds sites across the origin of a circular sequence', () => {
+    const ecoRV = ENZYMES.filter((e) => e.name === 'EcoRV');
+    // GA | TATC: the site starts at base 10 and ends at base 4 of the circle.
+    const dna = 'TATCAAAAAGA';
+    expect(findRestrictionSites(dna, ecoRV)).toEqual([]);
+    expect(findRestrictionSites(dna, ecoRV, true)).toEqual([{ enzyme: 'EcoRV', site: 'GATATC', position: 10, cutAfter: 1 }]);
+    // A site wholly inside the sequence is reported once, not again on the wrap.
+    expect(findRestrictionSites('AAGATATCAA', ecoRV, true).map((h) => [h.position, h.cutAfter])).toEqual([[3, 5]]);
+    // A circle shorter than the site holds no site.
+    expect(findRestrictionSites('GATA', ecoRV, true)).toEqual([]);
+  });
+
+  it('computes circular fragment lengths', () => {
+    expect(digestFragmentsCircular(10, [])).toEqual([]);
+    expect(digestFragmentsCircular(10, [3])).toEqual([10]);
+    expect(digestFragmentsCircular(10, [7, 3])).toEqual([4, 6]);
+    expect(digestFragmentsCircular(10, [10, 3, 3])).toEqual([7, 3]);
+    expect(digestFragmentsCircular(0, [1])).toEqual([]);
+  });
+});
+
+describe('bio science — nearest-neighbour Tm (SantaLucia 1998)', () => {
+  // Expected ΔH°/ΔS° are summed by hand from the paper's unified table.
+  it('sums steps and terminal initiation for CGTTGA', () => {
+    // CG -10.6/-27.2, GT -8.4/-22.4, TT -7.9/-22.2, TG -8.5/-22.7, GA -8.2/-22.2
+    // init G·C end 0.1/-2.8, init A·T end 2.3/4.1
+    const r = nearestNeighborTm('CGTTGA', { sodiumM: 1, oligoM: 1e-4 })!;
+    expect(r.dH).toBeCloseTo(-41.2, 9);
+    expect(r.dS).toBeCloseTo(-115.4, 9);
+    expect(r.selfComplementary).toBe(false);
+    expect(r.tm).toBeCloseTo(-41200 / (-115.4 + 1.987 * Math.log(1e-4 / 4)) - 273.15, 9);
+    expect(r.tm).toBeGreaterThan(28);
+    expect(r.tm).toBeLessThan(29.5);
+  });
+
+  it('applies the symmetry term to a self-complementary oligo', () => {
+    // GAATTC: GA -8.2/-22.2, AA -7.9/-22.2, AT -7.2/-20.4, TT -7.9/-22.2, TC -8.2/-22.2
+    // two G·C ends 0.2/-5.6, symmetry -1.4
+    const r = nearestNeighborTm('GAATTC', { sodiumM: 1, oligoM: 1e-4 })!;
+    expect(r.selfComplementary).toBe(true);
+    expect(r.dH).toBeCloseTo(-39.2, 9);
+    expect(r.dS).toBeCloseTo(-116.2, 9);
+    expect(r.tm).toBeCloseTo(-39200 / (-116.2 + 1.987 * Math.log(1e-4)) - 273.15, 9);
+  });
+
+  it('lowers Tm at lower salt and reports the conditions used', () => {
+    const oligo = 'AGCGGATAACAATTTCACACAGGA';
+    const std = nearestNeighborTm(oligo)!;
+    expect(std.sodiumM).toBe(0.05);
+    expect(std.oligoM).toBe(0.5e-6);
+    const oneMolar = nearestNeighborTm(oligo, { sodiumM: 1 })!;
+    expect(std.dS).toBeCloseTo(oneMolar.dS + 0.368 * 23 * Math.log(0.05), 9);
+    expect(std.tm).toBeLessThan(oneMolar.tm);
+    expect(nearestNeighborTm(oligo, { oligoM: 5e-6 })!.tm).toBeGreaterThan(std.tm);
+  });
+
+  it('declines sequences the model does not cover', () => {
+    expect(nearestNeighborTm('ACGTA')).toBeNull();
+    expect(nearestNeighborTm('ACGTNACGT')).toBeNull();
+    expect(nearestNeighborTm('A'.repeat(61))).toBeNull();
+    expect(nearestNeighborTm('ACGTACGT', { sodiumM: 0 })).toBeNull();
   });
 });
 

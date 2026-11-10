@@ -3571,3 +3571,11 @@ These need DSP/ML or native hosting we don't fake.
 - Creator display name is "Onazi oJ" from `src/shared/creator.ts`; optional desktop mark (Settings › Shell & Dock).
 - Open: packaged run of Ledger's SQLite path, Terminal split panes, per-app passes, release build. Backlog rows #134–#144 in `DEX_REMAINING_WORK.md`.
 - Terminal: split panes (1–4 per tab, resizable, shortcuts) + standalone `terminal` app; App Menu no longer drops uncategorised apps (8 were hidden); Engineering group.
+
+## Checkpoint 2026-11-10 (Terminal profiles, App Information, Bio thermodynamics)
+
+- Terminal: installed-shell list (`pty:shells`), per-pane shell + start folder that restore with the layout, default shell, text size, Files › Open in Terminal. Packaged run with live shells still open (#139, #146).
+- App Information shows License and Creator; every app has a purpose line (#147).
+- Bio: nearest-neighbour Tm (SantaLucia 1998, conditions shown) and circular-DNA digests (#148).
+- Listener-leak sweep after #130 found nothing else (#149).
+- Still open: 7.0.1 packaged verification and install test (#144), per-app passes for AXL / VINX / creative apps (#141).

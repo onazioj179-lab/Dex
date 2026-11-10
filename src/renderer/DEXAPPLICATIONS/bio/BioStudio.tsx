@@ -19,7 +19,8 @@ import { downloadText } from '../../improvements500/downloadBlob';
 import {
   parseSequence, parseFasta, toFasta, transcribe, reverseComplement, translate, findOrfs, gcContent,
   slidingGc, baseCounts, ssDnaMolecularWeight, dsDnaMolecularWeight, meltingTemp, proteinMolecularWeight,
-  extinctionCoefficient, findRestrictionSites, digestFragments, ENZYMES, molarityFromMass, massForMolarity,
+  extinctionCoefficient, findRestrictionSites, digestFragments, digestFragmentsCircular, nearestNeighborTm,
+  NN_MIN_LENGTH, NN_MAX_LENGTH, ENZYMES, molarityFromMass, massForMolarity,
   solveDilution, concentrationFromA260, purityNote, CONC_UNITS, VOLUME_UNITS, MASS_UNITS,
   type ConcUnit, type VolumeUnit, type MassUnit, type DilutionUnknown, type NucleicAcidType, type Orf,
 } from './bioScience';
@@ -134,10 +135,14 @@ const BioStudio: React.FC = () => {
     return null;
   }, [active]);
   const orfs = useMemo(() => (dna ? findOrfs(dna, minAa) : []), [dna, minAa]);
-  const sites = useMemo(() => (dna ? findRestrictionSites(dna) : []), [dna]);
+  const circular = isNuc && active!.circular === true;
+  const sites = useMemo(() => (dna ? findRestrictionSites(dna, ENZYMES, circular) : []), [dna, circular]);
   const gcPts = useMemo(() => (dna ? slidingGc(dna, gcWindow) : []), [dna, gcWindow]);
   const counts = useMemo(() => baseCounts(dna), [dna]);
   const tm = useMemo(() => meltingTemp(dna), [dna]);
+  // The nearest-neighbour parameters are for DNA duplexes; RNA is left out.
+  const activeKind = active?.kind;
+  const nnTm = useMemo(() => (activeKind === 'dna' ? nearestNeighborTm(dna) : null), [activeKind, dna]);
   const gc = useMemo(() => gcContent(dna), [dna]);
 
   // ---- actions ------------------------------------------------------------
@@ -227,6 +232,8 @@ const BioStudio: React.FC = () => {
     if (isNuc) {
       values['GC content'] = `${fmt(gc, 1)} %`;
       values['Tm'] = `${fmt(tm.tm, 1)} °C (${tm.method === 'wallace' ? 'Wallace rule' : 'basic formula, 50 mM Na⁺'})`;
+      if (nnTm) values['Tm (nearest-neighbour)'] = `${fmt(nnTm.tm, 1)} °C (SantaLucia 1998, ${nnTm.sodiumM * 1000} mM Na⁺, ${nnTm.oligoM * 1e6} µM oligo)`;
+      values['Topology'] = circular ? 'Circular' : 'Linear';
       values['ssDNA MW'] = `${fmt(ssDnaMolecularWeight(dna), 2)} g/mol`;
       values[`ORFs ≥ ${minAa} aa`] = String(orfs.length);
       values['Restriction sites'] = String(sites.length);
@@ -236,7 +243,7 @@ const BioStudio: React.FC = () => {
     }
     dispatch({ type: 'save-result', result: { sequenceId: active.id, sequenceName: active.name, title: `${active.name} — summary`, values } });
     addLog('info', `Saved a result snapshot for ${active.name}.`);
-  }, [active, isNuc, gc, tm, dna, minAa, orfs.length, sites.length, analysis, addLog]);
+  }, [active, isNuc, gc, tm, nnTm, circular, dna, minAa, orfs.length, sites.length, analysis, addLog]);
 
   // ---- keyboard (scoped to this window) -----------------------------------
   useEffect(() => {
@@ -507,11 +514,12 @@ const BioStudio: React.FC = () => {
               ) : tab === 'orfs' ? (
                 <OrfPanel orfs={orfs} minAa={minAa} onExtract={(o) => deriveFromActive('orf', o)} onExport={exportOrfs} />
               ) : tab === 'digest' ? (
-                <DigestPanel dna={dna} sites={sites} selected={selectedEnzymes} setSelected={setSelectedEnzymes} onExport={exportSites} />
+                <DigestPanel dna={dna} sites={sites} selected={selectedEnzymes} setSelected={setSelectedEnzymes} onExport={exportSites}
+                  circular={circular} setCircular={(c) => active && dispatch({ type: 'update', id: active.id, patch: { circular: c } })} />
               ) : tab === 'gc' ? (
                 <GcPanel pts={gcPts} length={dna.length} window={gcWindow} overall={gc} />
               ) : (
-                <NucleotideProps dna={dna} counts={counts} gc={gc} tm={tm} />
+                <NucleotideProps dna={dna} counts={counts} gc={gc} tm={tm} nnTm={nnTm} isDna={activeKind === 'dna'} />
               )}
             </div>
             {logOpen && (
@@ -639,19 +647,25 @@ const OrfPanel: React.FC<{ orfs: Orf[]; minAa: number; onExtract: (o: Orf) => vo
 const DigestPanel: React.FC<{
   dna: string; sites: ReturnType<typeof findRestrictionSites>; selected: string[];
   setSelected: (fn: (s: string[]) => string[]) => void; onExport: () => void;
-}> = ({ dna, sites, selected, setSelected, onExport }) => {
+  circular: boolean; setCircular: (c: boolean) => void;
+}> = ({ dna, sites, selected, setSelected, onExport, circular, setCircular }) => {
   const byEnzyme = useMemo(() => {
     const m = new Map<string, number[]>();
     for (const s of sites) m.set(s.enzyme, [...(m.get(s.enzyme) ?? []), s.cutAfter]);
     return m;
   }, [sites]);
   const cuts = selected.flatMap((e) => byEnzyme.get(e) ?? []);
-  const fragments = digestFragments(dna.length, cuts);
+  const fragments = circular ? digestFragmentsCircular(dna.length, cuts) : digestFragments(dna.length, cuts);
+  const topoBtn = (on: boolean): React.CSSProperties => (on ? { ...btn, background: colors.accent.soft, color: colors.accent.default } : btn);
   const L = Math.max(1, dna.length);
   return (
     <div>
-      <PanelHead title="Restriction analysis (linear DNA)">
+      <PanelHead title={`Restriction analysis (${circular ? 'circular' : 'linear'} DNA)`}>
         <Badge kind="calculated" />
+        <span role="group" aria-label="Topology" style={{ display: 'inline-flex', gap: 4 }}>
+          <button style={topoBtn(!circular)} aria-pressed={!circular} onClick={() => circular && setCircular(false)}>Linear</button>
+          <button style={topoBtn(circular)} aria-pressed={circular} title="Plasmid or other closed circle: sites across the origin count, and fragments wrap" onClick={() => !circular && setCircular(true)}>Circular</button>
+        </span>
         <button style={btn} disabled={!sites.length} onClick={onExport}>Export CSV</button>
       </PanelHead>
       <div style={{ padding: '0 14px 10px' }}>
@@ -667,7 +681,7 @@ const DigestPanel: React.FC<{
           )))}
         </div>
         <div style={{ fontSize: 12, color: colors.text.secondary }}>
-          {selected.length ? <>Fragments with {selected.join(' + ')}: <span style={{ color: colors.text.primary, fontVariantNumeric: 'tabular-nums' }}>{fragments.map((f) => `${f.toLocaleString()} bp`).join(', ')}</span></> : 'Tick enzymes below to digest.'}
+          {selected.length ? <>Fragments with {selected.join(' + ')}: <span style={{ color: colors.text.primary, fontVariantNumeric: 'tabular-nums' }}>{fragments.length ? fragments.map((f) => `${f.toLocaleString()} bp`).join(', ') : 'no cut, the circle stays closed'}</span></> : 'Tick enzymes below to digest.'}
         </div>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -720,7 +734,7 @@ const GcPanel: React.FC<{ pts: { pos: number; gc: number }[]; length: number; wi
   );
 };
 
-const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCounts>; gc: number; tm: ReturnType<typeof meltingTemp> }> = ({ dna, counts, gc, tm }) => (
+const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCounts>; gc: number; tm: ReturnType<typeof meltingTemp>; nnTm: ReturnType<typeof nearestNeighborTm>; isDna: boolean }> = ({ dna, counts, gc, tm, nnTm, isDna }) => (
   <div>
     <PanelHead title="Physical properties"><Badge kind="calculated" /></PanelHead>
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -729,11 +743,14 @@ const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCou
         <Row k="Base counts" v={`A ${counts.A} · C ${counts.C} · G ${counts.G} · T ${counts.T}${counts.N ? ` · N ${counts.N}` : ''}`} />
         <Row k="GC content" v={fmt(gc, 2)} unit="%" note="N excluded" />
         <Row k="Melting temperature" v={fmt(tm.tm, 1)} unit="°C" note={tm.method === 'wallace' ? 'Wallace rule 2(A+T)+4(G+C), < 14 nt' : 'Basic formula 64.9+41(GC−16.4)/N, 50 mM Na⁺'} />
+        {isDna && (nnTm
+          ? <Row k="Tm, nearest-neighbour" v={fmt(nnTm.tm, 1)} unit="°C" note={`SantaLucia 1998 · ${nnTm.sodiumM * 1000} mM Na⁺ · ${nnTm.oligoM * 1e6} µM oligo${nnTm.selfComplementary ? ' · self-complementary' : ''} · ΔH° ${fmt(nnTm.dH, 1)} kcal/mol`} />
+          : <Row k="Tm, nearest-neighbour" v="—" note={`Oligos of ${NN_MIN_LENGTH}–${NN_MAX_LENGTH} nt without N only`} />)}
         <Row k="Molecular weight (ssDNA)" v={fmt(ssDnaMolecularWeight(dna), 2)} unit="g/mol" note={counts.N ? 'Undefined with N bases' : 'Anhydrous, 5′-OH (OligoCalc)'} />
         <Row k="Molecular weight (dsDNA)" v={fmt(dsDnaMolecularWeight(dna), 2)} unit="g/mol" note="Both strands" />
       </tbody>
     </table>
-    <div style={{ padding: '8px 14px', fontSize: 11, color: colors.text.tertiary }}>Tm values are primer-design estimates, not a nearest-neighbour thermodynamic model.</div>
+    <div style={{ padding: '8px 14px', fontSize: 11, color: colors.text.tertiary }}>The first Tm is a quick estimate. The nearest-neighbour Tm assumes a perfect-match duplex with no Mg²⁺ or dNTP correction.</div>
   </div>
 );
 

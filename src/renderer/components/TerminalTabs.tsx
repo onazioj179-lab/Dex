@@ -19,6 +19,11 @@
  *   Ctrl+Shift+T new tab · Ctrl+Shift+D split right · Ctrl+Shift+E split down
  *   Ctrl+Shift+W close pane · Alt+←/→/↑/↓ previous/next pane
  *   Ctrl+Tab / Ctrl+Shift+Tab next/previous tab
+ *   Ctrl+= / Ctrl+- / Ctrl+0 larger / smaller / default text
+ *
+ * Profiles: a pane's shell and starting folder are fixed when it is created
+ * (./terminalProfiles.ts). The default shell applies to new tabs only; a split
+ * starts the same shell in the same folder as the pane it was split from.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -28,12 +33,45 @@ import {
   cyclePane, cycleTab, focusPane, initialLayout, parseLayout, resizeDivider, splitPane, type SplitDir,
   type TermLayout, type TermTab,
 } from './terminalLayout';
+import {
+  FONT_DEFAULT, FONT_MAX, FONT_MIN, OPEN_EVENT, PANE_PROFILES_KEY, SETTINGS_KEY, clampFontSize, folderLabel,
+  parsePaneProfiles, parseSettings, prunePaneProfiles, shellForNewTab, takeTerminalRequests,
+  type PaneProfile, type ShellInfo, type TermSettings,
+} from './terminalProfiles';
 
 interface TerminalTabsProps {
   onClose?: () => void;
   cwd?: string;
   height?: number | string;
+  /** Open a tab for each "Open in Terminal" request (the standalone Terminal app sets this). */
+  acceptOpenRequests?: boolean;
 }
+
+/** The shells installed on this machine, from the native side. Empty when there is no native bridge. */
+async function fetchShells(): Promise<ShellInfo[]> {
+  const dex = typeof window !== 'undefined' ? (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex : undefined;
+  if (!dex || typeof dex.invoke !== 'function') return [];
+  try {
+    const r = (await dex.invoke('pty:shells')) as { shells?: unknown } | null;
+    if (!r || !Array.isArray(r.shells)) return [];
+    return (r.shells as Partial<ShellInfo>[]).filter((s): s is ShellInfo => !!s && typeof s.path === 'string' && typeof s.label === 'string' && typeof s.id === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function allPanes(l: TermLayout): string[] {
+  return l.tabs.flatMap((t) => t.panes);
+}
+
+const menuRow: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '5px 10px', background: 'transparent', border: 'none',
+  color: 'var(--color-text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+};
+const stepBtn: React.CSSProperties = {
+  width: 22, height: 20, borderRadius: 4, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)',
+  color: 'var(--color-text-primary, #e0e0e0)', fontSize: 12, lineHeight: 1, cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+};
 
 function loadLayout(): TermLayout {
   try {
@@ -64,8 +102,25 @@ function focusPaneDom(root: HTMLElement | null, paneId: string) {
   }, 0);
 }
 
-export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height }) => {
+export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height, acceptOpenRequests }) => {
   const [layout, setLayout] = useState<TermLayout>(() => loadLayout());
+  const [settings, setSettings] = useState<TermSettings>(() => {
+    try { return parseSettings(localStorage.getItem(SETTINGS_KEY)); } catch { return parseSettings(null); }
+  });
+  const [paneProfiles, setPaneProfiles] = useState<Record<string, PaneProfile>>(() => {
+    try { return parsePaneProfiles(localStorage.getItem(PANE_PROFILES_KEY), allPanes(layout)); } catch { return {}; }
+  });
+  const [shells, setShells] = useState<ShellInfo[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const shellsRef = useRef(shells);
+  shellsRef.current = shells;
+  const profilesRef = useRef(paneProfiles);
+  profilesRef.current = paneProfiles;
   const [running, setRunning] = useState<Record<string, string | null>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -76,6 +131,24 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
   useEffect(() => {
     try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* storage unavailable */ }
   }, [layout]);
+
+  useEffect(() => {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* storage unavailable */ }
+  }, [settings]);
+
+  // Profiles follow their panes: a closed pane's profile is dropped.
+  useEffect(() => {
+    setPaneProfiles((p) => prunePaneProfiles(p, allPanes(layout)));
+  }, [layout]);
+  useEffect(() => {
+    try { localStorage.setItem(PANE_PROFILES_KEY, JSON.stringify(paneProfiles)); } catch { /* storage unavailable */ }
+  }, [paneProfiles]);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchShells().then((s) => { if (alive) setShells(s); });
+    return () => { alive = false; };
+  }, []);
 
   const activeTab = layout.tabs.find((t) => t.id === layout.activeId) ?? layout.tabs[0];
 
@@ -92,8 +165,57 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
     });
   }, []);
 
-  const newTab = useCallback(() => apply(addTabL, true), [apply]);
-  const split = useCallback((dir: SplitDir) => apply((l) => splitPane(l, l.activeId, dir), true), [apply]);
+  /** Commit a layout that gained the pane `paneId`, recording the profile it starts with. */
+  const commitNewPane = useCallback((next: TermLayout, paneId: string, profile: PaneProfile) => {
+    if (profile.shell || profile.cwd) {
+      const withPane = { ...profilesRef.current, [paneId]: profile };
+      profilesRef.current = withPane;
+      setPaneProfiles(withPane);
+    }
+    layoutRef.current = next;
+    setLayout(next);
+    focusPaneDom(rootRef.current, paneId);
+  }, []);
+
+  /** New tab. With no shell given it starts the default shell; `dir` is the folder it starts in. */
+  const openTab = useCallback((shell?: string, dir?: string) => {
+    const next = addTabL(layoutRef.current);
+    commitNewPane(next, next.activeId, { shell: shell ?? shellForNewTab(settingsRef.current, shellsRef.current), cwd: dir });
+  }, [commitNewPane]);
+  const newTab = useCallback(() => openTab(), [openTab]);
+
+  /** Split the active pane; the new pane starts the same shell in the same folder. */
+  const split = useCallback((dir: SplitDir) => {
+    const l = layoutRef.current;
+    const from = l.tabs.find((t) => t.id === l.activeId);
+    const next = splitPane(l, l.activeId, dir);
+    if (!from || next === l) return;
+    const created = next.tabs.find((t) => t.id === l.activeId)?.activePane;
+    if (created) commitNewPane(next, created, { ...(profilesRef.current[from.activePane] ?? {}) });
+  }, [commitNewPane]);
+
+  const setFontSize = useCallback((n: number) => setSettings((s) => ({ ...s, fontSize: clampFontSize(n) })), []);
+  // Steps read the latest size, so two quick presses always move two steps.
+  const stepFontSize = useCallback((d: number) => setSettings((s) => ({ ...s, fontSize: clampFontSize(s.fontSize + d) })), []);
+
+  // "Open in Terminal" from Files and other apps: one tab per requested folder.
+  useEffect(() => {
+    if (!acceptOpenRequests) return;
+    const drain = () => { for (const dir of takeTerminalRequests()) openTab(undefined, dir); };
+    drain();
+    window.addEventListener(OPEN_EVENT, drain);
+    return () => window.removeEventListener(OPEN_EVENT, drain);
+  }, [acceptOpenRequests, openTab]);
+
+  // The shell menu closes on a click outside it or Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const down = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key, true);
+    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); };
+  }, [menuOpen]);
   const closePane = useCallback((tabId: string, paneId: string) => {
     setRunning((r) => { const n = { ...r }; delete n[paneId]; return n; });
     apply((l) => closePaneL(l, tabId, paneId), true);
@@ -116,12 +238,15 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
       else if (ctrl && k === 'tab') apply((l) => cycleTab(l, e.shiftKey ? -1 : 1), true);
       else if (e.altKey && !ctrl && (k === 'arrowright' || k === 'arrowdown')) apply((l) => cyclePane(l, 1), true);
       else if (e.altKey && !ctrl && (k === 'arrowleft' || k === 'arrowup')) apply((l) => cyclePane(l, -1), true);
+      else if (ctrl && !e.altKey && (k === '=' || k === '+')) stepFontSize(1);
+      else if (ctrl && !e.altKey && k === '-') stepFontSize(-1);
+      else if (ctrl && !e.altKey && !e.shiftKey && k === '0') setFontSize(FONT_DEFAULT);
       else handled = false;
       if (handled) { e.preventDefault(); e.stopPropagation(); }
     };
     el.addEventListener('keydown', onKey, true);
     return () => el.removeEventListener('keydown', onKey, true);
-  }, [newTab, split, closePane, apply]);
+  }, [newTab, split, closePane, apply, setFontSize, stepFontSize]);
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
 
@@ -137,8 +262,13 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
     if (tab.name) return tab.name;
     const cmd = running[tab.activePane];
     if (cmd) return titleFromCommand(cmd);
+    const dir = paneProfiles[tab.activePane]?.cwd;
+    if (dir) return folderLabel(dir);
     return `Terminal ${index + 1}`;
-  }, [running]);
+  }, [running, paneProfiles]);
+
+  // The shell new tabs start: the saved default while it is still installed, else the system one.
+  const effectiveDefault = (shellForNewTab(settings, shells) ?? shells.find((s) => s.default)?.path ?? '').toLowerCase();
 
   // Divider drag: fraction delta from pointer movement over the tab's size.
   const startDrag = useCallback((e: React.PointerEvent, tab: TermTab, index: number) => {
@@ -226,7 +356,43 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           </button>
         </div>
-        <div style={{ display: 'flex', gap: 2, padding: '2px 4px', flexShrink: 0 }}>
+        <div ref={menuRef} style={{ display: 'flex', gap: 2, padding: '2px 4px', flexShrink: 0, position: 'relative' }}>
+          <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="Shells and text size" aria-haspopup="menu" aria-expanded={menuOpen} title="Shells and text size" className="dex-hover-bg" style={{ ...iconBtn, background: menuOpen ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+          </button>
+          {menuOpen && (
+            <div role="menu" aria-label="Shells and text size" style={{ position: 'absolute', top: '100%', right: 4, marginTop: 2, zIndex: 20, minWidth: 236, padding: '4px 0', borderRadius: 6, background: '#161617', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 6px 18px rgba(0,0,0,0.5)' }}>
+              <div style={{ padding: '4px 10px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary, #8a8a8a)' }}>New tab with</div>
+              {shells.length === 0 && (
+                <div style={{ padding: '4px 10px 6px', fontSize: 12, color: 'var(--color-text-secondary, #b8b8bd)' }}>No shells found. New tabs use the system shell.</div>
+              )}
+              {shells.map((s) => {
+                const isDefault = s.path.toLowerCase() === effectiveDefault;
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center' }}>
+                    <button type="button" role="menuitem" className="dex-hover-bg" title={s.path} onClick={() => { setMenuOpen(false); openTab(s.path); }} style={{ ...menuRow, flex: 1, minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                    </button>
+                    {isDefault ? (
+                      <span style={{ padding: '0 10px', fontSize: 11, color: 'var(--color-text-tertiary, #8a8a8a)' }}>Default</span>
+                    ) : (
+                      <button type="button" className="dex-hover-bg" aria-label={`Make ${s.label} the default shell`} title="New tabs start this shell" onClick={() => setSettings((prev) => ({ ...prev, defaultShell: s.default ? null : s.path }))} style={{ ...menuRow, width: 'auto', padding: '5px 10px', fontSize: 11, color: 'var(--color-accent, #0A84FF)' }}>
+                        Set default
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 12, color: 'var(--color-text-primary, #e0e0e0)' }}>
+                <span style={{ flex: 1 }}>Text size</span>
+                <button type="button" aria-label="Smaller text" title="Smaller (Ctrl+-)" disabled={settings.fontSize <= FONT_MIN} onClick={() => stepFontSize(-1)} style={{ ...stepBtn, opacity: settings.fontSize <= FONT_MIN ? 0.35 : 1 }}>−</button>
+                <span aria-live="polite" style={{ minWidth: 20, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{settings.fontSize}</span>
+                <button type="button" aria-label="Larger text" title="Larger (Ctrl+=)" disabled={settings.fontSize >= FONT_MAX} onClick={() => stepFontSize(1)} style={{ ...stepBtn, opacity: settings.fontSize >= FONT_MAX ? 0.35 : 1 }}>+</button>
+                <button type="button" title="Default size (Ctrl+0)" disabled={settings.fontSize === FONT_DEFAULT} onClick={() => setFontSize(FONT_DEFAULT)} style={{ ...stepBtn, width: 'auto', padding: '0 6px', fontSize: 11, opacity: settings.fontSize === FONT_DEFAULT ? 0.35 : 1 }}>Reset</button>
+              </div>
+            </div>
+          )}
           <button type="button" onClick={() => split('row')} disabled={!canSplit} aria-label="Split right" title={`Split right (Ctrl+Shift+D)${panesHint}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canSplit ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
           </button>
@@ -266,7 +432,9 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                     }}
                   >
                     <Terminal
-                      cwd={cwd}
+                      cwd={paneProfiles[p]?.cwd ?? cwd}
+                      shell={paneProfiles[p]?.shell}
+                      fontSize={settings.fontSize}
                       onClose={() => closePane(t.id, p)}
                       onRunningCommand={(cmd) => setRunning((prev) => (prev[p] === cmd ? prev : { ...prev, [p]: cmd }))}
                     />

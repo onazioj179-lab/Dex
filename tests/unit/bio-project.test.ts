@@ -54,6 +54,19 @@ describe('bio project — persistence', () => {
     expect(loadProject(s)).toEqual(h.present);
   });
 
+  it('topology is an undoable edit, survives a restore, and never applies to proteins', () => {
+    let h = historyInit(emptyProject());
+    h = historyReducer(h, { type: 'add', sequences: [seq('plasmid', 'ACGT')] });
+    const id = h.present.sequences[0].id;
+    h = historyReducer(h, { type: 'update', id, patch: { circular: true } });
+    expect(h.present.sequences[0].circular).toBe(true);
+    expect(normalizeProject(JSON.parse(JSON.stringify(h.present))).sequences[0].circular).toBe(true);
+    h = historyReducer(h, { type: 'undo' });
+    expect(h.present.sequences[0].circular).toBeUndefined();
+    const p = normalizeProject({ version: 1, sequences: [{ seq: 'MKV', kind: 'protein', circular: true }, { seq: 'ACGT', circular: 'yes' }] });
+    expect(p.sequences.map((s) => 'circular' in s)).toEqual([false, false]);
+  });
+
   it('corrupt storage falls back to an empty project, restore rejects bad files with a reason', () => {
     expect(loadProject({ getItem: () => '{not json' })).toEqual(emptyProject());
     expect(() => normalizeProject({ version: 2, sequences: [] })).toThrow(/Unsupported project version/);

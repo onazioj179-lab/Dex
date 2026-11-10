@@ -1153,7 +1153,7 @@ than 3%.
 | HTTP transfer (LAN share) | `httpTransfer:` start/stop/info/share/unshare/pickAndShare/acceptUpload + `transfer:selectFiles` (+ `http-transfer:*` events) | done (`http_transfer.rs`; `tiny_http` LAN server, download/upload + pending-accept, no-dep LAN-IP, 30-min expiry; multipart parser unit-tested 4/4; live serving needs in-app start) |
 | **Transfer / device / pairing (DTP)** | — | todo (device-to-device: mDNS discovery + custom TCP + encryption; not single-machine verifiable) |
 | Audio playback sink | — | NOT NEEDED (2026-06-15): the Music app (`pages/Audio.tsx`) plays renderer-side via `HTMLAudioElement` + `AudioContext` (crossfade + gapless preload). In a webview shell that IS the correct path; a native cpal/rodio sink would be redundant + wrong (playback outside the webview). Native decode/waveform stays in `dex-audio` for analysis. |
-| Terminal / PTY | `pty:` spawn/write/resize/kill/list (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
+| Terminal / PTY | `pty:` spawn/write/resize/kill/list/shells (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
 | **Security/Workflow controllers** | — | todo (largest; phase last) |
 | OS theme accent | `theme:getSystemAccentColor` | done on Windows (`native_ops::system_accent_color`, DWM AccentColor via `reg`, verified -> #0078D4); null degrade on mac/linux |
 
