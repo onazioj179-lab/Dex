@@ -2992,6 +2992,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 fn main() {
     startup_timeline::anchor();
     webview2::install_panic_logger();
+    webview2::log(&format!("DEX {} (build {}) starting", env!("CARGO_PKG_VERSION"), env!("DEX_BUILD_SERIAL")));
     // Must run before WebView2 opens its cache files (see storage_ctl.rs).
     storage_ctl::run_pending_cache_clear();
     // Fail loudly and helpfully when no WebView2 runtime exists, instead of

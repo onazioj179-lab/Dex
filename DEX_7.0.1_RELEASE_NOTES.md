@@ -2,6 +2,15 @@
 
 **Creator:** Onazi oJ · **Theme:** DEX Blue Modern · Changes since 6.1.0 (the last published release).
 
+## Build serials
+
+7.0.1 stays the version until it is declared finished; each update is marked
+`7.0.1 (<serial>)` in Settings › About, App Information and the startup log.
+
+| Serial | What it adds |
+| --- | --- |
+| 18a | Build serials themselves. Builds before this were Parts 16–17: DEX Ledger (native engine, import of the earlier ledger), one app-pinning service, the Dock in the DEX Bar, the smart App Menu, shared app menus, Terminal split panes, Bioengineering workspace |
+
 ## New
 
 - **Interface Transparency.** One slider from 0% (fully opaque, no blur) to 100% (maximum glass) in Settings › Appearance, Settings › Shell and Control Center, with a separate blur-strength slider and a Refined/Liquid style choice. It changes the top bar, DEX Bar, menus, panels and window chrome live, follows light and dark mode, and is saved. Refined glass is the default (reads as 40%). Reduce Transparency and low-end mode keep surfaces opaque.
