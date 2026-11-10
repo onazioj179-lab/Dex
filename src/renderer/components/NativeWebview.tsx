@@ -101,7 +101,7 @@ let sweep: Promise<unknown> | null = null;
 function ensureSubscribed(): void {
   if (subscribed) return;
   subscribed = true;
-  (window as any).dex?.on?.('browser-view', (p: { id?: string; type?: string; state?: string; url?: string; title?: string }) => {
+  (window as any).dex?.on?.('browser-view', (p: { id?: string; type?: string; state?: string; url?: string; title?: string; canGoBack?: boolean; canGoForward?: boolean; on?: boolean; code?: number; description?: string }) => {
     const host = p?.id ? hosts.get(p.id) : undefined;
     if (!host?.__dexEmit) return;
     if (p.type === 'load' && p.state === 'started') {
@@ -115,6 +115,15 @@ function ensureSubscribed(): void {
       host.__dexEmit('page-title-updated', { title: p.title });
     } else if (p.type === 'new-window') {
       host.__dexEmit('new-window', { url: p.url });
+    } else if (p.type === 'history') {
+      // Real WebView2 history (src-tauri/src/browser_view.rs native_signals).
+      host.__dexEmit('history-changed', { canGoBack: !!p.canGoBack, canGoForward: !!p.canGoForward });
+    } else if (p.type === 'fullscreen') {
+      host.__dexEmit(p.on ? 'enter-html-full-screen' : 'leave-html-full-screen');
+    } else if (p.type === 'load-error') {
+      // Electron-style shape the Browser already handles (-3 = aborted is filtered natively).
+      host.__dexEmit('did-fail-load', { errorCode: p.code ?? 0, errorDescription: p.description });
+      host.__dexEmit('did-stop-loading');
     }
   });
 }
@@ -146,7 +155,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
   const lastSrc = useRef<string>('');
   const shown = useRef(false);
   const lastRect = useRef('');
-  const state = useRef({ url: '', title: '', loading: false, userZoom: 1, appliedZoom: 1 });
+  const state = useRef<{ url: string; title: string; loading: boolean; userZoom: number; appliedZoom: number; canGoBack?: boolean; canGoForward?: boolean }>({ url: '', title: '', loading: false, userZoom: 1, appliedZoom: 1 });
   const activeRef = useRef(active);
   activeRef.current = active;
 
@@ -200,6 +209,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
       if (type === 'did-navigate' && typeof data?.url === 'string') s.url = data.url;
       if (type === 'did-stop-loading') s.loading = false;
       if (type === 'page-title-updated' && typeof data?.title === 'string') s.title = data.title;
+      if (type === 'history-changed') { s.canGoBack = !!data?.canGoBack; s.canGoForward = !!data?.canGoForward; }
       el.dispatchEvent(Object.assign(new Event(type), data ?? {}));
     };
     const api = {
@@ -208,9 +218,10 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
       goBack: () => invoke('browserView:back', tabId),
       goForward: () => invoke('browserView:forward', tabId),
       stop: () => invoke('browserView:stop', tabId),
-      // Native history depth is not exposed; the Browser keeps its own nav stack.
-      canGoBack: () => true,
-      canGoForward: () => true,
+      // From WebView2's own history (HistoryChanged). Until the first report
+      // arrives, assume back/forward may work so the buttons aren't wrongly dead.
+      canGoBack: () => s.canGoBack ?? true,
+      canGoForward: () => s.canGoForward ?? true,
       isLoading: () => s.loading,
       getURL: () => s.url,
       getTitle: () => s.title,

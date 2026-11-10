@@ -362,7 +362,6 @@ export const Files: React.FC = () => {
 
   const [currentPath, setCurrentPath] = useState<string>('');
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [allFiles, setAllFiles] = useState<FileItem[]>([]); // For smart collections
   const [selectedLocation, setSelectedLocation] = useState('documents');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -496,7 +495,6 @@ export const Files: React.FC = () => {
     try { return JSON.parse(localStorage.getItem('dex-file-tags') || '{}'); } catch { return {}; }
   });
   const [activeTagFilter, setActiveTagFilter] = useState<TagColor | null>(null);
-  const [showTagPicker, setShowTagPicker] = useState<{ x: number; y: number; path: string } | null>(null);
 
   // Drag state for file move
   const [dragFile, setDragFile] = useState<FileItem | null>(null);
@@ -603,7 +601,6 @@ export const Files: React.FC = () => {
     } else {
       colorLabels.removeLabel('files', 'file', path);
     }
-    setShowTagPicker(null);
   }, [colorLabels]);
 
   const handleDragStart = useCallback((e: React.DragEvent, file: FileItem) => {
@@ -659,7 +656,6 @@ export const Files: React.FC = () => {
             category: getFileCategory(f.extension || '', f.name),
           }));
           setFiles(filesWithCategory);
-          setAllFiles(filesWithCategory);
           setCurrentPath(result.path);
           recordRecentFolder(result.path);
           
@@ -680,7 +676,6 @@ export const Files: React.FC = () => {
           setRecentFiles(recent);
         } else {
           setFiles([]);
-          setAllFiles([]);
           setLoadError(result?.error ? `Couldn't open this folder: ${result.error}` : "Couldn't open this folder.");
         }
       } else {

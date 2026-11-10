@@ -91,9 +91,100 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
             if !visible {
                 let _ = wv.hide();
             }
+            #[cfg(windows)]
+            native_signals::attach(&wv, app.clone(), owner.clone(), tab.clone());
             json!({ "success": true })
         }
         Err(e) => json!({ "success": false, "error": e.to_string() }),
+    }
+}
+
+/// Page state WebView2 knows but Tauri's builder doesn't expose: real
+/// back/forward availability, element fullscreen (video players), and failed
+/// navigations. Read from the WebView2 object on the native side and sent to
+/// the owning DEX window only; the page itself still gets no DEX IPC.
+#[cfg(windows)]
+mod native_signals {
+    use super::emit;
+    use serde_json::json;
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2, COREWEBVIEW2_WEB_ERROR_STATUS};
+    use webview2_com::{ContainsFullScreenElementChangedEventHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler};
+    use windows_core::BOOL;
+
+    fn history(core: &ICoreWebView2) -> (bool, bool) {
+        let (mut back, mut fwd) = (BOOL(0), BOOL(0));
+        unsafe {
+            let _ = core.CanGoBack(&mut back);
+            let _ = core.CanGoForward(&mut fwd);
+        }
+        (back.as_bool(), fwd.as_bool())
+    }
+
+    /// Human-readable text for COREWEBVIEW2_WEB_ERROR_STATUS.
+    fn describe(code: i32) -> &'static str {
+        match code {
+            1..=5 => "The site's security certificate isn't valid",
+            6 | 12 => "The server can't be reached",
+            7 => "The connection timed out",
+            8 => "The server sent an invalid response",
+            9..=11 => "The connection was interrupted",
+            13 => "This site's address can't be found",
+            15 => "The site redirected too many times",
+            17 | 18 => "The site needs a sign-in DEX can't show here",
+            _ => "The page couldn't be loaded",
+        }
+    }
+
+    pub fn attach(wv: &tauri::Webview, app: tauri::AppHandle, owner: String, tab: String) {
+        let _ = wv.with_webview(move |pw| unsafe {
+            let Ok(core) = pw.controller().CoreWebView2() else { return };
+            let mut token = 0i64;
+
+            let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
+            let _ = core.add_HistoryChanged(
+                &HistoryChangedEventHandler::create(Box::new(move |sender, _| {
+                    if let Some(c) = sender {
+                        let (back, fwd) = history(&c);
+                        emit(&a, &o, json!({ "id": t, "type": "history", "canGoBack": back, "canGoForward": fwd }));
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            );
+
+            let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
+            let _ = core.add_ContainsFullScreenElementChanged(
+                &ContainsFullScreenElementChangedEventHandler::create(Box::new(move |sender, _| {
+                    if let Some(c) = sender {
+                        let mut on = BOOL(0);
+                        let _ = c.ContainsFullScreenElement(&mut on);
+                        emit(&a, &o, json!({ "id": t, "type": "fullscreen", "on": on.as_bool() }));
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            );
+
+            let (a, o, t) = (app, owner, tab);
+            let _ = core.add_NavigationCompleted(
+                &NavigationCompletedEventHandler::create(Box::new(move |_sender, args| {
+                    if let Some(args) = args {
+                        let mut ok = BOOL(1);
+                        let _ = args.IsSuccess(&mut ok);
+                        if !ok.as_bool() {
+                            let mut status = COREWEBVIEW2_WEB_ERROR_STATUS(0);
+                            let _ = args.WebErrorStatus(&mut status);
+                            // 14 = OPERATION_CANCELED: the user navigated away; not an error.
+                            if status.0 != 14 {
+                                emit(&a, &o, json!({ "id": t, "type": "load-error", "code": status.0, "description": describe(status.0) }));
+                            }
+                        }
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            );
+        });
     }
 }
 
