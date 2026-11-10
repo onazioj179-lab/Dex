@@ -266,7 +266,7 @@ export type TmMethod = 'wallace' | 'basic';
  * Oligo melting temperature (°C), the two OligoCalc formulas:
  * - Wallace rule (< 14 nt): Tm = 2(A+T) + 4(G+C)
  * - Basic (≥ 14 nt, 50 mM Na⁺): Tm = 64.9 + 41(G+C − 16.4)/N
- * These are estimates for primer design, not a nearest-neighbour model.
+ * These are quick estimates; `nearestNeighborTm` is the thermodynamic model.
  */
 export function meltingTemp(dna: string): { tm: number; method: TmMethod } {
   const { A, T, G, C } = baseCounts(dna);
@@ -274,6 +274,77 @@ export function meltingTemp(dna: string): { tm: number; method: TmMethod } {
   if (!n) return { tm: 0, method: 'wallace' };
   if (n < 14) return { tm: 2 * (A + T) + 4 * (G + C), method: 'wallace' };
   return { tm: 64.9 + (41 * (G + C - 16.4)) / n, method: 'basic' };
+}
+
+// Unified nearest-neighbour parameters, SantaLucia 1998 (PNAS 95:1460), Table 1:
+// [ΔH° kcal/mol, ΔS° cal/(mol·K)] per dinucleotide step read 5′→3′ on one
+// strand. A step and its reverse complement are the same duplex step.
+const NN_STEP: Readonly<Record<string, readonly [number, number]>> = {
+  AA: [-7.9, -22.2], TT: [-7.9, -22.2],
+  AT: [-7.2, -20.4],
+  TA: [-7.2, -21.3],
+  CA: [-8.5, -22.7], TG: [-8.5, -22.7],
+  GT: [-8.4, -22.4], AC: [-8.4, -22.4],
+  CT: [-7.8, -21.0], AG: [-7.8, -21.0],
+  GA: [-8.2, -22.2], TC: [-8.2, -22.2],
+  CG: [-10.6, -27.2],
+  GC: [-9.8, -24.4],
+  GG: [-8.0, -19.9], CC: [-8.0, -19.9],
+};
+const NN_INIT_GC: readonly [number, number] = [0.1, -2.8];
+const NN_INIT_AT: readonly [number, number] = [2.3, 4.1];
+const NN_SYMMETRY_DS = -1.4;
+const GAS_CONSTANT = 1.987; // cal/(mol·K)
+
+export const NN_MIN_LENGTH = 6;
+export const NN_MAX_LENGTH = 60;
+/** Conditions used when none are given: 50 mM Na⁺, 0.5 µM total strand. */
+export const NN_DEFAULTS = { sodiumM: 0.05, oligoM: 0.5e-6 } as const;
+
+export interface NearestNeighborTm {
+  /** °C */
+  tm: number;
+  /** kcal/mol */
+  dH: number;
+  /** cal/(mol·K), after the salt correction */
+  dS: number;
+  selfComplementary: boolean;
+  sodiumM: number;
+  oligoM: number;
+}
+
+/**
+ * Oligo duplex melting temperature from the SantaLucia 1998 unified
+ * nearest-neighbour model, for the oligo paired with its perfect complement:
+ *   Tm = ΔH° / (ΔS° + R·ln(C/x)) − 273.15, x = 4 (x = 1 if self-complementary)
+ * with the paper's salt correction ΔS°[Na⁺] = ΔS°[1 M] + 0.368·(N−1)·ln[Na⁺].
+ * `oligoM` is the total strand concentration. Returns null outside
+ * NN_MIN_LENGTH..NN_MAX_LENGTH nt (the two-state model does not hold for long
+ * duplexes) or when the sequence has ambiguous bases. No Mg²⁺/dNTP correction.
+ */
+export function nearestNeighborTm(dna: string, opts: { sodiumM?: number; oligoM?: number } = {}): NearestNeighborTm | null {
+  const n = dna.length;
+  if (n < NN_MIN_LENGTH || n > NN_MAX_LENGTH || /[^ACGT]/.test(dna)) return null;
+  const sodiumM = opts.sodiumM ?? NN_DEFAULTS.sodiumM;
+  const oligoM = opts.oligoM ?? NN_DEFAULTS.oligoM;
+  if (!(sodiumM > 0) || !(oligoM > 0)) return null;
+  let dH = 0;
+  let dS = 0;
+  for (let i = 0; i + 1 < n; i++) {
+    const step = NN_STEP[dna.slice(i, i + 2)];
+    dH += step[0];
+    dS += step[1];
+  }
+  for (const end of [dna[0], dna[n - 1]]) {
+    const init = end === 'G' || end === 'C' ? NN_INIT_GC : NN_INIT_AT;
+    dH += init[0];
+    dS += init[1];
+  }
+  const selfComplementary = reverseComplement(dna) === dna;
+  if (selfComplementary) dS += NN_SYMMETRY_DS;
+  dS += 0.368 * (n - 1) * Math.log(sodiumM);
+  const tm = (dH * 1000) / (dS + GAS_CONSTANT * Math.log(oligoM / (selfComplementary ? 1 : 4))) - 273.15;
+  return { tm, dH, dS, selfComplementary, sodiumM, oligoM };
 }
 
 // ---------------------------------------------------------------------------
@@ -354,15 +425,23 @@ export interface SiteHit {
   cutAfter: number;
 }
 
-/** Every site of every enzyme (all are palindromic, so one strand suffices). */
-export function findRestrictionSites(dna: string, enzymes: readonly RestrictionEnzyme[] = ENZYMES): SiteHit[] {
+/**
+ * Every site of every enzyme (all are palindromic, so one strand suffices).
+ * With `circular`, sites that span the origin are found too; their `cutAfter`
+ * wraps, so it is always within 1..length.
+ */
+export function findRestrictionSites(dna: string, enzymes: readonly RestrictionEnzyme[] = ENZYMES, circular = false): SiteHit[] {
   const hits: SiteHit[] = [];
+  const n = dna.length;
   for (const e of enzymes) {
+    // A circle shorter than the site cannot hold it once around.
+    const hay = circular && n >= e.site.length ? dna + dna.slice(0, e.site.length - 1) : dna;
     let from = 0;
     for (;;) {
-      const i = dna.indexOf(e.site, from);
-      if (i < 0) break;
-      hits.push({ enzyme: e.name, site: e.site, position: i + 1, cutAfter: i + e.cut });
+      const i = hay.indexOf(e.site, from);
+      if (i < 0 || i >= n) break;
+      const cut = i + e.cut;
+      hits.push({ enzyme: e.name, site: e.site, position: i + 1, cutAfter: cut > n ? cut - n : cut });
       from = i + 1;
     }
   }
@@ -376,6 +455,21 @@ export function digestFragments(length: number, cutsAfter: number[]): number[] {
   let prev = 0;
   for (const c of cuts) { out.push(c - prev); prev = c; }
   if (length > 0) out.push(length - prev);
+  return out;
+}
+
+/**
+ * Circular-DNA fragment lengths. One cut linearises the circle (one fragment
+ * of the full length); n cuts give n fragments, one of which runs through the
+ * origin. No cut returns an empty list: the circle stays closed.
+ */
+export function digestFragmentsCircular(length: number, cutsAfter: number[]): number[] {
+  if (!(length > 0)) return [];
+  const cuts = [...new Set(cutsAfter.filter((c) => Number.isFinite(c)).map((c) => (((Math.round(c) % length) + length) % length) || length))].sort((a, b) => a - b);
+  if (!cuts.length) return [];
+  const out: number[] = [];
+  for (let i = 1; i < cuts.length; i++) out.push(cuts[i] - cuts[i - 1]);
+  out.push(length - cuts[cuts.length - 1] + cuts[0]); // through the origin
   return out;
 }
 

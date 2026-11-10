@@ -14,6 +14,8 @@ export interface BioSequence {
   /** Cleaned residues (nucleotides stored as DNA, A/C/G/T/N). */
   seq: string;
   kind: SequenceKind;
+  /** Nucleotide topology: true for a plasmid or other closed circle. Absent = linear. */
+  circular?: boolean;
   source: SequenceSource;
   notes: string;
   createdAt: number;
@@ -68,6 +70,7 @@ export function normalizeProject(input: unknown): BioProject {
       name: typeof r.name === 'string' && r.name ? r.name : `Sequence ${i + 1}`,
       seq: r.seq.toUpperCase(),
       kind: kinds.includes(r.kind as SequenceKind) ? (r.kind as SequenceKind) : 'dna',
+      ...(r.circular === true && r.kind !== 'protein' ? { circular: true } : {}),
       source: sources.includes(r.source as SequenceSource) ? (r.source as SequenceSource) : 'imported',
       notes: typeof r.notes === 'string' ? r.notes : '',
       createdAt: typeof r.createdAt === 'number' ? r.createdAt : Date.now(),
@@ -111,7 +114,7 @@ function safeStorage(): Storage | null {
 
 export type BioAction =
   | { type: 'add'; sequences: Omit<BioSequence, 'id' | 'createdAt' | 'updatedAt'>[] }
-  | { type: 'update'; id: string; patch: Partial<Pick<BioSequence, 'name' | 'seq' | 'notes' | 'kind'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<BioSequence, 'name' | 'seq' | 'notes' | 'kind' | 'circular'>> }
   | { type: 'remove'; id: string }
   | { type: 'select'; id: string | null }
   | { type: 'rename-project'; name: string }

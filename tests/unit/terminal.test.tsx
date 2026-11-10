@@ -30,7 +30,8 @@ vi.mock('@xterm/xterm', () => ({
     dataCb: Fn | null = null;
     resizeCb: Fn | null = null;
     buffer = { active: { length: 0, getLine: () => undefined } };
-    constructor() { fake.instances.push(this); }
+    options: Record<string, unknown>;
+    constructor(opts: Record<string, unknown> = {}) { this.options = { ...opts }; fake.instances.push(this); }
     loadAddon() { /* noop */ }
     open() { /* noop */ }
     write(d: string) { this.written.push(d); }
@@ -157,5 +158,16 @@ describe('Terminal (pseudoterminal)', () => {
     await act(async () => { ({ unmount } = render(<Terminal />)); await tick(); });
     act(() => unmount());
     expect(invokeCalls.find(c => c.ch === 'pty:kill')?.args[0]).toEqual({ sessionId: 'pty-1' });
+  });
+
+  it('applies the text size at start and when it changes, without a new session', async () => {
+    const { Terminal } = await import('../../src/renderer/components/Terminal');
+    let rerender!: (ui: React.ReactElement) => void;
+    await act(async () => { ({ rerender } = render(<Terminal fontSize={16} />)); await tick(); });
+    expect(term().options.fontSize).toBe(16);
+    await act(async () => { rerender(<Terminal fontSize={18} />); await tick(); });
+    expect(term().options.fontSize).toBe(18);
+    expect(fake.instances.length).toBe(1);
+    expect(invokeCalls.filter(c => c.ch === 'pty:spawn').length).toBe(1);
   });
 });
