@@ -11,7 +11,7 @@
 
 import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
-import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion } from '../utils/appVersion';
 import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
@@ -1648,7 +1648,7 @@ export const Settings: React.FC = () => {
     window.addEventListener('dex-settings-changed', onExternal);
     return () => window.removeEventListener('dex-settings-changed', onExternal);
   }, []);
-  const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
+  const [appVersion, setAppVersion] = useState<string>(formatDisplayVersion(getBundledAppVersion()));
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
   // Hoist shell-prefs hook to component top-level so the hook count stays
@@ -1965,8 +1965,8 @@ export const Settings: React.FC = () => {
   }, []);
 
   React.useEffect(() => {
-    getRuntimeAppVersion().then(setAppVersion).catch(() => {
-      setAppVersion(getBundledAppVersion());
+    getRuntimeAppVersion().then(v => setAppVersion(formatDisplayVersion(v))).catch(() => {
+      setAppVersion(formatDisplayVersion(getBundledAppVersion()));
     });
   }, []);
 
