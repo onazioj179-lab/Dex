@@ -272,8 +272,8 @@ const PresentationBuilder: React.FC = () => {
   };
   const saveDeckFile = useCallback(() => {
     const name = deckTitle(slides).replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 80) || 'deck';
-    downloadText(`${name}.dexdeck.json`, serializeDeck(slides, themeId), 'application/json;charset=utf-8');
-    toast('success', `Saved ${slides.length} slide${slides.length === 1 ? '' : 's'} to ${name}.dexdeck.json`);
+    downloadText(`${name}.dexdeck`, serializeDeck(slides, themeId), 'application/json;charset=utf-8');
+    toast('success', `Saved ${slides.length} slide${slides.length === 1 ? '' : 's'} to ${name}.dexdeck`);
   }, [slides, themeId]);
   const openDeckFile = useCallback(async (file: File) => {
     try {
@@ -403,6 +403,26 @@ const PresentationBuilder: React.FC = () => {
   const updateCurrentSlide = useCallback((mut: (s: Slide) => Slide) => {
     setSlides(prev => prev.map((s, i) => (i === currentIdx ? mut(s) : s)));
   }, [currentIdx]);
+
+  // Pictures from this PC: downscaled to at most 1600 px (JPEG) so a deck of
+  // photos still fits app storage; PNG kept for small graphics with transparency.
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const imageTargetRef = useRef<string | null>(null);
+  const readLocalImage = useCallback(async (file: File): Promise<string> => {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImage(url);
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height);
+      const keepPng = file.type === 'image/png' && file.size < 400_000;
+      return c.toDataURL(keepPng ? 'image/png' : 'image/jpeg', 0.85);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
 
   const addBlock = useCallback((type: BlockType) => {
     const block: SlideBlock = {
@@ -813,11 +833,17 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
-          <input ref={deckInput} type="file" accept=".dexdeck.json,.json" hidden
+          <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
-          <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck.json file (Ctrl+O)">Open Deck…</button>
+          <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
           <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
+          <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
+            const f = e.target.files?.[0]; e.target.value = '';
+            const target = imageTargetRef.current;
+            if (!f || !target) return;
+            try { updateBlock(target, { content: await readLocalImage(f) }); } catch { toast('error', "That picture couldn't be read"); }
+          }} />
           <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
           <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Present</button>
@@ -1023,8 +1049,10 @@ const PresentationBuilder: React.FC = () => {
               {selectedBlock.type === 'image' && (
                 <label style={fieldLabel}>
                   <span>Image URL</span>
+                  <button type="button" style={{ ...toolbarBtn, alignSelf: 'flex-start' }} onClick={() => { imageTargetRef.current = selectedBlock.id; imageInputRef.current?.click(); }}>Choose picture from this PC…</button>
                   <input
-                    value={selectedBlock.content}
+                    value={selectedBlock.content.startsWith('data:') ? '(picture from this PC)' : selectedBlock.content}
+                    readOnly={selectedBlock.content.startsWith('data:')}
                     onChange={e => updateBlock(selectedBlock.id, { content: e.target.value })}
                     placeholder="https://..."
                     style={fieldInput}
