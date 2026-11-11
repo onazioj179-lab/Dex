@@ -515,12 +515,26 @@ function loadProject(): VinxProject {
   return createDefaultProject();
 }
 
+// A full app store used to fail silently (console only), and the native copy
+// was skipped with it. The native copy is now written independently, and the
+// user is told once per failure streak instead of losing edits unannounced.
+let saveFailed = false;
 function saveProject(project: VinxProject): void {
+  let json: string;
+  try { json = JSON.stringify(project); } catch (e) { console.warn('[VINX] Failed to serialise project:', e); return; }
+  (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, json)?.catch?.((e: unknown) => { console.warn('[DEX]', e); });
   try {
-    const json = JSON.stringify(project);
     localStorage.setItem(STORAGE_KEY, json);
-    (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
-  } catch (e) { console.warn('[VINX] Failed to save project:', e); }
+    saveFailed = false;
+  } catch (e) {
+    console.warn('[VINX] Failed to save project:', e);
+    if (!saveFailed) {
+      saveFailed = true;
+      try {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "VINX couldn't save the project: app storage is full. Save a checkpoint or export now, and remove unused media." } }));
+      } catch { /* non-DOM */ }
+    }
+  }
 }
 
 function loadLayout(): PanelLayout {
