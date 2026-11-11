@@ -13,6 +13,7 @@ import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { downloadText } from '../../improvements500/downloadBlob';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -201,9 +202,20 @@ const PresentationBuilder: React.FC = () => {
 
   const theme = getTheme(themeId);
 
-  // Persist
+  // Persist. A failed write (storage full) used to be swallowed, so the deck
+  // silently reverted on the next start; now it says so once, and Save Deck
+  // keeps a file copy that does not depend on app storage.
+  const saveFailedRef = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slides)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(slides));
+      saveFailedRef.current = false;
+    } catch {
+      if (!saveFailedRef.current) {
+        saveFailedRef.current = true;
+        toast('error', "Couldn't save the deck: app storage is full. Use Save Deck to keep a file copy, or remove large pictures.");
+      }
+    }
   }, [slides]);
   useEffect(() => {
     try { localStorage.setItem(THEME_KEY, themeId); } catch { /* ignore */ }
@@ -305,6 +317,51 @@ const PresentationBuilder: React.FC = () => {
   const updateCurrentSlide = useCallback((mut: (s: Slide) => Slide) => {
     setSlides(prev => prev.map((s, i) => (i === currentIdx ? mut(s) : s)));
   }, [currentIdx]);
+
+  // ---- Deck files (.dexdeck = JSON of theme + slides) ----
+  const saveDeckFile = useCallback(() => {
+    const title = slides[0]?.blocks.find(b => b.type === 'text')?.content?.split('\n')[0]?.trim() || 'Presentation';
+    const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'Presentation';
+    downloadText(`${safe}.dexdeck`, JSON.stringify({ format: 'dex-deck', version: 1, theme: themeId, slides }, null, 2), 'application/json');
+    toast('success', 'Deck saved as a file');
+  }, [slides, themeId]);
+
+  const deckInputRef = useRef<HTMLInputElement | null>(null);
+  const openDeckFile = useCallback(async (file: File) => {
+    try {
+      const doc = JSON.parse(await file.text());
+      const list = Array.isArray(doc) ? doc : doc?.slides;
+      if (!Array.isArray(list) || list.length === 0) throw new Error('no slides');
+      if (!window.confirm('Replace the current deck with this file? Save Deck first if you want to keep it.')) return;
+      setSlides(list.map(migrateSlide));
+      if (typeof doc?.theme === 'string' && THEMES.some(t => t.id === doc.theme)) setThemeId(doc.theme);
+      setCurrentIdx(0);
+      setSelectedBlockId(null);
+      toast('success', `Opened ${file.name}`);
+    } catch {
+      toast('error', "That file isn't a DEX deck");
+    }
+  }, []);
+
+  // Pictures from this PC: downscaled to at most 1600 px (JPEG) so a deck of
+  // photos still fits app storage; PNG kept for small graphics with transparency.
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const imageTargetRef = useRef<string | null>(null);
+  const readLocalImage = useCallback(async (file: File): Promise<string> => {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImage(url);
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height);
+      const keepPng = file.type === 'image/png' && file.size < 400_000;
+      return c.toDataURL(keepPng ? 'image/png' : 'image/jpeg', 0.85);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
 
   const addBlock = useCallback((type: BlockType) => {
     const block: SlideBlock = {
@@ -713,6 +770,15 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
+          <button onClick={() => deckInputRef.current?.click()} style={toolbarBtn} title="Open a .dexdeck file">Open Deck</button>
+          <button onClick={saveDeckFile} style={toolbarBtn} title="Save this deck as a .dexdeck file">Save Deck</button>
+          <input ref={deckInputRef} type="file" accept=".dexdeck,application/json" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void openDeckFile(f); }} />
+          <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
+            const f = e.target.files?.[0]; e.target.value = '';
+            const target = imageTargetRef.current;
+            if (!f || !target) return;
+            try { updateBlock(target, { content: await readLocalImage(f) }); } catch { toast('error', "That picture couldn't be read"); }
+          }} />
           <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
           <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Present</button>
@@ -918,8 +984,10 @@ const PresentationBuilder: React.FC = () => {
               {selectedBlock.type === 'image' && (
                 <label style={fieldLabel}>
                   <span>Image URL</span>
+                  <button type="button" style={{ ...toolbarBtn, alignSelf: 'flex-start' }} onClick={() => { imageTargetRef.current = selectedBlock.id; imageInputRef.current?.click(); }}>Choose picture from this PC…</button>
                   <input
-                    value={selectedBlock.content}
+                    value={selectedBlock.content.startsWith('data:') ? '(picture from this PC)' : selectedBlock.content}
+                    readOnly={selectedBlock.content.startsWith('data:')}
                     onChange={e => updateBlock(selectedBlock.id, { content: e.target.value })}
                     placeholder="https://..."
                     style={fieldInput}
