@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../../../components/DexIcon';
 import { ledger, LedgerError, type TxnList, type Txn } from '../ledgerApi';
+import { editableFields, nextField, inlinePatch, amountDraft, type InlineField } from '../inlineEdit';
 import { formatDate, parseMoneyInput, todayLocal } from '../money';
 import { useLedger, useLedgerQuery, Money, Btn, IconBtn, Empty, StatusDot, errText, CategorySelect } from '../ledgerUi';
 
@@ -13,7 +14,7 @@ type SortKey = 'date' | 'payee' | 'account' | 'category' | 'amount' | 'status';
 const PAGE = 300;
 
 export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ selectedId }) => {
-  const { accounts, groups, accountFilter, categoryFilter, go, openEditor, toast, confirm, digits, openImport } = useLedger();
+  const { accounts, groups, accountFilter, categoryFilter, go, openEditor, closeEditor, toast, confirm, digits, openImport } = useLedger();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [kind, setKind] = useState<'' | 'income' | 'expense' | 'transfer'>('');
@@ -26,6 +27,12 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const tableRef = useRef<HTMLTableSectionElement>(null);
+  // In-table editing: one cell at a time. `settled` stops the blur that follows
+  // Enter / Escape / Tab from saving a second time.
+  const [cell, setCell] = useState<{ id: number; field: InlineField } | null>(null);
+  const [draft, setDraft] = useState('');
+  const [cellErr, setCellErr] = useState<string | null>(null);
+  const settled = useRef(false);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search), 200); return () => clearTimeout(t); }, [search]);
   useEffect(() => { setChecked(new Set()); setLimit(PAGE); }, [accountFilter, categoryFilter, debounced, kind, status, from, to]);
@@ -87,11 +94,110 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
     } catch (e) { toast(errText(e), 'error'); }
   };
 
+  const focusRow = (id: number) => {
+    requestAnimationFrame(() => tableRef.current?.querySelector<HTMLTableRowElement>(`tr[data-txn="${id}"]`)?.focus());
+  };
+
+  const draftFor = (t: Txn, field: InlineField): string =>
+    field === 'date' ? t.date : field === 'payee' ? t.payee : field === 'amount' ? amountDraft(t.amount, digits) : String(t.categoryId ?? '');
+
+  /** Edit a cell in place; cells a row cannot edit inline open the full editor. */
+  const startEdit = (t: Txn, field: InlineField) => {
+    if (!editableFields(t).includes(field)) { openEditor({ mode: 'edit', id: t.id }); return; }
+    closeEditor();
+    settled.current = false;
+    setCellErr(null);
+    setDraft(draftFor(t, field));
+    setCell({ id: t.id, field });
+  };
+
+  const stopEdit = (t: Txn) => { settled.current = true; setCell(null); setCellErr(null); focusRow(t.id); };
+
+  const saveTxn = async (t: Txn, patch: Record<string, unknown>): Promise<boolean> => {
+    try { await ledger.updateTxn({ id: t.id, ...patch }); return true; }
+    catch (e) {
+      if (e instanceof LedgerError && e.message.startsWith('RECONCILED')) {
+        const ok = await confirm({ title: 'Change a reconciled transaction?', message: 'It was matched to a bank statement. Changing it means the account no longer matches that statement.', confirmLabel: 'Change', tone: 'destructive' });
+        if (!ok) return false;
+        try { await ledger.updateTxn({ id: t.id, ...patch, confirmReconciled: true }); return true; } catch (e2) { toast(errText(e2), 'error'); return false; }
+      }
+      toast(errText(e), 'error');
+      return false;
+    }
+  };
+
+  /** Save the cell, then close (`then` = null) or move to the next/previous cell. */
+  const commit = async (t: Txn, field: InlineField, value: string, then: 'next' | 'prev' | null) => {
+    settled.current = true;
+    const r = inlinePatch(t, field, value, digits);
+    if (!r.ok) { settled.current = false; setCellErr(r.error); toast(r.error, 'error'); return; }
+    if (r.patch && !(await saveTxn(t, r.patch))) { settled.current = false; return; }
+    const to = then ? nextField(t, field, then === 'prev') : null;
+    if (to) {
+      // The row reloads after a save; draft from the patched values meanwhile.
+      const merged = { ...t, ...(r.patch || {}) } as Txn;
+      settled.current = false;
+      setCellErr(null);
+      setDraft(draftFor(merged, to));
+      setCell({ id: t.id, field: to });
+    } else stopEdit(t);
+  };
+
+  const cellKey = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>, t: Txn, field: InlineField) => {
+    e.stopPropagation(); // keep row shortcuts (Space, Delete, arrows) out of the box
+    if (e.key === 'Escape') { e.preventDefault(); stopEdit(t); }
+    else if (e.key === 'Enter') { e.preventDefault(); void commit(t, field, (e.target as HTMLInputElement).value, null); }
+    else if (e.key === 'Tab') { e.preventDefault(); void commit(t, field, (e.target as HTMLInputElement).value, e.shiftKey ? 'prev' : 'next'); }
+  };
+
+  const editor = (t: Txn, field: InlineField) => {
+    const common = {
+      autoFocus: true,
+      className: `lg-input${cellErr ? ' lg-invalid' : ''}`,
+      title: cellErr || 'Enter saves, Tab moves on, Esc cancels',
+      'aria-invalid': !!cellErr,
+      onClick: (e: React.MouseEvent) => e.stopPropagation(),
+      onDoubleClick: (e: React.MouseEvent) => e.stopPropagation(),
+    };
+    if (field === 'category') {
+      return (
+        <select {...common} aria-label="Category" value={draft}
+          onChange={e => { setDraft(e.target.value); void commit(t, 'category', e.target.value, null); }}
+          onKeyDown={e => cellKey(e, t, 'category')}
+          onBlur={() => { if (!settled.current) stopEdit(t); }}>
+          <option value="">Uncategorised</option>
+          {groups.map(g => (
+            <optgroup key={g.id} label={g.name}>
+              {g.categories.filter(c => !c.archived || c.id === t.categoryId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      );
+    }
+    return (
+      <input {...common}
+        type={field === 'date' ? 'date' : 'text'}
+        inputMode={field === 'amount' ? 'decimal' : undefined}
+        aria-label={field === 'date' ? 'Date' : field === 'payee' ? 'Description' : 'Amount'}
+        style={field === 'amount' ? { textAlign: 'right' } : undefined}
+        value={draft}
+        onChange={e => { setDraft(e.target.value); if (cellErr) setCellErr(null); }}
+        onFocus={e => { if (field !== 'date') e.currentTarget.select(); }}
+        onKeyDown={e => cellKey(e, t, field)}
+        onBlur={e => { if (!settled.current) void commit(t, field, e.currentTarget.value, null); }}
+      />
+    );
+  };
+
+  const isEditing = (t: Txn, field: InlineField) => cell?.id === t.id && cell.field === field;
+  const onCellDouble = (t: Txn, field: InlineField) => (e: React.MouseEvent) => { e.stopPropagation(); startEdit(t, field); };
+
   const onRowKey = (e: React.KeyboardEvent<HTMLTableRowElement>, t: Txn, i: number) => {
     const rowsEl = tableRef.current?.querySelectorAll<HTMLTableRowElement>('tr[data-txn]');
     if (e.key === 'ArrowDown') { e.preventDefault(); rowsEl?.[Math.min(i + 1, rows.length - 1)]?.focus(); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); rowsEl?.[Math.max(i - 1, 0)]?.focus(); }
     else if (e.key === 'Enter') { e.preventDefault(); openEditor({ mode: 'edit', id: t.id }); }
+    else if (e.key === 'F2') { e.preventDefault(); startEdit(t, editableFields(t).includes('payee') ? 'payee' : 'date'); }
     else if (e.key === ' ') { e.preventDefault(); setChecked(prev => { const n = new Set(prev); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); return n; }); }
     else if (e.key === 'Delete') { e.preventDefault(); deleteIds(checked.size ? [...checked] : [t.id]); }
   };
@@ -188,7 +294,7 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
               {rows.map((t, i) => (
                 <tr
                   key={t.id}
-                  data-txn=""
+                  data-txn={t.id}
                   tabIndex={0}
                   className={selectedId === t.id ? 'lg-selected' : checked.has(t.id) ? 'lg-selected' : ''}
                   aria-selected={selectedId === t.id}
@@ -198,22 +304,26 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
                   <td onClick={e => e.stopPropagation()}>
                     <input type="checkbox" aria-label={`Select ${t.payee || 'transaction'}`} checked={checked.has(t.id)} onChange={() => setChecked(prev => { const n = new Set(prev); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); return n; })} />
                   </td>
-                  <td className="lg-num lg-muted" style={{ width: 100 }}>{formatDate(t.date)}</td>
-                  <td title={t.memo || undefined}>
+                  <td className={isEditing(t, 'date') ? 'lg-cell-edit' : 'lg-num lg-muted'} style={{ width: 100 }} onDoubleClick={onCellDouble(t, 'date')}>
+                    {isEditing(t, 'date') ? editor(t, 'date') : formatDate(t.date)}
+                  </td>
+                  {isEditing(t, 'payee') ? <td className="lg-cell-edit">{editor(t, 'payee')}</td> : <td title={t.memo || undefined} onDoubleClick={onCellDouble(t, 'payee')}>
                     {t.isTransfer
                       ? <span><DexIcon name="shuffle" size={11} color="var(--color-text-tertiary)" /> {t.amount < 0 ? 'To' : 'From'} {t.transferAccountName}</span>
                       : (t.payee || <span className="lg-muted">No description</span>)}
                     {t.memo && <span className="lg-muted"> · {t.memo}</span>}
                     {t.attachmentCount > 0 && <span className="lg-muted" title="Has a receipt"> <DexIcon name="paperclip" size={11} color="currentColor" /></span>}
-                  </td>
+                  </td>}
                   {!accountFilter && <td className="lg-muted lg-hide-sm">{t.accountName}</td>}
-                  <td className="lg-hide-xs">
-                    {t.isTransfer ? <span className="lg-muted">Transfer</span>
+                  <td className={`lg-hide-xs${isEditing(t, 'category') ? ' lg-cell-edit' : ''}`} onDoubleClick={onCellDouble(t, 'category')}>
+                    {isEditing(t, 'category') ? editor(t, 'category') : t.isTransfer ? <span className="lg-muted">Transfer</span>
                       : t.isSplit ? <span className="lg-tag">Split · {t.splitCount}</span>
                       : t.categoryName ? t.categoryName
                       : <span style={{ color: 'var(--color-warning, #ff9f0a)' }}>Uncategorised</span>}
                   </td>
-                  <td className="lg-r" style={{ width: 120 }}><Money minor={t.amount} tone="auto" /></td>
+                  <td className={`lg-r${isEditing(t, 'amount') ? ' lg-cell-edit' : ''}`} style={{ width: 120 }} onDoubleClick={onCellDouble(t, 'amount')}>
+                    {isEditing(t, 'amount') ? editor(t, 'amount') : <Money minor={t.amount} tone="auto" />}
+                  </td>
                   <td style={{ width: 56 }}><StatusDot status={t.status} onToggle={() => toggleStatus(t)} /></td>
                 </tr>
               ))}
