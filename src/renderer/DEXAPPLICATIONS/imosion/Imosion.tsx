@@ -4037,12 +4037,26 @@ const Imosion: React.FC = () => {
 
   // Save data (dual-write: localStorage + IPC) — debounced to avoid heavy serialization on every change
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveFailedRef = useRef(false);
   const saveProjectData = useCallback((showToast = false) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
     const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
-    localStorage.setItem('imosion-data', json);
-    (window as any).dex?.invoke?.('capability:storage:set', 'imosion-data', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    // Native copy first, so a full app store can't skip it. A failed local
+    // write used to throw inside the autosave timer: nothing was shown, Save
+    // did nothing, and the project still looked saved.
+    (window as any).dex?.invoke?.('capability:storage:set', 'imosion-data', json)?.catch?.((e: unknown) => { console.warn('[DEX]', e); });
+    try {
+      localStorage.setItem('imosion-data', json);
+    } catch (e) {
+      console.warn('[Imosion] save failed', e);
+      if (showToast || !saveFailedRef.current) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "Imosion couldn't save the project: app storage is full. Export your mix now and remove unused clips." } }));
+      }
+      saveFailedRef.current = true;
+      return;
+    }
+    saveFailedRef.current = false;
     setIsDirty(false);
     if (showToast) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));
