@@ -1185,6 +1185,10 @@ export const Browser: React.FC = () => {
         window.dex?.invoke?.('download:start', url).then((result: any) => {
           if (result?.success) {
             setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'completed', progress: 100, path: result.path } : d));
+          } else {
+            // No answer or a refusal used to leave the row "downloading" forever.
+            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
+            window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
           }
         }).catch(() => {
           setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
@@ -1356,6 +1360,9 @@ export const Browser: React.FC = () => {
             ? { ...d, status: 'completed', progress: 100, path: result.path, size: result.size }
             : d
         ));
+      } else {
+        setDownloads(prev => prev.map(d => d.id === id ? { ...d, status: 'error' } : d));
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
       }
     } catch (err) {
       setDownloads(prev => prev.map(d => 
