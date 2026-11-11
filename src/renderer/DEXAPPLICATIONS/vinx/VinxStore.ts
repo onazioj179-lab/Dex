@@ -529,7 +529,7 @@ function loadProject(): VinxProject {
   return createDefaultProject();
 }
 
-const SAVE_FAILED_LOCAL = 'Not saved: the project is larger than the browser store and DEX storage did not answer.';
+const SAVE_FAILED_LOCAL = 'Not saved: app storage is full and DEX storage did not answer. Save a checkpoint or export now, and remove unused media.';
 const SAVE_FAILED_NATIVE = 'Not saved: DEX storage refused the write.';
 
 /**
@@ -546,7 +546,7 @@ function saveProject(project: VinxProject, done: (error: string | null) => void)
     invoke?.('capability:storage:set', STORAGE_KEY, json)?.catch?.((e: unknown) => { console.warn('[VINX] native mirror failed', e); });
     return;
   }
-  if (!invoke) { done(local.reason === 'quota' ? 'Not saved: the project is larger than the browser store allows.' : 'Not saved: storage is unavailable.'); return; }
+  if (!invoke) { done(local.reason === 'quota' ? 'Not saved: app storage is full. Save a checkpoint or export now, and remove unused media.' : 'Not saved: storage is unavailable.'); return; }
   Promise.resolve(invoke('capability:storage:set', STORAGE_KEY, json)).then(() => done(null), () => done(local.reason === 'quota' ? SAVE_FAILED_LOCAL : SAVE_FAILED_NATIVE));
 }
 
