@@ -3579,3 +3579,8 @@ These need DSP/ML or native hosting we don't fake.
 - Bio: nearest-neighbour Tm (SantaLucia 1998, conditions shown) and circular-DNA digests (#148).
 - Listener-leak sweep after #130 found nothing else (#149).
 - Still open: 7.0.1 packaged verification and install test (#144), per-app passes for AXL / VINX / creative apps (#141).
+
+## Checkpoint 2026-11-11 (Bio GenBank + primers)
+
+- Bio imports and exports GenBank with features (table, extract to a sequence) and has a Primers tab: per-primer checks, pair checks, PCR product prediction on linear or circular templates (#150).
+- Still open: 7.0.1 packaged verification and install test (#144), packaged Terminal run (#139, #146), per-app passes for AXL / VINX / creative apps (#141).
