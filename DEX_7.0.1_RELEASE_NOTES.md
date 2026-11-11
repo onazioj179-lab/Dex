@@ -12,6 +12,7 @@
 | 18a | Build serials themselves. Builds before this were Parts 16–17: DEX Ledger (native engine, import of the earlier ledger), one app-pinning service, the Dock in the DEX Bar, the smart App Menu, shared app menus, Terminal split panes, Bioengineering workspace |
 | 18b | Browser: real back/forward state and a proper error page when a site can't be reached (both verified live); Terminal checked live in a built app (PowerShell runs commands; four shells detected), page fullscreen events wired; Terminal shell profiles and Open in Terminal; App Information shows creator and licence; Bio Studio nearest-neighbour melting temperature and circular-plasmid digests; app audit of Calculator, Calendar, Notes, Files, Store, Transfers (no fake controls found) |
 | 18c | Presentation: put pictures from your PC on slides (downscaled to fit), Save Deck / Open Deck as a .dexdeck file, and a clear warning if the deck can't be saved; VINX: a clear warning when the project can't be saved (it used to fail silently), with the native copy still written |
+| 18f | Browser downloads work: files save to your Downloads folder (never overwriting an existing file), and a failed download says why instead of spinning forever |
 
 ## New
 
