@@ -11,6 +11,7 @@
 | --- | --- |
 | 18a | Build serials themselves. Builds before this were Parts 16–17: DEX Ledger (native engine, import of the earlier ledger), one app-pinning service, the Dock in the DEX Bar, the smart App Menu, shared app menus, Terminal split panes, Bioengineering workspace |
 | 18b | Browser: real back/forward state and a proper error page when a site can't be reached (both verified live), page fullscreen events wired; Terminal shell profiles and Open in Terminal; App Information shows creator and licence; Bio Studio nearest-neighbour melting temperature and circular-plasmid digests; app audit of Calculator, Calendar, Notes, Files, Store, Transfers (no fake controls found) |
+| 18d | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
 
 ## New
 
