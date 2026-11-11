@@ -168,6 +168,8 @@ export interface ToolRiskSpec {
   capability?: ToolCapability;
   /** Sends data off the device (blocked in Local only unless Network is granted). */
   external?: boolean;
+  /** Always ask the user first, with this reason (standing automations). */
+  confirmReason?: string;
 }
 
 /** Risk table for the core tools. App actions are classified by their `mutates` flag. */
@@ -184,6 +186,9 @@ export const TOOL_RISK: Record<string, ToolRiskSpec> = {
   rename_file: { risk: 'medium', capability: 'file-write' },
   move_file: { risk: 'medium', capability: 'file-write' },
   trash_file: { risk: 'high', capability: 'file-write' },
+  schedule_task: { risk: 'medium', confirmReason: 'creates a task that runs on its own later' },
+  list_scheduled_tasks: { risk: 'low' },
+  cancel_scheduled_task: { risk: 'medium', confirmReason: 'deletes a scheduled task' },
 };
 
 export function toolRisk(tool: string, mutatesAppAction?: boolean): ToolRiskSpec {
@@ -217,6 +222,7 @@ export function decideToolCall(input: ToolDecisionInput): ToolDecision {
     return { kind: 'deny', reason: 'Local only mode is on, so nothing is sent off this device (grant Network access to allow web search).' };
   }
   if (spec.risk === 'high') return { kind: 'confirm', reason: 'high-risk action' };
+  if (spec.confirmReason) return { kind: 'confirm', reason: spec.confirmReason };
   if (spec.risk === 'medium' && spec.capability === 'file-write') return { kind: 'confirm', reason: 'changes your files' };
   return { kind: 'allow' };
 }
