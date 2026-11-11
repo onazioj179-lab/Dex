@@ -53,6 +53,8 @@ export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'analytics',
   // DEX Ledger (core/dex-ledger over its own ledger.db; ledger_ctl.rs).
   'ledger',
+  // Browser downloads (download_ctl.rs).
+  'download',
   // Focus/automation Modes (KV-backed CRUD + active-state; modes_dispatch in main.rs).
   'mode',
   // Workflow-ported clean subsystems (2026-06-19): KV/JSON CRUD + live-metric reads.
