@@ -21,7 +21,9 @@ import { planSilenceClips } from '../../../shared/media/silenceTimeline';
 import { decodeAudioToMono, slicePCM } from '../../services/media/decodeAudio';
 import { platform as _plat } from '../../utils';
 import { sharedTick } from '../../services/SharedTick';
-import { useVinxStore } from './VinxStore';
+import { useVinxStore, takeUnreadableProjectKey, projectWasLoadedFromStorage } from './VinxStore';
+import { beginSession, endSession, recoveryMessage } from './vinxPersistence';
+import { AutosaveIndicator } from '../../components/AutosaveIndicator';
 import { PlaybackEngine } from './PlaybackEngine';
 import { VinxPanelLayout } from './PanelLayout';
 import { MediaBrowser } from './MediaBrowser';
@@ -131,11 +133,6 @@ const toolbarBtnStyle: React.CSSProperties = {
 const toolbarBtnActiveStyle: React.CSSProperties = {
   ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)',
 };
-
-const saveBadgeStyle = (dirty: boolean): React.CSSProperties => ({
-  width: 6, height: 6, borderRadius: 4, flexShrink: 0,
-  background: dirty ? 'var(--color-error)' : 'var(--color-success)',
-});
 
 const recoveryBannerStyle: React.CSSProperties = {
   height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
@@ -291,6 +288,8 @@ const VinxEditor: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Imported "${asset.name}" from ${asset.sourceApp}` } }));
   }, [addMedia]));
   const isDirty = useVinxStore(s => s.isDirty);
+  const saveError = useVinxStore(s => s.saveError);
+  const lastSavedAt = useVinxStore(s => s.lastSavedAt);
   const executeCommand = useVinxStore(s => s.executeCommand);
   useUnsavedGuard(isDirty);
 
@@ -654,6 +653,43 @@ const VinxEditor: React.FC = () => {
     if (!engine) return;
     engine.setSequence(activeSequence, project.frameRate, sequenceDuration);
   }, [project.frameRate, activeSequence, sequenceDuration]);
+
+  // -- Session + recovery: a banner only when the last session did not close --
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try { storage = localStorage; } catch { /* unavailable */ }
+    const { uncleanSince } = beginSession(storage);
+    const aside = takeUnreadableProjectKey();
+    const text = aside
+      ? `The saved VINX project could not be read. It was kept as "${aside}" and a new project was started.`
+      : recoveryMessage(uncleanSince, projectWasLoadedFromStorage() ? useVinxStore.getState().project : null, (t) => new Date(t).toLocaleString());
+    if (text) useVinxStore.setState({ recoveryBanner: { show: true, text } });
+    const flush = () => { const s = useVinxStore.getState(); if (s.isDirty) s.markSaved(); };
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    const onPageHide = () => { flush(); endSession(storage); };
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onHide);
+    // Save two seconds after the last edit (the 30 s tick below stays as a backstop).
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = useVinxStore.subscribe((s, prev) => {
+      if (!s.isDirty || s.project === prev.project) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; flush(); }, 2000);
+    });
+    return () => {
+      unsub();
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onHide);
+      flush(); // closing VINX keeps the last edit
+      endSession(storage);
+    };
+  }, []);
+
+  // A failed save is said once per reason, then shown in the toolbar until it works.
+  useEffect(() => {
+    if (saveError) window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `VINX: ${saveError}` } }));
+  }, [saveError]);
 
   // -- Auto-save every 30 seconds --
   useEffect(() => {
@@ -1171,7 +1207,7 @@ const VinxEditor: React.FC = () => {
       {/* Recovery banner */}
       {recoveryBanner && recoveryBanner.show && (
         <div style={recoveryBannerStyle}>
-          <span>Recovered unsaved work from {recoveryBanner.time}</span>
+          <span>{recoveryBanner.text}</span>
           <button
             aria-label="Dismiss recovery banner"
             style={{ ...toolbarBtnStyle, color: 'var(--color-accent)', fontSize: 11 }}
@@ -1194,7 +1230,13 @@ const VinxEditor: React.FC = () => {
           onChange={e => setProjectName(e.target.value)}
           spellCheck={false}
         />
-        <div style={saveBadgeStyle(isDirty)} />
+        <span title={saveError ?? undefined} style={{ flexShrink: 0 }}>
+          <AutosaveIndicator
+            state={saveError ? 'error' : isDirty || !lastSavedAt ? 'idle' : 'saved'}
+            lastSavedAt={lastSavedAt || null}
+            label={saveError ? 'Not saved' : isDirty ? 'Unsaved changes' : undefined}
+          />
+        </span>
 
         <div style={toolbarSeparatorStyle} />
 
