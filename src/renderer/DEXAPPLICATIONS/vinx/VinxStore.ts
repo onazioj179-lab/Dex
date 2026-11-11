@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { readStoredProject, writeStoredProject, pickNewer, isProjectLike } from './vinxPersistence';
 import type {
   VinxProject, VinxSequence, Track, Clip, MediaItem, MediaBin,
   Marker, PanelLayout, VinxSettings, ClipEffect, KeyframeTrack,
@@ -38,6 +39,8 @@ interface VinxState {
   project: VinxProject;
   isDirty: boolean;
   lastSavedAt: number;
+  /** Why the last save failed (shown in the toolbar); null when saving works. */
+  saveError: string | null;
 
   // Playback
   currentFrame: number;
@@ -97,7 +100,7 @@ interface VinxState {
   autoSaveTimer: ReturnType<typeof setInterval> | null;
 
   // Recovery
-  recoveryBanner: { show: boolean; time: string } | null;
+  recoveryBanner: { show: boolean; text: string } | null;
 
   // New: Speed ramping panel
   showSpeedRampEditor: boolean;
@@ -484,12 +487,22 @@ function createDefaultProject(): VinxProject {
 const STORAGE_KEY = 'dex-vinx-project';
 const LAYOUT_KEY = 'dex-vinx-layout';
 
+const safeLocal = (): Storage | null => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+
+/** Set when the stored project could not be read and was copied aside. */
+let unreadableProjectKey: string | null = null;
+export function takeUnreadableProjectKey(): string | null { const k = unreadableProjectKey; unreadableProjectKey = null; return k; }
+/** True when the project in memory came from storage (not a new default one). */
+let loadedFromStorage = false;
+export function projectWasLoadedFromStorage(): boolean { return loadedFromStorage; }
+
 function loadProject(): VinxProject {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.id && parsed.sequences) {
+    const stored = readStoredProject(safeLocal(), STORAGE_KEY);
+    unreadableProjectKey = stored.movedAside;
+    if (stored.project) {
+      const parsed = stored.project as unknown as VinxProject;
+      {
         // Migration: clear stale demo clips ('cv1-1', 'cv2-1', 'ca1-1', 'ct1-1', etc.)
         // shipped before v4.2.1. If the persisted project still contains them and
         // user has not added any non-demo clips, reset to a clean empty project.
@@ -508,6 +521,7 @@ function loadProject(): VinxProject {
           console.info('[VINX] Migrating: removing demo clips from default project');
           return createDefaultProject();
         }
+        loadedFromStorage = true;
         return parsed;
       }
     }
@@ -515,26 +529,25 @@ function loadProject(): VinxProject {
   return createDefaultProject();
 }
 
-// A full app store used to fail silently (console only), and the native copy
-// was skipped with it. The native copy is now written independently, and the
-// user is told once per failure streak instead of losing edits unannounced.
-let saveFailed = false;
-function saveProject(project: VinxProject): void {
+const SAVE_FAILED_LOCAL = 'Not saved: app storage is full and DEX storage did not answer. Save a checkpoint or export now, and remove unused media.';
+const SAVE_FAILED_NATIVE = 'Not saved: DEX storage refused the write.';
+
+/**
+ * Write the project to localStorage and mirror it to DEX's native store. The
+ * save counts when either copy is written; the caller hears which.
+ */
+function saveProject(project: VinxProject, done: (error: string | null) => void): void {
   let json: string;
-  try { json = JSON.stringify(project); } catch (e) { console.warn('[VINX] Failed to serialise project:', e); return; }
-  (window as any).dex?.invoke?.('capability:storage:set', STORAGE_KEY, json)?.catch?.((e: unknown) => { console.warn('[DEX]', e); });
-  try {
-    localStorage.setItem(STORAGE_KEY, json);
-    saveFailed = false;
-  } catch (e) {
-    console.warn('[VINX] Failed to save project:', e);
-    if (!saveFailed) {
-      saveFailed = true;
-      try {
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "VINX couldn't save the project: app storage is full. Save a checkpoint or export now, and remove unused media." } }));
-      } catch { /* non-DOM */ }
-    }
+  try { json = JSON.stringify(project); } catch (e) { done(`Not saved: ${(e as Error).message}`); return; }
+  const local = writeStoredProject(safeLocal(), STORAGE_KEY, json);
+  const invoke = (window as any).dex?.invoke as ((ch: string, ...a: unknown[]) => Promise<unknown>) | undefined;
+  if (local.ok) {
+    done(null);
+    invoke?.('capability:storage:set', STORAGE_KEY, json)?.catch?.((e: unknown) => { console.warn('[VINX] native mirror failed', e); });
+    return;
   }
+  if (!invoke) { done(local.reason === 'quota' ? 'Not saved: app storage is full. Save a checkpoint or export now, and remove unused media.' : 'Not saved: storage is unavailable.'); return; }
+  Promise.resolve(invoke('capability:storage:set', STORAGE_KEY, json)).then(() => done(null), () => done(local.reason === 'quota' ? SAVE_FAILED_LOCAL : SAVE_FAILED_NATIVE));
 }
 
 function loadLayout(): PanelLayout {
@@ -556,32 +569,9 @@ function saveLayout(layout: PanelLayout): void {
   } catch (e) { console.warn('[VINX] Failed to save layout:', e); }
 }
 
-// ---------------------------------------------------------------------------
-// CHECK FOR RECOVERY
-// ---------------------------------------------------------------------------
-
-function checkRecovery(): { show: boolean; time: string } | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.modifiedAt) {
-        const lastMod = parsed.modifiedAt;
-        const age = Date.now() - lastMod;
-        // Widened window: any recovery <= 7 days old is offered.
-        // Previously age > 60s && age < 24h missed both immediate-crash and
-        // multi-day-old sessions, leaving valid recovery data hidden from the user.
-        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-        if (age >= 0 && age < SEVEN_DAYS) {
-          const d = new Date(lastMod);
-          const sameDay = (Date.now() - age) > Date.now() - 24 * 60 * 60 * 1000;
-          return { show: true, time: sameDay ? d.toLocaleTimeString() : d.toLocaleString() };
-        }
-      }
-    }
-  } catch (e) { console.warn('[VINX] Failed to check recovery:', e); }
-  return null;
-}
+// Recovery is decided when VINX opens (Vinx.tsx, session marker in
+// vinxPersistence.ts): a banner appears only if the previous session did not
+// close, never just because a saved project exists.
 
 // ---------------------------------------------------------------------------
 // STORE
@@ -591,12 +581,12 @@ export const useVinxStore = create<VinxState>((set, get) => {
   const initialProject = loadProject();
   const initialLayout = loadLayout();
   initialProject.panelLayout = initialLayout;
-  const recovery = checkRecovery();
-
   return {
     project: initialProject,
     isDirty: false,
-    lastSavedAt: Date.now(),
+    // 0 = never saved in this profile; the toolbar then says nothing about saving.
+    lastSavedAt: loadedFromStorage ? (initialProject.modifiedAt || 0) : 0,
+    saveError: null,
 
     currentFrame: 0,
     isPlaying: false,
@@ -641,7 +631,7 @@ export const useVinxStore = create<VinxState>((set, get) => {
 
     autoSaveTimer: null,
 
-    recoveryBanner: recovery,
+    recoveryBanner: null,
 
     // New state
     showSpeedRampEditor: false,
@@ -696,9 +686,16 @@ export const useVinxStore = create<VinxState>((set, get) => {
     }),
     markDirty: () => set({ isDirty: true }),
     markSaved: () => {
-      const s = get();
-      saveProject(s.project);
-      set({ isDirty: false, lastSavedAt: Date.now() });
+      const before = get().project;
+      const now = Date.now();
+      // Stamp the time so the newer of the local and native copies wins at the next start.
+      const project = { ...before, modifiedAt: now };
+      set({ project });
+      saveProject(project, (error) => {
+        if (error) { set({ saveError: error, isDirty: true }); return; }
+        // Edits made while an async write was in flight keep the project dirty.
+        set({ saveError: null, lastSavedAt: now, isDirty: get().project !== project });
+      });
     },
 
     // -- Playback --
@@ -1661,14 +1658,16 @@ export const useVinxStore = create<VinxState>((set, get) => {
   };
 });
 
-// Async IPC load on module init — overrides localStorage data with IPC backend data
+// Async native load on module init: use DEX's copy only when it is newer than
+// the local one (a local write that failed for size) and nothing was edited yet.
 (async () => {
   try {
     const raw = await (window as any).dex?.invoke?.('capability:storage:get', STORAGE_KEY);
     if (raw) {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (parsed && parsed.id && parsed.sequences) {
-        useVinxStore.setState({ project: parsed });
+      const s = useVinxStore.getState();
+      if (isProjectLike(parsed) && !s.isDirty && pickNewer(s.project as never, parsed as never) === parsed) {
+        useVinxStore.setState({ project: { ...(parsed as unknown as VinxProject), panelLayout: s.project.panelLayout } });
       }
     }
     const layoutRaw = await (window as any).dex?.invoke?.('capability:storage:get', LAYOUT_KEY);

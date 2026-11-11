@@ -3586,3 +3586,7 @@ These need DSP/ML or native hosting we don't fake.
 
 - Bio imports and exports GenBank with features (table, extract to a sequence) and has a Primers tab: per-primer checks, pair checks, PCR product prediction on linear or circular templates (#150).
 - Still open: 7.0.1 packaged verification and install test (#144), packaged Terminal run (#139, #146), per-app passes for AXL / VINX / creative apps (#141).
+
+## Checkpoint 2026-11-11 (VINX save and recovery)
+
+- VINX: recovery banner only after a session that did not close; saves 2 s after edits and on close; failures shown; newer copy wins at start (#152).
