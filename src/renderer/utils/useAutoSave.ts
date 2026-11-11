@@ -16,14 +16,20 @@ const getInvoke = (): ((...a: unknown[]) => Promise<unknown>) | undefined => (wi
 // Interval for durable version-history snapshots (5 minutes)
 const VERSION_SNAPSHOT_INTERVAL = 5 * 60_000;
 
+/** What happened to one autosave write (optional; lets an app show the real state). */
+export type AutoSaveResult = { ok: true; at: number } | { ok: false; reason: 'quota' | 'error' };
+
 export function useAutoSave(
   key: string,
   getData: () => unknown,
   isDirty: boolean,
   intervalMs = 30_000,
+  onResult?: (r: AutoSaveResult) => void,
 ): void {
   const instanceIdRef = useRef(`autosave-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const lastVersionSave = useRef(0);
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
   // The user's global autosave-interval preference wins when set; otherwise the
   // call site's own value is used (so existing apps are unchanged until opt-in).
   const effectiveInterval = resolveAutosaveInterval(intervalMs);
@@ -34,7 +40,12 @@ export function useAutoSave(
       try {
         const data = getData();
         localStorage.setItem(`dex-autosave-${key}`, JSON.stringify(data));
-      } catch { /* storage full or serialization error */ }
+        onResultRef.current?.({ ok: true, at: Date.now() });
+      } catch (e) {
+        // Storage full or serialization error: callers that pass onResult show it.
+        const err = e as { name?: string; message?: string };
+        onResultRef.current?.({ ok: false, reason: /quota/i.test(`${err?.name ?? ''} ${err?.message ?? ''}`) ? 'quota' : 'error' });
+      }
     };
     const autosaveId = `${instanceIdRef.current}-${key}`;
     const versionId = `${autosaveId}-version`;
