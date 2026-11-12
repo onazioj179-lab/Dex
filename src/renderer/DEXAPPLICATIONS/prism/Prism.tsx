@@ -1362,6 +1362,38 @@ const Prism: React.FC = () => {
     URL.revokeObjectURL(url);
   }, [canvasSize, layers, brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance]);
 
+  // ===== OPEN PROJECT (.prism.json written by Save) =====
+  // Save produced project files that nothing could open again.
+  const openProject = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const toast = (type: 'success' | 'error', message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+      try {
+        const p = JSON.parse(await file.text());
+        const okSize = p?.canvasSize && Number.isFinite(p.canvasSize.width) && Number.isFinite(p.canvasSize.height);
+        if (!p || p.version !== 1 || !Array.isArray(p.layers) || p.layers.length === 0 || !okSize) throw new Error('not a Prism project');
+        if (layers.length > 0 && isDirty && !window.confirm('Replace the current image with this project? Unsaved changes will be lost.')) return;
+        pushHistory('Open Project');
+        setCanvasSize({ width: p.canvasSize.width, height: p.canvasSize.height });
+        setLayers(p.layers as Layer[]);
+        setSelectedLayerId((p.layers[p.layers.length - 1] as Layer).id);
+        const a = p.adjustments || {};
+        const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+        setBrightness(num(a.brightness, 0)); setContrast(num(a.contrast, 0)); setSaturation(num(a.saturation, 0));
+        setHue(num(a.hue, 0)); setExposure(num(a.exposure, 0)); setHighlights(num(a.highlights, 0));
+        setShadows(num(a.shadows, 0)); setTemperature(num(a.temperature, 0)); setTint(num(a.tint, 0)); setVibrance(num(a.vibrance, 0));
+        toast('success', `Opened ${file.name}`);
+      } catch {
+        toast('error', "That file isn't a Prism project");
+      }
+    };
+    input.click();
+  }, [layers, isDirty, pushHistory]);
+
   // ===== APPLY FILTER PRESET =====
   const applyFilterPreset = useCallback((preset: FilterPreset) => {
     pushHistory('Apply Filter: ' + preset.name);
@@ -2974,6 +3006,7 @@ const Prism: React.FC = () => {
         </div>
         <div style={styles.headerCenter}>
           <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
+          <button className="prism-btn" style={styles.btn} onClick={openProject} aria-label="Open project" title="Open a .prism.json project saved with Save">{Icons.folder} Open Project</button>
           <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project">{Icons.save} Save</button>
           <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
           <button className="prism-btn" style={styles.btn} onClick={() => exportImage('png')} aria-label="Export image">{Icons.download} Export</button>
