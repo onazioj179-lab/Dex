@@ -14,6 +14,7 @@
 | 18c | Presentation: put pictures from your PC on slides (downscaled to fit), Save Deck / Open Deck as a .dexdeck file, and a clear warning if the deck can't be saved; VINX: a clear warning when the project can't be saved (it used to fail silently), with the native copy still written |
 | 18f | Browser downloads work: files save to your Downloads folder (never overwriting an existing file), and a failed download says why instead of spinning forever |
 | 18g | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
+| 18i | Rewind no longer hits an error when opened on a fresh install (plugin, profile and audit lists that come back empty); every one of the 56 apps now opens without an error in a built DEX |
 | 18j | More apps say so when they can't save your work: Calendar events, the Rewind journal, the Forge job queue, Imosion presets and track templates, and every app's crash-recovery copy. Spotlight: an app whose name starts with what you type now ranks above a file that only matches on its folder path |
 
 ## New
