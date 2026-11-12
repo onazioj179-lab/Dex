@@ -458,6 +458,7 @@ export interface ReferenceTrack {
 
 // Generate unique ID -- thin app default over the shared canonical
 import { generateId as sharedGenerateId } from '../../../shared/util/id';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 export const generateId = (prefix: string = 'id'): string => sharedGenerateId(prefix);
 
 // Convert bars to seconds
@@ -517,8 +518,8 @@ export const getAllTemplates = (): TrackTemplate[] => {
 // Save markers to localStorage
 export const saveMarkers = (projectId: string, markers: Marker[]) => {
   try {
-    localStorage.setItem(`dex-imosion-markers-${projectId}`, JSON.stringify(markers));
-  } catch { /* storage unavailable */ }
+    persistOrWarn(`dex-imosion-markers-${projectId}`, JSON.stringify(markers), 'Imosion markers');
+  } catch { /* serialisation failed */ }
 };
 
 // Load markers from localStorage
@@ -534,8 +535,8 @@ export const loadMarkers = (projectId: string): Marker[] => {
 // Save regions to localStorage
 export const saveRegions = (projectId: string, regions: Region[]) => {
   try {
-    localStorage.setItem(`dex-imosion-regions-${projectId}`, JSON.stringify(regions));
-  } catch { /* storage unavailable */ }
+    persistOrWarn(`dex-imosion-regions-${projectId}`, JSON.stringify(regions), 'Imosion regions');
+  } catch { /* serialisation failed */ }
 };
 
 // Load regions from localStorage
