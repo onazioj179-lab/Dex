@@ -163,7 +163,14 @@ export interface CollaborationState {
 
 import { generateId } from '../../shared/util/id';
 
-const generatePin = () => Math.random().toString().slice(2, 8);
+/** 6-digit share PIN from the CSPRNG. Math.random() was guessable and could
+ * return fewer than 6 digits (0.5 -> "5"). Rejection sampling keeps it unbiased. */
+export const generatePin = (): string => {
+  const buf = new Uint32Array(1);
+  const limit = 4_294_000_000; // largest multiple of 1e6 below 2^32
+  do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+  return String(buf[0] % 1_000_000).padStart(6, '0');
+};
 
 const generateShareLink = (projectId: string) => 
   `dex://collab/${projectId}/${Math.random().toString(36).slice(2, 10)}`;
