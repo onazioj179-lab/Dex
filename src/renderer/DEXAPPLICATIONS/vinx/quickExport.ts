@@ -18,6 +18,9 @@
  * cannot produce (ProRes / H.265 / etc.) the caller is told honestly that the
  * native encoder is required; this path only ever produces WebM.
  */
+import type { Lut3D } from './lut3d';
+import { LutRenderer } from './lutGL';
+
 
 // ---------------------------------------------------------------------------
 // Capability detection
@@ -88,6 +91,8 @@ export interface QuickExportOptions {
   /** Program LUT as a CSS filter string — baked into every rendered frame so
    *  the export matches what the user sees in the program monitor. */
   lutFilter?: string;
+  /** A loaded .cube 3D LUT, applied after compositing each frame. */
+  lutCube?: { cube: Lut3D; intensity: number };
   /** Start timeline playback at frame 0 at the project's natural speed. */
   startPlayback: () => void;
   /** Stop/pause timeline playback. */
@@ -216,6 +221,9 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
 
   const chunks: Blob[] = [];
   let rafId = 0;
+  // GPU (or CPU fallback) grader for a loaded .cube; built once per export.
+  let lutRenderer: LutRenderer | null = null;
+  if (opts.lutCube) { lutRenderer = new LutRenderer(); lutRenderer.setLut(opts.lutCube.cube); }
   let startTs = 0;
   let finished = false;
   let aborted = false;
@@ -243,6 +251,8 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
 
   function cleanupAll(): void {
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    lutRenderer?.dispose();
+    lutRenderer = null;
     cleanupStreams();
     cleanupAudio();
   }
@@ -277,6 +287,13 @@ export function runQuickExport(opts: QuickExportOptions): QuickExportController 
       } catch {
         ctx.filter = 'none';
         /* cross-origin/tainted frame — skip this element */
+      }
+    }
+
+    // Real 3D LUT: grade the composited frame (GPU when available).
+    if (lutRenderer && opts.lutCube) {
+      if (lutRenderer.render(canvas, width, height, opts.lutCube.intensity)) {
+        ctx.drawImage(lutRenderer.canvas, 0, 0, width, height);
       }
     }
 
