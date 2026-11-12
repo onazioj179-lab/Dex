@@ -249,12 +249,8 @@ html, body, #root {
   text-rendering: optimizeLegibility;
 }
 
-/* Keyboard-only focus ring on every interactive element (mouse stays clean). */
-:where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow: var(--dex-focus-ring);
-  border-radius: var(--dex-radius-sm);
-}
+/* Keyboard-only focus ring: the canonical outline rule in globals.css. A
+   box-shadow ring here drew a SECOND ring around every control. */
 
 /* OS-feel micro-interactions: animate only non-layout properties, no bounce. */
 :where(button, [role="button"], a, input, select) {

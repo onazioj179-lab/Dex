@@ -5194,12 +5194,6 @@ html.focus-mode,
   min-height: 44px;
 }
 
-/* Improved focus ring for dark themes */
-@media (prefers-color-scheme: dark) {
-  :focus-visible {
-    outline-color: #4a9eff !important;
-  }
-}
 
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
@@ -5810,14 +5804,6 @@ html[data-dex-large-text] * {
 
 /* Glow on hover */
 .dex-hover-glow,
-[data-hover-glow] {
-  transition: box-shadow 0.2s ease;
-}
-
-.dex-hover-glow:hover,
-[data-hover-glow]:hover {
-  box-shadow: 0 0 20px rgba(10, 132, 255, 0.3);
-}
 
 /* =============================================================================
    LOADING STATES
