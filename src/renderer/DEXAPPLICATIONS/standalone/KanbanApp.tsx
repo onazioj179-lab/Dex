@@ -10,6 +10,7 @@ import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../
 import { textIncludesAll, priorityRank, byField } from '../../../shared/collections/sortFilter';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 // -- Types --------------------------------------------------------------
 
@@ -65,7 +66,7 @@ async function loadBoardsAsync(): Promise<KanbanBoard[] | null> {
 }
 
 function saveBoards(boards: KanbanBoard[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(boards)); } catch (e) { console.warn('[DEX]', e); }
+  try { persistOrWarn(STORAGE_KEY, JSON.stringify(boards), 'your Kanban boards'); } catch (e) { console.warn('[DEX]', e); }
   (async () => {
     try {
       if ((window as any).dex?.invoke) {
