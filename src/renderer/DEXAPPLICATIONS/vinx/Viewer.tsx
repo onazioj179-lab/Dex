@@ -12,6 +12,7 @@
 
 import React, { useCallback, useRef, useState, useEffect, memo, useMemo } from 'react';
 import { useVinxStore } from './VinxStore';
+import { ProgramLutOverlay } from './ProgramLutOverlay';
 import { formatTimecode } from './VinxTypes';
 import type { Clip, MediaItem } from './VinxTypes';
 
@@ -560,7 +561,8 @@ const ViewerPanel: React.FC<{
             background: 'var(--color-bg-base)', position: 'relative', overflow: 'hidden',
             // Program LUT (store-driven so it survives re-renders; Quick
             // Export bakes the same filter into the rendered frames)
-            filter: programLUT?.cssFilter && programLUT.cssFilter !== 'none' ? programLUT.cssFilter : undefined,
+            // A loaded .cube is graded by the overlay below instead.
+            filter: !programLUT?.cube && programLUT?.cssFilter && programLUT.cssFilter !== 'none' ? programLUT.cssFilter : undefined,
           }}
         >
           <VideoLayer
@@ -569,6 +571,9 @@ const ViewerPanel: React.FC<{
             registerVideo={registerVideo}
             unregisterVideo={unregisterVideo}
           />
+          {programLUT?.cube && (
+            <ProgramLutOverlay cube={programLUT.cube} intensity={programLUT.intensity ?? 1} width={actualWidth} height={actualHeight} />
+          )}
           {overlay === 'safe-zones' && <SafeZoneOverlay width={actualWidth} height={actualHeight} />}
           {overlay === 'grid' && (
             <svg style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} width={actualWidth} height={actualHeight}>
