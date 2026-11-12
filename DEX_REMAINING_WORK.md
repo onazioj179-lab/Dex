@@ -210,7 +210,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
 | 102 | Install, upgrade, uninstall, reinstall of the 7.0.1 setup | NOT TESTED | Running it here would replace the owner's working 6.1.0 | NSIS setup | Run on a VM, or over 6.1.0 when the owner chooses | Owner / VM | P0 |
 | 103 | Blank strip above the DEX Bar in every app | FIXED (owner request) | Apps and maximized windows use the full height; the bar floats | `AppManager.tsx`, `FloatingLauncher.tsx` | Check in the installed app that no app has essential controls under the bar | Installed build | P2 |
 | 104 | Product name "DEX" vs "DEX OS" in the installer and Start menu | KEPT "DEX" | Renaming changes the install folder and uninstall key, so 7.0.1 would install beside 6.1.0 (two entries). Window title is "DEX OS" | `tauri.conf.json` | Rename only with a migration that removes the old entry | Owner | P3 |
-| 105 | Per-app completion pass (Part 12 §2–5) | NOT DONE this pass | This pass fixed release blockers. Packaged smoke opened 31 apps without a crash; workflow-level checks per app remain as in #54, #77, #99 | Apps | Continue app by app | — | P2 |
+| 105 | Per-app completion pass (Part 12 §2–5) | NOT DONE this pass (2026-11-11 smoke: all 56 apps opened in a built exe on a fresh isolated profile with 0 console errors and 0 error boundaries, after fixing Rewind null lists in 18g) | This pass fixed release blockers. Packaged smoke opened 31 apps without a crash; workflow-level checks per app remain as in #54, #77, #99 | Apps | Continue app by app | — | P2 |
 
 ## Part 8 follow-up (2026-11-03, PR #77)
 
