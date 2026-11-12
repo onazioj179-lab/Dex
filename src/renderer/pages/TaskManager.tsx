@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../components/DexIcon';
+import { openAppContextMenu } from '../components/AppContextMenu';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import NexusUkiPanel from '../components/NexusUkiPanel';
@@ -24,7 +25,7 @@ import { appLifecycle, type AppPhase } from '../services/AppLifecycle';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
-import { useElementSize } from '../utils/motionHooksExtended';
+import { LineChart, canvasColor } from '../components/telemetry/LineChart';
 
 // -- types + persisted preferences --------------------------------------------
 
@@ -132,118 +133,8 @@ const readHeapMB = (): { used: number; limit: number } | null => {
 
 // -- chart ------------------------------------------------------------------------
 
-/**
- * A colour the canvas can use, with alpha. Accepts hex, rgb()/rgba() or a CSS
- * variable such as var(--color-accent), resolved against `el` so the charts
- * follow the theme. (Appending hex alpha to "var(...)" made an invalid colour,
- * and addColorStop threw.)
- */
-export function canvasColor(color: string, alpha: number, el?: Element | null): string {
-  let c = color.trim();
-  const m = /^var\((--[\w-]+)(?:\s*,\s*([^)]+))?\)$/.exec(c);
-  if (m) {
-    const resolved = typeof getComputedStyle === 'function'
-      ? getComputedStyle(el ?? document.documentElement).getPropertyValue(m[1]).trim()
-      : '';
-    c = resolved || (m[2] ?? 'var(--color-accent)').trim();
-  }
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);
-  if (hex) {
-    const h = hex[1].length === 3 ? hex[1].split('').map((x) => x + x).join('') : hex[1];
-    const n = parseInt(h, 16);
-    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-  }
-  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c);
-  if (rgb) return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`;
-  return c; // named colour: no alpha, but still valid
-}
-
-interface LineChartProps {
-  series: number[];
-  /** Second, dashed series (e.g. network send). */
-  series2?: number[];
-  max: number;
-  height: number;
-  ariaLabel: string;
-  /** Draw the y-axis grid labels (top + middle). */
-  axisLabel?: (v: number) => string;
-}
-
-/**
- * One flat line chart: hairline grid, the accent line, a faint fill. No
- * gradients, glow or smoothing -- the shape is the data. Samples are laid out
- * right-aligned so a new chart fills in from the right like a system monitor.
- */
-const LineChart: React.FC<LineChartProps> = ({ series, series2, max, height, ariaLabel, axisLabel }) => {
-  const { ref, width, height: cssH } = useElementSize<HTMLCanvasElement>();
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas || !width || !cssH) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.floor(width), h = Math.floor(cssH);
-    if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    const accent = canvasColor('var(--color-accent, #0A84FF)', 1, canvas);
-    const fillTone = canvasColor('var(--color-accent, #0A84FF)', 0.12, canvas);
-    const grid = canvasColor('var(--color-text-primary, #ffffff)', 0.08, canvas);
-    const label = canvasColor('var(--color-text-tertiary, #8e8e93)', 1, canvas);
-
-    ctx.strokeStyle = grid;
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = Math.round((h - 1) * (i / 4)) + 0.5;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-    for (let i = 1; i < 6; i++) {
-      const x = Math.round(w * (i / 6)) + 0.5;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-
-    const safeMax = max > 0 ? max : 1;
-    const stepX = w / (HISTORY_LENGTH - 1);
-    const draw = (data: number[], dashed: boolean, fill: boolean) => {
-      const s = data.slice(-HISTORY_LENGTH);
-      if (s.length < 2) return;
-      const x0 = (HISTORY_LENGTH - s.length) * stepX;
-      const pt = (v: number, i: number): [number, number] => [x0 + i * stepX, (h - 1) - (Math.max(0, Math.min(safeMax, v)) / safeMax) * (h - 2)];
-      ctx.beginPath();
-      s.forEach((v, i) => { const [x, y] = pt(v, i); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-      if (fill) {
-        ctx.save();
-        ctx.lineTo(x0 + (s.length - 1) * stepX, h);
-        ctx.lineTo(x0, h);
-        ctx.closePath();
-        ctx.fillStyle = fillTone;
-        ctx.fill();
-        ctx.restore();
-        ctx.beginPath();
-        s.forEach((v, i) => { const [x, y] = pt(v, i); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-      }
-      ctx.setLineDash(dashed ? [4, 3] : []);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-      ctx.setLineDash([]);
-    };
-    draw(series, false, true);
-    if (series2) draw(series2, true, false);
-
-    if (axisLabel) {
-      ctx.fillStyle = label;
-      ctx.font = '10px var(--dex-font-ui, system-ui), system-ui, sans-serif';
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'right';
-      ctx.fillText(axisLabel(safeMax), w - 4, 3);
-      ctx.textBaseline = 'middle';
-      ctx.fillText(axisLabel(safeMax / 2), w - 4, h / 2);
-    }
-  }, [series, series2, max, width, cssH, axisLabel, ref]);
-  return <canvas ref={ref} role="img" aria-label={ariaLabel} style={{ width: '100%', height, display: 'block' }} />;
-};
+// Shared with the Diagnostics view; canvasColor stays exported from here for callers.
+export { canvasColor };
 
 // -- main component -----------------------------------------------------------
 
@@ -519,7 +410,7 @@ const TaskManager: React.FC = () => {
           />
         )}
         {view === 'diagnostics' && (
-          <div style={S.scroll}><NexusDiagnostics /></div>
+          <NexusDiagnostics />
         )}
         {view === 'system' && (
           <div style={S.scroll}>
@@ -918,7 +809,8 @@ const AppsView: React.FC<AppsViewProps> = ({ apps, currentAppId, onFocus, onQuit
           const canSuspend = !active && phase !== 'foreground' && appLifecycle.handles(app.id);
           const label = def?.name || app.name;
           return (
-            <div role="row" key={app.id} style={{ ...S.tr, gridTemplateColumns: APP_COLS, height: 36 }}>
+            <div role="row" key={app.id} style={{ ...S.tr, gridTemplateColumns: APP_COLS, height: 36 }}
+              onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: app.id, x: e.clientX, y: e.clientY, source: 'taskmanager' }); }}>
               <span style={S.cellName}>
                 <DexIcon name={def?.icon || app.icon || app.id} size={15} color="var(--color-text-secondary)" />
                 {def?.name || app.name}
@@ -970,7 +862,7 @@ const S: Record<string, React.CSSProperties> = {
   tableWrap: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   subbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0 },
   subtle: { fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 },
-  pill: { height: 24, padding: '0 10px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11.5, cursor: 'pointer' },
+  pill: { height: 24, padding: '0 10px', borderRadius: 9999, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11.5, cursor: 'pointer' },
   pillOn: { borderColor: 'var(--color-accent)', color: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)' },
   thead: { display: 'grid', gridTemplateColumns: PROC_COLS, gap: 8, height: 26, alignItems: 'center', padding: '0 12px', borderTop: '1px solid var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   th: { display: 'flex', alignItems: 'center', height: '100%', padding: 0, border: 'none', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left' },
@@ -995,7 +887,7 @@ const S: Record<string, React.CSSProperties> = {
   btnSm: { height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 11.5, cursor: 'pointer' },
   hint: { margin: 0, fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 },
   resList: { width: 210, flexShrink: 0, overflow: 'auto', borderRight: '1px solid var(--color-border-subtle)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 },
-  resItem: { display: 'grid', gridTemplateColumns: '64px 1fr', gap: 10, alignItems: 'center', padding: '7px 8px', borderRadius: 10, border: '1px solid transparent', background: 'transparent', color: 'var(--color-text-primary)', textAlign: 'left', cursor: 'pointer' },
+  resItem: { display: 'grid', gridTemplateColumns: '64px 1fr', gap: 10, alignItems: 'center', padding: '7px 8px', borderRadius: 10, borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent', background: 'transparent', color: 'var(--color-text-primary)', textAlign: 'left', cursor: 'pointer' },
   resItemOn: { background: 'var(--color-bg-elevated)', borderColor: 'var(--color-border-subtle)' },
   resSpark: { height: 30, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' },
   resName: { fontSize: 12, fontWeight: 600 },

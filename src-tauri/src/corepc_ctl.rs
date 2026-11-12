@@ -367,6 +367,12 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         // app.getVersion() -> version string. Same source as app:getVersion.
         "corepc:getVersion" => json!(env!("CARGO_PKG_VERSION")),
+        // Version plus build serial, e.g. { version: "7.0.1", serial: "18a", display: "7.0.1 (18a)" }.
+        "corepc:getBuild" => {
+            let serial = env!("DEX_BUILD_SERIAL");
+            let v = env!("CARGO_PKG_VERSION");
+            json!({ "version": v, "serial": serial, "display": if serial.is_empty() { v.to_string() } else { format!("{v} ({serial})") } })
+        }
         "corepc:verify" => verify(app),
         "corepc:query" => query(app, &a0),
         "corepc:execute" => execute(app, &a0),

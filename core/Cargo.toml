@@ -20,6 +20,7 @@ members = [
     "dex-scanner",
     "dex-ai-runtime",
     "dex-cache",
+    "dex-ledger",
 ]
 
 [workspace.package]

@@ -3,10 +3,10 @@
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // =============================================================================
 
-import type { SequenceKind } from './bioScience';
+import { MAX_FEATURES, type SeqFeature, type SequenceKind } from './bioScience';
 
 /** Where a sequence came from — shown next to every value derived from it. */
-export type SequenceSource = 'entered' | 'imported' | 'derived';
+export type SequenceSource = 'entered' | 'imported' | 'sample' | 'derived';
 
 export interface BioSequence {
   id: string;
@@ -14,6 +14,10 @@ export interface BioSequence {
   /** Cleaned residues (nucleotides stored as DNA, A/C/G/T/N). */
   seq: string;
   kind: SequenceKind;
+  /** Nucleotide topology: true for a plasmid or other closed circle. Absent = linear. */
+  circular?: boolean;
+  /** Annotations (from a GenBank import). Cleared when the residues are edited. */
+  features?: SeqFeature[];
   source: SequenceSource;
   notes: string;
   createdAt: number;
@@ -59,7 +63,7 @@ export function normalizeProject(input: unknown): BioProject {
   if (o.version !== 1) throw new Error(`Unsupported project version: ${String(o.version)}.`);
   if (!Array.isArray(o.sequences)) throw new Error('The project has no sequence list.');
   const kinds: SequenceKind[] = ['dna', 'rna', 'protein'];
-  const sources: SequenceSource[] = ['entered', 'imported', 'derived'];
+  const sources: SequenceSource[] = ['entered', 'imported', 'sample', 'derived'];
   const sequences: BioSequence[] = o.sequences.map((s, i) => {
     const r = (s ?? {}) as Record<string, unknown>;
     if (typeof r.seq !== 'string') throw new Error(`Sequence ${i + 1} has no residues.`);
@@ -68,6 +72,8 @@ export function normalizeProject(input: unknown): BioProject {
       name: typeof r.name === 'string' && r.name ? r.name : `Sequence ${i + 1}`,
       seq: r.seq.toUpperCase(),
       kind: kinds.includes(r.kind as SequenceKind) ? (r.kind as SequenceKind) : 'dna',
+      ...(r.circular === true && r.kind !== 'protein' ? { circular: true } : {}),
+      ...featuresOf(r.features, r.seq.length),
       source: sources.includes(r.source as SequenceSource) ? (r.source as SequenceSource) : 'imported',
       notes: typeof r.notes === 'string' ? r.notes : '',
       createdAt: typeof r.createdAt === 'number' ? r.createdAt : Date.now(),
@@ -81,6 +87,27 @@ export function normalizeProject(input: unknown): BioProject {
     ? o.activeId
     : sequences[0]?.id ?? null;
   return { version: 1, name: typeof o.name === 'string' && o.name ? o.name : 'Untitled project', sequences, results, activeId };
+}
+
+/** Keep only well-formed features that lie inside the sequence. */
+function featuresOf(input: unknown, length: number): { features?: SeqFeature[] } {
+  if (!Array.isArray(input)) return {};
+  const features: SeqFeature[] = [];
+  for (const x of input) {
+    if (features.length >= MAX_FEATURES) break;
+    const f = (x ?? {}) as Record<string, unknown>;
+    const start = Number(f.start);
+    const end = Number(f.end);
+    if (typeof f.type !== 'string' || typeof f.location !== 'string' || !Number.isInteger(start) || !Number.isInteger(end)) continue;
+    if (start < 1 || end < start || end > length) continue;
+    features.push({
+      type: f.type.slice(0, 40), location: f.location.slice(0, 2000), start, end,
+      strand: f.strand === -1 ? -1 : 1,
+      label: typeof f.label === 'string' ? f.label.slice(0, 120) : f.type,
+      partial: f.partial === true,
+    });
+  }
+  return features.length ? { features } : {};
 }
 
 export function loadProject(storage: Pick<Storage, 'getItem'> | null = safeStorage()): BioProject {
@@ -111,7 +138,7 @@ function safeStorage(): Storage | null {
 
 export type BioAction =
   | { type: 'add'; sequences: Omit<BioSequence, 'id' | 'createdAt' | 'updatedAt'>[] }
-  | { type: 'update'; id: string; patch: Partial<Pick<BioSequence, 'name' | 'seq' | 'notes' | 'kind'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<BioSequence, 'name' | 'seq' | 'notes' | 'kind' | 'circular'>> }
   | { type: 'remove'; id: string }
   | { type: 'select'; id: string | null }
   | { type: 'rename-project'; name: string }
@@ -129,7 +156,13 @@ export function applyAction(p: BioProject, a: BioAction, now = Date.now()): BioP
     case 'update':
       return {
         ...p,
-        sequences: p.sequences.map((s) => (s.id === a.id ? { ...s, ...a.patch, updatedAt: now } : s)),
+        sequences: p.sequences.map((s) => {
+          if (s.id !== a.id) return s;
+          const next = { ...s, ...a.patch, updatedAt: now };
+          // Feature coordinates describe the old residues; an edit makes them wrong.
+          if (a.patch.seq !== undefined && a.patch.seq !== s.seq) delete next.features;
+          return next;
+        }),
       };
     case 'remove': {
       const idx = p.sequences.findIndex((s) => s.id === a.id);

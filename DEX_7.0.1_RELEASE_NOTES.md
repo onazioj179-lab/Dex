@@ -2,6 +2,22 @@
 
 **Creator:** Onazi oJ · **Theme:** DEX Blue Modern · Changes since 6.1.0 (the last published release).
 
+## Build serials
+
+7.0.1 stays the version until it is declared finished; each update is marked
+`7.0.1 (<serial>)` in Settings › About, App Information and the startup log.
+
+| Serial | What it adds |
+| --- | --- |
+| 18a | Build serials themselves. Builds before this were Parts 16–17: DEX Ledger (native engine, import of the earlier ledger), one app-pinning service, the Dock in the DEX Bar, the smart App Menu, shared app menus, Terminal split panes, Bioengineering workspace |
+| 18b | Browser: real back/forward state and a proper error page when a site can't be reached (both verified live); Terminal checked live in a built app (PowerShell runs commands; four shells detected), page fullscreen events wired; Terminal shell profiles and Open in Terminal; App Information shows creator and licence; Bio Studio nearest-neighbour melting temperature and circular-plasmid digests; app audit of Calculator, Calendar, Notes, Files, Store, Transfers (no fake controls found) |
+| 18c | Presentation: put pictures from your PC on slides (downscaled to fit), Save Deck / Open Deck as a .dexdeck file, and a clear warning if the deck can't be saved; VINX: a clear warning when the project can't be saved (it used to fail silently), with the native copy still written |
+| 18f | Browser downloads work: files save to your Downloads folder (never overwriting an existing file), and a failed download says why instead of spinning forever |
+| 18g | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
+| 18i | Rewind no longer hits an error when opened on a fresh install (plugin, profile and audit lists that come back empty); every one of the 56 apps now opens without an error in a built DEX |
+| 18k | Notes: Export (Markdown, web page, text, DEX note JSON) and Import (.md, .txt, .html, DEX note JSON) work. Both always failed before: they were never connected in this version. Imports keep headings, lists, checklists, quotes, code and tables, take the title from the file, and say why when a file can't be used |
+| 18n | No more invented figures or fake successes: Home's System, Storage and Battery widgets show real readings (or say they need the desktop app); the Weather widget fetches current conditions itself and says when it is offline; VINX colour scopes read the real frame; DexCode open/save and Backup export really write the file and show errors; Learn's power profiles that did nothing are gone; Workflows' "Run Script" step no longer reports runs that never happened. Settings › Plugins installs from a folder and says plainly that plugin code does not run yet. Renderer crashes, memory alerts and warnings are now kept in `renderer.log` beside the startup log |
+
 ## New
 
 - **Interface Transparency.** One slider from 0% (fully opaque, no blur) to 100% (maximum glass) in Settings › Appearance, Settings › Shell and Control Center, with a separate blur-strength slider and a Refined/Liquid style choice. It changes the top bar, DEX Bar, menus, panels and window chrome live, follows light and dark mode, and is saved. Refined glass is the default (reads as 40%). Reduce Transparency and low-end mode keep surfaces opaque.

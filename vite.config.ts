@@ -7,7 +7,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
+
+/** package.json "dexBuild" (the build serial), or '' when absent/invalid. */
+function readDexBuild(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+    return typeof pkg.dexBuild === 'string' && /^\d+[a-z]$/.test(pkg.dexBuild) ? pkg.dexBuild : '';
+  } catch { return ''; }
+}
 
 /**
  * Fail the build when two output chunks statically import each other.
@@ -75,6 +84,9 @@ export default defineConfig({
   plugins: [react(), noChunkCycles()],
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.0'),
+    // Build serial (package.json "dexBuild", e.g. "18a"): marks each update
+    // while the version number stays put. See RELEASE.md "Build serials".
+    'import.meta.env.VITE_DEX_BUILD': JSON.stringify(readDexBuild()),
   },
   base: './',
   root: 'src/renderer',
@@ -164,6 +176,10 @@ export default defineConfig({
           // nearly every app AND by shared code (WordSuggestions). Left unpinned,
           // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // improvements500 helpers (downloadBlob, ...) are shared by shell code
+          // (SpatialHud) and apps (Bio Studio); left unpinned they landed in
+          // app-bio and made dex-app-core <-> app-bio a cycle.
+          if (/[\\/]renderer[\\/]improvements500[\\/]/.test(id)) return 'dex-app-core';
           // The shared NativeWebview imports a constant from the ad-block content
           // script; keep that module shared so app-browser (and the ad-block
           // engine) is not pulled into startup.

@@ -8,6 +8,25 @@
 //! u64). Queries are prefix-friendly so "rep" matches "report.pdf".
 
 use rayon::prelude::*;
+
+/// Background I/O pool for index content reads. Kept OFF rayon's global pool on purpose:
+/// sysinfo's process scan (Task Manager, Nexus Diagnostics) runs its parallel
+/// refresh on the global pool, and a first-launch full index of ~20k files used
+/// to occupy every global worker for as long as it ran, so those calls waited
+/// seconds to minutes (the "Diagnostics figures never appear" flake). Half the
+/// cores, named threads, 8 MiB stacks (the app's worker standard).
+fn io_pool() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        rayon::ThreadPoolBuilder::new()
+            .num_threads((n / 2).max(2))
+            .thread_name(|i| format!("dex-search-io-{i}"))
+            .stack_size(8 * 1024 * 1024)
+            .build()
+            .expect("dex-search-io thread pool")
+    })
+}
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -242,7 +261,8 @@ impl SearchIndex {
         // Read file contents (the I/O-bound part) in parallel, then feed the
         // single IndexWriter sequentially (the writer isn't Sync for concurrent
         // adds). Preserves the same documents, just overlaps the per-file reads.
-        let prepared: Vec<(String, String, String, u64, u64, String)> = walk(root, max)
+        let files = walk(root, max);
+        let prepared: Vec<(String, String, String, u64, u64, String)> = io_pool().install(|| files
             .into_par_iter()
             .map(|(path, modified, size)| {
                 let name = path
@@ -256,7 +276,7 @@ impl SearchIndex {
                 let content = read_text_content(&path, size);
                 (path.to_string_lossy().to_string(), name, ext, modified, size, content)
             })
-            .collect();
+            .collect());
 
         let n = prepared.len();
         for (path, name, ext, modified, size, content) in prepared {
@@ -742,5 +762,28 @@ mod tests {
 
         // An empty id is rejected rather than indexing a keyless doc.
         assert!(idx.upsert_doc("", "note", "x", "y", 0).is_err());
+    }
+}
+
+#[cfg(test)]
+mod io_pool_tests {
+    #[test]
+    fn a_busy_index_pool_leaves_the_global_pool_free() {
+        use rayon::prelude::*;
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let rx = std::sync::Mutex::new(rx);
+        // Occupy every index worker until released.
+        let workers = super::io_pool().current_num_threads();
+        let pool = super::io_pool();
+        let busy = std::thread::spawn(move || pool.install(|| (0..workers).into_par_iter().for_each(|_| {
+            let _ = rx.lock().unwrap().recv_timeout(std::time::Duration::from_secs(5));
+        })));
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let t = std::time::Instant::now();
+        let sum: u64 = (0..10_000u64).into_par_iter().sum();
+        assert_eq!(sum, 49_995_000);
+        assert!(t.elapsed() < std::time::Duration::from_secs(2), "global pool waited {:?}", t.elapsed());
+        for _ in 0..workers { let _ = tx.send(()); }
+        busy.join().unwrap();
     }
 }

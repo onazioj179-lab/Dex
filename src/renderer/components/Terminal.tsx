@@ -78,6 +78,8 @@ export interface TerminalProps {
   height?: number | string;
   /** Reports the last command entered (or null) so TerminalTabs can title the tab. */
   onRunningCommand?: (cmd: string | null) => void;
+  /** Text size in px (default 13). Changing it refits the terminal; the session keeps running. */
+  fontSize?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +139,7 @@ const toolbarBtn = (active = false): React.CSSProperties => ({
 
 type Status = 'starting' | 'running' | 'exited' | 'unavailable' | 'no-bridge';
 
-export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand }) => {
+export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand, fontSize = 13 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -155,6 +157,9 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const [status, setStatus] = useState<Status>('starting');
   const [error, setError] = useState<string | null>(null);
   const [shellName, setShellName] = useState<string>('');
+  const [sessionCwd, setSessionCwd] = useState<string>('');
+  const fontSizeRef = useRef(fontSize);
+  fontSizeRef.current = fontSize;
   const [exitCode, setExitCode] = useState<number | null>(null);
   const [dexResult, setDexResult] = useState<{ cmd: string; text: string; ok: boolean } | null>(null);
   const [find, setFind] = useState<{ q: string; hit: boolean | null } | null>(null);
@@ -221,7 +226,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     try {
       term = new XTerm({
         fontFamily: '"Cascadia Mono", "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace',
-        fontSize: 13,
+        fontSize: fontSizeRef.current,
         lineHeight: 1.2,
         cursorBlink: true,
         cursorStyle: 'bar',
@@ -323,6 +328,15 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     };
   }, [write]);
 
+  // Text size: applied to the live terminal, then refit so the shell learns
+  // its new column/row count (xterm's onResize forwards it to the PTY).
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term || term.options.fontSize === fontSize) return;
+    term.options.fontSize = fontSize;
+    try { fitRef.current?.fit(); } catch { /* hidden or disposed */ }
+  }, [fontSize]);
+
   // -------------------------------------------------------------------------
   // Session lifecycle
   // -------------------------------------------------------------------------
@@ -358,7 +372,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       const cols = t?.cols ?? 80;
       const rows = t?.rows ?? 24;
       b.invoke('pty:spawn', { cwd, shell, cols, rows }).then((res) => {
-        const r = (res ?? {}) as { sessionId?: string; error?: string; shell?: string };
+        const r = (res ?? {}) as { sessionId?: string; error?: string; shell?: string; cwd?: string };
+        if (mounted) setSessionCwd(typeof r.cwd === 'string' ? r.cwd : '');
         if (!mounted) return;
         if (r.error) { failed(r.error); return; }
         if (!r.sessionId) { failed('The shell did not start.'); return; }
@@ -548,7 +563,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
               background: status === 'running' ? '#5fd38a' : status === 'starting' ? '#e5c07b' : '#6b7078',
             }}
           />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{statusLabel}</span>
+          <span title={status === 'running' && sessionCwd ? `Started in ${sessionCwd}` : undefined} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{statusLabel}</span>
         </span>
         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
           {(status === 'exited' || status === 'unavailable') && (

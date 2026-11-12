@@ -9,6 +9,19 @@
 
 ---
 
+## 18n — renderer log, user info, honest plugins (2026-11-12)
+
+- New channels: `log:renderer` (warn/error only), `render-error:report`, `renderer:memory-critical` → `renderer_log.rs` → `<logs>/renderer.log` (JSON lines, 4000-char cap per entry, rotates to `renderer.log.1` at 512 KB). Removed from the renderer TELEMETRY_SINKS shim so they reach native.
+- `system:getUserInfo` → `{ success, username }` (account name only).
+- Removed renderer callers of channels that never existed: `native:*` helper (`utils/nativeBridge.ts`, `NativeSpringBatch.ts`), `batch:*` store, `plugins:browseRegistry/downloadAndInstall/package/publish`, `app:launch`.
+- Unhandled-channel scan script idea: collect `invoke('ns:name')` literals under `src/renderer`, diff against `"ns:name"` literals in `src-tauri/src` + `core`, then subtract `rendererShims.ts` keys.
+
+## PART 16 — DEX Ledger native engine + pinning (2026-11-04)
+
+- New native subsystem: `ledger:*` → `src-tauri/src/ledger_ctl.rs` → `core/dex-ledger` (rusqlite + `backup` feature). Own file `<data>/databases/ledger.db`, backups in `<data>/backups/ledger/`. Not routed through `db_dispatch`/dex.db on purpose (financial data isolated; its own restore path). `dex_ipc` gained a `webview: tauri::Webview` param to refuse ledger calls from child webviews.
+- `ledger` added to `TAURI_NATIVE_SUBSYSTEMS`. In the web preview Ledger shows an honest "desktop app only" state (no sample data).
+- E2E recipe used: `cargo build --features custom-protocol` (embeds `dist/renderer`, no dev server), run with `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in scratch and a unique CDP port; never the owner's profile.
+
 ## PART 2 — idle CPU, privacy honesty, storage, tiers (2026-11-01)
 
 Full write-up: `reports/PART2_IMPROVEMENT_REPORT.md`. Resume facts:
@@ -1147,7 +1160,7 @@ than 3%.
 | HTTP transfer (LAN share) | `httpTransfer:` start/stop/info/share/unshare/pickAndShare/acceptUpload + `transfer:selectFiles` (+ `http-transfer:*` events) | done (`http_transfer.rs`; `tiny_http` LAN server, download/upload + pending-accept, no-dep LAN-IP, 30-min expiry; multipart parser unit-tested 4/4; live serving needs in-app start) |
 | **Transfer / device / pairing (DTP)** | — | todo (device-to-device: mDNS discovery + custom TCP + encryption; not single-machine verifiable) |
 | Audio playback sink | — | NOT NEEDED (2026-06-15): the Music app (`pages/Audio.tsx`) plays renderer-side via `HTMLAudioElement` + `AudioContext` (crossfade + gapless preload). In a webview shell that IS the correct path; a native cpal/rodio sink would be redundant + wrong (playback outside the webview). Native decode/waveform stays in `dex-audio` for analysis. |
-| Terminal / PTY | `pty:` spawn/write/resize/kill/list (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
+| Terminal / PTY | `pty:` spawn/write/resize/kill/list/shells (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
 | **Security/Workflow controllers** | — | todo (largest; phase last) |
 | OS theme accent | `theme:getSystemAccentColor` | done on Windows (`native_ops::system_accent_color`, DWM AccentColor via `reg`, verified -> #0078D4); null degrade on mac/linux |
 

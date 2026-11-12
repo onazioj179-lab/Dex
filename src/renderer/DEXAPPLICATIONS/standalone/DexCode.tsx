@@ -39,6 +39,8 @@ import {
 } from './dexCode/project';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { registerAppIntentHandler } from '../../services/appIntents';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -168,7 +170,7 @@ const DexCode: React.FC = () => {
   // Autosave status for the status bar. 'saving' while the debounce is pending,
   // 'saved' briefly after the write lands, then idle. Purely a UI affordance --
   // the autosave timing itself is unchanged.
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   // Collapsible sidebar (DEX 5.6: IDE-like, "nothing locked"). Toggle from the
   // Navigator activity-bar button or Ctrl+B (VS Code convention). Persisted.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -420,11 +422,10 @@ const DexCode: React.FC = () => {
   useEffect(() => {
     setSaveState('saving');
     const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, code);
-        localStorage.setItem(FILE_KEY, fileName);
-      } catch { /* ignore */ }
-      setSaveState('saved');
+      // "Saved" only when the write really happened (it used to claim Saved
+      // even when app storage was full).
+      const ok = persistOrWarn(STORAGE_KEY, code, 'your DexCode draft') && persistOrWarn(FILE_KEY, fileName, 'your DexCode draft name');
+      setSaveState(ok ? 'saved' : 'failed');
     }, 300);
     return () => window.clearTimeout(timer);
   }, [code, fileName]);
@@ -788,6 +789,20 @@ const DexCode: React.FC = () => {
     const proj = await pickProjectFolder();
     if (proj) { setProject(proj); setWorkspaceHits([]); setWorkspaceQuery(''); }
   }, []);
+
+  // App Menu / search quick actions (registered in services/appRegistry.ts).
+  const intentRef = useRef({ handleNewFile, openFolder, isModified, fileName });
+  intentRef.current = { handleNewFile, openFolder, isModified, fileName };
+  useEffect(() => registerAppIntentHandler('dexcode', (action) => {
+    const r = intentRef.current;
+    if (action === 'new-file') {
+      if (r.isModified && !window.confirm(`Discard unsaved changes to ${r.fileName}?`)) return true;
+      r.handleNewFile();
+      return true;
+    }
+    if (action === 'open-project') { void r.openFolder(); return true; }
+    return false;
+  }), []);
 
   const closeProject = useCallback(() => {
     clearStoredProject();
@@ -1815,10 +1830,10 @@ const DexCode: React.FC = () => {
                 borderRadius: '50%',
                 background: saveState === 'saving'
                   ? 'var(--color-text-tertiary)'
-                  : 'var(--color-accent-fill)',
+                  : saveState === 'failed' ? 'var(--color-error)' : 'var(--color-accent-fill)',
               }}
             />
-            {saveState === 'saving' ? 'Saving…' : 'Saved'}
+            {saveState === 'saving' ? 'Saving…' : saveState === 'failed' ? 'Not saved' : 'Saved'}
           </span>
           <button
             type="button"

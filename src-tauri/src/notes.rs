@@ -1778,14 +1778,8 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         // exportNote writes a file to disk (and PDF needs a BrowserWindow);
         // importNotes reads files from disk — both are filesystem/OS concerns,
         // not pure DB work, so they degrade honestly rather than fabricate.
-        "dexnotes:export" => json!({
-            "success": false,
-            "error": "note file export not available in DB layer (not ported)"
-        }),
-        "dexnotes:import" => json!({
-            "imported": 0,
-            "errors": ["note file import not available in DB layer (not ported)"]
-        }),
+        // Export/import convert in the renderer (notesFileFormat.ts) and use
+        // `dexnotes:saveExport` / `dexnotes:readImportFile` in native_ops.
 
         // === Stats ===
         "dexnotes:stats" => get_stats(conn),

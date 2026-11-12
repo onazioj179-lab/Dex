@@ -14,6 +14,8 @@
 mod activity_feed;
 mod browser_view;
 mod paths;
+mod ledger_ctl;
+mod download_ctl;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -173,8 +175,8 @@ mod updates_ctl;
 mod workflow_ctl;
 mod changelog;
 mod color_labels;
-mod ledger;
-mod download;
+mod ledger_legacy;
+mod renderer_log;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -1293,6 +1295,16 @@ fn os_info() -> Value {
     })
 }
 
+/// The signed-in Windows account, for the Home greeting. Only the account
+/// name: no SID, profile path or anything else leaves this function.
+fn user_info() -> Value {
+    let username = std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default();
+    if username.trim().is_empty() {
+        return json!({ "success": false, "error": "The account name is not available." });
+    }
+    json!({ "success": true, "username": username })
+}
+
 fn disk_usage() -> Value {
     let disks = sysinfo::Disks::new_with_refreshed_list();
     let list: Vec<Value> = disks
@@ -1945,9 +1957,6 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("color-labels:") {
         return color_labels::dispatch(conn, channel, args);
     }
-    if channel.starts_with("ledger:") {
-        return ledger::dispatch(conn, channel, args);
-    }
     if channel.starts_with("dashboard:") {
         return dashboard::dispatch(conn, channel, args);
     }
@@ -2211,7 +2220,22 @@ fn fit_main_webview(app: &tauri::AppHandle) {
 /// one subsystem at a time; anything not yet ported returns `null`, so the UI
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
-async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::Webview, channel: String, args: Value) -> Value {
+    // DEX Ledger holds financial data: only a DEX window's own webview (the
+    // main shell or a detached DEX app window, both loading the local bundle)
+    // may reach it — never a child webview such as a browser tab.
+    if channel.starts_with("ledger:") {
+        let own_webview = webview.label() == webview.window().label();
+        if !own_webview || webview.label().starts_with("dexbrowser-") {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ledger_ctl::dispatch(&app, &channel, &args)))
+                .unwrap_or_else(|_| json!({ "ok": false, "error": "The ledger hit an internal error; nothing was saved." }))
+        })
+        .await
+        .unwrap_or(Value::Null);
+    }
     // Run OFF the UI thread. A synchronous `#[tauri::command]` executes on the main
     // thread, so the renderer's boot-time flood of IPC calls — SQLite, filesystem,
     // sysinfo, all blocking — froze the webview ("DEX not responding"). Hopping onto
@@ -2242,6 +2266,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     let arg_u64 = |i: usize| args.get(i).and_then(|v| v.as_u64());
 
     // === Migration wiring (modules; revert-proof) ===
+    if channel.starts_with("download:") { return download_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("git:") { return git::dispatch(&channel, &args); }
     if channel.starts_with("env:") { return env_manager::dispatch(&app, &channel, &args); }
     if channel.starts_with("ssh:") { return ssh::dispatch(&app, &channel, &args); }
@@ -2450,6 +2475,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 
         // --- System / power -------------------------------------------------
         "system:getStatus" => system_status(),
+        "system:getUserInfo" => user_info(),
+        "log:renderer" | "render-error:report" | "renderer:memory-critical" => renderer_log::dispatch(&channel, &args),
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
@@ -2470,7 +2497,6 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "dialog:showSaveDialog" => native_ops::show_save_dialog(&app, &args),
         "fs:readText" => native_ops::read_text(&args),
         "fs:writeText" => native_ops::write_text(&args),
-        "download:start" => download::start(&app, &args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
         // (project-archiver:* and media-library:* run their fs work inside
@@ -2480,6 +2506,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // `dexnotes:` prefix route below, which has no picker arm (these used to
         // fall through to it and return null, so Notes' Attach/Import did nothing).
         "dexnotes:pick-attachment-file" | "dexnotes:pick-import-file" => native_ops::note_pick_file(&app),
+        "dexnotes:saveExport" => native_ops::note_save_export(&app, &args),
+        "dexnotes:readImportFile" => native_ops::note_read_import(&args),
         "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
         "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),
@@ -2795,7 +2823,6 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("activity-feed:")
             || ch.starts_with("changelog:")
             || ch.starts_with("color-labels:")
-            || ch.starts_with("ledger:")
             || ch.starts_with("dashboard:")
             || ch.starts_with("goal-system:")
             || ch.starts_with("help:")
@@ -2925,7 +2952,6 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
     activity_feed::ensure_schema(c);
     changelog::ensure_schema(c);
     color_labels::ensure_schema(c);
-    ledger::ensure_schema(c);
     content_expiry::ensure_schema(c);
     daily_note::ensure_schema(c);
     dashboard::ensure_schema(c);
@@ -2986,6 +3012,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 fn main() {
     startup_timeline::anchor();
     webview2::install_panic_logger();
+    webview2::log(&format!("DEX {} (build {}) starting", env!("CARGO_PKG_VERSION"), env!("DEX_BUILD_SERIAL")));
     // Must run before WebView2 opens its cache files (see storage_ctl.rs).
     storage_ctl::run_pending_cache_clear();
     // Fail loudly and helpfully when no WebView2 runtime exists, instead of
@@ -3065,6 +3092,7 @@ fn main() {
             app.manage(db_state);
             // File-swap gate for backup:restore vs out-of-band dex.db connections.
             app.manage(db::DbGate::new(()));
+            app.manage(ledger_ctl::LedgerState::default());
             // Terminal/PTY session table (in-app shell; piped-stdio sessions).
             app.manage(terminal::TerminalState::default());
             // Live file-watcher table; start watchers for persisted folders now

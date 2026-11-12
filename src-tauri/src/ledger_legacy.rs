@@ -1,22 +1,19 @@
 // =============================================================================
-// DEX Ledger — local-first personal finance store (shared dex.db)
+// DEX Ledger — reader for the earlier (#88, Part 17) ledger tables in dex.db
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // =============================================================================
-//! Relational tables for accounts, categories, transactions, splits and monthly
-//! budgets. Money is stored as INTEGER minor units (cents) — never floating
-//! point. The renderer edits a working copy and persists it with
-//! `ledger:save`, which validates the whole document and replaces the tables
-//! inside ONE SQLite transaction: either every row lands or none does, so a
-//! crash mid-save can't leave half a ledger.
-//!
-//! Channels:
-//!   - ledger:load  ()     -> { ok, doc }   (doc has empty arrays on first run)
-//!   - ledger:save  (doc)  -> { ok } | { ok:false, error }
-//!   - ledger:stats ()     -> { ok, accounts, transactions }
+//! DEX Ledger now lives in its own database (`ledger.db`, core/dex-ledger via
+//! ledger_ctl.rs). An earlier build stored a ledger as `ledger_*` tables in
+//! dex.db. This module only READS those tables so the setup screen can offer
+//! a one-time import; it never writes or deletes them, and no IPC channel
+//! reaches it directly. (`save` and its validation are kept for the tests.)
 
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
+#[cfg(test)]
+use rusqlite::params;
 use serde_json::{json, Value};
 
+#[cfg(test)]
 pub fn ensure_schema(conn: &Connection) {
     let _ = conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS ledger_meta (
@@ -69,14 +66,17 @@ pub fn ensure_schema(conn: &Connection) {
     );
 }
 
+#[cfg(test)]
 fn s(v: &Value, k: &str) -> String {
     v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
+#[cfg(test)]
 fn opt_s(v: &Value, k: &str) -> Option<String> {
     v.get(k).and_then(|x| x.as_str()).filter(|x| !x.is_empty()).map(String::from)
 }
 /// Integer-only money. A float (e.g. 12.5) or out-of-range value is rejected,
 /// so a renderer bug can't silently round someone's balance.
+#[cfg(test)]
 fn minor(v: &Value, k: &str) -> Result<i64, String> {
     match v.get(k) {
         Some(Value::Number(n)) if n.is_i64() => {
@@ -87,14 +87,32 @@ fn minor(v: &Value, k: &str) -> Result<i64, String> {
         None => Ok(0),
     }
 }
+#[cfg(test)]
 fn is_month(m: &str) -> bool {
     m.len() == 7 && m.as_bytes()[4] == b'-' && m[..4].chars().all(|c| c.is_ascii_digit()) && m[5..].chars().all(|c| c.is_ascii_digit())
 }
+#[cfg(test)]
 fn is_date(d: &str) -> bool {
     d.len() == 10 && is_month(&d[..7]) && d.as_bytes()[7] == b'-' && d[8..].chars().all(|c| c.is_ascii_digit())
 }
+#[cfg(test)]
 fn arr<'a>(doc: &'a Value, k: &str) -> &'a [Value] {
     doc.get(k).and_then(|x| x.as_array()).map(|a| a.as_slice()).unwrap_or(&[])
+}
+
+/// Is there an earlier ledger worth importing? Counts only; None when the
+/// tables don't exist or hold nothing.
+pub fn probe(conn: &Connection) -> Option<Value> {
+    let count = |t: &str| conn.query_row(&format!("SELECT COUNT(*) FROM {t}"), [], |r| r.get::<_, i64>(0)).ok();
+    let accounts = count("ledger_accounts")?;
+    let transactions = count("ledger_transactions").unwrap_or(0);
+    if accounts == 0 && transactions == 0 {
+        return None;
+    }
+    let currency: String = conn
+        .query_row("SELECT value FROM ledger_meta WHERE key = 'currency'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "USD".into());
+    Some(serde_json::json!({ "accounts": accounts, "transactions": transactions, "currency": currency }))
 }
 
 pub fn load(conn: &Connection) -> Result<Value, String> {
@@ -162,6 +180,7 @@ pub fn load(conn: &Connection) -> Result<Value, String> {
 }
 
 /// Validate and replace the whole ledger atomically.
+#[cfg(test)]
 pub fn save(conn: &Connection, doc: &Value) -> Result<(), String> {
     let currency = doc.get("currency").and_then(|x| x.as_str()).unwrap_or("USD");
     if currency.len() != 3 || !currency.chars().all(|c| c.is_ascii_uppercase()) {
@@ -250,26 +269,6 @@ pub fn save(conn: &Connection, doc: &Value) -> Result<(), String> {
     tx.commit().map_err(e)
 }
 
-pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
-    match channel {
-        "ledger:load" => match load(conn) {
-            Ok(doc) => json!({ "ok": true, "doc": doc }),
-            Err(err) => json!({ "ok": false, "error": err }),
-        },
-        "ledger:save" => match args.get(0) {
-            Some(doc) => match save(conn, doc) {
-                Ok(()) => json!({ "ok": true }),
-                Err(err) => json!({ "ok": false, "error": err }),
-            },
-            None => json!({ "ok": false, "error": "missing ledger document" }),
-        },
-        "ledger:stats" => {
-            let n = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap_or(0);
-            json!({ "ok": true, "accounts": n("SELECT COUNT(*) FROM ledger_accounts"), "transactions": n("SELECT COUNT(*) FROM ledger_transactions") })
-        }
-        _ => Value::Null,
-    }
-}
 
 #[cfg(test)]
 mod tests {

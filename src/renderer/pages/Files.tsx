@@ -21,6 +21,7 @@ import { useToastHelpers } from '../components/Toast';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
+import { requestTerminalAt } from '../components/terminalProfiles';
 import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -362,7 +363,6 @@ export const Files: React.FC = () => {
 
   const [currentPath, setCurrentPath] = useState<string>('');
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [allFiles, setAllFiles] = useState<FileItem[]>([]); // For smart collections
   const [selectedLocation, setSelectedLocation] = useState('documents');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -496,7 +496,6 @@ export const Files: React.FC = () => {
     try { return JSON.parse(localStorage.getItem('dex-file-tags') || '{}'); } catch { return {}; }
   });
   const [activeTagFilter, setActiveTagFilter] = useState<TagColor | null>(null);
-  const [showTagPicker, setShowTagPicker] = useState<{ x: number; y: number; path: string } | null>(null);
 
   // Drag state for file move
   const [dragFile, setDragFile] = useState<FileItem | null>(null);
@@ -603,7 +602,6 @@ export const Files: React.FC = () => {
     } else {
       colorLabels.removeLabel('files', 'file', path);
     }
-    setShowTagPicker(null);
   }, [colorLabels]);
 
   const handleDragStart = useCallback((e: React.DragEvent, file: FileItem) => {
@@ -659,7 +657,6 @@ export const Files: React.FC = () => {
             category: getFileCategory(f.extension || '', f.name),
           }));
           setFiles(filesWithCategory);
-          setAllFiles(filesWithCategory);
           setCurrentPath(result.path);
           recordRecentFolder(result.path);
           
@@ -680,7 +677,6 @@ export const Files: React.FC = () => {
           setRecentFiles(recent);
         } else {
           setFiles([]);
-          setAllFiles([]);
           setLoadError(result?.error ? `Couldn't open this folder: ${result.error}` : "Couldn't open this folder.");
         }
       } else {
@@ -1042,6 +1038,16 @@ export const Files: React.FC = () => {
     }
   };
 
+  // Open a Terminal tab in a folder (for a file: the folder that holds it).
+  const handleOpenInTerminal = (file: FileItem) => {
+    setContextMenu(null);
+    const dir = file.isDirectory ? file.path : file.path.replace(/[\\/][^\\/]*$/, '');
+    if (!dir) return;
+    requestTerminalAt(dir);
+    const def = APP_DEFINITIONS.terminal;
+    launchApp({ id: 'terminal', name: def.name, icon: def.icon || 'terminal', color: def.color });
+  };
+
   // Copy a file's absolute path to the clipboard.
   const handleCopyPath = useCallback(async (file: FileItem) => {
     setContextMenu(null);
@@ -1132,15 +1138,14 @@ export const Files: React.FC = () => {
   // ----- Batch copy / cut / paste over the existing files:copy / files:move -----
   const handleBatchCopy = useCallback(() => {
     if (selectedFiles.size === 0) return;
+    // The "N items ready to copy · Paste" bar is the confirmation.
     setBatchClipboard({ paths: [...selectedFiles], mode: 'copy' });
-    toast.info(`Copied ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
-  }, [selectedFiles, toast]);
+  }, [selectedFiles]);
 
   const handleBatchCut = useCallback(() => {
     if (selectedFiles.size === 0) return;
     setBatchClipboard({ paths: [...selectedFiles], mode: 'cut' });
-    toast.info(`Cut ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
-  }, [selectedFiles, toast]);
+  }, [selectedFiles]);
 
   const handleBatchPaste = useCallback(async () => {
     if (!batchClipboard || !currentPath) return;
@@ -2419,6 +2424,9 @@ export const Files: React.FC = () => {
             })()}
             <button onClick={() => handleShowInExplorer(contextMenu.file)} aria-label={`Show ${contextMenu.file.name} in Explorer`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Show in Explorer
+            </button>
+            <button onClick={() => handleOpenInTerminal(contextMenu.file)} aria-label={contextMenu.file.isDirectory ? `Open ${contextMenu.file.name} in Terminal` : `Open the folder of ${contextMenu.file.name} in Terminal`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+              Open in Terminal
             </button>
             <div style={{ height: '1px', background: 'var(--color-border, var(--color-border-subtle))', margin: '4px 0' }} />
             <button onClick={() => handleCopyFile(contextMenu.file)} aria-label={`Copy ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>

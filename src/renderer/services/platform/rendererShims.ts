@@ -244,8 +244,6 @@ const TELEMETRY_SINKS = new Set<string>([
   // degrade (~1/sec) out of the report.
   'renderer:heartbeat',
   'renderer:save-emergency-state',
-  'renderer:memory-critical',
-  'render-error:report',
 ]);
 
 /**
@@ -266,8 +264,9 @@ export const NATIVE_PENDING: ReadonlyArray<{ channel: string; needs: string }> =
   // rewind:getDaySummary (main.rs); watch:start/stop (watch.rs); auth:setup:* (KV
   // sha256, Electron parity); dexnotes:pick-attachment-file / pick-import-file
   // (native picker -> {filePath}) + get-word-suggestions ([] until a dictionary
-  // source exists). renderer:save-emergency-state / memory-critical /
-  // render-error:report are fire-and-forget sinks (see TELEMETRY_SINKS). app:launch
+  // source exists). renderer:save-emergency-state is a fire-and-forget sink (see
+  // TELEMETRY_SINKS); render-error:report, renderer:memory-critical and log:renderer (warn/error)
+  // go to the native renderer.log (renderer_log.rs). app:launch
   // is a renderer action (running-apps store), not a native channel.
   //
   // files:organizeByType (main.rs files_organize_by_type — faithful FileOperation[]

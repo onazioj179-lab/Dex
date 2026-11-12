@@ -9,12 +9,21 @@
  * embeds, given the whole window. Closing the last session leaves an empty
  * state with a button to start a new one (the window stays open).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TerminalTabs } from '../../components/TerminalTabs';
+import { OPEN_EVENT } from '../../components/terminalProfiles';
 
 const TerminalApp: React.FC = () => {
   const [gen, setGen] = useState(0);
   const [open, setOpen] = useState(true);
+  // "Open in Terminal" while every session is closed: start again so the
+  // remounted tabs pick the waiting request up.
+  useEffect(() => {
+    if (open) return;
+    const reopen = () => { setGen((g) => g + 1); setOpen(true); };
+    window.addEventListener(OPEN_EVENT, reopen);
+    return () => window.removeEventListener(OPEN_EVENT, reopen);
+  }, [open]);
   if (!open) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#0a0a0a', color: 'var(--color-text-secondary, #b8b8bd)', fontSize: 12 }}>
@@ -28,7 +37,7 @@ const TerminalApp: React.FC = () => {
   }
   return (
     <div style={{ height: '100%', display: 'flex', background: '#0a0a0a' }}>
-      <TerminalTabs key={gen} onClose={() => setOpen(false)} />
+      <TerminalTabs key={gen} acceptOpenRequests onClose={() => setOpen(false)} />
     </div>
   );
 };

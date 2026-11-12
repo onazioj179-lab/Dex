@@ -93,7 +93,7 @@
 > marker the host tallies into `blockedCount`. On by default (blockAds+blockTrackers default true). 26 unit
 > tests incl. a code-injection-breakout guard + behavioral eval; live-verified in WebView2 (all APIs present,
 > matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
-> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: Vinx 3D-LUT math; Forge
+> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: ~~Vinx 3D-LUT math~~ ✅ 2026-11-12 (#158); Forge
 > WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
 >
 > **TRACK 6 — STORE APP LIFECYCLE ✅ (2026-07-02):** Install/remove/reinstall/reset is real (mandate:
@@ -2267,6 +2267,25 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   pass + keyboard nav audit next).
 - Screen Time / parental / Maps / AirPods: N/A for a desktop productivity OS.
 
+## Checkpoint 2026-11-04 (Part 16: DEX Ledger, universal pinning, smart App Menu)
+
+- **DEX Ledger** (`DEXAPPLICATIONS/ledger/`): local-first finance app. Engine is the new Rust crate `core/dex-ledger` (own `ledger.db`, separate from dex.db): integer minor units (i64, ISO 4217 exponents), versioned migrations (`PRAGMA user_version`), every write in one SQLite transaction with an audit row, FK integrity, transfers as linked pairs (never income/expense), splits must sum exactly, reconciled rows locked behind `confirmReconciled`, envelope budget with explicit rollover rules, CSV import (delimiter/header/date-order detection, duplicate detection by import id + pre-import counts, auto backup first), CSV export (formula-injection guarded), statement matching, reconcile/undo/history, reports (income vs expenses, cash flow, spending, balances, budget vs actual), backups (VACUUM INTO, validated restore with a safety backup, export/import file), integrity check, corrupt-file recovery that keeps the damaged file. 28 Rust tests (`cd core && cargo test -p dex-ledger`).
+- **One Ledger (owner decision, 2026-11-05):** #88 (Part 17) had landed a second, document-style Ledger (TS model + `ledger:load/save` over dex.db tables) under the same app id. Owner chose this native engine. #88's `ledgerModel.ts`/`ledgerStorage.ts` are removed; its `ledger.rs` is now the read-only `src-tauri/src/ledger_legacy.rs`, and setup offers **Import earlier ledger** (`ledger:legacy:probe/import` → `Ledger::import_legacy`, one transaction, only into an empty ledger, backup first). The old dex.db tables are never written or deleted.
+- Shell bridge `src-tauri/src/ledger_ctl.rs`: `ledger:*` channels; only a DEX window's own webview may call them (browser child webviews refused in `dex_ipc`); every user-file read/write goes through a native dialog opened in Rust — the renderer never passes a path.
+- **One pinning service**: `store/dockPinStore.ts` now holds Dock pins + App Menu pins (no permanent pins, deduped, persisted + native-mirrored); `services/appPinning.ts` is the API every surface uses. The DEX Bar shows the Dock (`components/DockPins.tsx`): pinned apps only (bar doesn't shift), running dots, drag reorder, drop-from-App-Menu to pin, Alt+←/→.
+- **App registry** `services/appRegistry.ts`: window sizes (moved from AppManager) + remembered per-app window size, pin eligibility, settings targets, registered quick actions (Ledger, Notes, DexCode, Browser — each implemented via `services/appIntents.ts`; a test asserts every advertised action has a handler), local app/action search (no fuzzy guessing).
+- **Smart App Menu** (`components/AppMenuPanel.tsx`): Search · Pinned · Recent · All Apps; Enter runs only the highlighted hit. **Shared app context menu** (`components/AppContextMenu.tsx`) from Dock, App Menu, DEX Bar search results, window title-bar icon and Task Manager rows: open / own window / quick actions / pin to Dock / pin to App Menu / app settings / App Information / bring to front / minimize / close window / quit — AppManager executes via `dex-app-command`.
+- Open: run the NSIS installer on the owner's machine (the release exe was verified on an isolated profile); drag a Dock icon by mouse (verified by keyboard + store tests, not a real mouse drag); multi-currency is intentionally unsupported (one book currency).
+
+## Checkpoint 2026-11-04 (Part 13: telemetry, top bar, control consolidation)
+
+- DEX telemetry (Task Manager › Diagnostics) rebuilt: section list + detail pane like the Performance view instead of a card grid; live DEX memory/CPU history from `xenon:selfSample` with 1/5/15-minute ranges (`services/diagnostics/resourceHistory.ts`, in-memory only, sampled only while open and visible); startup phase waterfall; crash/error log table; launch p95. Chart shared in `components/telemetry/LineChart.tsx`.
+- Settings › System Monitor no longer runs a second 3 s process poller; it opens Task Manager.
+- Top bar: network/mic/camera/location icons show only when notable (restricted network, permission on). The controls moved to a new Control Center › Privacy section (shared `usePermissionToggle`). Battery stays out of the top bar.
+- Fixed the React border shorthand/longhand bug on Task Manager's resource list and "Group by app" pill (deselected rows kept a white border).
+- Earlier on this branch: fullscreen black strip (#85 work), docked DEX Bar, Weather, Trophies, launcher icons.
+- Open: verify in the packaged build (preview pane was hidden: layout verified by measurement, not by eye); per-app sizing pass for remaining apps; creative/engineering app passes.
+
 ## Checkpoint 2026-11-04 (Part 12: one installer, release build)
 
 - The release build was broken on `main` since #78 (chunk cycle via `shell/input/appKeyScope.ts`); fixed here and, in parallel, by #81 (the merge keeps #81's version, which also keeps the Browser chunk out of startup).
@@ -3547,8 +3566,36 @@ These need DSP/ML or native hosting we don't fake.
 - Already in place before this pass (checked, not rebuilt): window resize from all edges and corners, workspace layouts (Command Palette › Save/Restore Workspace Layout), Task Manager CPU rounding, fullscreen black strip (#123).
 
 ## Checkpoint 2026-11-04 (Part 17: Ledger, Bioengineering, creator identity)
-- NEW Ledger app (`DEXAPPLICATIONS/ledger/`, native `src-tauri/src/ledger.rs`): integer minor units, splits, linked transfers, budgets with carry-over, reconciliation, reports, CSV in/out, backup/restore, undo. 14 TS + 5 Rust tests; preview-verified.
+- SUPERSEDED by Part 16's native Ledger (see that checkpoint; data importable). Was: Ledger app (`DEXAPPLICATIONS/ledger/`, native `src-tauri/src/ledger.rs`): integer minor units, splits, linked transfers, budgets with carry-over, reconciliation, reports, CSV in/out, backup/restore, undo. 14 TS + 5 Rust tests; preview-verified.
 - Bioengineering rewritten as a three-pane workspace on a tested science module (`bio/bioScience.ts`, 27 tests).
 - Creator display name is "Onazi oJ" from `src/shared/creator.ts`; optional desktop mark (Settings › Shell & Dock).
 - Open: packaged run of Ledger's SQLite path, Terminal split panes, per-app passes, release build. Backlog rows #134–#144 in `DEX_REMAINING_WORK.md`.
 - Terminal: split panes (1–4 per tab, resizable, shortcuts) + standalone `terminal` app; App Menu no longer drops uncategorised apps (8 were hidden); Engineering group.
+
+## Checkpoint 2026-11-10 (Terminal profiles, App Information, Bio thermodynamics)
+
+- Terminal: installed-shell list (`pty:shells`), per-pane shell + start folder that restore with the layout, default shell, text size, Files › Open in Terminal. Packaged run with live shells still open (#139, #146).
+- App Information shows License and Creator; every app has a purpose line (#147).
+- Bio: nearest-neighbour Tm (SantaLucia 1998, conditions shown) and circular-DNA digests (#148).
+- Listener-leak sweep after #130 found nothing else (#149).
+- Still open: 7.0.1 packaged verification and install test (#144), per-app passes for AXL / VINX / creative apps (#141).
+
+## Checkpoint 2026-11-11 (Bio GenBank + primers)
+
+- Bio imports and exports GenBank with features (table, extract to a sequence) and has a Primers tab: per-primer checks, pair checks, PCR product prediction on linear or circular templates (#150).
+- Still open: 7.0.1 packaged verification and install test (#144), packaged Terminal run (#139, #146), per-app passes for AXL / VINX / creative apps (#141).
+
+## Checkpoint 2026-11-11 (VINX save and recovery)
+
+- VINX: recovery banner only after a session that did not close; saves 2 s after edits and on close; failures shown; newer copy wins at start (#152).
+
+## Checkpoint 2026-11-11 (Presentation save, recovery, undo)
+
+- Presentation: debounced autosave with a visible failure state, recovery of an unreadable stored deck, undo/redo, deck files (#151).
+
+## Checkpoint 2026-11-12 (18n: no fake data, unhandled native calls)
+
+- Mock / fake data sweep (owner, 2026-11-05) merged with main; `DEX_REMAINING_WORK.md` #159. Main's `download_ctl.rs` kept over this branch's `download.rs`; main's Ledger (opt-in starter categories) and Bio (labelled opt-in sample) kept.
+- Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#160). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
+- Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
+- Still open: packaged check of DexCode save, backup export, a real download, Settings › Plugins install, renderer.log.

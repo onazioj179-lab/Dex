@@ -10,7 +10,7 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, act, cleanup } from '@testing-library/react';
-import NexusDiagnostics, { withTimeout } from '../../src/renderer/components/NexusDiagnostics';
+import NexusDiagnostics, { withTimeout, samplerHint } from '../../src/renderer/components/NexusDiagnostics';
 
 const SELF = { available: true, processCount: 7, memoryMB: 912, hostMemoryMB: 60, cpuPercent: 3.2 };
 const SYSTEM = { cpuPercent: 20, memoryPercent: 50, memoryUsedMB: 8192, memoryTotalMB: 16384 };
@@ -32,6 +32,16 @@ describe('withTimeout', () => {
   });
 });
 
+describe('samplerHint', () => {
+  const base = { pulls: 0, ok: 0, failed: 0, overlapped: 0, skippedHidden: 0, lastResult: null, lastAt: null } as const;
+  it('says why the figures are empty instead of a silent dash', () => {
+    expect(samplerHint({ ...base }, false, true)).toBe('Waiting for the first reading…');
+    expect(samplerHint({ ...base, pulls: 2, failed: 2, lastResult: 'no reply' }, false, true)).toBe('No reading yet (2 attempts: no reply); retrying');
+    expect(samplerHint({ ...base, pulls: 1, ok: 1, lastResult: 'ok' }, true, true)).toBe('Updates every 3 s while open');
+    expect(samplerHint({ ...base }, false, false)).toBe('Paused while hidden');
+  });
+});
+
 describe('Diagnostics sampler', () => {
   it('shows the figures after a first sample that never replies', async () => {
     vi.useFakeTimers();
@@ -48,12 +58,16 @@ describe('Diagnostics sampler', () => {
     (window as unknown as { dex: unknown }).dex = { invoke };
 
     render(<NexusDiagnostics />);
-    const memory = () => screen.getByText('Memory (all DEX processes)').nextElementSibling?.textContent;
-    expect(memory()).toBe('–');
+    // Resources pane (the default section): the "DEX memory" stat.
+    const memory = () => screen.getByText('DEX memory').nextElementSibling?.textContent;
+    expect(memory()).toBe('—');
 
     // Past the per-sample time box and the next 3 s tick.
     await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
     expect(selfCalls).toBeGreaterThan(1);
     expect(memory()).toBe('912 MB');
+    const card = screen.getByLabelText('DEX resource use');
+    expect(Number(card.getAttribute('data-sampler-failed'))).toBe(1);
+    expect(Number(card.getAttribute('data-sampler-ok'))).toBeGreaterThan(0);
   });
 });

@@ -318,11 +318,11 @@ const _O = platform.isMac ? '⌥' : 'Alt';
 
 export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon: string; shortcut?: string; version?: string; buildDate?: string; description?: string; category?: 'creative' | 'system' | 'productivity' | 'utility' | 'media' }> = {
   // Core System Apps
-  home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: `${_M}+1`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
-  files: { name: 'Files', color: '#339AF0', icon: 'files', shortcut: `${_M}+3`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
-  browser: { name: 'Browser', color: '#5E5CE6', icon: 'browser', shortcut: `${_M}+6`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
-  transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: `${_O}+T`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
-  settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: `${_M}+2`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: `${_M}+1`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'The desktop: clock, search, recent items and open apps' },
+  files: { name: 'Files', color: '#339AF0', icon: 'files', shortcut: `${_M}+3`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Browse, open, tag and manage the files on this computer' },
+  browser: { name: 'Browser', color: '#5E5CE6', icon: 'browser', shortcut: `${_M}+6`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Web browser with tabs, bookmarks and history' },
+  transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: `${_O}+T`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Send files to another device, or share them with a link and QR code' },
+  settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: `${_M}+2`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Appearance, privacy, permissions and system preferences for DEX' },
   taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: `${_M}+Shift+Esc`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
   liveactivity: { name: 'Live Activity', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'A live, browsable feed of everything happening across DEX' },
   inbox: { name: 'Inbox', color: '#64d2ff', icon: 'bell', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Unified feed of notifications and cross-app activity' },
@@ -332,19 +332,20 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   extensions: { name: 'Extensions', color: '#ff9f0a', icon: 'puzzle', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Install, enable, and permission-gate local DEX extensions' },
 
   // Productivity Apps
-  notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: `${_M}+4`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
-  tasks: { name: 'Tasks', color: 'var(--color-warning)', icon: 'tasks', shortcut: `${_M}+5`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
-  workflows: { name: 'Workflows', color: '#BF5AF2', icon: 'workflows', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
-  calendar: { name: 'Calendar', color: 'var(--color-error)', icon: 'calendar', shortcut: `${_M}+8`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: `${_M}+4`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Write and organise notes with rich formatting' },
+  tasks: { name: 'Tasks', color: 'var(--color-warning)', icon: 'tasks', shortcut: `${_M}+5`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'To-do lists with due dates and priorities' },
+  workflows: { name: 'Workflows', color: '#BF5AF2', icon: 'workflows', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Build automations by connecting steps on a canvas' },
+  ledger: { name: 'Ledger', color: '#0A84FF', icon: 'ledger', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Local-first budgeting: accounts, transactions, envelope budget, reconciliation and reports' },
+  calendar: { name: 'Calendar', color: 'var(--color-error)', icon: 'calendar', shortcut: `${_M}+8`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Events and schedules by day, week and month' },
 
   // Media Apps
-  gallery: { name: 'Gallery', color: '#FF375F', icon: 'gallery', shortcut: `${_M}+7`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
-  audio: { name: 'Music', color: '#FC3D39', icon: 'audio', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
+  gallery: { name: 'Gallery', color: '#FF375F', icon: 'gallery', shortcut: `${_M}+7`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'View and organise pictures and videos' },
+  audio: { name: 'Music', color: '#FC3D39', icon: 'audio', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'Play music from your library' },
 
   // Utility Apps
-  power: { name: 'Power', color: 'var(--color-error)', icon: 'power', shortcut: `${_O}+P`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  calculator: { name: 'Calculator', color: 'var(--color-text-tertiary)', icon: 'calculator', shortcut: `${_O}+C`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  passwordgenerator: { name: 'Password Generator', color: 'var(--color-accent)', icon: 'key', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  power: { name: 'Power', color: 'var(--color-error)', icon: 'power', shortcut: `${_O}+P`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Battery, power mode and energy use' },
+  calculator: { name: 'Calculator', color: 'var(--color-text-tertiary)', icon: 'calculator', shortcut: `${_O}+C`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Standard and scientific calculator' },
+  passwordgenerator: { name: 'Password Generator', color: 'var(--color-accent)', icon: 'key', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Generate strong passwords and passphrases' },
 
   // DEX Creative Suite
   videoeditor: { name: 'VINX', color: '#BF5AF2', icon: 'videoeditor', shortcut: `${_O}+V`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Professional video editing with multi-track timeline, effects, and color grading', category: 'creative' },
@@ -355,34 +356,34 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   axl: { name: 'AXL', color: 'var(--color-accent)', icon: 'axl', shortcut: `${_O}+X`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Engineering design studio with parametric modeling, simulation, and technical drawing', category: 'creative' },
 
   // DEX Rewind
-  rewind: { name: 'Rewind', color: 'var(--color-accent)', icon: 'rewind', shortcut: `${_O}+W`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  rewind: { name: 'Rewind', color: 'var(--color-accent)', icon: 'rewind', shortcut: `${_O}+W`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'A local log of your activity that you can search; nothing leaves this computer' },
 
   // Project Management
-  kanban: { name: 'Kanban', color: '#5E5CE6', icon: 'kanban', shortcut: `${_M}+9`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  kanban: { name: 'Kanban', color: '#5E5CE6', icon: 'kanban', shortcut: `${_M}+9`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Plan work on boards with columns and cards' },
 
   // Achievements
-  achievements: { name: 'Trophies', color: 'var(--color-warning)', icon: 'achievements', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  achievements: { name: 'Trophies', color: 'var(--color-warning)', icon: 'achievements', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Progress, unlocks and daily challenges' },
 
   // System - Recycle Bin
-  recyclebin: { name: 'Trash', color: 'var(--color-text-tertiary)', icon: 'recyclebin', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  recyclebin: { name: 'Trash', color: 'var(--color-text-tertiary)', icon: 'recyclebin', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Restore or permanently remove deleted items' },
 
   // New Standalone Apps
-  weather: { name: 'Weather', color: '#64D2FF', icon: 'weather', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  worldclock: { name: 'World Clock', color: 'var(--color-warning)', icon: 'worldclock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  noisegenerator: { name: 'Noise', color: 'var(--color-success)', icon: 'noisegenerator', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
-  dexcode: { name: 'DexCode', color: 'var(--color-text-primary)', icon: 'dexcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  weather: { name: 'Weather', color: '#64D2FF', icon: 'weather', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Current conditions and forecast' },
+  worldclock: { name: 'World Clock', color: 'var(--color-warning)', icon: 'worldclock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'The time in cities around the world' },
+  noisegenerator: { name: 'Noise', color: 'var(--color-success)', icon: 'noisegenerator', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'Layered background noise with presets and a sleep timer' },
+  dexcode: { name: 'DexCode', color: 'var(--color-text-primary)', icon: 'dexcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Code editor with a built-in terminal and plain-English scripting' },
   git: { name: 'Git', color: '#F05133', icon: 'git-branch', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Source control — status, stage, commit, branches, pull/push, and log for any repo' },
   env: { name: 'Environment', color: '#64D2FF', icon: 'code', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'View system environment variables and manage DEX-scoped overlays per app' },
   ssh: { name: 'SSH', color: '#30D158', icon: 'terminal', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'SSH connection profiles, key generation, and quick connect commands' },
-  nexus: { name: 'Nexus', color: 'var(--color-accent)', icon: 'nexus', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  nexus: { name: 'Nexus', color: 'var(--color-accent)', icon: 'nexus', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Live system load, running apps and UKI activity' },
 
   // Utility Apps (standalone)
-  stopwatch: { name: 'Stopwatch', color: 'var(--color-warning)', icon: 'stopwatch', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  unitconverter: { name: 'Converter', color: '#5E5CE6', icon: 'unitconverter', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  pomodoro: { name: 'Pomodoro', color: 'var(--color-error)', icon: 'pomodoro', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
-  qrcode: { name: 'QR Code', color: 'var(--color-success)', icon: 'qrcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
-  colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative' },
-  learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  stopwatch: { name: 'Stopwatch', color: 'var(--color-warning)', icon: 'stopwatch', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Stopwatch with laps' },
+  unitconverter: { name: 'Converter', color: '#5E5CE6', icon: 'unitconverter', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Convert between units of measurement' },
+  pomodoro: { name: 'Pomodoro', color: 'var(--color-error)', icon: 'pomodoro', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Focus timer with work and break intervals' },
+  qrcode: { name: 'QR Code', color: 'var(--color-success)', icon: 'qrcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Create QR codes from text and links' },
+  colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative', description: 'Pick colours, build palettes and copy colour codes' },
+  learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Shortcuts, tips and your usage patterns, kept on this computer' },
   collabhub: { name: 'Collab Hub', color: '#5E5CE6', icon: 'collabhub', shortcut: 'Alt+H', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints', category: 'productivity' },
   canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Whiteboard and drawing: sticky notes, shapes, frames, connectors, images and paint layers', category: 'creative' },
   creativehub: { name: 'Creative Hub', color: '#5E5CE6', icon: 'palette', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Recent projects, creative apps, templates and storage in one place', category: 'creative' },
@@ -403,7 +404,6 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   // Health & Bio Engineering
   health: { name: 'Health Studio', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Body composition, energy expenditure, cardio zones, and hydration targets' },
   bio: { name: 'Bio Engineering Studio', color: '#5E5CE6', icon: 'flux', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Sequence projects: FASTA import/export, six-frame ORFs, restriction digests, GC profiles, physical properties and unit-aware bench calculations' },
-  ledger: { name: 'Ledger', color: '#0A84FF', icon: 'pie-chart', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Local-first personal finance: accounts, split transactions, transfers, monthly budgets, reconciliation, reports, CSV import/export' },
   terminal: { name: 'Terminal', color: '#8E8E93', icon: 'terminal', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Shell sessions on a real pseudoterminal: tabs, split panes, search, copy/paste' },
   security: { name: 'Security Center', color: '#FF9F0A', icon: 'lock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'UKI action audit trail — full traceability of everything the assistant does' },
 };

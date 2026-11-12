@@ -144,6 +144,89 @@ fn resolve_shell() -> (String, Vec<String>) {
     }
 }
 
+/// Shells installed on this machine, for the terminal's profile menu. Only
+/// fixed, well-known locations are probed (no PATH walk); every entry passes
+/// `shell_allowed`, so the renderer can hand `path` straight back to `pty:spawn`.
+fn installed_shells() -> Vec<(String, String, String)> {
+    let mut out: Vec<(String, String, String)> = Vec::new();
+    let mut add = |id: &str, label: &str, path: String| {
+        if exists_abs(&path) && shell_allowed(&path) && !out.iter().any(|(_, _, p)| p.eq_ignore_ascii_case(&path)) {
+            out.push((id.to_string(), label.to_string(), path));
+        }
+    };
+    #[cfg(windows)]
+    {
+        let sys_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+        let pf = std::env::var("PROGRAMFILES").unwrap_or_else(|_| "C:\\Program Files".into());
+        let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        add("pwsh", "PowerShell 7", format!("{pf}\\PowerShell\\7\\pwsh.exe"));
+        add("powershell", "Windows PowerShell", format!("{sys_root}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"));
+        add("cmd", "Command Prompt", format!("{sys_root}\\System32\\cmd.exe"));
+        add("git-bash", "Git Bash", format!("{pf}\\Git\\bin\\bash.exe"));
+        if !local.is_empty() {
+            add("git-bash", "Git Bash", format!("{local}\\Programs\\Git\\bin\\bash.exe"));
+        }
+        // wsl.exe ships with Windows even when no Linux distribution is set up;
+        // starting it then begins a WSL download that asks for elevation. Only
+        // offer it when a distribution is registered.
+        if wsl_has_distribution() {
+            add("wsl", "WSL", format!("{sys_root}\\System32\\wsl.exe"));
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        add("zsh", "zsh", "/bin/zsh".into());
+        add("bash", "bash", "/bin/bash".into());
+        add("fish", "fish", "/usr/bin/fish".into());
+        add("sh", "sh", "/bin/sh".into());
+    }
+    out
+}
+
+/// True when `reg query` output for the Lxss key lists at least one distribution.
+fn lxss_lists_distribution(reg_output: &str) -> bool {
+    reg_output.lines().any(|l| {
+        let t = l.trim_start();
+        t.starts_with("DistributionName") && t.split_whitespace().nth(2).is_some_and(|name| !name.is_empty())
+    })
+}
+
+/// Whether WSL has a Linux distribution registered for this user (read-only
+/// registry query; never runs wsl.exe, which would offer to install WSL).
+#[cfg(windows)]
+fn wsl_has_distribution() -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::process::Command::new("reg")
+        .args(["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", "/s", "/v", "DistributionName"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .is_some_and(|o| lxss_lists_distribution(&String::from_utf8_lossy(&o.stdout)))
+}
+
+#[cfg(not(windows))]
+fn wsl_has_distribution() -> bool {
+    false
+}
+
+fn is_wsl(shell: &str) -> bool {
+    shell.rsplit(['\\', '/']).next().is_some_and(|b| b.eq_ignore_ascii_case("wsl.exe") || b.eq_ignore_ascii_case("wsl"))
+}
+
+fn list_shells() -> Value {
+    let (default, _) = resolve_shell();
+    let shells: Vec<Value> = installed_shells()
+        .into_iter()
+        .map(|(id, label, path)| {
+            let is_default = path.eq_ignore_ascii_case(&default);
+            json!({ "id": id, "label": label, "path": path, "default": is_default })
+        })
+        .collect();
+    json!({ "shells": shells, "default": default })
+}
+
 /// Whether a caller-supplied shell override is a recognized shell binary (matched
 /// by basename) — stops a compromised renderer from launching an arbitrary PATH
 /// executable via `pty:spawn` while still allowing a legitimate custom shell.
@@ -360,6 +443,10 @@ fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
         if shell_allowed(req) {
             shell = req.to_string();
         }
+    }
+    if is_wsl(&shell) && !wsl_has_distribution() {
+        // A saved profile can still name WSL; don't let it start an install.
+        return json!({ "error": "WSL has no Linux distribution installed. Install one yourself (for example `wsl --install` in an administrator terminal), then open a WSL tab again." });
     }
     let args = args_for(&shell);
 
@@ -584,13 +671,14 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "pty:getSize" => get_size(app, &opts),
         "pty:getStatus" => get_status(app, &opts),
         "pty:list" => list_sessions(app),
+        "pty:shells" => list_shells(),
         _ => Value::Null,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::decode_utf8_stream;
+    use super::{decode_utf8_stream, exists_abs, installed_shells, is_wsl, list_shells, lxss_lists_distribution, resolve_shell, shell_allowed};
 
     #[test]
     fn utf8_split_across_reads_is_reassembled() {
@@ -610,6 +698,32 @@ mod tests {
         let out = decode_utf8_stream(&mut carry, &[b'x', 0xFF, b'y']);
         assert_eq!(out, "x\u{FFFD}y");
         assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn installed_shells_exist_and_are_spawnable() {
+        let shells = installed_shells();
+        assert!(!shells.is_empty(), "at least the system shell is always present");
+        for (_, _, path) in &shells {
+            assert!(exists_abs(path), "{path} must exist");
+            assert!(shell_allowed(path), "{path} must be accepted by pty:spawn");
+        }
+        let (default, _) = resolve_shell();
+        assert!(shells.iter().any(|(_, _, p)| p.eq_ignore_ascii_case(&default)), "the default shell is listed");
+        let v = list_shells();
+        assert_eq!(v["shells"].as_array().unwrap().iter().filter(|s| s["default"] == true).count(), 1);
+    }
+
+    #[test]
+    fn wsl_is_offered_only_with_a_distribution() {
+        let none = "ERROR: The system was unable to find the specified registry key or value.";
+        assert!(!lxss_lists_distribution(none));
+        assert!(!lxss_lists_distribution(""));
+        let one = "\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{5c0d}\r\n    DistributionName    REG_SZ    Ubuntu\r\n\r\nEnd of search: 1 match(es) found.\r\n";
+        assert!(lxss_lists_distribution(one));
+        assert!(is_wsl("C:\\WINDOWS\\System32\\wsl.exe"));
+        assert!(is_wsl("WSL.EXE"));
+        assert!(!is_wsl("C:\\Program Files\\Git\\bin\\bash.exe"));
     }
 
     #[test]

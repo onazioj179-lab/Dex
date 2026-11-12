@@ -105,7 +105,7 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
   const labelFs = dense ? 9 : 11;
 
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min || 1)) * 100));
-  const fill = `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${pct}%, #26262e ${pct}%, #26262e 100%)`;
+  const fill = `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${pct}%, var(--cs-track, var(--color-bg-hover, #26262e)) ${pct}%, var(--cs-track, var(--color-bg-hover, #26262e)) 100%)`;
   const sliderInput = (
     <input
       type="range"

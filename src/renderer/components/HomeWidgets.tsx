@@ -23,6 +23,7 @@ import DexIcon from './DexIcon';
 import { platform } from '../utils';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { space, radius, fontSize, zIndex } from '../styles/tokens';
+import { loadActiveWeather, ageLabel } from '../DEXAPPLICATIONS/standalone/weatherData';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
@@ -556,53 +557,38 @@ const NexusMiniWidget: React.FC = () => {
   return <canvas ref={canvasRef} width={260} height={260} style={{ width: '100%', height: '100%', borderRadius: 10 }} />;
 };
 
-// Real weather for the widget, with NO fabricated fallback. Reads the Weather
-// app's own keyless open-meteo cache (localStorage 'dex-weather-cache:<loc>' for
-// the active location 'dex-weather-active', temps stored in Celsius) so it shows
-// the user's genuine last-known conditions. If the user has never opened the
-// Weather app (no cache) and no 'weather:get' IPC exists, it honestly shows an
-// unavailable state instead of inventing a sunny 72 degrees.
-interface WidgetWeather { temp: number; condition: string; humidity: number }
-
-const readWeatherFromCache = (): WidgetWeather | null => {
-  try {
-    const active = localStorage.getItem('dex-weather-active');
-    if (!active) return null;
-    const raw = localStorage.getItem(`dex-weather-cache:${active.trim().toLowerCase()}`);
-    if (!raw) return null;
-    const cur = (JSON.parse(raw) as { current?: { temp: number; condition: string; humidity: number } }).current;
-    if (!cur || typeof cur.temp !== 'number') return null;
-    const unitF = localStorage.getItem('dex-weather-unit') === 'F';
-    return {
-      temp: unitF ? Math.round(cur.temp * 9 / 5 + 32) : cur.temp,
-      condition: String(cur.condition || 'Clear').replace(/([A-Z])/g, ' $1').trim(),
-      humidity: cur.humidity ?? 0,
-    };
-  } catch { return null; }
-};
+// Real weather for the widget, never invented. Uses the Weather app's active
+// location and shared Open-Meteo cache (weatherData.ts): fresh data when the
+// cache is under 30 min old, otherwise it refetches itself. Offline it shows the
+// last reading with its age; with no location chosen it asks to open Weather.
+interface WidgetWeather { temp: number; condition: string; humidity: number; location: string; fetchedAt: number; stale: boolean }
 
 const WeatherWidget: React.FC = () => {
   const [weather, setWeather] = useState<WidgetWeather | null>(null);
   useEffect(() => {
+    const ctrl = new AbortController();
     const refresh = async () => {
-      // Prefer a native weather bridge if one is ever wired; otherwise fall back
-      // to the Weather app's cached real data. Never fabricate.
       try {
-        const ipc = (window as any).dex;
-        if (ipc?.invoke) {
-          const data = await ipc.invoke('weather:get');
-          if (data?.temp !== undefined) {
-            setWeather({ temp: data.temp, condition: data.condition || 'Clear', humidity: data.humidity ?? 0 });
-            return;
-          }
-        }
-      } catch { /* fall through to cache */ }
-      setWeather(readWeatherFromCache());
+        const res = await loadActiveWeather(30 * 60 * 1000, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+        if (!res) { setWeather(null); return; }
+        const cur = res.data.current;
+        let unitF = false;
+        try { unitF = localStorage.getItem('dex-weather-unit') === 'F'; } catch { /* default C */ }
+        setWeather({
+          temp: unitF ? Math.round(cur.temp * 9 / 5 + 32) : cur.temp,
+          condition: String(cur.condition || '').replace(/([A-Z])/g, ' $1').trim(),
+          humidity: cur.humidity ?? 0,
+          location: res.location.split(',')[0],
+          fetchedAt: res.data.fetchedAt,
+          stale: res.stale,
+        });
+      } catch { /* aborted on unmount */ }
     };
     refresh();
     const tickId = `weather-widget-${Date.now()}`;
-    sharedTick.subscribe(tickId, refresh, 300000); // Update every 5 min
-    return () => sharedTick.unsubscribe(tickId);
+    sharedTick.subscribe(tickId, refresh, 300000); // check every 5 min; fetches at most every 30
+    return () => { ctrl.abort(); sharedTick.unsubscribe(tickId); };
   }, []);
   const unavailable = weather == null;
   return (
@@ -614,7 +600,8 @@ const WeatherWidget: React.FC = () => {
         <>
           <div style={{ fontSize: 28, fontWeight: 300, color: '#fff', marginTop: 6 }}>{weather.temp}°</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{weather.condition}</div>
-          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Humidity: {weather.humidity}%</div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{weather.location} · Humidity {weather.humidity}%</div>
+          {weather.stale && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Offline · {ageLabel(weather.fetchedAt)}</div>}
         </>
       )}
     </div>

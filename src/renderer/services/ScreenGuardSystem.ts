@@ -36,8 +36,10 @@ class ScreenGuardSystem {
   };
   
   private isMonitoring = false;
-  private rafId: number = 0;
+  private rafId: number | null = null;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private frameProbeInterval: ReturnType<typeof setInterval> | null = null;
+  static readonly FRAME_PROBE_MS = 2000;
   private recoveryInProgress = false;
   private listeners: Set<(event: string) => void> = new Set();
   // Track focus / visibility so we don't false-positive on idle.
@@ -136,39 +138,43 @@ class ScreenGuardSystem {
   /**
    * Start frame monitoring
    */
+  /**
+   * Sampled frame probe. Every FRAME_PROBE_MS (while visible and focused) ask
+   * for ONE frame and time how long it takes to arrive; three late frames in a
+   * row (> 500 ms) mean the renderer stopped painting. This used to be a
+   * requestAnimationFrame loop on every frame, forever: in the packaged app it
+   * was 60 of the ~78 frames per second DEX requested while sitting idle at
+   * Home, keeping the renderer and GPU process busy for nothing.
+   */
   private startFrameMonitoring(): void {
-    let lastFrameTime = performance.now();
-    let frameCount = 0;
-
-    const monitor = (timestamp: number): void => {
+    const probe = (): void => {
       if (!this.isMonitoring) return;
-
-      const delta = timestamp - lastFrameTime;
-      lastFrameTime = timestamp;
-      frameCount++;
-
-      // Only count gaps as suspicious when the page is BOTH visible AND
-      // focused AND outside the post-resume grace window. The OS legitimately
-      // throttles rAF when DEX is hidden / unfocused / coming back from idle
-      // and previously this fired "recovery" routines that visually broke
-      // the home UI on return.
       const inGrace = Date.now() < this.suppressUntil;
-      const eligible = document.visibilityState === 'visible' && this.windowFocused && !inGrace;
-      if (delta > 500 && eligible) {
-        this.metrics.consecutiveBlankFrames++;
-        if (this.metrics.consecutiveBlankFrames >= 3) {
-          console.warn('[ScreenGuard] Detected potential blank screen');
-          this.attemptRecovery();
-        }
-      } else {
+      // The OS legitimately throttles frames when DEX is hidden, unfocused or
+      // coming back from idle; probing then fired "recovery" that broke Home.
+      if (document.visibilityState !== 'visible' || !this.windowFocused || inGrace) {
         this.metrics.consecutiveBlankFrames = 0;
+        return;
       }
-
-      this.metrics.lastRepaint = timestamp;
-      this.rafId = requestAnimationFrame(monitor);
+      const asked = performance.now();
+      this.rafId = requestAnimationFrame((timestamp) => {
+        this.rafId = null;
+        if (!this.isMonitoring) return;
+        const late = performance.now() - asked > 500;
+        const stillEligible = document.visibilityState === 'visible' && this.windowFocused && Date.now() >= this.suppressUntil;
+        if (late && stillEligible) {
+          this.metrics.consecutiveBlankFrames++;
+          if (this.metrics.consecutiveBlankFrames >= 3) {
+            console.warn('[ScreenGuard] Detected potential blank screen');
+            this.attemptRecovery();
+          }
+        } else {
+          this.metrics.consecutiveBlankFrames = 0;
+        }
+        this.metrics.lastRepaint = timestamp;
+      });
     };
-
-    this.rafId = requestAnimationFrame(monitor);
+    this.frameProbeInterval = setInterval(probe, ScreenGuardSystem.FRAME_PROBE_MS);
   }
 
   /**
@@ -273,6 +279,7 @@ class ScreenGuardSystem {
     
     if (this.rafId) cancelAnimationFrame(this.rafId);
     if (this.healthCheckInterval) clearInterval(this.healthCheckInterval);
+    if (this.frameProbeInterval) clearInterval(this.frameProbeInterval);
 
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     window.removeEventListener('focus', this.handleWindowFocus);

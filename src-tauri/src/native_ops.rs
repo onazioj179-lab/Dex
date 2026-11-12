@@ -339,6 +339,61 @@ pub fn note_pick_file(app: &tauri::AppHandle) -> Value {
     }
 }
 
+/// `dexnotes:saveExport` `{ fileName, ext, text }` — Save As dialog, then write
+/// the text the renderer already converted. `{ success, path }`, or
+/// `{ success: false, cancelled: true }` when the user closed the dialog.
+pub fn note_save_export(app: &tauri::AppHandle, args: &Value) -> Value {
+    let a = args.get(0).cloned().unwrap_or(Value::Null);
+    let file_name = a.get("fileName").and_then(|v| v.as_str()).unwrap_or("Untitled note.txt");
+    let ext = a.get("ext").and_then(|v| v.as_str()).unwrap_or("txt");
+    let Some(text) = a.get("text").and_then(|v| v.as_str()) else {
+        return json!({ "success": false, "error": "nothing to export" });
+    };
+    let label = match ext { "md" => "Markdown", "html" => "Web page", "json" => "DEX note (JSON)", _ => "Text" };
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Export note")
+        .set_file_name(file_name)
+        .add_filter(label, &[ext])
+        .blocking_save_file()
+        .and_then(fp_to_string);
+    let Some(path) = picked else { return json!({ "success": false, "cancelled": true }) };
+    match std::fs::write(&path, text.as_bytes()) {
+        Ok(()) => json!({ "success": true, "path": path }),
+        Err(e) => json!({ "success": false, "error": format!("couldn't write the file: {e}") }),
+    }
+}
+
+/// Largest file Notes will import (a note, not a book dump).
+const NOTE_IMPORT_MAX: u64 = 10 * 1024 * 1024;
+
+/// `dexnotes:readImportFile` `path` — the picked file's text for the renderer's
+/// converter. `{ success, name, text }` or `{ success: false, error }`.
+pub fn note_read_import(args: &Value) -> Value {
+    let Some(path) = args.get(0).and_then(|v| v.as_str()) else {
+        return json!({ "success": false, "error": "no file chosen" });
+    };
+    let p = std::path::Path::new(path);
+    match std::fs::metadata(p) {
+        Ok(m) if !m.is_file() => return json!({ "success": false, "error": "that is not a file" }),
+        Ok(m) if m.len() > NOTE_IMPORT_MAX => return json!({ "success": false, "error": "the file is larger than 10 MB" }),
+        Ok(_) => {}
+        Err(e) => return json!({ "success": false, "error": format!("couldn't open the file: {e}") }),
+    }
+    let bytes = match std::fs::read(p) {
+        Ok(b) => b,
+        Err(e) => return json!({ "success": false, "error": format!("couldn't read the file: {e}") }),
+    };
+    // Strip a UTF-8 BOM; refuse binary rather than importing garbage.
+    let body = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF][..]).unwrap_or(&bytes);
+    if body.contains(&0) {
+        return json!({ "success": false, "error": "that file isn't text" });
+    }
+    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    json!({ "success": true, "name": name, "text": String::from_utf8_lossy(body) })
+}
+
 /// detectFileType for a note attachment (ext includes the leading dot).
 fn note_attachment_type(ext: &str) -> &'static str {
     const IMAGE: &[&str] = &[".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico"];
@@ -917,3 +972,27 @@ mod text_file_tests {
     }
 }
 
+#[cfg(test)]
+mod note_import_tests {
+    use super::note_read_import;
+    use serde_json::json;
+
+    #[test]
+    fn reads_text_strips_bom_and_refuses_binary() {
+        let dir = std::env::temp_dir().join(format!("dex-note-import-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let md = dir.join("a.md");
+        std::fs::write(&md, b"\xEF\xBB\xBF# Hi\nthere").unwrap();
+        let r = note_read_import(&json!([md.to_string_lossy()]));
+        assert_eq!(r["success"], true);
+        assert_eq!(r["name"], "a.md");
+        assert_eq!(r["text"], "# Hi\nthere");
+
+        let bin = dir.join("b.png");
+        std::fs::write(&bin, [0x89u8, 0x50, 0x00, 0x01]).unwrap();
+        assert_eq!(note_read_import(&json!([bin.to_string_lossy()]))["success"], false);
+        assert_eq!(note_read_import(&json!([dir.join("missing.md").to_string_lossy()]))["success"], false);
+        assert_eq!(note_read_import(&json!([dir.to_string_lossy()]))["success"], false);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

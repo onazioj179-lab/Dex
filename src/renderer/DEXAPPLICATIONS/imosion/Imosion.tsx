@@ -6118,10 +6118,15 @@ const Imosion: React.FC = () => {
         const filePath = (file as any).path as string | undefined;
         let usedNativePath = false;
         if (filePath) {
-          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
-          if (waveData?.peaksPositive?.length > 0) {
-            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
-            newClip.duration = waveData.durationSecs;
+          const dexIpc = (window as any).dex;
+          const [waveData, meta] = await Promise.all([
+            dexIpc?.invoke?.('audio:getWaveform', filePath, 50),
+            dexIpc?.invoke?.('audio:getMetadata', filePath),
+          ]);
+          const seconds = Number(meta?.duration_ms ?? meta?.durationMs) / 1000;
+          if (waveData?.success && waveData.peaks?.length > 0 && seconds > 0) {
+            newClip.waveform = Array.from(waveData.peaks) as number[];
+            newClip.duration = seconds;
             usedNativePath = true;
           }
         }
@@ -6195,10 +6200,15 @@ const Imosion: React.FC = () => {
         const filePath = (file as any).path as string | undefined;
         let usedNativePath = false;
         if (filePath) {
-          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
-          if (waveData?.peaksPositive?.length > 0) {
-            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
-            newClip.duration = waveData.durationSecs;
+          const dexIpc = (window as any).dex;
+          const [waveData, meta] = await Promise.all([
+            dexIpc?.invoke?.('audio:getWaveform', filePath, 50),
+            dexIpc?.invoke?.('audio:getMetadata', filePath),
+          ]);
+          const seconds = Number(meta?.duration_ms ?? meta?.durationMs) / 1000;
+          if (waveData?.success && waveData.peaks?.length > 0 && seconds > 0) {
+            newClip.waveform = Array.from(waveData.peaks) as number[];
+            newClip.duration = seconds;
             usedNativePath = true;
           }
         }

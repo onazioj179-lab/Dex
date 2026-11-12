@@ -12,7 +12,13 @@ import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
-import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { AutosaveIndicator, type AutosaveState } from '../../components/AutosaveIndicator';
+import { downloadText } from '../../improvements500/downloadBlob';
+import {
+  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
+  historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
+} from './presentationDeck';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -145,17 +151,13 @@ const migrateSlide = (s: any): Slide => ({
   layout: (['title', 'title-content', 'two-column', 'blank'].includes(s?.layout) ? s.layout : undefined) as SlideLayout | undefined,
 });
 
+const safeStorage = (): Storage | null => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+
 const PresentationBuilder: React.FC = () => {
-  const [slides, setSlides] = useState<Slide[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(migrateSlide);
-      }
-    } catch { /* ignore */ }
-    return [makeBlankSlide()];
-  });
+  // A stored deck that cannot be read is moved aside, never overwritten by the next save.
+  const initialLoad = useRef<{ slides: Slide[] | null; movedAside: string | null } | null>(null);
+  if (!initialLoad.current) initialLoad.current = loadWorkingDeck(safeStorage(), STORAGE_KEY, migrateSlide);
+  const [slides, setSlides] = useState<Slide[]>(() => initialLoad.current?.slides ?? [makeBlankSlide()]);
   const [themeId, setThemeId] = useState<string>(() => {
     try {
       const raw = localStorage.getItem(THEME_KEY);
@@ -201,10 +203,106 @@ const PresentationBuilder: React.FC = () => {
 
   const theme = getTheme(themeId);
 
-  // Persist
+  // ---- Undo history (whole-deck snapshots; typing and drags coalesce) ----
+  const historyRef = useRef<DeckHistory<Slide>>(historyStart(slides));
+  const timeTravel = useRef(false);
+  const [historyDepth, setHistoryDepth] = useState({ past: 0, future: 0 });
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slides)); } catch { /* ignore */ }
+    if (timeTravel.current) { timeTravel.current = false; return; }
+    historyRef.current = historyRecord(historyRef.current, slides, Date.now());
+    setHistoryDepth({ past: historyRef.current.past.length, future: 0 });
   }, [slides]);
+  const travel = useCallback((dir: 'undo' | 'redo') => {
+    const r = dir === 'undo' ? historyUndo(historyRef.current) : historyRedo(historyRef.current);
+    if (!r) return;
+    historyRef.current = r.h;
+    timeTravel.current = true;
+    setSlides(r.slides);
+    setSelectedBlockId(null);
+    setCurrentIdx((i) => Math.min(i, r.slides.length - 1));
+    setHistoryDepth({ past: r.h.past.length, future: r.h.future.length });
+  }, []);
+
+  // ---- Autosave: debounced, flushed when the window hides or the app closes ----
+  const [saveState, setSaveState] = useState<AutosaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const pendingSave = useRef<Slide[] | null>(null);
+  const flushSave = useCallback(() => {
+    const toSave = pendingSave.current;
+    if (!toSave) return;
+    pendingSave.current = null;
+    const r = saveWorkingDeck(safeStorage(), STORAGE_KEY, toSave);
+    if (r.ok) { setSaveState('saved'); setLastSavedAt(Date.now()); setSaveError(null); }
+    else {
+      setSaveState('error');
+      setSaveError(r.reason === 'quota'
+        ? 'Not saved: the deck is larger than DEX can keep here (usually large images). Use Save Deck… to keep a copy.'
+        : 'Not saved: storage is unavailable. Use Save Deck… to keep a copy.');
+    }
+  }, []);
+  const firstSave = useRef(true);
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return; } // loading is not an edit
+    pendingSave.current = slides;
+    setSaveState('saving');
+    const t = setTimeout(flushSave, 500);
+    return () => clearTimeout(t);
+  }, [slides, flushSave]);
+  useEffect(() => {
+    const onHide = () => flushSave();
+    window.addEventListener('pagehide', onHide);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onHide);
+      flushSave(); // closing the app keeps the last edit
+    };
+  }, [flushSave]);
+  useEffect(() => {
+    const aside = initialLoad.current?.movedAside;
+    if (aside) toast('error', `The saved deck could not be read. It was kept as "${aside}" and a new deck was started.`);
+  }, []);
+
+  // ---- Deck files ----
+  const deckInput = useRef<HTMLInputElement>(null);
+  const deckTitle = (s: Slide[]) => {
+    const t = s[0]?.blocks.find(b => b.type === 'text')?.content?.trim();
+    return t && t !== 'Click to edit title' ? t : 'Untitled deck';
+  };
+  const saveDeckFile = useCallback(() => {
+    const name = deckTitle(slides).replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 80) || 'deck';
+    downloadText(`${name}.dexdeck`, serializeDeck(slides, themeId), 'application/json;charset=utf-8');
+    toast('success', `Saved ${slides.length} slide${slides.length === 1 ? '' : 's'} to ${name}.dexdeck`);
+  }, [slides, themeId]);
+  const openDeckFile = useCallback(async (file: File) => {
+    try {
+      if (file.size > 50 * 1024 * 1024) throw new Error('The file is larger than 50 MB.');
+      const deck = parseDeck(await file.text(), migrateSlide);
+      setSlides(deck.slides);
+      if (deck.theme && THEMES.some(t => t.id === deck.theme)) setThemeId(deck.theme);
+      setCurrentIdx(0);
+      setSelectedBlockId(null);
+      toast('success', `Opened ${file.name} (${deck.slides.length} slides). Undo returns the previous deck.`);
+    } catch (e) {
+      toast('error', `Could not open ${file.name}: ${(e as Error).message}`);
+    }
+  }, []);
+
+  // Undo / redo keys (not while presenting, and not inside a text field, which has its own undo).
+  useEffect(() => {
+    if (presenting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || isTypingTarget(e.target) || !keyEventForApp(e, 'presentation')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z') { e.preventDefault(); travel(e.shiftKey ? 'redo' : 'undo'); }
+      else if (k === 'y') { e.preventDefault(); travel('redo'); }
+      else if (k === 's') { e.preventDefault(); if (e.shiftKey) saveDeckFile(); else flushSave(); }
+      else if (k === 'o') { e.preventDefault(); deckInput.current?.click(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [presenting, travel, flushSave, saveDeckFile]);
   useEffect(() => {
     try { localStorage.setItem(THEME_KEY, themeId); } catch { /* ignore */ }
   }, [themeId]);
@@ -305,6 +403,26 @@ const PresentationBuilder: React.FC = () => {
   const updateCurrentSlide = useCallback((mut: (s: Slide) => Slide) => {
     setSlides(prev => prev.map((s, i) => (i === currentIdx ? mut(s) : s)));
   }, [currentIdx]);
+
+  // Pictures from this PC: downscaled to at most 1600 px (JPEG) so a deck of
+  // photos still fits app storage; PNG kept for small graphics with transparency.
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const imageTargetRef = useRef<string | null>(null);
+  const readLocalImage = useCallback(async (file: File): Promise<string> => {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImage(url);
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height);
+      const keepPng = file.type === 'image/png' && file.size < 400_000;
+      return c.toDataURL(keepPng ? 'image/png' : 'image/jpeg', 0.85);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
 
   const addBlock = useCallback((type: BlockType) => {
     const block: SlideBlock = {
@@ -692,12 +810,15 @@ const PresentationBuilder: React.FC = () => {
 
       {/* Toolbar */}
       <div style={{ ...premiumGlassToolbar, padding: '10px 14px', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, whiteSpace: 'nowrap' }}>
           <DexIcon name="monitor" size={18} color="var(--color-text-primary)" />
           <span style={{ fontSize: 14, fontWeight: 600 }}>Presentation</span>
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
             {currentIdx + 1} / {slides.length}
           </span>
+          <button onClick={() => travel('undo')} disabled={!historyDepth.past} style={{ ...toolbarBtn, opacity: historyDepth.past ? 1 : 0.45 }} title="Undo (Ctrl+Z)" aria-label="Undo">Undo</button>
+          <button onClick={() => travel('redo')} disabled={!historyDepth.future} style={{ ...toolbarBtn, opacity: historyDepth.future ? 1 : 0.45 }} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
+          <span title={saveError ?? undefined}><AutosaveIndicator state={saveState} lastSavedAt={lastSavedAt} label={saveError ? 'Not saved' : undefined} /></span>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
@@ -712,7 +833,17 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
+          <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
+          <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
+          <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
+          <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
+            const f = e.target.files?.[0]; e.target.value = '';
+            const target = imageTargetRef.current;
+            if (!f || !target) return;
+            try { updateBlock(target, { content: await readLocalImage(f) }); } catch { toast('error', "That picture couldn't be read"); }
+          }} />
           <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
           <button onClick={enterPresent} style={{ ...toolbarBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Present</button>
@@ -918,8 +1049,10 @@ const PresentationBuilder: React.FC = () => {
               {selectedBlock.type === 'image' && (
                 <label style={fieldLabel}>
                   <span>Image URL</span>
+                  <button type="button" style={{ ...toolbarBtn, alignSelf: 'flex-start' }} onClick={() => { imageTargetRef.current = selectedBlock.id; imageInputRef.current?.click(); }}>Choose picture from this PC…</button>
                   <input
-                    value={selectedBlock.content}
+                    value={selectedBlock.content.startsWith('data:') ? '(picture from this PC)' : selectedBlock.content}
+                    readOnly={selectedBlock.content.startsWith('data:')}
                     onChange={e => updateBlock(selectedBlock.id, { content: e.target.value })}
                     placeholder="https://..."
                     style={fieldInput}

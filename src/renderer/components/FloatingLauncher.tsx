@@ -11,7 +11,7 @@
 // there is no fixed dock, so it never shifts as apps open/close.
 //
 // Default (collapsed): a rounded capsule menu with a crisp, clear border --
-//   grip | apps | search | UKI | clock | expand. Nothing else. No widgets.
+//   grip | apps | pinned dock apps | search | UKI | expand. No widgets.
 //
 // Widgets are OPT-IN. The user clicks the expand toggle to reveal a widget
 //   drawer (Now Playing + Calendar, both wired to real data). The choice
@@ -27,6 +27,7 @@ import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
 
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
+import { DockPins } from './DockPins';
 
 const MOVE_THRESHOLD = 6; // px before a press becomes a drag
 const BAR_H = 44;         // collapsed capsule height
@@ -351,6 +352,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     <div
       ref={containerRef}
       role="region"
+      data-dex-chrome="dex-bar"
       aria-label="DEX menu"
       data-dex-nook
       data-autohidden={hidden ? '' : undefined}
@@ -424,6 +426,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
             {[[1, 1], [10, 1], [1, 10], [10, 10]].map(([rx, ry]) => <rect key={`${rx}-${ry}`} x={rx} y={ry} width="7" height="7" rx="2" fill="currentColor" />)}
           </svg>
         </button>
+        {/* Dock: pinned apps (shared pinning service) with running dots. */}
+        <DockPins maxWidth={360} />
+        <div style={vDivider(9)} />
         {/* The dock search IS the search now: a real field whose results dropdown
             drops straight from it (UP, since the dock sits near the bottom). The
             old full-screen Spotlight overlay is gone. stopPropagation keeps typing/

@@ -7,6 +7,25 @@
 //! files are never hashed). Streaming hash — never loads a whole file into RAM.
 
 use rayon::prelude::*;
+
+/// Background I/O pool for duplicate hashing. Kept OFF rayon's global pool on purpose:
+/// sysinfo's process scan (Task Manager, Nexus Diagnostics) runs its parallel
+/// refresh on the global pool, and a first-launch full index of ~20k files used
+/// to occupy every global worker for as long as it ran, so those calls waited
+/// seconds to minutes (the "Diagnostics figures never appear" flake). Half the
+/// cores, named threads, 8 MiB stacks (the app's worker standard).
+fn io_pool() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        rayon::ThreadPoolBuilder::new()
+            .num_threads((n / 2).max(2))
+            .thread_name(|i| format!("dex-scanner-io-{i}"))
+            .stack_size(8 * 1024 * 1024)
+            .build()
+            .expect("dex-scanner-io thread pool")
+    })
+}
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -120,12 +139,12 @@ pub fn find_duplicates(root: &Path, max: usize) -> Vec<DupGroup> {
         .filter(|(_, ps)| ps.len() >= 2)
         .flat_map(|(size, ps)| ps.into_iter().map(move |p| (size, p)))
         .collect();
-    let hashed: Vec<(u64, String, String)> = candidates
+    let hashed: Vec<(u64, String, String)> = io_pool().install(|| candidates
         .par_iter()
         .filter_map(|(size, p)| {
             hash_file(p).map(|h| (*size, h, p.to_string_lossy().to_string()))
         })
-        .collect();
+        .collect());
 
     // Regroup by (size, hash); a group of >=2 identical files is a duplicate set.
     let mut by_sh: HashMap<(u64, String), Vec<String>> = HashMap::new();

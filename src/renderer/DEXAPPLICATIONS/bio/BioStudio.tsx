@@ -19,7 +19,10 @@ import { downloadText } from '../../improvements500/downloadBlob';
 import {
   parseSequence, parseFasta, toFasta, transcribe, reverseComplement, translate, findOrfs, gcContent,
   slidingGc, baseCounts, ssDnaMolecularWeight, dsDnaMolecularWeight, meltingTemp, proteinMolecularWeight,
-  extinctionCoefficient, findRestrictionSites, digestFragments, ENZYMES, molarityFromMass, massForMolarity,
+  extinctionCoefficient, findRestrictionSites, digestFragments, digestFragmentsCircular, nearestNeighborTm,
+  NN_MIN_LENGTH, NN_MAX_LENGTH, ENZYMES, molarityFromMass, massForMolarity,
+  looksLikeGenBank, parseGenBank, toGenBank, extractLocation, checkPrimer, longestComplement, predictProducts,
+  PRIMER_ANCHOR, type SeqFeature, type PrimerCheck,
   solveDilution, concentrationFromA260, purityNote, CONC_UNITS, VOLUME_UNITS, MASS_UNITS,
   type ConcUnit, type VolumeUnit, type MassUnit, type DilutionUnknown, type NucleicAcidType, type Orf,
 } from './bioScience';
@@ -51,14 +54,14 @@ const th: React.CSSProperties = {
 };
 const td: React.CSSProperties = { padding: '5px 10px', borderBottom: hair, fontSize: 12, fontVariantNumeric: 'tabular-nums' };
 
-type Provenance = 'calculated' | 'measured';
-const PROV_LABEL: Record<Provenance, string> = { calculated: 'Calculated', measured: 'Measured (your input)' };
+type Provenance = 'calculated' | 'measured' | 'sample';
+const PROV_LABEL: Record<Provenance, string> = { calculated: 'Calculated', measured: 'Measured (your input)', sample: 'Sample data' };
 
 const Badge: React.FC<{ kind: Provenance }> = ({ kind }) => (
   <span style={{
     fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: radius.xs, whiteSpace: 'nowrap',
-    color: kind === 'measured' ? colors.semantic.warning : colors.accent.default,
-    background: kind === 'measured' ? colors.semantic.warningMuted : colors.accent.soft,
+    color: kind === 'measured' ? colors.semantic.warning : kind === 'sample' ? colors.text.secondary : colors.accent.default,
+    background: kind === 'measured' ? colors.semantic.warningMuted : kind === 'sample' ? 'var(--color-bg-hover)' : colors.accent.soft,
   }}>{PROV_LABEL[kind]}</span>
 );
 
@@ -76,16 +79,20 @@ const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toLocaleString(undefin
 // Tabs
 // ---------------------------------------------------------------------------
 
-type Tab = 'sequence' | 'orfs' | 'digest' | 'gc' | 'composition' | 'bench';
+type Tab = 'sequence' | 'orfs' | 'digest' | 'gc' | 'composition' | 'primers' | 'bench';
+/** Tabs that work without an open sequence. */
+const FREE_TABS: readonly Tab[] = ['primers', 'bench'];
 const TABS: { id: Tab; label: string; key: string }[] = [
   { id: 'sequence', label: 'Sequence', key: '1' },
   { id: 'orfs', label: 'ORFs', key: '2' },
   { id: 'digest', label: 'Restriction', key: '3' },
   { id: 'gc', label: 'GC profile', key: '4' },
   { id: 'composition', label: 'Properties', key: '5' },
-  { id: 'bench', label: 'Bench', key: '6' },
+  { id: 'primers', label: 'Primers', key: '6' },
+  { id: 'bench', label: 'Bench', key: '7' },
 ];
 
+const SAMPLE = 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAGGAATTCGGATCCATGAAAGCTAGCTTGCGGCCGCAAGCTTTAA';
 
 interface LogEntry { t: number; level: 'info' | 'warn' | 'error'; text: string }
 
@@ -103,6 +110,8 @@ const BioStudio: React.FC = () => {
   const [gcWindow, setGcWindow] = useState(40);
   const [frame, setFrame] = useState(0);
   const [selectedEnzymes, setSelectedEnzymes] = useState<string[]>(['EcoRI', 'BamHI']);
+  const [primerF, setPrimerF] = useState('');
+  const [primerR, setPrimerR] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'failed'>('saved');
@@ -133,24 +142,38 @@ const BioStudio: React.FC = () => {
     return null;
   }, [active]);
   const orfs = useMemo(() => (dna ? findOrfs(dna, minAa) : []), [dna, minAa]);
-  const sites = useMemo(() => (dna ? findRestrictionSites(dna) : []), [dna]);
+  const circular = isNuc && active!.circular === true;
+  const sites = useMemo(() => (dna ? findRestrictionSites(dna, ENZYMES, circular) : []), [dna, circular]);
   const gcPts = useMemo(() => (dna ? slidingGc(dna, gcWindow) : []), [dna, gcWindow]);
   const counts = useMemo(() => baseCounts(dna), [dna]);
   const tm = useMemo(() => meltingTemp(dna), [dna]);
+  // The nearest-neighbour parameters are for DNA duplexes; RNA is left out.
+  const activeKind = active?.kind;
+  const nnTm = useMemo(() => (activeKind === 'dna' ? nearestNeighborTm(dna) : null), [activeKind, dna]);
   const gc = useMemo(() => gcContent(dna), [dna]);
 
   // ---- actions ------------------------------------------------------------
-  const addSequences = useCallback((items: { name: string; raw: string; source: SequenceSource }[]) => {
+  const addSequences = useCallback((items: {
+    name: string; raw: string; source: SequenceSource;
+    kind?: 'dna' | 'protein'; circular?: boolean; features?: SeqFeature[]; notes?: string;
+  }[]) => {
     const seqs: Omit<BioSequence, 'id' | 'createdAt' | 'updatedAt'>[] = [];
     for (const it of items) {
-      const p = parseSequence(it.raw);
+      const p = parseSequence(it.raw, it.kind);
       if (!p.seq.length) { addLog('error', `${it.name}: no valid residues — skipped.`); continue; }
       if (p.invalid.length) {
         const shown = p.invalid.slice(0, 5).map((x) => `'${x.char}' at ${x.position}`).join(', ');
         addLog('warn', `${it.name}: ${p.invalid.length} invalid character(s) removed (${shown}${p.invalid.length > 5 ? ', …' : ''}).`);
       }
       if (p.ambiguous) addLog('warn', `${it.name}: ${p.ambiguous} ambiguous base(s) stored as N.`);
-      seqs.push({ name: it.name, seq: p.seq, kind: p.kind, source: it.source, notes: '' });
+      // Removed characters shift every later position, so annotations would point at the wrong bases.
+      const keepFeatures = !!it.features?.length && !p.invalid.length && p.kind !== 'protein';
+      if (it.features?.length && !keepFeatures) addLog('warn', `${it.name}: ${it.features.length} feature(s) not kept because characters were removed from the sequence.`);
+      seqs.push({
+        name: it.name, seq: p.seq, kind: p.kind, source: it.source, notes: it.notes ?? '',
+        ...(it.circular && p.kind !== 'protein' ? { circular: true } : {}),
+        ...(keepFeatures ? { features: it.features } : {}),
+      });
     }
     if (seqs.length) {
       dispatch({ type: 'add', sequences: seqs });
@@ -162,7 +185,18 @@ const BioStudio: React.FC = () => {
     try {
       if (file.size > 20 * 1024 * 1024) { addLog('error', `${file.name} is larger than 20 MB; split it first.`); return; }
       const text = await file.text();
-      if (/^\s*LOCUS\s/.test(text)) { addLog('error', `${file.name} looks like GenBank. Only FASTA and plain sequence text are supported.`); return; }
+      if (looksLikeGenBank(text)) {
+        const recs = parseGenBank(text);
+        if (!recs.length) { addLog('error', `${file.name}: no GenBank records found.`); return; }
+        for (const r of recs) for (const w of r.warnings) addLog('warn', `${file.name} › ${r.name}: ${w}`);
+        addSequences(recs.filter((r) => r.seq).map((r) => ({
+          name: r.name, raw: r.seq, source: 'imported' as const,
+          kind: r.units === 'aa' ? 'protein' as const : 'dna' as const,
+          circular: r.circular, features: r.features,
+          notes: [r.definition, r.organism && `Organism: ${r.organism}.`, r.accession && `Accession: ${r.accession}.`, `Imported from ${file.name} (GenBank).`].filter(Boolean).join(' '),
+        })));
+        return;
+      }
       const recs = parseFasta(text);
       if (!recs.length) { addLog('error', `${file.name}: no sequences found.`); return; }
       addSequences(recs.map((r) => ({ name: r.name || file.name, raw: r.seq, source: 'imported' as const })));
@@ -187,6 +221,19 @@ const BioStudio: React.FC = () => {
     downloadText(`${fileStem(all ? project.name : list[0].name)}.fasta`, toFasta(list.map((s) => ({ name: fileStem(s.name), description: '', seq: s.seq }))));
     addLog('info', `Exported ${list.length} sequence(s) as FASTA.`);
   }, [project, active, addLog]);
+
+  const exportGenBank = useCallback(() => {
+    if (!active || active.kind === 'protein') return;
+    downloadText(`${fileStem(active.name)}.gb`, toGenBank({ name: active.name, definition: active.notes.split('\n')[0], seq: active.seq, circular: active.circular, features: active.features }));
+    addLog('info', `Exported ${active.name} as GenBank${active.features?.length ? ` with ${active.features.length} feature(s); each keeps its location and label only` : ''}.`);
+  }, [active, addLog]);
+
+  const extractFeature = useCallback((f: SeqFeature) => {
+    if (!active) return;
+    const nt = extractLocation(active.seq, f.location);
+    if (!nt) { addLog('error', `${f.label}: the location ${f.location} cannot be read.`); return; }
+    dispatch({ type: 'add', sequences: [{ name: `${active.name} ${f.label}`, seq: nt, kind: 'dna', source: 'derived', notes: `${f.type} ${f.location} of ${active.name}, read 5′→3′ on its own strand.` }] });
+  }, [active, addLog]);
 
   const exportProject = useCallback(() => {
     downloadText(`${fileStem(project.name)}.dexbio.json`, JSON.stringify(project, null, 2), 'application/json;charset=utf-8');
@@ -226,6 +273,8 @@ const BioStudio: React.FC = () => {
     if (isNuc) {
       values['GC content'] = `${fmt(gc, 1)} %`;
       values['Tm'] = `${fmt(tm.tm, 1)} °C (${tm.method === 'wallace' ? 'Wallace rule' : 'basic formula, 50 mM Na⁺'})`;
+      if (nnTm) values['Tm (nearest-neighbour)'] = `${fmt(nnTm.tm, 1)} °C (SantaLucia 1998, ${nnTm.sodiumM * 1000} mM Na⁺, ${nnTm.oligoM * 1e6} µM oligo)`;
+      values['Topology'] = circular ? 'Circular' : 'Linear';
       values['ssDNA MW'] = `${fmt(ssDnaMolecularWeight(dna), 2)} g/mol`;
       values[`ORFs ≥ ${minAa} aa`] = String(orfs.length);
       values['Restriction sites'] = String(sites.length);
@@ -235,7 +284,7 @@ const BioStudio: React.FC = () => {
     }
     dispatch({ type: 'save-result', result: { sequenceId: active.id, sequenceName: active.name, title: `${active.name} — summary`, values } });
     addLog('info', `Saved a result snapshot for ${active.name}.`);
-  }, [active, isNuc, gc, tm, dna, minAa, orfs.length, sites.length, analysis, addLog]);
+  }, [active, isNuc, gc, tm, nnTm, circular, dna, minAa, orfs.length, sites.length, analysis, addLog]);
 
   // ---- keyboard (scoped to this window) -----------------------------------
   useEffect(() => {
@@ -296,11 +345,13 @@ const BioStudio: React.FC = () => {
       sections: [
         { id: 'new', items: [
           { id: 'file.newseq', label: 'New sequence', run: () => addSequences([{ name: `Sequence ${project.sequences.length + 1}`, raw: 'ATG', source: 'entered' }]) },
-          { id: 'file.import', label: 'Import FASTA…', shortcut: 'Ctrl+O', run: () => fileInput.current?.click() },
+          { id: 'file.import', label: 'Import FASTA or GenBank…', shortcut: 'Ctrl+O', run: () => fileInput.current?.click() },
+          { id: 'file.sample', label: 'Add sample sequence', run: () => addSequences([{ name: 'Sample construct', raw: SAMPLE, source: 'sample' }]) },
         ] },
         { id: 'export', label: 'Export', items: [
           { id: 'file.fasta', label: 'Active sequence as FASTA', disabled: !active, run: () => exportFasta(false) },
           { id: 'file.fastaAll', label: 'All sequences as FASTA', disabled: !project.sequences.length, run: () => exportFasta(true) },
+          { id: 'file.genbank', label: 'Active sequence as GenBank', disabled: !isNuc, run: exportGenBank },
           { id: 'file.orfs', label: 'ORF table (CSV)', disabled: !isNuc, run: exportOrfs },
           { id: 'file.sites', label: 'Restriction sites (CSV)', disabled: !isNuc, run: exportSites },
         ] },
@@ -351,7 +402,10 @@ const BioStudio: React.FC = () => {
             </Field>
             <KV k="Type" v={active.kind === 'protein' ? 'Protein' : 'Nucleotide (DNA)'} />
             <KV k="Length" v={`${active.seq.length.toLocaleString()} ${isNuc ? 'nt' : 'aa'}`} />
-            <KV k="Origin" v={{ entered: 'Typed in', imported: 'Imported file', derived: 'Derived' }[active.source]} />
+            {isNuc && <KV k="Topology" v={active.circular ? 'Circular' : 'Linear'} />}
+            {!!active.features?.length && <KV k="Features" v={active.features.length.toLocaleString()} />}
+            <KV k="Source" v={<Badge kind={active.source === 'sample' ? 'sample' : 'calculated'} />} />
+            <KV k="Origin" v={{ entered: 'Typed in', imported: 'Imported file', sample: 'Built-in sample', derived: 'Derived' }[active.source]} />
             <Field label="Notes">
               <textarea key={active.id + 'n'} defaultValue={active.notes} rows={3} style={{ ...input, width: '100%', height: 'auto', padding: 6, resize: 'vertical' }}
                 onBlur={(e) => e.target.value !== active.notes && dispatch({ type: 'update', id: active.id, patch: { notes: e.target.value } })} />
@@ -386,7 +440,7 @@ const BioStudio: React.FC = () => {
   // ---- render -------------------------------------------------------------
   return (
     <div ref={rootRef} style={{ height: '100%' }}>
-      <input ref={fileInput} type="file" accept=".fa,.fasta,.fna,.ffn,.faa,.txt,.seq" multiple hidden
+      <input ref={fileInput} type="file" accept=".fa,.fasta,.fna,.ffn,.faa,.txt,.seq,.gb,.gbk,.gbff,.genbank,.ape" multiple hidden
         onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) void importFasta(f); e.target.value = ''; }} />
       <input ref={restoreInput} type="file" accept=".json" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void restoreProject(f); e.target.value = ''; }} />
@@ -451,8 +505,9 @@ const BioStudio: React.FC = () => {
                 <div style={{ padding: '8px 12px', fontSize: 12, color: colors.text.tertiary, lineHeight: 1.5 }}>
                   No sequences yet.
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                    <button style={btn} onClick={() => fileInput.current?.click()}>Import FASTA…</button>
+                    <button style={btn} onClick={() => fileInput.current?.click()}>Import FASTA or GenBank…</button>
                     <button style={btn} onClick={() => addSequences([{ name: 'Sequence 1', raw: 'ATG', source: 'entered' }])}>New sequence</button>
+                    <button style={btn} onClick={() => addSequences([{ name: 'Sample construct', raw: SAMPLE, source: 'sample' }])}>Add sample</button>
                   </div>
                 </div>
               )}
@@ -478,23 +533,31 @@ const BioStudio: React.FC = () => {
             <div role="tablist" aria-label="Analysis" style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: hair }}>
               {TABS.map((t) => (
                 <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} title={`Alt+${t.key}`}
-                  disabled={!active && t.id !== 'bench'}
+                  disabled={!active && !FREE_TABS.includes(t.id)}
                   style={{
                     height: 26, padding: '0 10px', fontSize: 12, borderRadius: radius.sm, border: 'none', cursor: 'pointer',
                     background: tab === t.id ? colors.accent.light : 'transparent',
                     color: tab === t.id ? colors.accent.default : colors.text.secondary, fontWeight: tab === t.id ? 600 : 500,
-                    opacity: !active && t.id !== 'bench' ? 0.4 : 1,
+                    opacity: !active && !FREE_TABS.includes(t.id) ? 0.4 : 1,
                   }}>{t.label}</button>
               ))}
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              {tab === 'bench' ? <BenchPanel /> : !active ? (
-                <Empty title="Open or create a sequence" body="Import a FASTA file (Ctrl+O), or create a new sequence and paste your own." />
+              {tab === 'bench' ? <BenchPanel /> : tab === 'primers' ? (
+                <PrimerPanel f={primerF} r={primerR} setF={setPrimerF} setR={setPrimerR}
+                  template={isNuc ? active! : null}
+                  onSave={(values) => {
+                    dispatch({ type: 'save-result', result: { sequenceId: active?.id ?? '', sequenceName: active?.name ?? '—', title: `Primer pair${active && isNuc ? ` on ${active.name}` : ''}`, values } });
+                    addLog('info', 'Saved the primer pair check.');
+                  }} />
+              ) : !active ? (
+                <Empty title="Open or create a sequence" body="Import a FASTA or GenBank file (Ctrl+O), paste a new sequence, or add the sample construct from the explorer." />
               ) : tab === 'sequence' ? (
-                <SequencePanel key={active.id} seq={active} frame={frame}
+                <SequencePanel key={active.id} seq={active} frame={frame} onExtract={extractFeature}
                   onCommit={(raw) => {
                     const p = parseSequence(raw, active.kind === 'protein' ? 'protein' : 'dna');
                     if (p.invalid.length) addLog('warn', `${active.name}: ${p.invalid.length} invalid character(s) removed.`);
+                    if (p.seq !== active.seq && active.features?.length) addLog('warn', `${active.name}: ${active.features.length} feature(s) removed because the residues changed. Undo brings them back.`);
                     if (p.seq !== active.seq) dispatch({ type: 'update', id: active.id, patch: { seq: p.seq } });
                   }} />
               ) : !isNuc ? (
@@ -503,11 +566,12 @@ const BioStudio: React.FC = () => {
               ) : tab === 'orfs' ? (
                 <OrfPanel orfs={orfs} minAa={minAa} onExtract={(o) => deriveFromActive('orf', o)} onExport={exportOrfs} />
               ) : tab === 'digest' ? (
-                <DigestPanel dna={dna} sites={sites} selected={selectedEnzymes} setSelected={setSelectedEnzymes} onExport={exportSites} />
+                <DigestPanel dna={dna} sites={sites} selected={selectedEnzymes} setSelected={setSelectedEnzymes} onExport={exportSites}
+                  circular={circular} setCircular={(c) => active && dispatch({ type: 'update', id: active.id, patch: { circular: c } })} />
               ) : tab === 'gc' ? (
                 <GcPanel pts={gcPts} length={dna.length} window={gcWindow} overall={gc} />
               ) : (
-                <NucleotideProps dna={dna} counts={counts} gc={gc} tm={tm} />
+                <NucleotideProps dna={dna} counts={counts} gc={gc} tm={tm} nnTm={nnTm} isDna={activeKind === 'dna'} />
               )}
             </div>
             {logOpen && (
@@ -560,7 +624,7 @@ const PanelHead: React.FC<{ title: string; children?: React.ReactNode }> = ({ ti
   </div>
 );
 
-const SequencePanel: React.FC<{ seq: BioSequence; frame: number; onCommit: (raw: string) => void }> = ({ seq, frame, onCommit }) => {
+const SequencePanel: React.FC<{ seq: BioSequence; frame: number; onCommit: (raw: string) => void; onExtract: (f: SeqFeature) => void }> = ({ seq, frame, onCommit, onExtract }) => {
   const [draft, setDraft] = useState(seq.seq);
   useEffect(() => setDraft(seq.seq), [seq.seq]);
   const parsed = useMemo(() => parseSequence(draft, seq.kind === 'protein' ? 'protein' : 'dna'), [draft, seq.kind]);
@@ -591,6 +655,132 @@ const SequencePanel: React.FC<{ seq: BioSequence; frame: number; onCommit: (raw:
           <Derived title={`Translation, frame +${frame + 1} (* = stop)`} value={translate(seq.seq, frame)} unit="aa" />
         </div>
       )}
+      {!!seq.features?.length && <FeatureTable features={seq.features} onExtract={onExtract} />}
+    </div>
+  );
+};
+
+const FeatureTable: React.FC<{ features: SeqFeature[]; onExtract: (f: SeqFeature) => void }> = ({ features, onExtract }) => {
+  const [type, setType] = useState('all');
+  const types = useMemo(() => Array.from(new Set(features.map((f) => f.type))).sort(), [features]);
+  const shown = type === 'all' ? features : features.filter((f) => f.type === type);
+  return (
+    <div style={{ margin: '12px 14px 0', border: hair, borderRadius: radius.sm }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: hair }}>
+        <span style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>Features</span>
+        <span style={{ fontSize: 11, color: colors.text.tertiary }}>{shown.length.toLocaleString()} of {features.length.toLocaleString()} · from the imported file</span>
+        <select aria-label="Feature type" style={{ ...input, height: 22 }} value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="all">All types</option>
+          {types.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style={{ maxHeight: 260, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>{['Type', 'Label', 'Location', 'Strand', ''].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {shown.slice(0, 500).map((f, i) => (
+              <tr key={i}>
+                <td style={td}>{f.type}</td>
+                <td style={{ ...td, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.label}>{f.label}</td>
+                <td style={{ ...td, ...mono, fontSize: 11, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.location}>
+                  {f.location}{f.partial && <span style={{ color: colors.semantic.warning }} title="Runs past the end of this record"> · partial</span>}
+                </td>
+                <td style={td}>{f.strand === 1 ? '+' : '−'}</td>
+                <td style={td}><button style={{ ...btn, height: 22 }} onClick={() => onExtract(f)} title="New sequence from this feature, read on its own strand">To sequence</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {shown.length > 500 && <div style={{ padding: '6px 10px', fontSize: 11, color: colors.text.tertiary }}>First 500 shown. Filter by type to see the rest.</div>}
+      </div>
+    </div>
+  );
+};
+
+const PrimerPanel: React.FC<{
+  f: string; r: string; setF: (s: string) => void; setR: (s: string) => void;
+  template: BioSequence | null; onSave: (values: Record<string, string>) => void;
+}> = ({ f, r, setF, setR, template, onSave }) => {
+  const cf = useMemo(() => checkPrimer(f), [f]);
+  const cr = useMemo(() => checkPrimer(r), [r]);
+  const cross = useMemo(() => (cf.length && cr.length ? longestComplement(cf.seq, cr.seq) : null), [cf, cr]);
+  const products = useMemo(
+    () => (template && cf.length >= 8 && cr.length >= 8 ? predictProducts(template.seq, cf.seq, cr.seq, template.circular === true) : null),
+    [template, cf, cr],
+  );
+  const tmGap = cf.tm && cr.tm ? Math.abs(cf.tm.tm - cr.tm.tm) : null;
+  const pairIssues: string[] = [];
+  if (tmGap !== null && tmGap > 5) pairIssues.push(`Tm differs by ${fmt(tmGap, 1)} °C (within 5 °C is typical).`);
+  if (cross && (cross.length >= 8 || (cross.threePrime && cross.length >= 4))) pairIssues.push(`Primer-dimer: ${cross.length} bp${cross.threePrime ? ' at a 3′ end' : ''}.`);
+  const save = () => {
+    const v: Record<string, string> = { Forward: cf.seq, Reverse: cr.seq };
+    if (cf.tm) v['Forward Tm'] = `${fmt(cf.tm.tm, 1)} °C (SantaLucia 1998)`;
+    if (cr.tm) v['Reverse Tm'] = `${fmt(cr.tm.tm, 1)} °C (SantaLucia 1998)`;
+    if (cross) v['Cross-complementarity'] = `${cross.length} bp${cross.threePrime ? ', 3′ end' : ''}`;
+    if (products) v['Products'] = products.length ? products.map((p) => `${p.length} bp`).join(', ') : 'none';
+    if (template) v['Template'] = `${template.name} (${template.circular ? 'circular' : 'linear'})`;
+    onSave(v);
+  };
+  const col = (title: string, value: string, set: (s: string) => void, c: PrimerCheck) => (
+    <div style={{ flex: 1, minWidth: 240, border: hair, borderRadius: radius.sm }}>
+      <div style={{ padding: '6px 10px', borderBottom: hair, fontSize: 12, fontWeight: 600 }}>{title} (5′→3′)</div>
+      <div style={{ padding: 10 }}>
+        <input aria-label={`${title} primer`} value={value} onChange={(e) => set(e.target.value)} spellCheck={false} placeholder="e.g. GAATTCGGATCCATGAAAGC"
+          style={{ ...input, ...mono, width: '100%' }} />
+        {c.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+            <KV k="Length" v={`${c.length} nt`} />
+            <KV k="GC" v={`${fmt(c.gc, 1)} %`} />
+            <KV k="Tm (nearest-neighbour)" v={c.tm ? `${fmt(c.tm.tm, 1)} °C` : <span title={`Needs ${NN_MIN_LENGTH}–${NN_MAX_LENGTH} nt of A/C/G/T`}>—</span>} />
+            <KV k="3′ GC clamp" v={`${c.clamp} of last 5`} />
+            <KV k="Hairpin stem" v={`${c.hairpin} bp`} />
+            <KV k="Self-complementarity" v={`${c.selfDimer.length} bp${c.selfDimer.threePrime ? ', 3′ end' : ''}`} />
+          </div>
+        )}
+        {c.issues.map((m) => <div key={m} style={{ fontSize: 11, color: colors.semantic.warning, marginTop: 4 }}>{m}</div>)}
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ paddingBottom: 14 }}>
+      <PanelHead title="Primer pair check">
+        <Badge kind="calculated" />
+        <button style={btn} disabled={!cf.length || !cr.length} onClick={save}>Save to results</button>
+      </PanelHead>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '0 14px' }}>
+        {col('Forward', f, setF, cf)}
+        {col('Reverse', r, setR, cr)}
+      </div>
+      {cf.length > 0 && cr.length > 0 && (
+        <div style={{ margin: '10px 14px 0', border: hair, borderRadius: radius.sm, padding: 10, fontSize: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Pair</div>
+          <div>Tm difference: {tmGap === null ? '—' : `${fmt(tmGap, 1)} °C`} · Cross-complementarity: {cross?.length ?? 0} bp{cross?.threePrime ? ' (3′ end)' : ''}</div>
+          {pairIssues.map((m) => <div key={m} style={{ fontSize: 11, color: colors.semantic.warning, marginTop: 4 }}>{m}</div>)}
+          {!pairIssues.length && !cf.issues.length && !cr.issues.length && <div style={{ fontSize: 11, color: colors.text.tertiary, marginTop: 4 }}>No flags.</div>}
+        </div>
+      )}
+      <div style={{ margin: '10px 14px 0', border: hair, borderRadius: radius.sm, padding: 10, fontSize: 12 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Product on {template ? `${template.name} (${template.circular ? 'circular' : 'linear'}, ${template.seq.length.toLocaleString()} nt)` : 'a template'}</div>
+        {!template ? <div style={{ color: colors.text.tertiary }}>Select a nucleotide sequence in the explorer to predict products.</div>
+          : !products ? <div style={{ color: colors.text.tertiary }}>Enter both primers (at least 8 nt each).</div>
+          : !products.length ? <div>No product: the primers do not both bind facing each other.</div>
+          : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>{['Length', 'Template region', 'Forward strand primer'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {products.map((p, i) => (
+                  <tr key={i}><td style={td}>{p.length.toLocaleString()} bp</td><td style={td}>{p.from.toLocaleString()}–{p.to.toLocaleString()}{p.to < p.from ? ' (through the origin)' : ''}</td><td style={td}>{p.forwardIs === 'F' ? 'Forward' : 'Reverse (the pair is swapped)'}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        {products && products.length > 1 && <div style={{ fontSize: 11, color: colors.semantic.warning, marginTop: 6 }}>More than one product: a primer binds more than one place.</div>}
+      </div>
+      <p style={{ margin: '10px 14px 0', fontSize: 11, color: colors.text.tertiary, lineHeight: 1.5 }}>
+        Tm: SantaLucia 1998 nearest-neighbour, 50 mM Na⁺, 0.5 µM primer, no Mg²⁺ correction.
+        Binding needs an exact match of the last {PRIMER_ANCHOR} 3′ bases; extra 5′ bases count as a tail and are added to the product length.
+        Dimer and hairpin checks look for perfectly paired Watson–Crick stretches only; they are a screen, not a free-energy (ΔG) model.
+      </p>
     </div>
   );
 };
@@ -635,19 +825,25 @@ const OrfPanel: React.FC<{ orfs: Orf[]; minAa: number; onExtract: (o: Orf) => vo
 const DigestPanel: React.FC<{
   dna: string; sites: ReturnType<typeof findRestrictionSites>; selected: string[];
   setSelected: (fn: (s: string[]) => string[]) => void; onExport: () => void;
-}> = ({ dna, sites, selected, setSelected, onExport }) => {
+  circular: boolean; setCircular: (c: boolean) => void;
+}> = ({ dna, sites, selected, setSelected, onExport, circular, setCircular }) => {
   const byEnzyme = useMemo(() => {
     const m = new Map<string, number[]>();
     for (const s of sites) m.set(s.enzyme, [...(m.get(s.enzyme) ?? []), s.cutAfter]);
     return m;
   }, [sites]);
   const cuts = selected.flatMap((e) => byEnzyme.get(e) ?? []);
-  const fragments = digestFragments(dna.length, cuts);
+  const fragments = circular ? digestFragmentsCircular(dna.length, cuts) : digestFragments(dna.length, cuts);
+  const topoBtn = (on: boolean): React.CSSProperties => (on ? { ...btn, background: colors.accent.soft, color: colors.accent.default } : btn);
   const L = Math.max(1, dna.length);
   return (
     <div>
-      <PanelHead title="Restriction analysis (linear DNA)">
+      <PanelHead title={`Restriction analysis (${circular ? 'circular' : 'linear'} DNA)`}>
         <Badge kind="calculated" />
+        <span role="group" aria-label="Topology" style={{ display: 'inline-flex', gap: 4 }}>
+          <button style={topoBtn(!circular)} aria-pressed={!circular} onClick={() => circular && setCircular(false)}>Linear</button>
+          <button style={topoBtn(circular)} aria-pressed={circular} title="Plasmid or other closed circle: sites across the origin count, and fragments wrap" onClick={() => !circular && setCircular(true)}>Circular</button>
+        </span>
         <button style={btn} disabled={!sites.length} onClick={onExport}>Export CSV</button>
       </PanelHead>
       <div style={{ padding: '0 14px 10px' }}>
@@ -663,7 +859,7 @@ const DigestPanel: React.FC<{
           )))}
         </div>
         <div style={{ fontSize: 12, color: colors.text.secondary }}>
-          {selected.length ? <>Fragments with {selected.join(' + ')}: <span style={{ color: colors.text.primary, fontVariantNumeric: 'tabular-nums' }}>{fragments.map((f) => `${f.toLocaleString()} bp`).join(', ')}</span></> : 'Tick enzymes below to digest.'}
+          {selected.length ? <>Fragments with {selected.join(' + ')}: <span style={{ color: colors.text.primary, fontVariantNumeric: 'tabular-nums' }}>{fragments.length ? fragments.map((f) => `${f.toLocaleString()} bp`).join(', ') : 'no cut, the circle stays closed'}</span></> : 'Tick enzymes below to digest.'}
         </div>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -716,7 +912,7 @@ const GcPanel: React.FC<{ pts: { pos: number; gc: number }[]; length: number; wi
   );
 };
 
-const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCounts>; gc: number; tm: ReturnType<typeof meltingTemp> }> = ({ dna, counts, gc, tm }) => (
+const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCounts>; gc: number; tm: ReturnType<typeof meltingTemp>; nnTm: ReturnType<typeof nearestNeighborTm>; isDna: boolean }> = ({ dna, counts, gc, tm, nnTm, isDna }) => (
   <div>
     <PanelHead title="Physical properties"><Badge kind="calculated" /></PanelHead>
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -725,11 +921,14 @@ const NucleotideProps: React.FC<{ dna: string; counts: ReturnType<typeof baseCou
         <Row k="Base counts" v={`A ${counts.A} · C ${counts.C} · G ${counts.G} · T ${counts.T}${counts.N ? ` · N ${counts.N}` : ''}`} />
         <Row k="GC content" v={fmt(gc, 2)} unit="%" note="N excluded" />
         <Row k="Melting temperature" v={fmt(tm.tm, 1)} unit="°C" note={tm.method === 'wallace' ? 'Wallace rule 2(A+T)+4(G+C), < 14 nt' : 'Basic formula 64.9+41(GC−16.4)/N, 50 mM Na⁺'} />
+        {isDna && (nnTm
+          ? <Row k="Tm, nearest-neighbour" v={fmt(nnTm.tm, 1)} unit="°C" note={`SantaLucia 1998 · ${nnTm.sodiumM * 1000} mM Na⁺ · ${nnTm.oligoM * 1e6} µM oligo${nnTm.selfComplementary ? ' · self-complementary' : ''} · ΔH° ${fmt(nnTm.dH, 1)} kcal/mol`} />
+          : <Row k="Tm, nearest-neighbour" v="—" note={`Oligos of ${NN_MIN_LENGTH}–${NN_MAX_LENGTH} nt without N only`} />)}
         <Row k="Molecular weight (ssDNA)" v={fmt(ssDnaMolecularWeight(dna), 2)} unit="g/mol" note={counts.N ? 'Undefined with N bases' : 'Anhydrous, 5′-OH (OligoCalc)'} />
         <Row k="Molecular weight (dsDNA)" v={fmt(dsDnaMolecularWeight(dna), 2)} unit="g/mol" note="Both strands" />
       </tbody>
     </table>
-    <div style={{ padding: '8px 14px', fontSize: 11, color: colors.text.tertiary }}>Tm values are primer-design estimates, not a nearest-neighbour thermodynamic model.</div>
+    <div style={{ padding: '8px 14px', fontSize: 11, color: colors.text.tertiary }}>The first Tm is a quick estimate. The nearest-neighbour Tm assumes a perfect-match duplex with no Mg²⁺ or dNTP correction.</div>
   </div>
 );
 

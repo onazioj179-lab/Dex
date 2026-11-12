@@ -14,6 +14,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ContactTracker, touchCapabilities, MAX_CONTACTS, type Contact } from '../../shell/input/touchContacts';
 import { hapticSupport, hapticsEnabled, setHapticsEnabled, subscribeHaptics, haptic } from '../../shell/input/haptics';
+import { getDensityChoice, setDensityChoice, subscribeDensity, resolveDensity, type DensityChoice } from '../../utils/touchDensity';
+
+const DENSITY_OPTIONS: Array<{ value: DensityChoice; label: string }> = [
+  { value: 'auto', label: 'Automatic' },
+  { value: 'touch', label: 'Touch' },
+  { value: 'precision', label: 'Precision' },
+];
 
 const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle)' };
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' };
@@ -122,7 +129,10 @@ const TouchTestPad: React.FC = () => {
 export const TouchInputPanel: React.FC = () => {
   const [caps, setCaps] = useState(touchCapabilities);
   const [hapticsOn, setHapticsOn] = useState(hapticsEnabled);
+  const [density, setDensity] = useState<DensityChoice>(getDensityChoice);
   const support = hapticSupport();
+
+  useEffect(() => subscribeDensity(setDensity), []);
 
   useEffect(() => subscribeHaptics(setHapticsOn), []);
   useEffect(() => {
@@ -152,6 +162,28 @@ export const TouchInputPanel: React.FC = () => {
           <div style={desc}>{caps.coarsePrimary ? 'Touch is the main input.' : caps.anyCoarse ? 'Mouse or trackpad, with a touch screen as well.' : 'Mouse or trackpad.'}</div>
         </div>
         <span style={value}>{caps.hover ? 'Hover available' : 'No hover'}</span>
+      </div>
+      <div style={row}>
+        <div>
+          <div style={label}>Control size</div>
+          <div style={desc}>
+            Touch makes menus, Control Center and the DEX Bar larger and gives every button a 44 px touch area. Precision keeps compact desktop sizes.
+            {density === 'auto' && ` Automatic is using ${resolveDensity('auto', caps.coarsePrimary) === 'touch' ? 'Touch' : 'Precision'} on this device.`}
+          </div>
+        </div>
+        <div role="radiogroup" aria-label="Control size" style={{ display: 'flex', border: '1px solid var(--color-border-control)', borderRadius: 'var(--radius-sm, 6px)', overflow: 'hidden', flexShrink: 0 }}>
+          {DENSITY_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              role="radio"
+              aria-checked={density === o.value}
+              onClick={() => setDensityChoice(o.value)}
+              style={{ height: 28, padding: '0 10px', border: 'none', borderLeft: o.value === 'auto' ? 'none' : '1px solid var(--color-border-control)', background: density === o.value ? 'var(--color-accent-fill, var(--color-accent))' : 'var(--color-bg-surface)', color: density === o.value ? '#fff' : 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </div>
       {caps.maxTouchPoints > 0 && <TouchTestPad />}
       <div style={row}>
