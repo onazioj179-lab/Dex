@@ -3598,4 +3598,4 @@ These need DSP/ML or native hosting we don't fake.
 - Mock / fake data sweep (owner, 2026-11-05) merged with main; `DEX_REMAINING_WORK.md` #159. Main's `download_ctl.rs` kept over this branch's `download.rs`; main's Ledger (opt-in starter categories) and Bio (labelled opt-in sample) kept.
 - Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#160). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
 - Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
-- Still open: packaged check of DexCode save, backup export, a real download, Settings › Plugins install, renderer.log.
+- Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
