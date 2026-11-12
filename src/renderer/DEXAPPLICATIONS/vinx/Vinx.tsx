@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
+import { parseCube } from './lut3d';
 import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import { useAppLifecycle } from '../../hooks/useAppLifecycle';
@@ -456,6 +457,20 @@ const VinxEditor: React.FC = () => {
   const _addClip = useVinxStore(s => s._addClip);
   const programLUT = useVinxStore(s => s.programLUT);
   const setProgramLUT = useVinxStore(s => s.setProgramLUT);
+  const setProgramLUTIntensity = useVinxStore(s => s.setProgramLUTIntensity);
+  const cubeInputRef = useRef<HTMLInputElement>(null);
+  const [cubeError, setCubeError] = useState<string | null>(null);
+  const loadCubeFile = useCallback(async (file: File) => {
+    setCubeError(null);
+    if (file.size > 64 * 1024 * 1024) { setCubeError(`${file.name} is larger than 64 MB.`); return; }
+    try {
+      const r = parseCube(await file.text(), file.name.replace(/\.cube$/i, ''));
+      if (!r.ok) { setCubeError(`${file.name}: ${r.error}`); return; }
+      setProgramLUT({ name: r.lut.title, cssFilter: 'none', cube: r.lut, intensity: 1 });
+    } catch (e) {
+      setCubeError(`Could not read ${file.name}: ${(e as Error).message}`);
+    }
+  }, [setProgramLUT]);
 
   // ROADMAP-600 #199 — UKI creative-op handler. speedRamp + silence removal run
   // for real against the timeline; everything else skips honestly. Silence
@@ -816,7 +831,11 @@ const VinxEditor: React.FC = () => {
       videoBitsPerSecond: 8_000_000,
       // Bake the active program LUT into the export (read live from the
       // store — the callback deps stay stable)
-      lutFilter: useVinxStore.getState().programLUT?.cssFilter,
+      lutFilter: useVinxStore.getState().programLUT?.cube ? undefined : useVinxStore.getState().programLUT?.cssFilter,
+      lutCube: (() => {
+        const l = useVinxStore.getState().programLUT;
+        return l?.cube ? { cube: l.cube, intensity: l.intensity ?? 1 } : undefined;
+      })(),
       startPlayback: () => {
         setIsPlaying(true);
         engineRef.current?.play(0, 1);
@@ -1496,6 +1515,35 @@ const VinxEditor: React.FC = () => {
             <button aria-label="Close LUT Browser" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLUTBrowser}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10, overflowY: 'auto', maxHeight: 380 }}>
+            {/* Real 3D LUT from a .cube file (graded on the GPU, baked into Quick Export). */}
+            <div style={{ marginBottom: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="dex-label-caps">.cube file</div>
+              {programLUT?.cube ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-primary)' }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={programLUT.name}>{programLUT.name}</span>
+                    <span style={{ color: 'var(--color-text-tertiary)' }}>{programLUT.cube.size}³</span>
+                    <button aria-label="Remove loaded LUT" style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px' }} onClick={() => setProgramLUT(null)}>Remove</button>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                    Intensity
+                    <input type="range" min={0} max={100} step={1} aria-label="LUT intensity"
+                      value={Math.round((programLUT.intensity ?? 1) * 100)}
+                      onChange={e => setProgramLUTIntensity(Number(e.target.value) / 100)} style={{ flex: 1 }} />
+                    <span style={{ width: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round((programLUT.intensity ?? 1) * 100)}%</span>
+                  </label>
+                </>
+              ) : (
+                <button aria-label="Load a .cube LUT" style={{ padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}
+                  onClick={() => cubeInputRef.current?.click()}>
+                  Load .cube…
+                </button>
+              )}
+              {cubeError && <div role="alert" style={{ fontSize: 11, color: 'var(--color-error, #ff453a)' }}>{cubeError}</div>}
+              <input ref={cubeInputRef} type="file" accept=".cube" hidden aria-label="Choose a .cube file"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void loadCubeFile(f); }} />
+              <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>Built-in looks below are quick filter approximations.</div>
+            </div>
             {(['cinematic', 'filmic', 'vintage', 'creative', 'technical'] as const).map(cat => (
               <div key={cat} style={{ marginBottom: 'var(--space-3)' }}>
                 <div className="dex-label-caps" style={{ marginBottom: 6 }}>{cat}</div>
