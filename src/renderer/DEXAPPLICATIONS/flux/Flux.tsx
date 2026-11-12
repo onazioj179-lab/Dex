@@ -1363,6 +1363,22 @@ const Flux: React.FC = () => {
           }
           break;
           
+        case 'light': {
+          // A 2D point light: an additive radial glow that brightens whatever is
+          // under it. Size follows Scale, strength follows Opacity.
+          const r = 320;
+          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+          g.addColorStop(0, 'rgba(255,244,214,0.85)');
+          g.addColorStop(0.35, 'rgba(255,236,190,0.35)');
+          g.addColorStop(1, 'rgba(255,230,180,0)');
+          const prevOp = ctx.globalCompositeOperation;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = g;
+          ctx.fillRect(-r, -r, r * 2, r * 2);
+          ctx.globalCompositeOperation = prevOp;
+          break;
+        }
+
         case 'group': {
           // Pre-comp: draw its layers (bottom to top) inside this transform.
           const kids = (layer.children || []).filter(c => c.visible && c.type !== 'camera' && currentTime >= c.inPoint && currentTime <= c.outPoint);
@@ -1726,9 +1742,18 @@ const Flux: React.FC = () => {
         }
         case 'wiggle': {
           const amplitude = s.amplitude ?? 10;
-          const frequency = s.frequency ?? 0.3;
-          result.x = (result.x ?? 0) + Math.sin(localTime * frequency) * amplitude;
-          result.y = (result.y ?? 0) + Math.cos(localTime * frequency * 0.83) * amplitude;
+          // Auto Wiggle panel stores `property` and a frequency in wiggles per
+          // second; the plain behavior uses radians per frame.
+          const w = s.property ? (2 * Math.PI * (s.frequency ?? 5)) / fps : (s.frequency ?? 0.3);
+          const a = Math.sin(localTime * w), b = Math.cos(localTime * w * 0.83);
+          switch (s.property) {
+            case 'rotation': result.rotation = (result.rotation ?? 0) + a * amplitude; break;
+            case 'scale': result.scale = (result.scale ?? 1) * Math.max(0, 1 + (a * amplitude) / 100); break;
+            case 'opacity': result.opacity = (result.opacity ?? 1) * Math.min(1, Math.max(0, 1 - (Math.abs(a) * amplitude) / 100)); break;
+            default:
+              result.x = (result.x ?? 0) + a * amplitude;
+              result.y = (result.y ?? 0) + b * amplitude;
+          }
           break;
         }
         case 'drift': {
@@ -1808,7 +1833,7 @@ const Flux: React.FC = () => {
     }
     
     return result;
-  }, [ease, canvasSize]);
+  }, [ease, canvasSize, fps]);
 
   // ===== TOOLS =====
   const tools = useMemo(() => [
