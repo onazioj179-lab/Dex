@@ -38,6 +38,7 @@ import { decideToolCall, toolRisk, reasoningBudget, type ReasoningBudget } from 
 import { getProcessingMode, getReasoningPreference } from './providers/modelPrefs';
 import { listGrants } from './permissions';
 import { runFileTool, FILE_TOOL_NAMES } from './fileTools';
+import { scheduleTaskTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduleTools';
 
 /** Asks the user to approve a risky core-tool call; resolves true to proceed. */
 export type ToolConfirmHandler = (tool: string, args: Record<string, unknown>, reason: string) => Promise<boolean> | boolean;
@@ -175,6 +176,12 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
     }
     case 'list_apps':
       return Object.entries(APP_DEFINITIONS).map(([id, d]) => `${id} (${d.name})`).join(', ');
+    case 'schedule_task':
+      return scheduleTaskTool(args);
+    case 'list_scheduled_tasks':
+      return listScheduledTasksTool();
+    case 'cancel_scheduled_task':
+      return cancelScheduledTaskTool(args);
     default:
       return `Unknown tool: ${name}`;
   }
@@ -250,6 +257,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   let budget: ToolBudget = createToolBudget({
     web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
     find_files: 4, read_file: 6, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
+    schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
   });
 
   // One controller per run: the caller's signal and the task's Cancel button
