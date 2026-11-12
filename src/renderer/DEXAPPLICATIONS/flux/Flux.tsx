@@ -36,6 +36,8 @@ import {
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
 const FLUX_ACCENT = '#bf5af2';
@@ -76,6 +78,8 @@ interface Layer {
   shapeStyle?: { fill: string; stroke: string; strokeWidth: number; type: 'rectangle' | 'ellipse' | 'polygon' | 'star' };
   particleEmitter?: { birthRate: number; life: number; lifeRange: number; speed: number; speedRange: number; angle: number; angleRange: number; spin: number; spinRange: number; scale: number; scaleRange: number; color: string; colorRange: number; opacity: number; shape: 'circle' | 'point' | 'rectangle' | 'line' | 'image' };
   animations?: Animation[];
+  /** Camera layers only: lens and depth of field (see fluxCamera.ts). */
+  camera?: CameraSettings;
   // Live per-frame expressions keyed by transform property name (e.g. 'x',
   // 'opacity', 'rotationZ'). Evaluated every frame during render/preview; a
   // malformed expression degrades to the static/keyframe value. See expressions.ts.
@@ -728,10 +732,9 @@ const Flux: React.FC = () => {
   const [showEffectsStack, setShowEffectsStack] = useState(false);
   // 8. Camera Rig
   const [showCameraRig, setShowCameraRig] = useState(false);
-  const [cameraRigType, setCameraRigType] = useState<'orbit' | 'twoNode' | 'poi'>('orbit');
   const [cameraFov, setCameraFov] = useState(50);
   const [cameraDof, setCameraDof] = useState(false);
-  const [cameraFocusDistance, setCameraFocusDistance] = useState(1000);
+  const [cameraFocusDistance, setCameraFocusDistance] = useState(0);
   // 10. Render Queue
   const [showRenderQueue, setShowRenderQueue] = useState(false);
   const [renderQueue, setRenderQueue] = useState<{ id: string; name: string; format: string; status: 'queued' | 'rendering' | 'done' | 'error'; progress: number }[]>([]);
@@ -1082,7 +1085,22 @@ const Flux: React.FC = () => {
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
     
     // Render layers from bottom to top (reversed order)
-    const visibleLayers = layers.filter(l => l.visible && currentTime >= l.inPoint && currentTime <= l.outPoint).reverse();
+    const inTime = (l: Layer) => l.visible && currentTime >= l.inPoint && currentTime <= l.outPoint;
+    // The topmost active Camera layer frames the shot; cameras are never drawn.
+    const camLayer = layers.find(l => l.type === 'camera' && inTime(l));
+    const camView: CameraView | null = camLayer ? (() => {
+      const settings = { ...DEFAULT_CAMERA, ...(camLayer.camera || {}) };
+      return {
+        x: getAnimatedValue(camLayer, 'x', currentTime) ?? camLayer.transform.x,
+        y: getAnimatedValue(camLayer, 'y', currentTime) ?? camLayer.transform.y,
+        z: getAnimatedValue(camLayer, 'z', currentTime) ?? camLayer.transform.z ?? 0,
+        roll: getAnimatedValue(camLayer, 'rotationZ', currentTime) ?? camLayer.transform.rotationZ,
+        zoom: fovZoom(settings.fov),
+        focal: focalLength(settings.fov, canvasSize.height),
+        settings,
+      };
+    })() : null;
+    const visibleLayers = layers.filter(l => l.type !== 'camera' && inTime(l)).reverse();
     
     // Cache per-frame constants outside the layer loop
     const cachedTier = getPerfTier();
@@ -1091,6 +1109,18 @@ const Flux: React.FC = () => {
     
     for (const layer of visibleLayers) {
       ctx.save();
+
+      // Camera: frame the view, then perspective-scale this layer about the
+      // camera's look point by its Z distance; behind the camera = not drawn.
+      let camBlur = 0;
+      if (camView) {
+        applyCameraView(ctx, camView, canvasSize.width, canvasSize.height);
+        const depth = (getAnimatedValue(layer, 'z', currentTime) ?? layer.transform.z ?? 0) - camView.z;
+        const p = perspectiveScale(depth, camView.focal);
+        if (p === null) { ctx.restore(); continue; }
+        if (p !== 1) { ctx.translate(camView.x, camView.y); ctx.scale(p, p); ctx.translate(-camView.x, -camView.y); }
+        camBlur = dofBlur(depth, camView.settings);
+      }
       
       // Compute local time for this layer
       const localTime = currentTime - layer.inPoint;
@@ -1112,9 +1142,12 @@ const Flux: React.FC = () => {
         const cosY = Math.cos((tRotY * Math.PI) / 180);
         // Simulate 3D perspective via scale + skew approximation
         ctx.transform(cosY, 0, 0, cosX, 0, 0);
-        const depth = layer.transform.z || 0;
-        const perspScale = 1000 / (1000 + depth);
-        ctx.scale(perspScale, perspScale);
+        if (!camView) {
+          // No camera: a fixed 1000px lens for Z depth.
+          const depth = layer.transform.z || 0;
+          const perspScale = 1000 / (1000 + depth);
+          ctx.scale(perspScale, perspScale);
+        }
       }
       ctx.rotate((tRotZ * Math.PI) / 180);
       ctx.scale(tScaleX / 100, tScaleY / 100);
@@ -1176,6 +1209,10 @@ const Flux: React.FC = () => {
           ctx.filter = filterParts.join(' ');
         }
       }
+      if (camBlur > 0) {
+        const f = ctx.filter && ctx.filter !== 'none' ? `${ctx.filter} ` : '';
+        ctx.filter = `${f}blur(${camBlur}px)`;
+      }
       
       // Render based on layer type
       switch (layer.type) {
@@ -1190,8 +1227,8 @@ const Flux: React.FC = () => {
           
         case 'shape':
           const style = layer.shapeStyle || { fill: 'var(--color-accent)', stroke: 'var(--color-accent)', strokeWidth: 2, type: 'rectangle' as const };
-          ctx.fillStyle = style.fill;
-          ctx.strokeStyle = style.stroke;
+          ctx.fillStyle = resolveCanvasColor(style.fill);
+          ctx.strokeStyle = resolveCanvasColor(style.stroke);
           ctx.lineWidth = style.strokeWidth;
           // Stroke effects
           if (strokeDash > 0 || strokeGap > 0) ctx.setLineDash([strokeDash, strokeGap]);
@@ -1297,7 +1334,7 @@ const Flux: React.FC = () => {
               ctx.fillText(textContent, -0.5, -0.5);
             }
           }
-          ctx.fillStyle = textStyle.color;
+          ctx.fillStyle = resolveCanvasColor(textStyle.color);
           ctx.fillText(textContent, 0, 0);
           break;
           
@@ -1316,6 +1353,7 @@ const Flux: React.FC = () => {
         case 'particle': {
           // Real particle system using emitter settings (cached defaults)
           const emitter = layer.particleEmitter || defaultParticleEmitter;
+          const particleColor = resolveCanvasColor(emitter.color); // once per layer, not per particle
           const maxParticles = cachedMaxParticles;
           const particleCount = Math.min(emitter.birthRate * (emitter.life / fps), maxParticles);
           const baseAngle = (emitter.angle * Math.PI) / 180;
@@ -1347,7 +1385,7 @@ const Flux: React.FC = () => {
             ctx.translate(px * frictionFactor, py * frictionFactor);
             ctx.rotate(rotation);
             ctx.globalAlpha *= emitter.opacity * fadeIn * fadeOut;
-            ctx.fillStyle = emitter.color;
+            ctx.fillStyle = particleColor;
             const size = 4 * pScale * (1 - lifeProgress * 0.5);
             
             if (emitter.shape === 'circle' || emitter.shape === 'point') {
@@ -1357,7 +1395,7 @@ const Flux: React.FC = () => {
             } else if (emitter.shape === 'rectangle') {
               ctx.fillRect(-size, -size, size * 2, size * 2);
             } else if (emitter.shape === 'line') {
-              ctx.strokeStyle = emitter.color;
+              ctx.strokeStyle = particleColor;
               ctx.lineWidth = Math.max(0.5, size * 0.3);
               ctx.beginPath();
               ctx.moveTo(-size, 0);
@@ -3007,6 +3045,30 @@ const Flux: React.FC = () => {
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Scale" min={0} max={400} value={selectedLayer.transform.scaleX} unit="%" onChange={(v) => updateLayerTransform({ scaleX: v, scaleY: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Depth (Z)" min={-900} max={5000} value={selectedLayer.transform.z || 0} displayValue={Math.round(selectedLayer.transform.z || 0)} onChange={(v) => updateLayerTransform({ z: v })} />
+                    {selectedLayer.type === 'camera' && (() => {
+                      const cam = { ...DEFAULT_CAMERA, ...(selectedLayer.camera || {}) };
+                      const setCam = (patch: Partial<CameraSettings>) => setLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, camera: { ...cam, ...patch } } : l));
+                      return (
+                        <>
+                          <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Camera</div>
+                          <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Field of view" min={10} max={120} value={cam.fov} unit="°" onChange={(v) => setCam({ fov: v })} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)', margin: '6px 0' }}>
+                            <input type="checkbox" checked={cam.dof} onChange={e => setCam({ dof: e.target.checked })} style={{ accentColor: FLUX_ACCENT }} />
+                            Depth of field
+                          </label>
+                          {cam.dof && (
+                            <>
+                              <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Focus at" min={0} max={5000} value={cam.focusDistance} displayValue={Math.round(cam.focusDistance)} onChange={(v) => setCam({ focusDistance: v })} />
+                              <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Blur strength" min={0} max={100} value={Math.round(cam.aperture * 1000)} onChange={(v) => setCam({ aperture: v / 1000 })} />
+                            </>
+                          )}
+                          <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.45, marginTop: 4 }}>
+                            The camera's position is the centre of the shot and its rotation rolls it. Layers with a larger Depth look further away{cam.dof ? ' and blur away from the focus distance' : ''}.
+                          </div>
+                        </>
+                      );
+                    })()}
                     
                     {/* Easing curve editor */}
                     <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
@@ -4274,12 +4336,6 @@ const Flux: React.FC = () => {
             <button aria-label="Close Camera Rig panel" onClick={() => setShowCameraRig(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Rig Type</span>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              {(['orbit', 'twoNode', 'poi'] as const).map(t => (
-                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid ' + (cameraRigType === t ? fluxTint(30) : 'var(--color-bg-hover)'), background: cameraRigType === t ? fluxTint(12) : 'var(--color-border-subtle)', color: cameraRigType === t ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
-              ))}
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30 }}>FOV</span>
               <input type="range" min="10" max="120" value={cameraFov} onChange={e => setCameraFov(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
@@ -4304,10 +4360,11 @@ const Flux: React.FC = () => {
                 startTime: 0, duration: duration, inPoint: 0, outPoint: duration,
                 transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 },
                 behaviors: [], filters: [], animations: [],
+                camera: { ...DEFAULT_CAMERA, fov: cameraFov, dof: cameraDof, focusDistance: cameraFocusDistance },
               };
               setLayers(prev => [rigLayer, ...prev]);
               setSelectedLayerId(rigLayer.id);
-              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? `, DOF @ ${cameraFocusDistance}` : ''})`, type: 'success' } }));
+              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera added: it now frames the view (FOV ${cameraFov}°${cameraDof ? `, focus at ${cameraFocusDistance}` : ''}). Move or keyframe it to move the shot.`, type: 'success' } }));
               setShowCameraRig(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>

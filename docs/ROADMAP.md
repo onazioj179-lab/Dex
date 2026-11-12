@@ -3545,8 +3545,7 @@ These need DSP/ML or native hosting we don't fake.
 > the concurrent chat's shared `.vite` cache, so the few remaining deep click-paths (Imosion
 > Reverse/Invert post-state, Vinx Split/Duplicate click, Flux keyframe-delete click) are tsc-clean +
 > wired into menus already clicked-verified this session — high confidence, not yet click-captured.
-- Still queued (genuinely new work): Flux draggable keyframes + wiring its dead controls (camera DOF /
-  distribute / A-B snapshot); Forge real waveform + trim scrubber; Vinx color-wheel RGB readouts.
+- Still queued (genuinely new work): Flux draggable keyframes (camera DOF DONE 18n: real camera layers in `flux/fluxCamera.ts`; distribute already wired); Forge real waveform + trim scrubber; Vinx color-wheel RGB readouts.
 
 ### After Imosion (queued)
 - Games app — UI/UX pass, Apple-inspired internals
@@ -3599,3 +3598,4 @@ These need DSP/ML or native hosting we don't fake.
 - Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#160). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
 - Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
 - Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
+- 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #161), Flux camera + invisible-shape fix (#162), Weather widget icon, collaboration PIN from the CSPRNG.
