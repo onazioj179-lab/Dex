@@ -3590,3 +3590,7 @@ These need DSP/ML or native hosting we don't fake.
 ## Checkpoint 2026-11-11 (VINX save and recovery)
 
 - VINX: recovery banner only after a session that did not close; saves 2 s after edits and on close; failures shown; newer copy wins at start (#152).
+
+## Checkpoint 2026-11-11 (Presentation save, recovery, undo)
+
+- Presentation: debounced autosave with a visible failure state, recovery of an unreadable stored deck, undo/redo, deck files (#151).
