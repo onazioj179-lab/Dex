@@ -795,6 +795,41 @@ const Prism: React.FC = () => {
   const canvasDragRafRef = useRef<number>(0);
   const checkerPatternRef = useRef<CanvasPattern | null>(null);
   const layerImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  // Pixel tools edit the SELECTED LAYER, not the on-screen composite. They used
+  // to read and bake the display canvas (checkerboard + every visible layer)
+  // into the selected layer, duplicating the other layers into it.
+  const workRef = useRef<{ layers: Layer[]; selectedLayerId: string | null; canvasSize: { width: number; height: number } }>({ layers: [], selectedLayerId: null, canvasSize: { width: 0, height: 0 } });
+  workRef.current = { layers, selectedLayerId, canvasSize };
+  const layerWorkCanvas = useCallback((): HTMLCanvasElement | null => {
+    const { layers: ls, selectedLayerId: sid, canvasSize: cs } = workRef.current;
+    const layer = ls.find(l => l.id === sid);
+    if (!layer || cs.width <= 0 || cs.height <= 0) return null;
+    if (!layer.imageData && layer.type !== 'image') {
+      // Shape / text layers have no pixels to edit; baking would replace them.
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Pixel tools work on image layers. Select an image layer.' } }));
+      return null;
+    }
+    const c = document.createElement('canvas');
+    c.width = cs.width; c.height = cs.height;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    if (!cx) return null;
+    if (layer.imageData) {
+      const img = layerImageCacheRef.current.get(layer.imageData);
+      if (!img) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Show the layer first: its pixels are not loaded yet.' } }));
+        return null;
+      }
+      if (layer.rotation) {
+        const mx = layer.x + layer.width / 2, my = layer.y + layer.height / 2;
+        cx.translate(mx, my); cx.rotate((layer.rotation * Math.PI) / 180); cx.translate(-mx, -my);
+      }
+      cx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+      cx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    return c;
+  }, []);
+  /** The layer after a pixel edit: document-sized, unrotated, at the origin. */
+  const bakePatch = (c: HTMLCanvasElement) => ({ imageData: c.toDataURL(), x: 0, y: 0, width: c.width, height: c.height, rotation: 0 });
 
   // App lifecycle: cancel any pending canvas drag frame when Prism is
   // backgrounded/suspended so no stale rAF callback fires off-screen.
@@ -1381,11 +1416,11 @@ const Prism: React.FC = () => {
   // selected layer (resize / desaturate+contrast / square-crop+sharpen); custom or
   // empty actions report honestly rather than silently doing nothing.
   const runAction = useCallback((action: { id: string; name: string; steps: string[] }) => {
-    const canvas = canvasRef.current;
+    const canvas = layerWorkCanvas();
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const persist = () => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+    const persist = () => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
     if (action.id === 'action-1') {
       // Web Export Resize: downscale longest edge to 1200, then sharpen.
       pushHistory(`Action: ${action.name}`);
@@ -1549,7 +1584,7 @@ const Prism: React.FC = () => {
 
     // Bucket (flood fill) tool
     if (activeTool === 'bucket') {
-      const canvas = canvasRef.current;
+      const canvas = layerWorkCanvas();
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -1614,7 +1649,7 @@ const Prism: React.FC = () => {
       // Save to selected layer
       const selectedLayer = layers.find(l => l.id === selectedLayerId);
       if (selectedLayer && selectedLayer.type === 'image') {
-        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
       }
       return;
     }
@@ -3620,7 +3655,7 @@ const Prism: React.FC = () => {
                   <PrismSlider label="Intensity" min={0} max={100} value={filterIntensity} onChange={setFilterIntensity} unit="%" />
                   <button
                     onClick={() => {
-                      const canvas = canvasRef.current;
+                      const canvas = layerWorkCanvas();
                       if (!canvas) return;
                       const ctx = canvas.getContext('2d');
                       if (!ctx) return;
@@ -3629,7 +3664,7 @@ const Prism: React.FC = () => {
                       // Update selected layer with filtered result
                       const selLayer = layers.find(l => l.id === selectedLayerId);
                       if (selLayer && selLayer.type === 'image') {
-                        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+                        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
                       }
                       setActiveFilter(null);
                     }}
@@ -3806,7 +3841,7 @@ const Prism: React.FC = () => {
               ))}
             </div>
             <button aria-label="Generate content-aware fill" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Content-Aware Fill');
               const sel = selection; if (!sel.mask) return;
@@ -3896,7 +3931,7 @@ const Prism: React.FC = () => {
               }
               ctx.putImageData(fullData, 0, 0);
               // Save result back to active layer
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowContentAwareFill(false);
             }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Generate Fill</button>
             <button aria-label="Content-aware fill via diffusion inpaint" onClick={() => {
@@ -3905,7 +3940,7 @@ const Prism: React.FC = () => {
               // hole pixel from its known neighbours, so colour diffuses inward
               // from the actual surrounding content (not a flat fill).
               try {
-                const canvas = canvasRef.current; if (!canvas) return;
+                const canvas = layerWorkCanvas(); if (!canvas) return;
                 const ctx = canvas.getContext('2d', { willReadFrequently: true }); if (!ctx) return;
                 const sel = selection;
                 if (!sel.mask) {
@@ -3924,7 +3959,7 @@ const Prism: React.FC = () => {
                 for (let i = 0; i < holeMask.length; i++) holeMask[i] = sel.mask[i] ? 1 : 0;
                 const filled = diffusionInpaint(fullData, holeMask, 80);
                 ctx.putImageData(filled, 0, 0);
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
                 window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Filled via diffusion inpaint' } }));
                 setShowContentAwareFill(false);
               } catch (err) {
@@ -3959,7 +3994,7 @@ const Prism: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
               <button aria-label="Reconstruct liquify" onClick={() => {
-                const canvas = canvasRef.current; if (!canvas) return;
+                const canvas = layerWorkCanvas(); if (!canvas) return;
                 const ctx = canvas.getContext('2d'); if (!ctx) return;
                 const orig = liquifyOriginalRef.current;
                 if (!orig) return;
@@ -3969,12 +4004,12 @@ const Prism: React.FC = () => {
                 img.onload = () => {
                   ctx.clearRect(0, 0, canvas.width, canvas.height);
                   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+                  setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
                 };
                 img.src = orig;
               }} style={{ flex: 1, padding: '5px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>Reconstruct</button>
               <button aria-label="Apply liquify" onClick={() => {
-                const canvas = canvasRef.current; if (!canvas) return;
+                const canvas = layerWorkCanvas(); if (!canvas) return;
                 const ctx = canvas.getContext('2d'); if (!ctx) return;
                 const cx = liquifyCenter ? liquifyCenter.x : canvas.width / 2;
                 const cy = liquifyCenter ? liquifyCenter.y : canvas.height / 2;
@@ -4011,7 +4046,7 @@ const Prism: React.FC = () => {
                   }
                 }
                 ctx.putImageData(dst, 0, 0);
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
                 setShowLiquify(false);
               }} style={{ flex: 1, padding: '5px', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
             </div>
@@ -4258,7 +4293,7 @@ const Prism: React.FC = () => {
             ))}
             <button aria-label="Auto-detect lens profile" onClick={() => { setLensDistortion(0); setLensChromaticAb(0); setLensVignette(-15); }} style={{ width: '100%', padding: '6px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Auto-Detect Lens Profile</button>
             <button aria-label="Apply lens correction" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Lens Correction');
               const w = canvas.width, h = canvas.height;
@@ -4272,7 +4307,7 @@ const Prism: React.FC = () => {
                 vignette: lensVignette / 100,
               }));
               ctx.putImageData(dst, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowLensCorrection(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
           </div>
@@ -4671,7 +4706,7 @@ const Prism: React.FC = () => {
                 const h = images[0].naturalHeight;
                 const singleW = images[0].naturalWidth;
                 const totalW = Math.round(singleW * (1 + (images.length - 1) * (1 - overlap)));
-                const canvas = canvasRef.current; if (!canvas) return;
+                const canvas = layerWorkCanvas(); if (!canvas) return;
                 canvas.width = totalW; canvas.height = h;
                 setCanvasSize({ width: totalW, height: h });
                 const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -4707,7 +4742,7 @@ const Prism: React.FC = () => {
                     xOff += Math.round(iw * (1 - overlap));
                   }
                 }
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL(), width: totalW, height: h } : l));
+                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas), width: totalW, height: h } : l));
                 images.forEach(img => URL.revokeObjectURL(img.src));
                 setShowPanorama(false);
               };
@@ -4752,7 +4787,7 @@ const Prism: React.FC = () => {
                   images.push(img);
                 }
                 const w = images[0].naturalWidth, h = images[0].naturalHeight;
-                const canvas = canvasRef.current; if (!canvas) return;
+                const canvas = layerWorkCanvas(); if (!canvas) return;
                 canvas.width = w; canvas.height = h;
                 setCanvasSize({ width: w, height: h });
                 const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -4792,7 +4827,7 @@ const Prism: React.FC = () => {
                   }
                 }
                 ctx.putImageData(result, 0, 0);
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL(), width: w, height: h } : l));
+                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas), width: w, height: h } : l));
                 images.forEach(img => URL.revokeObjectURL(img.src));
                 setShowFocusStack(false);
               };
@@ -4857,7 +4892,7 @@ const Prism: React.FC = () => {
               <button aria-label="Reset curves" onClick={() => setCurvesPoints(prev => ({ ...prev, [curvesChannel]: [{ x: 0, y: 0 }, { x: 255, y: 255 }] }))} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 9999, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>Reset</button>
             </div>
             <button aria-label="Apply curves adjustment" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Curves');
               const w = canvas.width, h = canvas.height;
@@ -4889,7 +4924,7 @@ const Prism: React.FC = () => {
                 }
               }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowCurves(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
@@ -4943,7 +4978,7 @@ const Prism: React.FC = () => {
               </div>
             </div>
             <button aria-label="Apply levels adjustment" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Levels');
               const w = canvas.width, h = canvas.height;
@@ -4960,7 +4995,7 @@ const Prism: React.FC = () => {
               const chIdx = levelsChannel === 'r' ? [0] : levelsChannel === 'g' ? [1] : levelsChannel === 'b' ? [2] : [0, 1, 2];
               for (let i = 0; i < d.length; i += 4) { for (const c of chIdx) d[i + c] = lut[d[i + c]]; }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowLevels(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
@@ -4993,7 +5028,7 @@ const Prism: React.FC = () => {
               Monochrome
             </label>
             <button aria-label="Apply channel mixer" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Channel Mixer');
               const w = canvas.width, h = canvas.height;
@@ -5015,7 +5050,7 @@ const Prism: React.FC = () => {
                 }
               }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowChannelMixer(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
@@ -5043,7 +5078,7 @@ const Prism: React.FC = () => {
               </div>
             ))}
             <button aria-label="Apply selective color" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Selective Color');
               const w = canvas.width, h = canvas.height;
@@ -5082,7 +5117,7 @@ const Prism: React.FC = () => {
                 d[i+2] = Math.max(0, Math.min(255, Math.round(b * (1 - yf) * (1 - kf))));
               }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowSelectiveColor(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
           </div>
@@ -5120,13 +5155,13 @@ const Prism: React.FC = () => {
               Preserve Luminosity
             </label>
             <button aria-label="Apply photo filter" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Photo Filter');
               const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
               const filtered = applyPhotoFilter(imgData, photoFilterColor, photoFilterDensity, photoFilterPreserveLum);
               ctx.putImageData(filtered, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowPhotoFilter(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
@@ -5153,7 +5188,7 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Load Custom .cube LUT file</span>
             </div>
             <button aria-label="Apply color lookup" disabled={!colorLookupPreset} onClick={() => {
-              const canvas = canvasRef.current; if (!canvas || !colorLookupPreset) return;
+              const canvas = layerWorkCanvas(); if (!canvas || !colorLookupPreset) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Color Lookup');
               const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -5196,7 +5231,7 @@ const Prism: React.FC = () => {
                 d[i] = r; d[i + 1] = gr; d[i + 2] = b;
               }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowColorLookup(false);
             }} style={{ width: '100%', padding: '7px', marginTop: 10, borderRadius: 'var(--radius-lg)', border: 'none', background: colorLookupPreset ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: colorLookupPreset ? '#fff' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: colorLookupPreset ? 'pointer' : 'not-allowed', opacity: colorLookupPreset ? 1 : 0.6 }}>Apply LUT</button>
           </div>
@@ -5228,7 +5263,7 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{replaceColorFuzziness}</span>
             </div>
             <button aria-label="Apply color replacement" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               const src = hexToRgb(replaceColorSource);
               const tgt = hexToRgb(replaceColorTarget);
@@ -5249,7 +5284,7 @@ const Prism: React.FC = () => {
                 }
               }
               ctx.putImageData(imgData, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowReplaceColor(false);
             }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Replace</button>
           </div>
@@ -5272,7 +5307,7 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {[2, 4, 6, 8, 16].map(l => <button key={l} onClick={() => setPosterizeLevels(l)} aria-label={`${l} levels`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (posterizeLevels === l ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: posterizeLevels === l ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: posterizeLevels === l ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>{l}</button>)}
             </div>
-            <button aria-label="Apply posterize effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Posterize'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const lvl = posterizeLevels; for (let i = 0; i < d.length; i += 4) { for (let c = 0; c < 3; c++) { d[i + c] = Math.round(Math.round(d[i + c] / 255 * (lvl - 1)) / (lvl - 1) * 255); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowPosterize(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply posterize effect" onClick={() => { const canvas = layerWorkCanvas(); if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Posterize'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const lvl = posterizeLevels; for (let i = 0; i < d.length; i += 4) { for (let c = 0; c < 3; c++) { d[i + c] = Math.round(Math.round(d[i + c] / 255 * (lvl - 1)) / (lvl - 1) * 255); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l)); setShowPosterize(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -5293,7 +5328,7 @@ const Prism: React.FC = () => {
               <input type="range" min="1" max="255" value={thresholdValue} onChange={e => setThresholdValue(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{thresholdValue}</span>
             </div>
-            <button aria-label="Apply threshold effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Threshold'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; const v = lum >= thresholdValue ? 255 : 0; d[i] = v; d[i + 1] = v; d[i + 2] = v; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowThreshold(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply threshold effect" onClick={() => { const canvas = layerWorkCanvas(); if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Threshold'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; const v = lum >= thresholdValue ? 255 : 0; d[i] = v; d[i + 1] = v; d[i + 2] = v; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l)); setShowThreshold(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -5327,7 +5362,16 @@ const Prism: React.FC = () => {
                 </button>
               ))}
             </div>
-            <button aria-label="Apply canvas resize" onClick={() => { setCanvasSize(canvasSizeNew); setShowCanvasSize(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply canvas resize" onClick={() => {
+              // Anchor decides where the old canvas sits in the new one: shift every
+              // layer by the share of the size change on that side.
+              const fx = canvasSizeAnchor[1] === 'l' ? 0 : canvasSizeAnchor[1] === 'c' ? 0.5 : 1;
+              const fy = canvasSizeAnchor[0] === 't' ? 0 : canvasSizeAnchor[0] === 'm' ? 0.5 : 1;
+              const dx = Math.round((canvasSizeNew.width - canvasSize.width) * fx);
+              const dy = Math.round((canvasSizeNew.height - canvasSize.height) * fy);
+              if (dx || dy) { pushHistory('Canvas Size'); setLayers(prev => prev.map(l => ({ ...l, x: l.x + dx, y: l.y + dy }))); }
+              setCanvasSize(canvasSizeNew); setShowCanvasSize(false);
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -5405,7 +5449,7 @@ const Prism: React.FC = () => {
               </div>
             ))}
             <button aria-label="Apply color balance" onClick={() => {
-              const canvas = canvasRef.current; if (!canvas) return;
+              const canvas = layerWorkCanvas(); if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
               pushHistory('Color Balance');
               const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -5415,7 +5459,7 @@ const Prism: React.FC = () => {
               const toCMY = (t: { cr: number; mg: number; yb: number }) => ({ cyan: -t.cr, magenta: -t.mg, yellow: -t.yb });
               const result = adjustColorBalance(imgData, toCMY(v.shadows), toCMY(v.midtones), toCMY(v.highlights), true);
               ctx.putImageData(result, 0, 0);
-              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
+              setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l));
               setShowColorBalance(false);
             }} style={{ width: '100%', padding: '7px', marginTop: 4, borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
@@ -5445,7 +5489,7 @@ const Prism: React.FC = () => {
               ))}
               <button aria-label="Add gradient stop" onClick={() => setGradientMapStops(prev => [...prev.slice(0, -1), { offset: 0.5, color: '#888888' }, prev[prev.length - 1]])} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 9999, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>+</button>
             </div>
-            <button aria-label="Apply gradient map" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Gradient Map'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const stops = gradientMapStops; const parseHex = (hex: string) => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }; const lut: number[][] = []; for (let i = 0; i < 256; i++) { const t = i / 255; let s0 = stops[0], s1 = stops[stops.length - 1]; for (let j = 0; j < stops.length - 1; j++) { if (t >= stops[j].offset && t <= stops[j + 1].offset) { s0 = stops[j]; s1 = stops[j + 1]; break; } } const range = s1.offset - s0.offset; const f = range > 0 ? (t - s0.offset) / range : 0; const c0 = parseHex(s0.color); const c1 = parseHex(s1.color); lut.push([Math.round(c0[0] + (c1[0] - c0[0]) * f), Math.round(c0[1] + (c1[1] - c0[1]) * f), Math.round(c0[2] + (c1[2] - c0[2]) * f)]); } for (let i = 0; i < d.length; i += 4) { const lum = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114); const c = lut[lum]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowGradientMap(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply gradient map" onClick={() => { const canvas = layerWorkCanvas(); if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Gradient Map'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const stops = gradientMapStops; const parseHex = (hex: string) => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }; const lut: number[][] = []; for (let i = 0; i < 256; i++) { const t = i / 255; let s0 = stops[0], s1 = stops[stops.length - 1]; for (let j = 0; j < stops.length - 1; j++) { if (t >= stops[j].offset && t <= stops[j + 1].offset) { s0 = stops[j]; s1 = stops[j + 1]; break; } } const range = s1.offset - s0.offset; const f = range > 0 ? (t - s0.offset) / range : 0; const c0 = parseHex(s0.color); const c1 = parseHex(s1.color); lut.push([Math.round(c0[0] + (c1[0] - c0[0]) * f), Math.round(c0[1] + (c1[1] - c0[1]) * f), Math.round(c0[2] + (c1[2] - c0[2]) * f)]); } for (let i = 0; i < d.length; i += 4) { const lum = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114); const c = lut[lum]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l)); setShowGradientMap(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -5465,7 +5509,7 @@ const Prism: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 32, textAlign: 'right' }}>{s.label === 'Radius' ? unsharpRadius.toFixed(1) : s.val}{s.unit}</span>
               </div>
             ))}
-            <button aria-label="Apply unsharp mask" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Unsharp Mask'); applyFilter(ctx, canvasSize.width, canvasSize.height, 'sharpen', { intensity: unsharpAmount / 5, radius: unsharpRadius }, selection.mask); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowUnsharpMask(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Apply</button>
+            <button aria-label="Apply unsharp mask" onClick={() => { const canvas = layerWorkCanvas(); if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Unsharp Mask'); applyFilter(ctx, canvasSize.width, canvasSize.height, 'sharpen', { intensity: unsharpAmount / 5, radius: unsharpRadius }, selection.mask); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l)); setShowUnsharpMask(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Apply</button>
           </div>
         </div>
       )}
@@ -5495,7 +5539,7 @@ const Prism: React.FC = () => {
               <input type="checkbox" checked={noiseMonochrome} onChange={e => setNoiseMonochrome(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} />
               Monochromatic
             </label>
-            <button aria-label="Apply noise" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Add Noise'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const amt = noiseAmount / 100; for (let i = 0; i < d.length; i += 4) { const n = noiseDistribution === 'gaussian' ? (((Math.random() + Math.random() + Math.random() + Math.random() + Math.random() + Math.random()) - 3) / 3) * 255 * amt : (Math.random() - 0.5) * 255 * amt; if (noiseMonochrome) { d[i] = Math.min(255, Math.max(0, d[i] + n)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n)); } else { d[i] = Math.min(255, Math.max(0, d[i] + (Math.random() - 0.5) * 255 * amt)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + (Math.random() - 0.5) * 255 * amt)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + (Math.random() - 0.5) * 255 * amt)); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowAddNoise(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply noise" onClick={() => { const canvas = layerWorkCanvas(); if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Add Noise'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const amt = noiseAmount / 100; for (let i = 0; i < d.length; i += 4) { const n = noiseDistribution === 'gaussian' ? (((Math.random() + Math.random() + Math.random() + Math.random() + Math.random() + Math.random()) - 3) / 3) * 255 * amt : (Math.random() - 0.5) * 255 * amt; if (noiseMonochrome) { d[i] = Math.min(255, Math.max(0, d[i] + n)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n)); } else { d[i] = Math.min(255, Math.max(0, d[i] + (Math.random() - 0.5) * 255 * amt)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + (Math.random() - 0.5) * 255 * amt)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + (Math.random() - 0.5) * 255 * amt)); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, ...bakePatch(canvas) } : l)); setShowAddNoise(false); }} style={{ width: '100%', padding: '7px', borderRadius: 'var(--radius-lg)', border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
