@@ -2490,6 +2490,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // `dexnotes:` prefix route below, which has no picker arm (these used to
         // fall through to it and return null, so Notes' Attach/Import did nothing).
         "dexnotes:pick-attachment-file" | "dexnotes:pick-import-file" => native_ops::note_pick_file(&app),
+        "dexnotes:saveExport" => native_ops::note_save_export(&app, &args),
+        "dexnotes:readImportFile" => native_ops::note_read_import(&args),
         "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
         "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),
