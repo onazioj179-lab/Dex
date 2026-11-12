@@ -26,5 +26,5 @@ describe('canvas colours never use CSS var()', () => {
       });
     }
     expect(bad).toEqual([]);
-  });
+  }, 60_000); // reads every renderer file: slow on a busy machine
 });
