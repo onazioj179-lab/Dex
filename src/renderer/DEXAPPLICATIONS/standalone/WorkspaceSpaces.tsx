@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useRunningApps, APP_DEFINITIONS } from '../../store/runningApps';
 import { useStageStore } from '../../store/stageStore';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 // ---------------------------------------------------------------------------
 // Model + persistence
@@ -58,7 +59,7 @@ function loadSpaces(): WorkspaceSpace[] {
 
 function saveSpaces(spaces: WorkspaceSpace[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(spaces));
+    persistOrWarn(STORAGE_KEY, JSON.stringify(spaces), 'your Spaces');
   } catch {
     /* persistence is best-effort; never block the UI */
   }
