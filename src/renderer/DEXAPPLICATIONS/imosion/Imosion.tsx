@@ -4,6 +4,7 @@
  * Pro Recording DAW - Mixer Routing, Sample Manipulation, 32-bit Float
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
+import { resolveCanvasColor } from '../../utils/canvasTheme';
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { clampEventToViewport } from '../../utils/menuPosition';
@@ -10230,7 +10231,7 @@ const Imosion: React.FC = () => {
                   for (let i = 0; i < wf.length; i++) { ctx.lineTo((i / wf.length) * w, mid - wf[i] * mid * 0.9); }
                   ctx.stroke();
                   // dB scale
-                  ctx.fillStyle = 'var(--color-border-strong)'; ctx.font = '9px monospace';
+                  ctx.fillStyle = resolveCanvasColor('var(--color-border-strong)'); ctx.font = '9px monospace';
                   ctx.fillText('0 dB', 4, 12);
                   ctx.fillText('-6 dB', 4, mid * 0.5 + 4);
                   ctx.fillText('-inf', 4, mid + 4);
