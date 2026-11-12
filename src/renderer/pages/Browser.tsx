@@ -18,6 +18,10 @@ import DOMPurify from 'dompurify';
 import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
 import { AdblockEngine } from '../DEXAPPLICATIONS/browser/adblockEngine';
 import { buildAdblockScript, ADBLOCK_CONSOLE_PREFIX } from '../DEXAPPLICATIONS/browser/adblockContentScript';
+import {
+  parseFilterList, selectorsFor, DEFAULT_COSMETIC, loadFilterList, saveFilterList, loadShieldsOff, setShieldsOff,
+  normalizeHost, type StoredFilterList,
+} from '../DEXAPPLICATIONS/browser/filterList';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
@@ -128,11 +132,14 @@ function dropSecret(name: string): void {
 // ===========================================================================
 
 const BLOCKED_DOMAINS = new Set(BLOCKED_DOMAIN_LIST);
-// Shared filter engine for navigation-level blocking (tested; adds label-safe
-// suffix matching + a per-site allowlist). Sub-resource blocking is handled by
-// the injected content script (buildAdblockScript) since <webview> exposes no
-// request-interception API.
-const adblockEngine = new AdblockEngine(BLOCKED_DOMAIN_LIST);
+// Navigation-level blocking uses an AdblockEngine built in the component
+// (`pageEngine`: built-in + imported hosts, Shields-off sites allowed).
+// Sub-resource blocking and element hiding are done by the injected content
+// script (buildAdblockScript) since the webview exposes no request API.
+const filterBtn: React.CSSProperties = {
+  height: 26, padding: '0 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+  border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
+};
 
 
 // ===========================================================================
@@ -414,6 +421,22 @@ export const Browser: React.FC = () => {
   // Last per-page block count reported by each tab's injected script, so we can
   // add deltas to the session total (the in-page counter resets per navigation).
   const adblockCountsRef = useRef<Map<string, number>>(new Map());
+  // Imported filter list (EasyList syntax) and sites with Shields down. Both are
+  // per-machine; refs mirror them for the per-page injection attached on mount.
+  const [filterList, setFilterList] = useState<StoredFilterList | null>(() => loadFilterList());
+  const [shieldsOff, setShieldsOffState] = useState<string[]>(() => loadShieldsOff());
+  const filterListRef = useRef(filterList);
+  filterListRef.current = filterList;
+  const shieldsOffRef = useRef(shieldsOff);
+  shieldsOffRef.current = shieldsOff;
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  const blockHostList = useMemo(
+    () => (filterList?.hosts.length ? [...BLOCKED_DOMAIN_LIST, ...filterList.hosts] : BLOCKED_DOMAIN_LIST),
+    [filterList],
+  );
+  const blockHostListRef = useRef<readonly string[]>(blockHostList);
+  blockHostListRef.current = blockHostList;
+  const pageEngine = useMemo(() => new AdblockEngine(blockHostList, shieldsOff), [blockHostList, shieldsOff]);
   const keychainSaveRef = useRef<ReturnType<typeof setTimeout>>();
   // Per-session unguessable sentinel for credential detection (prevents spoofing)
   const credsSentinelRef = useRef('__DEX_CREDS_' + Math.random().toString(36).slice(2, 10) + '__');
@@ -1234,9 +1257,14 @@ export const Browser: React.FC = () => {
       // through a ref so the injection reflects the latest toggles without
       // re-attaching listeners.
       const s = adblockSettingsRef.current;
-      if (s.blockAds || s.blockTrackers) {
+      let pageHost = '';
+      try { pageHost = normalizeHost(new URL(webview.getURL?.() || '').hostname); } catch { /* about:blank etc. */ }
+      const shieldsDown = !!pageHost && shieldsOffRef.current.includes(pageHost);
+      if ((s.blockAds || s.blockTrackers) && !shieldsDown) {
         try {
-          const script = buildAdblockScript(BLOCKED_DOMAIN_LIST, { blockAds: s.blockAds, blockTrackers: s.blockTrackers });
+          const fl = filterListRef.current;
+          const cosmetic = [...DEFAULT_COSMETIC, ...(fl ? selectorsFor(fl, pageHost) : [])];
+          const script = buildAdblockScript(blockHostListRef.current, { blockAds: s.blockAds, blockTrackers: s.blockTrackers, cosmetic });
           if (script && webview.executeJavaScript) webview.executeJavaScript(script).catch(() => { /* page may block eval */ });
         } catch { /* never break navigation on adblock inject failure */ }
       }
@@ -1381,10 +1409,49 @@ export const Browser: React.FC = () => {
   // injected content script; this catches top-level ad/tracker navigations.
   const shouldBlock = useCallback((url: string): boolean => {
     if (!browserSettings.blockTrackers && !browserSettings.blockAds) return false;
-    const res = adblockEngine.check(url, undefined, browserSettings.blockTrackers);
+    // A top-level navigation's first party is the page being opened, so Shields
+    // down for that site lets it through.
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* not a URL */ }
+    const res = pageEngine.check(url, host || undefined, browserSettings.blockTrackers);
     if (res.blocked) { setBlockedCount(c => c + 1); return true; }
     return false;
-  }, [browserSettings.blockTrackers, browserSettings.blockAds]);
+  }, [browserSettings.blockTrackers, browserSettings.blockAds, pageEngine]);
+
+  const activeHost = useMemo(() => {
+    try { const u = new URL(activeTabUrl); return /^https?:$/.test(u.protocol) ? normalizeHost(u.hostname) : ''; } catch { return ''; }
+  }, [activeTabUrl]);
+  const activeShieldsOff = !!activeHost && shieldsOff.includes(activeHost);
+
+  const toggleShields = useCallback(() => {
+    if (!activeHost) return;
+    const next = setShieldsOff(activeHost, !shieldsOff.includes(activeHost));
+    setShieldsOffState(next);
+    // The page script is injected on load, so reload to apply the change.
+    try { webviewRefs.current.get(activeTab)?.reload?.(); } catch { /* tab gone */ }
+  }, [activeHost, shieldsOff, activeTab]);
+
+  const importFilterFile = useCallback(async (file: File) => {
+    try {
+      if (file.size > 8 * 1024 * 1024) { toast.error(`${file.name} is larger than 8 MB.`); return; }
+      const parsed = parseFilterList(await file.text());
+      if (!parsed.hosts.length && !parsed.genericHide.length && !Object.keys(parsed.siteHide).length) {
+        toast.error(`${file.name}: no rules DEX can use (${parsed.stats.skipped} skipped).`);
+        return;
+      }
+      const stored: StoredFilterList = { ...parsed, name: file.name, importedAt: Date.now() };
+      if (!saveFilterList(stored)) { toast.error('Could not save the filter list: browser storage is full.'); return; }
+      setFilterList(stored);
+      toast.success(`${file.name}: ${parsed.stats.network.toLocaleString()} blocked hosts, ${(parsed.stats.generic + parsed.stats.site).toLocaleString()} hiding rules (${parsed.stats.skipped.toLocaleString()} unsupported rules skipped). Applies to pages you open next.`);
+    } catch (e) {
+      toast.error(`Could not read ${file.name}: ${(e as Error).message}`);
+    }
+  }, [toast]);
+
+  const removeFilterList = useCallback(() => {
+    saveFilterList(null);
+    setFilterList(null);
+  }, []);
 
   // Force HTTPS - enhanced
   const upgradeToHttps = useCallback((url: string): string => {
@@ -2397,6 +2464,53 @@ export const Browser: React.FC = () => {
                 value={browserSettings.defaultSearchEngine}
                 onChange={v => writeDexSetting('defaultSearchEngine', v)}
               />
+            </div>
+
+            {/* Shields for the open site: off = no blocking or hiding on this host. */}
+            <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Shields for this site</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {activeHost ? (activeShieldsOff ? `Off on ${activeHost}: nothing blocked or hidden` : `On for ${activeHost}`) : 'Open a website to change this'}
+                </span>
+              </span>
+              <div
+                style={{ ...styles.toggleTrack, background: activeHost && !activeShieldsOff ? 'var(--color-accent)' : 'var(--color-bg-hover)', opacity: activeHost ? 1 : 0.5 }}
+                role="switch"
+                aria-checked={!!activeHost && !activeShieldsOff}
+                aria-disabled={!activeHost}
+                aria-label="Shields for this site"
+                tabIndex={activeHost ? 0 : -1}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleShields(); } }}
+                onClick={toggleShields}
+              >
+                <div style={{ ...styles.toggleKnob, transform: activeHost && !activeShieldsOff ? 'translateX(14px)' : 'translateX(0)' }} />
+              </div>
+            </div>
+            {shieldsOff.length > 0 && (
+              <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', padding: '0 14px var(--space-2)' }}>
+                Shields off on: {shieldsOff.join(', ')}
+              </div>
+            )}
+
+            {/* Filter list (EasyList / uBlock syntax), imported from a file. */}
+            <div style={{ ...styles.settingRow, flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Filter list</span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                {filterList
+                  ? `${filterList.name}: ${filterList.stats.network.toLocaleString()} hosts, ${(filterList.stats.generic + filterList.stats.site).toLocaleString()} hiding rules, ${filterList.stats.skipped.toLocaleString()} unsupported skipped`
+                  : 'Built-in list only. Import an EasyList-style .txt to block and hide more.'}
+              </span>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <button type="button" style={filterBtn} onClick={() => filterInputRef.current?.click()}>
+                  {filterList ? 'Replace…' : 'Import…'}
+                </button>
+                {filterList && (
+                  <button type="button" style={filterBtn} onClick={removeFilterList}>Remove</button>
+                )}
+              </span>
+              <input ref={filterInputRef} type="file" accept=".txt,text/plain" hidden aria-label="Import filter list"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFilterFile(f); }} />
             </div>
 
             {/* Real count only: requests the ad/tracker blocker stopped this session. */}
