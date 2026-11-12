@@ -29,6 +29,8 @@ export interface NewScheduledTask {
   kind: ScheduleKind;
   cron?: string;
   intervalMs?: number;
+  /** kind === 'once': fire time (epoch ms). */
+  atMs?: number;
   action: ScheduledAction;
   maxAttempts?: number;
   enabled?: boolean;
@@ -49,7 +51,7 @@ function isValidTask(t: unknown): t is ScheduledTask {
   const o = t as Record<string, unknown>;
   return typeof o.id === 'string'
     && typeof o.title === 'string'
-    && (o.kind === 'cron' || o.kind === 'interval')
+    && (o.kind === 'cron' || o.kind === 'interval' || o.kind === 'once')
     && !!o.action && typeof o.action === 'object';
 }
 
@@ -88,6 +90,7 @@ export const useScheduledTasksStore = create<ScheduledTasksState>()((set, get) =
       kind: def.kind,
       cron: def.kind === 'cron' ? def.cron : undefined,
       intervalMs,
+      atMs: def.kind === 'once' ? def.atMs : undefined,
       action: def.action,
       enabled: def.enabled ?? true,
       createdAt: now,

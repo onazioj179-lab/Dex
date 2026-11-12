@@ -13,6 +13,14 @@
 
 import { create } from 'zustand';
 import { DEFAULT_NOTE_TEMPLATES, findBuiltinTemplate } from './noteTemplates';
+import type { NoteExportFormat } from '../DEXAPPLICATIONS/notes/notesFileFormat';
+// Loaded on demand: this store sits in the core chunk, the converters in the
+// Notes app chunk; a static import would make a chunk cycle.
+const loadNoteFormats = () => import('../DEXAPPLICATIONS/notes/notesFileFormat');
+
+function notesToast(type: 'success' | 'error' | 'info', message: string): void {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* non-DOM */ }
+}
 
 // ---------------------------------------------------------------------------
 // IPC Helper (with localStorage fallback when window.dex is unavailable —
@@ -220,6 +228,17 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       }
       results.sort((a, b) => b.rank - a.rank || b.updated_at - a.updated_at);
       return results.slice(0, 100);
+    }
+    case 'dexnotes:saveExport': {
+      // Browser preview: no Save dialog, so hand the file to the browser.
+      const a = (args[0] || {}) as { fileName?: string; text?: string };
+      try {
+        const url = URL.createObjectURL(new Blob([a.text || ''], { type: 'text/plain;charset=utf-8' }));
+        const link = Object.assign(document.createElement('a'), { href: url, download: a.fileName || 'note.txt' });
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return { success: true, path: a.fileName };
+      } catch (e) { return { success: false, error: String(e) }; }
     }
     case 'dexnotes:getSuggestions': return [];
     case 'dexnotes:recordWord': return true;
@@ -913,23 +932,48 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   // -- Export / Import -----------------------------------------------------
 
   exportNote: async (noteId: string, format: string) => {
-    return await ipc('dexnotes:export', noteId, { format });
+    const { NOTE_EXPORT_EXT, noteToFileText, safeFileName } = await loadNoteFormats();
+    const fmt = (format in NOTE_EXPORT_EXT ? format : 'markdown') as NoteExportFormat;
+    const note = await ipc('dexnotes:get', noteId);
+    if (!note) { notesToast('error', "Couldn't export: the note wasn't found"); return null; }
+    const ext = NOTE_EXPORT_EXT[fmt];
+    const res = await ipc('dexnotes:saveExport', { fileName: safeFileName(note.title, ext), ext, text: noteToFileText(note, fmt) });
+    if (res?.success) {
+      notesToast('success', `Exported "${note.title || 'Untitled note'}"`);
+      return (res.path as string) ?? null;
+    }
+    if (!res?.cancelled) notesToast('error', `Couldn't export the note${res?.error ? `: ${res.error}` : ''}`);
+    return null;
   },
 
   importFile: async (filePath: string, folderId?: string | null) => {
-    const _folder = folderId !== undefined ? folderId : get().selectedFolderId;
-    const beforeIds = new Set(get().notes.map(note => note.id));
-    const result = await ipc('dexnotes:import', [filePath]);
-    if (result?.imported > 0) {
-      await get().loadNotes();
-      await get().loadStats();
-      const importedNote = get().notes.find(note => !beforeIds.has(note.id)) || get().notes[0] || null;
-      if (importedNote) {
-        await get().loadNote(importedNote.id);
-        return importedNote.id;
-      }
+    const folder = folderId !== undefined ? folderId : get().selectedFolderId;
+    const read = await ipc('dexnotes:readImportFile', filePath);
+    if (!read?.success) {
+      notesToast('error', `Couldn't import${read?.error ? `: ${read.error}` : ' the file'}`);
+      return null;
     }
-    return null;
+    const { fileToNote, serializeDoc, docToPlainText } = await loadNoteFormats();
+    let imported;
+    try {
+      imported = fileToNote(read.name || filePath, read.text || '');
+    } catch (e) {
+      notesToast('error', `Couldn't import: ${(e as Error).message}`);
+      return null;
+    }
+    const plain = docToPlainText(imported.doc);
+    const created = await ipc('dexnotes:create', {
+      title: imported.title, content: serializeDoc(imported.doc), plain_text: plain,
+      folder_id: folder,
+    });
+    if (!created?.id) { notesToast('error', "Couldn't import: the note couldn't be saved"); return null; }
+    void ipc('search:upsertDoc', created.id, 'note', imported.title, plain, Math.floor(Date.now() / 1000))
+      .catch(() => { /* index sync is best-effort */ });
+    await get().loadNotes();
+    await get().loadStats();
+    await get().loadNote(created.id);
+    notesToast('success', `Imported "${imported.title}"`);
+    return created.id as string;
   },
 
   // -- Daily Note ----------------------------------------------------------

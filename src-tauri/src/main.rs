@@ -15,6 +15,7 @@ mod activity_feed;
 mod browser_view;
 mod paths;
 mod ledger_ctl;
+mod download_ctl;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -2254,6 +2255,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     let arg_u64 = |i: usize| args.get(i).and_then(|v| v.as_u64());
 
     // === Migration wiring (modules; revert-proof) ===
+    if channel.starts_with("download:") { return download_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("git:") { return git::dispatch(&channel, &args); }
     if channel.starts_with("env:") { return env_manager::dispatch(&app, &channel, &args); }
     if channel.starts_with("ssh:") { return ssh::dispatch(&app, &channel, &args); }
@@ -2488,6 +2490,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // `dexnotes:` prefix route below, which has no picker arm (these used to
         // fall through to it and return null, so Notes' Attach/Import did nothing).
         "dexnotes:pick-attachment-file" | "dexnotes:pick-import-file" => native_ops::note_pick_file(&app),
+        "dexnotes:saveExport" => native_ops::note_save_export(&app, &args),
+        "dexnotes:readImportFile" => native_ops::note_read_import(&args),
         "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
         "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),

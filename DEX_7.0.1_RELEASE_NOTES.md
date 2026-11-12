@@ -12,6 +12,11 @@
 | 18a | Build serials themselves. Builds before this were Parts 16–17: DEX Ledger (native engine, import of the earlier ledger), one app-pinning service, the Dock in the DEX Bar, the smart App Menu, shared app menus, Terminal split panes, Bioengineering workspace |
 | 18b | Browser: real back/forward state and a proper error page when a site can't be reached (both verified live); Terminal checked live in a built app (PowerShell runs commands; four shells detected), page fullscreen events wired; Terminal shell profiles and Open in Terminal; App Information shows creator and licence; Bio Studio nearest-neighbour melting temperature and circular-plasmid digests; app audit of Calculator, Calendar, Notes, Files, Store, Transfers (no fake controls found) |
 | 18c | Presentation: put pictures from your PC on slides (downscaled to fit), Save Deck / Open Deck as a .dexdeck file, and a clear warning if the deck can't be saved; VINX: a clear warning when the project can't be saved (it used to fail silently), with the native copy still written |
+| 18f | Browser downloads work: files save to your Downloads folder (never overwriting an existing file), and a failed download says why instead of spinning forever |
+| 18g | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
+| 18i | Rewind no longer hits an error when opened on a fresh install (plugin, profile and audit lists that come back empty); every one of the 56 apps now opens without an error in a built DEX |
+| 18k | Notes: Export (Markdown, web page, text, DEX note JSON) and Import (.md, .txt, .html, DEX note JSON) work. Both always failed before: they were never connected in this version. Imports keep headings, lists, checklists, quotes, code and tables, take the title from the file, and say why when a file can't be used |
+| 18m | More apps say so when they can't save your work: Calendar events, the Rewind journal, the Forge job queue, Imosion presets and track templates, and every app's crash-recovery copy. Spotlight: an app whose name starts with what you type now ranks above a file that only matches on its folder path |
 
 ## New
 

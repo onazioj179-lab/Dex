@@ -12,8 +12,13 @@ import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
 import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
-import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { AutosaveIndicator, type AutosaveState } from '../../components/AutosaveIndicator';
 import { downloadText } from '../../improvements500/downloadBlob';
+import {
+  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
+  historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
+} from './presentationDeck';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -146,17 +151,13 @@ const migrateSlide = (s: any): Slide => ({
   layout: (['title', 'title-content', 'two-column', 'blank'].includes(s?.layout) ? s.layout : undefined) as SlideLayout | undefined,
 });
 
+const safeStorage = (): Storage | null => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+
 const PresentationBuilder: React.FC = () => {
-  const [slides, setSlides] = useState<Slide[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(migrateSlide);
-      }
-    } catch { /* ignore */ }
-    return [makeBlankSlide()];
-  });
+  // A stored deck that cannot be read is moved aside, never overwritten by the next save.
+  const initialLoad = useRef<{ slides: Slide[] | null; movedAside: string | null } | null>(null);
+  if (!initialLoad.current) initialLoad.current = loadWorkingDeck(safeStorage(), STORAGE_KEY, migrateSlide);
+  const [slides, setSlides] = useState<Slide[]>(() => initialLoad.current?.slides ?? [makeBlankSlide()]);
   const [themeId, setThemeId] = useState<string>(() => {
     try {
       const raw = localStorage.getItem(THEME_KEY);
@@ -202,21 +203,106 @@ const PresentationBuilder: React.FC = () => {
 
   const theme = getTheme(themeId);
 
-  // Persist. A failed write (storage full) used to be swallowed, so the deck
-  // silently reverted on the next start; now it says so once, and Save Deck
-  // keeps a file copy that does not depend on app storage.
-  const saveFailedRef = useRef(false);
+  // ---- Undo history (whole-deck snapshots; typing and drags coalesce) ----
+  const historyRef = useRef<DeckHistory<Slide>>(historyStart(slides));
+  const timeTravel = useRef(false);
+  const [historyDepth, setHistoryDepth] = useState({ past: 0, future: 0 });
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(slides));
-      saveFailedRef.current = false;
-    } catch {
-      if (!saveFailedRef.current) {
-        saveFailedRef.current = true;
-        toast('error', "Couldn't save the deck: app storage is full. Use Save Deck to keep a file copy, or remove large pictures.");
-      }
-    }
+    if (timeTravel.current) { timeTravel.current = false; return; }
+    historyRef.current = historyRecord(historyRef.current, slides, Date.now());
+    setHistoryDepth({ past: historyRef.current.past.length, future: 0 });
   }, [slides]);
+  const travel = useCallback((dir: 'undo' | 'redo') => {
+    const r = dir === 'undo' ? historyUndo(historyRef.current) : historyRedo(historyRef.current);
+    if (!r) return;
+    historyRef.current = r.h;
+    timeTravel.current = true;
+    setSlides(r.slides);
+    setSelectedBlockId(null);
+    setCurrentIdx((i) => Math.min(i, r.slides.length - 1));
+    setHistoryDepth({ past: r.h.past.length, future: r.h.future.length });
+  }, []);
+
+  // ---- Autosave: debounced, flushed when the window hides or the app closes ----
+  const [saveState, setSaveState] = useState<AutosaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const pendingSave = useRef<Slide[] | null>(null);
+  const flushSave = useCallback(() => {
+    const toSave = pendingSave.current;
+    if (!toSave) return;
+    pendingSave.current = null;
+    const r = saveWorkingDeck(safeStorage(), STORAGE_KEY, toSave);
+    if (r.ok) { setSaveState('saved'); setLastSavedAt(Date.now()); setSaveError(null); }
+    else {
+      setSaveState('error');
+      setSaveError(r.reason === 'quota'
+        ? 'Not saved: the deck is larger than DEX can keep here (usually large images). Use Save Deck… to keep a copy.'
+        : 'Not saved: storage is unavailable. Use Save Deck… to keep a copy.');
+    }
+  }, []);
+  const firstSave = useRef(true);
+  useEffect(() => {
+    if (firstSave.current) { firstSave.current = false; return; } // loading is not an edit
+    pendingSave.current = slides;
+    setSaveState('saving');
+    const t = setTimeout(flushSave, 500);
+    return () => clearTimeout(t);
+  }, [slides, flushSave]);
+  useEffect(() => {
+    const onHide = () => flushSave();
+    window.addEventListener('pagehide', onHide);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onHide);
+      flushSave(); // closing the app keeps the last edit
+    };
+  }, [flushSave]);
+  useEffect(() => {
+    const aside = initialLoad.current?.movedAside;
+    if (aside) toast('error', `The saved deck could not be read. It was kept as "${aside}" and a new deck was started.`);
+  }, []);
+
+  // ---- Deck files ----
+  const deckInput = useRef<HTMLInputElement>(null);
+  const deckTitle = (s: Slide[]) => {
+    const t = s[0]?.blocks.find(b => b.type === 'text')?.content?.trim();
+    return t && t !== 'Click to edit title' ? t : 'Untitled deck';
+  };
+  const saveDeckFile = useCallback(() => {
+    const name = deckTitle(slides).replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 80) || 'deck';
+    downloadText(`${name}.dexdeck`, serializeDeck(slides, themeId), 'application/json;charset=utf-8');
+    toast('success', `Saved ${slides.length} slide${slides.length === 1 ? '' : 's'} to ${name}.dexdeck`);
+  }, [slides, themeId]);
+  const openDeckFile = useCallback(async (file: File) => {
+    try {
+      if (file.size > 50 * 1024 * 1024) throw new Error('The file is larger than 50 MB.');
+      const deck = parseDeck(await file.text(), migrateSlide);
+      setSlides(deck.slides);
+      if (deck.theme && THEMES.some(t => t.id === deck.theme)) setThemeId(deck.theme);
+      setCurrentIdx(0);
+      setSelectedBlockId(null);
+      toast('success', `Opened ${file.name} (${deck.slides.length} slides). Undo returns the previous deck.`);
+    } catch (e) {
+      toast('error', `Could not open ${file.name}: ${(e as Error).message}`);
+    }
+  }, []);
+
+  // Undo / redo keys (not while presenting, and not inside a text field, which has its own undo).
+  useEffect(() => {
+    if (presenting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || isTypingTarget(e.target) || !keyEventForApp(e, 'presentation')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z') { e.preventDefault(); travel(e.shiftKey ? 'redo' : 'undo'); }
+      else if (k === 'y') { e.preventDefault(); travel('redo'); }
+      else if (k === 's') { e.preventDefault(); if (e.shiftKey) saveDeckFile(); else flushSave(); }
+      else if (k === 'o') { e.preventDefault(); deckInput.current?.click(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [presenting, travel, flushSave, saveDeckFile]);
   useEffect(() => {
     try { localStorage.setItem(THEME_KEY, themeId); } catch { /* ignore */ }
   }, [themeId]);
@@ -317,31 +403,6 @@ const PresentationBuilder: React.FC = () => {
   const updateCurrentSlide = useCallback((mut: (s: Slide) => Slide) => {
     setSlides(prev => prev.map((s, i) => (i === currentIdx ? mut(s) : s)));
   }, [currentIdx]);
-
-  // ---- Deck files (.dexdeck = JSON of theme + slides) ----
-  const saveDeckFile = useCallback(() => {
-    const title = slides[0]?.blocks.find(b => b.type === 'text')?.content?.split('\n')[0]?.trim() || 'Presentation';
-    const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'Presentation';
-    downloadText(`${safe}.dexdeck`, JSON.stringify({ format: 'dex-deck', version: 1, theme: themeId, slides }, null, 2), 'application/json');
-    toast('success', 'Deck saved as a file');
-  }, [slides, themeId]);
-
-  const deckInputRef = useRef<HTMLInputElement | null>(null);
-  const openDeckFile = useCallback(async (file: File) => {
-    try {
-      const doc = JSON.parse(await file.text());
-      const list = Array.isArray(doc) ? doc : doc?.slides;
-      if (!Array.isArray(list) || list.length === 0) throw new Error('no slides');
-      if (!window.confirm('Replace the current deck with this file? Save Deck first if you want to keep it.')) return;
-      setSlides(list.map(migrateSlide));
-      if (typeof doc?.theme === 'string' && THEMES.some(t => t.id === doc.theme)) setThemeId(doc.theme);
-      setCurrentIdx(0);
-      setSelectedBlockId(null);
-      toast('success', `Opened ${file.name}`);
-    } catch {
-      toast('error', "That file isn't a DEX deck");
-    }
-  }, []);
 
   // Pictures from this PC: downscaled to at most 1600 px (JPEG) so a deck of
   // photos still fits app storage; PNG kept for small graphics with transparency.
@@ -749,12 +810,15 @@ const PresentationBuilder: React.FC = () => {
 
       {/* Toolbar */}
       <div style={{ ...premiumGlassToolbar, padding: '10px 14px', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, whiteSpace: 'nowrap' }}>
           <DexIcon name="monitor" size={18} color="var(--color-text-primary)" />
           <span style={{ fontSize: 14, fontWeight: 600 }}>Presentation</span>
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
             {currentIdx + 1} / {slides.length}
           </span>
+          <button onClick={() => travel('undo')} disabled={!historyDepth.past} style={{ ...toolbarBtn, opacity: historyDepth.past ? 1 : 0.45 }} title="Undo (Ctrl+Z)" aria-label="Undo">Undo</button>
+          <button onClick={() => travel('redo')} disabled={!historyDepth.future} style={{ ...toolbarBtn, opacity: historyDepth.future ? 1 : 0.45 }} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
+          <span title={saveError ?? undefined}><AutosaveIndicator state={saveState} lastSavedAt={lastSavedAt} label={saveError ? 'Not saved' : undefined} /></span>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
@@ -769,10 +833,11 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
+          <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
+          <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
+          <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
-          <button onClick={() => deckInputRef.current?.click()} style={toolbarBtn} title="Open a .dexdeck file">Open Deck</button>
-          <button onClick={saveDeckFile} style={toolbarBtn} title="Save this deck as a .dexdeck file">Save Deck</button>
-          <input ref={deckInputRef} type="file" accept=".dexdeck,application/json" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void openDeckFile(f); }} />
           <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
             const f = e.target.files?.[0]; e.target.value = '';
             const target = imageTargetRef.current;

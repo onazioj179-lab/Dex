@@ -18,6 +18,7 @@ import type { Material } from '../types';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore } from '../stores/uiStore';
+import { persistOrWarn } from '../../../utils/persistOrWarn';
 
 // ─── Token model ────────────────────────────────────────────────────────────
 type TokenKind = 'color' | 'number';
@@ -79,7 +80,7 @@ function loadTokens(): DesignToken[] {
 
 function saveTokens(tokens: DesignToken[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+    persistOrWarn(STORAGE_KEY, JSON.stringify(tokens), 'AXL design tokens');
   } catch {
     // Storage may be unavailable (private mode / quota) — fail silently, the
     // in-memory token set still works for this session.

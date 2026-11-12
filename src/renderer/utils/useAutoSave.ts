@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { sharedTick } from '../services/SharedTick';
 import { resolveAutosaveInterval } from './autosavePrefs';
+import { persistOrWarn } from './persistOrWarn';
 
 // Looked up per call: this module is evaluated before the Tauri bridge is
 // installed (static imports run before main.tsx's body), so a module-level
@@ -39,12 +40,12 @@ export function useAutoSave(
     const save = () => {
       try {
         const data = getData();
-        localStorage.setItem(`dex-autosave-${key}`, JSON.stringify(data));
-        onResultRef.current?.({ ok: true, at: Date.now() });
-      } catch (e) {
-        // Storage full or serialization error: callers that pass onResult show it.
-        const err = e as { name?: string; message?: string };
-        onResultRef.current?.({ ok: false, reason: /quota/i.test(`${err?.name ?? ''} ${err?.message ?? ''}`) ? 'quota' : 'error' });
+        // Crash-recovery copy: persistOrWarn says once if it can't be kept (store
+        // full); callers that pass onResult can also show the state.
+        const ok = persistOrWarn(`dex-autosave-${key}`, JSON.stringify(data), `the crash-recovery copy for ${key}`);
+        onResultRef.current?.(ok ? { ok: true, at: Date.now() } : { ok: false, reason: 'quota' });
+      } catch {
+        onResultRef.current?.({ ok: false, reason: 'error' }); // serialisation error
       }
     };
     const autosaveId = `${instanceIdRef.current}-${key}`;

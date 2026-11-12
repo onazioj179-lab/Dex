@@ -13,7 +13,6 @@ import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave, type AutoSaveResult } from '../../utils/useAutoSave';
-import { parsePrismProject } from './prismProject';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
@@ -389,9 +388,7 @@ const Prism: React.FC = () => {
         : 'Recovery copy not saved. Use Save to keep a project file.');
     }
   }, []);
-  useEffect(() => {
-    if (autosaveError) window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `PRISM: ${autosaveError}` } }));
-  }, [autosaveError]);
+  // The one-time warning toast comes from persistOrWarn inside useAutoSave.
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
@@ -440,11 +437,12 @@ const Prism: React.FC = () => {
   const editMarkReady = useRef(false);
   useEffect(() => {
     const arm = () => { editMarkReady.current = true; };
+    const armKey = (e: KeyboardEvent) => { if (keyEventForApp(e, 'prism')) arm(); };
     window.addEventListener('pointerdown', arm, { capture: true, once: true });
-    window.addEventListener('keydown', arm, { capture: true, once: true });
+    window.addEventListener('keydown', armKey, { capture: true });
     return () => {
       window.removeEventListener('pointerdown', arm, { capture: true });
-      window.removeEventListener('keydown', arm, { capture: true });
+      window.removeEventListener('keydown', armKey, { capture: true });
     };
   }, []);
   useEffect(() => {
@@ -1392,31 +1390,9 @@ const Prism: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
     setIsDirty(false);
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Saved ${a.download}. Open it again with Open (Ctrl+O).` } }));
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Saved ${a.download}.` } }));
   }, [canvasSize, layers, brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance]);
 
-  // ===== OPEN (.prism.json written by Save) =====
-  const projectInputRef = useRef<HTMLInputElement | null>(null);
-  const openProject = useCallback(async (file: File) => {
-    try {
-      if (file.size > 300 * 1024 * 1024) throw new Error('The file is larger than 300 MB.');
-      const { project, warnings } = parsePrismProject<Layer>(await file.text());
-      if (isDirty && !window.confirm('Replace the current image with this project? Changes since your last Save will be lost.')) return;
-      setLayers(project.layers);
-      setSelectedLayerId(project.layers[0].id);
-      setCanvasSize(project.canvasSize);
-      const a = project.adjustments;
-      setBrightness(a.brightness ?? 0); setContrast(a.contrast ?? 0); setSaturation(a.saturation ?? 0); setHue(a.hue ?? 0);
-      setExposure(a.exposure ?? 0); setHighlights(a.highlights ?? 0); setShadows(a.shadows ?? 0);
-      setTemperature(a.temperature ?? 0); setTint(a.tint ?? 0); setVibrance(a.vibrance ?? 0);
-      // History starts again from the opened project.
-      setHistory([{ id: `hist-open-${Date.now()}`, name: `Open ${file.name}`, layers: structuredClone(project.layers), timestamp: Date.now() }]);
-      setHistoryIndex(0);
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: warnings.length ? 'warning' : 'success', message: `Opened ${file.name} (${project.layers.length} layers).${warnings.length ? ' ' + warnings.join(' ') : ''}` } }));
-    } catch (e) {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Could not open ${file.name}: ${(e as Error).message}` } }));
-    }
-  }, [isDirty]);
 
   // ===== APPLY FILTER PRESET =====
   const applyFilterPreset = useCallback((preset: FilterPreset) => {
@@ -2302,7 +2278,6 @@ const Prism: React.FC = () => {
         if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
         if (e.key === 'y') { e.preventDefault(); redo(); }
         if (e.key === 's') { e.preventDefault(); saveProject(); }
-        if (e.key === 'o') { e.preventDefault(); projectInputRef.current?.click(); }
         if (e.key === 'e') { e.preventDefault(); exportImage('png'); }
         if (e.key === 'a') { e.preventDefault(); setSelection(prev => ({ ...prev, mask: selectAll(canvasSize.width, canvasSize.height) })); }
         if (e.key === 'd') { e.preventDefault(); setSelection(createEmptySelection()); }
@@ -3031,9 +3006,6 @@ const Prism: React.FC = () => {
         </div>
         <div style={styles.headerCenter}>
           <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
-          <input ref={projectInputRef} type="file" accept=".prism.json,.json,application/json" hidden
-            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void openProject(f); }} />
-          <button className="prism-btn" style={styles.btn} onClick={() => projectInputRef.current?.click()} aria-label="Open project" title="Open a .prism.json project (Ctrl+O)">Open</button>
           <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project" title="Save the project as a .prism.json file (Ctrl+S)">{Icons.save} Save</button>
           <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
             <AutosaveIndicator

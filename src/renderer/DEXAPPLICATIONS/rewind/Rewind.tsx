@@ -197,6 +197,7 @@ function formatDate(ts: number): string {
 
 import { formatBytes } from '../../../shared/format/units';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 function todayStr(): string {
   const d = new Date();
@@ -211,6 +212,11 @@ function dateStrFromTs(ts: number): string {
 // ===========================================================================
 // NAV ITEMS
 // ===========================================================================
+
+// Native Rewind channels answer null when a feature has nothing yet (fresh
+// profile, unported channel). List state must stay a list, or render crashes
+// on .map (seen in the built app: plugin commands).
+const asList = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 type View = 'overview' | 'timeline' | 'search' | 'journal' | 'settings';
 
@@ -335,7 +341,7 @@ const Rewind: React.FC = () => {
   useEffect(() => {
     if (journalFlushTimer.current) clearTimeout(journalFlushTimer.current);
     journalFlushTimer.current = setTimeout(() => {
-      try { localStorage.setItem('dex-rewind-journal', JSON.stringify(journalEntries)); } catch { /* quota exceeded */ }
+      try { persistOrWarn('dex-rewind-journal', JSON.stringify(journalEntries), 'your Rewind journal'); } catch { /* serialisation failed */ }
     }, 500);
     return () => { if (journalFlushTimer.current) clearTimeout(journalFlushTimer.current); };
   }, [journalEntries]);
@@ -503,7 +509,7 @@ const Rewind: React.FC = () => {
         setCrashRecovery(await dex.rewind.getCrashRecoveryStatus());
       }
       if (dex.rewind.getWorkspaceProfiles) {
-        setWorkspaceProfiles(await dex.rewind.getWorkspaceProfiles());
+        setWorkspaceProfiles(asList(await dex.rewind.getWorkspaceProfiles()));
       }
       if (dex.rewind.getActiveWorkspaceProfile) {
         setActiveWorkspaceProfile(await dex.rewind.getActiveWorkspaceProfile());
@@ -516,10 +522,10 @@ const Rewind: React.FC = () => {
         setOnboardingCompleted(true);
       }
       if (dex.rewind.getPlugins) {
-        setPlugins(await dex.rewind.getPlugins());
+        setPlugins(asList(await dex.rewind.getPlugins()));
       }
       if (dex.rewind.getPluginCommands) {
-        setPluginCommands(await dex.rewind.getPluginCommands());
+        setPluginCommands(asList(await dex.rewind.getPluginCommands()));
       }
     } catch (e) {
       if (import.meta.env.DEV) console.warn('[Rewind] Phase 5 load error:', e);
@@ -1028,7 +1034,7 @@ const Rewind: React.FC = () => {
       case 'open-audit-log':
         setView('settings');
         setShowAuditLog(true);
-        if (dex.rewind.getAuditLog) setAuditLog(await dex.rewind.getAuditLog(200));
+        if (dex.rewind.getAuditLog) setAuditLog(asList(await dex.rewind.getAuditLog(200)));
         break;
       default:
         if (id.startsWith('plugin:')) {
@@ -2620,8 +2626,8 @@ const Rewind: React.FC = () => {
               style={S.headerBtn}
               onClick={async () => {
                 if (!dex?.rewind?.reloadPlugins) return;
-                setPlugins(await dex.rewind.reloadPlugins());
-                if (dex?.rewind?.getPluginCommands) setPluginCommands(await dex.rewind.getPluginCommands());
+                setPlugins(asList(await dex.rewind.reloadPlugins()));
+                if (dex?.rewind?.getPluginCommands) setPluginCommands(asList(await dex.rewind.getPluginCommands()));
               }}
             >
               Reload all
@@ -2658,8 +2664,8 @@ const Rewind: React.FC = () => {
                   onClick={async () => {
                     if (!dex?.rewind?.setPluginEnabled) return;
                     await dex.rewind.setPluginEnabled(plugin.id, !plugin.enabled);
-                    setPlugins(await dex.rewind.getPlugins());
-                    if (dex?.rewind?.getPluginCommands) setPluginCommands(await dex.rewind.getPluginCommands());
+                    setPlugins(asList(await dex.rewind.getPlugins()));
+                    if (dex?.rewind?.getPluginCommands) setPluginCommands(asList(await dex.rewind.getPluginCommands()));
                   }}
                 >
                   {plugin.enabled ? 'Disable' : 'Enable'}

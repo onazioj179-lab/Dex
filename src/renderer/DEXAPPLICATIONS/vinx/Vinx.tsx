@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
+import { parseCube } from './lut3d';
 import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
 import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import { useAppLifecycle } from '../../hooks/useAppLifecycle';
@@ -21,7 +22,9 @@ import { planSilenceClips } from '../../../shared/media/silenceTimeline';
 import { decodeAudioToMono, slicePCM } from '../../services/media/decodeAudio';
 import { platform as _plat } from '../../utils';
 import { sharedTick } from '../../services/SharedTick';
-import { useVinxStore } from './VinxStore';
+import { useVinxStore, takeUnreadableProjectKey, projectWasLoadedFromStorage } from './VinxStore';
+import { beginSession, endSession, recoveryMessage } from './vinxPersistence';
+import { AutosaveIndicator } from '../../components/AutosaveIndicator';
 import { PlaybackEngine } from './PlaybackEngine';
 import { VinxPanelLayout } from './PanelLayout';
 import { MediaBrowser } from './MediaBrowser';
@@ -131,11 +134,6 @@ const toolbarBtnStyle: React.CSSProperties = {
 const toolbarBtnActiveStyle: React.CSSProperties = {
   ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)',
 };
-
-const saveBadgeStyle = (dirty: boolean): React.CSSProperties => ({
-  width: 6, height: 6, borderRadius: 4, flexShrink: 0,
-  background: dirty ? 'var(--color-error)' : 'var(--color-success)',
-});
 
 const recoveryBannerStyle: React.CSSProperties = {
   height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
@@ -291,6 +289,8 @@ const VinxEditor: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Imported "${asset.name}" from ${asset.sourceApp}` } }));
   }, [addMedia]));
   const isDirty = useVinxStore(s => s.isDirty);
+  const saveError = useVinxStore(s => s.saveError);
+  const lastSavedAt = useVinxStore(s => s.lastSavedAt);
   const executeCommand = useVinxStore(s => s.executeCommand);
   useUnsavedGuard(isDirty);
 
@@ -457,6 +457,20 @@ const VinxEditor: React.FC = () => {
   const _addClip = useVinxStore(s => s._addClip);
   const programLUT = useVinxStore(s => s.programLUT);
   const setProgramLUT = useVinxStore(s => s.setProgramLUT);
+  const setProgramLUTIntensity = useVinxStore(s => s.setProgramLUTIntensity);
+  const cubeInputRef = useRef<HTMLInputElement>(null);
+  const [cubeError, setCubeError] = useState<string | null>(null);
+  const loadCubeFile = useCallback(async (file: File) => {
+    setCubeError(null);
+    if (file.size > 64 * 1024 * 1024) { setCubeError(`${file.name} is larger than 64 MB.`); return; }
+    try {
+      const r = parseCube(await file.text(), file.name.replace(/\.cube$/i, ''));
+      if (!r.ok) { setCubeError(`${file.name}: ${r.error}`); return; }
+      setProgramLUT({ name: r.lut.title, cssFilter: 'none', cube: r.lut, intensity: 1 });
+    } catch (e) {
+      setCubeError(`Could not read ${file.name}: ${(e as Error).message}`);
+    }
+  }, [setProgramLUT]);
 
   // ROADMAP-600 #199 — UKI creative-op handler. speedRamp + silence removal run
   // for real against the timeline; everything else skips honestly. Silence
@@ -655,6 +669,43 @@ const VinxEditor: React.FC = () => {
     engine.setSequence(activeSequence, project.frameRate, sequenceDuration);
   }, [project.frameRate, activeSequence, sequenceDuration]);
 
+  // -- Session + recovery: a banner only when the last session did not close --
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try { storage = localStorage; } catch { /* unavailable */ }
+    const { uncleanSince } = beginSession(storage);
+    const aside = takeUnreadableProjectKey();
+    const text = aside
+      ? `The saved VINX project could not be read. It was kept as "${aside}" and a new project was started.`
+      : recoveryMessage(uncleanSince, projectWasLoadedFromStorage() ? useVinxStore.getState().project : null, (t) => new Date(t).toLocaleString());
+    if (text) useVinxStore.setState({ recoveryBanner: { show: true, text } });
+    const flush = () => { const s = useVinxStore.getState(); if (s.isDirty) s.markSaved(); };
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    const onPageHide = () => { flush(); endSession(storage); };
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onHide);
+    // Save two seconds after the last edit (the 30 s tick below stays as a backstop).
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = useVinxStore.subscribe((s, prev) => {
+      if (!s.isDirty || s.project === prev.project) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; flush(); }, 2000);
+    });
+    return () => {
+      unsub();
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onHide);
+      flush(); // closing VINX keeps the last edit
+      endSession(storage);
+    };
+  }, []);
+
+  // A failed save is said once per reason, then shown in the toolbar until it works.
+  useEffect(() => {
+    if (saveError) window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `VINX: ${saveError}` } }));
+  }, [saveError]);
+
   // -- Auto-save every 30 seconds --
   useEffect(() => {
     sharedTick.subscribe('vinx-autosave', () => {
@@ -780,7 +831,11 @@ const VinxEditor: React.FC = () => {
       videoBitsPerSecond: 8_000_000,
       // Bake the active program LUT into the export (read live from the
       // store — the callback deps stay stable)
-      lutFilter: useVinxStore.getState().programLUT?.cssFilter,
+      lutFilter: useVinxStore.getState().programLUT?.cube ? undefined : useVinxStore.getState().programLUT?.cssFilter,
+      lutCube: (() => {
+        const l = useVinxStore.getState().programLUT;
+        return l?.cube ? { cube: l.cube, intensity: l.intensity ?? 1 } : undefined;
+      })(),
       startPlayback: () => {
         setIsPlaying(true);
         engineRef.current?.play(0, 1);
@@ -1171,7 +1226,7 @@ const VinxEditor: React.FC = () => {
       {/* Recovery banner */}
       {recoveryBanner && recoveryBanner.show && (
         <div style={recoveryBannerStyle}>
-          <span>Recovered unsaved work from {recoveryBanner.time}</span>
+          <span>{recoveryBanner.text}</span>
           <button
             aria-label="Dismiss recovery banner"
             style={{ ...toolbarBtnStyle, color: 'var(--color-accent)', fontSize: 11 }}
@@ -1194,7 +1249,13 @@ const VinxEditor: React.FC = () => {
           onChange={e => setProjectName(e.target.value)}
           spellCheck={false}
         />
-        <div style={saveBadgeStyle(isDirty)} />
+        <span title={saveError ?? undefined} style={{ flexShrink: 0 }}>
+          <AutosaveIndicator
+            state={saveError ? 'error' : isDirty || !lastSavedAt ? 'idle' : 'saved'}
+            lastSavedAt={lastSavedAt || null}
+            label={saveError ? 'Not saved' : isDirty ? 'Unsaved changes' : undefined}
+          />
+        </span>
 
         <div style={toolbarSeparatorStyle} />
 
@@ -1454,6 +1515,35 @@ const VinxEditor: React.FC = () => {
             <button aria-label="Close LUT Browser" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLUTBrowser}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10, overflowY: 'auto', maxHeight: 380 }}>
+            {/* Real 3D LUT from a .cube file (graded on the GPU, baked into Quick Export). */}
+            <div style={{ marginBottom: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="dex-label-caps">.cube file</div>
+              {programLUT?.cube ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-primary)' }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={programLUT.name}>{programLUT.name}</span>
+                    <span style={{ color: 'var(--color-text-tertiary)' }}>{programLUT.cube.size}³</span>
+                    <button aria-label="Remove loaded LUT" style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px' }} onClick={() => setProgramLUT(null)}>Remove</button>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                    Intensity
+                    <input type="range" min={0} max={100} step={1} aria-label="LUT intensity"
+                      value={Math.round((programLUT.intensity ?? 1) * 100)}
+                      onChange={e => setProgramLUTIntensity(Number(e.target.value) / 100)} style={{ flex: 1 }} />
+                    <span style={{ width: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round((programLUT.intensity ?? 1) * 100)}%</span>
+                  </label>
+                </>
+              ) : (
+                <button aria-label="Load a .cube LUT" style={{ padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}
+                  onClick={() => cubeInputRef.current?.click()}>
+                  Load .cube…
+                </button>
+              )}
+              {cubeError && <div role="alert" style={{ fontSize: 11, color: 'var(--color-error, #ff453a)' }}>{cubeError}</div>}
+              <input ref={cubeInputRef} type="file" accept=".cube" hidden aria-label="Choose a .cube file"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void loadCubeFile(f); }} />
+              <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>Built-in looks below are quick filter approximations.</div>
+            </div>
             {(['cinematic', 'filmic', 'vintage', 'creative', 'technical'] as const).map(cat => (
               <div key={cat} style={{ marginBottom: 'var(--space-3)' }}>
                 <div className="dex-label-caps" style={{ marginBottom: 6 }}>{cat}</div>
