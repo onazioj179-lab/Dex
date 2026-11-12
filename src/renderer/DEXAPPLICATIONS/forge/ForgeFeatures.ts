@@ -550,6 +550,7 @@ export const generateId = (prefix: string = 'job'): string => sharedGenerateId(p
 
 // Format file size
 import { formatBytes as formatFileSize } from '../../../shared/format/units';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 export { formatFileSize };
 
 // Format duration
@@ -640,8 +641,8 @@ export const loadCustomPresets = (): EncodingPreset[] => {
 // Save queue
 export const saveQueue = (jobs: QueueJob[]) => {
   try {
-    localStorage.setItem('dex-forge-queue', JSON.stringify(jobs));
-  } catch { /* storage unavailable */ }
+    persistOrWarn('dex-forge-queue', JSON.stringify(jobs), 'the Forge job queue');
+  } catch { /* serialisation failed */ }
 };
 
 // Load queue

@@ -71,6 +71,7 @@ import { generateRiff, RIFF_SCALES, type RiffScale } from '../../../shared/audio
 import { varyPattern } from '../../../shared/audio/patternVariant';
 import { DexSearchInput } from '../../styles/components';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 // ==================== APP IDENTITY ====================
 export const IMOSION_VERSION = '1.0.0';
@@ -2893,7 +2894,7 @@ const Imosion: React.FC = () => {
   useEffect(() => {
     try {
       const json = JSON.stringify(customMasteringPresets);
-      localStorage.setItem('imosion-custom-mastering-presets', json);
+      persistOrWarn('imosion-custom-mastering-presets', json, 'your Imosion mastering presets');
       (window as any).dex?.invoke?.('capability:storage:set', 'imosion-custom-mastering-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     } catch (e) { console.warn('[Imosion] Failed to save custom mastering presets:', e); }
   }, [customMasteringPresets]);
@@ -2901,7 +2902,7 @@ const Imosion: React.FC = () => {
   useEffect(() => {
     try {
       const json = JSON.stringify(customPluginPresets);
-      localStorage.setItem('imosion-custom-plugin-presets', json);
+      persistOrWarn('imosion-custom-plugin-presets', json, 'your Imosion plugin presets');
       (window as any).dex?.invoke?.('capability:storage:set', 'imosion-custom-plugin-presets', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     } catch (e) { console.warn('[Imosion] Failed to save custom plugin presets:', e); }
   }, [customPluginPresets]);
