@@ -16,7 +16,7 @@
 >    (confirm-gated, append-only, degrades without a provider key). ✅ (2026-11-11) UKI can *schedule*: core tools
 >    `schedule_task` / `list_scheduled_tasks` / `cancel_scheduled_task` (create/delete always ask first), plain-English
 >    times (`shared/automation/scheduleSpec.ts`), one-time tasks, and "Ask UKI" tasks that run a prompt when they fire
->    (failures retry with backoff, shown in Task Manager › System). See DEX_REMAINING_WORK #153. NEXT: richer text assist
+>    (failures retry with backoff, shown in Task Manager › System). See DEX_REMAINING_WORK #159. NEXT: richer text assist
 >    across apps (Notes has it; extend to Mail-style surfaces), wiring `src-tauri/task_queue.rs` to the renderer.
 > 3. **Speed (~80% faster open/nav/drag) — mostly LANDED, keep tightening.** Audit confirmed: per-app lazy chunks
 >    + predictive prewarm, keep-alive (never remount on nav), rAF-batched drag with GPU transform + zero content
@@ -94,8 +94,8 @@
 > ad `<script>/<img>/<iframe>` as they insert — REAL sub-resource blocking. Reports blocks via a console
 > marker the host tallies into `blockedCount`. On by default (blockAds+blockTrackers default true). 26 unit
 > tests incl. a code-injection-breakout guard + behavioral eval; live-verified in WebView2 (all APIs present,
-> matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
-> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: ~~Vinx 3D-LUT math~~ ✅ 2026-11-12 (#158); Forge
+> matcher correct, fetch override blocks ad + passes legit + restores). ✅ (2026-11-12) track-5: element hiding,
+> EasyList-style list import and per-site Shields (DEX_REMAINING_WORK #157). NEXT: native WebView2 request blocking. Other remaining: ~~Vinx 3D-LUT math~~ ✅ 2026-11-12 (#158); Forge
 > WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
 >
 > **TRACK 6 — STORE APP LIFECYCLE ✅ (2026-07-02):** Install/remove/reinstall/reset is real (mandate:
