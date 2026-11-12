@@ -14,6 +14,26 @@
 import { useScheduledTasksStore } from '../store/scheduledTasksStore';
 import { parseScheduleSpec } from '../../shared/automation/scheduleSpec';
 import { describeSchedule, type ScheduledAction } from '../../shared/automation/scheduledTasks';
+import { getUkiAppAction } from './appActionRegistry';
+import { validateArgsAgainst } from '../../shared/uki/toolValidation';
+
+/**
+ * Build a scheduled app-action from a tool call. The schedule_task call itself
+ * is confirmed by the user with these exact args shown, so a changing action
+ * is stored as pre-approved; it never runs anything else.
+ */
+export function appActionFor(actionId: string, rawArgs: unknown): { ok: true; action: ScheduledAction } | { ok: false; error: string } {
+  const entry = getUkiAppAction(actionId);
+  if (!entry) return { ok: false, error: `"${actionId}" is not an action DEX knows right now. Open the app first so its actions are available, then schedule it.` };
+  let args: Record<string, unknown> = {};
+  if (typeof rawArgs === 'string' && rawArgs.trim()) {
+    try { args = JSON.parse(rawArgs); } catch { return { ok: false, error: `args must be a JSON object, for example ${entry.spec.example}` }; }
+  } else if (rawArgs && typeof rawArgs === 'object') args = rawArgs as Record<string, unknown>;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return { ok: false, error: `args must be a JSON object, for example ${entry.spec.example}` };
+  const v = validateArgsAgainst(actionId, args, entry.spec.args, entry.spec.example);
+  if (!v.ok) return { ok: false, error: v.error };
+  return { ok: true, action: { type: 'app-action', actionId, args, appId: entry.appId, mutates: entry.spec.mutates, preApproved: entry.spec.mutates } };
+}
 
 const MAX_TITLE = 80;
 const MAX_TEXT = 1000;
@@ -38,9 +58,15 @@ export function scheduleTaskTool(args: Record<string, unknown>, now = Date.now()
   if (!spec.ok) return `Could not schedule: ${spec.error}`;
   const prompt = clip(args.prompt, MAX_TEXT);
   const message = clip(args.message, MAX_TEXT);
-  const action: ScheduledAction = prompt
-    ? { type: 'uki-prompt', prompt }
-    : { type: 'reminder', message: message || title };
+  const actionId = clip(args.action, 120);
+  let action: ScheduledAction;
+  if (actionId) {
+    const a = appActionFor(actionId, args.args);
+    if (!a.ok) return `Could not schedule: ${a.error}`;
+    action = a.action;
+  } else {
+    action = prompt ? { type: 'uki-prompt', prompt } : { type: 'reminder', message: message || title };
+  }
   const store = useScheduledTasksStore.getState();
   const id = store.addTask({
     title,
@@ -52,7 +78,10 @@ export function scheduleTaskTool(args: Record<string, unknown>, now = Date.now()
   }, now);
   const task = useScheduledTasksStore.getState().tasks.find((t) => t.id === id);
   const next = task ? whenText(task.nextRunAt, now) : 'unknown';
-  return `Scheduled "${title}" (${spec.summary}; ${prompt ? 'UKI will run the request and notify the answer' : 'a notification'}). Next run ${next}. Id ${id}. It is listed in Task Manager › Scheduled Tasks.`;
+  const what = action.type === 'app-action'
+    ? `runs ${action.actionId}${action.preApproved ? ', approved now so it runs without asking' : ''}; opens ${action.appId} if it is closed`
+    : prompt ? 'UKI will run the request and notify the answer' : 'a notification';
+  return `Scheduled "${title}" (${spec.summary}; ${what}). Next run ${next}. Id ${id}. It is listed in Task Manager › Scheduled Tasks.`;
 }
 
 export function listScheduledTasksTool(now = Date.now()): string {
