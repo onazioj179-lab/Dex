@@ -4810,11 +4810,11 @@ const styles: Record<string, React.CSSProperties> = {
     width: '72px',
     height: '72px',
     borderRadius: '14px',
-    background: 'linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)',
+    background: 'var(--color-accent)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 16px var(--color-accent-muted, rgba(10,132,255,0.3)), 0 1px 3px rgba(0,0,0,0.2)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
   },
   appInfo: {
     display: 'flex',

@@ -91,7 +91,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 28,
     height: 28,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+    background: 'var(--color-accent)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -136,7 +136,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 32,
     height: 32,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+    background: 'var(--color-accent)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -152,12 +152,13 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     fontSize: fontSize.base,
     lineHeight: 1.45,
-    color: '#fff',
-    background: 'rgba(255,255,255,0.08)',
+    color: 'var(--color-text-primary)',
+    background: 'var(--color-bg-hover)',
     borderBottomLeftRadius: radius.sm,
   },
   messageBubbleOwn: {
-    background: 'linear-gradient(135deg, #0a84ff, #5e5ce6)',
+    background: 'var(--color-accent)',
+    color: '#fff',
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: radius.sm,
   },
@@ -471,7 +472,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
               key={user.id}
               style={{
                 ...styles.presenceAvatar,
-                background: user.cursor?.color || 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
+                background: user.cursor?.color || 'var(--color-accent)',
               }}
               title={user.name}
             >

@@ -756,7 +756,7 @@ const Learn: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 38, height: 38, borderRadius: 10,
-              background: 'linear-gradient(135deg, #5e5ce6, #7d7aff)',
+              background: 'var(--color-accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <DexIcon name="brain" size={20} color="#fff" />

@@ -259,6 +259,7 @@
 >   Control Center collapsible/pinnable sections; delete dead `shell/FloatingWindow.tsx`+`snapEngine.ts`+
 >   `WindowDepthManager.ts`; delete 6 dead duplicate `:focus-visible` blocks in design-system.css; reconcile the
 >   3 motion-duration scales. Full findings in this session's `dex-design-audit` workflow output.
+>   **2026-11-12 (#164):** duplicate focus rules DONE — one canonical ring now (11 competing global/halo rules removed across design-system.css, design-tokens.css, globals.css); purple "AI" gradients → solid accent; coloured halos out of shared shadow tokens; dead glow/gradient-text CSS deleted.
 >
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
