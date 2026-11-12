@@ -500,7 +500,9 @@ const ViewerPanel: React.FC<{
 }) => {
   const overlay = useVinxStore(s => s.viewerOverlay);
   const setOverlay = useVinxStore(s => s.setViewerOverlay);
-  const programLUT = useVinxStore(s => s.programLUT);
+  // The program LUT grades the Program monitor only, never the Source monitor.
+  const storeLUT = useVinxStore(s => s.programLUT);
+  const programLUT = label === 'Program' ? storeLUT : null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ w: 640, h: 360 });
 
