@@ -23,7 +23,7 @@ import DexIcon from './DexIcon';
 import { platform } from '../utils';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { space, radius, fontSize, zIndex } from '../styles/tokens';
-import { loadActiveWeather, ageLabel } from '../DEXAPPLICATIONS/standalone/weatherData';
+import { loadActiveWeather, ageLabel, WEATHER_ICONS } from '../DEXAPPLICATIONS/standalone/weatherData';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
@@ -561,7 +561,7 @@ const NexusMiniWidget: React.FC = () => {
 // location and shared Open-Meteo cache (weatherData.ts): fresh data when the
 // cache is under 30 min old, otherwise it refetches itself. Offline it shows the
 // last reading with its age; with no location chosen it asks to open Weather.
-interface WidgetWeather { temp: number; condition: string; humidity: number; location: string; fetchedAt: number; stale: boolean }
+interface WidgetWeather { temp: number; condition: string; icon: string; humidity: number; location: string; fetchedAt: number; stale: boolean }
 
 const WeatherWidget: React.FC = () => {
   const [weather, setWeather] = useState<WidgetWeather | null>(null);
@@ -578,6 +578,7 @@ const WeatherWidget: React.FC = () => {
         setWeather({
           temp: unitF ? Math.round(cur.temp * 9 / 5 + 32) : cur.temp,
           condition: String(cur.condition || '').replace(/([A-Z])/g, ' $1').trim(),
+          icon: WEATHER_ICONS[cur.condition] || 'cloud',
           humidity: cur.humidity ?? 0,
           location: res.location.split(',')[0],
           fetchedAt: res.data.fetchedAt,
@@ -593,7 +594,9 @@ const WeatherWidget: React.FC = () => {
   const unavailable = weather == null;
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={unavailable ? 'var(--color-text-tertiary)' : '#FFD60A'} strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span style={{ color: unavailable ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)', display: 'flex' }}>
+        <DexIcon name={weather?.icon ?? 'cloud'} size={32} />
+      </span>
       {unavailable ? (
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8, textAlign: 'center' }}>Open Weather<br />to see conditions</div>
       ) : (
