@@ -38,6 +38,7 @@ import { getCompiled, validateExpression, type ExpressionContext } from './expre
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { resolveCanvasColor } from '../../utils/canvasTheme';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
+import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
 import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
@@ -1105,7 +1106,15 @@ const Flux: React.FC = () => {
         settings,
       };
     })() : null;
-    const visibleLayers = layers.filter(l => l.type !== 'camera' && inTime(l)).reverse();
+    const visibleLayers = layers.filter(l => l.type !== 'camera' && (l.type as string) !== 'null' && inTime(l)).reverse();
+    const parentTransformAt = (l: Layer): ParentTransform => ({
+      x: getAnimatedValue(l, 'x', currentTime) ?? l.transform.x,
+      y: getAnimatedValue(l, 'y', currentTime) ?? l.transform.y,
+      rotationZ: getAnimatedValue(l, 'rotationZ', currentTime) ?? l.transform.rotationZ,
+      scaleX: getAnimatedValue(l, 'scaleX', currentTime) ?? l.transform.scaleX,
+      scaleY: getAnimatedValue(l, 'scaleY', currentTime) ?? l.transform.scaleY,
+      anchorX: l.transform.anchorX, anchorY: l.transform.anchorY,
+    });
     
     // Cache per-frame constants outside the layer loop
     const cachedTier = getPerfTier();
@@ -1127,6 +1136,11 @@ const Flux: React.FC = () => {
         if (p === null) { ctx.restore(); return; }
         if (p !== 1) { ctx.translate(camView.x, camView.y); ctx.scale(p, p); ctx.translate(-camView.x, -camView.y); }
         camBlur = dofBlur(depth, camView.settings);
+      }
+
+      // Parenting: draw inside every ancestor's transform, root first.
+      if (layer.parent) {
+        for (const anc of ancestorChain(layers, layer)) applyParentTransform(ctx, parentTransformAt(anc));
       }
       
       // Compute local time for this layer
@@ -3065,6 +3079,21 @@ const Flux: React.FC = () => {
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Depth (Z)" min={-900} max={5000} value={selectedLayer.transform.z || 0} displayValue={Math.round(selectedLayer.transform.z || 0)} onChange={(v) => updateLayerTransform({ z: v })} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', width: 70 }}>Parent</span>
+                      <select aria-label="Parent layer" value={selectedLayer.parent || ''} onChange={e => {
+                        const pid = e.target.value || undefined;
+                        setLayers(prev => {
+                          const me = prev.find(l => l.id === selectedLayer.id);
+                          if (!me || (pid && wouldCycle(prev, me.id, pid))) return prev;
+                          const t = reparentPosition(prev, me, pid);
+                          return prev.map(l => l.id === me.id ? { ...l, parent: pid, transform: { ...l.transform, ...t } } : l);
+                        });
+                      }} style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-primary)', fontSize: 11 }}>
+                        <option value="">None</option>
+                        {layers.filter(l => l.id !== selectedLayer.id && l.type !== 'camera' && !wouldCycle(layers, selectedLayer.id, l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </div>
                     {selectedLayer.type === 'camera' && (() => {
                       const cam = { ...DEFAULT_CAMERA, ...(selectedLayer.camera || {}) };
                       const setCam = (patch: Partial<CameraSettings>) => setLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, camera: { ...cam, ...patch } } : l));
@@ -3847,11 +3876,28 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <button aria-label="Create null object" onClick={() => {
               const id = addLayer('shape');
-              const parent = layers.find(pl => pl.id === nullParentId);
-              setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, x: (parent ? parent.transform.x : l.transform.x) + nullOffsets.x, y: (parent ? parent.transform.y : l.transform.y) + nullOffsets.y, rotationZ: nullOffsets.rotation, scaleX: nullOffsets.scale / 100, scaleY: nullOffsets.scale / 100, opacity: 0 } } : l));
+              // Null object: an invisible layer that other layers can be parented to.
+              // With a control layer chosen, the null sits on it (plus offsets) and
+              // that layer becomes its child, so moving the null moves the layer.
+              const target = layers.find(pl => pl.id === nullParentId);
+              const nullT = {
+                ...IDENTITY_TRANSFORM,
+                x: (target ? target.transform.x : canvasSize.width / 2) + nullOffsets.x,
+                y: (target ? target.transform.y : canvasSize.height / 2) + nullOffsets.y,
+                rotationZ: nullOffsets.rotation, scaleX: nullOffsets.scale, scaleY: nullOffsets.scale, opacity: 0,
+              };
+              const nullName = `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`;
+              setLayers(prev => prev.map(l => {
+                if (l.id === id) return { ...l, name: nullName, type: 'null' as any, transform: nullT };
+                if (target && l.id === target.id) {
+                  const local = fromParentSpace({ x: l.transform.x, y: l.transform.y }, nullT);
+                  return { ...l, parent: id, transform: { ...l.transform, x: local.x, y: local.y, rotationZ: l.transform.rotationZ - nullT.rotationZ, scaleX: l.transform.scaleX * 100 / (nullT.scaleX || 100), scaleY: l.transform.scaleY * 100 / (nullT.scaleY || 100) } };
+                }
+                return l;
+              }));
             }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
             <div style={{ marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Parent Layer</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Control layer (optional)</span>
               <select value={nullParentId} onChange={e => setNullParentId(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                 <option value="">None</option>
                 {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
