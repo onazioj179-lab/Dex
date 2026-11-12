@@ -107,9 +107,15 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
 mod native_signals {
     use super::emit;
     use serde_json::json;
-    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2, COREWEBVIEW2_WEB_ERROR_STATUS};
-    use webview2_com::{ContainsFullScreenElementChangedEventHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler};
-    use windows_core::BOOL;
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2, COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_RESOURCE_CONTEXT,
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+    };
+    use webview2_com::{
+        ContainsFullScreenElementChangedEventHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
+        WebResourceRequestedEventHandler,
+    };
+    use windows_core::{BOOL, PWSTR};
 
     fn history(core: &ICoreWebView2) -> (bool, bool) {
         let (mut back, mut fwd) = (BOOL(0), BOOL(0));
@@ -138,7 +144,36 @@ mod native_signals {
     pub fn attach(wv: &tauri::Webview, app: tauri::AppHandle, owner: String, tab: String) {
         let _ = wv.with_webview(move |pw| unsafe {
             let Ok(core) = pw.controller().CoreWebView2() else { return };
+            let env = pw.environment();
             let mut token = 0i64;
+
+            // Network-level ad/tracker blocking (crate::browser_block decides).
+            // Every request passes through here; a block answers 403 locally so
+            // nothing leaves the machine, and the owning window is told.
+            let _ = core.AddWebResourceRequestedFilter(windows_core::w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+            let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
+            let _ = core.add_WebResourceRequested(
+                &WebResourceRequestedEventHandler::create(Box::new(move |sender, args| {
+                    let (Some(sender), Some(args)) = (sender, args) else { return Ok(()) };
+                    let req = args.Request()?;
+                    let mut uri = PWSTR::null();
+                    req.Uri(&mut uri)?;
+                    let uri = webview2_com::take_pwstr(uri);
+                    let mut ctx = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
+                    let _ = args.ResourceContext(&mut ctx);
+                    let mut src = PWSTR::null();
+                    let _ = sender.Source(&mut src);
+                    let page = webview2_com::take_pwstr(src);
+                    if crate::browser_block::should_block(&uri, &page, ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT) {
+                        if let Ok(resp) = env.CreateWebResourceResponse(None, 403, windows_core::w!("Blocked by DEX"), windows_core::w!("")) {
+                            let _ = args.SetResponse(&resp);
+                            emit(&a, &o, json!({ "id": t, "type": "blocked", "url": uri }));
+                        }
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            );
 
             let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
             let _ = core.add_HistoryChanged(
@@ -272,6 +307,8 @@ pub fn dispatch(app: &tauri::AppHandle, window: &tauri::Window, channel: &str, a
         }
         "browserView:close" => with_view(app, id, |wv| wv.close()),
         "browserView:closeAll" => close_all(app, window.label()),
+        // Not per-view: the list applies to every Browser tab.
+        "browserView:setBlocking" => crate::browser_block::set_blocking(args.get(0)),
         _ => Value::Null,
     }
 }

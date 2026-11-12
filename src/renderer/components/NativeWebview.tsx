@@ -120,6 +120,9 @@ function ensureSubscribed(): void {
       host.__dexEmit('history-changed', { canGoBack: !!p.canGoBack, canGoForward: !!p.canGoForward });
     } else if (p.type === 'fullscreen') {
       host.__dexEmit(p.on ? 'enter-html-full-screen' : 'leave-html-full-screen');
+    } else if (p.type === 'blocked') {
+      // A request WebView2 stopped before it left the machine (browser_block.rs).
+      host.__dexEmit('native-blocked', { url: p.url });
     } else if (p.type === 'load-error') {
       // Electron-style shape the Browser already handles (-3 = aborted is filtered natively).
       host.__dexEmit('did-fail-load', { errorCode: p.code ?? 0, errorDescription: p.description });
