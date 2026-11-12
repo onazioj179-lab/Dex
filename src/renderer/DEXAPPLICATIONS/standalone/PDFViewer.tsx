@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { sendToNotes } from '../../services/sendTo';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 interface Annotation {
   x: number;
@@ -114,7 +115,7 @@ const PDFViewer: React.FC = () => {
   // Persist annotations
   useEffect(() => {
     if (!docKey) return;
-    try { localStorage.setItem(storageKey(docKey), JSON.stringify(annotations)); } catch { /* ignore */ }
+    try { persistOrWarn(storageKey(docKey), JSON.stringify(annotations), 'PDF annotations'); } catch { /* serialisation failed */ }
   }, [annotations, docKey]);
 
   const openPdf = useCallback(async () => {

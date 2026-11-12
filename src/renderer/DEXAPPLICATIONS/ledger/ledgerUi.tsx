@@ -31,6 +31,7 @@ export interface LedgerCtx {
   accountFilter: number | null;
   categoryFilter: number | null;
   openEditor: (r: EditorRequest) => void;
+  closeEditor: () => void;
   toast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   confirm: (o: { title: string; message?: React.ReactNode; confirmLabel?: string; tone?: 'neutral' | 'destructive' }) => Promise<boolean>;
   openImport: (accountId?: number) => void;
@@ -286,6 +287,8 @@ export const LEDGER_CSS = `
 textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height: 56px; }
 .lg-input:focus { border-color: var(--color-accent); outline: none; }
 .lg-input.lg-invalid { border-color: var(--color-error); }
+.lg-table td.lg-cell-edit { padding: 0 4px; overflow: visible; }
+.lg-table td.lg-cell-edit .lg-input { height: 24px; }
 .lg-money-input { display: inline-flex; flex-direction: column; width: 100%; }
 .lg-field-error { color: var(--color-error); font-size: 11.5px; margin-top: 3px; }
 .lg-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
