@@ -165,7 +165,7 @@
 > backoff). LIVE-VERIFIED end-to-end: created a reminder in the UI (persists + shows "every 60 min"/1 active),
 > forced it past-due, and the runner's boot tick fired it (runCount 1, outcome ok), logged an 'automation'
 > task in the UKI ledger (status done), and rescheduled to the future. ALL 7 MANDATE TRACKS NOW SHIPPED.
-> NEXT (polish, not new tracks): app-action scheduled tasks w/ pre-approval; Settings schedule UI; per-site
+> NEXT (polish, not new tracks): ~~app-action scheduled tasks w/ pre-approval~~ ✅ 2026-11-12 (#162); Settings schedule UI; per-site
 > browser shields; Vinx 3D-LUT; Forge muxer; Imosion take comping.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.

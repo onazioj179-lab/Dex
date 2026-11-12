@@ -34,6 +34,16 @@ export interface ScheduledAction {
   /** app-action: the registered action id + JSON args. */
   actionId?: string;
   args?: Record<string, unknown>;
+  /** app-action: the app that owns the action (opened if it is closed). */
+  appId?: string;
+  /** app-action: the action changes the app's data. */
+  mutates?: boolean;
+  /**
+   * app-action: the user approved THIS action with THESE args when they
+   * scheduled it, so it may run without a prompt while they are away.
+   * Without it a changing action asks at run time (and fails if nobody answers).
+   */
+  preApproved?: boolean;
 }
 
 export type RunOutcome = 'ok' | 'error';
