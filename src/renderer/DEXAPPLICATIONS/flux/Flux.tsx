@@ -37,6 +37,7 @@ import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
 import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
 import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
@@ -86,6 +87,8 @@ interface Layer {
   camera?: CameraSettings;
   /** Text layers only: per character/word/line reveal (see textAnimator.ts). */
   textAnimator?: TextAnimator;
+  /** Generator layers: a GLSL fragment shader drawn every frame (see shaderLayer.ts). */
+  shader?: ShaderSpec;
   // Live per-frame expressions keyed by transform property name (e.g. 'x',
   // 'opacity', 'rotationZ'). Evaluated every frame during render/preview; a
   // malformed expression degrades to the static/keyframe value. See expressions.ts.
@@ -714,6 +717,9 @@ const Flux: React.FC = () => {
   const [maskExpansion, setMaskExpansion] = useState(0);
   const [maskOpacity, setMaskOpacity] = useState(100);
   const [shaderCode, setShaderCode] = useState(`precision mediump float;\nuniform float u_time;\nuniform vec2 u_resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / u_resolution;\n  vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0,2,4));\n  gl_FragColor = vec4(col, 1.0);\n}`);
+  const shaderPoolRef = useRef(new ShaderPool());
+  useEffect(() => () => shaderPoolRef.current.prune(new Set()), []);
+  const [shaderStatus, setShaderStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' }); // hex: the shader parses it
   // 2. Precompose
   const [showPrecompose, setShowPrecompose] = useState(false);
@@ -1106,6 +1112,7 @@ const Flux: React.FC = () => {
         settings,
       };
     })() : null;
+    shaderPoolRef.current.prune(new Set(layers.filter(l => l.shader).map(l => l.id)));
     const visibleLayers = layers.filter(l => l.type !== 'camera' && (l.type as string) !== 'null' && inTime(l)).reverse();
     const parentTransformAt = (l: Layer): ParentTransform => ({
       x: getAnimatedValue(l, 'x', currentTime) ?? l.transform.x,
@@ -1238,6 +1245,11 @@ const Flux: React.FC = () => {
       // Render based on layer type
       switch (layer.type) {
         case 'generator':
+          if (layer.shader) {
+            const out = shaderPoolRef.current.get(layer.id).render(layer.shader, canvasSize.width, canvasSize.height, localTime / fps);
+            if (out) ctx.drawImage(out as CanvasImageSource, -canvasSize.width / 2, -canvasSize.height / 2, canvasSize.width, canvasSize.height);
+            break;
+          }
           // Gradient background
           const gradient = ctx.createLinearGradient(0, 0, 200, 200);
           gradient.addColorStop(0, '#0e0e12');
@@ -4154,12 +4166,33 @@ const Flux: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>
               <textarea value={shaderCode} onChange={e => setShaderCode(e.target.value)} style={{ width: '100%', height: 180, padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.4))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical', lineHeight: 1.5 }} />
-              <button aria-label="Compile and apply shader" onClick={() => { if (!selectedLayerId) return; const intensity = shaderUniforms.u_intensity / 50; const hex = shaderUniforms.u_color; const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let hue = 0; if (mx !== mn) { const d = mx - mn; hue = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; } const hueDelta = Math.round(hue - 280); const filterStr = `contrast(${1 + intensity * 0.2}) saturate(${1 + intensity * 0.3}) brightness(${1 + intensity * 0.1}) hue-rotate(${hueDelta}deg)`; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { sepia: shaderUniforms.u_speed, grayscale: 0, invert: 0, customFilter: filterStr } }] } : l)); }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
+              <button aria-label="Compile and apply shader" onClick={() => {
+                const spec: ShaderSpec = { code: shaderCode, speed: Math.max(0.05, shaderUniforms.u_speed / 50), intensity: shaderUniforms.u_intensity / 100, color: shaderUniforms.u_color };
+                const sel = layers.find(l => l.id === selectedLayerId);
+                const targetId = sel?.type === 'generator' ? sel.id : `layer-shader-${Date.now()}`;
+                const err = shaderPoolRef.current.get(targetId).compile(spec.code);
+                if (err) { setShaderStatus({ ok: false, text: err }); return; }
+                setShaderStatus({ ok: true, text: sel?.type === 'generator' ? `Applied to ${sel.name}.` : 'Added as a new Shader layer.' });
+                if (sel?.type === 'generator') {
+                  setLayers(prev => prev.map(l => l.id === sel.id ? { ...l, shader: spec } : l));
+                } else {
+                  const layer: Layer = {
+                    id: targetId, name: 'Shader', type: 'generator', visible: true, locked: false, solo: false,
+                    startTime: 0, duration, inPoint: 0, outPoint: duration,
+                    transform: { ...IDENTITY_TRANSFORM, x: canvasSize.width / 2, y: canvasSize.height / 2 },
+                    behaviors: [], filters: [], animations: [], shader: spec,
+                  };
+                  setLayers(prev => [layer, ...prev]);
+                  setSelectedLayerId(layer.id);
+                }
+                setIsDirty(true);
+              }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
+              {shaderStatus && <pre style={{ marginTop: 6, whiteSpace: 'pre-wrap', fontSize: 10.5, fontFamily: 'var(--font-mono)', color: shaderStatus.ok ? 'var(--color-text-secondary)' : 'var(--color-error)', maxHeight: 90, overflow: 'auto' }}>{shaderStatus.text}</pre>}
             </div>
             {/* Uniforms & Presets */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, fontWeight: 600 }}>Uniforms</div>
-              {[{ name: 'u_time', val: shaderUniforms.u_time }, { name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: shaderUniforms.u_color }].map(u => (
+              {[{ name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: shaderUniforms.u_color }].map(u => (
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
@@ -4171,8 +4204,8 @@ const Flux: React.FC = () => {
               ))}
               <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Presets</div>
-                {[{ n: 'Chromatic Aberration', f: 'hue-rotate(5deg) saturate(1.5) contrast(1.1)' }, { n: 'Noise Grain', f: 'contrast(1.3) brightness(0.95)' }, { n: 'Barrel Distortion', f: 'contrast(1.2) brightness(1.05)' }, { n: 'RGB Split', f: 'saturate(2) hue-rotate(10deg) contrast(1.15)' }, { n: 'CRT Scanlines', f: 'contrast(1.4) brightness(0.9) saturate(0.8)' }].map(p => (
-                  <button key={p.n} aria-label={`Apply ${p.n} shader preset`} onClick={() => { if (!selectedLayerId) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { customFilter: p.f } }] } : l)); setShowShaderEffects(false); }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.n}</button>
+                {SHADER_PRESETS.map(p => (
+                  <button key={p.name} aria-label={`Load ${p.name} shader preset`} onClick={() => { setShaderCode(p.code); setShaderStatus(null); }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.name}</button>
                 ))}
               </div>
             </div>
