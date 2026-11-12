@@ -33,6 +33,61 @@ export interface ExpressionContext {
 export type ExpressionResult = number | [number, number];
 
 // ---------------------------------------------------------------------------
+// Allowlist check. The keyword blocklist below was the only guard before the
+// source reached `new Function`, and splitting a word defeats it:
+// `Math.max['con'+'structor']('...')()` names no blocked word yet reaches the
+// Function constructor and runs any code, with DEX's native bridge in reach.
+// Expressions arrive inside project files, so every expression must now pass
+// this token-level allowlist first: numbers, the injected names, `Math.<member>`,
+// operators, parentheses and array literals. No strings, no other property
+// access, no indexing, no assignment, no statements.
+// ---------------------------------------------------------------------------
+const ALLOWED_NAMES = new Set(['time', 'value', 'index', 'frame', 'fps', 'Math', 'wiggle', 'random', 'noise', 'clamp', 'lerp', 'smoothstep', 'true', 'false']);
+const MATH_MEMBERS = new Set([
+  'abs', 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atan2', 'atanh', 'cbrt', 'ceil', 'clz32', 'cos', 'cosh', 'exp', 'expm1',
+  'floor', 'fround', 'hypot', 'imul', 'log', 'log10', 'log1p', 'log2', 'max', 'min', 'pow', 'round', 'sign', 'sin', 'sinh',
+  'sqrt', 'tan', 'tanh', 'trunc', 'E', 'LN10', 'LN2', 'LOG10E', 'LOG2E', 'PI', 'SQRT1_2', 'SQRT2',
+]);
+const OPERATORS = ['===', '!==', '**', '<=', '>=', '==', '!=', '&&', '||', '??', '+', '-', '*', '/', '%', '<', '>', '!', '?', ':', ',', '(', ')', '[', ']'];
+const MAX_EXPRESSION_LENGTH = 2000;
+
+/** Null when `code` uses only allowed tokens, otherwise the reason it is refused. */
+export function checkExpressionTokens(code: string): string | null {
+  if (code.length > MAX_EXPRESSION_LENGTH) return 'Expression is too long.';
+  // 'operand' = the next token starts a value; 'operator' = a value just ended.
+  let expect: 'operand' | 'operator' = 'operand';
+  let prevName = '';
+  let i = 0;
+  while (i < code.length) {
+    const rest = code.slice(i);
+    const ws = /^\s+/.exec(rest);
+    if (ws) { i += ws[0].length; continue; }
+    const num = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(rest);
+    if (num && expect === 'operand') { i += num[0].length; expect = 'operator'; prevName = ''; continue; }
+    const id = /^[A-Za-z_$][\w$]*/.exec(rest);
+    if (id) {
+      if (!ALLOWED_NAMES.has(id[0])) return `"${id[0]}" is not allowed. Use time, value, index, frame, fps, Math.*, wiggle, random, noise, clamp, lerp or smoothstep.`;
+      i += id[0].length; expect = 'operator'; prevName = id[0];
+      continue;
+    }
+    if (rest[0] === '.' && prevName === 'Math') {
+      const member = /^\.\s*([A-Za-z_$][\w$]*)/.exec(rest);
+      if (!member || !MATH_MEMBERS.has(member[1])) return `"Math.${member?.[1] ?? ''}" is not allowed.`;
+      i += member[0].length; expect = 'operator'; prevName = '';
+      continue;
+    }
+    const op = OPERATORS.find((o) => rest.startsWith(o));
+    if (!op) return `"${rest[0]}" is not allowed in an expression.`;
+    // `[` after a value would index into it (a way to reach properties by string).
+    if (op === '[' && expect === 'operator') return 'Indexing with [ ] is not allowed.';
+    i += op.length;
+    prevName = '';
+    expect = op === ')' || op === ']' ? 'operator' : 'operand';
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Keywords that must never appear in a user expression. We reject the source
 // outright if any are present, so the sandboxed Function body can only see the
 // names we explicitly inject. Word-boundary matched to avoid false positives
@@ -163,6 +218,8 @@ export function compileExpression(source: string): CompiledExpression {
     return { eval: (ctx) => ctx.value, error: null };
   }
 
+  const refused = checkExpressionTokens(code);
+  if (refused) return { eval: (ctx) => ctx.value, error: refused };
   if (BLOCKED_PATTERN.test(code)) {
     return {
       eval: (ctx) => ctx.value,
@@ -239,6 +296,8 @@ export function compileExpression(source: string): CompiledExpression {
 export function validateExpression(source: string): string | null {
   const code = (source || '').trim();
   if (!code) return null;
+  const refused = checkExpressionTokens(code);
+  if (refused) return refused;
   if (BLOCKED_PATTERN.test(code)) {
     return 'Blocked keyword. Only math + animation helpers are allowed.';
   }
