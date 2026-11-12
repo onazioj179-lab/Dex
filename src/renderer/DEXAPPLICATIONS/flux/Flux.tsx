@@ -37,6 +37,7 @@ import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { POST_FILTER_TYPES, applyPostEffects } from './postEffects';
 import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
 import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
@@ -718,6 +719,7 @@ const Flux: React.FC = () => {
   const [maskOpacity, setMaskOpacity] = useState(100);
   const [shaderCode, setShaderCode] = useState(`precision mediump float;\nuniform float u_time;\nuniform vec2 u_resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / u_resolution;\n  vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0,2,4));\n  gl_FragColor = vec4(col, 1.0);\n}`);
   const shaderPoolRef = useRef(new ShaderPool());
+  const postCanvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => () => shaderPoolRef.current.prune(new Set()), []);
   const [shaderStatus, setShaderStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' }); // hex: the shader parses it
@@ -1083,6 +1085,7 @@ const Flux: React.FC = () => {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const mainCtx = ctx as CanvasRenderingContext2D;
     if (!ctx) {
       setCanvasError(true);
       return;
@@ -1130,7 +1133,32 @@ const Flux: React.FC = () => {
     
     // One layer, fully drawn. Groups (pre-comps) call it for their children
     // inside the group's own transform; the camera is applied once, at the top.
-    const drawLayer = (layer: Layer, nested: boolean): void => {
+    const drawLayer = (layer: Layer, nested: boolean, target: CanvasRenderingContext2D = mainCtx, inPost = false): void => {
+      const ctx = target;
+      // Chromatic aberration / vignette need the layer's pixels: draw it to an
+      // offscreen frame with the same transform, process, then composite.
+      if (!inPost && (layer.filters || []).some(f => f.enabled && POST_FILTER_TYPES.has(f.type))) {
+        const off = postCanvasRef.current ?? (postCanvasRef.current = document.createElement('canvas'));
+        if (off.width !== canvas.width || off.height !== canvas.height) { off.width = canvas.width; off.height = canvas.height; }
+        const oc = off.getContext('2d', { willReadFrequently: true });
+        if (oc) {
+          oc.setTransform(1, 0, 0, 1, 0, 0);
+          oc.clearRect(0, 0, off.width, off.height);
+          oc.setTransform(ctx.getTransform());
+          oc.globalAlpha = ctx.globalAlpha;
+          drawLayer(layer, nested, oc, true);
+          oc.setTransform(1, 0, 0, 1, 0, 0);
+          const img = oc.getImageData(0, 0, off.width, off.height);
+          applyPostEffects(img, layer.filters);
+          oc.putImageData(img, 0, 0);
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.drawImage(off, 0, 0);
+          ctx.restore();
+          return;
+        }
+      }
       ctx.save();
 
       // Camera: frame the view, then perspective-scale this layer about the
@@ -1223,11 +1251,12 @@ const Flux: React.FC = () => {
               if (fs.hueRotate) filterParts.push(`hue-rotate(${fs.hueRotate}deg)`);
               break;
             }
-            case 'vignette': filterParts.push(`brightness(${1 - (fs.amount ?? 0.3)})`); break;
+            // vignette and chromaticAberration: pixel post pass (postEffects.ts)
             case 'stylize': {
               if (fs.sepia) filterParts.push(`sepia(${fs.sepia / 100})`);
               if (fs.grayscale) filterParts.push(`grayscale(${fs.grayscale / 100})`);
               if (fs.invert) filterParts.push(`invert(${fs.invert / 100})`);
+              if (typeof fs.customFilter === 'string' && fs.customFilter) filterParts.push(fs.customFilter);
               break;
             }
             default: break;
@@ -1394,7 +1423,7 @@ const Flux: React.FC = () => {
         case 'group': {
           // Pre-comp: draw its layers (bottom to top) inside this transform.
           const kids = (layer.children || []).filter(c => c.visible && c.type !== 'camera' && currentTime >= c.inPoint && currentTime <= c.outPoint);
-          for (let k = kids.length - 1; k >= 0; k--) drawLayer(kids[k], true);
+          for (let k = kids.length - 1; k >= 0; k--) drawLayer(kids[k], true, ctx, inPost);
           break;
         }
 
@@ -1986,12 +2015,12 @@ const Flux: React.FC = () => {
     ));
   }, []);
 
-  const addFilter = useCallback((layerId: string, filterType: string) => {
+  const addFilter = useCallback((layerId: string, filterType: string, settings: Record<string, any> = {}) => {
     const newFilter: Filter = {
-      id: `filter-${Date.now()}`,
+      id: `filter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: filterType as Filter['type'],
       enabled: true,
-      settings: {},
+      settings: { ...settings },
     };
     setLayers(prev => prev.map(l => 
       l.id === layerId ? { ...l, filters: [...l.filters, newFilter] } : l
@@ -2915,25 +2944,25 @@ const Flux: React.FC = () => {
                       <>
                         <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Glow</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'glow').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.sparkle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Blur</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'blur').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.filter}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Color</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'color').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.sliders}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Other</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'distort' || p.category === 'stylize').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.wand}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
