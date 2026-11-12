@@ -13,8 +13,10 @@
 >    rehydrate as *failed* — crash honesty; >8s tasks notify on finish). Agent loop (`uki/agentRunner.ts`) now
 >    ledgers every tool-using run (lazily — pure Q&A stays out). Nexus "UKI Activity" panel gained a Background
 >    Tasks section (status chips, last step, Clear finished). New agent-callable `notes.enhance` app action
->    (confirm-gated, append-only, degrades without a provider key). NEXT: task queue UKI can *schedule* (cron
->    primitives exist in `shared/automation/`), self-re-check loops that retry stalled work, richer text assist
+>    (confirm-gated, append-only, degrades without a provider key). ✅ (2026-11-11) UKI can *schedule*: core tools
+>    `schedule_task` / `list_scheduled_tasks` / `cancel_scheduled_task` (create/delete always ask first), plain-English
+>    times (`shared/automation/scheduleSpec.ts`), one-time tasks, and "Ask UKI" tasks that run a prompt when they fire
+>    (failures retry with backoff, shown in Task Manager › System). See DEX_REMAINING_WORK #153. NEXT: richer text assist
 >    across apps (Notes has it; extend to Mail-style surfaces), wiring `src-tauri/task_queue.rs` to the renderer.
 > 3. **Speed (~80% faster open/nav/drag) — mostly LANDED, keep tightening.** Audit confirmed: per-app lazy chunks
 >    + predictive prewarm, keep-alive (never remount on nav), rAF-batched drag with GPU transform + zero content

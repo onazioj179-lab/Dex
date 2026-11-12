@@ -16,6 +16,7 @@
 | 18g | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
 | 18i | Rewind no longer hits an error when opened on a fresh install (plugin, profile and audit lists that come back empty); every one of the 56 apps now opens without an error in a built DEX |
 | 18k | Notes: Export (Markdown, web page, text, DEX note JSON) and Import (.md, .txt, .html, DEX note JSON) work. Both always failed before: they were never connected in this version. Imports keep headings, lists, checklists, quotes, code and tables, take the title from the file, and say why when a file can't be used |
+| 18m | More apps say so when they can't save your work: Calendar events, the Rewind journal, the Forge job queue, Imosion presets and track templates, and every app's crash-recovery copy. Spotlight: an app whose name starts with what you type now ranks above a file that only matches on its folder path |
 
 ## New
 

@@ -13,6 +13,7 @@ import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 interface CalendarEvent {
   id: string;
@@ -123,7 +124,7 @@ const Calendar: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('dex-calendar-events', JSON.stringify(events));
+      persistOrWarn('dex-calendar-events', JSON.stringify(events), 'your calendar events');
     } catch (e) { console.warn('[DEX]', e); }
     (async () => {
       try {

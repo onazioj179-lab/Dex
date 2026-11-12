@@ -41,6 +41,9 @@ export const KNOWN_TOOLS = [
   'rename_file',
   'move_file',
   'trash_file',
+  'schedule_task',
+  'list_scheduled_tasks',
+  'cancel_scheduled_task',
 ] as const;
 
 export type ToolName = (typeof KNOWN_TOOLS)[number];
@@ -147,6 +150,33 @@ export const CORE_TOOLS: ToolSpec[] = [
     description: 'move a file or folder to the Recycle Bin (never a permanent delete; asks the user first).',
     args: [{ name: 'path', type: 'string' }],
     example: '{"path": "C:\\\\Users\\\\me\\\\Downloads\\\\old.zip"}',
+  },
+  {
+    name: 'schedule_task',
+    argline: '{"title": string, "when": string, "message"?: string, "prompt"?: string}',
+    description:
+      'set a reminder or a background job that runs later or on repeat (asks the user first). "when" is plain English: "in 20 minutes", "tomorrow at 9am", "every 2 hours", "weekdays at 08:30", "every monday at 9", or a 5-field cron. With "prompt", UKI runs that request when it fires and notifies the answer; otherwise the user gets a notification with "message".',
+    args: [
+      { name: 'title', type: 'string' },
+      { name: 'when', type: 'string' },
+      { name: 'message', type: 'string', optional: true },
+      { name: 'prompt', type: 'string', optional: true },
+    ],
+    example: '{"title": "Stretch", "when": "every 1 hour", "message": "Stand up and stretch"}',
+  },
+  {
+    name: 'list_scheduled_tasks',
+    argline: '{}',
+    description: "list the user's scheduled reminders and background jobs with their next run and last result.",
+    args: [],
+    example: '{}',
+  },
+  {
+    name: 'cancel_scheduled_task',
+    argline: '{"task": string}',
+    description: 'delete a scheduled task by its id or title (asks the user first).',
+    args: [{ name: 'task', type: 'string' }],
+    example: '{"task": "Stretch"}',
   },
 ];
 

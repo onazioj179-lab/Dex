@@ -15,9 +15,9 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { useScheduledTasksStore, MIN_INTERVAL_MS } from '../store/scheduledTasksStore';
+import { useScheduledTasksStore } from '../store/scheduledTasksStore';
 import { describeSchedule } from '../../shared/automation/scheduledTasks';
-import { matchesCron } from '../../shared/automation/cron';
+import { parseScheduleSpec } from '../../shared/automation/scheduleSpec';
 import { CollapsibleSection } from './CollapsibleSection';
 
 function whenLabel(ts: number | null | undefined): string {
@@ -52,27 +52,29 @@ const ScheduledTasksPanel: React.FC = () => {
   const setEnabled = useScheduledTasksStore(s => s.setEnabled);
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<'interval' | 'cron'>('interval');
-  const [everyMin, setEveryMin] = useState(60);
-  const [cron, setCron] = useState('0 9 * * *');
+  const [when, setWhen] = useState('every 60 minutes');
+  const [mode, setMode] = useState<'reminder' | 'uki-prompt'>('reminder');
   const [message, setMessage] = useState('');
 
-  const cronValid = useMemo(() => kind !== 'cron' || matchesCron(cron, new Date()) || (() => {
-    // matchesCron returns false on parse error too; validate parse explicitly
-    try { return cron.trim().split(/\s+/).length === 5; } catch { return false; }
-  })(), [kind, cron]);
-
-  const canAdd = title.trim().length > 0 && (kind === 'interval' ? everyMin >= 1 : cron.trim().split(/\s+/).length === 5);
+  // Re-parse when the text changes; "in 20 minutes" is relative to now.
+  const spec = useMemo(() => parseScheduleSpec(when, Date.now()), [when]);
+  const canAdd = title.trim().length > 0 && spec.ok && (mode === 'reminder' || message.trim().length > 0);
 
   const submit = () => {
     if (!canAdd) return;
+    const now = Date.now();
+    const fresh = parseScheduleSpec(when, now);
+    if (!fresh.ok) return;
     addTask({
       title: title.trim(),
-      kind,
-      cron: kind === 'cron' ? cron.trim() : undefined,
-      intervalMs: kind === 'interval' ? Math.max(MIN_INTERVAL_MS, everyMin * 60000) : undefined,
-      action: { type: 'reminder', message: message.trim() || title.trim() },
-    }, Date.now());
+      kind: fresh.kind,
+      cron: fresh.kind === 'cron' ? fresh.cron : undefined,
+      intervalMs: fresh.kind === 'interval' ? fresh.intervalMs : undefined,
+      atMs: fresh.kind === 'once' ? fresh.atMs : undefined,
+      action: mode === 'uki-prompt'
+        ? { type: 'uki-prompt', prompt: message.trim() }
+        : { type: 'reminder', message: message.trim() || title.trim() },
+    }, now);
     setTitle('');
     setMessage('');
   };
@@ -102,35 +104,31 @@ const ScheduledTasksPanel: React.FC = () => {
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
           style={{ ...inputStyle, width: '100%' }}
         />
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
-            {(['interval', 'cron'] as const).map(k => (
-              <button
-                key={k} onClick={() => setKind(k)} aria-pressed={kind === k}
-                style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
-                  background: kind === k ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
-                  color: kind === k ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
-              >
-                {k === 'interval' ? 'Every' : 'Cron'}
-              </button>
-            ))}
-          </div>
-          {kind === 'interval' ? (
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              <input type="number" min={1} aria-label="Interval minutes" value={everyMin}
-                onChange={e => setEveryMin(Math.max(1, Number(e.target.value)))}
-                style={{ ...inputStyle, width: 64 }} />
-              minutes
-            </label>
-          ) : (
-            <input aria-label="Cron expression" placeholder="min hr dom mon dow" value={cron}
-              onChange={e => setCron(e.target.value)}
-              style={{ ...inputStyle, flex: 1, minWidth: 130, fontFamily: 'var(--font-mono, monospace)',
-                borderColor: cronValid ? 'var(--color-border-subtle)' : 'var(--color-error, #ff453a)' }} />
-          )}
+        <input
+          aria-label="When" placeholder='in 20 minutes · tomorrow at 9am · every 2 hours · weekdays at 08:30'
+          value={when} onChange={e => setWhen(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          style={{ ...inputStyle, width: '100%', borderColor: spec.ok ? 'var(--color-border-subtle)' : 'var(--color-error, #ff453a)' }}
+        />
+        <div aria-live="polite" style={{ fontSize: 11, color: spec.ok ? 'var(--color-text-tertiary)' : 'var(--color-error, #ff453a)', marginTop: -2 }}>
+          {spec.ok ? `Runs ${spec.summary}` : spec.error}
+        </div>
+        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border-subtle)', alignSelf: 'flex-start' }}>
+          {([['reminder', 'Notify me'], ['uki-prompt', 'Ask UKI']] as const).map(([k, l]) => (
+            <button
+              key={k} onClick={() => setMode(k)} aria-pressed={mode === k}
+              title={k === 'uki-prompt' ? 'UKI runs your request when the task fires and notifies the answer (needs an AI provider)' : 'Show a notification'}
+              style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
+                background: mode === k ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
+                color: mode === k ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+            >
+              {l}
+            </button>
+          ))}
         </div>
         <input
-          aria-label="Reminder message" placeholder="Notification message (optional)"
+          aria-label={mode === 'uki-prompt' ? 'Request for UKI' : 'Reminder message'}
+          placeholder={mode === 'uki-prompt' ? 'What should UKI do? (e.g. Summarise the weather for today)' : 'Notification message (optional)'}
           value={message} onChange={e => setMessage(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
           style={{ ...inputStyle, width: '100%' }}
@@ -143,14 +141,14 @@ const ScheduledTasksPanel: React.FC = () => {
             color: canAdd ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: canAdd ? 'pointer' : 'default' }}
         >
-          + Schedule reminder
+          {mode === 'uki-prompt' ? '+ Schedule UKI task' : '+ Schedule reminder'}
         </button>
       </div>
 
       {/* Task list */}
       {sorted.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 0' }}>
-          No scheduled tasks yet. Add a recurring reminder above — it runs in the background even while you work in other apps.
+          No scheduled tasks yet. Add a reminder or a UKI task above, or ask UKI ("remind me in 20 minutes…") — it runs in the background even while you work in other apps.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -174,7 +172,8 @@ const ScheduledTasksPanel: React.FC = () => {
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2, paddingLeft: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <span>{describeSchedule(t)}</span>
-                <span>· next {t.enabled ? whenLabel(t.nextRunAt) : 'paused'}</span>
+                {t.action.type === 'uki-prompt' && <span>· asks UKI</span>}
+                <span>· {t.enabled ? `next ${whenLabel(t.nextRunAt)}` : t.kind === 'once' && t.runCount > 0 ? (t.lastOutcome === 'ok' ? 'done' : 'gave up') : 'paused'}</span>
                 {t.runCount > 0 && <span>· ran {t.runCount}×</span>}
                 {t.lastOutcome === 'error' && <span style={{ color: 'var(--color-error, #ff453a)' }}>· last failed</span>}
               </div>

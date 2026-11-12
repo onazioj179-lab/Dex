@@ -197,6 +197,7 @@ function formatDate(ts: number): string {
 
 import { formatBytes } from '../../../shared/format/units';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 function todayStr(): string {
   const d = new Date();
@@ -340,7 +341,7 @@ const Rewind: React.FC = () => {
   useEffect(() => {
     if (journalFlushTimer.current) clearTimeout(journalFlushTimer.current);
     journalFlushTimer.current = setTimeout(() => {
-      try { localStorage.setItem('dex-rewind-journal', JSON.stringify(journalEntries)); } catch { /* quota exceeded */ }
+      try { persistOrWarn('dex-rewind-journal', JSON.stringify(journalEntries), 'your Rewind journal'); } catch { /* serialisation failed */ }
     }, 500);
     return () => { if (journalFlushTimer.current) clearTimeout(journalFlushTimer.current); };
   }, [journalEntries]);
