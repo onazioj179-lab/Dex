@@ -28,6 +28,7 @@ import {
   CollabPeer,
   CollabChatMessage,
 } from '../../services/collabSession';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -472,7 +473,7 @@ function loadRooms(): CollabRoom[] {
 
 function persistRooms(rooms: CollabRoom[]): void {
   try {
-    localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(rooms));
+    persistOrWarn(ROOMS_STORAGE_KEY, JSON.stringify(rooms), 'Collab Hub rooms');
   } catch (err) {
     console.error('[CollabHub] failed to persist rooms:', err);
   }

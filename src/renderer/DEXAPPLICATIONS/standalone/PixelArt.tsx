@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from '
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassToolbar } from '../../styles/glassMenu';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'replace' | 'line' | 'rect' | 'eyedropper';
 type GridSize = 8 | 16 | 32 | 64;
@@ -199,7 +200,7 @@ const PixelArt: React.FC = () => {
   // Persist
   useEffect(() => {
     const state: PersistedState = { size, frames, currentFrame, color, tool, mirror, onion, fps, exportScale, tilePreview, paletteLock, lockedPalette };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+    try { persistOrWarn(STORAGE_KEY, JSON.stringify(state), 'your Pixel Art'); } catch { /* serialisation failed */ }
   }, [size, frames, currentFrame, color, tool, mirror, onion, fps, exportScale, tilePreview, paletteLock, lockedPalette]);
 
   const frame = frames[currentFrame] ?? frames[0];
