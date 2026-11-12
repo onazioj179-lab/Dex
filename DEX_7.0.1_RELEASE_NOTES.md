@@ -14,7 +14,8 @@
 | 18c | Presentation: put pictures from your PC on slides (downscaled to fit), Save Deck / Open Deck as a .dexdeck file, and a clear warning if the deck can't be saved; VINX: a clear warning when the project can't be saved (it used to fail silently), with the native copy still written |
 | 18f | Browser downloads work: files save to your Downloads folder (never overwriting an existing file), and a failed download says why instead of spinning forever |
 | 18g | Your work is no longer lost silently when app storage is full: DexCode, Kanban, Markdown Editor, PDF annotations, Pixel Art, Imosion markers and regions, AXL design tokens, Collab Hub rooms and Spaces now warn once; DexCode shows "Not saved" instead of falsely saying Saved |
-| 18h | Prism: Open Project reopens the .prism.json files Save makes (they couldn't be opened before); Imosion: a full app store no longer makes Save silently do nothing, you get a warning and the native copy is still written; Canvas: a board that can't be saved now says so |
+| 18i | Rewind no longer hits an error when opened on a fresh install (plugin, profile and audit lists that come back empty); every one of the 56 apps now opens without an error in a built DEX |
+| 18l | Prism: Open Project reopens the .prism.json files Save makes (they couldn't be opened before); Imosion: a full app store no longer makes Save silently do nothing, you get a warning and the native copy is still written; Canvas: a board that can't be saved now says so |
 
 ## New
 
