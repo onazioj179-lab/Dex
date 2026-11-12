@@ -70,6 +70,9 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
     let (a3, o3, t3) = (app.clone(), owner.clone(), tab.clone());
     let builder = tauri::webview::WebviewBuilder::new(&label, tauri::WebviewUrl::External(url))
         .user_agent(USER_AGENT)
+        // Let web pages use HTML5 drag and drop (uploads by dropping a file,
+        // sortable lists); Tauri's own drop handler swallows it on Windows.
+        .disable_drag_drop_handler()
         .on_page_load(move |_wv, payload| {
             let state = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",

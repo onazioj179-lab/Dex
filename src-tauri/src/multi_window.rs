@@ -95,7 +95,10 @@ fn detach(app: &tauri::AppHandle, app_id: &str) -> Value {
     let url = WebviewUrl::App(format!("index.html?detached={}", app_id).into());
     let mut builder = WebviewWindowBuilder::new(app, &label, url)
         .title(format!("DEX — {}", app_id))
-        .min_inner_size(360.0, 280.0);
+        .min_inner_size(360.0, 280.0)
+        // Tauri's own file-drop handler swallows HTML5 drag and drop on Windows
+        // (files dropped on apps, in-page drags). DEX uses only HTML5 drops.
+        .disable_drag_drop_handler();
 
     // Restore saved bounds if present, else a sensible default size.
     let saved = crate::kv_get(app, &bounds_key(app_id));
