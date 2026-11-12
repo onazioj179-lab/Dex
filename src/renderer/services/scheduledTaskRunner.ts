@@ -66,6 +66,29 @@ class ScheduledTaskRunner {
         detail = res;
         ledger.logTaskStep(ledgerId, res.slice(0, 140));
         if (ACTION_FAILURE.test(res)) { outcome = 'error'; }
+      } else if (task.action.type === 'uki-prompt') {
+        const prompt = (task.action.prompt || '').trim();
+        if (!prompt) throw new Error('no prompt to run');
+        ledger.logTaskStep(ledgerId, `Asking UKI: ${prompt.slice(0, 100)}`);
+        // Lazy: the agent loop is only loaded when a prompt task actually fires.
+        const [{ runUkiAgent }, { buildSystemPrompt }] = await Promise.all([
+          import('../uki/agentRunner'),
+          import('../uki/identity'),
+        ]);
+        const answer = await runUkiAgent({
+          userText: `${prompt}
+
+(This is a scheduled task "${task.title}" running in the background; the user is not watching. Answer briefly.)`,
+          systemPrompt: buildSystemPrompt(),
+          pushStep: (st) => ledger.logTaskStep(ledgerId, st.slice(0, 140)),
+        });
+        if (!answer) {
+          outcome = 'error';
+          detail = 'No AI provider answered (add a provider key in UKI settings).';
+        } else {
+          detail = answer;
+          await notify({ title: task.title, body: answer.slice(0, 400), source: 'UKI' });
+        }
       } else {
         outcome = 'error';
         detail = `unknown action type`;

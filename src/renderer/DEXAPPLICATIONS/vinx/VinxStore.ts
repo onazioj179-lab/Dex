@@ -10,6 +10,7 @@
  * Timeline positions are always integer frame numbers.
  */
 
+import type { Lut3D } from './lut3d';
 import { create } from 'zustand';
 import { readStoredProject, writeStoredProject, pickNewer, isProjectLike } from './vinxPersistence';
 import type {
@@ -65,11 +66,11 @@ interface VinxState {
   viewerOverlay: ViewerOverlay;
   renderQuality: RenderQuality;
   sourceViewerFrame: number;
-  /** Active program-monitor LUT (CSS-filter approximation). Store-driven so it
-   *  survives re-renders and is baked into Quick Export via ctx.filter —
-   *  previously the LUT browser wrote element.style directly (ephemeral,
-   *  never exported). null = no LUT. */
-  programLUT: { name: string; cssFilter: string } | null;
+  /** Active program-monitor LUT. Built-in looks are CSS-filter
+   *  approximations; a loaded `.cube` (`cube`) is a real 3D LUT applied on the
+   *  GPU in the viewer and baked into Quick Export. `intensity` 0..1 (cube
+   *  only). Store-driven so it survives re-renders. null = no LUT. */
+  programLUT: { name: string; cssFilter: string; cube?: Lut3D; intensity?: number } | null;
 
   // UI
   mediaBrowserTab: 'media' | 'effects' | 'transitions' | 'titles' | 'audio';
@@ -216,7 +217,8 @@ interface VinxState {
   setViewerOverlay: (overlay: ViewerOverlay) => void;
   setRenderQuality: (quality: RenderQuality) => void;
   setSourceViewerFrame: (frame: number) => void;
-  setProgramLUT: (lut: { name: string; cssFilter: string } | null) => void;
+  setProgramLUT: (lut: { name: string; cssFilter: string; cube?: Lut3D; intensity?: number } | null) => void;
+  setProgramLUTIntensity: (intensity: number) => void;
   setMulticamAngle: (multicamId: string, angleIndex: number) => void;
 
   // UI
@@ -724,6 +726,9 @@ export const useVinxStore = create<VinxState>((set, get) => {
     setTool: (tool) => set({ activeTool: tool }),
     toggleSnap: () => set(s => ({ snapEnabled: !s.snapEnabled })),
     setProgramLUT: (lut) => set({ programLUT: lut }),
+    setProgramLUTIntensity: (intensity) => set(s => (s.programLUT
+      ? { programLUT: { ...s.programLUT, intensity: Math.min(1, Math.max(0, intensity)) } }
+      : {})),
 
     // Multicam active-angle setter (store action so the switch goes through
     // one place and can be wrapped in an undo command — the panel used to call
