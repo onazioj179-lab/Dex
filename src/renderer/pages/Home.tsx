@@ -220,8 +220,8 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
         alignItems: 'center',
         justifyContent: 'center',
         color: '#fff',
-        background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
-        boxShadow: png ? 'none' : '0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
+        background: png ? 'transparent' : def.color,
+        boxShadow: png ? 'none' : '0 1px 2px rgba(0,0,0,0.3)',
         overflow: 'hidden',
       }}>
         {png
@@ -311,8 +311,8 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   <span style={{
                     width: 40, height: 40, borderRadius: 10,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
-                    boxShadow: png ? 'none' : '0 3px 10px rgba(0,0,0,0.28)',
+                    background: png ? 'transparent' : def.color,
+                    boxShadow: png ? 'none' : '0 1px 2px rgba(0,0,0,0.3)',
                     color: '#fff', overflow: 'hidden',
                   }}>
                     {png

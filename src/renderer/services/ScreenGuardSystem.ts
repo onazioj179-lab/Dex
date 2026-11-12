@@ -452,7 +452,7 @@ class AppStartupOptimizer {
           width: 80px;
           height: 80px;
           border-radius: 14px;
-          background: linear-gradient(135deg, #0a84ff, #5856d6);
+          background: var(--color-accent, #0a84ff);
           animation: dex-splash-pulse 1.5s ease-in-out infinite;
         }
         .dex-splash-text {

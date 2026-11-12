@@ -7211,7 +7211,7 @@ const Imosion: React.FC = () => {
                     role="button" tabIndex={0} aria-label={`Change color for ${track.name}`}
                     onClick={(e) => { e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); }} 
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); } }}
-                    style={{ width: '28px', height: '28px', borderRadius: '50%', background: `linear-gradient(135deg, ${track.color}40, ${track.color}20)`, cursor: 'pointer', border: `1.5px solid ${track.color}60`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isSelected ? `0 0 8px ${track.color}30` : 'none' }} 
+                    style={{ width: '28px', height: '28px', borderRadius: '50%', background: `${track.color}33`, cursor: 'pointer', border: `1.5px solid ${track.color}60`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isSelected ? `0 0 8px ${track.color}30` : 'none' }} 
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={track.color} strokeWidth="2" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     {colorPickerTrackId === track.id && (
@@ -10150,7 +10150,7 @@ const Imosion: React.FC = () => {
                 <button aria-label="Reset All" onClick={() => updateClip(editingClip.trackId, editingClip.clip.id, { ...DEFAULT_CLIP_PROPS, gain: 1 })} style={{ padding: 'var(--space-2) 14px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Reset All</button>
                 <button aria-label="Open clip in Forge editor" onClick={() => { openForge(editingClip.trackId, editingClip.clip); setShowClipEditor(false); }} style={{ padding: 'var(--space-2) 14px', background: 'rgba(160, 90, 104,0.1)', border: '1px solid rgba(160, 90, 104,0.2)', borderRadius: '4px', color: '#a05a68', cursor: 'pointer', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>{Icon.audio} Open in Forge</button>
                 <div style={{ flex: 1 }} />
-                <button aria-label="Done" onClick={() => setShowClipEditor(false)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'linear-gradient(135deg, #0a84ff, #0a84ff)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Done</button>
+                <button aria-label="Done" onClick={() => setShowClipEditor(false)} style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--color-accent, #0a84ff)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Done</button>
               </div>
             </div>
           </div>
@@ -10392,7 +10392,7 @@ const Imosion: React.FC = () => {
                       <button aria-label="Create collaboration session" onClick={() => {
                         const input = document.getElementById('collab-session-name') as HTMLInputElement;
                         if (input?.value) createCollabSession(input.value);
-                      }} style={{ padding: '10px var(--space-4)', background: 'linear-gradient(135deg, #0a84ff, #0a84ff)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>{Icon.plus} Create</button>
+                      }} style={{ padding: '10px var(--space-4)', background: 'var(--color-accent, #0a84ff)', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>{Icon.plus} Create</button>
                     </div>
                   </div>
 

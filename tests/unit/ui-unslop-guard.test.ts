@@ -60,4 +60,16 @@ describe('UI unslop guards', () => {
       expect(read(f), f).not.toMatch(/linear-gradient\(135deg,[^)]*(#5e5ce6|#bf5af2|#8B5CF6|#5856d6|#7d7aff)/i);
     }
   });
+
+  it('pass 2: chrome fills are flat (icon fallbacks, splash, buttons, tints, offline clip)', () => {
+    // Wallpapers and LUT/filter thumbnails are content and may keep gradients.
+    for (const f of [
+      'pages/Home.tsx', 'pages/Settings.tsx', 'services/ScreenGuardSystem.ts', 'components/ShareDialog.tsx',
+      'DEXAPPLICATIONS/imosion/Imosion.tsx', 'DEXAPPLICATIONS/prism/Prism.tsx', 'DEXAPPLICATIONS/vinx/Viewer.tsx',
+    ]) {
+      // keyframe steps (`0% { background: … }`) are the live wallpapers
+      const src = read(f).replace(/^\s*\d+% \{ background:.*$/gm, '');
+      expect(src, f).not.toMatch(/linear-gradient\(135deg/);
+    }
+  });
 });

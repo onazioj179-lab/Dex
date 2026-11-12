@@ -199,17 +199,18 @@ const VideoLayer: React.FC<{
                 }}>{clip.titleData.text}</span>
               </div>
             )}
-            {/* Clip placeholder — gradient scene when no media loaded */}
+            {/* Clip placeholder when no media is loaded: flat, says what is missing */}
             {clip.type === 'video' && !src && isVisible && (
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `linear-gradient(135deg, ${clip.color || '#1a1a2e'} 0%, #16213e 50%, #0f3460 100%)`,
+                background: '#141416', boxShadow: `inset 0 0 0 1px ${clip.color || '#2a2a2e'}`,
                 opacity: clip.opacity * transitionOpacity,
                 transform: `translate(${clip.transform.positionX}px, ${clip.transform.positionY}px) scale(${clip.transform.scaleX}, ${clip.transform.scaleY}) rotate(${clip.transform.rotation}deg)`,
                 filter: combinedFilter, pointerEvents: 'none',
               }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em' }}>{clip.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{clip.name}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Media not loaded</div>
                 </div>
               </div>
             )}

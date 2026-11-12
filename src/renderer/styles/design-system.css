@@ -6711,24 +6711,6 @@ html, body {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ----- App-specific accent gradients ----- */
-.vinx-accent-gradient { 
-  background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); 
-}
-.imosion-accent-gradient { 
-  background: linear-gradient(135deg, #22D3EE 0%, #67E8F9 100%); 
-}
-.prism-accent-gradient { 
-  background: linear-gradient(135deg, #F472B6 0%, #F9A8D4 100%); 
-}
-.flux-accent-gradient { 
-  background: linear-gradient(135deg, #FB923C 0%, #FDBA74 100%); 
-}
-.forge-accent-gradient { 
-  background: linear-gradient(135deg, #4ADE80 0%, #86EFAC 100%); 
-}
-.axl-accent-gradient { 
-  background: linear-gradient(135deg, #60A5FA 0%, #93C5FD 100%); 
-}
 
 /* ----- VINX Video Editor ----- */
 .vinx-timeline-container {
@@ -6749,21 +6731,6 @@ html, body {
 .vinx-track.selected {
   background: rgba(139, 92, 246, 0.18);
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.4);
-}
-
-.vinx-clip {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.5);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  position: relative;
-}
-
-.vinx-clip::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, transparent 20%, transparent 80%, rgba(255,255,255,0.1) 100%);
 }
 
 .vinx-playhead {
