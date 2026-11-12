@@ -3595,3 +3595,11 @@ These need DSP/ML or native hosting we don't fake.
 ## Checkpoint 2026-11-11 (Presentation save, recovery, undo)
 
 - Presentation: debounced autosave with a visible failure state, recovery of an unreadable stored deck, undo/redo, deck files (#151).
+
+## Checkpoint 2026-11-12 (backlog cleanup, eval ratchet, unslop pass 2, AXL save pass)
+
+- Backlog cleared of finished work: `DEX_REMAINING_WORK.md` now lists only rows with work left (43) plus a compact table of finished rows waiting on a packaged-app, hardware, provider-key or owner check (49). 154 completed rows moved to `docs/reports/DEX_COMPLETED_WORK.md` with their numbers unchanged.
+- Security: the unused `shared/motion3d` evaluators (same string-splitting hole FLUX had, #161) deleted; `dynamic-code-ratchet.test.ts` lists every `new Function`/`eval` site with its reason (#165). Orphans `DEXAPPLICATIONS/index.ts` and `MarkdownEditor.tsx` deleted.
+- UI unslop pass 2: decorative 135° gradients flattened (Home icon fallbacks, splash, Imosion, Settings, Share, PRISM swatches, VINX offline clip); 19 dead gradient CSS rules and the unused `DEX_THEME` removed (#166). Left: header heights, Control Center.
+- AXL: true save status, a full store no longer throws inside edits, checked Open Project, New/Open keep the old project as a checkpoint, drop/import use the real mesh importer, export failures shown (#167).
+- Next: Imosion/Canvas save indicators and Forge (#77), `{success:false}` sweep on non-file channels (#61), test-only orphan pruning (#53), packaged runs listed at the end of the backlog.

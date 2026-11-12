@@ -225,7 +225,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 'var(--space-3)',
     padding: 'var(--space-3) 14px',
-    background: 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))',
+    background: 'rgba(255,159,10,0.08)',
     border: '1px solid rgba(255,159,10,0.2)',
     borderRadius: radius.xl,
     marginBottom: 'var(--space-2)',

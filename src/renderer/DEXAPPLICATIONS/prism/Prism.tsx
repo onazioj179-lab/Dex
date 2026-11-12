@@ -3687,7 +3687,7 @@ const Prism: React.FC = () => {
                   { name: 'Sepia', id: 'sepia' as FilterName, color: '#a16207' },
                 ]).map(filter => (
                   <button key={filter.id} onClick={() => setActiveFilter(activeFilter === filter.id ? null : filter.id)} aria-label={`${filter.name} filter`} style={{ ...styles.btn, flexDirection: 'column', padding: 'var(--space-3) var(--space-2)', border: activeFilter === filter.id ? '1px solid var(--dex-focus-color, #fff)' : undefined }}>
-                    <div style={{ width: '40px', height: '40px', background: `linear-gradient(135deg, ${filter.color}, ${filter.color}88)`, borderRadius: '4px', marginBottom: '4px' }} />
+                    <div style={{ width: '40px', height: '40px', background: filter.color, borderRadius: '4px', marginBottom: '4px' }} />
                     <span style={{ fontSize: '11px' }}>{filter.name}</span>
                   </button>
                 ))}

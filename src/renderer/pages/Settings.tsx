@@ -4078,7 +4078,7 @@ export const Settings: React.FC = () => {
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
-                  background: `linear-gradient(135deg, ${app.color}44, ${app.color}22)`,
+                  background: `${app.color}33`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 700, color: app.color,
                 }}>
@@ -4105,7 +4105,7 @@ export const Settings: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
                 width: 48, height: 48, borderRadius: 10,
-                background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
+                background: `${detail.color}33`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
               }}>

@@ -18,7 +18,8 @@ import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/cr
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave } from '../../utils/useAutoSave';
+import AutosaveIndicator from '../../components/AutosaveIndicator';
+import { useConfirm } from '../../components/ConfirmDialog';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
@@ -87,6 +88,7 @@ const FeatureExprInput: React.FC<{
 import { primitiveMassProperties, type PrimitiveKind, type PrimitiveDims } from './axlMassProperties';
 import { detectInterferences } from './AxlInspect';
 import { importCadFile } from './AxlImport';
+import { useAxlSaveStatus, parseAxlProject } from './axlPersistence';
 import type { InterferencePair, NamedView } from './types';
 import { exportProject as doExport } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
@@ -111,8 +113,11 @@ export const AXL_BUILD_DATE = '2026-04-11';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const AXL: React.FC = () => {
-  const [isDirty, setIsDirty] = useState(false);
-  useUnsavedGuard(isDirty);
+  // The project is written to app storage on every change (projectStore +
+  // axlPersistence). Leaving warns only while that write is failing.
+  const saveStatus = useAxlSaveStatus();
+  useUnsavedGuard(!saveStatus.ok);
+  const { confirm, ConfirmHost } = useConfirm();
   const collab = useCollaborationFeatures({ appId: 'axl', projectName: 'AXL Project', autoCheckpointInterval: 300000 });
   // Track app usage
   useAppTracking('axl');
@@ -126,7 +131,6 @@ const AXL: React.FC = () => {
 
   // ─── Stores ───────────────────────────────────────────────────────────
   const project = useProjectStore(s => s.project);
-  useAutoSave('axl', useCallback(() => ({ project }), [project]), isDirty, 30_000);
   const simResults = useProjectStore(s => s.simResults);
   const pStore = useProjectStore();
   // Saved versions of the project (listed and restored from Collab Hub).
@@ -135,9 +139,9 @@ const AXL: React.FC = () => {
     appName: 'AXL',
     getSnapshot: () => JSON.stringify(useProjectStore.getState().project),
     onRestore: (data) => {
-      const restored = JSON.parse(data);
-      if (!restored || typeof restored !== 'object' || !restored.assembly) throw new Error('not an AXL project');
-      useProjectStore.getState().loadProject(restored);
+      const parsed = parseAxlProject(data);
+      if (!parsed.ok) throw new Error(parsed.reason);
+      useProjectStore.getState().loadProject(parsed.project);
     },
   });
   const { tool, selectedPartId, hoveredPartId, gridVisible, snapEnabled } = useViewportStore();
@@ -558,7 +562,10 @@ const AXL: React.FC = () => {
 
   // ─── Export ───────────────────────────────────────────────────────────
   const handleExport = useCallback((format: 'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf') => {
-    doExport(project, format, canvasRef.current);
+    let msg: string | undefined;
+    try { msg = doExport(project, format, canvasRef.current) ?? undefined; }
+    catch (err) { ui.showToast(`Export failed: ${err instanceof Error ? err.message : String(err)}`); return; }
+    if (msg === 'Canvas not available') { ui.showToast('Export failed: the 3D view is not ready yet.'); return; }
     ui.showToast(`Exported as ${format.toUpperCase()}`);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'axlExports', amount: 1 } }));
   }, [project, ui]);
@@ -643,6 +650,41 @@ const AXL: React.FC = () => {
   }, [pStore, vStore, ui]);
 
   const triggerImport = useCallback(() => importInputRef.current?.click(), []);
+
+  // ─── Replacing the open project ───────────────────────────────────────
+  // The open project exists only in app storage, so New and Open keep it as a
+  // Collab Hub checkpoint first. If that fails (storage full), ask.
+  const checkpointSaveNow = checkpoints.saveNow;
+  const keepCurrentProject = useCallback(async (what: string): Promise<{ go: boolean; kept: boolean }> => {
+    const res = checkpointSaveNow(`Before ${what}`);
+    if (res.ok) return { go: true, kept: true };
+    const go = await confirm({
+      title: 'Replace the current project?',
+      message: `It could not be kept as a checkpoint (${res.error}). Export it first (Ctrl+E) if you want to keep it.`,
+      confirmLabel: 'Replace it',
+      tone: 'destructive',
+    });
+    return { go, kept: false };
+  }, [checkpointSaveNow, confirm]);
+
+  const openProjectFile = useCallback(async (file: File) => {
+    let text: string;
+    try { text = await file.text(); } catch { ui.showToast(`Could not read ${file.name}`); return; }
+    const parsed = parseAxlProject(text);
+    if (!parsed.ok) { ui.showToast(`${file.name}: ${parsed.reason}`); return; }
+    const keep = await keepCurrentProject('opening another project');
+    if (!keep.go) return;
+    pStore.loadProject(parsed.project);
+    vStore.setSelectedPartId(null);
+    ui.showToast([`Opened ${parsed.project.name}.`, ...parsed.notes, keep.kept ? 'The previous project is in Collab Hub checkpoints.' : ''].filter(Boolean).join(' '));
+  }, [keepCurrentProject, pStore, vStore, ui]);
+
+  const pickProjectFile = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json,.axl';
+    input.onchange = () => { const file = input.files?.[0]; if (file) void openProjectFile(file); };
+    input.click();
+  }, [openProjectFile]);
 
   // ─── UKI-driven AXL ───────────────────────────────────────────────────
   // The natural-language command bar (CreativeCommandBar) routes recognised
@@ -1652,15 +1694,19 @@ const AXL: React.FC = () => {
         }
         if (k === 'e') {                                                        // Ctrl+E  quick export JSON
           e.preventDefault();
-          doExport(project, 'json');
+          doExport(useProjectStore.getState().project, 'json');
           ui.showToast('Exported project as JSON');
           return;
         }
         if (k === 'n') {                                                        // Ctrl+N  new project (reset)
           e.preventDefault();
-          pStore.newProject();
-          vStore.setSelectedPartId(null);
-          ui.showToast('New project started');
+          void (async () => {
+            const keep = await keepCurrentProject('starting a new project');
+            if (!keep.go) return;
+            pStore.newProject();
+            vStore.setSelectedPartId(null);
+            ui.showToast(keep.kept ? 'New project started. The previous one is in Collab Hub checkpoints.' : 'New project started');
+          })();
           return;
         }
         return; // consume unknown Ctrl combos gracefully
@@ -1688,7 +1734,7 @@ const AXL: React.FC = () => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [applyStandardView, pStore, vStore, ui, selectedPartId, project.assembly.parts]);
+  }, [applyStandardView, pStore, vStore, ui, selectedPartId, project.assembly.parts, keepCurrentProject]);
 
   // ─── Styles ───────────────────────────────────────────────────────────
   const toolBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -1728,6 +1774,7 @@ const AXL: React.FC = () => {
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
       `}</style>
 
+      <ConfirmHost />
       {/* Hidden file input driving OBJ/STL/STEP import */}
       <input ref={importInputRef} type="file" accept=".obj,.stl,.step,.stp" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ''; }} />
@@ -1742,6 +1789,13 @@ const AXL: React.FC = () => {
           onAddFeature={addFeatureToSelected}
           sendToMenu={
             <>
+              <span title={saveStatus.ok ? 'AXL keeps the project in app storage on every change' : saveStatus.error}>
+                <AutosaveIndicator
+                  state={saveStatus.ok ? (saveStatus.savedAt ? 'saved' : 'idle') : 'error'}
+                  lastSavedAt={saveStatus.savedAt}
+                  label={saveStatus.ok ? (saveStatus.savedAt ? undefined : 'Up to date') : 'Not saved'}
+                />
+              </span>
               <SendToMenu sourceApp="axl" assetKind="model" getAsset={() => ({ name: `${project.name}.axl`, data: JSON.stringify(project), mimeType: 'application/json' })} />
               {collab.canShare && (
                 <button onClick={collab.openShareDialog} aria-label="Share project" style={collabButtonStyles}>
@@ -1779,42 +1833,10 @@ const AXL: React.FC = () => {
             // Handle file drops (STL, JSON from filesystem)
             if (e.dataTransfer.files.length > 0) {
               const file = e.dataTransfer.files[0];
-              if (file.name.toLowerCase().endsWith('.json')) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  try {
-                    const data = JSON.parse(reader.result as string);
-                    if (data.name && data.assembly) { pStore.loadProject(data); vStore.setSelectedPartId(null); ui.showToast('Project loaded'); }
-                    else { ui.showToast('Invalid AXL project file'); }
-                  } catch { ui.showToast('Failed to parse project file'); }
-                };
-                reader.readAsText(file);
-              } else if (file.name.toLowerCase().endsWith('.stl')) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  try {
-                    const text = reader.result as string;
-                    const vertexRe = /vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g;
-                    let match: RegExpExecArray | null;
-                    let minX = Infinity, minY = Infinity, minZ = Infinity;
-                    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                    let count = 0;
-                    while ((match = vertexRe.exec(text)) !== null) {
-                      const x = parseFloat(match[1]), y = parseFloat(match[2]), z = parseFloat(match[3]);
-                      if (x < minX) minX = x; if (x > maxX) maxX = x;
-                      if (y < minY) minY = y; if (y > maxY) maxY = y;
-                      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-                      count++;
-                    }
-                    if (count === 0) { ui.showToast('No vertices found in STL'); return; }
-                    const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY), d = Math.max(1, maxZ - minZ);
-                    const partName = file.name.replace(/\.stl$/i, '');
-                    pStore.addPrimitive('box', { width: w, height: h, depth: d }, partName);
-                    ui.showToast(`STL dropped: ${partName} (${(count / 3).toFixed(0)} faces)`);
-                  } catch { ui.showToast('Failed to import STL'); }
-                };
-                reader.readAsText(file);
-              }
+              const lower = file.name.toLowerCase();
+              if (lower.endsWith('.json') || lower.endsWith('.axl')) void openProjectFile(file);
+              else if (/\.(stl|obj|step|stp)$/.test(lower)) void handleImportFile(file);
+              else ui.showToast(`AXL can't open ${file.name}. Drop a project (.json) or a mesh (.stl, .obj, .step).`);
               return;
             }
             const partData = e.dataTransfer.getData('application/x-axl-part');
@@ -2583,57 +2605,8 @@ const AXL: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>PROJECT</div>
-                <button onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file'; input.accept = '.json';
-                  input.onchange = () => {
-                    const file = input.files?.[0]; if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      try {
-                        const data = JSON.parse(reader.result as string);
-                        if (data.name && data.assembly) { pStore.loadProject(data); vStore.setSelectedPartId(null); ui.showToast('Project loaded'); }
-                        else { ui.showToast('Invalid project file'); }
-                      } catch { ui.showToast('Failed to parse project file'); }
-                    };
-                    reader.readAsText(file);
-                  };
-                  input.click();
-                }} style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 10, cursor: 'pointer', textAlign: 'left', marginBottom: 6 }}>Import Project (JSON)</button>
-                <button onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file'; input.accept = '.stl';
-                  input.onchange = () => {
-                    const file = input.files?.[0]; if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      try {
-                        const text = reader.result as string;
-                        // Parse ASCII STL: collect all vertex lines
-                        const vertexRe = /vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g;
-                        let match: RegExpExecArray | null;
-                        let minX = Infinity, minY = Infinity, minZ = Infinity;
-                        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                        let count = 0;
-                        while ((match = vertexRe.exec(text)) !== null) {
-                          const x = parseFloat(match[1]), y = parseFloat(match[2]), z = parseFloat(match[3]);
-                          if (x < minX) minX = x; if (x > maxX) maxX = x;
-                          if (y < minY) minY = y; if (y > maxY) maxY = y;
-                          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-                          count++;
-                        }
-                        if (count === 0) { ui.showToast('No vertices found in STL'); return; }
-                        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
-                        const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY), d = Math.max(1, maxZ - minZ);
-                        const partName = file.name.replace(/\.stl$/i, '');
-                        pStore.addPrimitive('box', { width: w, height: h, depth: d }, partName);
-                        ui.showToast(`STL imported: ${partName} (${count / 3} faces, ${w.toFixed(1)}×${h.toFixed(1)}×${d.toFixed(1)}${project.units})`);
-                      } catch (err) { ui.showToast('Failed to import STL file'); }
-                    };
-                    reader.readAsText(file);
-                  };
-                  input.click();
-                }} style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 10, cursor: 'pointer', textAlign: 'left' }}>Import Part (STL)</button>
+                <button onClick={pickProjectFile} style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 10, cursor: 'pointer', textAlign: 'left', marginBottom: 6 }}>Open Project (JSON)</button>
+                <button onClick={triggerImport} style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 10, cursor: 'pointer', textAlign: 'left' }}>Import Part (STL, OBJ, STEP)</button>
               </div>
             </div>
           </div>
