@@ -153,14 +153,16 @@ export const CORE_TOOLS: ToolSpec[] = [
   },
   {
     name: 'schedule_task',
-    argline: '{"title": string, "when": string, "message"?: string, "prompt"?: string}',
+    argline: '{"title": string, "when": string, "message"?: string, "prompt"?: string, "action"?: string, "args"?: string}',
     description:
-      'set a reminder or a background job that runs later or on repeat (asks the user first). "when" is plain English: "in 20 minutes", "tomorrow at 9am", "every 2 hours", "weekdays at 08:30", "every monday at 9", or a 5-field cron. With "prompt", UKI runs that request when it fires and notifies the answer; otherwise the user gets a notification with "message".',
+      'set a reminder or a background job that runs later or on repeat (asks the user first). "when" is plain English: "in 20 minutes", "tomorrow at 9am", "every 2 hours", "weekdays at 08:30", "every monday at 9", or a 5-field cron. With "prompt", UKI runs that request when it fires and notifies the answer. With "action" (an app tool id such as notes.createNote) and "args" (its arguments as a JSON object string), that app action runs at the time, opening the app if needed; the user approves it now so it can run while they are away. Otherwise the user gets a notification with "message".',
     args: [
       { name: 'title', type: 'string' },
       { name: 'when', type: 'string' },
       { name: 'message', type: 'string', optional: true },
       { name: 'prompt', type: 'string', optional: true },
+      { name: 'action', type: 'string', optional: true },
+      { name: 'args', type: 'string', optional: true },
     ],
     example: '{"title": "Stretch", "when": "every 1 hour", "message": "Stand up and stretch"}',
   },
@@ -302,4 +304,9 @@ export function createToolCatalog(extra: readonly ToolSpec[] = []): ToolCatalog 
     },
     prompt: () => renderToolCatalog(specs),
   };
+}
+
+/** Validate args against any arg schema (e.g. an app action's) — same rules as the core tools. */
+export function validateArgsAgainst(name: string, args: Record<string, unknown>, specs: ArgSpec[], example: string): ValidationResult {
+  return validateAgainstSpecs(name, args, specs, example);
 }
