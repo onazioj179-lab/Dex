@@ -437,6 +437,18 @@ export const Browser: React.FC = () => {
   const blockHostListRef = useRef<readonly string[]>(blockHostList);
   blockHostListRef.current = blockHostList;
   const pageEngine = useMemo(() => new AdblockEngine(blockHostList, shieldsOff), [blockHostList, shieldsOff]);
+  // Native network blocking: WebView2 checks every tab's requests against this
+  // list before they leave the machine (src-tauri/src/browser_block.rs). The
+  // page script below still runs as a second layer and for element hiding.
+  useEffect(() => {
+    const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    if (!dex?.invoke) return;
+    void dex.invoke('browserView:setBlocking', {
+      enabled: browserSettings.blockAds || browserSettings.blockTrackers,
+      hosts: blockHostList.filter((h) => !h.includes('/')),
+      shieldsOff,
+    }).catch(() => { /* older native build: page-script blocking still applies */ });
+  }, [blockHostList, shieldsOff, browserSettings.blockAds, browserSettings.blockTrackers]);
   const keychainSaveRef = useRef<ReturnType<typeof setTimeout>>();
   // Per-session unguessable sentinel for credential detection (prevents spoofing)
   const credsSentinelRef = useRef('__DEX_CREDS_' + Math.random().toString(36).slice(2, 10) + '__');
@@ -1270,6 +1282,8 @@ export const Browser: React.FC = () => {
       }
       adblockCountsRef.current.set(tabId, 0); // fresh page — reset the delta base
     });
+    // Requests WebView2 refused natively (before the page could see them).
+    on('native-blocked', () => setBlockedCount(c => c + 1));
     // Tally sub-resource blocks the injected script reports via a console marker.
     on('console-message', (e: any) => {
       const msg: string = e?.message ?? '';
