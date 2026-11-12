@@ -92,8 +92,8 @@
 > ad `<script>/<img>/<iframe>` as they insert — REAL sub-resource blocking. Reports blocks via a console
 > marker the host tallies into `blockedCount`. On by default (blockAds+blockTrackers default true). 26 unit
 > tests incl. a code-injection-breakout guard + behavioral eval; live-verified in WebView2 (all APIs present,
-> matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
-> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: Vinx 3D-LUT math; Forge
+> matcher correct, fetch override blocks ad + passes legit + restores). ✅ (2026-11-12) track-5: element hiding,
+> EasyList-style list import and per-site Shields (DEX_REMAINING_WORK #157). NEXT: native WebView2 request blocking. Other remaining: Vinx 3D-LUT math; Forge
 > WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
 >
 > **TRACK 6 — STORE APP LIFECYCLE ✅ (2026-07-02):** Install/remove/reinstall/reset is real (mandate:
