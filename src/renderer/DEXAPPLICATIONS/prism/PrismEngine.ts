@@ -530,7 +530,7 @@ export function drawPenPath(ctx: CanvasRenderingContext2D, path: PenPath, showHa
 
 function drawAnchorPoint(ctx: CanvasRenderingContext2D, pt: PenPoint, isFirst: boolean): void {
   ctx.save();
-  ctx.fillStyle = isFirst ? '#ec4899' : 'var(--color-text-primary)';
+  ctx.fillStyle = isFirst ? '#ec4899' : '#ffffff';
   ctx.strokeStyle = '#ec4899';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -941,7 +941,7 @@ export function drawTransformHandles(ctx: CanvasRenderingContext2D, bounds: { x:
   // Handle points
   const handles = getTransformHandles(bounds);
   handles.forEach(h => {
-    ctx.fillStyle = h.id === 'rotate' ? '#ec4899' : 'var(--color-text-primary)';
+    ctx.fillStyle = h.id === 'rotate' ? '#ec4899' : '#ffffff';
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1.5;
     if (h.id === 'rotate') {

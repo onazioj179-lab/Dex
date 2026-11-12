@@ -2502,7 +2502,7 @@ const Prism: React.FC = () => {
               ctx.shadowColor = s.color + Math.round(((s.opacity || 75) / 100) * 255).toString(16).padStart(2, '0');
               ctx.shadowBlur = s.size || 20;
               ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-              ctx.fillStyle = s.color || 'var(--color-text-primary)';
+              ctx.fillStyle = s.color || '#ffffff';
               ctx.fillRect(layer.x - 100, layer.y - 100, layer.width + 200, layer.height + 200);
               ctx.restore();
               ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
