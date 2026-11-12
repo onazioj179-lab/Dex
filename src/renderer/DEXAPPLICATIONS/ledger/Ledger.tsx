@@ -152,6 +152,7 @@ const LedgerApp: React.FC<{ status: LedgerStatus; confirm: LedgerCtx['confirm'];
   }, []);
 
   const openEditor = useCallback((r: EditorRequest) => setEditor(r), []);
+  const closeEditor = useCallback(() => setEditor(null), []);
   const openImport = useCallback((accountId?: number) => setImportFor(accountId ?? null), []);
 
   const ctx: LedgerCtx = useMemo(() => ({
@@ -166,11 +167,12 @@ const LedgerApp: React.FC<{ status: LedgerStatus; confirm: LedgerCtx['confirm'];
     accountFilter,
     categoryFilter,
     openEditor,
+    closeEditor,
     toast,
     confirm,
     openImport,
     today: todayLocal(),
-  }), [live, currency, digits, accountsQ.data, groupsQ.data, prefs.section, go, accountFilter, categoryFilter, openEditor, confirm, openImport]);
+  }), [live, currency, digits, accountsQ.data, groupsQ.data, prefs.section, go, accountFilter, categoryFilter, openEditor, closeEditor, confirm, openImport]);
 
   const runBackup = useCallback(async () => {
     try { const b = await ledger.backup(); toast(`Backup saved (${b.file})`, 'success'); } catch (e) { toast(errText(e), 'error'); }

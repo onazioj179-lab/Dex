@@ -11,6 +11,7 @@ import { sendToNotes } from '../../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { searchLines } from '../../../shared/search/textSearch';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 
 const STORAGE_KEY = 'dex-markdown-content';
 const FILE_KEY = 'dex-markdown-filename';
@@ -45,7 +46,7 @@ const MarkdownEditor: React.FC = () => {
   // Persist content + filename (debounced) so a reload keeps the document.
   useEffect(() => {
     const id = window.setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, content); } catch { /* ignore */ }
+      persistOrWarn(STORAGE_KEY, content, 'your Markdown document');
     }, 300);
     return () => window.clearTimeout(id);
   }, [content]);
