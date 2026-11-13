@@ -26,6 +26,7 @@ import { evenChopBounds, computeChopSegments } from './ImosionChop';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { saveBothCopies } from '../../utils/saveBothCopies';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS } from '../../utils/adaptiveCanvas';
@@ -3999,6 +4000,22 @@ const Imosion: React.FC = () => {
 
 
 
+  // One way to apply a stored project (local copy, native copy, checkpoint).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyImosionData = useCallback((d: any) => {
+    if (d.bpm) setBpm(d.bpm);
+    if (d.masterSettings) setMasterSettings(d.masterSettings);
+    if (d.sampleRate) setSampleRate(d.sampleRate);
+    if (d.bitDepth) setBitDepth(d.bitDepth);
+    if (d.tracks) setTracks(d.tracks);
+    if (d.buses) setBuses(d.buses);
+    if (d.installedPlugins) setInstalledPlugins(d.installedPlugins);
+    if (d.templates) setTemplates([...DEFAULT_TEMPLATES, ...d.templates.filter((t: RecordingTemplate) => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id))]);
+  }, []);
+  // Set when a Collab Hub checkpoint is restored at start, so the native copy
+  // (which arrives later, asynchronously) does not overwrite it.
+  const restoredCheckpointRef = useRef(false);
+
   // Load saved data (IPC first, localStorage fallback)
   useEffect(() => {
     const loadLocal = () => {
@@ -4006,14 +4023,7 @@ const Imosion: React.FC = () => {
       if (saved) {
         try {
           const d = JSON.parse(saved);
-          if (d.bpm) setBpm(d.bpm);
-          if (d.masterSettings) setMasterSettings(d.masterSettings);
-          if (d.sampleRate) setSampleRate(d.sampleRate);
-          if (d.bitDepth) setBitDepth(d.bitDepth);
-          if (d.tracks) setTracks(d.tracks);
-          if (d.buses) setBuses(d.buses);
-          if (d.installedPlugins) setInstalledPlugins(d.installedPlugins);
-          if (d.templates) setTemplates([...DEFAULT_TEMPLATES, ...d.templates.filter((t: RecordingTemplate) => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id))]);
+          applyImosionData(d);
         } catch (e) { console.warn('[Imosion] State load failed:', e); }
       }
     };
@@ -4021,16 +4031,9 @@ const Imosion: React.FC = () => {
     (async () => {
       try {
         const ipcData = await (window as any).dex?.invoke?.('capability:storage:get', 'imosion-data');
-        if (ipcData) {
+        if (ipcData && !restoredCheckpointRef.current) {
           const d = typeof ipcData === 'string' ? JSON.parse(ipcData) : ipcData;
-          if (d.bpm) setBpm(d.bpm);
-          if (d.masterSettings) setMasterSettings(d.masterSettings);
-          if (d.sampleRate) setSampleRate(d.sampleRate);
-          if (d.bitDepth) setBitDepth(d.bitDepth);
-          if (d.tracks) setTracks(d.tracks);
-          if (d.buses) setBuses(d.buses);
-          if (d.installedPlugins) setInstalledPlugins(d.installedPlugins);
-          if (d.templates) setTemplates([...DEFAULT_TEMPLATES, ...d.templates.filter((t: RecordingTemplate) => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id))]);
+          applyImosionData(d);
         }
       } catch (e) { console.warn('[Imosion] IPC data load failed, using localStorage:', e); }
     })();
@@ -4041,10 +4044,29 @@ const Imosion: React.FC = () => {
   const saveFailedRef = useRef(false);
   const saveSeqRef = useRef(0);
   const lastSavedJsonRef = useRef<string | null>(null);
+  const buildImosionJson = useCallback(() => {
+    const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
+    return JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
+  }, [bitDepth, bpm, buses, installedPlugins, masterSettings, sampleRate, templates, tracks]);
+
+  // Saved versions of the project on this device, listed and restored in
+  // Collab Hub (autosaved every 5 minutes when it changed, or by hand from
+  // File › Save Checkpoint). Backlog #58.
+  const checkpoints = useAppCheckpoints({
+    appId: 'imosion',
+    appName: 'Imosion',
+    getSnapshot: () => buildImosionJson(),
+    onRestore: (data) => {
+      const d = JSON.parse(data);
+      if (!d || typeof d !== 'object' || !Array.isArray(d.tracks)) throw new Error('not an Imosion project');
+      restoredCheckpointRef.current = true;
+      applyImosionData(d);
+    },
+  });
+
   const saveProjectData = useCallback((showToast = false) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
-    const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
+    const json = buildImosionJson();
     // Nothing changed since the last good save (re-renders, playback): no write.
     if (!showToast && json === lastSavedJsonRef.current) return;
     const seq = ++saveSeqRef.current;
@@ -4071,7 +4093,7 @@ const Imosion: React.FC = () => {
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));
       }
     });
-  }, [bitDepth, bpm, buses, installedPlugins, masterSettings, sampleRate, templates, tracks]);
+  }, [buildImosionJson]);
 
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -6946,6 +6968,7 @@ const Imosion: React.FC = () => {
               <div className="frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '180px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(360px, calc(100vh - 72px))', zIndex: 'var(--z-modal)', padding: '4px', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { applyTemplate(DEFAULT_TEMPLATES[3]); setShowFileMenu(false); }}>{Icon.plus} New Project</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { saveProjectData(true); setShowFileMenu(false); }}>{Icon.save} Save</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { const r = checkpoints.saveNow(); window.dispatchEvent(new CustomEvent('dex-toast', { detail: r.ok ? { type: 'success', message: 'Checkpoint saved. Find it in Collab Hub.' } : { type: 'error', message: r.error } })); setShowFileMenu(false); }}>{Icon.save} Save Checkpoint</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { setShowTemplates(true); setShowFileMenu(false); }}>{Icon.template} Templates</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { fileInputRef.current?.click(); setShowFileMenu(false); }}>{Icon.upload} Import Audio</div>
