@@ -1704,27 +1704,10 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         }
         "dexnotes:deleteFolder" => delete_folder(conn, &s(0)),
 
-        // === Attachments (filesystem-backed; degrade honestly) ===
-        // addAttachment copies a file from disk into the attachments dir,
-        // openAttachment shells out to the OS file handler — neither is pure DB
-        // work, so they are not ported. getAttachments/removeAttachment touch the
-        // DB but the TS removeAttachment also unlinks the on-disk file; to avoid a
-        // partial (DB-only) behavior that diverges from Electron, all four
-        // attachment write/open paths degrade honestly. getAttachments is a pure
-        // read and is ported faithfully.
+        // === Attachments ===
+        // add/remove/open touch files on disk and are routed to
+        // note_attachments.rs from main.rs before this dispatcher.
         "dexnotes:getAttachments" => query_attachments(conn, &s(0)),
-        "dexnotes:addAttachment" => json!({
-            "success": false,
-            "error": "attachment file copy not available in DB layer (not ported)"
-        }),
-        "dexnotes:removeAttachment" => json!({
-            "success": false,
-            "error": "attachment file removal not available in DB layer (not ported)"
-        }),
-        "dexnotes:openAttachment" => json!({
-            "success": false,
-            "error": "opening files in the OS shell not available in DB layer (not ported)"
-        }),
 
         // === Links ===
         "dexnotes:addLink" => add_link(conn, &s(0), &s(1), &s(2)),

@@ -52,6 +52,11 @@ export function unrestorableReason(item: RecycledItem): string | null {
   }
   const d = parseData(item);
   if (!d) return 'The saved copy is unreadable.';
+  // Rows moved here by an expiry rule (content_expiry.rs) keep only the item id,
+  // not a copy of the item, so there is nothing to put back.
+  if (d.source === 'content-expiry' || d.expired === true) {
+    return 'Removed by an expiry rule; DEX kept only its name, not a copy.';
+  }
   if (item.app === 'notes' && typeof d.id !== 'string') return 'The saved copy is incomplete.';
   return null;
 }
