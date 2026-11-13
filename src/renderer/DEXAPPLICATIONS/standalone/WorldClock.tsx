@@ -444,10 +444,10 @@ const WorldClock: React.FC = () => {
 
   return (
     <div style={s.container}>
-      {/* Scoped polish: hover lift, focus-visible rings, control reveal. */}
+      {/* Scoped polish: hover border, control reveal. Focus uses the one global ring. */}
       <style>{`
         .wc-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
-        .wc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+        .wc-card:hover { border-color: var(--color-border-strong) !important; }
         .wc-card .wc-icon-btn { opacity: 0; transition: opacity 0.15s ease; }
         .wc-card:hover .wc-icon-btn,
         .wc-card:focus-within .wc-icon-btn { opacity: 1; }
@@ -455,16 +455,8 @@ const WorldClock: React.FC = () => {
         .wc-icon-btn:hover { color: var(--color-text-primary); background: var(--color-bg-hover, rgba(255,255,255,0.08)); }
         .wc-result-row { transition: background 0.12s ease; }
         .wc-result-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; }
-        .wc-search:focus-visible,
-        .wc-icon-btn:focus-visible,
-        .wc-result-row:focus-visible,
-        .wc-card:focus-visible {
-          outline: 2px solid var(--color-accent, #0A84FF);
-          outline-offset: 2px;
-        }
         @media (prefers-reduced-motion: reduce) {
           .wc-card, .wc-card .wc-icon-btn, .wc-result-row { transition: none; }
-          .wc-card:hover { transform: none; }
         }
       `}</style>
       {/* Toolbar */}
@@ -750,7 +742,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   homeTag: {
     marginLeft: 6, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-    color: 'var(--color-accent)', verticalAlign: 'middle',
+    color: 'var(--color-text-tertiary)', verticalAlign: 'middle',
   },
   clockLabel: { fontSize: 14, fontWeight: 600, marginTop: 12 },
   clockOffset: { fontSize: 11, color: 'var(--color-text-secondary)' },
@@ -766,8 +758,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   workBadge: {
     fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
-    color: 'var(--color-accent)',
-    border: '1px solid var(--color-accent)',
+    color: 'var(--color-text-secondary)',
+    border: '1px solid var(--color-border)',
     borderRadius: 10, padding: '1px 5px',
   },
   emptyState: {

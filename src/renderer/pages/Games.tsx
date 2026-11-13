@@ -276,9 +276,7 @@ export default function Games(): React.ReactElement {
       ) : (
         <>
           <style>{`
-            .dex-game-card { cursor: pointer; border-radius: var(--radius-lg); transition: transform 0.16s ease; outline: none; }
-            .dex-game-card:hover { transform: translateY(-4px); }
-            .dex-game-card:focus-visible { box-shadow: 0 0 0 2px var(--color-accent, #0A84FF); border-radius: var(--radius-lg); }
+            .dex-game-card { cursor: pointer; border-radius: var(--radius-lg); }
             .dex-game-cover { position: relative; aspect-ratio: 16 / 10; border-radius: var(--radius-lg); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.10); }
             .dex-game-initial { font-size: 46px; font-weight: 800; color: rgba(255,255,255,0.22); letter-spacing: -0.02em; }
             .dex-game-badge { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 700; color: #fff; padding: 3px 7px; border-radius: 6px; letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }

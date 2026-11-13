@@ -592,7 +592,7 @@ export default function EnvManager(): React.ReactElement {
             const isRevealed = revealed.has(row.name);
             return (
               <li key={row.name} className="dex-liquid-glass" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 'var(--radius-lg)' }}>
-                <span style={{ width: 220, flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-accent)' }} className="truncate" title={row.name}>{row.name}</span>
+                <span style={{ width: 220, flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-primary)' }} className="truncate" title={row.name}>{row.name}</span>
                 {isSystem ? (
                   <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 12, opacity: 0.85 }} title={isRevealed ? row.value : undefined}>
                     {isRevealed ? row.value : '•'.repeat(Math.min(Math.max(row.value.length, 4), 24))}

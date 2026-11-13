@@ -1190,21 +1190,21 @@ const VinxEditor: React.FC = () => {
         /* === VINX - PROFESSIONAL NLE STYLES === */
         .vinx-app button { font-family: inherit; }
         .vinx-app button:active { transform: scale(0.97); }
-        .vinx-tb button:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; color: var(--color-accent) !important; }
-        .vinx-ctx-item:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
-        .vinx-ctx-item:active { background: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+        .vinx-tb button:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .vinx-ctx-item:hover { background: var(--color-bg-hover) !important; }
+        .vinx-ctx-item:active { background: var(--color-bg-active) !important; }
         .vinx-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         .vinx-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .vinx-app ::-webkit-scrollbar-track { background: transparent; }
         .vinx-app ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
         .vinx-app ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
         .vinx-dropdown-item { transition: background 0.12s ease; }
-        .vinx-dropdown-item:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
-        .vinx-dropdown-item:active { background: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+        .vinx-dropdown-item:hover { background: var(--color-bg-hover) !important; }
+        .vinx-dropdown-item:active { background: var(--color-bg-active) !important; }
         .vinx-app input, .vinx-app select { font-family: inherit; }
         .vinx-app input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
         .vinx-app input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; }
-        .vinx-app input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-soft, rgba(74,158,255,0.15)); border-radius: 2px; }
+        .vinx-app input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
         /* Responsive floating panel constraints */
         @media (max-width: 600px) {
           .vinx-app [style*="position: absolute"][style*="zIndex: 'var(--z-modal)'"],

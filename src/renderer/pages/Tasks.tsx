@@ -1241,12 +1241,7 @@ export const Tasks: React.FC = () => {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        /* Pointer focus stays clean; keyboard focus gets a clear ring (a11y, WCAG 2.4.7). */
-        .dex-tasks-root :focus-visible {
-          outline: 2px solid var(--color-accent, #0a84ff);
-          outline-offset: 2px;
-          border-radius: var(--radius-sm, 4px);
-        }
+        /* Pointer focus stays clean; keyboard focus uses the one global ring. */
         .dex-tasks-root input:focus:not(:focus-visible),
         .dex-tasks-root select:focus:not(:focus-visible),
         .dex-tasks-root textarea:focus:not(:focus-visible) { outline: none; }
@@ -1754,7 +1749,7 @@ export const Tasks: React.FC = () => {
                   }}>
                     {task.title}
                     {task.recurring && task.recurring !== 'none' && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--color-accent)', fontWeight: 500 }}>{task.recurring}</span>
+                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>{task.recurring}</span>
                     )}
                     {(() => {
                       const blockers = openBlockers(task);

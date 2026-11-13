@@ -276,14 +276,6 @@ const Weather: React.FC = () => {
     <div style={s.container}>
       <style>{`
         .dex-weather-forecast-row:hover { background: var(--color-bg-hover) !important; }
-        .dex-weather-forecast-row:focus-visible {
-          outline: 2px solid var(--color-accent); outline-offset: -2px;
-        }
-        .dex-weather-hourly-item { transition: transform 0.15s ease, background 0.15s ease; }
-        .dex-weather-hourly-item:hover {
-          transform: translateY(-2px);
-          background: var(--color-bg-hover) !important;
-        }
         .dex-weather-loc-btn { transition: background 0.15s ease, transform 0.1s ease; }
         .dex-weather-loc-btn:hover { background: var(--color-border) !important; }
         .dex-weather-loc-btn:active { transform: scale(0.94); }

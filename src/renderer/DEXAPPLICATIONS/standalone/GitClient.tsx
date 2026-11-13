@@ -413,7 +413,7 @@ export default function GitClient(): React.ReactElement {
       {/* Live operation indicator: while a git command runs, say WHICH one. The
           pulsing dot + accent text reads as active; clears the moment it ends. */}
       {busy && currentOp && (
-        <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>
+        <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)', animation: 'ukiPulse 0.9s ease-in-out infinite', flexShrink: 0 }} />
           {currentOp}…
         </div>
@@ -558,7 +558,7 @@ export default function GitClient(): React.ReactElement {
                           border: active ? '1px solid var(--color-accent)' : '1px solid transparent',
                         }}
                       >
-                        <code style={{ color: 'var(--color-accent)', fontSize: 11 }}>{c.shortHash}</code>
+                        <code style={{ color: 'var(--color-text-secondary)', fontSize: 11 }}>{c.shortHash}</code>
                         <span className="truncate" style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{c.subject}</span>
                         <span className="text-xs" style={{ opacity: 0.55, whiteSpace: 'nowrap' }}>{c.author} · {c.date}</span>
                       </li>
@@ -595,7 +595,7 @@ export default function GitClient(): React.ReactElement {
                   <div>
                     <dt className="text-xs" style={{ opacity: 0.55, marginBottom: 2 }}>Hash</dt>
                     <dd style={{ margin: 0 }}>
-                      <code style={{ fontSize: 11, color: 'var(--color-accent)', wordBreak: 'break-all' }}>{selectedCommit.hash}</code>
+                      <code style={{ fontSize: 11, color: 'var(--color-text-secondary)', wordBreak: 'break-all' }}>{selectedCommit.hash}</code>
                     </dd>
                   </div>
                   <div>

@@ -113,7 +113,7 @@ const PomodoroTimer: React.FC = () => {
         <>
           {/* Timer circle */}
           <div style={s.timerArea}>
-            <div style={{ ...s.circleWrap, ...(running ? { filter: `drop-shadow(0 0 28px ${accentColor}33)` } : {}) }}>
+            <div style={s.circleWrap}>
               <svg width="264" height="264" viewBox="0 0 264 264">
                 <defs>
                   <linearGradient id={ringGradId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -132,7 +132,7 @@ const PomodoroTimer: React.FC = () => {
                   {fmtTime(remainingSecs)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: accentColor, boxShadow: running ? `0 0 8px ${accentColor}` : 'none', transition: 'box-shadow 0.3s ease' }} />
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: accentColor, boxShadow: running ? `0 0 4px ${accentColor}` : 'none', transition: 'box-shadow 0.3s ease' }} />
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                     {idle ? 'Ready' : running ? PHASE_LABELS[phase] : 'Paused'}
                   </span>
@@ -308,13 +308,10 @@ const s: Record<string, React.CSSProperties> = {
 
 const POMO_CSS = `
 .pomo-tab:hover { background: var(--color-bg-surface); color: var(--color-text-primary); }
-.pomo-tab:focus-visible, .pomo-icon-btn:focus-visible, .pomo-primary-btn:focus-visible {
-  outline: 2px solid var(--color-accent); outline-offset: 2px;
-}
-.pomo-icon-btn:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); transform: translateY(-1px); }
-.pomo-icon-btn:active { transform: translateY(0) scale(0.95); }
-.pomo-primary-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
-.pomo-primary-btn:active { transform: translateY(0) scale(0.97); }
+.pomo-icon-btn:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); }
+.pomo-icon-btn:active { transform: scale(0.95); }
+.pomo-primary-btn:hover { filter: brightness(1.06); }
+.pomo-primary-btn:active { transform: scale(0.97); }
 `;
 
 PomodoroTimer.displayName = 'PomodoroTimer';

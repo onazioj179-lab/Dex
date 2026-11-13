@@ -414,7 +414,7 @@ export const ModifierStack: React.FC<ModifierStackProps> = ({
                       key={type}
                       style={styles.dropdownItem}
                       onClick={() => handleSelectType(type)}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-subtle)')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       <span style={{ width: 20 }}>{getModifierIcon(type)}</span>

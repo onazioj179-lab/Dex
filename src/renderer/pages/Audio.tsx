@@ -1551,7 +1551,7 @@ export const Audio: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Duration</span>
-                <span style={{ fontSize: 9, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{crossfadeDuration}s</span>
+                <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{crossfadeDuration}s</span>
               </div>
               <input type="range" min="0" max="12" value={crossfadeDuration} onChange={e => setCrossfadeDuration(Number(e.target.value))} aria-label="Crossfade duration in seconds" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 6 }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--color-text-tertiary)' }}>
@@ -1678,7 +1678,7 @@ export const Audio: React.FC = () => {
               >
                 {Icons.repeat}
                 {loopMode === 'one' && (
-                  <span style={{ position: 'absolute', top: 1, right: 3, fontSize: 8, fontWeight: 700, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>1</span>
+                  <span style={{ position: 'absolute', top: 1, right: 3, fontSize: 8, fontWeight: 700, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>1</span>
                 )}
               </button>
             </div>
@@ -2143,7 +2143,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-on-accent, #fff)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    boxShadow: '0 2px 12px color-mix(in srgb, var(--color-accent) 30%, transparent)',
   },
   progressSection: {
     display: 'flex',
