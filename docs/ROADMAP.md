@@ -3646,3 +3646,13 @@ These need DSP/ML or native hosting we don't fake.
 - Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
 - Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
 - 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #182), Flux camera + invisible-shape fix (#183), Weather widget icon, collaboration PIN from the CSPRNG.
+
+## Checkpoint 2026-11-12 (Imosion, Canvas, Forge save status)
+
+- Every creative app now shows a save state that comes from real writes (#169). New `utils/saveBothCopies.ts` writes app storage and the native store and reads the native reply; `persistSetStrict` lets IndexedDB failures surface (Canvas's warning could never fire before). Forge's queue autosave is real (it was a timed fake "Saved").
+- Next on #77: workflow-by-workflow audit; Rewind, Gallery, Pixel Art save paths.
+
+## Checkpoint 2026-11-13 (shell opens, Gallery, Pixel Art, Rewind honesty)
+
+- Shell opens now say why they failed (`utils/openWithShell.ts`, #191); Gallery no longer crashes on full storage; Pixel Art keeps a bad stored drawing aside instead of crashing.
+- Rewind made honest (#192): it records nothing in the Tauri app; dead sections hidden, toggles disabled with the reason, real native delete, log path follows `DEX_DATA_DIR`. Owner decision: build capture (privacy policy change) or retire Rewind.

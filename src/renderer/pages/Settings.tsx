@@ -12,6 +12,7 @@
 import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion } from '../utils/appVersion';
+import { openWithShell } from '../utils/openWithShell';
 import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
@@ -2225,7 +2226,7 @@ export const Settings: React.FC = () => {
         type="button"
         style={styles.manageBtn}
         aria-label={`Open Windows settings: ${label}`}
-        onClick={() => { void (window as any).dex?.invoke?.('shell:openExternal', uri); }}
+        onClick={() => { void openWithShell('external', uri, `Windows settings (${label})`); }}
       >Open in Windows</button>
     </div>
   );
@@ -3173,7 +3174,7 @@ export const Settings: React.FC = () => {
         <button
           type="button"
           style={styles.manageBtn}
-          onClick={() => { void (window as any).dex?.invoke?.('shell:openExternal', 'windowsdefender:'); }}
+          onClick={() => { void openWithShell('external', 'windowsdefender:', 'Windows Security'); }}
         >Open</button>
       </div>
 
@@ -3376,9 +3377,9 @@ export const Settings: React.FC = () => {
       </div>
 
       <div style={styles.aboutLinks}>
-        <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => (window as any).dex?.invoke?.('shell:openExternal', POLICY_REPOSITORY_URL) || window.open(POLICY_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}>Repository</button>
+        <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => { void openWithShell('external', POLICY_REPOSITORY_URL, 'the DEX repository'); }}>Repository</button>
         <button style={styles.linkBtn} aria-label="Open DEX policies" onClick={() => openPolicyViewer('terms')}>Policies</button>
-        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).dex?.invoke?.('shell:openExternal', `${POLICY_REPOSITORY_URL}/issues`) || window.open(`${POLICY_REPOSITORY_URL}/issues`, '_blank', 'noopener,noreferrer')}>Report Issue</button>
+        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => { void openWithShell('external', `${POLICY_REPOSITORY_URL}/issues`, 'the issue tracker'); }}>Report Issue</button>
       </div>
 
       {/* Legal & Privacy */}
