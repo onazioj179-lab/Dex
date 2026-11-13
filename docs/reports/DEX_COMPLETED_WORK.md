@@ -355,3 +355,9 @@ Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; 
 | 156 | Ledger: Edit transactions in the table, not only in the side editor | VERIFIED. Created a ledger, an account and a "Probe coffee" transaction; double-clicking its Description cell opened an inline field (not the side editor); "Probe tea" + Enter saved; after switching to Overview and back the table still showed "Probe tea" (1 transaction). |
 | 205 | Notes: Move to Trash asked every time; no undo | VERIFIED. Right-click › Delete Note on a probe note: no confirm dialog, note count 2 → 1, toast "“DEX probe note …” moved to Trash" with Undo; Undo restored it (count 2). |
 | 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | VERIFIED. `example.com` → https://example.com/, `localhost:9` → http://localhost:9/, `192.168.0.1:9` → http://192.168.0.1:9/, plain words → a DuckDuckGo search. |
+
+## Packaged Browser check 2026-11-13 (`claude/browser-minimized-create`)
+
+| # | Item | Packaged result |
+|---|---|---|
+| 46 | Browser blank in the packaged app | VERIFIED (release exe, isolated profile, DEX window restored before opening Browser). `example.com` loaded: the tab title became "Example Domain", reading inside the page returned "Example Domain | https://example.com/", and the active page view was visible at the slot size (2880×1557 px at 2.25×) while the inactive tab's view was hidden. The earlier inconclusive run was caused by the test window being minimized, which exposed a real bug (#219). |
