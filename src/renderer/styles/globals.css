@@ -95,9 +95,7 @@ html[data-perf-tier="mid"] [style*="backdrop-filter"] {
 /* Reduce infinite animations on low-tier to prevent battery/CPU drain */
 html[data-perf-tier="low"] .pulse,
 html[data-perf-tier="low"] .skeleton,
-html[data-perf-tier="low"] .animate-pulse,
 html[data-perf-tier="low"] .animate-spin,
-html[data-perf-tier="low"] .animate-float,
 html[data-perf-tier="low"] .badge-live,
 html[data-perf-tier="low"] .badge-unread,
 html[data-perf-tier="low"] .loading-dots > span,
@@ -127,10 +125,6 @@ html[data-thermal-state="warm"] .liquid-glass-overlay {
   backdrop-filter: var(--blur-md) saturate(140%) !important;
   -webkit-backdrop-filter: var(--blur-md) saturate(140%) !important;
 }
-html[data-thermal-state="warm"] .animate-float,
-html[data-thermal-state="warm"] .animate-pulse {
-  animation-duration: 3s !important;
-}
 
 html[data-thermal-state="hot"] [style*="backdrop-filter"],
 html[data-thermal-state="hot"] [style*="backdropFilter"] {
@@ -149,9 +143,7 @@ html[data-thermal-state="hot"] *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-html[data-thermal-state="hot"] .animate-pulse,
 html[data-thermal-state="hot"] .animate-spin,
-html[data-thermal-state="hot"] .animate-float,
 html[data-thermal-state="hot"] .badge-live,
 html[data-thermal-state="hot"] .notification-dot,
 html[data-thermal-state="hot"] .dex-skeleton {
@@ -216,17 +208,11 @@ input[type="radio"]:focus-visible {
   outline-offset: 3px !important;
 }
 
-/* Range slider focus ring (a11y #423) — visible on dark theme via accent halo on the thumb */
+/* Range slider focus (a11y #423): the canonical ring, set further out so it
+   clears the thumb. No second ring or halo on the thumb itself. */
 input[type="range"]:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff) !important;
   outline-offset: 4px !important;
   border-radius: var(--radius-full);
-}
-input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.45), 0 0 0 5px rgba(74, 158, 255, 0.18) !important;
-}
-input[type="range"]:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.45), 0 0 0 5px rgba(74, 158, 255, 0.18) !important;
 }
 
 /* iOS-style home spotlight pill — soft inset focus instead of hard outline ring */
@@ -517,8 +503,7 @@ html[data-perf-tier="low"] img, html[data-perf-tier="low"] video {
   will-change: auto !important;
 }
 html[data-perf-tier="low"] canvas { image-rendering: pixelated; }
-html[data-perf-tier="low"] .decorative, html[data-perf-tier="low"] .particle-bg,
-html[data-perf-tier="low"] .ambient-glow, html[data-perf-tier="low"] [class*="gradient-bg"] {
+html[data-perf-tier="low"] .decorative, html[data-perf-tier="low"] .particle-bg, html[data-perf-tier="low"] [class*="gradient-bg"] {
   display: none !important;
 }
 html[data-perf-tier="low"] ::-webkit-scrollbar { width: 4px; background: transparent; }
@@ -526,7 +511,7 @@ html[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,
 /* Low: keep text crisp */
 html[data-perf-tier="low"] { -webkit-font-smoothing: antialiased !important; -moz-osx-font-smoothing: grayscale !important; text-rendering: optimizeLegibility !important; }
 /* Low: flat borders instead of shadows */
-html[data-perf-tier="low"] .card, html[data-perf-tier="low"] .panel {
+html[data-perf-tier="low"] .panel {
   border: 1px solid rgba(255,255,255,0.08) !important;
 }
 
@@ -595,8 +580,7 @@ html[data-memory-pressure="high"] video:not([data-playing]) {
    Off-screen app canvases are already released by the [data-app-state] rules
    below, so no foreground-blanking rule is needed. */
 html[data-memory-pressure="high"] .decorative,
-html[data-memory-pressure="high"] .particle-bg,
-html[data-memory-pressure="high"] .ambient-glow {
+html[data-memory-pressure="high"] .particle-bg {
   display: none !important;
 }
 
@@ -631,8 +615,7 @@ html[data-memory-pressure="high"] .ambient-glow {
    loops still throttle themselves on document `visibilitychange` (minimized),
    which is the correct place to save power — not on mere focus loss. */
 html[data-window-focus="blurred"] .decorative,
-html[data-window-focus="blurred"] .particle-bg,
-html[data-window-focus="blurred"] .ambient-glow {
+html[data-window-focus="blurred"] .particle-bg {
   display: none !important;
 }
 
@@ -693,13 +676,6 @@ button, a, input, select, textarea,
 }
 
 /* Hover lift effect -- smooth spring */
-.hover-lift {
-  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0.2, 1);
-}
-.hover-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-}
 
 /* Press effect -- smooth tactile feedback */
 .press-effect:active {
@@ -708,15 +684,6 @@ button, a, input, select, textarea,
 }
 
 /* Smooth hover scale for cards and interactive containers */
-.hover-scale {
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.hover-scale:hover {
-  transform: scale(1.02);
-}
-.hover-scale:active {
-  transform: scale(0.98);
-}
 
 /* Fade transitions */
 .fade-in {
@@ -1052,14 +1019,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 }
 
 /* -- Shared interactive hover states for glass UI elements ---------------- */
-.dex-hover-lift {
-  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), background 0.12s ease, box-shadow 0.15s ease;
-}
-.dex-hover-lift:hover { 
-  transform: scale(1.02) translateY(-2px); 
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-}
-.dex-hover-lift:active { transform: scale(0.98); }
 
 .dex-hover-bg {
   transition: background 0.12s ease;
@@ -1158,20 +1117,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
    SMOOTH CARD INTERACTIONS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.dex-card {
-  transition: 
-    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.2s ease,
-    border-color 0.15s ease;
-}
-.dex-card:hover {
-  transform: translateY(-2px) scale(1.005);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  border-color: rgba(255,255,255,0.12);
-}
-.dex-card:active {
-  transform: translateY(0) scale(0.995);
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SMOOTH TOGGLE / SWITCH
@@ -1255,13 +1200,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   transform: rotate(180deg);
 }
 
-.dex-hover-card {
-  transition: transform 0.04s cubic-bezier(0.23,1,0.32,1), background 0.03s ease, box-shadow 0.03s ease;
-}
-.dex-hover-card:hover {
-  background: rgba(255,255,255,0.04) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
 
 /* Floating window will-change promoted into CSS (remove inline willChange) */
 [data-floating-window] {
@@ -1612,38 +1550,9 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   gap: 12px;
 }
 
-.media-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--bg-inset);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: all var(--duration-fast) var(--ease-out);
-}
 
-.media-btn:hover {
-  background: var(--bg-hover);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
-}
 
-.media-btn.play-btn {
-  width: 48px;
-  height: 48px;
-  background: var(--accent);
-  color: white;
-  box-shadow: 0 4px 16px rgba(10, 132, 255, 0.35);
-}
 
-.media-btn.play-btn:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 6px 24px rgba(10, 132, 255, 0.5);
-  transform: translateY(-2px);
-}
 
 /* Apps Grid - 4x4 compact grid */
 .apps-grid {
@@ -1652,21 +1561,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   gap: 8px;
 }
 
-.app-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 6px;
-  border-radius: var(--radius-md);
-  transition: all var(--duration-fast) var(--ease-out);
-}
 
-.app-item:hover {
-  background: var(--bg-inset);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
 
 .app-icon {
   width: 40px;
@@ -1693,19 +1588,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   gap: 2px;
 }
 
-.recent-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-}
 
-.recent-item:hover {
-  background: var(--bg-inset);
-}
 
 .recent-icon {
   color: var(--text-tertiary);
@@ -1717,9 +1600,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   color: var(--text-primary);
 }
 
-.recent-item svg:last-child {
-  color: var(--text-muted);
-}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Page Styles
@@ -1950,20 +1830,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   gap: 12px;
 }
 
-.gallery-item {
-  aspect-ratio: 1;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-}
 
-.gallery-item:hover {
-  transform: scale(1.02);
-}
 
 /* Audio Page */
 .audio-player {
@@ -2740,18 +2607,7 @@ textarea,
   gap: 8px;
 }
 
-.idea-card {
-  padding: 16px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-md);
-  border-left: 4px solid;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-}
 
-.idea-card:hover {
-  transform: translateX(4px);
-}
 
 .idea-title {
   display: block;
@@ -3320,9 +3176,6 @@ textarea,
   animation: spin 0.8s linear infinite;
 }
 
-.animate-pulse {
-  animation: pulse 1.5s ease-in-out infinite;
-}
 
 .animate-fade-in {
   animation: fade-in var(--duration-normal) var(--ease-out);
@@ -3599,12 +3452,6 @@ button:active:not(:disabled),
 }
 
 /* List row hover lift */
-.recent-item:hover,
-.list-row:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transform: translateX(2px);
-  transition: all 0.15s ease;
-}
 
 /* Badge/tag elements pop */
 .widget-count {
@@ -3711,13 +3558,6 @@ select option {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Item 157: Enhanced card hover feedback */
-.card:hover,
-.dex-card:hover,
-[data-card]:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
-  transform: translateY(-1px);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
 
 /* Item 158: Smooth section transitions */
 .section-header,
@@ -3810,11 +3650,6 @@ select option {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
 }
 
-.dex-glass-card-hover:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-}
 
 .dex-toggle .toggle-knob,
 .toggle-switch .toggle-knob {
@@ -4101,8 +3936,7 @@ body {
 /* Item 185: Reduced paint area for tooltips/popovers */
 [role="tooltip"],
 [role="menu"],
-.popover,
-.dex-popover {
+.popover {
   contain: layout paint;
   isolation: isolate;
 }
@@ -4427,11 +4261,6 @@ textarea {
 }
 
 /* Card hover lift (opt-in via .dex-card, integer translate = no blur) */
-.dex-card:hover,
-[data-card]:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.3));
-}
 
 /* Sidebar item hover -- background only; the old padding shift caused
    layout jitter on every hover. */
@@ -4461,15 +4290,9 @@ textarea {
   background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
 }
 
-/* Slider/range hover */
-input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.15);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
 /* Context menu item hover -- no !important; menus may theme themselves */
 :where([role="menuitem"]):hover {
-  background: var(--color-accent-muted, rgba(10, 132, 255, 0.15));
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
   color: var(--color-text-primary);
 }
 
@@ -4641,16 +4464,6 @@ input[type="range"]:hover::-webkit-slider-thumb {
   to { background-position: 200% 0; }
 }
 
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255,255,255,0.04) 25%,
-    rgba(255,255,255,0.08) 50%,
-    rgba(255,255,255,0.04) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmerSlide 1.5s ease-in-out infinite;
-}
 
 /* Modal backdrop animation */
 @keyframes backdropFadeIn {
@@ -4701,14 +4514,7 @@ input[type="range"]:hover::-webkit-slider-thumb {
 .stagger-children > *:nth-child(10) { animation-delay: 0.27s; }
 
 /* Hover lift for interactive cards */
-.hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
 
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
-}
 
 /* Smooth color transitions for theme changes */
 :root {
@@ -5465,11 +5271,7 @@ html[data-dex-large-text] * {
   }
   
   /* Reduce padding */
-  .dex-card,
-  [data-card] {
-    padding: 8px;
   }
-}
 
 /* =============================================================================
    PERFORMANCE OPTIMIZATIONS
@@ -5677,31 +5479,6 @@ html[data-dex-large-text] * {
 [data-pressable]:active {
   transform: scale(0.97);
   opacity: 0.9;
-}
-
-/* Hover lift effect */
-.dex-hover-lift,
-[data-hover-lift] {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.dex-hover-lift:hover,
-[data-hover-lift]:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Glow on hover */
-.dex-hover-glow,
-
-/* =============================================================================
-   LOADING STATES
-   ============================================================================= */
-
-/* Pulse loading indicator */
-.dex-loading-pulse,
-[data-loading-pulse] {
-  animation: dex-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes dex-pulse {

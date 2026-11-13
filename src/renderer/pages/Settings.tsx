@@ -4691,7 +4691,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Toolbar header. Transparent so the content pane's glass reads through; the
   // bottom hairline stays for structure.
   header: {
-    height: '44px',
+    height: 'var(--app-header-height)',
     display: 'flex',
     alignItems: 'center',
     padding: '0 18px',

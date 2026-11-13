@@ -1147,15 +1147,15 @@ export const Gallery: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="dex-gallery-root" style={styles.container}>
       <style>{`
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.dex-gallery-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.dex-gallery-root) button:active { transform: scale(0.97); }
+        :where(.dex-gallery-root), :where(.dex-gallery-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.dex-gallery-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-gallery-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-gallery-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.dex-gallery-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
       `}</style>
       {/* Sidebar */}
       <div style={{

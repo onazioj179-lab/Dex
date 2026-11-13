@@ -344,14 +344,6 @@ class ButtonResponsivenessSystem {
         filter: brightness(1.05);
       }
 
-      /* Focus visible state */
-      button:focus-visible,
-      [role="button"]:focus-visible,
-      .dex-btn:focus-visible {
-        outline: 2px solid var(--color-accent, #0a84ff);
-        outline-offset: 2px;
-      }
-
       /* Disabled state */
       button:disabled,
       [role="button"][aria-disabled="true"],

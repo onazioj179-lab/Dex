@@ -813,7 +813,7 @@ const KanbanApp: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base, #0e0e0e)', overflow: 'hidden' },
-  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
+  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-5)', minHeight: 'var(--app-header-height)', boxSizing: 'border-box', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   topLeft: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' },
   topRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },

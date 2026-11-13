@@ -56,7 +56,6 @@ import { gestureRecognizer, initializeTouchSystem } from '../utils/TouchInputSys
 import { AppOverview } from '../shell/AppOverview';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
-import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import AppSwitcher from '../shell/AppSwitcher';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
 import { rewardUnlocks as rewardUnlocksEngine, recordChallengeAction, recordChallengeForStat } from '../services/achievementEngine';
@@ -3135,7 +3134,6 @@ export const AppManager: React.FC = () => {
   // -- Gesture Engine wiring ------------------------------------------------
   useEffect(() => {
     gestureEngine.init();
-    initVisualEffects();
     initializeTouchSystem();
 
     // Attach multi-touch pointer gesture recognizer to document body
@@ -3245,7 +3243,6 @@ export const AppManager: React.FC = () => {
     window.addEventListener('dex-stage-toggle', toggleStage);
     return () => {
       gestureEngine.destroy();
-      destroyVisualEffects();
       window.removeEventListener('dex-gesture', handleGesture);
       window.removeEventListener('dex-stage-toggle', toggleStage);
       unsub3L(); unsub3R(); unsub3U(); unsubPinch(); unsubSpread();
