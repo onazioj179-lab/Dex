@@ -3667,3 +3667,8 @@ These need DSP/ML or native hosting we don't fake.
 ## Checkpoint 2026-11-13 (checkpoints in every creative app)
 
 - PRISM, FLUX and Presentation join VINX, AXL, Imosion and Canvas: saved versions on this device, listed and restored in Collab Hub, restore is an undo step (#58 done).
+
+## Checkpoint 2026-11-13 (packaged verification batch)
+
+- Release build of main (7.0.2 / 001z) passed the bundle gate; run on an isolated profile. Verified in the exe: clean exit with no stack overflow (#44), Recycle Bin delete (#59), copy/move/rename never overwrite (#60), WSL only listed with a distribution (#153), text read for Quick Look (#202), metadata-stripped JPEG copy (#203); 16 apps open without a crash. Gallery gained a regression test for the removed fake face groups (#208).
+- Still open for B018 / #6 / #102: the installer itself (install, upgrade, uninstall) on a clean machine, and signing (#30).

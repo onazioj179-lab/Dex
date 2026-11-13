@@ -198,6 +198,14 @@ describe('Gallery Page', () => {
     const { container } = render(<WithToast><Gallery /></WithToast>);
     expect(container).toBeTruthy();
   });
+
+  it('has no invented "face groups" (DEX has no face recognition)', async () => {
+    const { default: Gallery } = await import('../../src/renderer/pages/Gallery');
+    const { container } = render(<WithToast><Gallery /></WithToast>);
+    const labels = [...container.querySelectorAll('button')].map((b) => `${b.textContent} ${b.getAttribute('aria-label') ?? ''}`);
+    expect(labels.some((t) => /\bfaces?\b/i.test(t))).toBe(false);
+    expect(container.textContent).not.toMatch(/Person \d/);
+  });
 });
 
 // ===========================================================================

@@ -174,13 +174,10 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 143 | C++: Native C++ modules | Owner decision |
 | 33 | Click-through of the transparency slider in rendered Settings | Packaged-app run |
 | 38 | Light/dark + 125/150/200% scaling audit of every built-in app | Packaged-app run |
-| 44 | Packaged app exits with `thread '<unknown>' has overflowed its stack` | Packaged-app run |
 | 46 | Browser blank in the packaged app (WebView2 has no `<webview>`) | Packaged-app run |
 | 54 | Remaining apps audited this way | Packaged-app run |
 | 55 | Auth engine lost from `main` | Packaged-app run |
 | 57 | Fake controls in creative apps | Packaged-app run |
-| 59 | Files deleted permanently while saying "moved to the recycle bin" | Packaged-app run |
-| 60 | Native copy/move/rename could overwrite or lose data | Packaged-app run |
 | 68 | Redundant square controls at the bottom of the spatial desktop | Packaged-app run |
 | 79 | Maps "My location" failed silently | Packaged-app run |
 | 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | Packaged-app run |
@@ -198,7 +195,6 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 146 | Terminal: Shell profiles, default shell, text size, open in folder | Packaged-app run |
 | 150 | Bio: GenBank import/export with features; primer pair check | Packaged-app run |
 | 152 | VINX: Honest recovery, save that reports failure, no lost edits on close (#77) | Packaged-app run |
-| 153 | Terminal: WSL offered on machines without a Linux distribution | Packaged-app run |
 | 154 | Terminal: Live shells in the packaged app (extends #139/#146) | Packaged-app run |
 | 155 | Bio: GenBank + primers in the packaged app (extends #150) | Packaged-app run |
 | 156 | Ledger: Edit transactions in the table, not only in the side editor | Packaged-app run |
@@ -234,8 +230,6 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | # | App | Item | Priority | Status | What changed | Next check |
 |---|---|---|---|---|---|---|
 | 201 | Platform | Native IPC ABI guard (B001/B002/B016) | HIGH | FIXED (unit tests + `npm run abi:check`) | `scripts/ipc-abi.mjs` locks all 1,920 native channels in `src-tauri/ipc-abi.lock.json`; removing one, or adding a renderer call nothing answers, fails `tests/unit/ipc-abi-compat.test.ts` and `npm run lint`. 7 known unhandled calls, all honest degrades, may only shrink | Add `npm run abi:check` as its own CI step |
-| 202 | Quick Look | Text previews always blank in the desktop app | HIGH | FIXED (found by #201); not run in a packaged build | Called `files:read`, which no native arm answers; now `fs:readText` | Quick Look a `.txt` in the packaged app |
-| 203 | Gallery | Save a copy without metadata (B003/B011) | HIGH | FIXED (5 cargo tests); not run in a packaged build | Native `fs:stripMetadata` (`metadata_strip.rs`): lossless JPEG/PNG copy without EXIF/GPS, XMP, IPTC, comments, PNG text/time; keeps colour profile, orientation, C2PA credentials; never touches the original | Strip a phone photo with GPS; check it opens upright and the GPS row reads "No GPS Data" |
 | 204 | Shell | Hover submenus closed while the pointer moved into them; no safe triangle | MEDIUM | FIXED (6 component tests) | `UnifiedDropdown` closed a submenu 180 ms after leaving its row; now the parent owns one-open-at-a-time + safe triangle (`utils/safeTriangle.ts`), same guard in `ContextMenu` | Hover a nested menu in a real app menu bar |
 | 205 | Notes | Move to Trash asked every time; no undo | LOW | FIXED (tsc); not clicked through | Deletes at once with an Undo toast (restores from Trash); permanent delete still asks | Delete a note, press Undo |
 | 206 | Shell | Easter eggs never counted; Egg Hunter achievements could not unlock (B010) | LOW | FIXED, VERIFIED live (preview: Konami code showed the credits card) | 4 eggs (`services/easterEggs.ts`), each counts once toward `easterEggsFound` | — |
