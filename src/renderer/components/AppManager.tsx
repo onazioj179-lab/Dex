@@ -369,6 +369,7 @@ import imosionIconPng from '../../../appicons/imosion.png';
 import forgeIconPng from '../../../appicons/forge.png';
 import nexusIconPng from '../../../appicons/nexus.png';
 import { useDexSetting } from '../hooks/useDexSetting';
+import { notificationsAllowed } from '../utils/notificationsAllowed';
 
 const AppIconPngs: Record<string, string> = {
   videoeditor: vinxIconPng,
@@ -835,6 +836,8 @@ export const AppManager: React.FC = () => {
     const onNotify = (e: Event) => {
       const d = (e as CustomEvent).detail || {};
       if (!d || !d.title) return;
+      // Allow Notifications off / Do Not Disturb: no banner (the hub still keeps it).
+      if (!notificationsAllowed()) return;
       notifyPush({
         title: String(d.title),
         body: d.body != null ? String(d.body) : undefined,
