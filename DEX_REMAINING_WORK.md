@@ -174,13 +174,11 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 143 | C++: Native C++ modules | Owner decision |
 | 33 | Click-through of the transparency slider in rendered Settings | Packaged-app run |
 | 38 | Light/dark + 125/150/200% scaling audit of every built-in app | Packaged-app run |
-| 46 | Browser blank in the packaged app (WebView2 has no `<webview>`) | Packaged-app run |
 | 54 | Remaining apps audited this way | Packaged-app run |
 | 55 | Auth engine lost from `main` | Packaged-app run |
 | 57 | Fake controls in creative apps | Packaged-app run |
 | 68 | Redundant square controls at the bottom of the spatial desktop | Packaged-app run |
 | 79 | Maps "My location" failed silently | Packaged-app run |
-| 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | Packaged-app run |
 | 86 | FLUX undo/redo ran side effects inside state updaters | Packaged-app run |
 | 91 | Spatial canvas grew into a horizontal strip | Packaged-app run |
 | 99 | Nexus, Spotlight, context menus, dropdowns, notifications | Packaged-app run |
@@ -189,15 +187,12 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 115 | Live preview verification of 111-114 | Packaged-app run |
 | 128 | Terminal is a real terminal (§7) | Packaged-app run |
 | 133 | Windows PowerShell 5.1 `Read-Host` can receive keys out of order | Packaged-app run |
-| 139 | Terminal: Split panes, standalone app | Packaged-app run |
 | 142 | Dock / App Menu: Pin, unpin, reorder; app menu completeness | Packaged-app run |
 | 145 | Forge Watermark / Crop & Pad / Subtitle burn-in did nothing | Packaged-app run |
-| 146 | Terminal: Shell profiles, default shell, text size, open in folder | Packaged-app run |
 | 150 | Bio: GenBank import/export with features; primer pair check | Packaged-app run |
 | 152 | VINX: Honest recovery, save that reports failure, no lost edits on close (#77) | Packaged-app run |
 | 154 | Terminal: Live shells in the packaged app (extends #139/#146) | Packaged-app run |
 | 155 | Bio: GenBank + primers in the packaged app (extends #150) | Packaged-app run |
-| 156 | Ledger: Edit transactions in the table, not only in the side editor | Packaged-app run |
 | 158 | VINX: Real 3D LUT math (ROADMAP "Vinx 3D-LUT"); the built-in looks were … | Packaged-app run |
 | 163 | FLUX: True save state; unsaved flag that clears; Open Project that checks the … | Packaged-app run |
 | 165 | Browser: block ads and trackers in WebView2 itself, before requests leave … | Packaged-app run |
@@ -231,7 +226,6 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 |---|---|---|---|---|---|---|
 | 201 | Platform | Native IPC ABI guard (B001/B002/B016) | HIGH | FIXED (unit tests + `npm run abi:check`) | `scripts/ipc-abi.mjs` locks all 1,920 native channels in `src-tauri/ipc-abi.lock.json`; removing one, or adding a renderer call nothing answers, fails `tests/unit/ipc-abi-compat.test.ts` and `npm run lint`. 7 known unhandled calls, all honest degrades, may only shrink | Add `npm run abi:check` as its own CI step |
 | 204 | Shell | Hover submenus closed while the pointer moved into them; no safe triangle | MEDIUM | FIXED (6 component tests) | `UnifiedDropdown` closed a submenu 180 ms after leaving its row; now the parent owns one-open-at-a-time + safe triangle (`utils/safeTriangle.ts`), same guard in `ContextMenu` | Hover a nested menu in a real app menu bar |
-| 205 | Notes | Move to Trash asked every time; no undo | LOW | FIXED (tsc); not clicked through | Deletes at once with an Undo toast (restores from Trash); permanent delete still asks | Delete a note, press Undo |
 | 206 | Shell | Easter eggs never counted; Egg Hunter achievements could not unlock (B010) | LOW | FIXED, VERIFIED live (preview: Konami code showed the credits card) | 4 eggs (`services/easterEggs.ts`), each counts once toward `easterEggsFound` | — |
 | 207 | Shell | Hit slop, continuous corners, view-transition theme fade (B013) | LOW | FIXED (tsc; corner-shape confirmed applied in the preview, Chrome 156) | `.dex-hit-slop` on traffic lights; `corner-shape: superellipse(1.5)`; theme flips cross-fade, off with Reduce Motion | Look at window corners and a theme flip in the packaged app (WebView2 version decides corner-shape support) |
 | 208 | Gallery | "Scan for Faces" invented groups | MEDIUM | FIXED (removed; tsc + Gallery tests) | It made "Person 1..N" from the media count with no face detection. The Faces tool and panel are gone; real on-device detection would be a new feature | — |
@@ -243,3 +237,11 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 214 | Gallery | EXIF read and "Save a copy without metadata" got `file://` URLs | HIGH | FIXED (tsc); not run in a packaged build | Gallery items carry `file://C:/...`; the native channels need a path. `fileUrlToPath` (utils/exifParser.ts) now converts. This broke #203 as shipped | Strip a photo in the packaged app |
 | 215 | Shell | Back ignored the app's own history; mouse side buttons did nothing (B013 predictive back) | MEDIUM | FIXED, VERIFIED live (preview: side buttons went Calculator → Notes → Calculator) | `services/backNavigation.ts`: Back asks the front app first (Files: previous folder, Browser: previous page) and only then switches apps; the title-bar Back tooltip says where it lands; mouse X1/X2 = Back/Forward. 3 tests | Files folder back with a mouse side button |
 | 216 | Gallery | Do local images (`file://`) load in the packaged app at all? | HIGH | OPEN (check) | The page origin is `http://tauri.localhost` and there's no asset protocol, so Chromium may block `file://` thumbnails. BlurHash placeholders (B013) depend on reading those pixels and were not built | Open Gallery in the packaged app; if blank, add Tauri's asset protocol with a user-folder scope |
+
+## Session 2026-11-13 (`claude/terminal-split-notes-colors`): packaged UI checks + fixes they found
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 217 | Terminal | "Split down" on a side-by-side tab added a third column | MEDIUM | FIXED (layout + 25 tests); found in the packaged run | A tab is one row or column of panes, fixed by its first split; `splitPane` now refuses the other direction (`canSplit`), the button is disabled with the reason, the shortcut does nothing instead of the wrong thing | Nested splits (a tree layout) if wanted |
+| 218 | Notes | Row colour menu showed raw CSS ("○ var(--color-error)") and stored it, so the toolbar never marked that colour | LOW | FIXED (tests); found in the packaged run | Row menu: "Color Label" submenu with the toolbar's named colours, swatches, current marked, None; old raw values still recognised (`noteColorName`) | Click it in the packaged app |
+| 46 | Browser | Page render in the packaged app | — | INCONCLUSIVE (2026-11-13) | Address bar and native page view both work up to creation; the page view was created while the test window was minimized and stayed 810×2 px, a new tab got correct bounds but stayed hidden, and `browserView:evalResult` timed out on both. The DEX window was not on screen during the run, so this is not a fair test | Repeat with DEX in front: open a page, check it draws, back/forward |
