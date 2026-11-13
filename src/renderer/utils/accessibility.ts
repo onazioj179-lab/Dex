@@ -693,7 +693,6 @@ export const ICON_BUTTON_LABELS = {
   skipForward: 'Skip forward',
   skipBack: 'Skip back',
   fastForward: 'Fast forward',
-  rewind: 'Rewind',
   loop: 'Toggle loop',
   shuffle: 'Toggle shuffle',
   

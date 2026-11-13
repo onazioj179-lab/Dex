@@ -69,7 +69,6 @@ export const APP_WINDOW_SIZES: Record<string, AppWindowConfig> = {
   flux: { w: 850, h: 580, maximized: true },
   forge: { w: 850, h: 580, maximized: true },
   audio: { w: 800, h: 550 },
-  rewind: { w: 720, h: 500 },
   tasks: { w: 680, h: 480 },
   workflows: { w: 720, h: 500 },
   store: { w: 900, h: 640 },
