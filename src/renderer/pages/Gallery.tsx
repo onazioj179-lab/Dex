@@ -412,8 +412,6 @@ export const Gallery: React.FC = () => {
   const [colorLabels, setColorLabels] = useState<Record<string, string>>({});
   const [showExifPanel, setShowExifPanel] = useState(false);
   const [exifCache, setExifCache] = useState<Record<string, ExifData | null>>({});
-  const [showFaceDetection, setShowFaceDetection] = useState(false);
-  const [faceGroups, setFaceGroups] = useState<Array<{ name: string; count: number; color: string }>>([]);
   const [showTagSystem, setShowTagSystem] = useState(false);
   const [mediaTags, setMediaTags] = useState<Record<string, string[]>>({});
   const [tagInput, setTagInput] = useState('');
@@ -1530,7 +1528,6 @@ export const Gallery: React.FC = () => {
           {[
             { label: 'Smart Albums', fn: () => setShowSmartAlbums(v => !v), active: showSmartAlbums },
             { label: 'EXIF', fn: () => setShowExifPanel(v => !v), active: showExifPanel },
-            { label: 'Faces', fn: () => setShowFaceDetection(v => !v), active: showFaceDetection },
             { label: 'Tags', fn: () => setShowTagSystem(v => !v), active: showTagSystem },
             { label: 'Adjust', fn: () => setShowQuickAdjust(v => !v), active: showQuickAdjust },
             { label: 'Crop', fn: () => setShowCropRotate(v => !v), active: showCropRotate },
@@ -1606,38 +1603,6 @@ export const Gallery: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Face Detection */}
-      {showFaceDetection && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", left: 80, top: 80, width: 'min(240px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Face Groups</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowFaceDetection(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
-          </div>
-          <div style={{ padding: 'var(--space-3)' }}>
-            {faceGroups.map((g, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: g.color + '20', border: `2px solid ${g.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2a3 3 0 100 6 3 3 0 000-6zM3 12.5C3 10.567 5.239 9 8 9s5 1.567 5 3.5c0 .276-.224.5-.5.5h-9a.5.5 0 01-.5-.5z" fill={g.color}/></svg>
-                </div>
-                <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>{g.name}</div></div>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{g.count}</span>
-              </div>
-            ))}
-            <button aria-label="Scan for faces" onClick={() => {
-              // Generate face groups from current media set using heuristic clustering
-              const colors = ['var(--color-accent)', 'var(--color-success)', 'var(--color-tag-purple, #bf5af2)', 'var(--color-warning)', 'var(--color-error)', 'var(--color-info, #64d2ff)'];
-              const count = Math.min(Math.max(Math.floor(media.length / 8), 1), 6);
-              const groups = Array.from({ length: count }, (_, i) => ({
-                name: `Person ${i + 1}`,
-                count: Math.max(1, Math.floor(media.filter(m => m.type === 'image').length / count) + (i === 0 ? media.length % count : 0)),
-                color: colors[i % colors.length],
-              }));
-              setFaceGroups(groups);
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Scan for Faces</button>
           </div>
         </div>
       )}
