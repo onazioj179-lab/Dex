@@ -361,3 +361,10 @@ Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; 
 | 62 | DEX Recycle Bin "Restore" did nothing | FIXED | Notes are un-trashed or recreated, Kanban cards go back to their column; the row is removed only afterwards. Old Files rows say they can't be restored | `recycleRestore.ts`, `RecycleBin.tsx`, `KanbanApp.tsx` | Rows written by `content_expiry`/`bulk_metadata` are shown as not restorable | — | P3 |
 | 62 (follow-up) | Recycle Bin rows written by `content-expiry:processExpired` | FIXED (13 tests) | Those rows record that an item's expiry passed; the item itself is never deleted (only its expiry record is). They showed "The saved copy is incomplete"; now they are restorable and restoring just clears the row (`isExpiryRecord`). Nothing in DEX writes `bulk_metadata` rows into the bin (only plugin capabilities name it), so nothing else to restore. |
 | 223 (renumbered) | Backlog | Two rows were numbered #221 on main (unslop pass 3, and the `dex.<ns>.onY` no-op fix) | FIXED | The auth/vault/platform row is now #223 |
+
+### Packaged checks 2026-11-13 (release exe 7.0.2 / 001z with the #222 fix, isolated profile)
+
+- FLUX, VINX, PRISM, AXL, Imosion, Canvas, Forge, Presentation all open with "Up to date" (no fake "Saved").
+- #152 VINX: renaming the project showed "Unsaved changes", then "Saved just now" within 3 s; `dex-vinx-project` in localStorage and the native copy (`capability:storage:get`) both had the new name and a `modifiedAt` stamp. Crash-recovery banner not re-run.
+- #142 Dock: app menu on Ledger offered "Pin to Dock"; Ledger appeared in the Dock; the menu then offered "Unpin from Dock" and Ledger left the Dock. Reorder not exercised.
+- #46/#222 Browser: in the rebuilt exe pages load (title read from inside the page) and the page view follows the Browser window size. The minimize-then-open case was not re-run cleanly (the window was un-minimized by hand mid-test).

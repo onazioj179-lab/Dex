@@ -194,17 +194,17 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 115 | Live preview verification of 111-114 | Packaged-app run |
 | 128 | Terminal is a real terminal (§7) | Packaged-app run |
 | 133 | Windows PowerShell 5.1 `Read-Host` can receive keys out of order | Packaged-app run |
-| 142 | Dock / App Menu: Pin, unpin, reorder; app menu completeness | Packaged-app run |
+| 142 | Dock / App Menu: Pin, unpin, reorder; app menu completeness | Packaged-app run: reorder only (pin/unpin VERIFIED 2026-11-13) |
 | 145 | Forge Watermark / Crop & Pad / Subtitle burn-in did nothing | Packaged-app run |
 | 150 | Bio: GenBank import/export with features; primer pair check | Packaged-app run |
-| 152 | VINX: Honest recovery, save that reports failure, no lost edits on close (#77) | Packaged-app run |
+| 152 | VINX: Honest recovery, save that reports failure, no lost edits on close (#77) | Packaged-app run: crash-recovery banner only (save + native copy VERIFIED 2026-11-13) |
 | 154 | Terminal: Live shells in the packaged app (extends #139/#146) | Packaged-app run |
 | 155 | Bio: GenBank + primers in the packaged app (extends #150) | Packaged-app run |
 | 158 | VINX: Real 3D LUT math (ROADMAP "Vinx 3D-LUT"); the built-in looks were … | Packaged-app run |
-| 163 | FLUX: True save state; unsaved flag that clears; Open Project that checks the … | Packaged-app run |
+| 163 | FLUX: True save state; unsaved flag that clears; Open Project that checks the … | Packaged-app run: edit → Saved, Open Project (opens with an honest "Up to date", 2026-11-13) |
 | 165 | Browser: block ads and trackers in WebView2 itself, before requests leave … | Packaged-app run |
-| 168 | AXL: Save state that is true; Open/New that cannot lose work; honest export … | Packaged-app run |
-| 169 | Imosion, Canvas, Forge: True save status in the remaining creative apps (#77) | Packaged-app run |
+| 168 | AXL: Save state that is true; Open/New that cannot lose work; honest export … | Packaged-app run: edit → Saved, Open/New (opens with an honest "Up to date", 2026-11-13) |
+| 169 | Imosion, Canvas, Forge: True save status in the remaining creative apps (#77) | Packaged-app run: edit → Saved in each app (all three open with an honest "Up to date", 2026-11-13) |
 | 191 | Gallery, Pixel Art, Files, Home, Settings, Terminal: silent failures and a Gallery crash … | Packaged-app run |
 | 58 | Restore a collaboration checkpoint (all creative apps) | Packaged-app run |
 | 9 | Cloud model catalog is dated | Provider key |
