@@ -2979,7 +2979,15 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("notifications:") => notifications_dispatch(&app, ch, &args),
 
         // --- Vault (GOAL-6B): all vault:* channels except copyToClipboard --
-        ch if ch.starts_with("vault:") => vault_dispatch(&app, ch, &args),
+        ch if ch.starts_with("vault:") => {
+            let out = vault_dispatch(&app, ch, &args);
+            // Every window (main + detached Vault) keeps its own store; tell them all.
+            if matches!(ch, "vault:create" | "vault:unlock" | "vault:lock" | "vault:importVault" | "vault:changeMasterPassword") {
+                let state = vault_dispatch(&app, "vault:getState", &json!([]));
+                crate::native_ops::emit_event(&app, "vault:state-changed", &state);
+            }
+            out
+        }
 
         // --- Security permissions (SecurityController portable core) -------
         ch if ch.starts_with("security:") => security_dispatch(&app, ch, &args),
