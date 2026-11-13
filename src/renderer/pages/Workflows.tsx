@@ -284,9 +284,9 @@ const ACTION_BLOCKS: ActionBlock[] = [
   { id: 'a30', name: 'Try/Catch', category: 'Control', description: 'Handle errors gracefully',
     configFields: [{ key: 'onError', label: 'On Error', type: 'select', options: ['continue', 'retry', 'stop'] }] },
 
-  // Scripting (5 actions)
-  { id: 'a7', name: 'Run Script', category: 'Scripting', description: 'Execute a custom script',
-    configFields: [{ key: 'language', label: 'Language', type: 'select', options: ['JavaScript', 'Python', 'PowerShell', 'Bash'] }, { key: 'code', label: 'Script', type: 'text' }] },
+  // Scripting (4 actions)
+  // 'a7' Run Script is not offered: there is no sandboxed script runner. Saved
+  // workflows that still contain it fail that step with a clear reason.
   { id: 'a31', name: 'Evaluate Expression', category: 'Scripting', description: 'Evaluate a math or string expression',
     configFields: [{ key: 'expression', label: 'Expression', type: 'text' }] },
   { id: 'a32', name: 'Regular Expression', category: 'Scripting', description: 'Match or replace using regex',
@@ -373,15 +373,6 @@ const WORKFLOW_TEMPLATES: { name: string; description: string; nodes: WorkflowNo
       { id: 't1n3', actionId: 'a5', name: 'Send Message', category: 'Communication', x: 80, y: 340, config: { title: 'Backup Complete', body: 'Files backed up' } },
     ],
     connections: [{ from: 't1n1', to: 't1n2' }, { from: 't1n2', to: 't1n3' }],
-  },
-  {
-    name: 'Scheduled Script',
-    description: 'Run a script after a delay',
-    nodes: [
-      { id: 't2n1', actionId: 'a6', name: 'Wait', category: 'Control', x: 80, y: 60, config: { seconds: '30' } },
-      { id: 't2n2', actionId: 'a7', name: 'Run Script', category: 'Scripting', x: 80, y: 200, config: { language: 'JavaScript', code: 'console.log("done")' } },
-    ],
-    connections: [{ from: 't2n1', to: 't2n2' }],
   },
   {
     name: 'Organize Files',
@@ -1048,13 +1039,9 @@ export const Workflows: React.FC = () => {
               break;
             }
             case 'a7': { // Run Script (config: language, code)
-              const script = node.config.code || '';
-              if (script && window.dex?.invoke) {
-                const res = await window.dex.invoke('workflow:runScript', script);
-                context.output = res?.output || '';
-                context.result = res;
-              }
-              break;
+              // DEX has no sandboxed script runner yet, so this step fails with
+              // a reason instead of reporting a run that never happened.
+              throw new Error('Run Script is not available yet: DEX has no sandboxed script runner. Use a Terminal or DexCode step instead.');
             }
             case 'a8': { // Open App (config: appName)
               const app = node.config.appName || '';

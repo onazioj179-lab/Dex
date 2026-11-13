@@ -494,17 +494,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   }, [clip.id, wheels, updateClipColorGrading]);
 
   const [liveScopeMode, setLiveScopeMode] = useState<ScopeMode>('waveform');
-  const [previewVideo, setPreviewVideo] = useState<HTMLVideoElement | null>(null);
-  useEffect(() => {
-    // Resolve video element via DOM (preview tagged with data-vinx-preview)
-    const find = () => document.querySelector<HTMLVideoElement>('video[data-vinx-preview]');
-    setPreviewVideo(find());
-    const id = window.setInterval(() => {
-      const v = find();
-      setPreviewVideo(prev => (prev === v ? prev : v));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, []);
+  const previewVideo = usePreviewVideo();
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
@@ -520,7 +510,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
       <div style={sectionHeaderStyle}>Live Scopes</div>
       <div style={{ padding: '0 var(--space-2) var(--space-2)' }}>
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-          {(['waveform', 'vectorscope', 'histogram'] as ScopeMode[]).map(m => (
+          {(['waveform', 'vectorscope', 'histogram', 'parade'] as ScopeMode[]).map(m => (
             <button
               key={m}
               onClick={() => setLiveScopeMode(m)}
@@ -591,7 +581,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
       {showScopes && (
         <div style={{ padding: '4px var(--space-2)' }}>
           <div style={{ display: 'flex', gap: 4, marginBottom: 4, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
-            {(['waveform', 'vectorscope', 'histogram', 'parade'] as ScopeType[]).map(type => (
+            {(['waveform', 'vectorscope', 'histogram', 'parade'] as ScopeMode[]).map(type => (
               <button
                 key={type}
                 aria-label={`Select ${type} scope`}
@@ -607,7 +597,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
               </button>
             ))}
           </div>
-          <ScopeDisplay type={scopeType} />
+          <ScopeDisplay type={(['waveform', 'vectorscope', 'histogram', 'parade'] as const).includes(scopeType as ScopeMode) ? scopeType as ScopeMode : 'waveform'} />
         </div>
       )}
 
@@ -826,167 +816,24 @@ const CurvesEditor: React.FC<{
 CurvesEditor.displayName = 'CurvesEditor';
 
 // ---------------------------------------------------------------------------
-// SCOPE DISPLAY
+// SCOPE DISPLAY — the real frame-sampling scopes on the program monitor's video
+// (the old version drew pseudo-random dots shaped by the grade sliders).
 // ---------------------------------------------------------------------------
 
-const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const colorGrade = useVinxStore(s => s.colorGrade);
-  const width = 240;
-  const height = 120;
-
+function usePreviewVideo(): HTMLVideoElement | null {
+  const [el, setEl] = useState<HTMLVideoElement | null>(null);
   useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#080808';
-    ctx.fillRect(0, 0, width, height);
-    const cs = getComputedStyle(document.documentElement);
-    const accent = cs.getPropertyValue('--color-accent').trim() || '#4a9eff';
-    const textTertiary = cs.getPropertyValue('--color-text-tertiary').trim() || '#71717a';
+    const find = () => document.querySelector<HTMLVideoElement>('video[data-vinx-preview]');
+    setEl(find());
+    const id = window.setInterval(() => { const v = find(); setEl((prev) => (prev === v ? prev : v)); }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return el;
+}
 
-    // Grid
-    ctx.strokeStyle = '#1A1A1A';
-    ctx.lineWidth = 0.5;
-    for (let i = 1; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(0, height * i / 4); ctx.lineTo(width, height * i / 4); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(width * i / 4, 0); ctx.lineTo(width * i / 4, height); ctx.stroke();
-    }
-
-    // Derive visual params from color grade
-    const exp = colorGrade.exposure;
-    const con = colorGrade.contrast;
-    const sat = colorGrade.saturation;
-    const temp = colorGrade.temperature;
-    const tint = colorGrade.tint;
-    const hi = colorGrade.highlights;
-    const sh = colorGrade.shadows;
-
-    /** Pseudo-random seeded by index */
-    const prng = (seed: number) => {
-      const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
-      return x - Math.floor(x);
-    };
-
-    if (type === 'waveform') {
-      // Simulated luma waveform influenced by exposure/contrast/highlights/shadows
-      ctx.globalAlpha = 0.6;
-      for (let col = 0; col < width; col++) {
-        const n = 18 + Math.floor(prng(col) * 8);
-        for (let j = 0; j < n; j++) {
-          const base = prng(col * 100 + j);
-          let luma = base * 0.6 + 0.2; // baseline mid-range
-          luma += exp * 0.12;
-          luma += (luma > 0.5 ? hi : sh) * 0.001;
-          const contrast_factor = 1 + con * 0.5;
-          luma = 0.5 + (luma - 0.5) * contrast_factor;
-          luma = Math.max(0, Math.min(1, luma));
-          const y = (1 - luma) * height;
-          const intensity = 0.3 + prng(col + j * 300) * 0.5;
-          ctx.fillStyle = `rgba(200, 220, 200, ${intensity})`;
-          ctx.fillRect(col, y, 1.2, 1.2);
-        }
-      }
-      ctx.globalAlpha = 1;
-    } else if (type === 'vectorscope') {
-      // Vectorscope: dot cloud around center influenced by saturation/temp/tint
-      const cx = width / 2;
-      const cy = height / 2;
-      const maxR = Math.min(width, height) / 2 - 6;
-      ctx.strokeStyle = '#1A1A1A';
-      ctx.beginPath(); ctx.arc(cx, cy, maxR, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, cy, maxR * 0.5, 0, Math.PI * 2); ctx.stroke();
-      // Skin tone line
-      ctx.strokeStyle = '#3A2A1A';
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + maxR * 0.7, cy - maxR * 0.4); ctx.stroke();
-      ctx.globalAlpha = 0.5;
-      const satMul = Math.max(0.1, sat);
-      const tempOff = temp * 0.005;
-      const tintOff = tint * 0.003;
-      for (let i = 0; i < 400; i++) {
-        const angle = prng(i) * Math.PI * 2 + tempOff;
-        const dist = prng(i * 3 + 7) * maxR * 0.5 * satMul;
-        const x = cx + Math.cos(angle) * dist + tintOff * maxR;
-        const y = cy + Math.sin(angle) * dist;
-        const r = Math.floor(128 + Math.cos(angle) * 60);
-        const g = Math.floor(128 + Math.cos(angle + 2.1) * 60);
-        const b = Math.floor(128 + Math.cos(angle + 4.2) * 60);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect(x, y, 1.5, 1.5);
-      }
-      ctx.globalAlpha = 1;
-    } else if (type === 'histogram') {
-      // RGB histograms
-      const bins = 64;
-      const rBins = new Float32Array(bins);
-      const gBins = new Float32Array(bins);
-      const bBins = new Float32Array(bins);
-      for (let i = 0; i < 600; i++) {
-        let rv = prng(i * 2) + exp * 0.1 + temp * 0.002;
-        let gv = prng(i * 2 + 1) + exp * 0.1 - temp * 0.001 + tint * 0.001;
-        let bv = prng(i * 2 + 2) + exp * 0.1 - temp * 0.002;
-        rv = Math.max(0, Math.min(1, rv)); gv = Math.max(0, Math.min(1, gv)); bv = Math.max(0, Math.min(1, bv));
-        rBins[Math.floor(rv * (bins - 1))] += 1;
-        gBins[Math.floor(gv * (bins - 1))] += 1;
-        bBins[Math.floor(bv * (bins - 1))] += 1;
-      }
-      const maxVal = Math.max(1, ...(Array.from(rBins) as number[]), ...(Array.from(gBins) as number[]), ...(Array.from(bBins) as number[]));
-      const bw = width / bins;
-      ctx.globalAlpha = 0.5;
-      for (let i = 0; i < bins; i++) {
-        const x = i * bw;
-        const rh = (rBins[i] / maxVal) * height * 0.9;
-        const gh = (gBins[i] / maxVal) * height * 0.9;
-        const bh = (bBins[i] / maxVal) * height * 0.9;
-        ctx.fillStyle = '#FF6B6B'; ctx.fillRect(x, height - rh, bw - 0.5, rh);
-        ctx.fillStyle = '#6BCB77'; ctx.fillRect(x, height - gh, bw - 0.5, gh);
-        ctx.fillStyle = accent; ctx.fillRect(x, height - bh, bw - 0.5, bh);
-      }
-      ctx.globalAlpha = 1;
-    } else if (type === 'parade') {
-      // RGB Parade — 3 side-by-side waveforms
-      const third = Math.floor(width / 3);
-      const channels = [
-        { color: 'rgba(255,100,100,', offset: 0, tempBias: temp * 0.003 },
-        { color: 'rgba(100,200,120,', offset: third, tempBias: -temp * 0.001 + tint * 0.001 },
-        { color: 'rgba(74,158,255,', offset: third * 2, tempBias: -temp * 0.003 },
-      ];
-      ctx.globalAlpha = 0.6;
-      for (const ch of channels) {
-        for (let col = 0; col < third; col++) {
-          const n = 12 + Math.floor(prng(col + ch.offset) * 6);
-          for (let j = 0; j < n; j++) {
-            let v = prng(col * 50 + j + ch.offset * 17);
-            v += exp * 0.12 + ch.tempBias;
-            v = Math.max(0, Math.min(1, v));
-            const y = (1 - v) * height;
-            const alpha = 0.3 + prng(col + j * 200 + ch.offset) * 0.4;
-            ctx.fillStyle = `${ch.color}${alpha})`;
-            ctx.fillRect(ch.offset + col, y, 1.2, 1.2);
-          }
-        }
-      }
-      ctx.globalAlpha = 1;
-      // Divider lines
-      ctx.strokeStyle = '#2A2A2A'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(third, 0); ctx.lineTo(third, height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(third * 2, 0); ctx.lineTo(third * 2, height); ctx.stroke();
-    }
-
-    // Label
-    ctx.fillStyle = textTertiary;
-    ctx.font = '9px system-ui';
-    ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), 4, 12);
-  }, [type, width, height, colorGrade]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'block' }}
-    />
-  );
+const ScopeDisplay: React.FC<{ type: ScopeMode }> = memo(({ type }) => {
+  const video = usePreviewVideo();
+  return <ScopesPanel videoEl={video} mode={type} height={120} />;
 });
 
 ScopeDisplay.displayName = 'ScopeDisplay';

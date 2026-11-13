@@ -302,12 +302,6 @@ export function initUkiRendererBridge(): void {
           if (chosen) utterance.voice = chosen;
         }
       } catch { /* ignore voice selection failures */ }
-      utterance.onend = () => {
-        ipc.send?.('uki:tts:ended');
-      };
-      utterance.onerror = () => {
-        ipc.send?.('uki:tts:ended');
-      };
       window.speechSynthesis.speak(utterance);
     }
   });

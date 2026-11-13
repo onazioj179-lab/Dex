@@ -25,7 +25,6 @@ import { AppErrorBoundary } from './services/ErrorBoundary';
 import ToastProvider from './components/Toast';
 import { ModalProvider } from './shell/ModalHost';
 import {
-  BatchActionBar,
   FeedbackPanel,
   GlobalSearchOverlay,
   ScratchpadOverlay,
@@ -548,7 +547,6 @@ export const App: React.FC = () => {
         <ScratchpadOverlay />
         <FeedbackPanel />
         <TaskQueueStrip />
-        <BatchActionBar />
         <KeyboardShortcuts />
         <WorkspacePresetsPanel />
         <PermissionCenter />

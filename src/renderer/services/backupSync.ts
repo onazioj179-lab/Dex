@@ -19,8 +19,8 @@
  *                 + a best-effort timestamp/version heuristic (versioning-style).
  *
  * Offline folder sync writes/reads `.dexbackup` files via the same FS bridge the
- * editor apps use (`dialog:save-file` / `dialog:showOpenDialog` / `fs:write-file`
- * / `fs:read-file` / `fs:readdir`). When the bridge is absent (web preview), it
+ * editor apps use (`dialog:showSaveDialog` / `dialog:showOpenDialog` / `fs:writeText`
+ * / `fs:readText` / `fs:readdir`). When the bridge is absent (web preview), it
  * falls back to a Blob download and a file-input picker.
  */
 
@@ -293,10 +293,10 @@ export async function exportEncrypted(passphrase: string): Promise<ExportOutcome
   const fileName = defaultBackupName();
   const dex = bridge();
 
-  // Native path: save dialog -> fs:write-file.
+  // Native path: save dialog -> fs:writeText (atomic; failures are reported).
   if (dex) {
     try {
-      const result = await dex.invoke('dialog:save-file', {
+      const result = await dex.invoke('dialog:showSaveDialog', {
         defaultPath: fileName,
         filters: [
           { name: 'DEX Backup', extensions: [BACKUP_FILE_EXT] },
@@ -306,7 +306,8 @@ export async function exportEncrypted(passphrase: string): Promise<ExportOutcome
       if (!result || result.canceled || !result.filePath) {
         return { success: false, keyCount: payload.keyCount, error: 'Save cancelled.' };
       }
-      await dex.invoke('fs:write-file', result.filePath, envText);
+      const w = await dex.invoke('fs:writeText', result.filePath, envText);
+      if (!w?.ok) return { success: false, keyCount: payload.keyCount, error: w?.error || 'Could not write the backup file.' };
       recordBackup({ kind: 'export', location: result.filePath, keyCount: payload.keyCount });
       return { success: true, location: result.filePath, keyCount: payload.keyCount };
     } catch (err: any) {
@@ -386,8 +387,9 @@ export async function pickBackupFile(): Promise<{ text: string; location: string
       });
       if (!result || result.canceled || !result.filePaths?.length) return null;
       const path = result.filePaths[0];
-      const text = await dex.invoke('fs:read-file', path);
-      return { text, location: path };
+      const r = await dex.invoke('fs:readText', path);
+      if (!r?.ok) { console.error('[backupSync] pickBackupFile: read failed', r?.error); return null; }
+      return { text: String(r.content), location: path };
     } catch (err) {
       console.error('[backupSync] pickBackupFile: native open failed', err);
       return null;
@@ -590,7 +592,8 @@ export async function syncOutToFolder(folder: string, passphrase: string): Promi
     const payload = collectBackup();
     const envText = await encryptString(JSON.stringify(payload), passphrase);
     const path = joinPath(folder, defaultBackupName());
-    await dex.invoke('fs:write-file', path, envText);
+    const w = await dex.invoke('fs:writeText', path, envText);
+    if (!w?.ok) return { success: false, keyCount: payload.keyCount, error: w?.error || 'Could not write to the sync folder.' };
     recordBackup({ kind: 'sync-out', location: path, keyCount: payload.keyCount });
     return { success: true, location: path, keyCount: payload.keyCount };
   } catch (err: any) {
@@ -621,7 +624,9 @@ export async function syncInFromFile(path: string, passphrase: string): Promise<
   if (!dex) throw new Error('Folder sync needs the desktop app.');
   let text: string;
   try {
-    text = await dex.invoke('fs:read-file', path);
+    const r = await dex.invoke('fs:readText', path);
+    if (!r?.ok) throw new Error(r?.error || 'Could not read the backup file.');
+    text = String(r.content);
   } catch (err: any) {
     throw new Error(err?.message || 'Could not read the backup file.');
   }

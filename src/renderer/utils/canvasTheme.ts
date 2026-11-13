@@ -40,3 +40,16 @@ export function canvasColor(name: string, el?: Element | null): string {
   } catch { /* non-DOM environment */ }
   return FALLBACKS[name] ?? '#ffffff';
 }
+
+/**
+ * Resolve any color string for canvas use: `var(--token)` (optionally with a
+ * fallback, `var(--token, #fff)`) becomes the live token value; anything else
+ * passes through. For stored colors that may hold a theme token.
+ */
+export function resolveCanvasColor(color: string | undefined | null, el?: Element | null): string {
+  if (!color) return '#ffffff';
+  const m = /^var\(\s*(--[\w-]+)\s*(?:,\s*(.+?))?\s*\)$/.exec(color.trim());
+  if (!m) return color;
+  const v = canvasColor(m[1], el);
+  return v === '#ffffff' && m[2] && !(m[1] in FALLBACKS) ? m[2] : v;
+}

@@ -993,10 +993,7 @@ const DexNotes: React.FC = () => {
               ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="3" y="8" width="2" height="6"/><rect x="7" y="4" width="2" height="10"/><rect x="11" y="2" width="2" height="12"/></svg></button>
               <button
                 aria-label="Open Trash"
-                onClick={() => {
-                  const dex = (window as any).dex;
-                  if (dex?.invoke) dex.invoke('app:launch', 'recyclebin');
-                }}
+                onClick={() => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'recyclebin' } }))}
                 style={{ ...S.footerBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}
                 title="Open Trash"
               ><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><polyline points="2 4 3.5 4 14 4"/><path d="M12.5 4l-.7 9.3a1.3 1.3 0 0 1-1.3 1.2H5.5a1.3 1.3 0 0 1-1.3-1.2L3.5 4"/><path d="M6.5 7v4M9.5 7v4"/><path d="M5.5 4V2.7a.7.7 0 0 1 .7-.7h3.6a.7.7 0 0 1 .7.7V4"/></svg></button>
