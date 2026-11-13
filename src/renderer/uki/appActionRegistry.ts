@@ -164,6 +164,22 @@ export function runnableActionToolSpecs(): ToolSpec[] {
   return listRunnableUkiActions().map((e) => actionToToolSpec(e.spec));
 }
 
+/** Every registered action, running app or not (for choosing one to schedule). */
+export function listKnownUkiActions(): AppActionEntry[] {
+  return listAppActions(registry);
+}
+
+/** The registered entry for an action id, if any. */
+export function getUkiAppAction(id: string): AppActionEntry | undefined {
+  return getAppAction(registry, id) ?? undefined;
+}
+
+/** True when the app that owns `id` is running and the action is registered. */
+export function isUkiActionReady(id: string): boolean {
+  const e = getAppAction(registry, id);
+  return !!e && runningAppIds().has(e.appId);
+}
+
 /** True if `id` is a registered app action (vs. a core tool). */
 export function isUkiAppAction(id: string): boolean {
   return !!getAppAction(registry, id);
@@ -174,7 +190,12 @@ export function isUkiAppAction(id: string): boolean {
  * throws — errors, missing apps and denied confirmations all come back as a
  * RESULT the agent can read and recover from.
  */
-export async function runUkiAction(id: string, args: Record<string, unknown>): Promise<string> {
+export async function runUkiAction(
+  id: string,
+  args: Record<string, unknown>,
+  /** preApproved: the user approved this exact call ahead of time (a scheduled task). */
+  opts: { preApproved?: boolean } = {},
+): Promise<string> {
   const entry = getAppAction(registry, id);
   if (!entry) return `Unknown app action "${id}".`;
   const redacted = redactArgs(args);
@@ -183,7 +204,7 @@ export async function runUkiAction(id: string, args: Record<string, unknown>): P
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
     return result;
   }
-  if (entry.spec.mutates) {
+  if (entry.spec.mutates && !opts.preApproved) {
     let allowed = false;
     if (confirmHandler) {
       try {
@@ -200,7 +221,8 @@ export async function runUkiAction(id: string, args: Record<string, unknown>): P
   }
   try {
     const out = await entry.handler(args);
-    const result = typeof out === 'string' && out.trim() ? out : 'Done.';
+    const text = typeof out === 'string' && out.trim() ? out : 'Done.';
+    const result = entry.spec.mutates && opts.preApproved ? `${text} (approved when scheduled)` : text;
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'ran', result });
     return result;
   } catch (e) {

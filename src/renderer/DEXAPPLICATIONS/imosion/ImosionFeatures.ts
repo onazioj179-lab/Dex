@@ -494,7 +494,7 @@ export const formatBarPosition = (bars: number): string => {
 export const saveCustomTemplates = (templates: TrackTemplate[]) => {
   try {
     const custom = templates.filter(t => !t.isBuiltIn);
-    localStorage.setItem('dex-imosion-templates', JSON.stringify(custom));
+    persistOrWarn('dex-imosion-templates', JSON.stringify(custom), 'your Imosion track templates');
   } catch (error) {
     console.warn('Failed to save templates:', error);
   }

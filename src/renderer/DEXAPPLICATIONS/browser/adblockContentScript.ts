@@ -28,6 +28,8 @@
 export interface AdblockScriptOptions {
   blockAds: boolean;
   blockTrackers: boolean;
+  /** Element-hiding selectors for this page (already filtered by safeSelector). */
+  cosmetic?: readonly string[];
 }
 
 /** Console marker the injected script logs; the host parses "<PREFIX><n>". */
@@ -56,6 +58,13 @@ export function buildAdblockScript(
   const pathsJson = JSON.stringify(paths);
   const patternsJson = JSON.stringify(opts.blockTrackers ? ['/beacon', 'track.php', '&_ga='] : []);
   const prefix = JSON.stringify(ADBLOCK_CONSOLE_PREFIX);
+  // One rule per selector: the CSS parser drops an invalid rule on its own
+  // instead of discarding the whole sheet.
+  const cosmeticCss = JSON.stringify(
+    opts.blockAds && opts.cosmetic?.length
+      ? opts.cosmetic.map((s) => `${s}{display:none !important}`).join('\n')
+      : '',
+  );
 
   return `(function(){
   try {
@@ -66,6 +75,18 @@ export function buildAdblockScript(
     var PATTERNS = ${patternsJson};
     var PREFIX = ${prefix};
     var blocked = 0, reportTimer = 0;
+    var COSMETIC = ${cosmeticCss};
+    if (COSMETIC) {
+      var addStyle = function(){
+        try {
+          var st = document.createElement('style');
+          st.setAttribute('data-dex-cosmetic', '');
+          st.textContent = COSMETIC;
+          (document.head || document.documentElement).appendChild(st);
+        } catch(e){}
+      };
+      if (document.documentElement) addStyle(); else document.addEventListener('DOMContentLoaded', addStyle);
+    }
     function norm(h){ h = (h||'').toLowerCase(); if (h.indexOf('www.')===0) h = h.slice(4); return h.replace(/\\.$/,'').replace(/:\\d+$/,''); }
     function hostBlocked(host){
       var h = norm(host); if (!h) return false;

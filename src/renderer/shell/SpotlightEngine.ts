@@ -1716,15 +1716,24 @@ export class SpotlightEngine {
   private _searchIndex(query: string): SpotlightResult[] {
     const results: SpotlightResult[] = [];
 
+    const ql = query.trim().toLowerCase();
     for (const item of this._index) {
       const match = fuzzyMatch(query, item.title);
-      const subtitleMatch = item.subtitle ? fuzzyMatch(query, item.subtitle) : null;
+      // A name that starts with what was typed is the strongest signal.
+      if (match && item.title.toLowerCase().startsWith(ql)) match.score += 40;
+      // Matches only on the subtitle (often a folder path) or hidden keywords
+      // count for less than a match on the name: a PDF whose FOLDER contained
+      // "calc" used to outrank the Calculator app for "calc".
+      // The cut-off below still uses the raw score, so keyword-only finds
+      // (settings, app keywords) keep showing up; only their ORDER drops.
+      const weak = (m: { score: number; highlights: HighlightSpan[] } | null) => (m ? { ...m, score: m.score * 0.6, raw: m.score } : null);
+      const subtitleMatch = item.subtitle ? weak(fuzzyMatch(query, item.subtitle)) : null;
       // Also check searchText for keyword matches (settings, app keywords etc.)
-      const searchTextMatch = item.searchText ? fuzzyMatch(query, item.searchText) : null;
-      const candidates = [match, subtitleMatch, searchTextMatch].filter(Boolean) as { score: number; highlights: HighlightSpan[] }[];
+      const searchTextMatch = item.searchText ? weak(fuzzyMatch(query, item.searchText)) : null;
+      const candidates = [match, subtitleMatch, searchTextMatch].filter(Boolean) as { score: number; highlights: HighlightSpan[]; raw?: number }[];
       const bestMatch = candidates.sort((a, b) => b.score - a.score)[0];
 
-      if (bestMatch && bestMatch.score > 20) {
+      if (bestMatch && (bestMatch.raw ?? bestMatch.score) > 20) {
         const titleHighlights = match === bestMatch ? bestMatch.highlights : [];
         results.push({
           id: item.id,

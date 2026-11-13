@@ -326,6 +326,7 @@ const Canvas: React.FC = () => {
     objects: objectsRef.current,
   }), []);
 
+  const saveFailedRef = useRef(false);
   const persist = useCallback(() => {
     const idx = boardsRef.current;
     if (!idx || !idx.activeId) return;
@@ -333,8 +334,13 @@ const Canvas: React.FC = () => {
     const next = touchBoard(idx, idx.activeId);
     boardsRef.current = next;
     setBoards(next);
-    void saveBoard(idx.activeId, payload);
-    void saveIndex(next);
+    // A failed IndexedDB write used to vanish (void promise); say so once.
+    Promise.all([saveBoard(idx.activeId, payload), saveIndex(next)]).then(() => { saveFailedRef.current = false; }, (e) => {
+      console.warn('[Canvas] save failed', e);
+      if (saveFailedRef.current) return;
+      saveFailedRef.current = true;
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "Couldn't save this board. Export it as an image so your latest changes aren't lost." } }));
+    });
   }, [snapshot]);
 
   // Replace the layer stack with a stored board (or one blank layer).

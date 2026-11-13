@@ -13,8 +13,10 @@
 >    rehydrate as *failed* — crash honesty; >8s tasks notify on finish). Agent loop (`uki/agentRunner.ts`) now
 >    ledgers every tool-using run (lazily — pure Q&A stays out). Nexus "UKI Activity" panel gained a Background
 >    Tasks section (status chips, last step, Clear finished). New agent-callable `notes.enhance` app action
->    (confirm-gated, append-only, degrades without a provider key). NEXT: task queue UKI can *schedule* (cron
->    primitives exist in `shared/automation/`), self-re-check loops that retry stalled work, richer text assist
+>    (confirm-gated, append-only, degrades without a provider key). ✅ (2026-11-11) UKI can *schedule*: core tools
+>    `schedule_task` / `list_scheduled_tasks` / `cancel_scheduled_task` (create/delete always ask first), plain-English
+>    times (`shared/automation/scheduleSpec.ts`), one-time tasks, and "Ask UKI" tasks that run a prompt when they fire
+>    (failures retry with backoff, shown in Task Manager › System). See DEX_REMAINING_WORK #159. NEXT: richer text assist
 >    across apps (Notes has it; extend to Mail-style surfaces), wiring `src-tauri/task_queue.rs` to the renderer.
 > 3. **Speed (~80% faster open/nav/drag) — mostly LANDED, keep tightening.** Audit confirmed: per-app lazy chunks
 >    + predictive prewarm, keep-alive (never remount on nav), rAF-batched drag with GPU transform + zero content
@@ -92,8 +94,8 @@
 > ad `<script>/<img>/<iframe>` as they insert — REAL sub-resource blocking. Reports blocks via a console
 > marker the host tallies into `blockedCount`. On by default (blockAds+blockTrackers default true). 26 unit
 > tests incl. a code-injection-breakout guard + behavioral eval; live-verified in WebView2 (all APIs present,
-> matcher correct, fetch override blocks ad + passes legit + restores). NEXT track-5: cosmetic filter lists
-> (element hiding), EasyList import, per-site shields UI toggle. Other remaining: ~~Vinx 3D-LUT math~~ ✅ 2026-11-12 (#158); Forge
+> matcher correct, fetch override blocks ad + passes legit + restores). ✅ (2026-11-12) track-5: element hiding,
+> EasyList-style list import and per-site Shields (DEX_REMAINING_WORK #157). Native WebView2 request blocking ✅ 2026-11-12 (#165). Other remaining: ~~Vinx 3D-LUT math~~ ✅ 2026-11-12 (#158); Forge
 > WebCodecs muxer; Imosion take comping; track 2 (UKI scheduling); track 6 (Store lifecycle).
 >
 > **TRACK 6 — STORE APP LIFECYCLE ✅ (2026-07-02):** Install/remove/reinstall/reset is real (mandate:
@@ -163,7 +165,7 @@
 > backoff). LIVE-VERIFIED end-to-end: created a reminder in the UI (persists + shows "every 60 min"/1 active),
 > forced it past-due, and the runner's boot tick fired it (runCount 1, outcome ok), logged an 'automation'
 > task in the UKI ledger (status done), and rescheduled to the future. ALL 7 MANDATE TRACKS NOW SHIPPED.
-> NEXT (polish, not new tracks): app-action scheduled tasks w/ pre-approval; Settings schedule UI; per-site
+> NEXT (polish, not new tracks): ~~app-action scheduled tasks w/ pre-approval~~ ✅ 2026-11-12 (#162); Settings schedule UI; per-site
 > browser shields; Vinx 3D-LUT; Forge muxer; Imosion take comping.
 > 5. **Browser.** Speed, security, reliability; **ad-blocking ON by default**; background-first operation with
 >    popups only for necessary notices.
@@ -257,6 +259,7 @@
 >   Control Center collapsible/pinnable sections; delete dead `shell/FloatingWindow.tsx`+`snapEngine.ts`+
 >   `WindowDepthManager.ts`; delete 6 dead duplicate `:focus-visible` blocks in design-system.css; reconcile the
 >   3 motion-duration scales. Full findings in this session's `dex-design-audit` workflow output.
+>   **2026-11-12 (#164):** duplicate focus rules DONE — one canonical ring now (11 competing global/halo rules removed across design-system.css, design-tokens.css, globals.css); purple "AI" gradients → solid accent; coloured halos out of shared shadow tokens; dead glow/gradient-text CSS deleted.
 >
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
@@ -3592,10 +3595,18 @@ These need DSP/ML or native hosting we don't fake.
 
 - Presentation: debounced autosave with a visible failure state, recovery of an unreadable stored deck, undo/redo, deck files (#151).
 
+## Checkpoint 2026-11-12 (backlog cleanup, eval ratchet, unslop pass 2, AXL save pass)
+
+- Backlog cleared of finished work: `DEX_REMAINING_WORK.md` now lists only rows with work left (43) plus a compact table of finished rows waiting on a packaged-app, hardware, provider-key or owner check (49). 154 completed rows moved to `docs/reports/DEX_COMPLETED_WORK.md` with their numbers unchanged.
+- Security: the unused `shared/motion3d` evaluators (same string-splitting hole FLUX had, #161) deleted; `dynamic-code-ratchet.test.ts` lists every `new Function`/`eval` site with its reason (#166). Orphans `DEXAPPLICATIONS/index.ts` and `MarkdownEditor.tsx` deleted.
+- UI unslop pass 2: decorative 135° gradients flattened (Home icon fallbacks, splash, Imosion, Settings, Share, PRISM swatches, VINX offline clip); 19 dead gradient CSS rules and the unused `DEX_THEME` removed (#167). Left: header heights, Control Center.
+- AXL: true save status, a full store no longer throws inside edits, checked Open Project, New/Open keep the old project as a checkpoint, drop/import use the real mesh importer, export failures shown (#168).
+- Next: Imosion/Canvas save indicators and Forge (#77), `{success:false}` sweep on non-file channels (#61), test-only orphan pruning (#53), packaged runs listed at the end of the backlog.
+
 ## Checkpoint 2026-11-12 (18n: no fake data, unhandled native calls)
 
-- Mock / fake data sweep (owner, 2026-11-05) merged with main; `DEX_REMAINING_WORK.md` #159. Main's `download_ctl.rs` kept over this branch's `download.rs`; main's Ledger (opt-in starter categories) and Bio (labelled opt-in sample) kept.
-- Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#160). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
+- Mock / fake data sweep (owner, 2026-11-05) merged with main; `DEX_REMAINING_WORK.md` #169. Main's `download_ctl.rs` kept over this branch's `download.rs`; main's Ledger (opt-in starter categories) and Bio (labelled opt-in sample) kept.
+- Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#170). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
 - Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
 - Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
-- 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #161), Flux camera + invisible-shape fix (#162), Weather widget icon, collaboration PIN from the CSPRNG.
+- 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #171), Flux camera + invisible-shape fix (#172), Weather widget icon, collaboration PIN from the CSPRNG.

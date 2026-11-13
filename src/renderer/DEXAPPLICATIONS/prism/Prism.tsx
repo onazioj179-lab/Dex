@@ -12,7 +12,7 @@ import type { MenuGroup } from '../../components/appShell/menuTypes';
 import { useAppLifecycle } from '../../hooks/useAppLifecycle';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
+import { useAutoSave, loadAutoSave, type AutoSaveResult } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
@@ -373,19 +373,22 @@ const Prism: React.FC = () => {
   // declared, so the snapshot can include them (they were previously lost on a
   // crash). It reads a ref so the heavy data-URL layer payload is serialized only
   // on the autosave tick, not on every brush stroke or slider drag.
-  // Surface autosave lifecycle in the header. While there are unsaved edits we
-  // show "Saving...", then settle to "Saved <relative>" once edits stop landing.
+  // The header shows what the crash-recovery autosave actually did (it used to
+  // flip to "Saved" 800 ms after any edit, whether or not anything was written).
   const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  useEffect(() => {
-    if (!isDirty) return;
-    setAutosaveState('saving');
-    const t = setTimeout(() => {
-      setAutosaveState('saved');
-      setLastSavedAt(Date.now());
-    }, 800);
-    return () => clearTimeout(t);
-  }, [isDirty, layers, selectedLayerId, activeTool]);
+  const [changedSinceAutosave, setChangedSinceAutosave] = useState(false);
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const onAutoSave = useCallback((r: AutoSaveResult) => {
+    if (r.ok) { setAutosaveState('saved'); setLastSavedAt(r.at); setChangedSinceAutosave(false); setAutosaveError(null); }
+    else {
+      setAutosaveState('error');
+      setAutosaveError(r.reason === 'quota'
+        ? 'Recovery copy not saved: app storage is full (large images). Use Save to keep a project file.'
+        : 'Recovery copy not saved. Use Save to keep a project file.');
+    }
+  }, []);
+  // The one-time warning toast comes from persistOrWarn inside useAutoSave.
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
@@ -426,7 +429,27 @@ const Prism: React.FC = () => {
   const prismSnapshotRef = useRef({ layers, selectedLayerId, activeTool, canvasSize, adjustments: { brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance } });
   prismSnapshotRef.current = { layers, selectedLayerId, activeTool, canvasSize, adjustments: { brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance } };
   const getPrismSnapshot = useCallback(() => prismSnapshotRef.current, []);
-  useAutoSave('prism', getPrismSnapshot, isDirty, 30_000);
+  useAutoSave('prism', getPrismSnapshot, isDirty, 30_000, onAutoSave);
+  // Any change to the picture marks the work unsaved (several edit paths never
+  // set the flag, and nothing ever cleared it; Save now does).
+  // Restores at start (recovery copy, workspace) also change these, so only
+  // changes after the user's first pointer or key input count as edits.
+  const editMarkReady = useRef(false);
+  useEffect(() => {
+    const arm = () => { editMarkReady.current = true; };
+    const armKey = (e: KeyboardEvent) => { if (keyEventForApp(e, 'prism')) arm(); };
+    window.addEventListener('pointerdown', arm, { capture: true, once: true });
+    window.addEventListener('keydown', armKey, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', arm, { capture: true });
+      window.removeEventListener('keydown', armKey, { capture: true });
+    };
+  }, []);
+  useEffect(() => {
+    if (!editMarkReady.current) return;
+    setIsDirty(true);
+    setChangedSinceAutosave(true);
+  }, [layers, canvasSize, brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance]);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number; layerId: string | null }>({ visible: false, x: 0, y: 0, layerId: null });
@@ -1298,6 +1321,12 @@ const Prism: React.FC = () => {
   }, []);
 
   const exportImage = useCallback(async (format: 'png' | 'jpg' | 'webp', quality: number = 100) => {
+    try { await exportImageInner(format, quality); } catch {
+      // A layer picture that fails to decode used to reject silently.
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Export failed: a layer picture could not be read.' } }));
+    }
+  }, [layers, canvasSize]);
+  const exportImageInner = async (format: 'png' | 'jpg' | 'webp', quality: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -1342,7 +1371,7 @@ const Prism: React.FC = () => {
     link.href = exportCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : format}`, quality / 100);
     link.click();
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'imagesEdited', amount: 1 } }));
-  }, [layers, canvasSize]);
+  };
 
   // ===== HISTORY (UNDO/REDO) =====
   // Push initial history state when first layer is added
@@ -1395,7 +1424,48 @@ const Prism: React.FC = () => {
     a.download = `prism-project-${new Date().toISOString().slice(0, 10)}.prism.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setIsDirty(false);
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Saved ${a.download}.` } }));
   }, [canvasSize, layers, brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance]);
+
+  // ===== OPEN PROJECT (.prism.json written by Save) =====
+  // Save produced project files that nothing could open again.
+  const openProject = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const toast = (type: 'success' | 'error', message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+      try {
+        const p = JSON.parse(await file.text());
+        const okSize = p?.canvasSize && Number.isFinite(p.canvasSize.width) && Number.isFinite(p.canvasSize.height);
+        if (!p || p.version !== 1 || !Array.isArray(p.layers) || p.layers.length === 0 || !okSize) throw new Error('not a Prism project');
+        if (layers.length > 0 && isDirty && !window.confirm('Replace the current image with this project? Unsaved changes will be lost.')) return;
+        // Only pictures embedded in the file are kept, so opening a project
+        // never makes PRISM fetch a URL named inside it.
+        let unembedded = 0;
+        p.layers = (p.layers as Layer[]).map((l) => {
+          if (l && typeof l.imageData === 'string' && !l.imageData.startsWith('data:image/')) { unembedded++; const { imageData: _x, ...rest } = l; return rest as Layer; }
+          return l;
+        });
+        pushHistory('Open Project');
+        setCanvasSize({ width: p.canvasSize.width, height: p.canvasSize.height });
+        setLayers(p.layers as Layer[]);
+        setSelectedLayerId((p.layers[p.layers.length - 1] as Layer).id);
+        const a = p.adjustments || {};
+        const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+        setBrightness(num(a.brightness, 0)); setContrast(num(a.contrast, 0)); setSaturation(num(a.saturation, 0));
+        setHue(num(a.hue, 0)); setExposure(num(a.exposure, 0)); setHighlights(num(a.highlights, 0));
+        setShadows(num(a.shadows, 0)); setTemperature(num(a.temperature, 0)); setTint(num(a.tint, 0)); setVibrance(num(a.vibrance, 0));
+        toast('success', `Opened ${file.name}${unembedded ? ` (${unembedded} layer picture(s) were not embedded in the file and were left out)` : ''}`);
+      } catch {
+        toast('error', "That file isn't a Prism project");
+      }
+    };
+    input.click();
+  }, [layers, isDirty, pushHistory]);
 
   // ===== APPLY FILTER PRESET =====
   const applyFilterPreset = useCallback((preset: FilterPreset) => {
@@ -3009,8 +3079,15 @@ const Prism: React.FC = () => {
         </div>
         <div style={styles.headerCenter}>
           <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
-          <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project">{Icons.save} Save</button>
-          <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
+          <button className="prism-btn" style={styles.btn} onClick={openProject} aria-label="Open project" title="Open a .prism.json project saved with Save">{Icons.folder} Open Project</button>
+          <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project" title="Save the project as a .prism.json file (Ctrl+S)">{Icons.save} Save</button>
+          <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
+            <AutosaveIndicator
+              state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}
+              lastSavedAt={lastSavedAt}
+              label={autosaveError ? 'Not saved' : changedSinceAutosave ? 'Unsaved changes' : undefined}
+            />
+          </span>
           <button className="prism-btn" style={styles.btn} onClick={() => exportImage('png')} aria-label="Export image">{Icons.download} Export</button>
           <span style={{ position: 'relative', display: 'inline-flex' }}>
             <button className="prism-btn" style={styles.btn} onClick={() => setShowImageInfo(v => !v)} aria-expanded={showImageInfo} aria-label="Image info">Info</button>
@@ -3645,7 +3722,7 @@ const Prism: React.FC = () => {
                   { name: 'Sepia', id: 'sepia' as FilterName, color: '#a16207' },
                 ]).map(filter => (
                   <button key={filter.id} onClick={() => setActiveFilter(activeFilter === filter.id ? null : filter.id)} aria-label={`${filter.name} filter`} style={{ ...styles.btn, flexDirection: 'column', padding: 'var(--space-3) var(--space-2)', border: activeFilter === filter.id ? '1px solid var(--dex-focus-color, #fff)' : undefined }}>
-                    <div style={{ width: '40px', height: '40px', background: `linear-gradient(135deg, ${filter.color}, ${filter.color}88)`, borderRadius: '4px', marginBottom: '4px' }} />
+                    <div style={{ width: '40px', height: '40px', background: filter.color, borderRadius: '4px', marginBottom: '4px' }} />
                     <span style={{ fontSize: '11px' }}>{filter.name}</span>
                   </button>
                 ))}

@@ -19,7 +19,6 @@ const ALLOWED = new Set([
   'src/renderer/DEXAPPLICATIONS/forge/Forge.tsx:handleKey',             // Escape closes its own menu
   'src/renderer/DEXAPPLICATIONS/imosion/Imosion.tsx:resume',            // once: resumes the AudioContext
   'src/renderer/DEXAPPLICATIONS/standalone/KanbanApp.tsx:onKey',        // Escape closes its own dialog
-  'src/renderer/DEXAPPLICATIONS/standalone/MarkdownEditor.tsx:handleKey', // not mounted anywhere
   'src/renderer/pages/settingsPanels/SpatialDesktopPanel.tsx:onKey',    // shortcut capture while recording
 ]);
 

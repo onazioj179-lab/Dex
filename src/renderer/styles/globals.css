@@ -2449,17 +2449,6 @@ textarea,
   background: var(--bg-inset);
 }
 
-.vault-item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
 .vault-item-info {
   flex: 1;
 }
@@ -2488,25 +2477,6 @@ textarea,
   gap: 16px;
   padding: 40px 0;
   cursor: pointer;
-}
-
-.voice-orb {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  transition: all var(--duration-normal) var(--ease-out);
-  box-shadow: 0 4px 24px rgba(16, 185, 129, 0.3);
-}
-
-.voice-orb.listening {
-  transform: scale(1.02);
-  box-shadow: 0 4px 32px rgba(16, 185, 129, 0.5);
-  animation: voiceOrbPulse 2s infinite;
 }
 
 @keyframes voiceOrbPulse {
@@ -2571,17 +2541,6 @@ textarea,
   border-radius: var(--radius-md);
 }
 
-.automation-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #06b6d4, #0891b2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
 .automation-info {
   flex: 1;
 }
@@ -2627,30 +2586,6 @@ textarea,
   gap: 12px;
 }
 
-.device-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  text-align: center;
-}
-
-.device-card.connected {
-  border: 2px solid var(--accent);
-}
-
-.device-card.current {
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.1), rgba(0, 122, 255, 0.05));
-  border: 2px solid var(--accent);
-}
-
-.device-card svg {
-  color: var(--text-secondary);
-}
-
 .device-name {
   font-size: 13px;
   font-weight: 500;
@@ -2686,17 +2621,6 @@ textarea,
   padding: 14px 16px;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-}
-
-.transfer-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #14b8a6, #0d9488);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
 }
 
 .transfer-info {
@@ -2867,17 +2791,6 @@ textarea,
   padding: 14px 16px;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-}
-
-.learning-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
 }
 
 .learning-info {
@@ -3066,17 +2979,6 @@ textarea,
   padding: 14px 16px;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-}
-
-.plugin-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #84cc16, #65a30d);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
 }
 
 .plugin-info {
@@ -5194,12 +5096,6 @@ html.focus-mode,
   min-height: 44px;
 }
 
-/* Improved focus ring for dark themes */
-@media (prefers-color-scheme: dark) {
-  :focus-visible {
-    outline-color: #4a9eff !important;
-  }
-}
 
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
@@ -5810,14 +5706,6 @@ html[data-dex-large-text] * {
 
 /* Glow on hover */
 .dex-hover-glow,
-[data-hover-glow] {
-  transition: box-shadow 0.2s ease;
-}
-
-.dex-hover-glow:hover,
-[data-hover-glow]:hover {
-  box-shadow: 0 0 20px rgba(10, 132, 255, 0.3);
-}
 
 /* =============================================================================
    LOADING STATES

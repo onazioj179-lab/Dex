@@ -4078,7 +4078,7 @@ export const Settings: React.FC = () => {
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
-                  background: `linear-gradient(135deg, ${app.color}44, ${app.color}22)`,
+                  background: `${app.color}33`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 700, color: app.color,
                 }}>
@@ -4105,7 +4105,7 @@ export const Settings: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
                 width: 48, height: 48, borderRadius: 10,
-                background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
+                background: `${detail.color}33`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
               }}>
@@ -4810,11 +4810,11 @@ const styles: Record<string, React.CSSProperties> = {
     width: '72px',
     height: '72px',
     borderRadius: '14px',
-    background: 'linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)',
+    background: 'var(--color-accent)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 16px var(--color-accent-muted, rgba(10,132,255,0.3)), 0 1px 3px rgba(0,0,0,0.2)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
   },
   appInfo: {
     display: 'flex',

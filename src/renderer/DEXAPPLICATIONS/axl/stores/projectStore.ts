@@ -9,7 +9,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { axlStateStorage } from '../axlPersistence';
 import type {
   AXLProject, Part, Constraint, ConstraintType, Measurement, GDTAnnotation,
   BOMEntry, Material, PartFeature, PrimitiveType, BooleanOp, Vec3,
@@ -752,6 +753,8 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: 'axl-project',
+      // Writes never throw inside an edit; a failed write is shown in the toolbar.
+      storage: createJSONStorage(() => axlStateStorage),
       partialize: (state) => ({ project: state.project }),
       merge: (persisted: any, current: any) => {
         const merged = { ...current, ...persisted };

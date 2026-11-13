@@ -17,7 +17,8 @@ import { CreativeSlider } from '../../components/controls';
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
+import { useAutoSave, loadAutoSave, type AutoSaveResult } from '../../utils/useAutoSave';
+import { parseFluxProject } from './fluxProject';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
@@ -462,6 +463,8 @@ const PARTICLE_PRESETS: ParticlePreset[] = [
 const Flux: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   useUnsavedGuard(isDirty);
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
   // Creative app settings from Settings page
   // Track app usage
   useAppTracking('flux');
@@ -476,9 +479,21 @@ const Flux: React.FC = () => {
   // Crash-recovery autosave is wired further down, after the document state
   // (layers/settings) is declared — at this point those are not yet in scope,
   // which is why this used to save a useless `{ isDirty: true }` placeholder.
-  // Header autosave status: "Saving..." while edits are landing, then "Saved".
+  // Header autosave status, from what the crash-recovery autosave actually
+  // wrote (it used to flip to "Saved" 800 ms after any edit regardless).
   const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [changedSinceAutosave, setChangedSinceAutosave] = useState(false);
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const onAutoSave = useCallback((r: AutoSaveResult) => {
+    if (r.ok) { setAutosaveState('saved'); setLastSavedAt(r.at); setChangedSinceAutosave(false); setAutosaveError(null); }
+    else {
+      setAutosaveState('error');
+      setAutosaveError(r.reason === 'quota'
+        ? 'Recovery copy not saved: app storage is full. Use Save Project to keep a file.'
+        : 'Recovery copy not saved. Use Save Project to keep a file.');
+    }
+  }, []);
 
   const { dropProps, dropOverlayStyle } = useFileDrop(
     ['image/*', 'video/*', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm'],
@@ -518,15 +533,6 @@ const Flux: React.FC = () => {
   // Start with empty canvas — user adds layers as needed
   const [layers, setLayers] = useState<Layer[]>(() => []);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isDirty) return;
-    setAutosaveState('saving');
-    const t = setTimeout(() => {
-      setAutosaveState('saved');
-      setLastSavedAt(Date.now());
-    }, 800);
-    return () => clearTimeout(t);
-  }, [isDirty, layers]);
   const [showEasingPopover, setShowEasingPopover] = useState(false);
   const [showMorphModal, setShowMorphModal] = useState(false);
   const [morphPathInput, setMorphPathInput] = useState('');
@@ -620,7 +626,26 @@ const Flux: React.FC = () => {
     layers: layers.map(l => ({ ...l, content: typeof l.content === 'string' ? l.content : undefined })),
     settings: { fps, duration, canvasSize, is3DMode },
     timestamp: Date.now(),
-  }), [layers, fps, duration, canvasSize, is3DMode]), isDirty, 30_000);
+  }), [layers, fps, duration, canvasSize, is3DMode]), isDirty, 30_000, onAutoSave);
+  // Any change to the document after the user's first pointer or key input in
+  // FLUX marks the work unsaved (several edit paths never set the flag and
+  // nothing cleared it; Save Project now does). Restores at start don't count.
+  const editMarkReady = useRef(false);
+  useEffect(() => {
+    const arm = () => { editMarkReady.current = true; };
+    const armKey = (e: KeyboardEvent) => { if (keyEventForApp(e, 'flux')) arm(); };
+    window.addEventListener('pointerdown', arm, { capture: true, once: true });
+    window.addEventListener('keydown', armKey, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', arm, { capture: true });
+      window.removeEventListener('keydown', armKey, { capture: true });
+    };
+  }, []);
+  useEffect(() => {
+    if (!editMarkReady.current) return;
+    setIsDirty(true);
+    setChangedSinceAutosave(true);
+  }, [layers, fps, duration, canvasSize, is3DMode]);
   
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1588,6 +1613,12 @@ const Flux: React.FC = () => {
         exportVideo();
         return;
       }
+      // Ctrl+O was listed in the File menu but never handled.
+      if (mod && e.key === 'o') {
+        e.preventDefault();
+        openProject();
+        return;
+      }
       switch (e.code) {
         case 'Space':
           e.preventDefault();
@@ -2293,6 +2324,9 @@ const Flux: React.FC = () => {
     a.download = `flux-project-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setIsDirty(false);
+    const dropped = layers.filter(l => l.content !== undefined && typeof l.content !== 'string').length;
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: dropped ? 'warning' : 'success', message: `Saved ${a.download}.${dropped ? ` ${dropped} image/video layer(s) keep their settings but not the media itself; add the media again after opening.` : ''}` } }));
   }, [layers, fps, duration, canvasSize, is3DMode]);
 
   // ===== OPEN PROJECT =====
@@ -2303,38 +2337,48 @@ const Flux: React.FC = () => {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      // A refused or broken file used to be reported only in the console, and
+      // the file's settings were applied unchecked.
+      const toast = (type: 'success' | 'warning' | 'error', message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
       try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (data.appId !== 'flux') {
-          console.warn('[Flux] Not a Flux project file');
-          return;
-        }
-        if (data.layers) setLayers(data.layers);
-        if (data.settings) {
-          if (data.settings.fps) setFps(data.settings.fps);
-          if (data.settings.duration) setDuration(data.settings.duration);
-          if (data.settings.canvasSize) setCanvasSize(data.settings.canvasSize);
-          if (data.settings.is3DMode !== undefined) setIs3DModeGated(data.settings.is3DMode);
-        }
-        if (data.layers?.length > 0) setSelectedLayerId(data.layers[0].id);
+        if (file.size > 100 * 1024 * 1024) throw new Error('The file is larger than 100 MB.');
+        const { layers: opened, settings, warnings } = parseFluxProject<Layer>(await file.text());
+        if (isDirtyRef.current && !window.confirm('Replace the current composition with this project? Changes since your last Save Project will be lost.')) return;
+        setLayers(opened);
+        if (settings.fps !== undefined) setFps(settings.fps);
+        if (settings.duration !== undefined) setDuration(settings.duration);
+        if (settings.canvasSize) setCanvasSize(settings.canvasSize);
+        if (settings.is3DMode !== undefined) setIs3DModeGated(settings.is3DMode);
+        setSelectedLayerId(opened[0]?.id ?? null);
+        toast(warnings.length ? 'warning' : 'success', `Opened ${file.name} (${opened.length} layer${opened.length === 1 ? '' : 's'}).${warnings.length ? ' ' + warnings.join(' ') : ''}`);
       } catch (err) {
-        console.error('[Flux] Failed to open project:', err);
+        toast('error', `Could not open ${file.name}: ${(err as Error).message}`);
       }
     };
     input.click();
-  }, []);
+  }, [setIs3DModeGated]);
 
   // ===== EXPORT VIDEO =====
   const exportVideo = useCallback(async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const exportFailed = (why: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Export failed: ${why}` } }));
+    if (typeof MediaRecorder === 'undefined' || typeof (canvas as any).captureStream !== 'function') { exportFailed('video recording is not available here.'); return; }
 
-    const stream = (canvas as any).captureStream(fps) as MediaStream;
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : 'video/webm';
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    let stream: MediaStream;
+    let recorder: MediaRecorder;
+    try {
+      stream = (canvas as any).captureStream(fps) as MediaStream;
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+      recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    } catch (err) {
+      // Starting the recorder used to throw unseen (an unhandled rejection).
+      exportFailed((err as Error)?.message || 'the recorder could not start.');
+      return;
+    }
+    recorder.onerror = () => { exportFailed('recording stopped with an error.'); setIsPlaying(false); };
 
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -2660,7 +2704,13 @@ const Flux: React.FC = () => {
           <button style={styles.btn} onClick={importMedia} aria-label="Import media">{Icons.upload} Import</button>
           <button style={styles.btn} onClick={openProject} aria-label="Open project">{Icons.folder} Open</button>
           <button style={styles.btn} onClick={saveProject} aria-label="Save project">{Icons.save} Save</button>
-          <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
+          <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
+            <AutosaveIndicator
+              state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}
+              lastSavedAt={lastSavedAt}
+              label={autosaveError ? 'Not saved' : changedSinceAutosave ? 'Unsaved changes' : undefined}
+            />
+          </span>
         </div>
         <div style={styles.headerCenter}>
           <select

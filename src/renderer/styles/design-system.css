@@ -201,9 +201,9 @@
   --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.24), 0 8px 32px rgba(0, 0, 0, 0.27);
   --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.24), 0 16px 56px rgba(0, 0, 0, 0.30);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.21), 0 12px 44px rgba(0, 0, 0, 0.27), inset 0 0.5px 0 rgba(255,255,255,0.06);
-  --shadow-glow: 0 0 16px rgba(74, 158, 255, 0.15);
+  --shadow-glow: 0 0 0 1px rgba(74, 158, 255, 0.35), 0 0 4px rgba(74, 158, 255, 0.18);
   --shadow-glow-sm: 0 0 8px rgba(74, 158, 255, 0.09);
-  --shadow-glow-accent: 0 0 20px rgba(74, 158, 255, 0.18);
+  --shadow-glow-accent: 0 0 0 1px rgba(74, 158, 255, 0.45), 0 0 4px rgba(74, 158, 255, 0.22);
   /* Interactive state shadows — affordances for hover-lift and press-in feedback
      so components stop hardcoding one-off inline shadows for these states. */
   --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.22);
@@ -213,7 +213,7 @@
   --shadow-depth-3: 0 2px 6px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.21);
   --shadow-depth-4: 0 4px 10px rgba(0, 0, 0, 0.18), 0 16px 48px rgba(0, 0, 0, 0.24);
   --shadow-inset: inset 0 1px 4px rgba(0, 0, 0, 0.18);
-  --shadow-dock: 0 -4px 32px rgba(0, 0, 0, 0.30), 0 0 12px rgba(74, 158, 255, 0.05);
+  --shadow-dock: 0 -4px 32px rgba(0, 0, 0, 0.30);
   --shadow-focus: 0 0 0 2.5px color-mix(in srgb, var(--dex-focus-color, #fff) 40%, transparent);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.27), 0 8px 28px rgba(0, 0, 0, 0.21), 0 0 8px rgba(74, 158, 255, 0.06);
 
@@ -566,9 +566,9 @@
   
   /* 901. Depth-aware premium shadows */
   --shadow-premium-sm: 0 2px 4px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15);
-  --shadow-premium-md: 0 4px 8px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.20), 0 0 12px rgba(74, 158, 255, 0.08);
-  --shadow-premium-lg: 0 6px 12px rgba(0,0,0,0.35), 0 16px 40px rgba(0,0,0,0.25), 0 0 20px rgba(74, 158, 255, 0.12);
-  --shadow-premium-xl: 0 8px 16px rgba(0,0,0,0.40), 0 24px 56px rgba(0,0,0,0.30), 0 0 32px rgba(74, 158, 255, 0.15);
+  --shadow-premium-md: 0 4px 8px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.20);
+  --shadow-premium-lg: 0 6px 12px rgba(0,0,0,0.35), 0 16px 40px rgba(0,0,0,0.25);
+  --shadow-premium-xl: 0 8px 16px rgba(0,0,0,0.40), 0 24px 56px rgba(0,0,0,0.30);
   
   /* 909. Layered shadow system (contact + ambient) */
   --shadow-contact-1: 0 1px 2px rgba(0,0,0,0.20);
@@ -590,7 +590,7 @@
   --border-glass-left: linear-gradient(90deg, rgba(255,255,255,0.10) 0%, transparent 100%);
   
   /* 925. Premium focus rings */
-  --focus-ring-premium: 0 0 0 2px rgba(74, 158, 255, 0.4), 0 0 0 4px rgba(74, 158, 255, 0.2), 0 0 12px rgba(74, 158, 255, 0.3);
+  --focus-ring-premium: 0 0 0 2px rgba(74, 158, 255, 0.4), 0 0 0 4px rgba(74, 158, 255, 0.2);
   --focus-ring-error: 0 0 0 2px rgba(255, 69, 58, 0.4), 0 0 0 4px rgba(255, 69, 58, 0.2);
   --focus-ring-success: 0 0 0 2px rgba(52, 199, 89, 0.4), 0 0 0 4px rgba(52, 199, 89, 0.2);
   
@@ -745,15 +745,6 @@
 .dex-stagger-7 { animation: dex-fade-in-up 300ms ease-out 350ms both; }
 .dex-stagger-8 { animation: dex-fade-in-up 300ms ease-out 400ms both; }
 
-/* 919. Glow pulse for notifications/badges */
-@keyframes dex-glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(74, 158, 255, 0.3), 0 0 16px rgba(74, 158, 255, 0.15); }
-  50% { box-shadow: 0 0 16px rgba(74, 158, 255, 0.5), 0 0 32px rgba(74, 158, 255, 0.25); }
-}
-
-.dex-glow-pulse {
-  animation: dex-glow-pulse 2s ease-in-out infinite;
-}
 
 /* 920. Number counter animation */
 @keyframes dex-count-up {
@@ -1670,9 +1661,9 @@ html[data-darkroom="on"] {
   --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(0, 0, 0, 0.10);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.06), 0 12px 36px rgba(0, 0, 0, 0.10);
-  --shadow-glow: 0 0 12px rgba(0, 122, 255, 0.15);
+  --shadow-glow: 0 0 0 1px rgba(0, 122, 255, 0.3), 0 0 4px rgba(0, 122, 255, 0.15);
   --shadow-glow-sm: 0 0 6px rgba(0, 122, 255, 0.10);
-  --shadow-glow-accent: 0 0 16px rgba(0, 122, 255, 0.18);
+  --shadow-glow-accent: 0 0 0 1px rgba(0, 122, 255, 0.4), 0 0 4px rgba(0, 122, 255, 0.2);
   --shadow-depth-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-depth-2: 0 2px 4px rgba(0, 0, 0, 0.05), 0 4px 10px rgba(0, 0, 0, 0.06);
   --shadow-depth-3: 0 2px 6px rgba(0, 0, 0, 0.05), 0 8px 20px rgba(0, 0, 0, 0.08);
@@ -2908,17 +2899,6 @@ img, svg {
 /* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL FOCUS-VISIBLE — Keyboard Accessibility
    ═══════════════════════════════════════════════════════════════════════════ */
-button:focus-visible,
-[role="button"]:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-md);
-}
 
 /* Interactive depth for clickable elements */
 .depth-interactive {
@@ -3050,10 +3030,6 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
   outline: none;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 12: LIQUID GLASS SYSTEM
@@ -3446,11 +3422,6 @@ html[data-perf-tier="low"] *::after {
    SECTION 18.5: VISUAL SOUL -- Subtle life and depth
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Accent glow on focused interactive elements */
-:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-}
 
 /* Subtle accent bar on active items */
 .dex-active-indicator {
@@ -3516,17 +3487,9 @@ html[data-perf-tier="low"] *::after {
   animation: dex-pulse 2s var(--ease-default) infinite;
 }
 
-/* Subtle breathing glow for active accent elements */
-@keyframes dex-breathe {
-  0%, 100% { box-shadow: 0 0 8px rgba(74, 158, 255, 0.15); }
-  50% { box-shadow: 0 0 16px rgba(74, 158, 255, 0.25); }
-}
-.dex-breathe {
-  animation: dex-breathe 3s var(--ease-default) infinite;
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .dex-pulse, .dex-breathe {
+  .dex-pulse {
     animation: none;
   }
   .dex-card-interactive:hover {
@@ -3689,21 +3652,6 @@ html[data-perf-tier="low"] *::after {
   opacity: 0.85;
 }
 
-/* Focus Visible - Keyboard accessibility */
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
 
 /* Remove focus outline for mouse users */
 :focus:not(:focus-visible) {
@@ -3930,11 +3878,6 @@ body, p, li, span, label, button, input, textarea {
    SECTION 8: GLOBAL INTERACTION STATES
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Focus-visible ring — keyboard-only focus indicator */
-*:focus-visible {
-  outline: 2px solid var(--color-accent, #007aff);
-  outline-offset: 2px;
-}
 *:focus:not(:focus-visible) {
   outline: none;
 }
@@ -4528,34 +4471,7 @@ button[aria-disabled="true"],
 /* ═══════════════════════════════════════════════════════════════════════════
    Visible Focus Indicators (WCAG 2.1 AA)
    ═══════════════════════════════════════════════════════════════════════════ */
-*:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-/* Remove default browser outline when mouse-focused */
-*:focus:not(:focus-visible) {
-  outline: none;
-}
-/* Stronger focus for buttons/links */
-button:focus-visible, a:focus-visible, [role="button"]:focus-visible,
-[role="tab"]:focus-visible, [role="menuitem"]:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(74, 158, 255, 0.2);
-}
-/* Focus ring for inputs */
-input:focus-visible, textarea:focus-visible, select:focus-visible,
-[contenteditable]:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff);
-  outline-offset: 0;
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
-}
-/* Custom focus for toggle switches */
-[role="switch"]:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff);
-  outline-offset: 3px;
-}
+/* Keyboard focus ring: the ONE canonical rule lives in globals.css (:focus-visible). Do not add global focus rules here. */
 /* Focus within sidebar navigation */
 .dex-sidebar [role="listbox"] *:focus-visible,
 .dex-sidebar [role="list"] *:focus-visible {
@@ -5417,11 +5333,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 [data-theme="light"] .acrylic { background: rgba(255, 255, 255, 0.72); border-color: rgba(0, 0, 0, 0.08); }
 
-/* Gradient text */
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-accent), #a855f7);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
 
 /* Theme transition */
 .theme-transition, .theme-transition *, .theme-transition *::before, .theme-transition *::after {
@@ -5969,15 +5880,6 @@ button:active:not(:disabled),
   transition-duration: 0.02s;
 }
 
-/* Enhanced focus ring */
-button:focus-visible,
-[role="button"]:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 20: CREATIVE APP OPTIMIZATIONS (AXL, PRISM, VINX, IMOSION, FLUX)
@@ -6199,7 +6101,6 @@ input[type="range"]::-webkit-slider-thumb:active {
   background: rgba(255, 26, 26, 0.12);
   border-color: #FF1A1A;
   color: #FF1A1A;
-  box-shadow: 0 0 12px rgba(255, 26, 26, 0.2);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -6298,34 +6199,6 @@ html, body {
 .leading-relaxed { line-height: 1.625; }
 .leading-loose { line-height: 2; }
 
-/* Text gradient - beautiful accent headings */
-.text-gradient-accent {
-  background: linear-gradient(135deg, #4A9EFF 0%, #8B5CF6 50%, #4A9EFF 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-gold {
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-sunset {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF9F0A 50%, #FFCC00 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-cool {
-  background: linear-gradient(135deg, #34C759 0%, #4A9EFF 50%, #8B5CF6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
 
 /* Heading styles - Sharp display text */
 .heading-display {
@@ -6436,19 +6309,6 @@ html, body {
 .bg-error { background-color: var(--color-error); }
 .bg-error-muted { background-color: var(--color-error-muted); }
 
-/* Accent glow backgrounds */
-.bg-glow-accent { 
-  background: var(--color-accent-muted);
-  box-shadow: 0 0 24px rgba(74, 158, 255, 0.15);
-}
-.bg-glow-success { 
-  background: var(--color-success-muted);
-  box-shadow: 0 0 24px rgba(52, 199, 89, 0.15);
-}
-.bg-glow-error { 
-  background: var(--color-error-muted);
-  box-shadow: 0 0 24px rgba(255, 69, 58, 0.15);
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
   SECTION 25: SYSTEM POLISH ANIMATIONS
@@ -6501,13 +6361,6 @@ html, body {
   transition-duration: 40ms;
 }
 
-/* Glow on hover */
-.hover-glow {
-  transition: box-shadow 200ms var(--ease-default);
-}
-.hover-glow:hover {
-  box-shadow: 0 0 20px rgba(74, 158, 255, 0.25);
-}
 
 /* Smooth entrance animations */
 @keyframes fadeInUp {
@@ -6858,24 +6711,6 @@ html, body {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ----- App-specific accent gradients ----- */
-.vinx-accent-gradient { 
-  background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); 
-}
-.imosion-accent-gradient { 
-  background: linear-gradient(135deg, #22D3EE 0%, #67E8F9 100%); 
-}
-.prism-accent-gradient { 
-  background: linear-gradient(135deg, #F472B6 0%, #F9A8D4 100%); 
-}
-.flux-accent-gradient { 
-  background: linear-gradient(135deg, #FB923C 0%, #FDBA74 100%); 
-}
-.forge-accent-gradient { 
-  background: linear-gradient(135deg, #4ADE80 0%, #86EFAC 100%); 
-}
-.axl-accent-gradient { 
-  background: linear-gradient(135deg, #60A5FA 0%, #93C5FD 100%); 
-}
 
 /* ----- VINX Video Editor ----- */
 .vinx-timeline-container {
@@ -6896,21 +6731,6 @@ html, body {
 .vinx-track.selected {
   background: rgba(139, 92, 246, 0.18);
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.4);
-}
-
-.vinx-clip {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.5);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  position: relative;
-}
-
-.vinx-clip::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, transparent 20%, transparent 80%, rgba(255,255,255,0.1) 100%);
 }
 
 .vinx-playhead {
@@ -6938,7 +6758,6 @@ html, body {
 
 .imosion-channel:hover {
   border-color: rgba(34, 211, 238, 0.35);
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.1);
 }
 
 .imosion-fader {
@@ -7023,7 +6842,7 @@ html, body {
 
 .flux-keyframe.selected {
   background: #fff;
-  box-shadow: 0 0 12px var(--color-flux-primary);
+  box-shadow: 0 0 0 2px var(--color-flux-primary);
 }
 
 .flux-bezier-handle {
@@ -7220,15 +7039,7 @@ html, body {
 
 /* ----- Focus Ring System ----- */
 /* Default focus ring for all focusable elements */
-:focus {
-  outline: none;
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
+/* (the default ring is the canonical :focus-visible rule in globals.css) */
 
 /* Focus ring utilities */
 .focus-ring {
@@ -7568,9 +7379,6 @@ input[type="checkbox"]:checked::after {
   border-bottom: 2px solid #fff;
   transform: rotate(45deg) translate(-1px, -1px);
 }
-input[type="checkbox"]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(10,132,255,0.30);
-}
 input[type="checkbox"]:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Toggle switches - opt-in via .dex-toggle wrapper or [data-toggle] */
@@ -7607,10 +7415,6 @@ input[type="checkbox"][data-toggle]:checked {
 input[type="checkbox"][data-toggle]:checked::after {
   transform: translateX(16px);
 }
-.dex-toggle:focus-visible,
-input[type="checkbox"][data-toggle]:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
 
 /* Native select polish */
 select {
@@ -7630,10 +7434,7 @@ select {
   background-position: right 10px center;
 }
 select:hover { border-color: rgba(10,132,255,0.45); }
-select:focus-visible {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(10,132,255,0.25);
-}
+select:focus { border-color: var(--color-accent); }
 select:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Number / text inputs - consistent focus ring */
@@ -7642,12 +7443,7 @@ input[type="text"]:not([data-skip-polish]),
 input[type="search"] {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-input[type="number"]:focus-visible,
-input[type="text"]:not([data-skip-polish]):focus-visible,
-input[type="search"]:focus-visible {
-  box-shadow: 0 0 0 3px rgba(10,132,255,0.25);
-  outline: none;
-}
+/* Focus: the canonical outline ring (globals.css); no extra halo. */
 
 /* Settings rows / labels - consistent rhythm */
 .dex-control-row {

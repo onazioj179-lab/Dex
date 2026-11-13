@@ -13,6 +13,7 @@
 
 mod activity_feed;
 mod browser_view;
+mod browser_block;
 mod paths;
 mod ledger_ctl;
 mod download_ctl;

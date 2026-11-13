@@ -16,7 +16,7 @@ import { sharedTick } from './SharedTick';
 import { notify } from './notify';
 import { useScheduledTasksStore } from '../store/scheduledTasksStore';
 import { useUkiTasks } from '../store/ukiTasksStore';
-import { runUkiAction } from '../uki/appActionRegistry';
+import { runUkiAction, isUkiActionReady } from '../uki/appActionRegistry';
 import { dueTasks, applyRunResult, type ScheduledTask } from '../../shared/automation/scheduledTasks';
 
 const SUBSCRIBER_ID = 'scheduled-task-runner';
@@ -25,6 +25,19 @@ const CHECK_INTERVAL_MS = 30_000;
 
 /** Result markers runUkiAction returns instead of throwing — treat as failures. */
 const ACTION_FAILURE = /not running|needs the user'?s confirmation|Unknown app action|failed|error/i;
+/** How long to wait for a closed app to open and register its actions. */
+const APP_OPEN_TIMEOUT_MS = 15_000;
+
+function waitFor(ok: () => boolean, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (ok()) { resolve(true); return; }
+    const start = Date.now();
+    const t = setInterval(() => {
+      if (ok()) { clearInterval(t); resolve(true); }
+      else if (Date.now() - start > timeoutMs) { clearInterval(t); resolve(false); }
+    }, 250);
+  });
+}
 
 class ScheduledTaskRunner {
   private started = false;
@@ -62,10 +75,41 @@ class ScheduledTaskRunner {
         await notify({ title: task.title, body: task.action.message || 'Scheduled reminder', source: 'Scheduler' });
         detail = 'reminder delivered';
       } else if (task.action.type === 'app-action') {
-        const res = await runUkiAction(task.action.actionId || '', task.action.args || {});
+        const actionId = task.action.actionId || '';
+        if (!isUkiActionReady(actionId) && task.action.appId) {
+          // App actions exist only while their app is open: open it and wait
+          // for it to register the action.
+          ledger.logTaskStep(ledgerId, `Opening ${task.action.appId}`);
+          try { window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: task.action.appId, appName: task.action.appId } })); } catch { /* non-DOM */ }
+          await waitFor(() => isUkiActionReady(actionId), APP_OPEN_TIMEOUT_MS);
+        }
+        const res = await runUkiAction(actionId, task.action.args || {}, { preApproved: task.action.preApproved === true });
         detail = res;
         ledger.logTaskStep(ledgerId, res.slice(0, 140));
         if (ACTION_FAILURE.test(res)) { outcome = 'error'; }
+      } else if (task.action.type === 'uki-prompt') {
+        const prompt = (task.action.prompt || '').trim();
+        if (!prompt) throw new Error('no prompt to run');
+        ledger.logTaskStep(ledgerId, `Asking UKI: ${prompt.slice(0, 100)}`);
+        // Lazy: the agent loop is only loaded when a prompt task actually fires.
+        const [{ runUkiAgent }, { buildSystemPrompt }] = await Promise.all([
+          import('../uki/agentRunner'),
+          import('../uki/identity'),
+        ]);
+        const answer = await runUkiAgent({
+          userText: `${prompt}
+
+(This is a scheduled task "${task.title}" running in the background; the user is not watching. Answer briefly.)`,
+          systemPrompt: buildSystemPrompt(),
+          pushStep: (st) => ledger.logTaskStep(ledgerId, st.slice(0, 140)),
+        });
+        if (!answer) {
+          outcome = 'error';
+          detail = 'No AI provider answered (add a provider key in UKI settings).';
+        } else {
+          detail = answer;
+          await notify({ title: task.title, body: answer.slice(0, 400), source: 'UKI' });
+        }
       } else {
         outcome = 'error';
         detail = `unknown action type`;

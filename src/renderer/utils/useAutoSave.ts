@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { sharedTick } from '../services/SharedTick';
 import { resolveAutosaveInterval } from './autosavePrefs';
+import { persistOrWarn } from './persistOrWarn';
 
 // Looked up per call: this module is evaluated before the Tauri bridge is
 // installed (static imports run before main.tsx's body), so a module-level
@@ -16,14 +17,20 @@ const getInvoke = (): ((...a: unknown[]) => Promise<unknown>) | undefined => (wi
 // Interval for durable version-history snapshots (5 minutes)
 const VERSION_SNAPSHOT_INTERVAL = 5 * 60_000;
 
+/** What happened to one autosave write (optional; lets an app show the real state). */
+export type AutoSaveResult = { ok: true; at: number } | { ok: false; reason: 'quota' | 'error' };
+
 export function useAutoSave(
   key: string,
   getData: () => unknown,
   isDirty: boolean,
   intervalMs = 30_000,
+  onResult?: (r: AutoSaveResult) => void,
 ): void {
   const instanceIdRef = useRef(`autosave-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const lastVersionSave = useRef(0);
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
   // The user's global autosave-interval preference wins when set; otherwise the
   // call site's own value is used (so existing apps are unchanged until opt-in).
   const effectiveInterval = resolveAutosaveInterval(intervalMs);
@@ -33,8 +40,13 @@ export function useAutoSave(
     const save = () => {
       try {
         const data = getData();
-        localStorage.setItem(`dex-autosave-${key}`, JSON.stringify(data));
-      } catch { /* storage full or serialization error */ }
+        // Crash-recovery copy: persistOrWarn says once if it can't be kept (store
+        // full); callers that pass onResult can also show the state.
+        const ok = persistOrWarn(`dex-autosave-${key}`, JSON.stringify(data), `the crash-recovery copy for ${key}`);
+        onResultRef.current?.(ok ? { ok: true, at: Date.now() } : { ok: false, reason: 'quota' });
+      } catch {
+        onResultRef.current?.({ ok: false, reason: 'error' }); // serialisation error
+      }
     };
     const autosaveId = `${instanceIdRef.current}-${key}`;
     const versionId = `${autosaveId}-version`;

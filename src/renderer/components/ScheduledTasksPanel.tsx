@@ -15,10 +15,12 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { useScheduledTasksStore, MIN_INTERVAL_MS } from '../store/scheduledTasksStore';
+import { useScheduledTasksStore } from '../store/scheduledTasksStore';
 import { describeSchedule } from '../../shared/automation/scheduledTasks';
-import { matchesCron } from '../../shared/automation/cron';
+import { parseScheduleSpec } from '../../shared/automation/scheduleSpec';
 import { CollapsibleSection } from './CollapsibleSection';
+import { listKnownUkiActions } from '../uki/appActionRegistry';
+import { appActionFor } from '../uki/scheduleTools';
 
 function whenLabel(ts: number | null | undefined): string {
   if (!ts) return '—';
@@ -52,29 +54,46 @@ const ScheduledTasksPanel: React.FC = () => {
   const setEnabled = useScheduledTasksStore(s => s.setEnabled);
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<'interval' | 'cron'>('interval');
-  const [everyMin, setEveryMin] = useState(60);
-  const [cron, setCron] = useState('0 9 * * *');
+  const [when, setWhen] = useState('every 60 minutes');
+  const [mode, setMode] = useState<'reminder' | 'uki-prompt' | 'app-action'>('reminder');
   const [message, setMessage] = useState('');
+  // App action: chosen from the actions apps have registered (an app must have
+  // been opened this session for its actions to be listed).
+  const [actionId, setActionId] = useState('');
+  const [actionArgs, setActionArgs] = useState('{}');
+  const [approved, setApproved] = useState(false);
+  const known = useMemo(() => (mode === 'app-action' ? listKnownUkiActions() : []), [mode]);
+  const chosen = known.find(a => a.spec.id === actionId);
+  const built = useMemo(() => (mode === 'app-action' && actionId ? appActionFor(actionId, actionArgs) : null), [mode, actionId, actionArgs]);
 
-  const cronValid = useMemo(() => kind !== 'cron' || matchesCron(cron, new Date()) || (() => {
-    // matchesCron returns false on parse error too; validate parse explicitly
-    try { return cron.trim().split(/\s+/).length === 5; } catch { return false; }
-  })(), [kind, cron]);
-
-  const canAdd = title.trim().length > 0 && (kind === 'interval' ? everyMin >= 1 : cron.trim().split(/\s+/).length === 5);
+  // Re-parse when the text changes; "in 20 minutes" is relative to now.
+  const spec = useMemo(() => parseScheduleSpec(when, Date.now()), [when]);
+  const actionOk = !!built?.ok && (!chosen?.spec.mutates || approved);
+  const canAdd = title.trim().length > 0 && spec.ok && (
+    mode === 'reminder' || (mode === 'uki-prompt' && message.trim().length > 0) || (mode === 'app-action' && actionOk)
+  );
 
   const submit = () => {
     if (!canAdd) return;
+    const now = Date.now();
+    const fresh = parseScheduleSpec(when, now);
+    if (!fresh.ok) return;
     addTask({
       title: title.trim(),
-      kind,
-      cron: kind === 'cron' ? cron.trim() : undefined,
-      intervalMs: kind === 'interval' ? Math.max(MIN_INTERVAL_MS, everyMin * 60000) : undefined,
-      action: { type: 'reminder', message: message.trim() || title.trim() },
-    }, Date.now());
+      kind: fresh.kind,
+      cron: fresh.kind === 'cron' ? fresh.cron : undefined,
+      intervalMs: fresh.kind === 'interval' ? fresh.intervalMs : undefined,
+      atMs: fresh.kind === 'once' ? fresh.atMs : undefined,
+      action: mode === 'app-action' && built?.ok
+        // Approval is explicit here (checkbox), so store it only when ticked.
+        ? { ...built.action, preApproved: !!built.action.mutates && approved }
+        : mode === 'uki-prompt'
+          ? { type: 'uki-prompt', prompt: message.trim() }
+          : { type: 'reminder', message: message.trim() || title.trim() },
+    }, now);
     setTitle('');
     setMessage('');
+    setApproved(false);
   };
 
   const sorted = useMemo(
@@ -102,39 +121,65 @@ const ScheduledTasksPanel: React.FC = () => {
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
           style={{ ...inputStyle, width: '100%' }}
         />
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
-            {(['interval', 'cron'] as const).map(k => (
-              <button
-                key={k} onClick={() => setKind(k)} aria-pressed={kind === k}
-                style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
-                  background: kind === k ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
-                  color: kind === k ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
-              >
-                {k === 'interval' ? 'Every' : 'Cron'}
-              </button>
-            ))}
-          </div>
-          {kind === 'interval' ? (
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              <input type="number" min={1} aria-label="Interval minutes" value={everyMin}
-                onChange={e => setEveryMin(Math.max(1, Number(e.target.value)))}
-                style={{ ...inputStyle, width: 64 }} />
-              minutes
-            </label>
-          ) : (
-            <input aria-label="Cron expression" placeholder="min hr dom mon dow" value={cron}
-              onChange={e => setCron(e.target.value)}
-              style={{ ...inputStyle, flex: 1, minWidth: 130, fontFamily: 'var(--font-mono, monospace)',
-                borderColor: cronValid ? 'var(--color-border-subtle)' : 'var(--color-error, #ff453a)' }} />
-          )}
-        </div>
         <input
-          aria-label="Reminder message" placeholder="Notification message (optional)"
+          aria-label="When" placeholder='in 20 minutes · tomorrow at 9am · every 2 hours · weekdays at 08:30'
+          value={when} onChange={e => setWhen(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          style={{ ...inputStyle, width: '100%', borderColor: spec.ok ? 'var(--color-border-subtle)' : 'var(--color-error, #ff453a)' }}
+        />
+        <div aria-live="polite" style={{ fontSize: 11, color: spec.ok ? 'var(--color-text-tertiary)' : 'var(--color-error, #ff453a)', marginTop: -2 }}>
+          {spec.ok ? `Runs ${spec.summary}` : spec.error}
+        </div>
+        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border-subtle)', alignSelf: 'flex-start' }}>
+          {([['reminder', 'Notify me'], ['uki-prompt', 'Ask UKI'], ['app-action', 'Run app action']] as const).map(([k, l]) => (
+            <button
+              key={k} onClick={() => setMode(k)} aria-pressed={mode === k}
+              title={k === 'uki-prompt' ? 'UKI runs your request when the task fires and notifies the answer (needs an AI provider)' : 'Show a notification'}
+              style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
+                background: mode === k ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
+                color: mode === k ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {mode === 'app-action' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <select aria-label="App action" value={actionId}
+              onChange={e => {
+                const id = e.target.value;
+                setActionId(id);
+                setApproved(false);
+                setActionArgs(known.find(a => a.spec.id === id)?.spec.example || '{}');
+              }}
+              style={{ ...inputStyle, width: '100%' }}>
+              <option value="">{known.length ? 'Choose an action…' : 'No app actions yet: open an app (Notes, Tasks, Calendar…) first'}</option>
+              {known.map(a => <option key={a.spec.id} value={a.spec.id}>{a.spec.id}{a.spec.mutates ? ' (changes data)' : ''}</option>)}
+            </select>
+            {chosen && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{chosen.spec.description}</div>}
+            {chosen && (
+              <textarea aria-label="Action arguments (JSON)" value={actionArgs} onChange={e => setActionArgs(e.target.value)} rows={2} spellCheck={false}
+                style={{ ...inputStyle, width: '100%', fontFamily: 'var(--font-mono, monospace)', resize: 'vertical',
+                  borderColor: built && !built.ok ? 'var(--color-error, #ff453a)' : 'var(--color-border-subtle)' }} />
+            )}
+            {built && !built.ok && <div role="alert" style={{ fontSize: 11, color: 'var(--color-error, #ff453a)' }}>{built.error}</div>}
+            {chosen?.spec.mutates && (
+              <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                <input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} aria-label="Approve running this without asking" />
+                <span>This changes {chosen.appId} data. Run it with exactly these arguments without asking each time.</span>
+              </label>
+            )}
+            {chosen && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>If {chosen.appId} is closed when the task fires, it is opened first.</div>}
+          </div>
+        ) : (
+        <input
+          aria-label={mode === 'uki-prompt' ? 'Request for UKI' : 'Reminder message'}
+          placeholder={mode === 'uki-prompt' ? 'What should UKI do? (e.g. Summarise the weather for today)' : 'Notification message (optional)'}
           value={message} onChange={e => setMessage(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
           style={{ ...inputStyle, width: '100%' }}
         />
+        )}
         <button
           onClick={submit} disabled={!canAdd} aria-label="Add scheduled task"
           style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 9999,
@@ -143,14 +188,14 @@ const ScheduledTasksPanel: React.FC = () => {
             color: canAdd ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: canAdd ? 'pointer' : 'default' }}
         >
-          + Schedule reminder
+          {mode === 'uki-prompt' ? '+ Schedule UKI task' : mode === 'app-action' ? '+ Schedule action' : '+ Schedule reminder'}
         </button>
       </div>
 
       {/* Task list */}
       {sorted.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 0' }}>
-          No scheduled tasks yet. Add a recurring reminder above — it runs in the background even while you work in other apps.
+          No scheduled tasks yet. Add a reminder or a UKI task above, or ask UKI ("remind me in 20 minutes…") — it runs in the background even while you work in other apps.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -174,7 +219,9 @@ const ScheduledTasksPanel: React.FC = () => {
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2, paddingLeft: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <span>{describeSchedule(t)}</span>
-                <span>· next {t.enabled ? whenLabel(t.nextRunAt) : 'paused'}</span>
+                {t.action.type === 'uki-prompt' && <span>· asks UKI</span>}
+                {t.action.type === 'app-action' && <span>· runs {t.action.actionId}{t.action.mutates ? (t.action.preApproved ? ' (approved)' : ' (asks first)') : ''}</span>}
+                <span>· {t.enabled ? `next ${whenLabel(t.nextRunAt)}` : t.kind === 'once' && t.runCount > 0 ? (t.lastOutcome === 'ok' ? 'done' : 'gave up') : 'paused'}</span>
                 {t.runCount > 0 && <span>· ran {t.runCount}×</span>}
                 {t.lastOutcome === 'error' && <span style={{ color: 'var(--color-error, #ff453a)' }}>· last failed</span>}
               </div>

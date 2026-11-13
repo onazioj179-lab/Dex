@@ -57,8 +57,9 @@ describe('DEX design tokens (UI patch)', () => {
   it('applies the tokens to the full system (global layer, zero-specificity)', () => {
     // app-root font → system stack everywhere
     expect(css).toMatch(/html,\s*body,\s*#root\s*\{[^}]*--dex-font-ui/);
-    // keyboard focus ring app-wide via :where (never overrides components)
-    expect(css).toContain(':where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus-visible');
+    // No second app-wide focus ring here: a box-shadow ring on top of the
+    // canonical outline (globals.css) drew a doubled ring on every control.
+    expect(css).not.toMatch(/:where\([^)]*\):focus-visible\s*\{[^}]*box-shadow/);
     // motion cascade on interactive elements
     expect(css).toMatch(/:where\(button[^)]*\)\s*\{\s*transition/);
   });

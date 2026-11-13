@@ -150,7 +150,7 @@ const PowerRename: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #FF375F, #FF6482)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FF375F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <DexIcon name="wand" size={18} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -306,8 +306,8 @@ const PowerRename: React.FC = () => {
                 style={{
                   padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                   border: 'none', cursor: canApply ? 'pointer' : 'not-allowed',
-                  background: canApply ? 'linear-gradient(135deg, #FF375F, #FF6482)' : 'rgba(255,255,255,0.08)',
-                  color: canApply ? '#fff' : 'rgba(255,255,255,0.35)', transition: 'all 0.12s ease',
+                  background: canApply ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                  color: canApply ? '#fff' : 'var(--color-text-tertiary)', transition: 'background 0.12s ease',
                 }}
               >{applying ? 'Renaming…' : `Apply Rename${realCount > 0 && changeCount > 0 ? ` (${changeCount})` : ''}`}</button>
             </div>

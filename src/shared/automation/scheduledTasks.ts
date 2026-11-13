@@ -18,17 +18,32 @@
 import { parseCron, cronMatches } from './cron';
 import { backoffDelay, shouldRetry } from './backoff';
 
-export type ScheduleKind = 'cron' | 'interval';
+export type ScheduleKind = 'cron' | 'interval' | 'once';
 
 /** What a scheduled task DOES when it fires (executed by the runner). */
 export interface ScheduledAction {
-  /** 'reminder' → notify; 'app-action' → run a registered UKI app action. */
-  type: 'reminder' | 'app-action';
+  /**
+   * 'reminder' → notify; 'app-action' → run a registered UKI app action;
+   * 'uki-prompt' → run the UKI agent on `prompt` and notify the answer.
+   */
+  type: 'reminder' | 'app-action' | 'uki-prompt';
   /** reminder: the message body. app-action: unused. */
   message?: string;
+  /** uki-prompt: what UKI is asked to do when the task fires. */
+  prompt?: string;
   /** app-action: the registered action id + JSON args. */
   actionId?: string;
   args?: Record<string, unknown>;
+  /** app-action: the app that owns the action (opened if it is closed). */
+  appId?: string;
+  /** app-action: the action changes the app's data. */
+  mutates?: boolean;
+  /**
+   * app-action: the user approved THIS action with THESE args when they
+   * scheduled it, so it may run without a prompt while they are away.
+   * Without it a changing action asks at run time (and fails if nobody answers).
+   */
+  preApproved?: boolean;
 }
 
 export type RunOutcome = 'ok' | 'error';
@@ -41,6 +56,8 @@ export interface ScheduledTask {
   cron?: string;
   /** Present when kind === 'interval' (>= 60000ms enforced by the store). */
   intervalMs?: number;
+  /** Present when kind === 'once': the single fire time (epoch ms). */
+  atMs?: number;
   action: ScheduledAction;
   enabled: boolean;
   createdAt: number;
@@ -67,7 +84,10 @@ const CRON_SCAN_LIMIT = 366 * 24 * 60;
  * can't be scheduled. Cron scans minute-by-minute from the next whole minute;
  * interval is simply from + intervalMs.
  */
-export function computeNextRun(task: Pick<ScheduledTask, 'kind' | 'cron' | 'intervalMs'>, from: number): number | null {
+export function computeNextRun(task: Pick<ScheduledTask, 'kind' | 'cron' | 'intervalMs' | 'atMs'>, from: number): number | null {
+  if (task.kind === 'once') {
+    return typeof task.atMs === 'number' && task.atMs > from ? task.atMs : null;
+  }
   if (task.kind === 'interval') {
     const ms = task.intervalMs ?? 0;
     if (ms < 1000) return null;
@@ -137,6 +157,8 @@ export function applyRunResult(
   if (!task.enabled) return { ...base, nextRunAt: null };
 
   if (outcome === 'ok') {
+    // A one-time task is finished: it stays in the list (history) but is off.
+    if (task.kind === 'once') return { ...base, attempt: 0, enabled: false, nextRunAt: null };
     return { ...base, attempt: 0, nextRunAt: computeNextRun(task, now) };
   }
 
@@ -146,12 +168,19 @@ export function applyRunResult(
     const delay = backoffDelay(task.attempt, { baseMs: opts.baseMs, factor: opts.factor, maxMs: opts.maxMs, jitter: opts.jitter, rng: opts.rng });
     return { ...base, attempt: nextAttempt, nextRunAt: now + Math.max(1000, delay) };
   }
-  // give up this cycle — resume normal cadence
+  // give up this cycle — resume normal cadence (a one-time task just stops)
+  if (task.kind === 'once') return { ...base, attempt: 0, enabled: false, nextRunAt: null };
   return { ...base, attempt: 0, nextRunAt: computeNextRun(task, now) };
 }
 
 /** Human-readable summary of a task's schedule (for the UI). */
-export function describeSchedule(task: Pick<ScheduledTask, 'kind' | 'cron' | 'intervalMs'>): string {
+export function describeSchedule(task: Pick<ScheduledTask, 'kind' | 'cron' | 'intervalMs' | 'atMs'>): string {
+  if (task.kind === 'once') {
+    if (typeof task.atMs !== 'number') return 'once: (unset)';
+    const d = new Date(task.atMs);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `once: ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
   if (task.kind === 'interval') {
     const ms = task.intervalMs ?? 0;
     const min = Math.round(ms / 60000);
