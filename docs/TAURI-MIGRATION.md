@@ -1166,7 +1166,7 @@ than 3%.
 | Licensing / telemetry | full `licensing:*` | done (`licensing.rs`, self-contained SHA-256) |
 | **Dialogs (file/folder)** | — | todo (use Tauri dialog plugin to avoid event-loop deadlock) |
 | HTTP transfer (LAN share) | `httpTransfer:` start/stop/info/share/unshare/pickAndShare/acceptUpload + `transfer:selectFiles` (+ `http-transfer:*` events) | done (`http_transfer.rs`; `tiny_http` LAN server, download/upload + pending-accept, no-dep LAN-IP, 30-min expiry; multipart parser unit-tested 4/4; live serving needs in-app start) |
-| **Transfer / device / pairing (DTP)** | — | todo (device-to-device: mDNS discovery + custom TCP + encryption; not single-machine verifiable) |
+| **Transfer / device / pairing (DTP)** | — | done 2026-11-13: UDP discovery (dtp_ctl.rs) + encrypted TCP transfer (`core/dex-dtp` + dtp_transfer.rs, X25519/AES-GCM, match code, approval prompt); loopback-tested, not yet run between two machines |
 | Audio playback sink | — | NOT NEEDED (2026-06-15): the Music app (`pages/Audio.tsx`) plays renderer-side via `HTMLAudioElement` + `AudioContext` (crossfade + gapless preload). In a webview shell that IS the correct path; a native cpal/rodio sink would be redundant + wrong (playback outside the webview). Native decode/waveform stays in `dex-audio` for analysis. |
 | Terminal / PTY | `pty:` spawn/write/resize/kill/list/shells (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
 | **Security/Workflow controllers** | — | todo (largest; phase last) |

@@ -870,13 +870,13 @@ declare global {
       };
       // DTP: DEX Transfer Protocol - high-speed device-to-device transfers
       dtp: {
-        startServer: () => Promise<any>;
+        startServer: (opts?: { downloadDir?: string }) => Promise<any>;
         stopServer: () => Promise<any>;
         startDiscovery: () => Promise<any>;
         stopDiscovery: () => Promise<any>;
         getDevices: () => Promise<any[]>;
         refreshDevices: () => Promise<any>;
-        sendFiles: (args: { files: string[]; targetAddress: string; targetPort?: number; sessionToken: string }) => Promise<any>;
+        sendFiles: (args: { files: string[]; targetAddress: string; targetPort?: number; deviceName?: string }) => Promise<any>;
         cancelSend: (transferId: string) => Promise<any>;
         pauseSend: (transferId: string) => Promise<any>;
         resumeSend: (transferId: string) => Promise<any>;
