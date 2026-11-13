@@ -355,3 +355,9 @@ Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; 
 | 156 | Ledger: Edit transactions in the table, not only in the side editor | VERIFIED. Created a ledger, an account and a "Probe coffee" transaction; double-clicking its Description cell opened an inline field (not the side editor); "Probe tea" + Enter saved; after switching to Overview and back the table still showed "Probe tea" (1 transaction). |
 | 205 | Notes: Move to Trash asked every time; no undo | VERIFIED. Right-click › Delete Note on a probe note: no confirm dialog, note count 2 → 1, toast "“DEX probe note …” moved to Trash" with Undo; Undo restored it (count 2). |
 | 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | VERIFIED. `example.com` → https://example.com/, `localhost:9` → http://localhost:9/, `192.168.0.1:9` → http://192.168.0.1:9/, plain words → a DuckDuckGo search. |
+
+## Session 2026-11-13 (`claude/backlog-pass-1113b`)
+
+| 62 | DEX Recycle Bin "Restore" did nothing | FIXED | Notes are un-trashed or recreated, Kanban cards go back to their column; the row is removed only afterwards. Old Files rows say they can't be restored | `recycleRestore.ts`, `RecycleBin.tsx`, `KanbanApp.tsx` | Rows written by `content_expiry`/`bulk_metadata` are shown as not restorable | — | P3 |
+| 62 (follow-up) | Recycle Bin rows written by `content-expiry:processExpired` | FIXED (13 tests) | Those rows record that an item's expiry passed; the item itself is never deleted (only its expiry record is). They showed "The saved copy is incomplete"; now they are restorable and restoring just clears the row (`isExpiryRecord`). Nothing in DEX writes `bulk_metadata` rows into the bin (only plugin capabilities name it), so nothing else to restore. |
+| 223 (renumbered) | Backlog | Two rows were numbered #221 on main (unslop pass 3, and the `dex.<ns>.onY` no-op fix) | FIXED | The auth/vault/platform row is now #223 |
