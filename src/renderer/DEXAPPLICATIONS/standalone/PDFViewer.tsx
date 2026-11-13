@@ -3,6 +3,7 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * PDF rendering via Electron iframe + per-document highlight annotations
  */
+import { toMediaUrl } from '../../utils/mediaUrl';
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { sendToNotes } from '../../services/sendTo';
@@ -267,7 +268,7 @@ const PDFViewer: React.FC = () => {
   }, [page, zoom, fitMode, layout]);
 
   const fileUrl = filePath
-    ? `file://${filePath.replace(/\\/g, '/')}#${buildFragment()}`
+    ? `${toMediaUrl(filePath)}#${buildFragment()}`
     : '';
 
   const rotated = rotation % 180 !== 0;

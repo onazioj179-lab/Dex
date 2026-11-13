@@ -360,4 +360,4 @@ Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; 
 
 | # | Item | Packaged result |
 |---|---|---|
-| 46 | Browser blank in the packaged app | VERIFIED (release exe, isolated profile, DEX window restored before opening Browser). `example.com` loaded: the tab title became "Example Domain", reading inside the page returned "Example Domain | https://example.com/", and the active page view was visible at the slot size (2880×1557 px at 2.25×) while the inactive tab's view was hidden. The earlier inconclusive run was caused by the test window being minimized, which exposed a real bug (#219). |
+| 46 | Browser blank in the packaged app | VERIFIED (release exe, isolated profile, DEX window restored before opening Browser). `example.com` loaded: the tab title became "Example Domain", reading inside the page returned "Example Domain | https://example.com/", and the active page view was visible at the slot size (2880×1557 px at 2.25×) while the inactive tab's view was hidden. The earlier inconclusive run was caused by the test window being minimized, which exposed a real bug (#222). |

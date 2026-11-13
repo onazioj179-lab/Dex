@@ -9,6 +9,7 @@
  * Reads EXIF data from ArrayBuffer without external dependencies.
  * Supports camera, lens, ISO, aperture, shutter speed, GPS, dimensions.
  */
+import { mediaPathOf, toMediaUrl } from './mediaUrl';
 
 export interface ExifData {
   camera?: string;
@@ -271,9 +272,8 @@ export async function loadExifFromPath(filePath: string): Promise<ExifData | nul
       }
     }
 
-    // Fallback: fetch via file protocol or blob URL
-    const url = filePath.startsWith('file://') ? filePath
-      : filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath) ? `file://${filePath.replace(/\\/g, '/')}` : filePath;
+    // Fallback: fetch (dexmedia in the desktop app, else file:// or blob:)
+    const url = toMediaUrl(filePath);
 
     const response = await fetch(url, {
       headers: { Range: 'bytes=0-131071' },
@@ -286,14 +286,11 @@ export async function loadExifFromPath(filePath: string): Promise<ExifData | nul
 }
 
 /**
- * `file://C:/x/y.jpg` (or `file:///C:/x/y.jpg`) -> `C:/x/y.jpg`, the form the
- * native fs channels open. Plain paths pass through unchanged. Gallery builds
- * `file://` URLs for <img>, and native channels can't open those.
+ * The local path behind a Gallery item URL (`file://...` or dexmedia), the
+ * form the native fs channels open. Plain paths pass through unchanged.
+ * (The earlier version's regex lost a backslash, so `file:///C:\...` kept its
+ * leading slash.)
  */
 export function fileUrlToPath(u: string): string {
-  if (!/^file:\/\//i.test(u)) return u;
-  let p = u.replace(/^file:\/\//i, '');
-  if (/^\/[a-zA-Z]:[\/]/.test(p)) p = p.slice(1); // "/C:/..." -> "C:/..."
-  try { p = decodeURI(p); } catch { /* not encoded */ }
-  return p;
+  return mediaPathOf(u);
 }

@@ -250,6 +250,23 @@ interface DTPProgress {
   streamCount: number;
   chunkSize: number;
   status: string;
+  /** Present on DEX-to-DEX transfers: 'receive' for incoming. */
+  direction?: string;
+  deviceName?: string;
+  /** 6-digit match code; both screens show the same one. */
+  code?: string;
+  error?: string;
+}
+
+interface PendingOffer {
+  transferId?: string;
+  deviceId: string;
+  deviceName: string;
+  deviceType: string;
+  code?: string;
+  fileCount?: number;
+  totalBytes?: number;
+  files?: { name: string; size: number }[];
 }
 
 interface TransferHistoryEntry {
@@ -271,7 +288,7 @@ const Transfers: React.FC = () => {
   const [devices, setDevices] = useState<DTPDevice[]>([]);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [activeTransfers, setActiveTransfers] = useState<DTPProgress[]>([]);
-  const [pendingDevices, setPendingDevices] = useState<{ deviceId: string; deviceName: string; deviceType: string }[]>([]);
+  const [pendingDevices, setPendingDevices] = useState<PendingOffer[]>([]);
   const [history, setHistory] = useState<TransferHistoryEntry[]>([]);
   const [sending, setSending] = useState(false);
 
@@ -307,14 +324,13 @@ const Transfers: React.FC = () => {
     try { const s = localStorage.getItem('transfers-nicknames'); return s ? JSON.parse(s) : {}; } catch { return {}; }
   });
 
-  // --- Transfer control state (pause/resume, retry, ordering) ---
-  // transferIds the user has paused (so the UI can show resume + freeze ETA)
-  const [pausedTransfers, setPausedTransfers] = useState<Set<string>>(new Set());
-  // transferIds that errored out — kept so they can be retried/cleared
+  // transferIds that errored out — kept so they can be sent again or cleared
   const [failedTransfers, setFailedTransfers] = useState<Record<string, DTPProgress>>({});
-  // Renderer-side ordering of active transfers (transferId -> manual order index).
-  // Lower number = higher in the list. Used for queue reorder / priority bump.
-  const [transferOrder, setTransferOrder] = useState<Record<string, number>>({});
+  // Receiving is a native TCP listener; if it can't start, say so instead of
+  // showing a device list that can never deliver.
+  const [receiverError, setReceiverError] = useState<string | null>(null);
+  // What each outgoing transfer sent, so "Send Again" can re-send the same files.
+  const sendRequestsRef = useRef<Map<string, { device: DTPDevice; files: string[] }>>(new Map());
   // Per-transfer locally-computed speed/ETA derived from successive progress events.
   // The native payload carries `speed`/`timeRemainingMs` but it can be absent or
   // coarse; we compute a smoothed fallback from deltaBytes/deltaTime here.
@@ -328,7 +344,6 @@ const Transfers: React.FC = () => {
 
   // DTP Lifecycle
   useEffect(() => {
-    window.dex?.dtp?.startServer?.();
     window.dex?.dtp?.startDiscovery?.().then(() => setDiscoveryRunning(true)).catch(() => { /* discovery unavailable */ });
     window.dex?.dtp?.getDevices?.().then((d: DTPDevice[]) => { if (d) setDevices(d); }).catch(() => { /* no devices */ });
     window.dex?.dtp?.getHistory?.(50).then((h: TransferHistoryEntry[]) => { if (h) setHistory(h); }).catch(() => { /* no history */ });
@@ -339,12 +354,19 @@ const Transfers: React.FC = () => {
     const onDeviceLost = (device: DTPDevice) => {
       setDevices(prev => prev.filter(d => d.deviceId !== device.deviceId));
     };
-    const onDevicePending = (info: { deviceId: string; deviceName: string; deviceType: string }) => {
+    const onDeviceUpdated = (device: DTPDevice) => {
+      setDevices(prev => prev.some(d => d.deviceId === device.deviceId) ? prev.map(d => d.deviceId === device.deviceId ? device : d) : [...prev, device]);
+    };
+    const onDevicePending = (info: PendingOffer) => {
       if (autoAcceptRef.current || trustedDevicesRef.current.has(info.deviceId)) {
         window.dex?.dtp?.approveDevice?.(info.deviceId);
       } else {
-        setPendingDevices(prev => [...prev, info]);
+        setPendingDevices(prev => [...prev.filter(p => p.deviceId !== info.deviceId), info]);
+        setActiveTab('active');
       }
+    };
+    const onPendingCleared = (info: { deviceId: string }) => {
+      setPendingDevices(prev => prev.filter(p => p.deviceId !== info?.deviceId));
     };
     // Compute a smoothed speed (deltaBytes/deltaTime) + ETA (remainingBytes/speed)
     // from successive progress payloads. Updates the computedStats map.
@@ -380,17 +402,26 @@ const Transfers: React.FC = () => {
         return [...prev, progress];
       });
     };
-    const onTransferError = (info: { transferId?: string } & Partial<DTPProgress>) => {
+    const onTransferError = (info: { transferId?: string; error?: string; declined?: boolean; cancelled?: boolean } & Partial<DTPProgress>) => {
       try {
         const id = info?.transferId;
         if (!id) return;
+        let name = '';
         setActiveTransfers(prev => {
           const existing = prev.find(t => t.transferId === id);
-          if (existing) setFailedTransfers(f => ({ ...f, [id]: { ...existing, status: 'error', ...info } }));
+          name = existing?.deviceName || '';
+          // A decline or our own cancel isn't a failure; only real errors go to the Failed list.
+          if (existing && !info.declined && !info.cancelled) {
+            setFailedTransfers(f => ({ ...f, [id]: { ...existing, status: 'error', ...info } }));
+          }
           return prev.filter(t => t.transferId !== id);
         });
         computedRef.current.delete(id);
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Transfer failed' } }));
+        if (info.cancelled) return;
+        const message = info.declined
+          ? (info.error || `${name || 'The other device'} declined.`)
+          : `Transfer failed: ${info.error || 'unknown error'}`;
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: info.declined ? 'info' : 'error', message } }));
       } catch (e) { console.warn('[Transfers] transfer error handler:', e); }
     };
     // Transfer chimes follow both this page's toggle and Settings > Sound.
@@ -407,33 +438,44 @@ const Transfers: React.FC = () => {
         return [...prev, info];
       });
     };
-    const onTransferComplete = () => {
+    const onTransferComplete = (info?: DTPProgress & { files?: string[]; folder?: string }) => {
+      if (info?.transferId) {
+        setActiveTransfers(prev => prev.map(t => t.transferId === info.transferId ? { ...t, ...info } : t));
+        const n = info.files?.length ?? 0;
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Received ${n} file${n === 1 ? '' : 's'}${info.deviceName ? ` from ${info.deviceName}` : ''}${info.folder ? ` in ${info.folder}` : ''}` } }));
+      }
       window.dex?.dtp?.getHistory?.(50).then((h: TransferHistoryEntry[]) => { if (h) setHistory(h); }).catch(() => { /* history unavailable */ });
       if (chimeOn()) { try { new Audio('data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAAB/f39/f39/f39/f39/').play().catch(() => {}); } catch { /* sound playback optional */ } }
     };
 
-    window.dex?.dtp?.onDeviceFound?.(onDeviceFound);
-    window.dex?.dtp?.onDeviceLost?.(onDeviceLost);
-    window.dex?.dtp?.onDevicePending?.(onDevicePending);
-    window.dex?.dtp?.onSendProgress?.(onSendProgress);
-    window.dex?.dtp?.onSendComplete?.(onSendComplete);
-    window.dex?.dtp?.onTransferProgress?.(onTransferProgress);
-    window.dex?.dtp?.onTransferComplete?.(onTransferComplete);
-    (window.dex?.dtp as any)?.onSendError?.(onTransferError);
-    (window.dex?.dtp as any)?.onTransferError?.(onTransferError);
-
-    return () => {
-      window.dex?.dtp?.offDeviceFound?.(onDeviceFound);
-      window.dex?.dtp?.offDeviceLost?.(onDeviceLost);
-      (window.dex?.dtp as any)?.offDevicePending?.(onDevicePending);
-      window.dex?.dtp?.offSendProgress?.(onSendProgress);
-      (window.dex?.dtp as any)?.offSendComplete?.(onSendComplete);
-      window.dex?.dtp?.offTransferProgress?.(onTransferProgress);
-      (window.dex?.dtp as any)?.offTransferComplete?.(onTransferComplete);
-      (window.dex?.dtp as any)?.offSendError?.(onTransferError);
-      (window.dex?.dtp as any)?.offTransferError?.(onTransferError);
-    };
+    // The bridge's namespaced dtp event helpers are no-ops under Tauri; native pushes
+    // arrive only through dex.on(channel). Same channels dtp_ctl/dtp_transfer emit.
+    const subs: [string, (data: any) => void][] = [
+      ['dtp:device-found', onDeviceFound],
+      ['dtp:device-updated', onDeviceUpdated],
+      ['dtp:device-lost', onDeviceLost],
+      ['dtp:device-pending', onDevicePending],
+      ['dtp:device-pending-cleared', onPendingCleared],
+      ['dtp:send-progress', onSendProgress],
+      ['dtp:send-complete', onSendComplete],
+      ['dtp:send-error', onTransferError],
+      ['dtp:transfer-progress', onTransferProgress],
+      ['dtp:transfer-complete', onTransferComplete],
+      ['dtp:transfer-error', onTransferError],
+    ];
+    subs.forEach(([ch, fn]) => window.dex?.on?.(ch, fn));
+    return () => { subs.forEach(([ch, fn]) => window.dex?.off?.(ch, fn)); };
   }, []);
+
+  // Receiver: listens for other DEX devices, saving into the chosen folder.
+  // Re-sent when the folder changes; it keeps running while DEX is open.
+  useEffect(() => {
+    const start = window.dex?.dtp?.startServer;
+    if (!start) return;
+    Promise.resolve(start({ downloadDir: downloadLocation || undefined }))
+      .then((r: { success?: boolean; error?: string } | undefined) => setReceiverError(r && r.success === false ? (r.error || 'Receiving is unavailable.') : null))
+      .catch((e: unknown) => setReceiverError(String(e)));
+  }, [downloadLocation]);
 
   // HTTP event listeners
   useEffect(() => {
@@ -502,55 +544,49 @@ const Transfers: React.FC = () => {
     window.dex?.dtp?.getDevices?.().then((d: DTPDevice[]) => { if (d) setDevices(d); }).catch(() => { /* no devices */ });
   }, []);
 
+  const sendPaths = useCallback(async (device: DTPDevice, files: string[]) => {
+    const res = await window.dex?.dtp?.sendFiles?.({
+      files,
+      targetAddress: device.address,
+      targetPort: device.port,
+      deviceName: deviceNicknames[device.deviceId] || device.deviceName,
+    }) as { success?: boolean; transferId?: string; error?: string } | undefined;
+    if (!res || res.success !== true || !res.transferId) {
+      toast.error(`Couldn't send: ${res?.error || 'sending is unavailable'}`);
+      return;
+    }
+    sendRequestsRef.current.set(res.transferId, { device, files });
+    setActiveTab('active');
+  }, [deviceNicknames, toast]);
+
   const sendToDevice = useCallback(async (device: DTPDevice) => {
     if (sending) return;
     setSending(true);
     try {
       const result = await window.dex?.transfer?.selectFiles?.();
-      if (!result?.filePaths?.length) { setSending(false); return; }
-      setActiveTab('active');
-      await window.dex?.dtp?.sendFiles?.({
-        files: result.filePaths,
-        targetAddress: device.address,
-        targetPort: device.port,
-        sessionToken: '',
-      });
+      if (!result?.filePaths?.length) return;
+      await sendPaths(device, result.filePaths);
     } catch (e) { console.error('[Transfers] Send error:', e); toast.error('Failed to send files'); }
     finally { setSending(false); }
-  }, [sending]);
+  }, [sending, sendPaths, toast]);
 
-  const approveDevice = useCallback((deviceId: string) => {
-    window.dex?.dtp?.approveDevice?.(deviceId);
+  const approveDevice = useCallback(async (deviceId: string) => {
     setPendingDevices(prev => prev.filter(d => d.deviceId !== deviceId));
-  }, []);
+    const r = await window.dex?.dtp?.approveDevice?.(deviceId) as { success?: boolean; error?: string } | undefined;
+    if (r && r.success === false) toast.error(r.error || 'That request is no longer waiting.');
+  }, [toast]);
 
   const denyDevice = useCallback((deviceId: string) => {
     window.dex?.dtp?.denyDevice?.(deviceId);
     setPendingDevices(prev => prev.filter(d => d.deviceId !== deviceId));
   }, []);
 
-  const pauseTransfer = useCallback((transferId: string) => {
-    try {
-      window.dex?.dtp?.pauseSend?.(transferId);
-      setPausedTransfers(prev => { const next = new Set(prev); next.add(transferId); return next; });
-      // Reset the speed sampler so resume recomputes from a fresh baseline.
-      computedRef.current.delete(transferId);
-    } catch (e) { console.error('[Transfers] Pause error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to pause transfer' } })); }
-  }, []);
-
-  const resumeTransfer = useCallback((transferId: string) => {
-    try {
-      window.dex?.dtp?.resumeSend?.(transferId);
-      setPausedTransfers(prev => { const next = new Set(prev); next.delete(transferId); return next; });
-    } catch (e) { console.error('[Transfers] Resume error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to resume transfer' } })); }
-  }, []);
-
   const cancelTransfer = useCallback((transferId: string) => {
     try {
+      // One native channel cancels either direction by transferId.
       window.dex?.dtp?.cancelSend?.(transferId);
     } catch (e) { console.error('[Transfers] Cancel error:', e); }
     setActiveTransfers(prev => prev.filter(t => t.transferId !== transferId));
-    setPausedTransfers(prev => { const next = new Set(prev); next.delete(transferId); return next; });
     setComputedStats(prev => { const next = { ...prev }; delete next[transferId]; return next; });
     computedRef.current.delete(transferId);
   }, []);
@@ -634,18 +670,19 @@ const Transfers: React.FC = () => {
     } catch (e) { console.error('[Transfers] Remove file error:', e); }
   }, []);
 
+  // A failed DEX-to-DEX send can't resume (the receiver discards partial
+  // files), so "Send Again" re-sends the same files to the same device.
   const retryTransfer = useCallback(async (transferId: string) => {
-    try {
-      // Prefer a native retry if the bridge exposes one; otherwise re-issue the
-      // transfer for the same files/target captured on the failed record.
-      const fn = (window.dex?.dtp as any)?.retryTransfer;
-      if (typeof fn === 'function') {
-        await fn(transferId);
-      }
-      setFailedTransfers(prev => { const next = { ...prev }; delete next[transferId]; return next; });
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Retrying transfer' } }));
-    } catch (e) { console.error('[Transfers] Retry error:', e); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Failed to retry transfer' } })); }
-  }, []);
+    const req = sendRequestsRef.current.get(transferId);
+    if (!req) {
+      toast.info('Send the files again from Devices.');
+      return;
+    }
+    setFailedTransfers(prev => { const next = { ...prev }; delete next[transferId]; return next; });
+    sendRequestsRef.current.delete(transferId);
+    try { await sendPaths(req.device, req.files); }
+    catch (e) { console.error('[Transfers] Send again error:', e); toast.error('Failed to send files'); }
+  }, [sendPaths, toast]);
 
   const dismissFailed = useCallback((transferId: string) => {
     setFailedTransfers(prev => { const next = { ...prev }; delete next[transferId]; return next; });
@@ -659,28 +696,6 @@ const Transfers: React.FC = () => {
   const clearCompleted = useCallback(() => {
     setActiveTransfers(prev => prev.filter(t => t.status !== 'complete' && Math.round(t.progress) < 100));
   }, []);
-
-  const bumpPriority = useCallback((transferId: string) => {
-    // Move a transfer to the top of the visual queue.
-    setTransferOrder(prev => {
-      const min = Object.values(prev).length ? Math.min(0, ...Object.values(prev)) : 0;
-      return { ...prev, [transferId]: min - 1 };
-    });
-  }, []);
-
-  const moveTransfer = useCallback((transferId: string, dir: -1 | 1) => {
-    setActiveTransfers(prev => {
-      // Apply current ordering, find the item, swap with its neighbour, then
-      // bake the resulting positions back into transferOrder.
-      const ordered = [...prev].sort((a, b) => (transferOrder[a.transferId] ?? 0) - (transferOrder[b.transferId] ?? 0));
-      const idx = ordered.findIndex(t => t.transferId === transferId);
-      const swapIdx = idx + dir;
-      if (idx < 0 || swapIdx < 0 || swapIdx >= ordered.length) return prev;
-      [ordered[idx], ordered[swapIdx]] = [ordered[swapIdx], ordered[idx]];
-      setTransferOrder(() => { const next: Record<string, number> = {}; ordered.forEach((t, i) => { next[t.transferId] = i; }); return next; });
-      return prev;
-    });
-  }, [transferOrder]);
 
   const qrWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -731,39 +746,26 @@ const Transfers: React.FC = () => {
           if (info.isRunning) { setHttpServerRunning(true); setHttpServerUrl(info.url ?? null); }
         }
       } else {
-        // For devices tab, default to first available device
-        if (devices.length > 0) {
-          setActiveTab('active');
-          await window.dex?.dtp?.sendFiles?.({
-            files: paths,
-            targetAddress: devices[0].address,
-            targetPort: devices[0].port,
-            sessionToken: '',
-          });
+        // Only send when the target is unambiguous and the drop carried real paths
+        // (WebView2 drops give names, not paths); never guess a device.
+        const realPaths = files.map(f => (f as any).path as string | undefined).filter((x): x is string => !!x);
+        if (realPaths.length === 0) {
+          toast.info('Use Send Files on a device to pick what to send.');
+        } else if (devices.length !== 1) {
+          toast.info(devices.length ? 'Several devices are nearby. Use Send Files on the one you want.' : 'No devices nearby yet.');
+        } else {
+          await sendPaths(devices[0], realPaths);
         }
       }
     }
-  }, [activeTab, devices]);
+  }, [activeTab, devices, sendPaths, toast]);
 
-  // Active transfers in their manual (priority) order. Items without an explicit
-  // order keep their natural position via a stable tiebreak.
-  const orderedActiveTransfers = useMemo(() => {
-    return [...activeTransfers].sort((a, b) => {
-      const oa = transferOrder[a.transferId];
-      const ob = transferOrder[b.transferId];
-      if (oa === undefined && ob === undefined) return 0;
-      if (oa === undefined) return 1;
-      if (ob === undefined) return -1;
-      return oa - ob;
-    });
-  }, [activeTransfers, transferOrder]);
-
-  // Overall throughput summary across active (non-paused) transfers. Prefers the
+  // Overall throughput summary across active transfers. Prefers the
   // locally-computed speed, falling back to the native payload's `speed`.
   const throughput = useMemo(() => {
     let totalSpeed = 0, totalBytes = 0, sentBytes = 0, count = 0;
     for (const t of activeTransfers) {
-      if (pausedTransfers.has(t.transferId)) continue;
+      if (t.status !== 'sending' && t.status !== 'receiving') continue;
       const sp = computedStats[t.transferId]?.speed ?? t.speed ?? 0;
       totalSpeed += sp;
       totalBytes += t.totalBytes || 0;
@@ -773,7 +775,7 @@ const Transfers: React.FC = () => {
     const remaining = Math.max(0, totalBytes - sentBytes);
     const etaMs = totalSpeed > 0 ? (remaining / totalSpeed) * 1000 : 0;
     return { totalSpeed, count, etaMs, totalBytes, sentBytes };
-  }, [activeTransfers, pausedTransfers, computedStats]);
+  }, [activeTransfers, computedStats]);
 
   const failedList = useMemo(() => Object.values(failedTransfers), [failedTransfers]);
 
@@ -819,15 +821,9 @@ const Transfers: React.FC = () => {
   const { menuState: ctxMenuState, show: showCtxMenu, close: closeCtxMenu } = useContextMenu();
 
   const buildTransferCtxItems = useCallback((t: DTPProgress): ContextMenuItem[] => [
-    pausedTransfers.has(t.transferId)
-      ? { label: 'Resume', icon: Icons.send, onClick: () => resumeTransfer(t.transferId) }
-      : { label: 'Pause', icon: Icons.pause, onClick: () => pauseTransfer(t.transferId) },
-    { label: 'Bump to Top', icon: Icons.speed, onClick: () => bumpPriority(t.transferId) },
-    { label: 'Move Up', onClick: () => moveTransfer(t.transferId, -1) },
-    { label: 'Move Down', onClick: () => moveTransfer(t.transferId, 1), divider: true },
     { label: 'Cancel', icon: Icons.close, onClick: () => cancelTransfer(t.transferId), danger: true },
     { label: 'Copy Transfer ID', onClick: () => navigator.clipboard.writeText(t.transferId) },
-  ], [pauseTransfer, resumeTransfer, cancelTransfer, bumpPriority, moveTransfer, pausedTransfers]);
+  ], [cancelTransfer]);
 
   const buildHistoryCtxItems = useCallback((h: TransferHistoryEntry): ContextMenuItem[] => [
     { label: 'Copy Device Name', onClick: () => navigator.clipboard.writeText(h.deviceName) },
@@ -932,7 +928,14 @@ const Transfers: React.FC = () => {
         {activeTab === 'devices' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Nearby devices on your network</div>
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Nearby devices on your network</div>
+                {receiverError && (
+                  <div role="status" style={{ fontSize: 11, color: 'var(--color-warning, #FF9F0A)', marginTop: 4 }}>
+                    Other devices can't send to this one: {receiverError}
+                  </div>
+                )}
+              </div>
               <button onClick={refreshDevices} style={{
                 padding: '6px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)',
                 background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
@@ -1014,7 +1017,16 @@ const Transfers: React.FC = () => {
                       {Icons.shield}
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{pd.deviceName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{pd.deviceType} wants to send files</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                          {pd.fileCount
+                            ? `Wants to send ${pd.fileCount} file${pd.fileCount === 1 ? '' : 's'} (${formatSize(pd.totalBytes || 0)})${pd.files?.length === 1 ? `: ${pd.files[0].name}` : ''}`
+                            : 'Wants to send files'}
+                        </div>
+                        {pd.code && (
+                          <div title="Accept only if the sender's screen shows the same code." style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                            Match code <strong style={{ color: 'var(--color-text-primary)', letterSpacing: 1 }}>{pd.code}</strong>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -1079,15 +1091,15 @@ const Transfers: React.FC = () => {
                     background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.2)',
                   }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Failed: {formatSize(t.totalBytes)}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} of {formatSize(t.totalBytes)} sent</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Failed: {formatSize(t.totalBytes)}{t.deviceName ? (t.direction === 'receive' ? ` from ${t.deviceName}` : ` to ${t.deviceName}`) : ''}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{t.error || `${formatSize(t.sentBytes)} of ${formatSize(t.totalBytes)} sent`}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => retryTransfer(t.transferId)} style={{
+                      {t.direction !== 'receive' && <button onClick={() => retryTransfer(t.transferId)} style={{
                         padding: '5px var(--space-3)', borderRadius: 6, border: 'none',
                         background: 'var(--color-accent-muted, rgba(10,132,255,0.15))', color: 'var(--color-accent)',
                         fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-                      }}>{Icons.refresh} Retry</button>
+                      }}>{Icons.refresh} Send Again</button>}
                       <button onClick={() => dismissFailed(t.transferId)} title="Dismiss" aria-label="Dismiss failed transfer" style={{
                         width: 28, height: 28, borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                         background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
@@ -1105,55 +1117,36 @@ const Transfers: React.FC = () => {
                   <span style={{ color: 'var(--color-success, #32D54B)', display: 'flex' }}>{Icons.send}</span>
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Select a device above to start sharing files</div>
-                <button onClick={async () => {
-                  try {
-                    const result = await window.dex?.transfer?.selectFiles?.();
-                    if (result?.filePaths?.length) {
-                      toast.success(`${result.filePaths.length} file(s) ready — select a device to send`);
-                    }
-                  } catch { /* dialog unavailable */ }
-                }} style={{ padding: '6px var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
+                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Pick a device, then the files to send</div>
+                <button onClick={() => setActiveTab('devices')} style={{ padding: '6px var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Choose a Device</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {orderedActiveTransfers.map((t, idx) => {
-                  const isPaused = pausedTransfers.has(t.transferId);
+                {activeTransfers.map((t) => {
+                  const incoming = t.direction === 'receive';
+                  const who = t.deviceName ? (incoming ? ` from ${t.deviceName}` : ` to ${t.deviceName}`) : '';
+                  const title = t.status === 'connecting' ? `Connecting${who}...`
+                    : t.status === 'awaiting-approval' ? `Waiting for ${t.deviceName || 'the other device'} to accept`
+                    : t.status === 'complete' ? `${incoming ? 'Received' : 'Sent'} ${formatSize(t.totalBytes)}${who}`
+                    : `${incoming ? 'Receiving' : 'Sending'} ${formatSize(t.totalBytes)}${who}`;
                   const stat = computedStats[t.transferId];
                   // Prefer native speed/ETA; fall back to the locally-computed values.
-                  const dispSpeed = isPaused ? 0 : (t.speed && t.speed > 0 ? t.speed : (stat?.speed ?? 0));
-                  const dispEta = isPaused ? 0 : (t.timeRemainingMs && t.timeRemainingMs > 0 ? t.timeRemainingMs : (stat?.etaMs ?? 0));
+                  const dispSpeed = (t.speed && t.speed > 0 ? t.speed : (stat?.speed ?? 0));
+                  const dispEta = (t.timeRemainingMs && t.timeRemainingMs > 0 ? t.timeRemainingMs : (stat?.etaMs ?? 0));
                   return (
                   <div key={t.transferId} onContextMenu={e => showCtxMenu(e, buildTransferCtxItems(t))} className="dex-liquid-glass" style={{
                     padding: 'var(--space-4) 18px', borderRadius: 'var(--radius-xl)',
-                    opacity: isPaused ? 0.7 : 1,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {isPaused ? `Paused — ${formatSize(t.totalBytes)}` : t.status === 'bandwidth-test' ? 'Measuring bandwidth...' : t.status === 'verifying' ? 'Verifying...' : `Sending ${formatSize(t.totalBytes)}`}
+                          {title}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                          {formatSpeed(dispSpeed)} {t.streamCount > 0 && `| ${t.streamCount} streams`} | ETA: {formatTime(dispEta)}
+                          {t.status === 'complete' ? 'Done' : `${formatSpeed(dispSpeed)} | ETA: ${formatTime(dispEta)}`}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {/* Reorder / priority controls */}
-                        <button onClick={() => moveTransfer(t.transferId, -1)} disabled={idx === 0} title="Move up" aria-label="Move transfer up" style={{
-                          width: 28, height: 28, borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)',
-                          background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
-                          cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
-                        }}>↑</button>
-                        <button onClick={() => moveTransfer(t.transferId, 1)} disabled={idx === orderedActiveTransfers.length - 1} title="Move down" aria-label="Move transfer down" style={{
-                          width: 28, height: 28, borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)',
-                          background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
-                          cursor: idx === orderedActiveTransfers.length - 1 ? 'default' : 'pointer', opacity: idx === orderedActiveTransfers.length - 1 ? 0.35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
-                        }}>↓</button>
-                        <button onClick={() => isPaused ? resumeTransfer(t.transferId) : pauseTransfer(t.transferId)} title={isPaused ? 'Resume' : 'Pause'} aria-label={isPaused ? 'Resume transfer' : 'Pause transfer'} style={{
-                          width: 28, height: 28, borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)',
-                          background: isPaused ? 'rgba(48,209,88,0.1)' : 'var(--color-bg-elevated)', color: isPaused ? 'var(--color-success)' : 'var(--color-text-muted)',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>{isPaused ? Icons.send : Icons.pause}</button>
                         <button onClick={() => cancelTransfer(t.transferId)} title="Cancel" aria-label="Cancel transfer" style={{
                           width: 28, height: 28, borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,69,58,0.3)',
                           background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
@@ -1164,10 +1157,12 @@ const Transfers: React.FC = () => {
                     {/* Transfer status */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       <span style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 500 }}>
-                        {Icons.shield} Protected transfer
+                        {Icons.shield} Encrypted
                       </span>
-                      {speedLimit > 0 && (
-                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>| Limit: {speedLimit} MB/s</span>
+                      {t.code && (
+                        <span title="The other screen shows the same code. If it doesn't, cancel." style={{ fontSize: 10, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                          | Match code <strong style={{ color: 'var(--color-text-primary)', letterSpacing: 1 }}>{t.code}</strong>
+                        </span>
                       )}
                     </div>
                     <div style={{ width: '100%', height: 6, borderRadius: 4, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>

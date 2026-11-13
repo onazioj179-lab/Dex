@@ -21,6 +21,7 @@ members = [
     "dex-ai-runtime",
     "dex-cache",
     "dex-ledger",
+    "dex-dtp",
 ]
 
 [workspace.package]

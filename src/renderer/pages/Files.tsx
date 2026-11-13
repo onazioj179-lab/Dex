@@ -10,6 +10,7 @@
  * Auto-categorization, fast search by name/date/type/time
  */
 
+import { toMediaUrl } from '../utils/mediaUrl';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
@@ -2365,7 +2366,7 @@ export const Files: React.FC = () => {
             {/* Image Preview */}
             {['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'].includes(previewFile.extension.toLowerCase()) && (
               <img
-                src={`file://${previewFile.path.replace(/\\/g, '/')}`}
+                src={toMediaUrl(previewFile.path)}
                 alt={previewFile.name}
                 style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 6 }}
               />
@@ -2373,7 +2374,7 @@ export const Files: React.FC = () => {
             {/* Video Preview */}
             {['.mp4', '.mov', '.webm'].includes(previewFile.extension.toLowerCase()) && (
               <video
-                src={`file://${previewFile.path.replace(/\\/g, '/')}`}
+                src={toMediaUrl(previewFile.path)}
                 controls
                 autoPlay
                 style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 6 }}
@@ -2384,7 +2385,7 @@ export const Files: React.FC = () => {
               <div style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-8)', borderRadius: 10 }}>
                 <Icons.music size={64} />
                 <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)', fontSize: 16 }}>{previewFile.name}</div>
-                <audio src={`file://${previewFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ width: 300 }} />
+                <audio src={toMediaUrl(previewFile.path)} controls autoPlay style={{ width: 300 }} />
               </div>
             )}
             {/* File Name */}

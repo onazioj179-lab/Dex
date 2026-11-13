@@ -1078,7 +1078,13 @@ const Forge: React.FC = () => {
 
           // Start file system monitoring via IPC
           try {
-            await dex.invoke('watch:start', { id: folderId, path: folderPath });
+            const started = await dex.invoke('watch:start', { id: folderId, path: folderPath }) as { success?: boolean; error?: string } | undefined;
+            if (!started || started.success !== true) {
+              // Folder kept, but say plainly it is not being watched.
+              setWatchFolders(prev => prev.map(f => f.id === folderId ? { ...f, active: false } : f));
+              toast.error(`Can't watch ${folderPath}: ${started?.error || 'the watcher did not start'}`);
+              return;
+            }
             // Listen for new files detected by the watcher
             const handler = (data: { id: string; files: string[] }) => {
               if (data?.id === folderId) {
@@ -1132,7 +1138,7 @@ const Forge: React.FC = () => {
         console.warn('Could not access folder:', err);
       }
     }
-  }, [selectedPreset, customOutputDir]);
+  }, [selectedPreset, customOutputDir, toast]);
 
   const addFolder = useCallback(async () => {
     try {
