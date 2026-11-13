@@ -156,6 +156,8 @@ export function normalizeVaultState(raw: unknown): { isUnlocked: boolean; vaultE
   return { isUnlocked: !!(r.isUnlocked ?? r.unlocked), vaultExists: !!(r.vaultExists ?? r.exists) };
 }
 
+let _vaultStateCleanup: (() => void) | null = null;
+
 export const useVaultStore = create<VaultState>((set, get) => ({
   // Initial State
   isUnlocked: false,
@@ -201,14 +203,23 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         await get().loadSettings();
       }
 
-      // Listen for state changes
-      window.dex!.vault.onStateChange((raw) => {
+      // Native pushes `vault:state-changed` after create/unlock/lock/import, so a
+      // lock in another window (detached Vault) clears secrets here too.
+      // (dex.vault.onStateChange is a no-op under Tauri.) Re-subscribe safely.
+      if (_vaultStateCleanup) { _vaultStateCleanup(); _vaultStateCleanup = null; }
+      const onVaultState = (raw: unknown) => {
         const newState = normalizeVaultState(raw);
+        const wasUnlocked = get().isUnlocked;
         set({
           isUnlocked: newState.isUnlocked,
           vaultExists: newState.vaultExists,
         });
 
+        if (newState.isUnlocked && !wasUnlocked) {
+          // Unlocked elsewhere: load what this window hasn't got yet.
+          void get().loadCredentials();
+          void get().loadAuthenticators();
+        }
         if (!newState.isUnlocked) {
           // Clear sensitive data when locked
           set({
@@ -218,7 +229,12 @@ export const useVaultStore = create<VaultState>((set, get) => ({
             selectedAuthenticatorId: null,
           });
         }
-      });
+      };
+      const dex = window.dex;
+      if (dex?.on) {
+        dex.on('vault:state-changed', onVaultState);
+        _vaultStateCleanup = () => { dex.off?.('vault:state-changed', onVaultState); };
+      }
     } catch (error) {
       set({ error: String(error), isLoading: false });
     }

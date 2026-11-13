@@ -193,7 +193,6 @@ declare global {
         setSecurityQuestions: (qa: { question: string; answer: string }[]) => Promise<{ success: boolean; error?: string }>;
         getSecurityQuestions: () => Promise<{ enabled: boolean; questions: { index: number; question: string }[] }>;
         recoverAccount: (req: { answers: string[]; newPassword?: string }) => Promise<{ success: boolean; error?: string; token?: string }>;
-        onStateChange: (callback: (state: any) => void) => void;
       };
       // Secure Vault - Password Manager & Authenticator
       vault: {
@@ -224,7 +223,6 @@ declare global {
         addCategory: (category: any) => Promise<any>;
         export: (password: string) => Promise<string | null>;
         import: (data: string, password: string) => Promise<{ success: boolean; error?: string }>;
-        onStateChange: (callback: (state: any) => void) => void;
       };
       // Phase 12: System Map
       systemMap: {
@@ -562,8 +560,6 @@ declare global {
         markRead: (id: string) => Promise<boolean>;
         markAllRead: () => Promise<boolean>;
         clearAll: () => Promise<boolean>;
-        onNew: (callback: (...args: any[]) => void) => void;
-        offNew: (callback: (...args: any[]) => void) => void;
       };
       // CLIPBOARD HISTORY: OS-level clipboard management
       clipboard: {
@@ -888,19 +884,6 @@ declare global {
         getTrustedDevices: () => Promise<any[]>;
         removeTrustedDevice: (deviceId: string) => Promise<any>;
         measureBandwidth: (args: { address: string; port?: number }) => Promise<any>;
-        onDeviceFound: (callback: (device: any) => void) => void;
-        onDeviceLost: (callback: (device: any) => void) => void;
-        onDevicePending: (callback: (info: any) => void) => void;
-        onSendProgress: (callback: (progress: any) => void) => void;
-        onSendComplete: (callback: (result: any) => void) => void;
-        onSendError: (callback: (error: any) => void) => void;
-        onTransferProgress: (callback: (info: any) => void) => void;
-        onTransferComplete: (callback: (info: any) => void) => void;
-        onTransferError: (callback: (info: any) => void) => void;
-        offDeviceFound: (callback: (device: any) => void) => void;
-        offDeviceLost: (callback: (device: any) => void) => void;
-        offSendProgress: (callback: (progress: any) => void) => void;
-        offTransferProgress: (callback: (info: any) => void) => void;
       };
       // Updates
       updates: {
@@ -915,8 +898,6 @@ declare global {
         openReleaseNotes: () => Promise<any>;
         getChangelog: () => Promise<any>;
         getReleaseNotesForVersion: (version: string) => Promise<{ version: string; notes: string }>;
-        onInstalled: (callback: (payload: { version: string; backupPath?: string | null; timestamp: number }) => void) => void;
-        offInstalled: (callback: (payload: { version: string; backupPath?: string | null; timestamp: number }) => void) => void;
         getConfig: () => Promise<any>;
         listBackups: () => Promise<any[]>;
         rollback: (backupId: string) => Promise<any>;
@@ -992,8 +973,6 @@ declare global {
         runPluginCommand: (pluginId: string, name: string, payload?: any) => Promise<any>;
         getTodayLogs: () => Promise<any>;
         openLogsFolder: () => Promise<any>;
-        onBackgroundError: (callback: (payload: { message: string; timestamp: number }) => void) => void;
-        offBackgroundError: (callback: (payload: { message: string; timestamp: number }) => void) => void;
       };
       // Generic invoke for backward compatibility
       invoke: (channel: string, ...args: any[]) => Promise<any>;

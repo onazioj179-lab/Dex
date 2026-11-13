@@ -572,10 +572,11 @@ const DexNotes: React.FC = () => {
         const result = await dex.invoke('dexnotes:pick-attachment-file');
         if (result?.filePath) {
           await store.addAttachment(activeNote.id, result.filePath);
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Attached' } }));
         }
       }
-    } catch (_e) {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'File picker not available' } }));
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: e instanceof Error ? e.message : "Couldn't attach the file" } }));
     }
   }, [activeNote, store]);
 
@@ -597,7 +598,8 @@ const DexNotes: React.FC = () => {
     if (added > 0) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Attached ${added} file${added !== 1 ? 's' : ''}` } }));
     } else {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Could not attach dropped file' } }));
+      // WebView2 drops carry names, not paths: point to the picker instead of failing vaguely.
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Use Attach file to add it (dropped files have no path here).' } }));
     }
   }, [activeNote, store]);
 

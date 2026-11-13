@@ -240,6 +240,7 @@ mod keyboard_navigation;
 mod localization;
 mod nl_task;
 mod notes;
+mod note_attachments;
 mod session_replay;
 mod shared_media_library;
 mod theme_schedule;
@@ -2054,6 +2055,14 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("daily-note:") {
         return daily_note::dispatch(conn, channel, args);
     }
+    if channel == "feedback:submit" {
+        let dir = app.dex_data_dir().unwrap_or_default().join("feedback");
+        return feedback_collector::submit_to_file(conn, &dir, args, &renderer_log::log_path());
+    }
+    if channel == "feedback:getSystemInfoPreview" {
+        let active = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+        return feedback_collector::system_info(active, &renderer_log::log_path());
+    }
     if channel.starts_with("feedback:") {
         return feedback_collector::dispatch(conn, channel, args);
     }
@@ -2128,6 +2137,22 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         // (the Tauri analog of Electron userData) and probe for whisper.wasm.
         let data_dir = app.dex_data_dir().unwrap_or_default();
         return voice_memo::dispatch(conn, &data_dir, channel, args);
+    }
+    if matches!(channel, "dexnotes:addAttachment" | "dexnotes:removeAttachment" | "dexnotes:openAttachment") {
+        // Attachments are files on disk (copied under the data dir), not DB-only work.
+        let data_dir = app.dex_data_dir().unwrap_or_default();
+        let s = |i: usize| args.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        return match channel {
+            "dexnotes:addAttachment" => note_attachments::add(conn, &data_dir, &s(0), &s(1)),
+            "dexnotes:removeAttachment" => note_attachments::remove(conn, &data_dir, &s(0)),
+            _ => match note_attachments::open_target(conn, &s(0)) {
+                Ok(p) => match open::that(&p) {
+                    Ok(()) => json!({ "success": true }),
+                    Err(e) => json!({ "success": false, "error": format!("Windows couldn't open it: {e}") }),
+                },
+                Err(e) => json!({ "success": false, "error": e }),
+            },
+        };
     }
     if channel.starts_with("dexnotes:") {
         return notes::dispatch(conn, channel, args);
@@ -2980,7 +3005,15 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         ch if ch.starts_with("notifications:") => notifications_dispatch(&app, ch, &args),
 
         // --- Vault (GOAL-6B): all vault:* channels except copyToClipboard --
-        ch if ch.starts_with("vault:") => vault_dispatch(&app, ch, &args),
+        ch if ch.starts_with("vault:") => {
+            let out = vault_dispatch(&app, ch, &args);
+            // Every window (main + detached Vault) keeps its own store; tell them all.
+            if matches!(ch, "vault:create" | "vault:unlock" | "vault:lock" | "vault:importVault" | "vault:changeMasterPassword") {
+                let state = vault_dispatch(&app, "vault:getState", &json!([]));
+                crate::native_ops::emit_event(&app, "vault:state-changed", &state);
+            }
+            out
+        }
 
         // --- Security permissions (SecurityController portable core) -------
         ch if ch.starts_with("security:") => security_dispatch(&app, ch, &args),

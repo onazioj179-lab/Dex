@@ -237,10 +237,6 @@ memorySentinel.start();
 })();
 
 
-// DTP: Transfer notification service for inner apps
-import { initTransferNotifications } from './services/TransferNotifications';
-initTransferNotifications();
-
 // UKI: Voice assistant renderer bridge
 import { initUkiRendererBridge } from './services/ukiBridge';
 initUkiRendererBridge();

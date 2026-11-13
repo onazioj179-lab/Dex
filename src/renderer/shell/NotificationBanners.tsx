@@ -19,6 +19,7 @@ import type { NotificationRecord, NotificationPriority } from '../../shared/noti
 import { summarizeGroup, type DigestItem } from '../../shared/notifications/digest';
 import { readHubTarget } from '../services/notify';
 import { readDexSetting } from '../hooks/useDexSetting';
+import { doNotDisturbOn } from '../utils/notificationsAllowed';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -196,7 +197,7 @@ const Banner: React.FC<{
 
   // Play sound on mount (Settings > Notifications > Sound)
   useEffect(() => {
-    if (readDexSetting('soundEnabled', true)) playNotification(window.innerWidth - BANNER_WIDTH / 2);
+    if (readDexSetting('soundEnabled', true) && !doNotDisturbOn()) playNotification(window.innerWidth - BANNER_WIDTH / 2);
   }, []);
 
   // Swipe to dismiss: distance OR a quick flick (utils/swipeDismiss), rubber

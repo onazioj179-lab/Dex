@@ -13,8 +13,27 @@
 
 import { useAuthStore } from '../store/useAuthStore';
 
-/** True unless the user turned "Allow Notifications" off (default on). */
+export const DND_KEY = 'dex-dnd';
+
+/**
+ * Control Center / Settings "Do Not Disturb". It used to call a native channel
+ * that answered "not ported" and nothing read the flag, so it silenced nothing.
+ * Now it is a persisted flag every popup and sound path checks.
+ */
+export function doNotDisturbOn(): boolean {
+  try { return localStorage.getItem(DND_KEY) === '1'; } catch { return false; }
+}
+
+export function setDoNotDisturbFlag(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(DND_KEY, '1');
+    else localStorage.removeItem(DND_KEY);
+  } catch { /* storage unavailable: state lives in the store only */ }
+}
+
+/** True unless the user turned "Allow Notifications" off (default on) or Do Not Disturb is on. */
 export function notificationsAllowed(): boolean {
+  if (doNotDisturbOn()) return false;
   try {
     return JSON.parse(localStorage.getItem('dex-settings') || '{}').enableNotifications !== false;
   } catch {
@@ -22,8 +41,9 @@ export function notificationsAllowed(): boolean {
   }
 }
 
-/** Settings > Notifications > "Sound" (default on). */
+/** Settings > Notifications > "Sound" (default on); off while Do Not Disturb is on. */
 export function notificationSoundEnabled(): boolean {
+  if (doNotDisturbOn()) return false;
   try {
     return JSON.parse(localStorage.getItem('dex-settings') || '{}').soundEnabled !== false;
   } catch {

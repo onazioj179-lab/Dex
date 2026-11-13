@@ -837,23 +837,31 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
 
   // -- Attachments ---------------------------------------------------------
 
+  // Native answers {success:false,error}; throw so callers can say why.
   addAttachment: async (noteId: string, filePath: string) => {
-    await ipc('dexnotes:addAttachment', noteId, filePath);
+    const r = await ipc('dexnotes:addAttachment', noteId, filePath) as { success?: boolean; error?: string } | null;
+    if (!r || r.success !== true) throw new Error(r?.error || "Couldn't attach the file");
     if (get().activeNote?.id === noteId) {
       await get().loadNote(noteId);
     }
   },
 
   removeAttachment: async (attachmentId: string) => {
-    await ipc('dexnotes:removeAttachment', attachmentId);
+    const r = await ipc('dexnotes:removeAttachment', attachmentId) as { success?: boolean; error?: string } | null;
     const { activeNote } = get();
     if (activeNote) {
       await get().loadNote(activeNote.id);
     }
+    if (!r || r.success !== true) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: r?.error || "Couldn't remove the attachment" } }));
+    }
   },
 
   openAttachment: async (attachmentId: string) => {
-    await ipc('dexnotes:openAttachment', attachmentId);
+    const r = await ipc('dexnotes:openAttachment', attachmentId) as { success?: boolean; error?: string } | null;
+    if (!r || r.success !== true) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: r?.error || "Couldn't open the attachment" } }));
+    }
   },
 
   // -- Links ---------------------------------------------------------------
