@@ -1364,7 +1364,7 @@ const Forge: React.FC = () => {
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
     categoryHeader: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', padding: 'var(--space-3) 0 var(--space-2)', marginTop: 'var(--space-2)', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
-    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
+    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'var(--color-bg-surface)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     checkbox: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
     select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px var(--space-2)', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
@@ -1507,12 +1507,9 @@ const Forge: React.FC = () => {
         /* === FORGE - PROFESSIONAL UI === */
         button { font-family: inherit; }
         button:active { transform: scale(0.97); }
-        .forge-btn-primary:hover { background: #3aa2ff !important; }
-        .forge-job-item:hover { border-color: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; background: #0d1a2e !important; }
-        .forge-preset-item:hover { border-color: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; background: #0d1a2e !important; }
-        .forge-icon-btn:hover { color: var(--color-accent) !important; background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
-        .forge-ctx-item:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
-        .forge-ctx-item:active { background: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+        .forge-icon-btn:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
+        .forge-ctx-item:hover { background: var(--color-bg-hover) !important; }
+        .forge-ctx-item:active { background: var(--color-bg-active) !important; }
         * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -1525,14 +1522,12 @@ const Forge: React.FC = () => {
         }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
         select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
-        select:focus { border-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
-        select:hover { border-color: color-mix(in srgb, var(--color-accent) 15%, transparent); }
-        .forge-tab:hover { color: var(--color-accent) !important; background: #0d1a2e !important; }
+        select:hover { border-color: var(--color-border-strong); }
         .forge-dropdown-item { transition: background 0.12s ease; }
-        .forge-dropdown-item:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
-        .forge-dropdown-item:active { background: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+        .forge-dropdown-item:hover { background: var(--color-bg-hover) !important; }
+        .forge-dropdown-item:active { background: var(--color-bg-active) !important; }
         .forge-tools-btn { transition: background 0.12s ease, color 0.12s ease; }
-        .forge-tools-btn:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; color: var(--color-text-primary) !important; }
+        .forge-tools-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
       `}</style>
       {/* Standardized menu bar (File / Edit / Queue / Tools with submenus) */}
       <CreativeMenuBar menus={forgeMenus} accent="var(--color-accent)" />
@@ -1571,7 +1566,7 @@ const Forge: React.FC = () => {
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '9999px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
+            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'var(--color-bg-active)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-text-primary)' : 'var(--color-text-muted)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '9999px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
               <div className="dex-creative-panel-strong" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: '14px', boxShadow: '0 16px 48px rgba(0,0,0,0.55)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PROCESSING</div>

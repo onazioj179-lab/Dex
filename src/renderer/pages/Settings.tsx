@@ -3408,7 +3408,7 @@ export const Settings: React.FC = () => {
           {DATA_CATEGORIES.map(category => (
             <div key={category.id} style={{ padding: '10px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
               <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{category.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{DATA_STATE_LABEL[category.defaultState]}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', margin: '3px 0 5px' }}>{DATA_STATE_LABEL[category.defaultState]}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
             </div>
           ))}
@@ -4228,7 +4228,6 @@ export const Settings: React.FC = () => {
         .settings-nav[data-active="true"]::before {
           content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
           width: 2px; background: var(--color-accent); border-radius: 2px;
-          box-shadow: 0 0 6px var(--color-accent-light, rgba(74,158,255,0.55));
         }
         .settings-btn:hover { background: var(--color-bg-hover) !important; }
         .settings-btn:active { transform: scale(0.97); }
@@ -4236,7 +4235,7 @@ export const Settings: React.FC = () => {
         .settings-select:hover { border-color: var(--color-border-strong) !important; }
         .settings-action:hover { background: var(--color-bg-hover) !important; }
         .settings-danger:hover { background: rgba(255,69,58,0.18) !important; }
-        .settings-color:hover { transform: scale(1.15); }
+        .settings-color:hover { box-shadow: 0 0 0 1px var(--color-border-strong); }
         .settings-shell input[type="range"] { accent-color: var(--color-accent); }
         .settings-shell input[type="checkbox"] { accent-color: var(--color-accent); }
         .settings-shell input[type="color"] { border-radius: 6px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
@@ -4443,8 +4442,8 @@ export const Settings: React.FC = () => {
         {countChangedSettings(settings) > 0 && (
           <div style={{ 
             padding: '6px var(--space-3)', margin: '0 var(--space-3) var(--space-2)', borderRadius: 4,
-            background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))',
-            fontSize: 10, color: 'var(--color-accent)',
+            background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+            fontSize: 10, color: 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent-fill)' }} />

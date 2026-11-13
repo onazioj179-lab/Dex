@@ -159,8 +159,6 @@ const Achievements: React.FC = () => {
       <style>{`
         .tr-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
         .tr-scroll::-webkit-scrollbar-thumb { background: var(--color-bg-active); border-radius: 6px; }
-        .tr-card { transition: transform .15s ease, border-color .15s ease; }
-        .tr-card:hover { transform: translateY(-2px); border-color: var(--color-border); }
       `}</style>
 
       <div className="tr-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 26px 30px' }}>

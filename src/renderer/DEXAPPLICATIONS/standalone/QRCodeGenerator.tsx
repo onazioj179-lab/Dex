@@ -43,10 +43,10 @@ const QR_SCOPED_CSS = `
 [data-dex-qr-root] .qr-tab { transition: background 0.12s ease, color 0.12s ease; }
 [data-dex-qr-root] .qr-tab:hover { background: var(--color-bg-surface); color: var(--color-text-primary); }
 [data-dex-qr-root] .qr-quick { transition: transform 0.12s ease, filter 0.12s ease; }
-[data-dex-qr-root] .qr-quick:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+[data-dex-qr-root] .qr-quick:not(:disabled):hover { filter: brightness(1.06); }
 [data-dex-qr-root] .qr-quick:not(:disabled):active { transform: scale(0.96); }
 [data-dex-qr-root] .qr-field { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
-[data-dex-qr-root] .qr-field:focus, [data-dex-qr-root] .qr-field:focus-within { border-color: var(--color-accent); }
+[data-dex-qr-root] .qr-field:focus-within { border-color: var(--color-border-strong); }
 `;
 
 // Minimal QR code generator (byte mode, version 1-10 auto, selectable EC level)
@@ -859,7 +859,7 @@ const s: Record<string, React.CSSProperties> = {
   historyBadge: {
     flexShrink: 0, width: 18, height: 18, borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+    background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
     fontSize: 11, fontWeight: 700,
   },
   historyText: {

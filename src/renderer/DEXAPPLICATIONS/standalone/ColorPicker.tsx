@@ -142,28 +142,19 @@ const ColorPicker: React.FC = () => {
           cursor: pointer;
           transition: transform 0.12s ease, box-shadow 0.12s ease;
         }
-        .cp-slider::-webkit-slider-thumb:hover { transform: scale(1.14); }
         .cp-slider::-webkit-slider-thumb:active { transform: scale(0.96); }
         .cp-slider::-moz-range-thumb {
           width: 18px; height: 18px; border-radius: 50%;
           background: #fff; border: 2px solid rgba(0,0,0,0.18);
           box-shadow: 0 1px 4px rgba(0,0,0,0.35); cursor: pointer;
         }
-        .cp-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(74,158,255,0.4); }
-        .cp-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(74,158,255,0.4); }
         .cp-chip { transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease; }
-        .cp-chip:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .cp-chip:hover { filter: brightness(1.06); }
         .cp-chip:active { transform: scale(0.98); }
         .cp-swatch { transition: transform 0.12s ease, box-shadow 0.15s ease; }
-        .cp-swatch:hover { transform: scale(1.12); z-index: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
-        .cp-swatch:active { transform: scale(1.02); }
+        .cp-swatch:hover { box-shadow: 0 0 0 1px var(--color-border-strong); }
+        .cp-swatch:active { transform: scale(0.96); }
         .cp-hex { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-        .cp-hex:focus-visible { box-shadow: 0 0 0 3px rgba(74,158,255,0.35); }
-        .cp-chip:focus-visible,
-        .cp-swatch:focus-visible {
-          outline: 2px solid var(--color-accent, #4A9EFF);
-          outline-offset: 2px;
-        }
       `}</style>
       {/* Color preview */}
       <div style={{ ...s.previewBar, background: hex }}>

@@ -5413,7 +5413,6 @@ export const AppManager: React.FC = () => {
               pointerEvents: 'none',
               zIndex: 4000,
               transition: 'all 180ms var(--pg-curve-standard, cubic-bezier(0.4, 0, 0.2, 1))',
-              boxShadow: '0 0 20px rgba(59,130,246,0.1)',
             }}
           />
         );
@@ -5613,7 +5612,7 @@ export const AppManager: React.FC = () => {
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', marginBottom: 'var(--space-6)' }}>DEX</div>
           <div style={{ width: 200, height: 3, borderRadius: 2, background: 'var(--color-border-subtle)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #4a9eff, #a855f7)', width: `${splashProgress}%`, transition: 'width 0.3s ease' }} />
+            <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent-fill, #0A84FF)', width: `${splashProgress}%`, transition: 'width 0.3s ease' }} />
           </div>
         </div>
       )}

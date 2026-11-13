@@ -729,9 +729,7 @@ const INBOX_CSS = `
 .inbox-tool-btn:hover:not(:disabled) { background: var(--color-bg-hover, var(--color-bg-surface)); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
 .inbox-tool-btn:active:not(:disabled) { transform: scale(0.97); }
 .inbox-tool-btn:disabled { opacity: 0.45; cursor: default; }
-.inbox-tool-btn:focus-visible, .inbox-chip:focus-visible, .inbox-row:focus-visible, .inbox-row-action:focus-visible, .inbox-search-input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .inbox-chip:hover { color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
-.inbox-search-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent); }
 .inbox-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); }
 .inbox-row.inbox-row-active { background: color-mix(in srgb, var(--color-accent) 16%, transparent); }
 .inbox-row-actions { opacity: 0; transform: translateX(4px); transition: opacity 0.12s ease, transform 0.12s ease; pointer-events: none; }

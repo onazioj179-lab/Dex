@@ -133,8 +133,8 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--color-accent)',
-        background: 'rgba(10,132,255,0.14)',
+        color: 'rgba(255,255,255,0.85)',
+        background: 'rgba(255,255,255,0.10)',
       }}>
         <DexIcon name="file-text" size={22} color="currentColor" />
       </span>
@@ -838,8 +838,8 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                         border: isActive ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-border-subtle)',
                         cursor: 'pointer', position: 'relative', overflow: 'hidden',
                         transition: 'border-color 0.2s, transform 0.15s',
-                        transform: isActive ? 'scale(1.02)' : 'scale(1)',
-                        boxShadow: isActive ? '0 0 0 2px rgba(10,132,255,0.3), 0 4px 12px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.2)',
+                        transform: 'none',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                       }}
                     >
                       {isActive && (
