@@ -1,5 +1,41 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
+> Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
+> Rust backend (`src-tauri` + `core/*`), **userspace** is everything that calls it over `dex_ipc` channels
+> (renderer, apps, plugins, saved automations). Version is now **7.0.2**, build serial **001z** (owner bump).
+> Status per item. "Shipped" means built and tested here; nothing below has had a packaged-app run yet.
+> - **B001/B002/B016 kernel compatibility, compliance tool, regression testing: SHIPPED.** New IPC ABI guard
+>   `scripts/ipc-abi.mjs` + lock `src-tauri/ipc-abi.lock.json` (1,920 native channels). `npm run abi:check`, also in
+>   `npm run lint` and `tests/unit/ipc-abi-compat.test.ts`: fails if a shipped channel disappears, or if new renderer
+>   code calls a channel nothing answers (that list only shrinks). Rules in `docs/NATIVE_ABI.md`. First run found a real
+>   break: Quick Look text previews called `files:read`, which nothing answers (always blank in the desktop app), now
+>   `fs:readText`. Not done: CI doesn't yet run `npm run lint` as its own step (the unit tests cover it).
+> - **B003/B011 privacy + metadata controls: SHIPPED (first slice).** Native `fs:stripMetadata`
+>   (`src-tauri/src/metadata_strip.rs`, 5 cargo tests): lossless JPEG/PNG copy without EXIF/GPS, XMP, IPTC, comments,
+>   PNG text/time chunks. Keeps colour profiles, EXIF orientation (rewritten as a 1-entry block) and C2PA content
+>   credentials, which are signed provenance, not personal data. Gallery › EXIF panel: "Save a copy without metadata".
+>   Creator attribution (B010 side) already existed (desktop creator mark, `shared/creator.ts`).
+> - **B010 easter eggs: SHIPPED.** `services/easterEggs.ts` + `shell/EasterEggHost.tsx`: Konami code (credits card with
+>   version + creator), 7 quick taps on Settings › About version, UKI "42" and "dance". Each counts once toward
+>   `easterEggsFound`; the Egg Hunter achievements existed but nothing counted eggs, so they could never unlock.
+>   Verified live in the preview (card showed "DEX 7.0.2 (001z)").
+> - **B013 UI improvements: 8 of 20 SHIPPED or already present.** New: Amazon safe triangle for hover submenus
+>   (`utils/safeTriangle.ts`, wired into `UnifiedDropdown` + `ContextMenu`; also fixed a real bug where a UnifiedDropdown
+>   submenu closed 180 ms after the pointer left its row, even while moving into the flyout); undo toast + optimistic
+>   delete (Notes: Move to Trash no longer asks, the toast has Undo, restore via `dexnotes:restore`); hit slop
+>   (`.dex-hit-slop`, traffic lights 14 px → about 20 × 30 px targets, bigger on touch); continuous corners
+>   (`corner-shape: superellipse(1.5)` on windows, menus, dialogs, glass; progressive); view transitions
+>   (`utils/viewTransition.ts`, theme flips cross-fade as one compositor fade, off under Reduce Motion). Already present:
+>   command menu (CommandPalette), skeleton loaders, balanced headlines, tabular numbers, safe-area insets, one-time-code
+>   autofill. Not done: BlurHash placeholders, predictive back, swipe-to-dismiss sheets, idempotency keys on IPC
+>   writes, pre-rendering, shortcut hints audit.
+> - **B012 animation principles: partial.** New motion respects Reduce Motion (easter card, view transitions); no
+>   systematic pass across all 20 principles yet.
+> - **B004–B009, B014, B015, B017, B018: not started in this pass** (much already exists: Power/Task Manager system
+>   control, ConPTY terminal + profiles, Store/plugins, themes, DexCode). B018 release verification needs a packaged
+>   build + clean-machine install (see DEX_REMAINING_WORK #6, #30). Release verdict: **NOT READY**.
+
 > **GOAL (2026-07-01) — Owner /goal: "60% smarter UKI, 80% faster shell, Stage Manager Home" (full mandate, decoded from voice).**
 > The owner's standing mandate, split into tracks. Items marked ✅ shipped this session; the rest is the backlog.
 > 1. **Stage Manager (✅ shipped).** Home IS the stage: zoom out to see EVERY running app as its LIVE window
@@ -3621,7 +3657,7 @@ These need DSP/ML or native hosting we don't fake.
 - Shell opens now say why they failed (`utils/openWithShell.ts`, #191); Gallery no longer crashes on full storage; Pixel Art keeps a bad stored drawing aside instead of crashing.
 - Rewind made honest (#192): it records nothing in the Tauri app; dead sections hidden, toggles disabled with the reason, real native delete, log path follows `DEX_DATA_DIR`. Owner decision: build capture (privacy policy change) or retire Rewind.
 
-## Checkpoint 2026-11-13 (18o: Rewind retired, release build)
+## Checkpoint 2026-11-13 (Rewind retired, release build)
 
 - Rewind retired (owner): gone from every app list, cannot be opened, data left in place (#193).
-- Release build of 18o passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).
+- Release build (7.0.1 serial 18o tree) passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).

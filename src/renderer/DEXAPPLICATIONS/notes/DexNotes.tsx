@@ -330,8 +330,7 @@ const DexNotes: React.FC = () => {
   // Local "New from template" menu (Meeting / Standup / Retro / Blank).
   const [showDocTemplateMenu, setShowDocTemplateMenu] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deleteToast, setDeleteToast] = useState<{ title: string; visible: boolean } | null>(null);
+  const [deleteToast, setDeleteToast] = useState<{ id: string; title: string; visible: boolean } | null>(null);
   const deleteToastTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // -- Word Suggestions -------------------------------------------------
@@ -542,28 +541,27 @@ const DexNotes: React.FC = () => {
     }
   }, [activeNote, store]);
 
-  // -- Delete with confirmation -----------------------------------------
+  // -- Delete: move to Trash at once, offer Undo ------------------------
+  // Trash is recoverable, so this no longer stops to ask "Move to Trash?".
+  // The note goes immediately and the toast offers Undo for a few seconds
+  // (permanent delete from Trash still asks).
   const handleDeleteWithConfirm = useCallback((id: string) => {
-    setConfirmDeleteId(id);
-  }, []);
+    const note = notes.find(n => n.id === id);
+    void store.deleteNote(id);
+    if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current);
+    setDeleteToast({ id, title: note?.title || 'Untitled', visible: true });
+    deleteToastTimer.current = setTimeout(() => setDeleteToast(null), 6000);
+  }, [store, notes]);
 
-  const confirmDelete = useCallback(() => {
-    if (confirmDeleteId) {
-      const note = notes.find(n => n.id === confirmDeleteId);
-      store.deleteNote(confirmDeleteId);
-      setConfirmDeleteId(null);
-      // Show "Moved to Trash" toast
-      if (note) {
-        if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current);
-        setDeleteToast({ title: note.title || 'Untitled', visible: true });
-        deleteToastTimer.current = setTimeout(() => setDeleteToast(null), 3500);
-      }
-    }
-  }, [confirmDeleteId, store, notes]);
+  const undoDelete = useCallback(() => {
+    const t = deleteToast;
+    if (!t) return;
+    if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current);
+    setDeleteToast(null);
+    void store.restoreNote(t.id).then(() => store.loadNote(t.id)).catch(() => { /* restore failed: note stays in Trash */ });
+  }, [deleteToast, store]);
 
-  const cancelDelete = useCallback(() => {
-    setConfirmDeleteId(null);
-  }, []);
+  useEffect(() => () => { if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current); }, []);
 
   const handleAddAttachment = useCallback(async () => {
     if (!activeNote) return;
@@ -1380,42 +1378,9 @@ const DexNotes: React.FC = () => {
         onClose={() => setShowStats(false)}
       />
 
-      {/* Delete Confirmation Dialog */}
-      {confirmDeleteId && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 'var(--z-max)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.7)',
-        }} onClick={cancelDelete}>
-          <div style={{
-            background: 'var(--color-bg-elevated)', borderRadius: 10,
-            padding: 'var(--space-6) 28px', maxWidth: 340, width: '90%',
-            border: '1px solid var(--color-border)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' }}>
-              Move to Trash?
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-5)', lineHeight: 1.5 }}>
-              &ldquo;{notes.find(n => n.id === confirmDeleteId)?.title || 'Untitled'}&rdquo; will be moved to Trash and automatically deleted after 30 days.
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-              <button onClick={cancelDelete} style={{
-                padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
-                background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', cursor: 'pointer',
-              }}>Cancel</button>
-              <button onClick={confirmDelete} style={{
-                padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
-                background: 'rgba(255,69,58,0.2)', color: 'var(--color-error)', cursor: 'pointer',
-              }}>Move to Trash</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete Toast */}
       {deleteToast?.visible && (
-        <div style={{
+        <div role="status" aria-live="polite" style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 'var(--z-notification)', display: 'flex', alignItems: 'center', gap: 10,
           padding: '10px var(--space-4)', borderRadius: 10,
@@ -1429,6 +1394,14 @@ const DexNotes: React.FC = () => {
             <polyline points="20 6 9 17 4 12"/>
           </svg>
           <span>&ldquo;{deleteToast.title}&rdquo; moved to Trash</span>
+          <button
+            onClick={undoDelete}
+            style={{
+              marginLeft: 4, padding: '4px 10px', minHeight: 28, borderRadius: 6, border: 'none',
+              background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+          >Undo</button>
         </div>
       )}
     </div>

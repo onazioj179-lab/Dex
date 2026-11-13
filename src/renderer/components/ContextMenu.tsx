@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { AIM_GRACE_MS, isAimingAtRect, type Pt } from '../utils/safeTriangle';
 
 export interface ContextMenuItem {
   id?: string;
@@ -62,6 +63,39 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
   const [subUp, setSubUp] = useState(false);
   const [subFocus, setSubFocus] = useState(-1);
   const subCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Safe triangle: while the pointer travels from an open submenu's row toward
+  // its flyout across sibling rows, those siblings don't steal the hover.
+  const aimApexRef = useRef<Pt | null>(null);
+  const pointerRef = useRef<Pt | null>(null);
+  const pendingHoverRef = useRef<(() => void) | null>(null);
+  const aimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openSubRef = useRef<string | null>(null);
+  openSubRef.current = openSub;
+  useEffect(() => () => {
+    if (aimTimerRef.current) clearTimeout(aimTimerRef.current);
+    if (subCloseTimerRef.current) clearTimeout(subCloseTimerRef.current);
+  }, []);
+
+  /** Run a row hover now, or defer it while the pointer is aiming at the open flyout. */
+  const hoverRow = useCallback((rowKey: string, apply: () => void) => {
+    const run = () => {
+      if (aimTimerRef.current) { clearTimeout(aimTimerRef.current); aimTimerRef.current = null; }
+      pendingHoverRef.current = null;
+      apply();
+    };
+    const open = openSubRef.current;
+    if (open && open !== rowKey && aimApexRef.current && pointerRef.current) {
+      const flyout = menuRef.current?.querySelector<HTMLElement>('[data-ctx-flyout]');
+      const rect = flyout?.getBoundingClientRect();
+      if (rect && isAimingAtRect(aimApexRef.current, pointerRef.current, rect)) {
+        pendingHoverRef.current = () => hoverRow(rowKey, apply);
+        if (aimTimerRef.current) clearTimeout(aimTimerRef.current);
+        aimTimerRef.current = setTimeout(run, AIM_GRACE_MS);
+        return;
+      }
+    }
+    run();
+  }, []);
   const [adjustedPos, setAdjustedPos] = useState(position);
 
   // Layout effect: position before the first paint, so the menu never flashes
@@ -197,6 +231,15 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         outline: 'none',
         animation: 'ctxFadeIn 0.16s var(--ease-tahoe, cubic-bezier(0.23, 1, 0.32, 1))',
       } as React.CSSProperties}
+      onMouseMove={(e) => {
+        pointerRef.current = { x: e.clientX, y: e.clientY };
+        pendingHoverRef.current?.();
+      }}
+      onMouseLeave={() => {
+        // Pointer left the whole menu (the flyout is inside it): close the submenu shortly.
+        if (subCloseTimerRef.current) clearTimeout(subCloseTimerRef.current);
+        subCloseTimerRef.current = setTimeout(() => setOpenSub(null), 120);
+      }}
     >
       <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.96) translateY(-2px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .dex-ctx-item { background: transparent; transition: background 100ms var(--ease-out, ease-out), color 100ms var(--ease-out, ease-out); }
@@ -226,18 +269,26 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
               data-ctx-key={itemKey}
               tabIndex={-1}
               onMouseEnter={(e) => {
-                setFocusIdx(curActionIdx);
-                if (hasSub) {
-                  if (subCloseTimerRef.current) { clearTimeout(subCloseTimerRef.current); subCloseTimerRef.current = null; }
-                  // Flip the submenu to the left if a rightward one would clip.
-                  placeSubmenu(e.currentTarget as HTMLElement);
-                  setSubFocus(-1);
-                  setOpenSub(itemKey);
-                }
+                const row = e.currentTarget as HTMLElement;
+                if (subCloseTimerRef.current) { clearTimeout(subCloseTimerRef.current); subCloseTimerRef.current = null; }
+                hoverRow(itemKey, () => {
+                  setFocusIdx(curActionIdx);
+                  if (hasSub) {
+                    // Flip the submenu to the left if a rightward one would clip.
+                    placeSubmenu(row);
+                    setSubFocus(-1);
+                    if (openSubRef.current !== itemKey) aimApexRef.current = pointerRef.current;
+                    setOpenSub(itemKey);
+                  } else {
+                    setOpenSub(null);
+                  }
+                });
               }}
-              onMouseLeave={() => {
-                if (hasSub) {
-                  subCloseTimerRef.current = setTimeout(() => setOpenSub(null), 120);
+              onMouseMove={(e) => {
+                // Keep the triangle's apex at the last point on the open row
+                // (not while the pointer is inside the flyout, a descendant).
+                if (hasSub && openSubRef.current === itemKey && !(e.target as HTMLElement).closest('[data-ctx-flyout]')) {
+                  aimApexRef.current = { x: e.clientX, y: e.clientY };
                 }
               }}
               onClick={() => {
@@ -277,7 +328,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                 <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>{String.fromCharCode(9656)}</span>
               )}
               {hasSub && openSub === itemKey && (
-                <div role="menu" aria-label={item.label} style={{
+                <div role="menu" aria-label={item.label} data-ctx-flyout="" style={{
                   position: 'absolute',
                   top: subUp ? undefined : -4,
                   bottom: subUp ? -4 : undefined,

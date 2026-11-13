@@ -9,6 +9,14 @@
 
 ---
 
+## 7.0.2 (001z) — IPC ABI lock, metadata strip (2026-11-12)
+
+- `src-tauri/ipc-abi.lock.json` + `scripts/ipc-abi.mjs`: every `dex_ipc` channel (src-tauri and `core/*`) is ABI;
+  `npm run abi:check` fails on a removed channel or a new renderer call with no handler. After adding or wiring a
+  channel run `npm run abi:update`. 7 known unhandled calls remain, all honest degrades.
+- New native channel `fs:stripMetadata` (`metadata_strip.rs`, 5 cargo tests, `cargo test --bin dex-tauri metadata_strip`).
+- Packaged run still pending for this build.
+
 ## 18n — renderer log, user info, honest plugins (2026-11-12)
 
 - New channels: `log:renderer` (warn/error only), `render-error:report`, `renderer:memory-critical` → `renderer_log.rs` → `<logs>/renderer.log` (JSON lines, 4000-char cap per entry, rotates to `renderer.log.1` at 512 KB). Removed from the renderer TELEMETRY_SINKS shim so they reach native.

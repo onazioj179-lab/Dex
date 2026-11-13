@@ -4,6 +4,8 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
+import { withViewTransition } from './viewTransition';
+
 export const T = {
   bg:       'var(--color-bg-base)',
   surface:  'var(--color-bg-surface)',
@@ -31,7 +33,8 @@ export const T = {
 export function toggleTheme(): void {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const next = isDark ? 'light' : 'dark';
-  applyTheme(next);
+  // An explicit flip cross-fades (one compositor fade, see viewTransition.ts).
+  withViewTransition(() => applyTheme(next));
   // User explicitly toggled — pin and stop following OS
   localStorage.setItem('darkMode', (!isDark).toString());
   localStorage.setItem('dex-theme-source', 'user');
