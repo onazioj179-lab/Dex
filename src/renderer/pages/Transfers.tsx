@@ -959,8 +959,8 @@ const Transfers: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{
                         width: 40, height: 40, borderRadius: 10,
-                        background: 'rgba(100,210,255,0.1)', border: '1px solid rgba(100,210,255,0.2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
+                        background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)',
                       }}>{getDeviceIcon(device.deviceType)}</div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1054,7 +1054,7 @@ const Transfers: React.FC = () => {
                 background: 'var(--color-accent-muted, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-light, rgba(10,132,255,0.25))',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: 'var(--color-accent)', display: 'flex' }}>{Icons.speed}</span>
+                  <span style={{ color: 'var(--color-text-secondary)', display: 'flex' }}>{Icons.speed}</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatSpeed(throughput.totalSpeed)} total</div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{throughput.count} active transfer{throughput.count !== 1 ? 's' : ''}</div>
@@ -1063,7 +1063,7 @@ const Transfers: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Overall ETA</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{formatTime(throughput.etaMs)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatTime(throughput.etaMs)}</div>
                   </div>
                   <button onClick={clearCompleted} style={{
                     padding: '6px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
@@ -1170,7 +1170,7 @@ const Transfers: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(t.progress)}%</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(t.progress)}%</span>
                     </div>
                   </div>
                   );
@@ -1256,7 +1256,7 @@ const Transfers: React.FC = () => {
                   <div className="dex-label-caps" style={{ marginBottom: 'var(--space-3)' }}>Share URL</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
                     <div onClick={copyUrl} role="button" tabIndex={0} aria-label="Copy share URL" onKeyDown={e => e.key === 'Enter' && copyUrl()} style={{
-                      fontSize: 13, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontWeight: 600,
+                      fontSize: 13, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600,
                       padding: 'var(--space-2) 14px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--color-border-subtle)', cursor: 'pointer', userSelect: 'all',
                     }}>{httpServerUrl}</div>
@@ -1411,7 +1411,7 @@ const Transfers: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Speed Limit</span>
-                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>{speedLimit === 0 ? 'Unlimited' : `${speedLimit} MB/s`}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{speedLimit === 0 ? 'Unlimited' : `${speedLimit} MB/s`}</span>
               </div>
               <input type="range" min="0" max="1000" step="10" value={speedLimit}
                 onChange={e => setSpeedLimit(Number(e.target.value))}
@@ -1439,7 +1439,7 @@ const Transfers: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Auto-Stop Server</span>
-                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>{httpExpiry === 0 ? 'Never' : `${httpExpiry}m`}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{httpExpiry === 0 ? 'Never' : `${httpExpiry}m`}</span>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {[0, 5, 15, 30, 60].map(v => (

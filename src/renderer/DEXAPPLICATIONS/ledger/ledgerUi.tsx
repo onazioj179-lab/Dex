@@ -240,7 +240,6 @@ export const StatusDot: React.FC<{ status: 'uncleared' | 'cleared' | 'reconciled
 
 export const LEDGER_CSS = `
 .dex-ledger { container-type: inline-size; container-name: ledger; --lg-row: 30px; --lg-side: 232px; font-size: 13px; }
-.dex-ledger *:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: 4px; }
 .lg-layout { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .lg-side { width: var(--lg-side); flex-shrink: 0; border-right: 1px solid var(--color-border-subtle); background: var(--color-bg-inset); display: flex; flex-direction: column; min-height: 0; }
 .lg-side.lg-collapsed { width: 48px; }
@@ -285,7 +284,6 @@ export const LEDGER_CSS = `
 .lg-icon-btn:disabled { opacity: .4; cursor: default; }
 .lg-input { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg-base); color: var(--color-text-primary); font: inherit; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
 textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height: 56px; }
-.lg-input:focus { border-color: var(--color-accent); outline: none; }
 .lg-input.lg-invalid { border-color: var(--color-error); }
 .lg-table td.lg-cell-edit { padding: 0 4px; overflow: visible; }
 .lg-table td.lg-cell-edit .lg-input { height: 24px; }
@@ -311,14 +309,14 @@ textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height
 .lg-table tbody tr { cursor: default; }
 .lg-table tbody tr:hover td { background: color-mix(in srgb, var(--color-bg-hover) 55%, transparent); }
 .lg-table tbody tr.lg-selected td { background: var(--color-accent-light); }
-.lg-table tbody tr:focus-visible td { background: var(--color-accent-soft); }
+.lg-table tbody tr:focus-visible td { background: var(--color-bg-hover); }
 .lg-muted { color: var(--color-text-tertiary); }
 .lg-tag { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; height: 18px; border-radius: 4px; background: var(--color-bg-hover); color: var(--color-text-secondary); font-size: 11.5px; }
 .lg-status { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 9.5px; font-weight: 700; border: 1.5px solid var(--color-border); color: transparent; }
 .lg-status-cleared { border-color: var(--color-accent); color: var(--color-accent); }
 .lg-status-reconciled { border-color: transparent; background: var(--color-accent-fill); color: #fff; }
 .lg-status-btn { all: unset; cursor: pointer; display: inline-flex; border-radius: 50%; }
-.lg-status-btn:hover .lg-status { border-color: var(--color-accent); }
+.lg-status-btn:hover .lg-status { border-color: var(--color-border-strong); }
 .lg-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--color-border-subtle); border-radius: 10px; overflow: hidden; }
 .lg-summary > div { padding: 12px 14px; border-right: 1px solid var(--color-border-subtle); min-width: 0; }
 .lg-summary > div:last-child { border-right: none; }

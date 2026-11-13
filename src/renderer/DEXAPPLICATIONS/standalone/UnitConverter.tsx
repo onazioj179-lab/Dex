@@ -168,26 +168,19 @@ const UnitConverter: React.FC = () => {
   return (
     <div style={s.container} role="region" aria-label="Unit Converter">
       <style>{`
-        .uc-search:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
         .uc-tab { transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease; }
         .uc-tab:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
         .uc-tab:active { transform: scale(0.96); }
-        .uc-tab:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
         .uc-select { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
         .uc-select:hover { border-color: var(--color-border) !important; }
-        .uc-select:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
-        .uc-input:focus-visible { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-light); }
         .uc-swap { transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease; }
-        .uc-swap:hover { background: var(--color-bg-hover) !important; color: var(--color-accent) !important; transform: rotate(180deg); }
-        .uc-swap:active { transform: rotate(180deg) scale(0.92); }
-        .uc-swap:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+        .uc-swap:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .uc-swap:active { transform: scale(0.92); }
         .uc-copy { transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease; }
         .uc-copy:not(:disabled):hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
         .uc-copy:not(:disabled):active { transform: scale(0.92); }
-        .uc-copy:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
         .uc-recent { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease; }
-        .uc-recent:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; color: var(--color-text-primary) !important; transform: translateY(-1px); }
-        .uc-recent:focus-visible { outline: 2px solid var(--color-accent, #0a84ff); outline-offset: 2px; }
+        .uc-recent:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; color: var(--color-text-primary) !important; }
       `}</style>
       {/* Unit search */}
       <div style={s.searchBar}>
@@ -407,8 +400,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   resultDisplay: {
     flex: 1, padding: '14px var(--space-4)', borderRadius: 14,
-    background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
-    color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
+    background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+    color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
     boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

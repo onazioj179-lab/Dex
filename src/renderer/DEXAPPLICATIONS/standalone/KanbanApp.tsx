@@ -560,15 +560,13 @@ const KanbanApp: React.FC = () => {
     <div style={styles.container}>
       <style>{`
         .kanban-card { position: relative; }
-        .kanban-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.28); transform: translateY(-1px); border-color: var(--color-border) !important; }
+        .kanban-card:hover { border-color: var(--color-border-strong) !important; }
         .kanban-card:active { transform: scale(0.99); cursor: grabbing; }
         .kanban-card[draggable="true"] { cursor: grab; }
-        .kanban-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
         .kanban-card .kanban-card-grip { position: absolute; top: 8px; right: 8px; opacity: 0; color: var(--color-text-muted); transition: opacity 0.15s ease; pointer-events: none; }
         .kanban-card:hover .kanban-card-grip { opacity: 0.45; }
         .kanban-btn:hover { filter: brightness(1.15); }
         .kanban-btn:active { transform: scale(0.97); }
-        .kanban-btn:focus-visible, .kanban-tab:focus-visible, .kanban-icon-btn:focus-visible, .kanban-add-card:focus-visible, .kanban-add-col:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
         .kanban-tab:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
         .kanban-add-card:hover { background: var(--color-border-subtle) !important; color: var(--color-text-secondary) !important; }
         .kanban-add-col:hover { border-color: var(--color-text-tertiary) !important; background: var(--color-border-subtle) !important; }
@@ -818,7 +816,7 @@ const styles: Record<string, React.CSSProperties> = {
   topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   topLeft: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' },
   topRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
-  boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-accent-soft, rgba(99,102,241,0.12))', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   boardTitle: { fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.3px' },
   boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
   progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
@@ -830,7 +828,7 @@ const styles: Record<string, React.CSSProperties> = {
   controlSelect: { padding: '5px var(--space-2)', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', outline: 'none', cursor: 'pointer' },
   controlBtn: { padding: '5px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' },
   controlHint: { fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', opacity: 0.7, marginLeft: 'auto' },
-  dropLine: { height: 2, borderRadius: 2, margin: '1px 4px', background: 'var(--color-accent-fill)', boxShadow: '0 0 6px var(--color-accent)' },
+  dropLine: { height: 2, borderRadius: 2, margin: '1px 4px', background: 'var(--color-accent-fill)' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
   column: { minWidth: 300, maxWidth: 340, borderRadius: 14, display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0 },
   colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', borderRadius: '12px 12px 0 0' },

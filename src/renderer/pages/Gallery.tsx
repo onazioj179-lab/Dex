@@ -1304,7 +1304,7 @@ export const Gallery: React.FC = () => {
               </button>
               {selectionMode && selectedItems.size > 0 && (
                 <>
-                  <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600 }}>{selectedItems.size} selected</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{selectedItems.size} selected</span>
                   <button onClick={selectAll} aria-label="Select all" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-accent)' }}>All</button>
                   <button onClick={batchFavorite} aria-label="Favorite selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Favorite</button>
                   <button onClick={batchExport} aria-label="Export selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-success)' }}>Export</button>
@@ -2172,7 +2172,7 @@ export const Gallery: React.FC = () => {
                       onClick={() => setColorLabels(prev => ({ ...prev, [selectedMedia.id]: prev[selectedMedia.id] === color ? '' : color }))}
                       style={{
                         width: 18, height: 18, borderRadius: '50%', border: colorLabels[selectedMedia.id] === color ? '2px solid #fff' : '2px solid transparent',
-                        background: color, cursor: 'pointer', padding: 0, boxShadow: colorLabels[selectedMedia.id] === color ? `0 0 6px ${color}` : 'none',
+                        background: color, cursor: 'pointer', padding: 0, boxShadow: colorLabels[selectedMedia.id] === color ? `0 0 4px ${color}` : 'none',
                         transition: 'all 0.15s',
                       }}
                       aria-label={`Label ${name}`}

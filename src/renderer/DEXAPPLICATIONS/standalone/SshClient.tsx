@@ -493,7 +493,7 @@ export default function SshClient(): React.ReactElement {
           <ul style={{ listStyle: 'none', margin: '0 0 10px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {keys.map(k => (
               <li key={k.path} className="dex-liquid-glass" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 'var(--radius-lg)' }}>
-                <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 700, color: 'var(--color-accent)' }}>{k.type || '?'}</span>
+                <span style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>{k.type || '?'}</span>
                 <span className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }} title={k.path}>{k.fingerprint || k.path}</span>
                 <span className="truncate text-xs" style={{ opacity: 0.6, maxWidth: 160 }} title={k.comment}>{k.comment}</span>
                 <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11 }} onClick={() => { void copy(k.path, 'Path copied'); }}>Copy path</button>

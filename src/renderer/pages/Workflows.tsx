@@ -542,7 +542,7 @@ const WorkflowNodeCard: React.FC<{
             boxShadow: selected ? '0 0 0 2px var(--color-accent-muted, rgba(10,132,255,0.25))' : 'none',
           }}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
             {catIcon}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1729,7 +1729,7 @@ export const Workflows: React.FC = () => {
                 {nodes.length === 0 ? (
                   <div style={styles.emptyEditor}>
                     <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'var(--color-bg-hover, rgba(255,255,255,0.03))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', transform: 'rotate(45deg)' }}>
-                      <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-accent)' }}><DexIcon name="zap" size={24} /></span>
+                      <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-text-secondary)' }}><DexIcon name="zap" size={24} /></span>
                     </div>
                     <span style={{ fontSize: 16, fontWeight: 600, marginTop: 'var(--space-4)' }}>Add actions to build your workflow</span>
                     <span style={{ color: 'var(--color-text-muted)', fontSize: 13, marginTop: 4 }}>Click actions from the panel or use a template to start</span>
@@ -2132,7 +2132,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardIcon: {
     width: '48px', height: '48px', borderRadius: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)',
   },
   cardActions: { display: 'flex', gap: '4px' },
   cardActionBtn: {
@@ -2200,7 +2200,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   backBtn: {
     padding: '6px var(--space-3)', borderRadius: '10px', border: 'none',
-    background: 'var(--color-bg-hover)', color: 'var(--color-accent)',
+    background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
     cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 4,
     whiteSpace: 'nowrap', flexShrink: 0,
   },
@@ -2281,7 +2281,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-elevated)', border: 'none', width: '100%',
     textAlign: 'left' as const, color: 'var(--color-text-primary)', minWidth: 0,
   },
-  actionIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', width: 20 },
+  actionIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', width: 20 },
   actionInfo: { flex: 1, minWidth: 0 },
   actionName: { display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   actionDesc: { display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },

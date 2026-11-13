@@ -269,7 +269,6 @@ const PasswordGenerator: React.FC = () => {
     <div style={S.container} role="region" aria-label="Password Generator">
       <style>{`
         .pwg-btn:hover:not(:disabled) { background: var(--color-bg-hover); }
-        .pwg-btn:focus-visible, .pwg-seg:focus-visible, .pwg-check:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
         .pwg-primary:hover:not(:disabled) { filter: brightness(1.08); }
         .pwg-range { width: 100%; accent-color: var(--color-accent); }
       `}</style>
