@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
+import { openWithShell } from '../utils/openWithShell';
 import { formatBytes } from '../../shared/format/units';
 import { naturalCompare } from '../../shared/format/naturalSort';
 import { useAppTracking, useFileTracking } from '../services/usePatternLearning';
@@ -1029,13 +1030,7 @@ export const Files: React.FC = () => {
 
   const handleShowInExplorer = async (file: FileItem) => {
     setContextMenu(null);
-    try {
-      if (window.dex?.invoke) {
-        await window.dex.invoke('shell:showItemInFolder', file.path);
-      }
-    } catch (err) {
-      console.error('Show in explorer failed:', err);
-    }
+    await openWithShell('reveal', file.path, file.name);
   };
 
   // Open a Terminal tab in a folder (for a file: the folder that holds it).

@@ -25,6 +25,8 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
 import { editedCanvasSize } from './galleryEdit';
+import { openWithShell } from '../utils/openWithShell';
+import { persistOrWarn } from '../utils/persistOrWarn';
 
 // ===========================================================================
 // TYPES
@@ -288,8 +290,15 @@ const loadFavorites = async (): Promise<string[]> => {
 
 const saveFavorites = async (favorites: string[]) => {
   const data = JSON.stringify(favorites);
-  localStorage.setItem('dex-gallery-favorites', data);
-  try { await window.dex?.invoke?.('capability:storage:set', 'dex-gallery-favorites', data); } catch { /* */ }
+  // Native copy first (it is the one loaded at start). The local write used to
+  // come first without a guard, so a full store threw and skipped the native copy.
+  let nativeOk = false;
+  try {
+    const r = await window.dex?.invoke?.('capability:storage:set', 'dex-gallery-favorites', data);
+    nativeOk = r !== undefined && !(r && typeof r === 'object' && (r as { success?: unknown }).success === false);
+  } catch { /* reported below if the local copy fails too */ }
+  if (nativeOk) { try { localStorage.setItem('dex-gallery-favorites', data); } catch { /* native copy kept */ } }
+  else persistOrWarn('dex-gallery-favorites', data, 'your Gallery favorites');
 };
 
 // ===========================================================================
@@ -453,7 +462,7 @@ export const Gallery: React.FC = () => {
 
   // Persist renames whenever they change.
   useEffect(() => {
-    try { localStorage.setItem('dex-gallery-renames', JSON.stringify(renameMap)); } catch { /* */ }
+    try { persistOrWarn('dex-gallery-renames', JSON.stringify(renameMap), 'your Gallery renames'); } catch { /* unserialisable */ }
   }, [renameMap]);
 
   // Derive a folder breadcrumb from the media path (id/src are absolute file paths).
@@ -692,9 +701,9 @@ export const Gallery: React.FC = () => {
     if (!adjustCacheKey) return;
     const hasAdj = adjustExposure !== 0 || adjustContrast !== 0 || adjustSaturation !== 0 || adjustTemp !== 0;
     if (hasAdj) {
-      localStorage.setItem(adjustCacheKey, JSON.stringify({ e: adjustExposure, c: adjustContrast, s: adjustSaturation, t: adjustTemp }));
+      persistOrWarn(adjustCacheKey, JSON.stringify({ e: adjustExposure, c: adjustContrast, s: adjustSaturation, t: adjustTemp }), 'your photo adjustments');
     } else {
-      localStorage.removeItem(adjustCacheKey);
+      try { localStorage.removeItem(adjustCacheKey); } catch { /* nothing stored */ }
     }
   }, [adjustCacheKey, adjustExposure, adjustContrast, adjustSaturation, adjustTemp]);
 
@@ -1056,7 +1065,7 @@ export const Gallery: React.FC = () => {
         { id: 'vinx', label: 'Edit in Vinx', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'videoeditor') },
         { id: 'forge', label: 'Send to Forge', icon: Icons.settings, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'forge') },
       ] : []),
-      { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).dex?.invoke) (window as any).dex.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
+      { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { void openWithShell('reveal', item.src, item.name); }, dividerAfter: true },
       { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
   }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
@@ -1318,10 +1327,8 @@ export const Gallery: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  try {
-                    const folder = selectedAlbum === 'videos' ? 'videos' : 'pictures';
-                    window.dex?.invoke?.('shell:openPath', folder);
-                  } catch { toast.error('Could not open folder'); }
+                  const folder = selectedAlbum === 'videos' ? 'videos' : 'pictures';
+                  void openWithShell('path', folder, folder === 'videos' ? 'Videos' : 'Pictures');
                 }}
                 style={{
                   padding: 'var(--space-2) var(--space-5)', borderRadius: 6,

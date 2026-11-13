@@ -30,6 +30,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { APP_DEFINITIONS } from '../store/runningApps';
+import { openWithShell } from '../utils/openWithShell';
 import { buildDexCommands, matchTerminalCommand, resolveShortcut } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { describeCapabilities } from '../uki/permissions';
@@ -243,8 +244,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       term.loadAddon(search);
       term.loadAddon(new WebLinksAddon((_e, uri) => {
         // Open links with the OS default browser; never inside the shell webview.
-        const b = bridge();
-        if (b) b.invoke('shell:openExternal', uri).catch(() => { /* not available */ });
+        void openWithShell('external', uri);
       }));
       term.open(host);
       fitRef.current = fit;

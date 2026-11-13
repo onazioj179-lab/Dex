@@ -257,7 +257,13 @@ const Rewind: React.FC = () => {
 
   // -- State --
   const [view, setView] = useState<View>('overview');
-  const [isRecording, setIsRecording] = useState(true);
+  // Not recording until the native side says so (it was assumed true, so the
+  // header showed a red "recording" dot while nothing was captured).
+  const [isRecording, setIsRecording] = useState(false);
+  // Which Electron-era Rewind features this build's native side answers.
+  // A section whose channel answers null is hidden instead of showing
+  // buttons that do nothing.
+  const [nativeHas, setNativeHas] = useState({ settings: false, backup: false, profiles: false, plugins: false });
   const [timeline, setTimeline] = useState<RewindEntry[]>([]);
   const [searchResults, setSearchResults] = useState<RewindEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -437,8 +443,10 @@ const Rewind: React.FC = () => {
     if (!dex?.rewind) return;
     try {
       const s = await dex.rewind.getSettings();
+      if (!s || typeof s !== 'object') { setNativeHas(h => ({ ...h, settings: false })); setIsRecording(false); return; }
+      setNativeHas(h => ({ ...h, settings: true }));
       setSettings(s);
-      setIsRecording(s.isRecording);
+      setIsRecording(!!s.isRecording);
       const nextTheme = (s.themeName || 'dark') as RewindThemeName;
       const nextCustom = s.customTheme || customTheme;
       setThemeName(nextTheme);
@@ -509,20 +517,26 @@ const Rewind: React.FC = () => {
         setCrashRecovery(await dex.rewind.getCrashRecoveryStatus());
       }
       if (dex.rewind.getWorkspaceProfiles) {
-        setWorkspaceProfiles(asList(await dex.rewind.getWorkspaceProfiles()));
+        const profiles = await dex.rewind.getWorkspaceProfiles();
+        setNativeHas(h => ({ ...h, profiles: Array.isArray(profiles) }));
+        setWorkspaceProfiles(asList(profiles));
       }
       if (dex.rewind.getActiveWorkspaceProfile) {
         setActiveWorkspaceProfile(await dex.rewind.getActiveWorkspaceProfile());
       }
       if (dex.rewind.getBackupSettings) {
-        setBackupSettings(await dex.rewind.getBackupSettings());
+        const backup = await dex.rewind.getBackupSettings();
+        setNativeHas(h => ({ ...h, backup: !!backup && typeof backup === 'object' }));
+        setBackupSettings(backup);
       }
       if (dex.rewind.getOnboardingState != null) {
         // Onboarding auto-completed -- first-launch hint handles new users
         setOnboardingCompleted(true);
       }
       if (dex.rewind.getPlugins) {
-        setPlugins(asList(await dex.rewind.getPlugins()));
+        const list = await dex.rewind.getPlugins();
+        setNativeHas(h => ({ ...h, plugins: Array.isArray(list) }));
+        setPlugins(asList(list));
       }
       if (dex.rewind.getPluginCommands) {
         setPluginCommands(asList(await dex.rewind.getPluginCommands()));
@@ -805,6 +819,11 @@ const Rewind: React.FC = () => {
   const toggleRecording = async () => {
     if (!dex?.rewind) return;
     const newState = await dex.rewind.toggleRecording();
+    if (typeof newState !== 'boolean') {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: "Rewind isn't recording: activity capture is not part of this version of DEX." } }));
+      setIsRecording(false);
+      return;
+    }
     setIsRecording(newState);
   };
 
@@ -847,7 +866,14 @@ const Rewind: React.FC = () => {
       tone: 'destructive',
     });
     if (!ok) return;
-    await dex.rewind.deleteAllData();
+    // Only clear the screen when the native side says it deleted (it used to
+    // answer null, and the screen said everything was gone).
+    const res = await dex.rewind.deleteAllData().catch((e: unknown) => ({ success: false, error: e instanceof Error ? e.message : String(e) }));
+    if (!res || res.success !== true) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Rewind data was not deleted${res?.error ? `: ${res.error}` : '.'}` } }));
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Rewind data deleted' } }));
     setTimeline([]);
     setSearchResults([]);
     setSummary(null);
@@ -1205,7 +1231,7 @@ const Rewind: React.FC = () => {
             </span>
             <button style={S.dateBtn} onClick={() => shiftDate(1)} disabled={selectedDate === todayStr()} aria-label="Next day"><DexIcon name="chevron-right" size={12} /></button>
           </div>
-          <button style={S.recordToggle} onClick={toggleRecording} title={isRecording ? 'Pause recording' : 'Resume recording'} aria-label={isRecording ? 'Pause recording' : 'Resume recording'}>
+          <button style={{ ...S.recordToggle, ...(nativeHas.settings ? {} : { opacity: 0.5, cursor: 'default' }) }} onClick={toggleRecording} disabled={!nativeHas.settings} title={!nativeHas.settings ? "Not recording: activity capture is not part of this version of DEX" : isRecording ? 'Pause recording' : 'Resume recording'} aria-label={!nativeHas.settings ? 'Not recording' : isRecording ? 'Pause recording' : 'Resume recording'}>
             <span style={{
               width: 8, height: 8, borderRadius: '50%',
               background: isRecording ? 'var(--color-error)' : 'var(--color-text-tertiary)',
@@ -2260,9 +2286,12 @@ const Rewind: React.FC = () => {
             <span style={{ fontSize: 12 }}>Background activity logging</span>
             <button
               aria-label={isRecording ? 'Disable background activity logging' : 'Enable background activity logging'}
+              title={nativeHas.settings ? undefined : 'Activity capture is not part of this version of DEX'}
+              disabled={!nativeHas.settings}
               style={{
                 ...S.toggleBtn,
                 background: isRecording ? 'var(--color-accent-fill)' : 'rgba(255,255,255,0.1)',
+                ...(nativeHas.settings ? {} : { opacity: 0.5, cursor: 'default' }),
               }}
               onClick={toggleRecording}
             >
@@ -2528,6 +2557,8 @@ const Rewind: React.FC = () => {
           )}
         </div>
 
+        {nativeHas.backup && (
+        <>
         {/* Phase 5: Backup scheduler */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Backups</div>
@@ -2559,7 +2590,11 @@ const Rewind: React.FC = () => {
             Folder: {backupSettings?.folder || 'Default app data folder'}
           </div>
         </div>
+        </>
+        )}
 
+        {nativeHas.profiles && (
+        <>
         {/* Phase 5: Workspace profiles */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Workspace Profiles</div>
@@ -2606,7 +2641,11 @@ const Rewind: React.FC = () => {
             ))}
           </div>
         </div>
+        </>
+        )}
 
+        {nativeHas.plugins && (
+        <>
         {/* Phase 7: Plugins */}
         <div style={S.insightCard}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Plugins</div>
@@ -2674,6 +2713,8 @@ const Rewind: React.FC = () => {
             ))}
           </div>
         </div>
+        </>
+        )}
 
         {/* Phase 4: Security & Integrity */}
         <div style={S.insightCard}>
@@ -2685,11 +2726,11 @@ const Rewind: React.FC = () => {
               onClick={async () => {
                 if (!dex?.rewind?.runIntegrityCheck) return;
                 const result = await dex.rewind.runIntegrityCheck();
-                if (result && !result.passed) {
-                  setIntegrityWarning(true);
-                } else {
-                  setIntegrityWarning(false);
+                if (!result || typeof result.passed !== 'boolean') {
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: "The integrity check isn't available in this version of DEX." } }));
+                  return;
                 }
+                setIntegrityWarning(!result.passed);
               }}
             >
               Run Integrity Check
@@ -2742,6 +2783,12 @@ const Rewind: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {!(nativeHas.backup && nativeHas.profiles && nativeHas.plugins) && (
+          <div style={{ ...S.insightCard, fontSize: 11, opacity: 0.75 }}>
+            Backups, workspace profiles and plugins from earlier DEX versions are not part of this version, so they are not shown.
           </div>
         )}
 

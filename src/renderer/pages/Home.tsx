@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
+import { shellFailure } from '../utils/openWithShell';
 import { sharedTick } from '../services/SharedTick';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
@@ -64,11 +65,12 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
       addRecent({ path: file.path, name: file.name, appId: 'files' });
       const result = await ((window as any).dex?.shell?.openPath?.(file.path)
         ?? (window as any).dex?.invoke?.('shell:openPath', file.path));
-      if (result && typeof result === 'string') {
-        console.warn('[Home] Failed to open pinned file:', result);
-      }
+      // The native reply is {success:false, error}; only an Electron-era string was checked.
+      const why = shellFailure(result);
+      if (why) window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't open ${file.name}: ${why}.` } }));
     } catch (error) {
       console.warn('[Home] Failed to open pinned file:', error);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't open ${file.name}.` } }));
     }
   }, [addRecent, file.name, file.path]);
 
