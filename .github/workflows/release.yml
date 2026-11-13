@@ -51,6 +51,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      # WE DO NOT BREAK USERSPACE: no release may drop a native IPC channel a
+      # previous build shipped, or ship renderer calls nothing answers.
+      # See docs/NATIVE_ABI.md.
+      - name: Native IPC ABI check
+        run: npm run abi:check
+
       # Builds the Vite renderer (via tauri's beforeBuildCommand) then compiles
       # the Rust backbone and bundles the one official Windows setup (NSIS;
       # bundle.targets in src-tauri/tauri.conf.json). Tauri fetches NSIS.

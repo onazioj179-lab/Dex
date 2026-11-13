@@ -195,6 +195,8 @@ const KeyboardShortcuts: React.FC = () => {
     const cancelTransient = () => { clearRevealTimer(); if (!sticky) setVisible(false); };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    // Other surfaces (Command Palette, Help) open the pinned sheet by event.
+    window.addEventListener('dex-show-shortcuts', openSticky);
     window.addEventListener('wheel', cancelTransient, { passive: true });
     window.addEventListener('mousedown', cancelTransient, { passive: true });
     window.addEventListener('touchstart', cancelTransient, { passive: true });
@@ -204,13 +206,14 @@ const KeyboardShortcuts: React.FC = () => {
       clearRevealTimer();
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('dex-show-shortcuts', openSticky);
       window.removeEventListener('wheel', cancelTransient);
       window.removeEventListener('mousedown', cancelTransient);
       window.removeEventListener('touchstart', cancelTransient);
       window.removeEventListener('blur', cancelTransient);
       document.removeEventListener('visibilitychange', cancelTransient);
     };
-  }, [clearRevealTimer, handleKeyDown, handleKeyUp, sticky]);
+  }, [clearRevealTimer, handleKeyDown, handleKeyUp, sticky, openSticky]);
 
   // Focus the search box when pinned open.
   useEffect(() => {

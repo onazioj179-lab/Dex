@@ -30,8 +30,10 @@
 >   command menu (CommandPalette), skeleton loaders, balanced headlines, tabular numbers, safe-area insets, one-time-code
 >   autofill. Not done: BlurHash placeholders, predictive back, swipe-to-dismiss sheets, idempotency keys on IPC
 >   writes, pre-rendering, shortcut hints audit.
-> - **B012 animation principles: partial.** New motion respects Reduce Motion (easter card, view transitions); no
->   systematic pass across all 20 principles yet.
+> - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
+>   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
+>   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),
+>   release workflow runs the ABI check (#212).
 > - **B004–B009, B014, B015, B017, B018: not started in this pass** (much already exists: Power/Task Manager system
 >   control, ConPTY terminal + profiles, Store/plugins, themes, DexCode). B018 release verification needs a packaged
 >   build + clean-machine install (see DEX_REMAINING_WORK #6, #30). Release verdict: **NOT READY**.

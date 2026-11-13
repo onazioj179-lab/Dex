@@ -10,6 +10,7 @@
  * progress indicator, stacking, swipe-to-dismiss, grouping, and undo.
  */
 
+import { rubberBand, shouldDismiss, type SwipeSample } from '../utils/swipeDismiss';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
 import { playNotification } from './SpatialAudio';
@@ -198,13 +199,17 @@ const Banner: React.FC<{
     if (readDexSetting('soundEnabled', true)) playNotification(window.innerWidth - BANNER_WIDTH / 2);
   }, []);
 
-  // Swipe to dismiss
+  // Swipe to dismiss: distance OR a quick flick (utils/swipeDismiss), rubber
+  // band when pulled left, and a follow-through slide off-screen on dismiss.
   const swipeStartRef = useRef<number | null>(null);
+  const samplesRef = useRef<SwipeSample[]>([]);
+  const [leaving, setLeaving] = useState(false);
   // Set once a gesture moves past a small threshold, so the synthetic click that
   // follows pointerup doesn't fire the banner's onClick (deep-link) after a swipe.
   const draggedRef = useRef(false);
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     swipeStartRef.current = e.clientX;
+    samplesRef.current = [{ x: e.clientX, t: e.timeStamp }];
     draggedRef.current = false;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
@@ -212,18 +217,32 @@ const Banner: React.FC<{
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (swipeStartRef.current === null) return;
     const dx = e.clientX - swipeStartRef.current;
-    if (dx > 4) draggedRef.current = true;
-    if (dx > 0) setSwipeX(dx); // Only swipe right to dismiss
+    if (Math.abs(dx) > 4) draggedRef.current = true;
+    const samples = samplesRef.current;
+    samples.push({ x: e.clientX, t: e.timeStamp });
+    if (samples.length > 12) samples.shift();
+    setSwipeX(rubberBand(dx)); // right dismisses; left only gives a little
   }, []);
 
   const handlePointerUp = useCallback(() => {
-    if (swipeX > BANNER_WIDTH * 0.5) {
-      onDismiss(notification.id);
+    if (swipeStartRef.current === null) return;
+    swipeStartRef.current = null;
+    const width = bannerRef.current?.offsetWidth || BANNER_WIDTH;
+    if (shouldDismiss(swipeX, samplesRef.current, width)) {
+      if (isReduceMotion()) { onDismiss(notification.id); return; }
+      // Follow through: finish the throw, then remove.
+      setLeaving(true);
+      setSwipeX(width + 32);
+      window.setTimeout(() => onDismiss(notification.id), 180);
     } else {
       setSwipeX(0);
     }
-    swipeStartRef.current = null;
   }, [swipeX, notification.id, onDismiss]);
+
+  const handlePointerCancel = useCallback(() => {
+    swipeStartRef.current = null;
+    setSwipeX(0);
+  }, []);
 
   const handleClick = useCallback(() => {
     // Suppress the click that trails a swipe gesture; reset for the next one.
@@ -265,6 +284,7 @@ const Banner: React.FC<{
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onClick={handleClick}
       style={{
         // Apple-style frosted notification: background/blur/border + specular rim
@@ -278,7 +298,9 @@ const Banner: React.FC<{
         cursor: 'pointer',
         transform: `translateX(${swipeX}px)`,
         opacity: swipeX > 0 ? Math.max(0, 1 - swipeX / BANNER_WIDTH) : 1,
-        transition: swipeX === 0 && !isReduceMotion() ? 'transform 0.25s cubic-bezier(0.23,1,0.32,1), opacity 0.25s cubic-bezier(0.23,1,0.32,1)' : 'none',
+        transition: (swipeX === 0 || leaving) && !isReduceMotion()
+          ? `transform ${leaving ? '0.18s' : '0.25s'} cubic-bezier(0.23,1,0.32,1), opacity ${leaving ? '0.18s' : '0.25s'} cubic-bezier(0.23,1,0.32,1)`
+          : 'none',
         animation: isReduceMotion() ? 'none' : `bannerSlideIn 0.22s cubic-bezier(0.23,1,0.32,1)`,
         position: 'relative',
         touchAction: 'pan-y',
