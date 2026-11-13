@@ -1568,83 +1568,6 @@ const ActiveWorkflowsWidget: React.FC = () => {
   );
 };
 
-// --- 5. Rewind Summary --------------------------------------------------
-// Uses the existing Rewind day-summary channel for a compact "today" view.
-// Degrades to a tasteful empty state when Rewind is off-platform or has no
-// data for today.
-
-interface DashDaySummary {
-  totalEntries: number;
-  byType: Record<string, number>;
-  topApps: { name: string; count: number }[];
-}
-
-const RewindSummaryWidget: React.FC = () => {
-  const [summary, setSummary] = useState<DashDaySummary | null | 'unavailable'>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      const api = (window as any).dex?.rewind;
-      if (!api?.getDaySummary) { if (alive) setSummary('unavailable'); return; }
-      try {
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const s = await api.getDaySummary(dateStr);
-        if (!alive) return;
-        if (s && typeof s.totalEntries === 'number') {
-          setSummary({ totalEntries: s.totalEntries, byType: s.byType || {}, topApps: Array.isArray(s.topApps) ? s.topApps : [] });
-        } else {
-          setSummary({ totalEntries: 0, byType: {}, topApps: [] });
-        }
-      } catch { if (alive) setSummary('unavailable'); }
-    };
-    void load();
-    const tickId = `home-rewind-${Date.now()}`;
-    sharedTick.subscribe(tickId, () => { void load(); }, 120000);
-    return () => { alive = false; sharedTick.unsubscribe(tickId); };
-  }, []);
-
-  return (
-    <div style={dashCardStyle}>
-      <DashCardHeader title="Rewind Summary" icon="rewind" appId="rewind" />
-      {summary === 'unavailable' ? (
-        <DashEmpty icon="rewind" label="Rewind is off" hint="Open Rewind to start capturing your day." />
-      ) : summary === null ? (
-        <DashEmpty icon="rewind" label="Loading today…" />
-      ) : summary.totalEntries === 0 ? (
-        <DashEmpty icon="rewind" label="Nothing captured today" hint="Your day timeline will build as you work." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 26, fontWeight: 300, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-              {summary.totalEntries}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>moments today</span>
-          </div>
-          {summary.topApps.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className="dex-label-caps" style={{ fontSize: 10 }}>Top apps</span>
-              {summary.topApps.slice(0, 3).map((a, i) => {
-                const max = summary.topApps[0]?.count || 1;
-                const pct = Math.max(8, Math.round((a.count / max) * 100));
-                return (
-                  <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                    <span style={{ width: 56, height: 4, borderRadius: 2, background: 'var(--color-bg-hover, rgba(255,255,255,0.08))', overflow: 'hidden', flexShrink: 0 }}>
-                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent-fill)', borderRadius: 2 }} />
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // --- 6. AI Suggestions --------------------------------------------------
 // Reuses the local pattern-learning engine (patterns:getSuggestions). This
 // is real, on-device behaviour learning — NOT fabricated model output. When
@@ -1866,7 +1789,6 @@ export const HomeDashboard: React.FC = () => {
       <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><RecentNotesWidget /></div>
       <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><CurrentTasksWidget /></div>
       <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><ActiveWorkflowsWidget /></div>
-      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><RewindSummaryWidget /></div>
       <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><AiSuggestionsWidget /></div>
       <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><PinnedAppsWidget /></div>
     </div>

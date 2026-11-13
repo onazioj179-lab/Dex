@@ -3656,3 +3656,8 @@ These need DSP/ML or native hosting we don't fake.
 
 - Shell opens now say why they failed (`utils/openWithShell.ts`, #191); Gallery no longer crashes on full storage; Pixel Art keeps a bad stored drawing aside instead of crashing.
 - Rewind made honest (#192): it records nothing in the Tauri app; dead sections hidden, toggles disabled with the reason, real native delete, log path follows `DEX_DATA_DIR`. Owner decision: build capture (privacy policy change) or retire Rewind.
+
+## Checkpoint 2026-11-13 (Rewind retired, release build)
+
+- Rewind retired (owner): gone from every app list, cannot be opened, data left in place (#193).
+- Release build (7.0.1 serial 18o tree) passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).
