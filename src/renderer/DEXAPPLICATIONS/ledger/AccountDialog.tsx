@@ -3,8 +3,8 @@
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // =============================================================================
 
-import React, { useState } from 'react';
-import { ledger, LedgerError, ACCOUNT_KINDS, ACCOUNT_KIND_SINGULAR, type Account, type AccountKind } from './ledgerApi';
+import React, { useRef, useState } from 'react';
+import { ledger, LedgerError, newIdempotencyKey, ACCOUNT_KINDS, ACCOUNT_KIND_SINGULAR, type Account, type AccountKind } from './ledgerApi';
 import { todayLocal } from './money';
 import { useLedger, Modal, Field, Btn, MoneyInput, errText } from './ledgerUi';
 
@@ -22,8 +22,12 @@ export const AccountDialog: React.FC<{ onClose: () => void; account?: Account }>
   // Credit balances are money owed: stored negative.
   const signedOpening = (opening ?? 0) * (kind === 'credit' && owed ? -1 : 1);
 
+  const createKey = useRef(newIdempotencyKey());
+  const inFlight = useRef(false);
   const save = async () => {
-    if (!name.trim()) return;
+    // Enter in the name field called save() even while a save was running.
+    if (!name.trim() || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -38,12 +42,12 @@ export const AccountDialog: React.FC<{ onClose: () => void; account?: Account }>
         }
         toast('Account saved', 'success');
       } else {
-        const r = await ledger.createAccount({ name: name.trim(), kind, openingBalance: signedOpening, openingDate, notes });
+        const r = await ledger.createAccount({ name: name.trim(), kind, openingBalance: signedOpening, openingDate, notes, idempotencyKey: createKey.current });
         toast(`Added ${name.trim()}`, 'success');
         go('transactions', { accountId: r.id });
       }
       onClose();
-    } catch (e) { setError(errText(e)); } finally { setBusy(false); }
+    } catch (e) { setError(errText(e)); } finally { inFlight.current = false; setBusy(false); }
   };
 
   return (

@@ -261,7 +261,7 @@ export async function loadExifFromPath(filePath: string): Promise<ExifData | nul
   try {
     // Use Electron IPC to read the first 128KB
     if (window.dex?.invoke) {
-      const buffer = await window.dex.invoke('fs:readFileHead', filePath, 131072);
+      const buffer = await window.dex.invoke('fs:readFileHead', fileUrlToPath(filePath), 131072);
       if (buffer instanceof ArrayBuffer) {
         return parseExif(buffer);
       }
@@ -283,4 +283,17 @@ export async function loadExifFromPath(filePath: string): Promise<ExifData | nul
   } catch {
     return null;
   }
+}
+
+/**
+ * `file://C:/x/y.jpg` (or `file:///C:/x/y.jpg`) -> `C:/x/y.jpg`, the form the
+ * native fs channels open. Plain paths pass through unchanged. Gallery builds
+ * `file://` URLs for <img>, and native channels can't open those.
+ */
+export function fileUrlToPath(u: string): string {
+  if (!/^file:\/\//i.test(u)) return u;
+  let p = u.replace(/^file:\/\//i, '');
+  if (/^\/[a-zA-Z]:[\/]/.test(p)) p = p.slice(1); // "/C:/..." -> "C:/..."
+  try { p = decodeURI(p); } catch { /* not encoded */ }
+  return p;
 }

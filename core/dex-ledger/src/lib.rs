@@ -130,7 +130,15 @@ const DEFAULT_GROUPS: &[(&str, &str, &[&str])] = &[
 pub struct Ledger {
     pub(crate) conn: Connection,
     pub(crate) backup_dir: PathBuf,
+    /// Idempotency: the last successful writes that carried an
+    /// `idempotencyKey`, as (channel + key, response). A repeat of the same key
+    /// on the same channel (double click, double Enter, a retry after a lost
+    /// reply) returns the first response instead of writing again.
+    recent_writes: std::collections::VecDeque<(String, Value)>,
 }
+
+/// How many keyed writes are remembered (per open ledger, not persisted).
+const IDEMPOTENCY_MEMORY: usize = 64;
 
 impl Ledger {
     /// Open (or create) the ledger file. A file that fails SQLite's integrity
@@ -159,11 +167,35 @@ impl Ledger {
 
     fn from_conn(mut conn: Connection, backup_dir: &Path) -> R<Ledger> {
         schema::migrate(&mut conn)?;
-        Ok(Ledger { conn, backup_dir: backup_dir.to_path_buf() })
+        Ok(Ledger { conn, backup_dir: backup_dir.to_path_buf(), recent_writes: std::collections::VecDeque::new() })
     }
 
     /// Route one `ledger:*` channel. Always returns `{ ok, data | error }`.
     pub fn dispatch(&mut self, channel: &str, args: &Value) -> Value {
+        let key = payload(args)
+            .get("idempotencyKey")
+            .and_then(|v| v.as_str())
+            .filter(|k| !k.is_empty() && k.len() <= 128)
+            .map(|k| format!("{channel}#{k}"));
+        if let Some(k) = &key {
+            if let Some((_, prev)) = self.recent_writes.iter().find(|(kk, _)| kk == k) {
+                return prev.clone();
+            }
+        }
+        let out = self.dispatch_inner(channel, args);
+        // Only successes are remembered: a failed write may be retried with the same key.
+        if let Some(k) = key {
+            if out["ok"] == true {
+                self.recent_writes.push_back((k, out.clone()));
+                while self.recent_writes.len() > IDEMPOTENCY_MEMORY {
+                    self.recent_writes.pop_front();
+                }
+            }
+        }
+        out
+    }
+
+    fn dispatch_inner(&mut self, channel: &str, args: &Value) -> Value {
         let p = payload(args);
         let res = match channel {
             "ledger:status" => self.status(),

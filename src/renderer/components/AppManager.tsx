@@ -12,6 +12,7 @@
  * ===========================================================================
  */
 
+import { appBackLabel, tryAppBack, tryAppForward, MOUSE_BACK, MOUSE_FORWARD } from '../services/backNavigation';
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { platform } from '../utils';
@@ -1771,6 +1772,9 @@ export const AppManager: React.FC = () => {
   }, [handleCloseApp, resolveRequestedAppId, setCurrentApp]);
 
   const goBack = useCallback(() => {
+    // Predictive back: the app in front gets the first say (previous folder,
+    // previous page); only then does Back switch apps (services/backNavigation).
+    if (tryAppBack(useRunningApps.getState().currentAppId)) return;
     const idx = navIndexRef.current;
     const hist = navHistoryRef.current;
     if (idx > 0) {
@@ -1784,6 +1788,7 @@ export const AppManager: React.FC = () => {
   }, [launchApp, setCurrentRunningApp]);
 
   const goForward = useCallback(() => {
+    if (tryAppForward(useRunningApps.getState().currentAppId)) return;
     const idx = navIndexRef.current;
     const hist = navHistoryRef.current;
     if (idx < hist.length - 1) {
@@ -1795,6 +1800,16 @@ export const AppManager: React.FC = () => {
       else setCurrentRunningApp(appId);
     }
   }, [launchApp, setCurrentRunningApp]);
+
+  // Mouse side buttons (X1/X2) = Back / Forward, same as Alt+Left/Right.
+  useEffect(() => {
+    const onUp = (e: MouseEvent) => {
+      if (e.button === MOUSE_BACK) { e.preventDefault(); goBack(); }
+      else if (e.button === MOUSE_FORWARD) { e.preventDefault(); goForward(); }
+    };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, [goBack, goForward]);
 
   const { closeAllApps } = useRunningApps();
 
@@ -5094,7 +5109,13 @@ export const AppManager: React.FC = () => {
             </button>
           </div>
         )}
-        <button style={{...navBtnStyle, opacity: navIndex > 0 ? 1 : 0.4, cursor: navIndex > 0 ? 'pointer' : 'not-allowed'}} onClick={goBack} disabled={navIndex <= 0} data-tip="Back" aria-label="Navigate back" aria-disabled={navIndex <= 0}>
+        <button style={{...navBtnStyle, opacity: navIndex > 0 ? 1 : 0.4, cursor: navIndex > 0 ? 'pointer' : 'not-allowed'}} onClick={goBack} disabled={navIndex <= 0} data-tip="Back" aria-label="Navigate back" aria-disabled={navIndex <= 0}
+          onMouseEnter={(e) => {
+            // Predict where Back lands: inside the app first, else the previous app.
+            const inApp = appBackLabel(useRunningApps.getState().currentAppId);
+            const prevApp = navIndex > 0 ? APP_DEFINITIONS[navHistoryRef.current[navIndex - 1] as AppId]?.name : null;
+            e.currentTarget.dataset.tip = inApp ? `Back to ${inApp}` : prevApp ? `Back to ${prevApp}` : 'Back';
+          }}>
           {Icons.chevronLeft}
         </button>
         <button style={{...navBtnStyle, opacity: navIndex < navHistoryRef.current.length - 1 ? 1 : 0.4, cursor: navIndex < navHistoryRef.current.length - 1 ? 'pointer' : 'not-allowed'}} onClick={goForward} disabled={navIndex >= navHistoryRef.current.length - 1} data-tip="Forward" aria-label="Navigate forward" aria-disabled={navIndex >= navHistoryRef.current.length - 1}>
