@@ -852,7 +852,10 @@ fn update_config(app: &tauri::AppHandle) -> Value {
 /// when Settings changes PIN/password/fingerprint directly over IPC.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let out = dispatch_inner(app, channel, args);
-    let read_only = channel.starts_with("auth:get") || channel == "auth:verifySession";
+    let read_only = matches!(
+        channel,
+        "auth:getState" | "auth:getConfig" | "auth:getLockoutStatus" | "auth:getSecurityQuestions" | "auth:verifySession"
+    );
     // Null = unknown channel, except lock (which answers nothing).
     if !read_only && (!out.is_null() || channel == "auth:lock") {
         crate::native_ops::emit_event(app, "auth:state-changed", &get_state(app));
