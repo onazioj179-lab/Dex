@@ -27,13 +27,13 @@ import { DexSearchInput } from '../../styles/components';
 const colors = {
   bg: 'var(--color-bg-inset, rgba(0,0,0,0.2))',
   bgHover: 'var(--color-border-subtle)',
-  bgSelected: 'rgba(100,210,255,0.08)',
+  bgSelected: 'var(--color-accent-soft)',
   border: 'var(--color-bg-hover)',
   text: 'var(--color-text-primary)',
   textDim: 'var(--color-text-tertiary)',
   textMuted: 'var(--color-text-tertiary)',
-  accent: '#64d2ff',
-  accentDim: 'rgba(100,210,255,0.2)',
+  accent: 'var(--color-accent)',
+  accentDim: 'var(--color-accent-light)',
   danger: 'var(--color-error)',
   pin: 'var(--color-warning)',
   star: 'var(--color-warning)',
@@ -649,7 +649,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           <button
             aria-label="Create new note"
             onClick={() => { setShowTemplateMenu(false); onCreate(); }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.32)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent) 24%, transparent)')}
             onMouseLeave={e => (e.currentTarget.style.background = colors.accentDim)}
             style={{
               flex: 1,
@@ -671,7 +671,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
               aria-label="New note from template"
               title="New from template"
               onClick={() => setShowTemplateMenu(v => !v)}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.32)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent) 24%, transparent)')}
               onMouseLeave={e => (e.currentTarget.style.background = colors.accentDim)}
               style={{
                 width: 30,

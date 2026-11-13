@@ -1040,19 +1040,21 @@ html[data-theme="light"][data-perf-tier="low"] {
   background: #161619;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-xl);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.30),
-    0 10px 30px rgba(0, 0, 0, 0.34),
-    0 24px 56px -16px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
 }
 .dex-creative-panel-strong {
   background: #0f0f12;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-xl);
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.40),
-    0 14px 38px rgba(0, 0, 0, 0.44),
-    0 30px 64px -16px rgba(0, 0, 0, 0.54);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.40);
+}
+/* Light theme: the dark pro chrome left white cards on a black panel. Follow
+   the theme tokens instead (still opaque, still no blur). */
+[data-theme="light"] .dex-creative-panel,
+[data-theme="light"] .dex-creative-panel-strong {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-subtle);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 /* ── AXL engineering hardware chrome ──────────────────────────────────────────
