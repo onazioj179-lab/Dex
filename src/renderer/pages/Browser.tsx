@@ -9,6 +9,7 @@
  * Privacy mode - enhanced protection
  */
 
+import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
@@ -1828,6 +1829,26 @@ export const Browser: React.FC = () => {
       if (wv) { try { wv.loadURL(nextUrl); } catch (e) { console.warn('[DEX]', e); } }
     }
   }, []);
+
+  // System Back goes to the previous page of the active tab first.
+  useBackHandler('browser', {
+    canGoBack: () => {
+      const tab = tabsRef.current.find(t => t.id === activeTabRef.current);
+      return !!tab && tab.navIndex > 0;
+    },
+    goBack,
+    canGoForward: () => {
+      const tab = tabsRef.current.find(t => t.id === activeTabRef.current);
+      return !!tab && tab.navIndex < tab.navHistory.length - 1;
+    },
+    goForward,
+    backLabel: () => {
+      const tab = tabsRef.current.find(t => t.id === activeTabRef.current);
+      const prev = tab && tab.navIndex > 0 ? tab.navHistory[tab.navIndex - 1] : null;
+      if (!prev) return null;
+      try { return new URL(prev).hostname || prev; } catch { return prev; }
+    },
+  });
 
   // Navigation: Refresh current page
   const refresh = useCallback(() => {

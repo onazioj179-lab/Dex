@@ -16,7 +16,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
-import { type ExifData, loadExifFromPath } from '../utils/exifParser';
+import { type ExifData, fileUrlToPath, loadExifFromPath } from '../utils/exifParser';
 import DexIcon from '../components/DexIcon';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
@@ -959,7 +959,7 @@ export const Gallery: React.FC = () => {
     if (!dex?.invoke || !selectedMedia) return;
     setStripState({ busy: true });
     try {
-      const r = await dex.invoke('fs:stripMetadata', selectedMedia.src);
+      const r = await dex.invoke('fs:stripMetadata', fileUrlToPath(selectedMedia.src));
       if (!r || r.ok === false) {
         setStripState({ busy: false, error: true, message: r?.error || 'Could not remove the metadata.' });
       } else if (!r.outPath) {

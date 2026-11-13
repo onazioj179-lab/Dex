@@ -5,9 +5,9 @@
 // Amounts are typed as positive numbers; the type (money out / money in /
 // transfer) gives the sign, so a user never has to type a minus.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { ledger, LedgerError, type TxnDetail, type Attachment } from './ledgerApi';
+import { ledger, LedgerError, newIdempotencyKey, type TxnDetail, type Attachment } from './ledgerApi';
 import { todayLocal } from './money';
 import { useLedger, Btn, IconBtn, Field, MoneyInput, CategorySelect, AccountSelect, Money, errText, type EditorRequest } from './ledgerUi';
 
@@ -72,11 +72,19 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
     return true;
   }, [amount, date, accountId, kind, toAccountId, split, lines, remaining]);
 
+  // One key per new-entry intent: a double Enter / double click, or a retry,
+  // can't create the transaction twice (the engine replays the first result).
+  const createKey = useRef(newIdempotencyKey());
+  const inFlight = useRef(false);
+
   const run = async (fn: (confirmReconciled: boolean) => Promise<number>) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
       const id = await fn(false);
+      createKey.current = newIdempotencyKey(); // the next entry is a new write
       toast(isEdit ? 'Saved' : 'Transaction added', 'success');
       onSaved(id);
     } catch (e) {
@@ -86,7 +94,7 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
           try { const id = await fn(true); toast('Saved', 'success'); onSaved(id); } catch (e2) { setError(errText(e2)); }
         }
       } else setError(errText(e));
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   };
 
   const save = () => {
@@ -99,7 +107,7 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
           return loaded.id;
         });
       }
-      return run(async () => (await ledger.transfer({ fromAccountId: accountId!, toAccountId: toAccountId!, date, amount: amount!, memo, status })).id);
+      return run(async () => (await ledger.transfer({ fromAccountId: accountId!, toAccountId: toAccountId!, date, amount: amount!, memo, status, idempotencyKey: createKey.current })).id);
     }
     const splits = split ? lines.map(l => ({ categoryId: l.categoryId, amount: sign * (l.amount ?? 0), memo: l.memo })) : undefined;
     const body: Record<string, unknown> = { accountId, date, payee, memo, amount: sign * amount! };
@@ -110,7 +118,7 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
       if (loaded.status !== 'reconciled') body.status = status;
       return run(async (c) => { await ledger.updateTxn({ id: loaded.id, ...body, confirmReconciled: c }); return loaded.id; });
     }
-    return run(async () => (await ledger.createTxn({ ...body, status })).id);
+    return run(async () => (await ledger.createTxn({ ...body, status, idempotencyKey: createKey.current })).id);
   };
 
   const remove = async () => {
