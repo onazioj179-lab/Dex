@@ -708,7 +708,6 @@ export const Browser: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
 
   // DevTools
-  const [devToolsOpen, setDevToolsOpen] = useState(false);
 
   // Search suggestions
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -790,7 +789,9 @@ export const Browser: React.FC = () => {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
         e.preventDefault();
-        setDevToolsOpen(prev => !prev);
+        // Inspect the page in the active tab (WebView2 DevTools, Browser views only).
+        const wv = webviewRefs.current.get(activeTabRef.current) as { toggleDevTools?: () => Promise<unknown> } | undefined;
+        void wv?.toggleDevTools?.();
       }
       if (e.key === 'Escape' && fullscreenTabId) {
         const wv = webviewRefs.current.get(fullscreenTabId);

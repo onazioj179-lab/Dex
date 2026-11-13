@@ -25,6 +25,13 @@ describe('HTML5 drag and drop stays enabled in every DEX webview', () => {
     expect(read('src-tauri/src/browser_view.rs')).toContain('.disable_drag_drop_handler()');
   });
 
+  it('devtools: only Browser page views can open them in a release build', () => {
+    const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
+    for (const w of conf.app.windows) expect(w.devtools).toBe(false);
+    expect(read('src-tauri/src/multi_window.rs')).toContain('.devtools(cfg!(debug_assertions))');
+    expect(read('src-tauri/src/browser_view.rs')).toContain('.devtools(true)');
+  });
+
   it('nothing listens for Tauri drop events (they no longer fire)', () => {
     const shell = read('src/renderer/App.tsx');
     expect(shell).not.toMatch(/onDragDropEvent|tauri:\/\/drag-drop/);

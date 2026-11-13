@@ -1221,6 +1221,18 @@ const Rewind: React.FC = () => {
         </div>
       </div>
 
+      {/* -- PROBLEMS: load failures and a failed integrity check used to be set and never shown -- */}
+      {(backgroundErrorBanner || integrityWarning) && (
+        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '6px 12px 0', padding: '8px 12px', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--color-warning, #ff9f0a) 40%, transparent)', background: 'color-mix(in srgb, var(--color-warning, #ff9f0a) 10%, transparent)', fontSize: 12, color: 'var(--color-text-primary)' }}>
+          {integrityWarning && <span>The last integrity check failed: some Rewind records may have been changed or damaged. Settings › Security › Run Integrity Check runs it again.</span>}
+          {backgroundErrorBanner && (
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{backgroundErrorBanner.message}</span>
+              <button aria-label="Dismiss" onClick={() => setBackgroundErrorBanner(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 12 }}>Dismiss</button>
+            </span>
+          )}
+        </div>
+      )}
       {/* -- MAIN CONTENT -- */}
       <div style={S.main}>
         <div style={S.content}>
@@ -2684,11 +2696,14 @@ const Rewind: React.FC = () => {
               style={S.headerBtn}
               onClick={async () => {
                 if (!dex?.rewind?.runIntegrityCheck) return;
-                const result = await dex.rewind.runIntegrityCheck();
-                if (result && !result.passed) {
-                  setIntegrityWarning(true);
-                } else {
-                  setIntegrityWarning(false);
+                const toast = (type: string, message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+                try {
+                  const result = await dex.rewind.runIntegrityCheck();
+                  if (!result) { toast('error', 'The integrity check did not run.'); return; }
+                  setIntegrityWarning(!result.passed);
+                  toast(result.passed ? 'success' : 'warning', result.passed ? 'Integrity check passed.' : 'Integrity check failed: see the warning at the top.');
+                } catch (e) {
+                  toast('error', `The integrity check could not run: ${e instanceof Error ? e.message : String(e)}`);
                 }
               }}
             >

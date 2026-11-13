@@ -218,6 +218,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     const api = {
       loadURL: (url: string) => { lastSrc.current = url; return invoke('browserView:navigate', tabId, url); },
       reload: () => invoke('browserView:reload', tabId),
+      toggleDevTools: () => invoke('browserView:devtools', tabId),
       goBack: () => invoke('browserView:back', tabId),
       goForward: () => invoke('browserView:forward', tabId),
       stop: () => invoke('browserView:stop', tabId),

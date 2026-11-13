@@ -21,7 +21,8 @@
         "minHeight": 600,
         "resizable": true,
         "decorations": false,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "devtools": false
       }
     ],
     "security": {

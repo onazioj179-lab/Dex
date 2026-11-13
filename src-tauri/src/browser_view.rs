@@ -73,6 +73,8 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
         // Let web pages use HTML5 drag and drop (uploads by dropping a file,
         // sortable lists); Tauri's own drop handler swallows it on Windows.
         .disable_drag_drop_handler()
+        // Web pages may be inspected (Browser › Inspect, Ctrl+Shift+I).
+        .devtools(true)
         .on_page_load(move |_wv, payload| {
             let state = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",
@@ -293,6 +295,7 @@ pub fn dispatch(app: &tauri::AppHandle, window: &tauri::Window, channel: &str, a
             None => json!({ "success": false, "error": "only http(s) pages can be opened" }),
         },
         "browserView:reload" => with_view(app, id, |wv| wv.reload()),
+        "browserView:devtools" => with_view(app, id, |wv| { if wv.is_devtools_open() { wv.close_devtools() } else { wv.open_devtools() }; Ok(()) }),
         "browserView:back" => with_view(app, id, |wv| wv.eval("history.back()")),
         "browserView:forward" => with_view(app, id, |wv| wv.eval("history.forward()")),
         "browserView:stop" => with_view(app, id, |wv| wv.eval("window.stop()")),

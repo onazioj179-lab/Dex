@@ -98,7 +98,9 @@ fn detach(app: &tauri::AppHandle, app_id: &str) -> Value {
         .min_inner_size(360.0, 280.0)
         // Tauri's own file-drop handler swallows HTML5 drag and drop on Windows
         // (files dropped on apps, in-page drags). DEX uses only HTML5 drops.
-        .disable_drag_drop_handler();
+        .disable_drag_drop_handler()
+        // DEX's own windows never open devtools in a release build.
+        .devtools(cfg!(debug_assertions));
 
     // Restore saved bounds if present, else a sensible default size.
     let saved = crate::kv_get(app, &bounds_key(app_id));
