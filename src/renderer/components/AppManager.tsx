@@ -4156,13 +4156,13 @@ export const AppManager: React.FC = () => {
               {/* Traffic light controls (left side, macOS style) */}
               {windowControls === 'traffic' && (
                 <div className="traffic-light-group" style={{ display: 'flex', gap: 6, marginRight: 4, alignItems: 'center' }}>
-                  <button onClick={() => handleCloseApp(appId)} aria-label={`Close ${getLabel(appId)}`} style={trafficBtn('#ff5f57')}>
+                  <button onClick={() => handleCloseApp(appId)} aria-label={`Close ${getLabel(appId)}`} className="dex-hit-slop" style={trafficBtn('#ff5f57')}>
                     <svg className="tl-glyph" width="6" height="6" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
                   </button>
-                  <button onClick={() => minimizeFloatingApp(appId)} aria-label={`Minimize ${getLabel(appId)}`} style={trafficBtn('#febc2e')}>
+                  <button onClick={() => minimizeFloatingApp(appId)} aria-label={`Minimize ${getLabel(appId)}`} className="dex-hit-slop" style={trafficBtn('#febc2e')}>
                     <svg className="tl-glyph" width="6" height="6" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 4H7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
                   </button>
-                  <button onClick={() => tileWindow(appId, 'maximize')} aria-label={isMaximized ? `Restore ${getLabel(appId)}` : `Maximize ${getLabel(appId)}`} style={trafficBtn('#28c840')}>
+                  <button onClick={() => tileWindow(appId, 'maximize')} aria-label={isMaximized ? `Restore ${getLabel(appId)}` : `Maximize ${getLabel(appId)}`} className="dex-hit-slop" style={trafficBtn('#28c840')}>
                     <svg className="tl-glyph" width="6" height="6" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L4 4L7 1M1 7L4 4L7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
                   </button>
                 </div>
@@ -5088,13 +5088,13 @@ export const AppManager: React.FC = () => {
             className="traffic-light-group"
             style={{ display: 'flex', gap: 'var(--space-2)', marginRight: 'var(--space-2)', alignItems: 'center' }}
           >
-            <button onClick={handleClose} data-tip="Close" aria-label="Close window" style={trafficBtn('#ff5f57')}>
+            <button onClick={handleClose} data-tip="Close" aria-label="Close window" className="dex-hit-slop" style={trafficBtn('#ff5f57')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
-            <button onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window" style={trafficBtn('#febc2e')}>
+            <button onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window" className="dex-hit-slop" style={trafficBtn('#febc2e')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 4H7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
-            <button onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window" style={trafficBtn('#28c840')}>
+            <button onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window" className="dex-hit-slop" style={trafficBtn('#28c840')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L4 4L7 1M1 7L4 4L7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
           </div>
@@ -5610,7 +5610,7 @@ export const AppManager: React.FC = () => {
 
 // -- Traffic light button --------------------------------------------------
 const trafficBtn = (color: string): React.CSSProperties => ({
-  width: 14, height: 14, borderRadius: '50%', background: color,
+  width: 14, height: 14, borderRadius: '50%', background: color, position: 'relative',
   border: 'none', cursor: 'pointer', padding: 0, opacity: 0.85,
   transition: 'opacity 0.12s ease', touchAction: 'manipulation',
   display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -8668,3 +8668,55 @@ html:not([data-theme="light"]):not([data-darkroom="on"]):not([data-high-contrast
   --color-bg-active: #38383B;
   background-color: var(--color-bg-base);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v7.0.2 interaction primitives (ROADMAP v7.0.2 §4)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Hit slop (Fitts's law / bigger hit areas): grow a small control's pointer
+   target without changing how it looks. Tune per control with --hit-slop-x/y;
+   keep x at or under half the gap between neighbours so targets never overlap.
+   The traffic-light buttons are 14 px; with this they are about 20 x 30 px. */
+.dex-hit-slop { position: relative; }
+.dex-hit-slop::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--hit-slop-y, 8px)) calc(-1 * var(--hit-slop-x, 8px));
+  border-radius: inherit;
+}
+.traffic-light-group .dex-hit-slop { --hit-slop-x: 3px; --hit-slop-y: 8px; }
+@media (pointer: coarse) {
+  .traffic-light-group .dex-hit-slop { --hit-slop-y: 14px; }
+}
+
+/* Continuous corners: a superellipse corner instead of a circular arc, so a
+   rounded surface's curve eases into its straight edge (no visible "kink").
+   Progressive: engines without corner-shape keep the round corners they have.
+   Zero specificity, so a component that sets its own corner-shape wins. */
+@supports (corner-shape: superellipse(1.5)) {
+  :where(
+    [data-floating-window],
+    [data-dex-dropdown],
+    [role="menu"],
+    [role="dialog"],
+    [role="alertdialog"],
+    .dex-liquid-glass
+  ) {
+    corner-shape: superellipse(1.5);
+  }
+}
+
+/* View transitions (see utils/viewTransition.ts): a short cross-fade for
+   whole-view swaps. Reduced motion turns it off. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

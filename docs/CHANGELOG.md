@@ -10,6 +10,24 @@ history (`git tag --list`) and on the GitHub Releases page.
 
 ---
 
+## v7.0.2 (001z) — unreleased
+
+Owner roadmap "we do not break userspace". Details in docs/ROADMAP.md (top) and
+DEX_REMAINING_WORK.md #191–#198.
+
+- The native IPC channel set is now locked (`npm run abi:check`): a channel that
+  shipped can't be removed by accident, and new code can't call a channel that
+  nothing answers. It found Quick Look text previews were always blank in the
+  desktop app; fixed.
+- Gallery can save a copy of a photo without camera, date and location data
+  (lossless; colour, orientation and C2PA content credentials stay).
+- Hover submenus stay open while you move into them, and siblings you cross on
+  the way no longer steal the hover.
+- Notes: Move to Trash happens at once, with Undo.
+- Bigger click targets on the window buttons, smoother corners, and light/dark
+  switches cross-fade (not with Reduce Motion).
+- A few easter eggs. They count toward the hidden achievements.
+
 ## v7.0.1 — DEX Blue Modern (unreleased)
 
 The full notes are in [DEX_7.0.1_RELEASE_NOTES.md](../DEX_7.0.1_RELEASE_NOTES.md);

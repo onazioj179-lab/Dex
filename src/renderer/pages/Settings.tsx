@@ -56,6 +56,8 @@ import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITO
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 import { applyTheme } from '../utils/theme';
+import { withViewTransition } from '../utils/viewTransition';
+import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 
 // ===========================================================================
 // TYPES
@@ -848,7 +850,9 @@ const applySettings = (settings: Record<string, unknown>) => {
     // Apply selected theme (dark or light)
     const theme = settings.darkMode !== false ? 'dark' : 'light';
     // One style pass with transitions off (see utils/theme withoutTransitions).
-    applyTheme(theme);
+    // A real light/dark change cross-fades as one view transition.
+    if (root.getAttribute('data-theme') !== theme) withViewTransition(() => applyTheme(theme));
+    else applyTheme(theme);
     // When the user actually changes Dark Mode, pin it: utils/theme's boot code
     // otherwise ignores `darkMode` and follows the OS scheme, so a Light choice
     // was undone on restart.
@@ -1649,6 +1653,7 @@ export const Settings: React.FC = () => {
     return () => window.removeEventListener('dex-settings-changed', onExternal);
   }, []);
   const [appVersion, setAppVersion] = useState<string>(formatDisplayVersion(getBundledAppVersion()));
+  const versionTaps = React.useRef(createTapCounter(7, 3000));
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
   // Hoist shell-prefs hook to component top-level so the hook count stays
@@ -3313,7 +3318,10 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.appInfo}>
           <span style={styles.appName}>DEX OS</span>
-          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>Version {appVersion}</span>
+          <span
+            onClick={() => { if (versionTaps.current.tap()) discoverEasterEgg('version-tap'); }}
+            style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', cursor: 'default', userSelect: 'none' }}
+          >Version {appVersion}</span>
         </div>
       </div>
 
