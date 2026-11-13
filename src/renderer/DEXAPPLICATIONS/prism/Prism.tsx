@@ -20,6 +20,7 @@ import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { capHistoryTail } from '../../../shared/creative/history';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { upscaleByFactor } from '../../../shared/creative/resample';
 import { denoiseImage } from '../../../shared/creative/denoise';
@@ -1428,6 +1429,31 @@ const Prism: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Saved ${a.download}.` } }));
   }, [canvasSize, layers, brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance]);
 
+  // Apply a PRISM project (a .prism.json from Save, or a Collab Hub
+  // checkpoint). Throws when it is not one. Undoable: it is a history step.
+  // Only pictures embedded in the project are kept, so it never makes PRISM
+  // fetch a URL named inside it. Returns how many layer pictures were left out.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyPrismProject = useCallback((p: any, label: string): number => {
+    const okSize = p?.canvasSize && Number.isFinite(p.canvasSize.width) && Number.isFinite(p.canvasSize.height);
+    if (!p || p.version !== 1 || !Array.isArray(p.layers) || p.layers.length === 0 || !okSize) throw new Error('not a Prism project');
+    let unembedded = 0;
+    const nextLayers = (p.layers as Layer[]).map((l) => {
+      if (l && typeof l.imageData === 'string' && !l.imageData.startsWith('data:image/')) { unembedded++; const { imageData: _x, ...rest } = l; return rest as Layer; }
+      return l;
+    });
+    pushHistory(label);
+    setCanvasSize({ width: p.canvasSize.width, height: p.canvasSize.height });
+    setLayers(nextLayers);
+    setSelectedLayerId(nextLayers[nextLayers.length - 1].id);
+    const a = p.adjustments || {};
+    const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+    setBrightness(num(a.brightness, 0)); setContrast(num(a.contrast, 0)); setSaturation(num(a.saturation, 0));
+    setHue(num(a.hue, 0)); setExposure(num(a.exposure, 0)); setHighlights(num(a.highlights, 0));
+    setShadows(num(a.shadows, 0)); setTemperature(num(a.temperature, 0)); setTint(num(a.tint, 0)); setVibrance(num(a.vibrance, 0));
+    return unembedded;
+  }, [pushHistory]);
+
   // ===== OPEN PROJECT (.prism.json written by Save) =====
   // Save produced project files that nothing could open again.
   const openProject = useCallback(() => {
@@ -1443,29 +1469,35 @@ const Prism: React.FC = () => {
         const okSize = p?.canvasSize && Number.isFinite(p.canvasSize.width) && Number.isFinite(p.canvasSize.height);
         if (!p || p.version !== 1 || !Array.isArray(p.layers) || p.layers.length === 0 || !okSize) throw new Error('not a Prism project');
         if (layers.length > 0 && isDirty && !window.confirm('Replace the current image with this project? Unsaved changes will be lost.')) return;
-        // Only pictures embedded in the file are kept, so opening a project
-        // never makes PRISM fetch a URL named inside it.
-        let unembedded = 0;
-        p.layers = (p.layers as Layer[]).map((l) => {
-          if (l && typeof l.imageData === 'string' && !l.imageData.startsWith('data:image/')) { unembedded++; const { imageData: _x, ...rest } = l; return rest as Layer; }
-          return l;
-        });
-        pushHistory('Open Project');
-        setCanvasSize({ width: p.canvasSize.width, height: p.canvasSize.height });
-        setLayers(p.layers as Layer[]);
-        setSelectedLayerId((p.layers[p.layers.length - 1] as Layer).id);
-        const a = p.adjustments || {};
-        const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-        setBrightness(num(a.brightness, 0)); setContrast(num(a.contrast, 0)); setSaturation(num(a.saturation, 0));
-        setHue(num(a.hue, 0)); setExposure(num(a.exposure, 0)); setHighlights(num(a.highlights, 0));
-        setShadows(num(a.shadows, 0)); setTemperature(num(a.temperature, 0)); setTint(num(a.tint, 0)); setVibrance(num(a.vibrance, 0));
+        const unembedded = applyPrismProject(p, 'Open Project');
         toast('success', `Opened ${file.name}${unembedded ? ` (${unembedded} layer picture(s) were not embedded in the file and were left out)` : ''}`);
       } catch {
         toast('error', "That file isn't a Prism project");
       }
     };
     input.click();
-  }, [layers, isDirty, pushHistory]);
+  }, [layers, isDirty, applyPrismProject]);
+
+  // Saved versions on this device, listed and restored in Collab Hub
+  // (autosaved every 5 minutes when the project changed, or the Checkpoint
+  // button). A restore is one undo step. Backlog #58.
+  const checkpoints = useAppCheckpoints({
+    appId: 'prism',
+    appName: 'PRISM',
+    getSnapshot: () => {
+      const snap = prismSnapshotRef.current;
+      if (!snap.layers.length) return null;
+      return JSON.stringify({ version: 1, canvasSize: snap.canvasSize, layers: snap.layers, adjustments: snap.adjustments });
+    },
+    onRestore: (data, name) => {
+      const left = applyPrismProject(JSON.parse(data), `Restore checkpoint: ${name}`);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Restored "${name}"${left ? ` (${left} layer picture(s) were not embedded and were left out)` : ''}. Undo brings back what was there.` } }));
+    },
+  });
+  const saveCheckpointNow = useCallback(() => {
+    const r = checkpoints.saveNow();
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: r.ok ? { type: 'success', message: 'Checkpoint saved. Find it in Collab Hub.' } : { type: 'error', message: r.error } }));
+  }, [checkpoints]);
 
   // ===== APPLY FILTER PRESET =====
   const applyFilterPreset = useCallback((preset: FilterPreset) => {
@@ -3081,6 +3113,7 @@ const Prism: React.FC = () => {
           <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
           <button className="prism-btn" style={styles.btn} onClick={openProject} aria-label="Open project" title="Open a .prism.json project saved with Save">{Icons.folder} Open Project</button>
           <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project" title="Save the project as a .prism.json file (Ctrl+S)">{Icons.save} Save</button>
+          <button className="prism-btn" style={styles.btn} onClick={saveCheckpointNow} aria-label="Save checkpoint" title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
           <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
             <AutosaveIndicator
               state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}

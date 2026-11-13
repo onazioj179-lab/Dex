@@ -90,6 +90,16 @@ export async function call<T>(channel: string, payload: Record<string, unknown> 
   return res.data as T;
 }
 
+/**
+ * A fresh idempotency key. Put it in a create payload as `idempotencyKey`:
+ * the engine answers a repeat of the same key with the first result instead
+ * of writing twice (double click, double Enter, a retry). Make one per form
+ * submission intent and renew it after a successful save.
+ */
+export function newIdempotencyKey(): string {
+  try { return crypto.randomUUID(); } catch { return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; }
+}
+
 /** Mutating call: fires LEDGER_CHANGED on success so views refresh. */
 export function mutate<T>(channel: string, payload: Record<string, unknown> = {}): Promise<T> {
   return call<T>(channel, payload, { mutates: true });
@@ -101,7 +111,7 @@ export const ledger = {
   setCurrency: (currency: string) => mutate<LedgerStatus>('ledger:settings:currency', { currency }),
 
   accounts: () => call<Account[]>('ledger:accounts:list'),
-  createAccount: (a: { name: string; kind: AccountKind; openingBalance: number; openingDate: string; notes?: string }) => mutate<{ id: number }>('ledger:accounts:create', a),
+  createAccount: (a: { name: string; kind: AccountKind; openingBalance: number; openingDate: string; notes?: string; idempotencyKey?: string }) => mutate<{ id: number }>('ledger:accounts:create', a),
   updateAccount: (a: { id: number; name?: string; kind?: AccountKind; notes?: string; openingBalance?: number; openingDate?: string; confirmReconciled?: boolean }) => mutate<{ id: number }>('ledger:accounts:update', a),
   archiveAccount: (id: number, archived: boolean) => mutate('ledger:accounts:archive', { id, archived }),
   deleteAccount: (id: number) => mutate('ledger:accounts:delete', { id }),
@@ -120,7 +130,7 @@ export const ledger = {
   txns: (filter: Record<string, unknown>) => call<TxnList>('ledger:txns:list', filter),
   txn: (id: number) => call<TxnDetail>('ledger:txns:get', { id }),
   createTxn: (t: Record<string, unknown>) => mutate<{ id: number }>('ledger:txns:create', t),
-  transfer: (t: { fromAccountId: number; toAccountId: number; date: string; amount: number; memo?: string; status?: TxnStatus }) => mutate<{ id: number; peerId: number }>('ledger:txns:transfer', t),
+  transfer: (t: { fromAccountId: number; toAccountId: number; date: string; amount: number; memo?: string; status?: TxnStatus; idempotencyKey?: string }) => mutate<{ id: number; peerId: number }>('ledger:txns:transfer', t),
   updateTxn: (t: Record<string, unknown>) => mutate<{ id: number }>('ledger:txns:update', t),
   deleteTxns: (ids: number[], confirmReconciled = false) => mutate<{ deleted: number }>('ledger:txns:delete', { ids, confirmReconciled }),
   setStatus: (ids: number[], status: 'uncleared' | 'cleared', confirmReconciled = false) => mutate<{ updated: number }>('ledger:txns:setStatus', { ids, status, confirmReconciled }),

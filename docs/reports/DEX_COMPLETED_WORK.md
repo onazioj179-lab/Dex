@@ -324,3 +324,34 @@ Rows moved out of `DEX_REMAINING_WORK.md` on 2026-11-12 because nothing is left 
 | # | App | Requirement | Priority | Status | Evidence / blocker | Next action |
 |---|---|---|---|---|---|---|
 | 192 | Rewind | Rewind captures nothing in the Tauri app; controls that did nothing | HIGH | RETIRED (owner, 2026-11-13) | Nothing in the app calls `rewind:record`, so the activity log stays empty; most Electron-era channels (`getSettings`, `toggleRecording`, `getBackupSettings`, `runBackupNow`, `restoreBackupFromPicker`, workspace profiles, plugins, `runIntegrityCheck`, `deleteAllData`) have no Tauri handler and answer null. The screen still showed a red recording dot (state started as true), working-looking Backup / Profiles / Plugins sections, an integrity check that read null as a pass, and "Delete All Rewind Data" cleared the screen while nothing was deleted. Now: recording starts off and both record toggles are disabled with "activity capture is not part of this version"; sections whose channel answers null are hidden with one note; the integrity check says it is unavailable; `rewind:deleteAllData` is real (removes the activity log; Rust test) and the screen clears only on success. Also: the Rewind log path ignored `DEX_DATA_DIR`, so isolated test runs wrote to the real profile; it now follows it. Preview: Settings showed the note, no Backup/Profiles/Plugins buttons, "Not recording" disabled | — (owner chose to retire Rewind; done in #193) |
+
+## Session 2026-11-13 (`claude/checkpoints-prism-flux-pres`): checkpoints in every creative app
+
+| # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
+|---|---|---|---|---|---|---|---|
+| 58 | Restore a collaboration checkpoint | DONE for every creative app (VINX, AXL, Imosion, Canvas, PRISM, FLUX, Presentation) (2026-11-13: Imosion File › Save Checkpoint + 5-min autosave, restore verified in the preview; Canvas autosave + restore of the open board, verified in the preview; a restore at start is not overwritten by the late native load; 2026-11-13: PRISM Checkpoint button, FLUX File › Save Checkpoint, Presentation Checkpoint button, each with the 5-minute autosave; restore is an undo step; verified in the preview: PRISM 6→4 layers, FLUX 3→1, Presentation 3→1 slides) | Per-app checkpoints on this device (10 per app, 2 MB cap), saved by hand or automatically when the project changes; Collab Hub lists them with Restore and Delete (`app-checkpoints.test.ts`) | `appCheckpoints.ts`, `useAppCheckpoints.ts` | Click-through in the packaged app | Tester | P3 |
+
+## Packaged checks 2026-11-13 (`claude/packaged-verify-batch`)
+
+Release build of `main` at a9bbdbfa (`npm run build:tauri`, MSVC, 7.0.2 build 001z): BUILD_EXIT=0, bundle gate OK (WebView2 loader static, no source maps, `DEX_7.0.2_x64-setup.exe` 14.9 MB, NotSigned). Run from `target/release` with `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` in a scratch folder and CDP on a private port; all file probes worked only inside that scratch folder; the owner's profile was not touched. The installer was NOT run. App smoke in the same exe: notes, gallery, flux, videoeditor, prism, axl, imosion, canvas, forge, presentation, bio, ledger, terminal, files, settings, taskmanager all mounted with no crash screen and no page error; the Terminal tab ran a live Windows PowerShell session.
+
+| # | Item | Packaged result |
+|---|---|---|
+| 44 | Packaged app exits with `thread '<unknown>' has overflowed its stack` | VERIFIED. Clean close (WM_CLOSE to the DEX window) exited within 20 s; `startup.log` has no panic / stack-overflow line; no child process (the open PowerShell tab) left running. Exit code not readable from a non-parent process. |
+| 59 | Files deleted permanently while saying "moved to the recycle bin" | VERIFIED. `files:trash` on a probe file: gone from its folder and listed in the Windows Recycle Bin (Shell namespace 10) with its original folder; not deleted permanently. |
+| 60 | Native copy/move/rename could overwrite or lose data | VERIFIED. `files:copy` into a folder that already has `keep.txt` wrote `keep copy.txt` and left the original reading "ORIGINAL"; `files:move` onto an existing name refused ("An item named \"other.txt\" already exists there") with both files intact; `files:rename` onto an existing name refused. |
+| 153 | Terminal: WSL offered on machines without a Linux distribution | VERIFIED. `pty:shells` lists powershell, cmd, git-bash only; WSL no longer offered on this machine (no distribution registered, `reg query` exit 1). |
+| 202 | Quick Look: Text previews always blank in the desktop app | VERIFIED (native channel; the Quick Look panel itself was not opened). `fs:writeText` then `fs:readText` round-trips the text; a missing file returns `ok:false` with the OS error. |
+| 203 | Gallery: Save a copy without metadata (B003/B011) | VERIFIED. `fs:stripMetadata` on a JPEG with camera Make/Model/DateTime and a GPS block (made with Pillow): wrote `exif (no metadata).jpg` (891 → 677 bytes), reported "EXIF (camera, date, location)" removed; the copy has no Exif marker, camera string or GPS IFD, decodes at 64×48, and the original still has its EXIF. |
+
+## Packaged UI checks 2026-11-13 (`claude/terminal-split-notes-colors`)
+
+Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; the test window was restored from minimized first. Clean close again with no panic.
+
+| # | Item | Packaged result |
+|---|---|---|
+| 139 | Terminal: Split panes, standalone app | VERIFIED. Release exe, isolated profile: Split right then Split down gave 3 panes, each with its own live PowerShell session (pty-1..3); a command typed into pane 1 and pane 3 printed in those panes. Split down added a third column instead of stacking: fixed in #217. |
+| 146 | Terminal: Shell profiles, default shell, text size, open in folder | VERIFIED. "Shells and text size" menu listed Windows PowerShell, Command Prompt, Git Bash (each with Set default); choosing Command Prompt opened a new tab running cmd.exe (banner shown); + changed text size 13 → 14 and saved `dex.terminal.settings.v1`. |
+| 156 | Ledger: Edit transactions in the table, not only in the side editor | VERIFIED. Created a ledger, an account and a "Probe coffee" transaction; double-clicking its Description cell opened an inline field (not the side editor); "Probe tea" + Enter saved; after switching to Overview and back the table still showed "Probe tea" (1 transaction). |
+| 205 | Notes: Move to Trash asked every time; no undo | VERIFIED. Right-click › Delete Note on a probe note: no confirm dialog, note count 2 → 1, toast "“DEX probe note …” moved to Trash" with Undo; Undo restored it (count 2). |
+| 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | VERIFIED. `example.com` → https://example.com/, `localhost:9` → http://localhost:9/, `192.168.0.1:9` → http://192.168.0.1:9/, plain words → a DuckDuckGo search. |

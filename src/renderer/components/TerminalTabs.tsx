@@ -30,7 +30,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Terminal } from './Terminal';
 import {
   LAYOUT_KEY, LAYOUT_KEY_V1, MAX_PANES, addTab as addTabL, closePane as closePaneL, closeTab as closeTabL,
-  cyclePane, cycleTab, focusPane, initialLayout, parseLayout, resizeDivider, splitPane, type SplitDir,
+  cyclePane, cycleTab, focusPane, initialLayout, parseLayout, resizeDivider, splitPane, canSplit as canSplitDir, type SplitDir,
   type TermLayout, type TermTab,
 } from './terminalLayout';
 import {
@@ -290,6 +290,12 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
 
   const canSplit = (activeTab?.panes.length ?? MAX_PANES) < MAX_PANES;
   const panesHint = useMemo(() => (canSplit ? '' : ` (max ${MAX_PANES} panes)`), [canSplit]);
+  // A tab's panes share one direction, set by its first split.
+  const canRight = canSplitDir(activeTab, 'row');
+  const canDown = canSplitDir(activeTab, 'column');
+  const axisHint = (dir: SplitDir) => (canSplit && !canSplitDir(activeTab, dir)
+    ? ` (this tab already splits ${activeTab?.dir === 'row' ? 'side by side' : 'top to bottom'}; open a new tab to split the other way)`
+    : panesHint);
 
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0, flex: 1, width: '100%', minWidth: 0 }}>
@@ -393,10 +399,10 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               </div>
             </div>
           )}
-          <button type="button" onClick={() => split('row')} disabled={!canSplit} aria-label="Split right" title={`Split right (Ctrl+Shift+D)${panesHint}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canSplit ? 1 : 0.35 }}>
+          <button type="button" onClick={() => split('row')} disabled={!canRight} aria-label="Split right" title={`Split right (Ctrl+Shift+D)${axisHint('row')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canRight ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
           </button>
-          <button type="button" onClick={() => split('column')} disabled={!canSplit} aria-label="Split down" title={`Split down (Ctrl+Shift+E)${panesHint}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canSplit ? 1 : 0.35 }}>
+          <button type="button" onClick={() => split('column')} disabled={!canDown} aria-label="Split down" title={`Split down (Ctrl+Shift+E)${axisHint('column')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canDown ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="3" y1="12" x2="21" y2="12" /></svg>
           </button>
         </div>

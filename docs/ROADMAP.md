@@ -28,8 +28,9 @@
 >   (`corner-shape: superellipse(1.5)` on windows, menus, dialogs, glass; progressive); view transitions
 >   (`utils/viewTransition.ts`, theme flips cross-fade as one compositor fade, off under Reduce Motion). Already present:
 >   command menu (CommandPalette), skeleton loaders, balanced headlines, tabular numbers, safe-area insets, one-time-code
->   autofill. Not done: BlurHash placeholders, predictive back, swipe-to-dismiss sheets, idempotency keys on IPC
->   writes, pre-rendering, shortcut hints audit.
+>   autofill. Later passes: swipe-to-dismiss with flick (#210), shortcut sheet from the palette (#211), Ledger
+>   idempotency keys (#213), predictive back + mouse side buttons (#215). Not done: BlurHash (blocked on #216:
+>   local images may not load in the packaged app), pre-rendering.
 > - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
 >   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
 >   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),
@@ -3663,3 +3664,12 @@ These need DSP/ML or native hosting we don't fake.
 
 - Rewind retired (owner): gone from every app list, cannot be opened, data left in place (#193).
 - Release build (7.0.1 serial 18o tree) passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).
+
+## Checkpoint 2026-11-13 (checkpoints in every creative app)
+
+- PRISM, FLUX and Presentation join VINX, AXL, Imosion and Canvas: saved versions on this device, listed and restored in Collab Hub, restore is an undo step (#58 done).
+
+## Checkpoint 2026-11-13 (packaged verification batch)
+
+- Release build of main (7.0.2 / 001z) passed the bundle gate; run on an isolated profile. Verified in the exe: clean exit with no stack overflow (#44), Recycle Bin delete (#59), copy/move/rename never overwrite (#60), WSL only listed with a distribution (#153), text read for Quick Look (#202), metadata-stripped JPEG copy (#203); 16 apps open without a crash. Gallery gained a regression test for the removed fake face groups (#208).
+- Still open for B018 / #6 / #102: the installer itself (install, upgrade, uninstall) on a clean machine, and signing (#30).

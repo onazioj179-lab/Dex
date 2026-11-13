@@ -465,3 +465,43 @@ fn imports_the_earlier_document_ledger() {
     // Never into a ledger that already has data.
     assert!(l.import_legacy(&doc).unwrap_err().contains("already has"));
 }
+
+#[test]
+fn idempotency_key_makes_a_repeated_write_happen_once() {
+    let mut l = ledger("idem");
+    let acct = json!({ "name": "Main", "kind": "checking", "openingBalance": 0, "openingDate": "2026-01-01", "idempotencyKey": "k-1" });
+    let a = ok(&mut l, "ledger:accounts:create", acct.clone());
+    let b = ok(&mut l, "ledger:accounts:create", acct);
+    assert_eq!(a["id"], b["id"], "the repeat returned the first result");
+    assert_eq!(ok(&mut l, "ledger:accounts:list", json!({})).as_array().unwrap().len(), 1);
+
+    let id = a["id"].as_i64().unwrap();
+    let t = json!({ "accountId": id, "date": "2026-01-02", "payee": "Shop", "amount": -500, "idempotencyKey": "t-1" });
+    let x = ok(&mut l, "ledger:txns:create", t.clone());
+    let y = ok(&mut l, "ledger:txns:create", t);
+    assert_eq!(x["id"], y["id"]);
+    // A new key is a new write.
+    ok(&mut l, "ledger:txns:create", json!({ "accountId": id, "date": "2026-01-02", "payee": "Shop", "amount": -500, "idempotencyKey": "t-2" }));
+    // No key: every call writes (unchanged behaviour).
+    ok(&mut l, "ledger:txns:create", json!({ "accountId": id, "date": "2026-01-02", "payee": "Shop", "amount": -500 }));
+    ok(&mut l, "ledger:txns:create", json!({ "accountId": id, "date": "2026-01-02", "payee": "Shop", "amount": -500 }));
+    let list = ok(&mut l, "ledger:txns:list", json!({ "accountId": id }));
+    assert_eq!(list["total"], 4);
+}
+
+#[test]
+fn idempotency_key_does_not_cache_a_failure() {
+    let mut l = ledger("idem-fail");
+    fail(&mut l, "ledger:accounts:create", json!({ "name": "", "kind": "checking", "openingBalance": 0, "openingDate": "2026-01-01", "idempotencyKey": "k" }));
+    // Same key, now valid: it is written, not answered with the old error.
+    ok(&mut l, "ledger:accounts:create", json!({ "name": "Main", "kind": "checking", "openingBalance": 0, "openingDate": "2026-01-01", "idempotencyKey": "k" }));
+}
+
+#[test]
+fn idempotency_keys_are_per_channel() {
+    let mut l = ledger("idem-ch");
+    let g = ok(&mut l, "ledger:groups:create", json!({ "name": "A", "idempotencyKey": "same" }));
+    let c = ok(&mut l, "ledger:categories:create", json!({ "groupId": g["id"], "name": "B", "idempotencyKey": "same" }));
+    // The category write ran (not answered with the group's cached reply).
+    assert_eq!(c["id"].as_i64(), Some(cat(&mut l, "B")));
+}
