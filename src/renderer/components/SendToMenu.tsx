@@ -19,6 +19,7 @@ import {
   useCreativeInbox,
   type SharedAsset,
 } from '../services/CreativeSuiteBridge';
+import { saveAsset } from '../services/creativeAssetStore';
 
 const APP_META: Record<CreativeAppId, { label: string; color: string; icon: JSX.Element }> = {
   imosion: {
@@ -128,6 +129,16 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
     }
   }, [getAsset, assetKind, sourceApp, sendToApp]);
 
+  // Keep a copy in the shared library (Creative Hub) for later reuse.
+  const handleSaveToLibrary = useCallback(async () => {
+    setOpen(false);
+    const { name, data, mimeType, metadata } = getAsset();
+    const res = await saveAsset({ kind: assetKind, name, sourceApp, data, mimeType, metadata });
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: res.ok
+      ? { type: 'success', message: `Saved "${res.entry.name}" to the asset library (Creative Hub)` }
+      : { type: 'error', message: `Not saved to the library: ${res.error}` } }));
+  }, [getAsset, assetKind, sourceApp]);
+
   if (targets.length === 0) return null;
 
   return (
@@ -206,6 +217,18 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
               </div>
             );
           })}
+          <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 6px' }} />
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => { void handleSaveToLibrary(); }}
+            onKeyDown={e => { if (e.key === 'Enter') void handleSaveToLibrary(); }}
+            style={{ padding: '7px 10px', fontSize: '12px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+            className="dex-send-to-item"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            <span style={{ flex: 1 }}>Save to Library</span>
+          </div>
         </div>
       )}
     </div>

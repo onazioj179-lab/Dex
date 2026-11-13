@@ -19,6 +19,7 @@ import { useNotesStore } from '../../store/notesStore';
 import { loadIndex, requestCanvas, type BoardsIndex } from './canvasBoards';
 import { BOARD_TEMPLATES } from './canvasObjects';
 import { persistGet } from '../../utils/persistentStore';
+import { HubAssetLibrary } from './HubAssetLibrary';
 
 /** The creative suite, with what each app is for in Part 5's terms. */
 const CREATIVE_APPS: Array<{ id: string; role: string }> = [
@@ -134,6 +135,8 @@ export const CreativeHub: React.FC = () => {
             </ul>
           )}
         </section>
+
+        <HubAssetLibrary card={card} h2={h2} term={term} />
 
         <section style={card} aria-labelledby="hub-templates">
           <h2 id="hub-templates" style={h2}>Start from a template</h2>
