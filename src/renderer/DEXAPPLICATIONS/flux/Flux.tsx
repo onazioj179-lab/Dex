@@ -776,6 +776,7 @@ const Flux: React.FC = () => {
   const [cameraFocusDistance, setCameraFocusDistance] = useState(0);
   // 10. Render Queue
   const [showRenderQueue, setShowRenderQueue] = useState(false);
+  const renderClockRef = useRef({ time: 0, duration: 1 });
   const [renderQueue, setRenderQueue] = useState<{ id: string; name: string; format: string; status: 'queued' | 'rendering' | 'done' | 'error'; progress: number }[]>([]);
   // 11. Timeline Markers
   const [showMarkers, setShowMarkers] = useState(false);
@@ -1124,6 +1125,7 @@ const Flux: React.FC = () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
     
+    renderClockRef.current = { time: currentTime, duration };
     // Render layers from bottom to top (reversed order)
     const inTime = (l: Layer) => l.visible && currentTime >= l.inPoint && currentTime <= l.outPoint;
     // The topmost active Camera layer frames the shot; cameras are never drawn.
@@ -4578,7 +4580,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Render Queue panel" onClick={() => setShowRenderQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
+            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'WebM (VP9)', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {renderQueue.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>Queue is empty</div>}
               {renderQueue.map(job => (
@@ -4597,22 +4599,38 @@ const Flux: React.FC = () => {
             {renderQueue.length > 0 && (
               <div style={{ display: 'flex', gap: 4, marginTop: 'var(--space-2)' }}>
                 <button aria-label="Start rendering" onClick={() => {
-                  const queuedJobs = renderQueue.filter(j => j.status === 'queued');
-                  if (queuedJobs.length === 0) return;
-                  // Mark first queued as rendering, then export
-                  setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: 'rendering' as const, progress: 0 } : j));
-                  exportVideo();
-                  // After export completes, mark done. Safety cap prevents
-                  // an unbounded poll if the recorder never enters 'inactive'.
-                  const startedAt = Date.now();
-                  const MAX_POLL_MS = 10 * 60 * 1000; // 10 minutes
-                  const checkDone = setInterval(() => {
-                    const expired = Date.now() - startedAt > MAX_POLL_MS;
-                    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive' || expired) {
-                      clearInterval(checkDone);
-                      setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
-                    }
-                  }, 500);
+                  // Render every queued job in turn. Progress follows the
+                  // playhead while recording; a job is done when its recorder stops.
+                  const MAX_POLL_MS = 10 * 60 * 1000;
+                  const runNext = () => {
+                    let next: string | null = null;
+                    setRenderQueue(prev => {
+                      const job = prev.find(j => j.status === 'queued');
+                      next = job ? job.id : null;
+                      return job ? prev.map(j => j.id === job.id ? { ...j, status: 'rendering' as const, progress: 0 } : j) : prev;
+                    });
+                    setTimeout(() => {
+                      if (!next) return;
+                      const id = next;
+                      const previous = mediaRecorderRef.current;
+                      exportVideo();
+                      const startedAt = Date.now();
+                      const poll = setInterval(() => {
+                        const rec = mediaRecorderRef.current === previous ? null : mediaRecorderRef.current;
+                        const expired = Date.now() - startedAt > MAX_POLL_MS || (!rec && Date.now() - startedAt > 3000);
+                        const { time, duration: d } = renderClockRef.current;
+                        if (rec && rec.state === 'recording' && !expired) {
+                          setRenderQueue(prev => prev.map(j => j.id === id ? { ...j, progress: Math.min(99, Math.round((time / Math.max(1, d)) * 100)) } : j));
+                          return;
+                        }
+                        if (rec && rec.state !== 'inactive' && !expired) return; // not started yet
+                        clearInterval(poll);
+                        setRenderQueue(prev => prev.map(j => j.id === id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
+                        if (!expired) setTimeout(runNext, 300);
+                      }, 400);
+                    }, 0);
+                  };
+                  runNext();
                 }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>
                 <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px var(--space-3)', borderRadius: 9999, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
               </div>
