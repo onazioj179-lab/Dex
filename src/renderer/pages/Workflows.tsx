@@ -1434,14 +1434,14 @@ export const Workflows: React.FC = () => {
     <>
     <div style={styles.container}>
       <style>{`
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        input:focus { outline: none; }
+        @scope { button { font-family: inherit; transition: all 0.12s ease; } }
+        @scope { button:active { transform: scale(0.97); } }
+        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; } }
+        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        @scope { ::-webkit-scrollbar-track { background: transparent; } }
+        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; } }
+        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border); } }
+        @scope { input:focus { outline: none; } }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>

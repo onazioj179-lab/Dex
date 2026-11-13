@@ -103,6 +103,32 @@ describe('UI unslop guards', () => {
       expect(strip(read('styles/design-system.css'))).not.toMatch(halo);
     });
 
+    it('hover is not tinted with an app brand colour helper either (Flux)', () => {
+      expect(hits(/:hover[^{}`]*\{[^}]*(fluxTint|FLUX_ACCENT)[^}]*\}/g)).toEqual([]);
+    });
+
+    it('app <style> blocks do not restyle the whole OS (bare element rules are @scope-d or root-prefixed)', () => {
+      const bare = /^\s*(\*|button|select|input|textarea|::-webkit-scrollbar[\w-]*)(\[[^\]]*\])?((:[\w-]+(\([^)]*\))?)|(::[\w-]+))*\s*[,{]/;
+      const leaks: string[] = [];
+      for (const { f, src } of apps) {
+        for (const block of src.matchAll(/<style>\{`([\s\S]*?)`\}<\/style>/g)) {
+          for (const line of block[1].split(/\r?\n/)) if (bare.test(line)) leaks.push(`${f}: ${line.trim().slice(0, 80)}`);
+        }
+      }
+      expect(leaks).toEqual([]);
+    });
+
+    it('shared CSS hover never lifts or grows (dock magnify and slider thumbs excepted)', () => {
+      for (const file of ['styles/design-system.css', 'styles/globals.css']) {
+        const css = strip(read(file));
+        const bad = [...css.matchAll(/([^{}]*:hover[^{}]*)\{([^{}]*)\}/g)]
+          .filter(([, sel]) => !/dock-magnify|slider-thumb|range-thumb/.test(sel))
+          .filter(([, , body]) => /transform:\s*[^;]*(translate[XY]?\(-?[1-9]|translate[XY]?\(-?0\.[1-9]|scale\(1\.[0-9]*[1-9])/.test(body))
+          .map(([, sel]) => `${file}: ${sel.trim().replace(/\s+/g, ' ').slice(0, 80)}`);
+        expect(bad).toEqual([]);
+      }
+    });
+
     it('no glow wider than 4px on app chrome', () => {
       const glow = /(?:box-shadow|boxShadow|drop-shadow)[^;\n]*?\b0 0 (\d+)px (?!rgba\(0, ?0, ?0)/g;
       const wide = apps.flatMap(({ f, src }) => [...src.matchAll(glow)]

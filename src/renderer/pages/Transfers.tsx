@@ -845,13 +845,13 @@ const Transfers: React.FC = () => {
       onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
     >
       <style>{`
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
+        @scope { button { font-family: inherit; transition: all 0.12s ease; } }
+        @scope { button:active { transform: scale(0.97); } }
+        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; } }
+        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        @scope { ::-webkit-scrollbar-track { background: transparent; } }
+        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; } }
+        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); } }
       `}</style>
       {/* Drag overlay */}
       {dragOver && (

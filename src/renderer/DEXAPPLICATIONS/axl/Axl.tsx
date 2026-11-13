@@ -1762,16 +1762,16 @@ const AXL: React.FC = () => {
           transition: background 0.12s ease, color 0.12s ease;
         }
         .axl-close:hover { background: rgba(255,255,255,0.08); color: var(--color-text-primary); }
-        button { font-family: inherit; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
-        input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
+        @scope { button { font-family: inherit; } }
+        @scope { button:active { transform: scale(0.97); } }
+        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; } }
+        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        @scope { ::-webkit-scrollbar-track { background: transparent; } }
+        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; } }
+        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); } }
+        @scope { input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; } }
+        @scope { input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; } }
+        @scope { input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; } }
       `}</style>
 
       <ConfirmHost />

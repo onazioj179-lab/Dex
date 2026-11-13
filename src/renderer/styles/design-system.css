@@ -796,7 +796,6 @@
 }
 
 .dex-magnetic:hover {
-  transform: scale(1.02);
 }
 
 /* 913. Parallax depth layers */
@@ -1316,7 +1315,6 @@ html[data-darkroom="on"] {
               box-shadow var(--duration-fast) var(--ease-out);
 }
 .dex-hover-lift:hover {
-  transform: translateY(-1px);
   box-shadow: var(--elev-2);
 }
 .dex-hover-lift:active {
@@ -1339,7 +1337,6 @@ html[data-darkroom="on"] {
 }
 
 .dex-btn-premium:hover {
-  transform: translateY(-1px);
   box-shadow: var(--shadow-premium-md);
 }
 
@@ -2323,7 +2320,6 @@ img, svg {
 .card:hover {
   border-color: var(--color-border-default);
   box-shadow: var(--shadow-card-hover), inset 0 0.5px 0 rgba(255,255,255,0.06);
-  transform: translateY(-1px);
 }
 
 .card-header {
@@ -2907,7 +2903,6 @@ img, svg {
 }
 .depth-interactive:hover {
   box-shadow: var(--shadow-depth-2);
-  transform: translateY(-1px);
 }
 .depth-interactive:active {
   box-shadow: var(--shadow-inset);
@@ -3445,7 +3440,6 @@ html[data-perf-tier="low"] *::after {
               box-shadow var(--duration-fast) var(--ease-default);
 }
 .dex-card-interactive:hover {
-  transform: translateY(-1px);
   box-shadow: var(--shadow-card-hover);
 }
 
@@ -4974,7 +4968,6 @@ svg, img.icon, [data-icon] {
   cursor: pointer;
 }
 .card-interactive:hover {
-  transform: translateY(-1px);
   box-shadow: var(--shadow-card-hover);
 }
 .card-interactive:active {
@@ -5071,8 +5064,8 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
 .border-inset-accent { box-shadow: inset 0 0 0 1px var(--color-accent); }
 
 /* Hover scale */
-.hover-scale-sm:hover { transform: scale(1.01); }
-.hover-scale-md:hover { transform: scale(1.02); }
+.hover-scale-sm:hover { }
+.hover-scale-md:hover { }
 
 /* Divider with dot */
 .divider-dot { display: flex; align-items: center; gap: 8px; }
@@ -5913,7 +5906,6 @@ button:active:not(:disabled),
 .creative-toolbar button:hover,
 .creative-header button:hover {
   background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.02);
 }
 
 .creative-toolbar button:active,
@@ -6018,7 +6010,6 @@ input[type="range"]::-webkit-slider-thumb:active {
 
 .color-swatch:hover,
 [data-color-swatch]:hover {
-  transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -6315,7 +6306,6 @@ html, body {
   transition: transform 150ms var(--ease-spring), box-shadow 150ms var(--ease-default);
 }
 .hover-lift:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-depth-2);
 }
 
@@ -6324,7 +6314,6 @@ html, body {
   transition: transform 150ms var(--ease-spring);
 }
 .hover-scale:hover {
-  transform: scale(1.02);
 }
 
 /* Press effect */
@@ -6349,7 +6338,6 @@ html, body {
               box-shadow 120ms var(--ease-out, ease-out);
 }
 .dex-pressable:hover:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(-0.5px);
 }
 .dex-pressable:active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(0.5px) scale(0.985);
@@ -7307,7 +7295,6 @@ body.modal-open {
 
 .empty-state-action:hover {
   background: var(--color-accent-hover);
-  transform: translateY(-1px);
 }
 
 /* ----------------------------------------------------------------------- */

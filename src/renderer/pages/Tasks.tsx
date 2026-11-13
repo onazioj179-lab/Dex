@@ -1236,11 +1236,11 @@ export const Tasks: React.FC = () => {
       <style>{`
         .dex-tasks-root button { font-family: inherit; transition: all 0.12s ease; }
         .dex-tasks-root button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; } }
+        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        @scope { ::-webkit-scrollbar-track { background: transparent; } }
+        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; } }
+        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border); } }
         /* Pointer focus stays clean; keyboard focus uses the one global ring. */
         .dex-tasks-root input:focus:not(:focus-visible),
         .dex-tasks-root select:focus:not(:focus-visible),

@@ -6820,33 +6820,33 @@ const Imosion: React.FC = () => {
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        * { box-sizing: border-box; }
-        button { 
+        @scope { * { box-sizing: border-box; } }
+        @scope { button { 
           font-family: inherit;
           border: none;
           outline: none;
-        }
-        button:active { transform: scale(0.97); }
-        button:disabled { opacity: 0.35; cursor: not-allowed; }
+        } }
+        @scope { button:active { transform: scale(0.97); } }
+        @scope { button:disabled { opacity: 0.35; cursor: not-allowed; } }
         /* Analog hardware sliders: a recessed dark groove + brushed-metal cap,
            matching the Fader/Knob components so every raw slider in the DAW reads
            as a real physical control (the Logic/FL look) instead of a flat web
            input. The cap carries a center indent line and a lit top bevel. */
-        input[type="range"] {
+        @scope { input[type="range"] {
           -webkit-appearance: none;
           appearance: none;
           background: transparent;
           cursor: pointer;
           height: 16px;
-        }
-        input[type="range"]::-webkit-slider-runnable-track {
+        } }
+        @scope { input[type="range"]::-webkit-slider-runnable-track {
           height: 5px;
           background: linear-gradient(180deg, #060608, #15151a);
           border-radius: 3px;
           border: 1px solid #050507;
           box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
-        }
-        input[type="range"]::-webkit-slider-thumb {
+        } }
+        @scope { input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
           height: 16px;
           width: 11px;
@@ -6855,31 +6855,31 @@ const Imosion: React.FC = () => {
           margin-top: -6px;
           border: 1px solid #050507;
           box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.22);
-        }
-        input[type="range"]::-webkit-slider-thumb:hover { background: linear-gradient(180deg, #5a5a66 0%, #303038 55%, #1e1e24 100%); }
-        input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 1px 2px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.28), 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent); }
-        input[type="range"]::-moz-range-track {
+        } }
+        @scope { input[type="range"]::-webkit-slider-thumb:hover { background: linear-gradient(180deg, #5a5a66 0%, #303038 55%, #1e1e24 100%); } }
+        @scope { input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 1px 2px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.28), 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent); } }
+        @scope { input[type="range"]::-moz-range-track {
           height: 5px;
           background: linear-gradient(180deg, #060608, #15151a);
           border-radius: 3px;
           border: 1px solid #050507;
           box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
-        }
-        input[type="range"]::-moz-range-thumb {
+        } }
+        @scope { input[type="range"]::-moz-range-thumb {
           height: 15px;
           width: 10px;
           border-radius: 3px;
           background: linear-gradient(180deg, #50505a 0%, #2a2a30 55%, #1a1a1e 100%);
           border: 1px solid #050507;
           box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.22);
-        }
+        } }
         /* Vertical faders (mixer buses/master use writing-mode + slider-vertical). */
         input[type="range"][style*="vertical"]::-webkit-slider-thumb { width: 16px; height: 11px; margin-top: 0; margin-left: -6px; }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; } }
+        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        @scope { ::-webkit-scrollbar-track { background: transparent; } }
+        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; } }
+        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border); } }
         .imosion-root { container-type: size; }
         .imosion-root button, .imosion-root select, .imosion-root input { font-family: inherit; }
         /* Consistent sizing: box-sizing so a 1px border never changes the footprint,
@@ -6903,8 +6903,8 @@ const Imosion: React.FC = () => {
         .clip-dragging { opacity: 0.6; }
         .drop-target { background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; }
         .modal-overlay { animation: fadeIn 0.15s ease; background: rgba(0,0,0,0.5); }
-        select { outline: none; font-family: inherit; }
-        select:focus, input:focus { outline: none; }
+        @scope { select { outline: none; font-family: inherit; } }
+        @scope { select:focus, input:focus { outline: none; } }
         .btn {
           display: flex;
           align-items: center;

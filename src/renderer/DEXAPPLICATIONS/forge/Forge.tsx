@@ -1472,7 +1472,7 @@ const Forge: React.FC = () => {
   ];
 
   return (
-    <div style={styles.container}
+    <div className="forge-root" style={styles.container}
       onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}
       onDragOver={e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
       onDrop={e => {
@@ -1511,24 +1511,24 @@ const Forge: React.FC = () => {
     >
       <style>{`
         /* === FORGE - PROFESSIONAL UI === */
-        button { font-family: inherit; }
-        button:active { transform: scale(0.97); }
+        .forge-root button { font-family: inherit; }
+        .forge-root button:active { transform: scale(0.97); }
         .forge-icon-btn:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
         .forge-ctx-item:hover { background: var(--color-bg-hover) !important; }
         .forge-ctx-item:active { background: var(--color-bg-active) !important; }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { 
+        .forge-root * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        .forge-root ::-webkit-scrollbar { width: 6px; height: 6px; }
+        .forge-root ::-webkit-scrollbar-track { background: transparent; }
+        .forge-root ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        .forge-root ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        .forge-root input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        .forge-root input[type="range"]::-webkit-slider-thumb { 
           -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; 
           background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none;
         }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
-        select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
-        select:hover { border-color: var(--color-border-strong); }
+        .forge-root input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
+        .forge-root select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
+        .forge-root select:hover { border-color: var(--color-border-strong); }
         .forge-dropdown-item { transition: background 0.12s ease; }
         .forge-dropdown-item:hover { background: var(--color-bg-hover) !important; }
         .forge-dropdown-item:active { background: var(--color-bg-active) !important; }

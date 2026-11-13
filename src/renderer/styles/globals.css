@@ -697,7 +697,6 @@ button, a, input, select, textarea,
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0.2, 1);
 }
 .hover-lift:hover {
-  transform: translateY(-3px);
   box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 
@@ -712,7 +711,6 @@ button, a, input, select, textarea,
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .hover-scale:hover {
-  transform: scale(1.02);
 }
 .hover-scale:active {
   transform: scale(0.98);
@@ -1055,8 +1053,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 .dex-hover-lift {
   transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), background 0.12s ease, box-shadow 0.15s ease;
 }
-.dex-hover-lift:hover { 
-  transform: scale(1.02) translateY(-2px); 
+.dex-hover-lift:hover {  
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 .dex-hover-lift:active { transform: scale(0.98); }
@@ -1165,7 +1162,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
     border-color 0.15s ease;
 }
 .dex-card:hover {
-  transform: translateY(-2px) scale(1.005);
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   border-color: rgba(255,255,255,0.12);
 }
@@ -1628,7 +1624,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 .media-btn:hover {
   background: var(--bg-hover);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
 }
 
 .media-btn.play-btn {
@@ -1642,7 +1637,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 .media-btn.play-btn:hover {
   background: var(--accent-hover);
   box-shadow: 0 6px 24px rgba(10, 132, 255, 0.5);
-  transform: translateY(-2px);
 }
 
 /* Apps Grid - 4x4 compact grid */
@@ -1665,7 +1659,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 .app-item:hover {
   background: var(--bg-inset);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
 }
 
 .app-icon {
@@ -1962,7 +1955,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 }
 
 .gallery-item:hover {
-  transform: scale(1.02);
 }
 
 /* Audio Page */
@@ -2750,7 +2742,6 @@ textarea,
 }
 
 .idea-card:hover {
-  transform: translateX(4px);
 }
 
 .idea-title {
@@ -3602,7 +3593,6 @@ button:active:not(:disabled),
 .recent-item:hover,
 .list-row:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transform: translateX(2px);
   transition: all 0.15s ease;
 }
 
@@ -3715,7 +3705,6 @@ select option {
 .dex-card:hover,
 [data-card]:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
-  transform: translateY(-1px);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -4429,7 +4418,6 @@ textarea {
 /* Card hover lift (opt-in via .dex-card, integer translate = no blur) */
 .dex-card:hover,
 [data-card]:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.3));
 }
 
@@ -4706,7 +4694,6 @@ input[type="range"]:hover::-webkit-slider-thumb {
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px);
   box-shadow: 0 12px 32px rgba(0,0,0,0.3);
 }
 
@@ -5687,7 +5674,6 @@ html[data-dex-large-text] * {
 
 .dex-hover-lift:hover,
 [data-hover-lift]:hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
