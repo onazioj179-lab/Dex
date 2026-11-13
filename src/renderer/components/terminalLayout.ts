@@ -93,9 +93,19 @@ export function addTab(l: TermLayout): TermLayout {
  * splits keep it (the new pane is inserted after the active one and takes half
  * of its space). Refused at MAX_PANES.
  */
+/**
+ * Whether a tab can take another pane in `dir`. A tab is one row or one column
+ * of panes, fixed by its first split; splitting the other way used to add a pane
+ * in the tab's direction anyway ("Split down" made a third column).
+ */
+export function canSplit(tab: Pick<TermTab, 'panes' | 'dir'> | undefined, dir: SplitDir): boolean {
+  if (!tab || tab.panes.length >= MAX_PANES) return false;
+  return tab.panes.length === 1 || tab.dir === dir;
+}
+
 export function splitPane(l: TermLayout, tabId: string, dir: SplitDir): TermLayout {
   const tab = l.tabs.find((t) => t.id === tabId);
-  if (!tab || tab.panes.length >= MAX_PANES) return l;
+  if (!tab || !canSplit(tab, dir)) return l;
   const id = `p${l.nextNum}`;
   const i = tab.panes.indexOf(tab.activePane);
   const at = i < 0 ? tab.panes.length - 1 : i;

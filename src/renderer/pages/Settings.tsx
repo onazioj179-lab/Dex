@@ -2065,7 +2065,13 @@ export const Settings: React.FC = () => {
     setAuthError('');
     try {
       if (window.dex?.invoke) {
-        await window.dex.invoke('auth:setup:biometric');
+        // Native answers {success:false,error} when Windows Hello is cancelled,
+        // unavailable or the credential could not be saved. Don't claim it's on.
+        const res = await window.dex.invoke('auth:setup:biometric') as { success?: boolean; error?: string } | undefined;
+        if (!res || res.success !== true) {
+          setAuthError(res?.error || 'Fingerprint sign-in was not enabled');
+          return;
+        }
         const newMethod = settings.pinEnabled ? 'pin+biometric' as const : settings.passwordEnabled ? 'password+biometric' as const : 'biometric' as const;
         setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod }));
       } else if ('PublicKeyCredential' in window) {

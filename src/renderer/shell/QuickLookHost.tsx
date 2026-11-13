@@ -21,6 +21,7 @@
  * dismiss -- handled by QuickLook itself.
  */
 
+import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useEffect } from 'react';
 import { QuickLook, useQuickLook, type QuickLookItemType } from './QuickLook';
 
@@ -56,11 +57,10 @@ function inferType(req: QuickLookRequest): QuickLookItemType {
 }
 
 function toFileUrl(path: string): string {
-  // Electron/Tauri can render file:// (or asset:) URLs for media. Normalise
-  // Windows backslashes and drive letters into a usable URL.
-  if (/^[a-z]+:\/\//i.test(path)) return path; // already a URL
-  const norm = path.replace(/\\/g, '/');
-  return norm.startsWith('/') ? `file://${norm}` : `file:///${norm}`;
+  // Local files load through dexmedia in the desktop app (file:// is blocked
+  // from its http origin; utils/mediaUrl). Web URLs pass through.
+  if (/^[a-z]+:\/\//i.test(path) && !/^file:\/\//i.test(path)) return path;
+  return toMediaUrl(path);
 }
 
 async function readText(path: string): Promise<string | null> {

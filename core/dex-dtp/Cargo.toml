@@ -1,0 +1,19 @@
+[package]
+name = "dex-dtp"
+description = "DEX Transfer Protocol: encrypted DEX-to-DEX file transfer over the LAN"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+x25519-dalek = "2"  # ephemeral key exchange per connection
+hkdf = "0.12"       # session keys + match code from the shared secret
+sha2 = "0.10"       # HKDF hash + per-file integrity check
+aes-gcm = "0.10"    # AES-256-GCM frames (same crate dex-vault uses)
+rand = "0.8"        # OsRng for the ephemeral secret and temp names
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

@@ -29,8 +29,10 @@
 >   (`utils/viewTransition.ts`, theme flips cross-fade as one compositor fade, off under Reduce Motion). Already present:
 >   command menu (CommandPalette), skeleton loaders, balanced headlines, tabular numbers, safe-area insets, one-time-code
 >   autofill. Later passes: swipe-to-dismiss with flick (#210), shortcut sheet from the palette (#211), Ledger
->   idempotency keys (#213), predictive back + mouse side buttons (#215). Not done: BlurHash (blocked on #216:
->   local images may not load in the packaged app), pre-rendering.
+>   idempotency keys (#213), predictive back + mouse side buttons (#215). Not done: BlurHash, pre-rendering.
+>   **Userspace break fixed (#216):** local media never loaded in the Tauri build (`file://` is blocked from
+>   `http://tauri.localhost`; proven in a release exe). New native `dexmedia` protocol + `toMediaUrl` for Gallery,
+>   Audio, Files previews, Quick Look, PDF and disk wallpapers.
 > - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
 >   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
 >   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),
