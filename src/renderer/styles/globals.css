@@ -697,7 +697,6 @@ button, a, input, select, textarea,
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0.2, 1);
 }
 .hover-lift:hover {
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 
 /* Press effect -- smooth tactile feedback */
@@ -1054,7 +1053,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), background 0.12s ease, box-shadow 0.15s ease;
 }
 .dex-hover-lift:hover {  
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 .dex-hover-lift:active { transform: scale(0.98); }
 
@@ -1162,7 +1160,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
     border-color 0.15s ease;
 }
 .dex-card:hover {
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   border-color: rgba(255,255,255,0.12);
 }
 .dex-card:active {
@@ -1490,7 +1487,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 }
 
 .widget:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -1623,7 +1619,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 
 .media-btn:hover {
   background: var(--bg-hover);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 .media-btn.play-btn {
@@ -1636,7 +1631,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 
 .media-btn.play-btn:hover {
   background: var(--accent-hover);
-  box-shadow: 0 6px 24px rgba(10, 132, 255, 0.5);
 }
 
 /* Apps Grid - 4x4 compact grid */
@@ -1658,7 +1652,6 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 
 .app-item:hover {
   background: var(--bg-inset);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 .app-icon {
@@ -3704,7 +3697,6 @@ select option {
 .card:hover,
 .dex-card:hover,
 [data-card]:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -3802,7 +3794,6 @@ select option {
 .dex-glass-card-hover:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
 
 .dex-toggle .toggle-knob,
@@ -4418,7 +4409,6 @@ textarea {
 /* Card hover lift (opt-in via .dex-card, integer translate = no blur) */
 .dex-card:hover,
 [data-card]:hover {
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.3));
 }
 
 /* Sidebar item hover -- background only; the old padding shift caused
@@ -4694,7 +4684,6 @@ input[type="range"]:hover::-webkit-slider-thumb {
 }
 
 .hover-lift:hover {
-  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
 }
 
 /* Smooth color transitions for theme changes */
@@ -5674,7 +5663,6 @@ html[data-dex-large-text] * {
 
 .dex-hover-lift:hover,
 [data-hover-lift]:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Glow on hover */
