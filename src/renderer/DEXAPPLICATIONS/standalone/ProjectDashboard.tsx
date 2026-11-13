@@ -313,11 +313,11 @@ const ACTIVITY_LIMIT = 12;
 // Scoped interaction polish for the dashboard's clickable surfaces (a half-applied
 // edit referenced this without defining it; completed here).
 const SCOPED_CSS = `
-.dex-projdash-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
-.dex-projdash-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,0.28); }
-.dex-projdash-card:not(:disabled):active { transform: translateY(0) scale(0.99); }
+.dex-projdash-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+.dex-projdash-card:not(:disabled):hover { border-color: var(--color-border-strong) !important; }
+.dex-projdash-card:not(:disabled):active { transform: scale(0.99); }
 .dex-projdash-link { transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease; }
-.dex-projdash-link:hover { transform: translateY(-1px); border-color: var(--color-accent); }
+.dex-projdash-link:hover { border-color: var(--color-border-strong) !important; }
 .dex-projdash-link:active { transform: scale(0.97); }
 .dex-projdash-row { transition: background 0.1s ease; }
 .dex-projdash-row:not(:disabled):hover { background: var(--color-bg-hover, rgba(255,255,255,0.05)); }

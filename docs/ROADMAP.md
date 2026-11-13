@@ -301,6 +301,7 @@
 >   `WindowDepthManager.ts`; delete 6 dead duplicate `:focus-visible` blocks in design-system.css; reconcile the
 >   3 motion-duration scales. Full findings in this session's `dex-design-audit` workflow output.
 >   **2026-11-12 (#164):** duplicate focus rules DONE — one canonical ring now (11 competing global/halo rules removed across design-system.css, design-tokens.css, globals.css); purple "AI" gradients → solid accent; coloured halos out of shared shadow tokens; dead glow/gradient-text CSS deleted.
+>   **2026-11-13 (#221, pass 3, inner apps):** rule = accent only for the primary action and the selected state. App hovers neutral and flat (no accent tint, lift, grow or spin), per-app accent focus rings and the last shared input halos removed, glows ≤ 4 px, accent-coloured readouts/icons/labels → text colours. Guarded by 5 new checks in `ui-unslop-guard.test.ts`. Next: per-app selected-state tints, unscoped Forge/Prism `<style>` blocks, hover scale rules in shared CSS.
 >
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions

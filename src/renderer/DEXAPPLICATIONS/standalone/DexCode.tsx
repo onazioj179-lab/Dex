@@ -1803,7 +1803,7 @@ const DexCode: React.FC = () => {
           <span>DexScript</span>
           <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
           {selStats ? (
-            <span style={{ color: 'var(--color-accent)' }}>
+            <span>
               Sel {selStats.chars} ch{selStats.lines > 1 ? `, ${selStats.lines} ln` : ''}
             </span>
           ) : (

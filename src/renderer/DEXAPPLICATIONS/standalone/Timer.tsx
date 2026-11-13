@@ -160,7 +160,6 @@ const Timer: React.FC = () => {
         .dex-timer button:not(:disabled):hover { filter: brightness(1.07); }
         .dex-timer button:not(:disabled):active { transform: scale(0.96); }
         .dex-timer input[style] { transition: border-color 0.12s ease; }
-        .dex-timer input:focus { border-color: var(--color-accent) !important; }
       `}</style>
       {/* New-timer composer */}
       <div style={s.composer}>
@@ -284,7 +283,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center', justifyContent: 'center', textAlign: 'center',
   },
   time: { fontSize: 34, fontWeight: 300, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' },
-  completeText: { display: 'block', fontSize: 12, color: 'var(--color-accent)', fontWeight: 600, marginTop: 2 },
+  completeText: { display: 'block', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, marginTop: 2 },
   cardControls: { display: 'flex', gap: 'var(--space-2)', alignItems: 'center', width: '100%' },
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

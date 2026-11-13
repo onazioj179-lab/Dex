@@ -1322,13 +1322,11 @@ const CollabHub: React.FC = () => {
                     onClick={() => handleOpenProject(project)}
                     onMouseEnter={e => {
                       e.currentTarget.style.borderColor = 'var(--color-border, rgba(255,255,255,0.15))';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
                       const menuBtn = e.currentTarget.querySelector('[data-menu-btn]') as HTMLElement;
                       if (menuBtn) menuBtn.style.opacity = '1';
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.transform = 'translateY(0)';
                       const menuBtn = e.currentTarget.querySelector('[data-menu-btn]') as HTMLElement;
                       if (menuBtn) menuBtn.style.opacity = '0';
                     }}
@@ -1645,7 +1643,7 @@ const CollabHub: React.FC = () => {
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%',
                   background: STATUS_COLORS.online, flexShrink: 0,
-                  boxShadow: `0 0 8px ${STATUS_COLORS.online}`,
+                  boxShadow: `0 0 4px ${STATUS_COLORS.online}`,
                 }} />
                 <span style={{ fontSize: 12, color: 'var(--color-text-tertiary, #8e8e93)' }}>
                   Local session · presence and chat are stored on this device only
@@ -1836,7 +1834,7 @@ const CollabHub: React.FC = () => {
                             <span style={{
                               width: 8, height: 8, borderRadius: '50%',
                               background: liveSupported ? STATUS_COLORS.online : STATUS_COLORS.away,
-                              boxShadow: liveSupported ? `0 0 8px ${STATUS_COLORS.online}` : 'none',
+                              boxShadow: liveSupported ? `0 0 4px ${STATUS_COLORS.online}` : 'none',
                               flexShrink: 0,
                             }} />
                             <div style={{ minWidth: 0 }}>

@@ -6895,11 +6895,10 @@ const Imosion: React.FC = () => {
           .imosion-root .divider { display: none; }
         }
         .resize-handle { cursor: col-resize; background: var(--color-border-subtle); }
-        .resize-handle:hover { background: color-mix(in srgb, var(--color-accent) 20%, transparent); }
-        .dropdown-item:hover { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
-        .track-row:hover { background: color-mix(in srgb, var(--color-accent) 4%, transparent) !important; }
+        .resize-handle:hover { background: var(--color-border-strong); }
+        .track-row:hover { background: color-mix(in srgb, var(--color-text-primary) 3%, transparent) !important; }
         .clip-item { cursor: grab; }
-        .clip-item:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent) !important; }
+        .clip-item:hover { background: var(--color-bg-hover) !important; }
         .clip-item:active { cursor: grabbing; }
         .clip-dragging { opacity: 0.6; }
         .drop-target { background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; }
@@ -6932,7 +6931,7 @@ const Imosion: React.FC = () => {
         .btn-primary:hover { background: color-mix(in srgb, var(--color-accent-fill) 88%, #000); border-color: color-mix(in srgb, var(--color-accent-fill) 88%, #000); }
         .btn-danger { background: var(--color-error); border-color: var(--color-error); color: #FFFFFF; border-radius: 9999px; }
         .divider { width: 1px; height: 18px; background: var(--color-border-subtle); margin: 0 4px; }
-        .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--color-accent); }
+        .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); }
         .frosted-dropdown { background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--pg-shadow-popover, 0 8px 24px rgba(0,0,0,0.35)); }
         .collapsible-header { cursor: pointer; user-select: none; transition: background 0.15s ease; }
         .collapsible-header:hover { background: var(--color-border-subtle); }
@@ -6940,13 +6939,13 @@ const Imosion: React.FC = () => {
         /* Multi-column menus keep long lists short (no endless vertical scroll). */
         .frosted-dropdown.cols { column-width: 188px; column-gap: 8px; }
         .frosted-dropdown.cols > * { break-inside: avoid; }
-        .dropdown-item:hover { background: var(--color-accent-light) !important; }
-        .dropdown-item:active { background: color-mix(in srgb, var(--color-accent) 24%, transparent) !important; }
+        .dropdown-item:hover { background: var(--color-bg-hover) !important; }
+        .dropdown-item:active { background: var(--color-bg-active) !important; }
         .plugin-drag { cursor: grab; user-select: none; }
         .plugin-drag:active { cursor: grabbing; opacity: 0.7; }
         .ctx-item { transition: background 0.1s ease; }
-        .ctx-item:hover { background: var(--color-accent-light) !important; }
-        .ctx-item:active { background: color-mix(in srgb, var(--color-accent) 24%, transparent) !important; }
+        .ctx-item:hover { background: var(--color-bg-hover) !important; }
+        .ctx-item:active { background: var(--color-bg-active) !important; }
       `}</style>
 
       {/* Logic Pro-style Control Bar -- unified single bar */}
@@ -7058,9 +7057,9 @@ const Imosion: React.FC = () => {
           {/* Transport Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--color-bg-inset)', borderRadius: '10px', padding: '3px', border: '1px solid var(--color-border)' }}>
             <button aria-label="Rewind" onClick={() => setCurrentTime(0)} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.rewind}</button>
-            <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} style={{ width: '42px', height: '28px', borderRadius: '6px', border: 'none', background: isPlaying ? 'var(--color-accent)' : 'var(--color-bg-active)', color: isPlaying ? 'var(--color-accent-text)' : 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isPlaying ? '0 0 7px color-mix(in srgb, var(--color-accent) 50%, transparent)' : 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{isPlaying ? Icon.pause : Icon.play}</button>
+            <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} style={{ width: '42px', height: '28px', borderRadius: '6px', border: 'none', background: isPlaying ? 'var(--color-accent)' : 'var(--color-bg-active)', color: isPlaying ? 'var(--color-accent-text)' : 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isPlaying ? '0 0 4px color-mix(in srgb, var(--color-accent) 50%, transparent)' : 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{isPlaying ? Icon.pause : Icon.play}</button>
             <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>{Icon.stop}</button>
-            <button aria-label={isRecording ? 'Stop Recording' : 'Record (R)'} onClick={isRecording ? stopRecording : startRecording} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: isRecording ? 'var(--color-error)' : 'transparent', color: isRecording ? '#fff' : '#ff6b63', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isRecording ? '0 0 7px rgba(158, 90, 85,0.5)' : 'none' }}>{Icon.record}</button>
+            <button aria-label={isRecording ? 'Stop Recording' : 'Record (R)'} onClick={isRecording ? stopRecording : startRecording} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: isRecording ? 'var(--color-error)' : 'transparent', color: isRecording ? '#fff' : '#ff6b63', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isRecording ? '0 0 4px rgba(158, 90, 85,0.5)' : 'none' }}>{Icon.record}</button>
             <div style={{ width: '1px', height: '18px', background: 'var(--color-border)', margin: '0 2px' }} />
             <button aria-label="Loop" onClick={() => setIsLooping(!isLooping)} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: isLooping ? 'var(--color-accent-fill)' : 'transparent', color: isLooping ? '#fff' : '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { if (!isLooping) e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { if (!isLooping) e.currentTarget.style.background = 'transparent'; }}>{Icon.loop}</button>
             <button aria-label="Metronome" onClick={() => setMetronomeSettings(s => ({ ...s, enabled: !s.enabled }))} style={{ width: '30px', height: '28px', borderRadius: '6px', border: 'none', background: metronomeSettings.enabled ? 'var(--color-accent-fill)' : 'transparent', color: metronomeSettings.enabled ? '#fff' : '#c7c7d1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }} onMouseEnter={e => { if (!metronomeSettings.enabled) e.currentTarget.style.background = '#26262e'; }} onMouseLeave={e => { if (!metronomeSettings.enabled) e.currentTarget.style.background = 'transparent'; }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2L6 22h12L12 2z"/><line x1="8" y1="14" x2="16" y2="14"/><circle cx="12" cy="10" r="1.5"/></svg></button>
@@ -7255,7 +7254,7 @@ const Imosion: React.FC = () => {
                     role="button" tabIndex={0} aria-label={`Change color for ${track.name}`}
                     onClick={(e) => { e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); }} 
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setColorPickerTrackId(colorPickerTrackId === track.id ? null : track.id); } }}
-                    style={{ width: '28px', height: '28px', borderRadius: '50%', background: `${track.color}33`, cursor: 'pointer', border: `1.5px solid ${track.color}60`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isSelected ? `0 0 8px ${track.color}30` : 'none' }} 
+                    style={{ width: '28px', height: '28px', borderRadius: '50%', background: `${track.color}33`, cursor: 'pointer', border: `1.5px solid ${track.color}60`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: isSelected ? `0 0 4px ${track.color}30` : 'none' }} 
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={track.color} strokeWidth="2" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                     {colorPickerTrackId === track.id && (
@@ -7482,7 +7481,7 @@ const Imosion: React.FC = () => {
               >
                 {/* Drop indicator */}
                 {dropTarget?.trackId === track.id && (
-                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${dropTarget.time * zoom}px`, width: '2px', background: 'var(--color-accent-fill)', zIndex: 50, pointerEvents: 'none', boxShadow: '0 0 12px rgba(10,132,255,0.6)' }} />
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${dropTarget.time * zoom}px`, width: '2px', background: 'var(--color-accent-fill)', zIndex: 50, pointerEvents: 'none' }} />
                 )}
                 {track.clips.map(clip => (
                   <div 
@@ -7937,7 +7936,7 @@ const Imosion: React.FC = () => {
                         transition: 'transform 0.04s ease, box-shadow 0.06s ease',
                         transform: activePad === i ? 'translateY(1px) scale(0.97)' : 'none',
                         boxShadow: activePad === i
-                          ? `inset 0 2px 6px rgba(0,0,0,0.5), 0 0 16px ${color}77`
+                          ? `inset 0 2px 6px rgba(0,0,0,0.5), 0 0 4px ${color}77`
                           : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.5)',
                       }}
                     >
@@ -8136,7 +8135,7 @@ const Imosion: React.FC = () => {
                     <div key={`beat-${i}`} style={{ position: 'absolute', left: i * pianoRollZoom, top: 0, bottom: 0, width: i % 4 === 0 ? '1.5px' : '1px', background: i % 4 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.05)', zIndex: 1 }} />
                   ))}
                   {/* Playhead */}
-                  <div ref={pianoPlayheadRef} style={{ position: 'absolute', left: playbackPosition * (bpm / 60) * pianoRollZoom, top: 0, bottom: 0, width: '2px', background: '#8a6a9c', zIndex: 5, boxShadow: '0 0 8px rgba(138, 106, 156,0.6)' }} />
+                  <div ref={pianoPlayheadRef} style={{ position: 'absolute', left: playbackPosition * (bpm / 60) * pianoRollZoom, top: 0, bottom: 0, width: '2px', background: '#8a6a9c', zIndex: 5, boxShadow: '0 0 4px rgba(138, 106, 156,0.6)' }} />
                   {/* Notes */}
                   {pianoRollNotes.map(note => {
                     const beatWidth = pianoRollZoom;
@@ -8151,7 +8150,7 @@ const Imosion: React.FC = () => {
                     const noteBg = isSelected ? 'rgba(255,149,0,0.85)' : note.color ? `${note.color}${aHex}` : note.slide ? `rgba(74, 120, 150,${velocityAlpha})` : `rgba(138, 106, 156,${velocityAlpha})`;
                     const noteBorder = isSelected ? '1px solid #a8744a' : note.color ? `1px solid ${note.color}` : note.slide ? '1px solid #4a7896' : '1px solid var(--color-border)';
                     return (
-                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: noteBg, borderRadius: '4px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: note.muted ? '1px dashed var(--color-text-tertiary)' : noteBorder, opacity: note.muted ? 0.35 : 1, boxShadow: `${note.slide ? '0 0 6px rgba(74, 120, 150,0.4), ' : isSelected ? '0 0 6px rgba(255,149,0,0.3), ' : ''}inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.22)`, transition: 'box-shadow 0.1s, opacity 0.1s' }}
+                      <div key={note.id} style={{ position: 'absolute', left: x, top: y, width: Math.max(w, 4), height: noteHeight - 1, background: noteBg, borderRadius: '4px', cursor: pianoRollTool === 'select' ? 'grab' : 'pointer', zIndex: 3, border: note.muted ? '1px dashed var(--color-text-tertiary)' : noteBorder, opacity: note.muted ? 0.35 : 1, boxShadow: `${note.slide ? '0 0 4px rgba(74, 120, 150,0.4), ' : isSelected ? '0 0 4px rgba(255,149,0,0.3), ' : ''}inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 3px rgba(0,0,0,0.22)`, transition: 'box-shadow 0.1s, opacity 0.1s' }}
                         onMouseDown={e => { if (pianoRollTool === 'erase') { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); return; } if (pianoRollTool === 'select') startNoteMove(e, note); }}
                         onDoubleClick={e => { e.stopPropagation(); setPianoRollNotes(prev => prev.filter(n => n.id !== note.id)); setPianoRollSelectedNotes(prev => { const s = new Set(prev); s.delete(note.id); return s; }); }}
                         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!pianoRollSelectedNotes.has(note.id)) setPianoRollSelectedNotes(new Set([note.id])); setPrMenu({ x: e.clientX, y: e.clientY }); }}
@@ -9500,7 +9499,7 @@ const Imosion: React.FC = () => {
       {/* Plugin Browser Modal */}
       {showPluginBrowser && selectedTrackData && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowPluginBrowser(false)}>
-          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: 'var(--color-bg-elevated)', borderRadius: '10px', border: '1px solid color-mix(in srgb, var(--color-accent) 15%, transparent)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent)' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: 'var(--color-bg-elevated)', borderRadius: '10px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent)' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 8%, transparent) 0%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4f8a60" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>

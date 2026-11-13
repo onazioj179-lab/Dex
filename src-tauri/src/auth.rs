@@ -846,7 +846,24 @@ fn update_config(app: &tauri::AppHandle) -> Value {
 /// Route every natively-handled `auth:*` channel. `auth:biometricsAvailable` is
 /// answered renderer-side (WebAuthn probe) and never reaches here; anything
 /// unrecognised returns `Value::Null` so the central dispatcher can fall through.
+/// Route an `auth:*` channel. Anything that can change sign-in state (enrol, disable,
+/// lock, unlock attempts that move the lockout counter) is followed by an
+/// `auth:state-changed` push with the fresh `getState`, so the auth store stays right
+/// when Settings changes PIN/password/fingerprint directly over IPC.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    let out = dispatch_inner(app, channel, args);
+    let read_only = matches!(
+        channel,
+        "auth:getState" | "auth:getConfig" | "auth:getLockoutStatus" | "auth:getSecurityQuestions" | "auth:verifySession"
+    );
+    // Null = unknown channel, except lock (which answers nothing).
+    if !read_only && (!out.is_null() || channel == "auth:lock") {
+        crate::native_ops::emit_event(app, "auth:state-changed", &get_state(app));
+    }
+    out
+}
+
+fn dispatch_inner(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let arg_str = |i: usize| -> String {
         args.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string()
     };

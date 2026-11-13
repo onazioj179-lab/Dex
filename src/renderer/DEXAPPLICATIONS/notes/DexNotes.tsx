@@ -902,16 +902,16 @@ const DexNotes: React.FC = () => {
         /* === DEXNOTES - UI HOVER === */
         .dexnotes-app button { font-family: inherit; transition: all 0.12s ease; }
         .dexnotes-app button:active { transform: scale(0.97); }
-        .dexnotes-app .dn-footer button:hover { background: var(--color-accent-light, rgba(10,132,255,0.12)) !important; color: var(--color-accent, #0a84ff) !important; }
+        .dexnotes-app .dn-footer button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; color: var(--color-text-primary) !important; }
         .dexnotes-app .dn-tree-acts:hover { opacity: 1 !important; }
         .dexnotes-app .dn-tree-acts button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; border-radius: 3px; }
-        .dexnotes-app .dn-swatch { transition: transform 0.12s ease; }
-        .dexnotes-app .dn-swatch:hover { transform: scale(1.15); }
+        .dexnotes-app .dn-swatch { transition: box-shadow 0.12s ease; }
+        .dexnotes-app .dn-swatch:hover { box-shadow: 0 0 0 1px var(--color-border-strong); }
         /* Favorite star: hidden until the note row is hovered; always shown once on. */
         .dexnotes-app .dn-star { opacity: 0; transition: opacity 0.12s ease, transform 0.12s ease; }
         .dexnotes-app .dn-note-item:hover .dn-star { opacity: 0.55; }
         .dexnotes-app .dn-star.dn-star-on { opacity: 1; }
-        .dexnotes-app .dn-star:hover { opacity: 1 !important; transform: scale(1.15); }
+        .dexnotes-app .dn-star:hover { opacity: 1 !important; }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         .dexnotes-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .dexnotes-app ::-webkit-scrollbar-track { background: transparent; }
@@ -1003,7 +1003,7 @@ const DexNotes: React.FC = () => {
           <div
             style={S.resizer}
             onMouseDown={sidebarResizer.onMouseDown}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-light, rgba(10,132,255,0.2))')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-strong)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           />
         </>
@@ -1106,7 +1106,7 @@ const DexNotes: React.FC = () => {
                       border: '1px solid var(--color-border-subtle)', background: 'transparent',
                       color: 'var(--color-text-tertiary)', transition: 'all 0.12s ease',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-accent, #0a84ff)'; e.currentTarget.style.borderColor = 'var(--color-accent, #0a84ff)'; }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.borderColor = 'var(--color-border-strong)'; }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.borderColor = 'var(--color-border-subtle)'; }}
                   >
                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>
@@ -1166,7 +1166,7 @@ const DexNotes: React.FC = () => {
           <div
             style={S.resizer}
             onMouseDown={listResizer.onMouseDown}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-light, rgba(10,132,255,0.2))')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-strong)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           />
         </>

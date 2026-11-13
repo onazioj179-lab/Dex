@@ -729,27 +729,21 @@ const Calendar: React.FC = () => {
         .cal-icon-btn { outline: none; }
         .cal-icon-btn:hover { background: var(--color-border-subtle) !important; color: var(--color-text-primary) !important; }
         .cal-icon-btn:active { transform: scale(0.94); }
-        .cal-icon-btn:focus-visible { box-shadow: 0 0 0 2px var(--color-accent); }
         .cal-pill:hover { background: var(--color-border-subtle) !important; color: var(--color-text-primary) !important; }
         .cal-pill:active { transform: scale(0.97); }
-        .cal-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
-        .cal-add:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-success) 45%, transparent); }
+        .cal-add:hover { filter: brightness(1.1); }
         .cal-add:active { transform: scale(0.95); }
-        .cal-add:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
         .cal-daycell:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-default) !important; }
-        .cal-daycell:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
         .cal-mini-day:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
-        .cal-event-row:hover { border-color: var(--color-border-default) !important; box-shadow: var(--shadow-md) !important; transform: translateX(2px); }
-        .cal-event-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent) !important; }
-        .cal-agenda-row:hover { border-color: var(--color-border-default) !important; box-shadow: var(--shadow-sm) !important; transform: translateX(2px); }
-        .cal-agenda-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent) !important; }
+        .cal-event-row:hover { border-color: var(--color-border-strong) !important; }
+        .cal-agenda-row:hover { border-color: var(--color-border-strong) !important; }
         .cal-cat-row:hover { background: var(--color-bg-hover) !important; }
         .cal-mini-action:hover { background: var(--color-border-subtle) !important; color: var(--color-text-secondary) !important; }
-        .cal-week-event:hover { filter: brightness(1.08); transform: scale(1.02); z-index: 2; position: relative; }
+        .cal-week-event:hover { filter: brightness(1.08); }
         .cal-save:hover { filter: brightness(1.1); }
         .cal-save:active { transform: scale(0.97); }
         .cal-cancel:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
-        .cal-chip-input:focus-within, .cal-input:focus { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
+        .cal-chip-input:focus-within { border-color: var(--color-border-strong) !important; }
       `}</style>
       {/* Header */}
       <div className="dex-liquid-glass" style={styles.header}>
@@ -1892,7 +1886,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '12px',
-    boxShadow: '0 1px 4px color-mix(in srgb, var(--color-accent) 50%, transparent)',
   },
   // -- Week View Styles --------------------------------------
   weekViewContainer: {
@@ -2225,8 +2218,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   colorBtnActive: {
     border: '2px solid var(--color-text-primary)',
-    transform: 'scale(1.15)',
-    boxShadow: 'var(--shadow-md)',
   },
   textarea: {
     background: 'var(--color-bg-hover)',

@@ -6,7 +6,7 @@
 // Guards for the UI unslop pass: one keyboard focus ring, no coloured halos
 // in shared shadow tokens, no purple "AI" gradients on the touched surfaces.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const R = join(__dirname, '../../src/renderer');
@@ -71,5 +71,43 @@ describe('UI unslop guards', () => {
       const src = read(f).replace(/^\s*\d+% \{ background:.*$/gm, '');
       expect(src, f).not.toMatch(/linear-gradient\(135deg/);
     }
+  });
+
+  // Pass 3 (inner apps). Accent is for the primary action and the selected
+  // state; hover is neutral and flat; keyboard focus is the one global ring.
+  describe('pass 3: app style blocks', () => {
+    const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(d, e.name)) : /\.tsx?$/.test(e.name) ? [join(d, e.name)] : []);
+    const apps = [...walk(join(R, 'DEXAPPLICATIONS')), ...walk(join(R, 'pages'))]
+      .map((f) => ({ f: f.slice(R.length + 1).replace(/\\/g, '/'), src: readFileSync(f, 'utf8') }));
+    const hits = (re: RegExp) => apps.flatMap(({ f, src }) =>
+      [...src.matchAll(re)].map((m) => `${f}: ${m[0].replace(/\s+/g, ' ').slice(0, 120)}`));
+
+    it('hover never lifts, grows or spins a control', () => {
+      expect(hits(/:hover[^{}`]*\{[^}]*(translate[XY]\(-?[1-9]|scale\(1\.[0-9]|rotate\()[^}]*\}/g)).toEqual([]);
+    });
+
+    it('hover is not accent-tinted (filled primary buttons excepted)', () => {
+      const found = hits(/[^\s{}`,]*:hover[^{}`]*\{[^}]*(--color-accent(?!-fill)|--prism-accent)[^}]*\}/g)
+        .filter((h) => !/btn-primary/.test(h));
+      expect(found).toEqual([]);
+    });
+
+    it('apps do not paint their own accent focus ring', () => {
+      expect(hits(/:focus(-visible|-within)?[^{}`]*\{[^}]*(--color-accent|rgba\(74, ?158, ?255|rgba\(10, ?132, ?255)[^}]*\}/g)).toEqual([]);
+    });
+
+    it('shared CSS adds no accent halo to focused inputs', () => {
+      const halo = /(?:^|\n)\s*(?:input:focus|:where\(input, textarea, select\):focus-visible|\.property-input:focus)[^{]*\{[^}]*box-shadow:\s*0 0 0/;
+      expect(strip(read('styles/globals.css'))).not.toMatch(halo);
+      expect(strip(read('styles/design-system.css'))).not.toMatch(halo);
+    });
+
+    it('no glow wider than 4px on app chrome', () => {
+      const glow = /(?:box-shadow|boxShadow|drop-shadow)[^;\n]*?\b0 0 (\d+)px (?!rgba\(0, ?0, ?0)/g;
+      const wide = apps.flatMap(({ f, src }) => [...src.matchAll(glow)]
+        .filter((m) => Number(m[1]) > 4).map((m) => `${f}: ${m[0].slice(0, 100)}`));
+      expect(wide).toEqual([]);
+    });
   });
 });

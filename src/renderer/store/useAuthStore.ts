@@ -161,18 +161,28 @@ export const useAuthStore = create<AuthStore>()(devtools(
         _authStateCleanup();
         _authStateCleanup = null;
       }
-      const unsubscribe = window.dex?.auth?.onStateChange?.((newState: any) => {
+      // Native pushes `auth:state-changed` after any enrol/disable/unlock attempt,
+      // including the ones Settings makes directly over IPC. (dex.auth.onStateChange
+      // is a no-op under Tauri; pushes only arrive through dex.on.)
+      // isLocked is NOT taken from the push: native never locks on its own
+      // (always reports false), so the lock state stays owned by lock()/unlock here.
+      const onState = (newState: any) => {
+        if (!newState || typeof newState !== 'object') return;
         set({
-          isLocked: newState.isLocked,
-          isEnabled: newState.isEnabled,
+          isEnabled: !!newState.isEnabled,
           method: newState.method,
-          hasPassword: newState.hasPassword,
-          hasPin: newState.hasPin,
-          hasBiometric: newState.hasBiometric,
+          hasPassword: !!newState.hasPassword,
+          hasPin: !!newState.hasPin,
+          hasBiometric: !!newState.hasBiometric,
+          hasSecurityQuestions: !!newState.hasSecurityQuestions,
           lockoutStatus: newState.lockoutStatus,
         });
-      });
-      _authStateCleanup = typeof unsubscribe === 'function' ? unsubscribe : null;
+      };
+      const dex = window.dex;
+      if (dex?.on) {
+        dex.on('auth:state-changed', onState);
+        _authStateCleanup = () => { dex.off?.('auth:state-changed', onState); };
+      }
     } catch (error) {
       console.error('[AuthStore] Failed to initialize:', error);
       set({ isLoading: false, isLocked: false, error: 'Failed to initialize authentication' });

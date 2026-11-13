@@ -561,7 +561,7 @@ const ScreenRecorder: React.FC = () => {
             {(state === 'idle' || state === 'countdown') && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--color-text-muted)' }}>
                 {state === 'countdown' ? (
-                  <span style={{ fontSize: 72, fontWeight: 700, color: 'var(--color-accent)', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 72, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                     {countdown}
                   </span>
                 ) : (

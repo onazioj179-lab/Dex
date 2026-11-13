@@ -836,7 +836,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   presetName: { fontSize: 16, fontWeight: 600 },
   timerDisplay: {
-    fontSize: 14, color: 'var(--color-accent)', marginTop: 'var(--space-2)',
+    fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)',
     fontVariantNumeric: 'tabular-nums',
   },
   transport: {

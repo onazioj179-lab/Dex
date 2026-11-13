@@ -478,10 +478,6 @@ const CALC_CSS = `
 .dex-calc-key:hover { filter: brightness(1.06); }
 :root[data-theme="light"] .dex-calc-key:hover, .light-mode .dex-calc-key:hover { filter: brightness(0.96); }
 .dex-calc-key:active { transform: scale(0.95); }
-.dex-calc-key:focus-visible, .dex-calc-seg:focus-visible, .dex-calc-icon:focus-visible,
-.dex-calc-history-item:focus-visible, .dex-calc-link:focus-visible {
-  outline: 2px solid var(--color-accent); outline-offset: 2px;
-}
 .dex-calc-seg {
   height: 26px; padding: 0 var(--space-3); border: none; border-radius: var(--radius-sm, 6px);
   background: transparent; color: var(--color-text-secondary);
@@ -500,7 +496,6 @@ const CALC_CSS = `
   background: var(--color-bg-surface); color: var(--color-text-primary);
   font: 13px var(--dex-font-ui); outline: none;
 }
-.dex-calc-input:focus { border-color: var(--color-accent); }
 .dex-calc-link {
   border: none; background: transparent; color: var(--color-accent); cursor: pointer;
   font: 600 12px var(--dex-font-ui); padding: 4px var(--space-2); border-radius: var(--radius-sm, 6px);
@@ -595,8 +590,8 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: 'var(--space-2)',
     left: 'var(--space-3)',
-    background: 'color-mix(in srgb, var(--color-accent) 14%, transparent)',
-    color: 'var(--color-accent)',
+    background: 'var(--color-bg-hover)',
+    color: 'var(--color-text-secondary)',
     padding: '2px var(--space-2)',
     borderRadius: 'var(--radius-sm, 6px)',
     fontSize: 10,

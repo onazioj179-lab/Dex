@@ -2999,7 +2999,7 @@ const Prism: React.FC = () => {
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
     tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', transition: 'all 0.12s ease' },
     tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
-    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
+    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'var(--color-bg-surface)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px var(--space-2)', fontSize: '11px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.12s ease' },
   }), [activeTool]);
@@ -3079,12 +3079,12 @@ const Prism: React.FC = () => {
         button:active { transform: scale(0.97); }
         .prism-btn-primary:hover { background: color-mix(in srgb, var(--prism-accent) 88%, #fff) !important; }
         .prism-btn:not(:disabled):not(.prism-btn-active):hover { background: var(--color-bg-hover) !important; }
-        .prism-layer-item:hover { background: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)) !important; border-color: color-mix(in srgb, var(--prism-accent) 35%, var(--color-border)) !important; }
-        .prism-tool-btn:hover { background: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)) !important; color: var(--prism-accent) !important; }
-        .prism-icon-btn:hover { color: var(--prism-accent) !important; background: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)) !important; }
-        .prism-tab:hover { color: var(--prism-accent) !important; background: color-mix(in srgb, var(--prism-accent) 10%, var(--color-bg-elevated)) !important; }
-        .prism-ctx-item:hover { background: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)) !important; }
-        .prism-ctx-item:active { background: color-mix(in srgb, var(--prism-accent) 35%, var(--color-border)) !important; }
+        .prism-layer-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
+        .prism-tool-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .prism-icon-btn:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
+        .prism-tab:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
+        .prism-ctx-item:hover { background: var(--color-bg-hover) !important; }
+        .prism-ctx-item:active { background: var(--color-bg-active) !important; }
         * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -3097,11 +3097,10 @@ const Prism: React.FC = () => {
         }
         input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
         select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
-        select:focus { border-color: color-mix(in srgb, var(--prism-accent) 35%, var(--color-border)); }
-        select:hover { border-color: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)); }
+        select:hover { border-color: var(--color-border-strong); }
         .prism-dropdown-item { transition: background 0.12s ease; }
-        .prism-dropdown-item:hover { background: color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated)) !important; }
-        .prism-dropdown-item:active { background: color-mix(in srgb, var(--prism-accent) 35%, var(--color-border)) !important; }
+        .prism-dropdown-item:hover { background: var(--color-bg-hover) !important; }
+        .prism-dropdown-item:active { background: var(--color-bg-active) !important; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>

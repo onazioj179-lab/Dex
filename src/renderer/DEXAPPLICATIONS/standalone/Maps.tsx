@@ -167,15 +167,10 @@ const ctrlBtn: React.CSSProperties = {
   transition: 'background 0.12s ease, color 0.12s ease',
 };
 
-// Scoped polish: focus-visible rings, crisp hover transitions and a subtle pop
+// Scoped polish: crisp hover transitions and a subtle press
 // for the action buttons inside cards/drawers. Mirrors this file's inline
 // language (DEX tokens, hairline chrome) so nothing leaks to other apps.
 const MAPS_STYLE = `
-.dex-maps-root :focus-visible {
-  outline: 2px solid var(--color-accent-primary);
-  outline-offset: 2px;
-  border-radius: 8px;
-}
 .dex-maps-root button { transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease; }
 .dex-maps-root .dex-maps-card-btn:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-strong, var(--color-border)) !important; }
 .dex-maps-root .dex-maps-card-btn:active { transform: scale(0.97); }
