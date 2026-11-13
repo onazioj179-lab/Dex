@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  restoreRecycledItem, unrestorableReason, insertKanbanCard, isExpiryRecord, type RecycledItem,
+  restoreRecycledItem, unrestorableReason, insertKanbanCard, type RecycledItem,
 } from '../../src/renderer/services/recycleRestore';
 
 const item = (over: Partial<RecycledItem>): RecycledItem => ({
@@ -28,6 +28,11 @@ describe('unrestorableReason', () => {
   it('rejects unknown apps and unreadable data', () => {
     expect(unrestorableReason(item({ app: 'mystery' }))).toBeTruthy();
     expect(unrestorableReason(item({ app: 'kanban', item_data: 'not json' }))).toBeTruthy();
+  });
+  it('says expiry-rule rows hold no copy (content_expiry.rs writes only the id)', () => {
+    const data = JSON.stringify({ expired: true, item_id: 'n1', source: 'content-expiry' });
+    expect(unrestorableReason(item({ item_data: data }))).toMatch(/expiry rule/);
+    expect(unrestorableReason(item({ app: 'kanban', item_data: data }))).toMatch(/expiry rule/);
   });
   it('accepts notes and kanban cards', () => {
     expect(unrestorableReason(item({ item_data: '{"id":"n1"}' }))).toBeNull();
@@ -91,23 +96,5 @@ describe('restoreRecycledItem', () => {
 
   it('refuses Files rows instead of pretending', async () => {
     await expect(restoreRecycledItem(item({ app: 'files', item_data: '{}' }), vi.fn())).rejects.toThrow(/permanently/);
-  });
-});
-
-describe('content-expiry rows', () => {
-  // Written by content-expiry:processExpired: only the expiry record is removed,
-  // the item itself stays in its app.
-  const expired = item({ app: 'notes', item_data: JSON.stringify({ expired: true, item_id: 'n-9', source: 'content-expiry' }) });
-
-  it('are restorable (used to say "The saved copy is incomplete")', () => {
-    expect(isExpiryRecord(expired)).toBe(true);
-    expect(unrestorableReason(expired)).toBeNull();
-    expect(isExpiryRecord(item({ item_data: '{"id":"n1"}' }))).toBe(false);
-  });
-
-  it('restore touches nothing in the app', async () => {
-    const ipc = vi.fn();
-    await expect(restoreRecycledItem(expired, ipc)).resolves.toBeUndefined();
-    expect(ipc).not.toHaveBeenCalled();
   });
 });

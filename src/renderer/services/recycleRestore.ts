@@ -42,18 +42,8 @@ function parseData(item: RecycledItem): Record<string, any> | null {
   }
 }
 
-/**
- * Rows written by `content-expiry:processExpired` record that an item's expiry
- * date passed; the item itself is never deleted (only its expiry record is), so
- * there is nothing to bring back and "restoring" just clears the row.
- */
-export function isExpiryRecord(item: RecycledItem): boolean {
-  return parseData(item)?.source === 'content-expiry';
-}
-
 /** Why an item can't be restored, or null when it can. */
 export function unrestorableReason(item: RecycledItem): string | null {
-  if (isExpiryRecord(item)) return null;
   if (item.app === 'files') {
     return 'Deleted permanently by an earlier DEX version; the file itself is gone.';
   }
@@ -62,6 +52,11 @@ export function unrestorableReason(item: RecycledItem): string | null {
   }
   const d = parseData(item);
   if (!d) return 'The saved copy is unreadable.';
+  // Rows moved here by an expiry rule (content_expiry.rs) keep only the item id,
+  // not a copy of the item, so there is nothing to put back.
+  if (d.source === 'content-expiry' || d.expired === true) {
+    return 'Removed by an expiry rule; DEX kept only its name, not a copy.';
+  }
   if (item.app === 'notes' && typeof d.id !== 'string') return 'The saved copy is incomplete.';
   return null;
 }
@@ -150,8 +145,6 @@ async function restoreNote(data: Record<string, any>, ipc: Ipc): Promise<void> {
 export async function restoreRecycledItem(item: RecycledItem, ipc: Ipc): Promise<void> {
   const reason = unrestorableReason(item);
   if (reason) throw new Error(reason);
-  // The item is still in its app; removing the bin row is the whole restore.
-  if (isExpiryRecord(item)) return;
   const data = parseData(item)!;
   if (item.app === 'notes') return restoreNote(data, ipc);
   return restoreKanban(item, data, ipc);

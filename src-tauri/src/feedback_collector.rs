@@ -76,14 +76,12 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
     match channel {
         "feedback:submit" => submit(conn, args),
 
-        // gatherSystemInfo reads Electron/OS APIs (app.getVersion, os.platform,
-        // os.release, the capability_tier setting, the renderer's active app via
-        // executeJavaScript, and the electron-log file tail). Not portable to the
-        // DB layer — degrade honestly rather than fabricate a SystemInfo object.
-        "feedback:getSystemInfoPreview" => json!({
-            "success": false,
-            "error": "system info gathering not available in DB layer (not ported)"
-        }),
+        // feedback:submit and feedback:getSystemInfoPreview are answered in main.rs
+        // (submit_to_file / system_info), which has the data and log folders.
+        "feedback:getSystemInfoPreview" => system_info(
+            args.get(0).and_then(|v| v.as_str()).unwrap_or(""),
+            &crate::renderer_log::log_path(),
+        ),
 
         // getAllReports reads JSON files from the userData feedback dir off the
         // filesystem (not the feedback_reports table), so it is not a DB op. It
@@ -96,5 +94,89 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         "feedback:getFeedbackDir" => Value::Null,
 
         _ => Value::Null,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Real report + system info (routed from main.rs, which has the data dir).
+// Before: submit answered success:false with no file, and the preview answered
+// "not ported", so the panel showed "Report saved" with an empty path.
+// ---------------------------------------------------------------------------
+
+/// What "Include system info" adds. Nothing personal: version, OS, CPU arch,
+/// and the last renderer warnings/errors DEX logged itself.
+pub fn system_info(active_app: &str, log_path: &std::path::Path) -> Value {
+    let tail: Vec<String> = std::fs::read_to_string(log_path)
+        .map(|t| t.lines().rev().take(10).map(|l| l.chars().take(400).collect()).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .rev()
+        .collect();
+    json!({
+        "dexVersion": env!("CARGO_PKG_VERSION"),
+        "osName": sysinfo::System::name().unwrap_or_else(|| std::env::consts::OS.to_string()),
+        "osVersion": sysinfo::System::long_os_version().or_else(sysinfo::System::os_version).unwrap_or_default(),
+        "arch": std::env::consts::ARCH,
+        "capabilityTier": "desktop",
+        "activeApp": active_app,
+        "errorLogTail": tail,
+    })
+}
+
+/// feedback:submit(type, description, includeSystemInfo, activeApp?) -> { success, filePath }.
+/// Saves the row and a `feedback-<ms>.json` file under `<data>/feedback/` that the
+/// user can attach to a support message. Nothing is sent anywhere.
+pub fn submit_to_file(conn: &Connection, dir: &std::path::Path, args: &Value, log_path: &std::path::Path) -> Value {
+    let report_type = args.get(0).and_then(|v| v.as_str()).unwrap_or("bug");
+    let description = args.get(1).and_then(|v| v.as_str()).unwrap_or("").trim();
+    if description.is_empty() {
+        return json!({ "success": false, "error": "Describe the problem first." });
+    }
+    let include = args.get(2).and_then(|v| v.as_bool()).unwrap_or(true);
+    let active = args.get(3).and_then(|v| v.as_str()).unwrap_or("");
+    let now: i64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let info = if include { system_info(active, log_path) } else { Value::Null };
+    let info_s = if include { Some(info.to_string()) } else { None };
+    if let Err(e) = conn.execute(
+        "INSERT INTO feedback_reports (report_type, description, system_info, created_at) VALUES (?, ?, ?, ?)",
+        params![report_type, description, info_s, now],
+    ) {
+        return json!({ "success": false, "error": format!("Couldn't save the report: {e}") });
+    }
+    if let Err(e) = std::fs::create_dir_all(dir) {
+        return json!({ "success": false, "error": format!("Couldn't create the feedback folder: {e}") });
+    }
+    let path = dir.join(format!("feedback-{now}.json"));
+    let body = json!({ "type": report_type, "description": description, "createdAt": now, "systemInfo": info });
+    match std::fs::write(&path, serde_json::to_string_pretty(&body).unwrap_or_default()) {
+        Ok(()) => json!({ "success": true, "filePath": path.to_string_lossy() }),
+        Err(e) => json!({ "success": false, "error": format!("Couldn't write the report file: {e}") }),
+    }
+}
+
+#[cfg(test)]
+mod file_tests {
+    use super::*;
+
+    #[test]
+    fn submit_writes_row_and_file_with_system_info() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn);
+        let dir = std::env::temp_dir().join(format!("dex-feedback-{}", crate::util::pseudo_uuid_v4()));
+        let log = dir.join("none.log");
+        let r = submit_to_file(&conn, &dir, &json!(["bug", "It broke", true, "notes"]), &log);
+        assert_eq!(r["success"], true, "{r}");
+        let text = std::fs::read_to_string(r["filePath"].as_str().unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["description"], "It broke");
+        assert_eq!(v["systemInfo"]["activeApp"], "notes");
+        assert_eq!(v["systemInfo"]["dexVersion"], env!("CARGO_PKG_VERSION"));
+        let n: i64 = conn.query_row("SELECT COUNT(*) FROM feedback_reports", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 1);
+        assert_eq!(submit_to_file(&conn, &dir, &json!(["bug", "  "]), &log)["success"], false);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

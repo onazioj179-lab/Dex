@@ -131,22 +131,36 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         "scratchpad:clear" => clear_content(conn),
         "scratchpad:sendToNotes" => send_to_notes(conn),
 
-        // updateContent only mutates the in-memory `pendingContent` field (no DB
-        // write of its own) and saveNow flushes that buffer to disk. The buffer
-        // and its 5s autosave timer are in-memory session state that a stateless
-        // DB dispatcher cannot carry between calls, so there is no faithful pure-DB
-        // behavior to reproduce here. The Tauri command layer should hold the
-        // pending buffer (and timer) and issue the content UPDATE itself; until
-        // then these degrade honestly rather than write the wrong thing.
-        "scratchpad:updateContent" => json!({
-            "success": false,
-            "error": "in-memory pending buffer not available in DB layer (not ported)"
-        }),
-        "scratchpad:saveNow" => json!({
-            "success": false,
-            "error": "in-memory pending buffer not available in DB layer (not ported)"
-        }),
+        // Electron buffered content in memory and flushed it every 5 s; this port
+        // answered with an error, so nothing typed in the scratchpad was ever saved.
+        // The renderer debounces, so each call is written straight to the row.
+        "scratchpad:updateContent" => {
+            let text = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            match conn.execute(
+                "UPDATE scratchpad SET content = ?, updated_at = ? WHERE id = 1",
+                params![text, now_ms()],
+            ) {
+                Ok(_) => json!(true),
+                Err(e) => json!({ "success": false, "error": e.to_string() }),
+            }
+        }
+        // Content is already on disk after each updateContent.
+        "scratchpad:saveNow" => json!(true),
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_content_is_saved_and_read_back() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn);
+        assert_eq!(dispatch(&conn, "scratchpad:updateContent", &json!(["hello"])), json!(true));
+        assert_eq!(dispatch(&conn, "scratchpad:saveNow", &json!([])), json!(true));
+        assert_eq!(dispatch(&conn, "scratchpad:getState", &json!([]))["content"], "hello");
     }
 }
