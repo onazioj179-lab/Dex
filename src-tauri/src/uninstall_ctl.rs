@@ -110,7 +110,7 @@ fn write_tracking(app: &tauri::AppHandle, mut tracking: Value) {
         o.insert("updatedAt".into(), json!(now_ms()));
     }
     if let Ok(raw) = serde_json::to_string_pretty(&tracking) {
-        let _ = std::fs::write(footprint_path(app), raw);
+        let _ = crate::write_atomic(footprint_path(app), raw);
     }
 }
 
@@ -440,7 +440,7 @@ fn export_user_data(app: &tauri::AppHandle, args: &Value) -> Value {
         })).collect::<Vec<_>>(),
     });
     if let Ok(raw) = serde_json::to_string_pretty(&manifest) {
-        let _ = std::fs::write(output_path.join("dex-export-manifest.json"), raw);
+        let _ = crate::write_atomic(output_path.join("dex-export-manifest.json"), raw);
     }
 
     json!({ "success": true, "exportedCount": exported_count })

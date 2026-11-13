@@ -190,7 +190,7 @@ mod tests {
     fn copy_into_same_folder_never_overwrites() {
         let d = scratch("copy-same");
         let f = d.join("a.txt");
-        std::fs::write(&f, b"original").unwrap();
+        crate::write_atomic(&f, b"original").unwrap();
         assert!(ok(&copy_into(&s(&f), &s(&d))));
         assert!(ok(&copy_into(&s(&f), &s(&d))));
         assert_eq!(std::fs::read(&f).unwrap(), b"original");
@@ -204,9 +204,9 @@ mod tests {
         let d = scratch("copy-tree");
         let src = d.join("src");
         std::fs::create_dir_all(src.join("nested/deeper")).unwrap();
-        std::fs::write(src.join("nested/deeper/x.bin"), vec![7u8; 4096]).unwrap();
+        crate::write_atomic(src.join("nested/deeper/x.bin"), vec![7u8; 4096]).unwrap();
         for i in 0..200 {
-            std::fs::write(src.join(format!("f{i}.txt")), format!("{i}")).unwrap();
+            crate::write_atomic(src.join(format!("f{i}.txt")), format!("{i}")).unwrap();
         }
         let out = d.join("out");
         std::fs::create_dir(&out).unwrap();
@@ -238,8 +238,8 @@ mod tests {
         let b = d.join("b");
         std::fs::create_dir_all(&a).unwrap();
         std::fs::create_dir_all(&b).unwrap();
-        std::fs::write(a.join("n.txt"), b"from-a").unwrap();
-        std::fs::write(b.join("n.txt"), b"from-b").unwrap();
+        crate::write_atomic(a.join("n.txt"), b"from-a").unwrap();
+        crate::write_atomic(b.join("n.txt"), b"from-b").unwrap();
         assert!(!ok(&move_into(&s(&a.join("n.txt")), &s(&b))));
         assert_eq!(std::fs::read(b.join("n.txt")).unwrap(), b"from-b");
         assert_eq!(std::fs::read(a.join("n.txt")).unwrap(), b"from-a");
@@ -255,8 +255,8 @@ mod tests {
     #[test]
     fn rename_refuses_existing_name_and_strips_paths() {
         let d = scratch("rename");
-        std::fs::write(d.join("one.txt"), b"1").unwrap();
-        std::fs::write(d.join("two.txt"), b"2").unwrap();
+        crate::write_atomic(d.join("one.txt"), b"1").unwrap();
+        crate::write_atomic(d.join("two.txt"), b"2").unwrap();
         assert!(!ok(&rename_in_place(&s(&d.join("one.txt")), "two.txt")));
         assert_eq!(std::fs::read(d.join("two.txt")).unwrap(), b"2");
         assert!(ok(&rename_in_place(&s(&d.join("one.txt")), "../escaped.txt")));

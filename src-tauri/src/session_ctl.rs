@@ -115,7 +115,7 @@ fn load_current(app: &tauri::AppHandle) -> Value {
 fn store_current(app: &tauri::AppHandle, session: &Value) -> std::io::Result<()> {
     let path = current_path(app);
     let body = serde_json::to_string_pretty(session).unwrap_or_else(|_| "{}".into());
-    std::fs::write(path, body)
+    crate::write_atomic(path, body)
 }
 
 // listSessions(): read every *.json (except the reserved current-session.json),
@@ -221,7 +221,7 @@ fn capture_session(app: &tauri::AppHandle) -> Value {
     // objects in this persisted form).
     let file = sessions_dir(app).join(format!("{}.json", id));
     let body = serde_json::to_string_pretty(&session).unwrap_or_else(|_| "{}".into());
-    let _ = std::fs::write(file, body);
+    let _ = crate::write_atomic(file, body);
     // Keep the captured snapshot as the live current session too.
     let _ = store_current(app, &session);
 

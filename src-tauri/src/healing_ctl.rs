@@ -105,7 +105,7 @@ fn read_store(app: &tauri::AppHandle) -> Value {
 // file so the renderer's reads (get_config/get_health/...) observe the change.
 fn write_store(app: &tauri::AppHandle, store: &Value) {
     if let Ok(s) = serde_json::to_string_pretty(store) {
-        let _ = std::fs::write(store_path(app), s);
+        let _ = crate::write_atomic(store_path(app), s);
     }
 }
 
@@ -325,7 +325,7 @@ fn attempt_recovery(app: &tauri::AppHandle, component: &str) -> bool {
             if backup.exists() {
                 std::fs::copy(&backup, &settings).is_ok()
             } else {
-                std::fs::write(&settings, "{}").is_ok()
+                crate::write_atomic(&settings, "{}").is_ok()
             }
         }
         // No portable native GC; honest false (the global.gc-absent branch).

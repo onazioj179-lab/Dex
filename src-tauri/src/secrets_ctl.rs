@@ -53,7 +53,7 @@ fn save(app: &tauri::AppHandle, map: &BTreeMap<String, String>) -> bool {
     }
     let tmp = p.with_extension("json.tmp");
     let Ok(body) = serde_json::to_string(map) else { return false };
-    std::fs::write(&tmp, body).is_ok() && std::fs::rename(&tmp, &p).is_ok()
+    crate::write_atomic(&tmp, body).is_ok() && std::fs::rename(&tmp, &p).is_ok()
 }
 
 #[cfg(windows)]

@@ -89,7 +89,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_file(app: &tauri::AppHandle, name: &str, data: &Value) -> bool {
     match serde_json::to_string_pretty(data) {
-        Ok(s) => std::fs::write(security_path(app, name), s).is_ok(),
+        Ok(s) => crate::write_atomic(security_path(app, name), s).is_ok(),
         Err(_) => false,
     }
 }

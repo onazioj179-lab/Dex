@@ -65,7 +65,7 @@ fn read_file(app: &tauri::AppHandle) -> Value {
 
 fn write_file(app: &tauri::AppHandle, value: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
 }
 
@@ -142,7 +142,7 @@ fn execute_undo(undo_data: &Value) -> Result<(), String> {
             if let (Some(orig), Some(bak)) = (original, backup) {
                 std::fs::copy(bak, orig).map(|_| ()).map_err(|e| e.to_string())
             } else if let (Some(orig), Some(c)) = (original, content) {
-                std::fs::write(orig, c).map_err(|e| e.to_string())
+                crate::write_atomic(orig, c).map_err(|e| e.to_string())
             } else {
                 Ok(())
             }
@@ -181,7 +181,7 @@ fn execute_redo(undo_data: &Value) -> Result<(), String> {
         "file_restore" => {
             if let (Some(orig), Some(bak)) = (original, backup) {
                 match std::fs::read(orig) {
-                    Ok(bytes) => std::fs::write(format!("{}.redo", bak), bytes)
+                    Ok(bytes) => crate::write_atomic(format!("{}.redo", bak), bytes)
                         .map_err(|e| e.to_string()),
                     Err(e) => Err(e.to_string()),
                 }

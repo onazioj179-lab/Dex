@@ -102,7 +102,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 // like saveConfig()'s try/catch (it logged and continued).
 fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(store_path(app, name), raw);
+        let _ = crate::write_atomic(store_path(app, name), raw);
     }
 }
 

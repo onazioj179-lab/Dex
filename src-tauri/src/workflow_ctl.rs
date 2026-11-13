@@ -170,7 +170,7 @@ fn record_execution(app: &tauri::AppHandle, execution: &Value) {
     }
     let data = json!({ "version": 1, "executions": executions });
     if let Ok(raw) = serde_json::to_string_pretty(&data) {
-        let _ = std::fs::write(store_path(app, HISTORY_FILE), raw);
+        let _ = crate::write_atomic(store_path(app, HISTORY_FILE), raw);
     }
 }
 

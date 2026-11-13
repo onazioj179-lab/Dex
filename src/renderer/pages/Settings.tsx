@@ -730,7 +730,8 @@ const saveSettingsToBackend = async (settings: Record<string, unknown>, retries 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       if (window.dex?.invoke) {
-        await window.dex.invoke('capability:storage:set', 'dex-settings', settings);
+        const res = await window.dex.invoke('capability:storage:set', 'dex-settings', settings);
+        if (res?.success === false) throw new Error(res.error || 'storage write failed');
         return true;
       }
     } catch (e) {

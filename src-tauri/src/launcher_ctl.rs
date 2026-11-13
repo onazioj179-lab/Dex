@@ -89,7 +89,7 @@ fn read_json(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_json(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     match serde_json::to_string_pretty(value) {
-        Ok(raw) => std::fs::write(launcher_dir(app).join(name), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(launcher_dir(app).join(name), raw).is_ok(),
         Err(_) => false,
     }
 }
@@ -1091,9 +1091,9 @@ mod launch_policy_tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let doc = dir.join("movie.mp4");
-        std::fs::write(&doc, b"x").unwrap();
+        crate::write_atomic(&doc, b"x").unwrap();
         let script = dir.join("evil.ps1");
-        std::fs::write(&script, b"x").unwrap();
+        crate::write_atomic(&script, b"x").unwrap();
 
         assert!(check_launch_args(&[]).is_ok());
         assert!(check_launch_args(&[doc.to_string_lossy().into_owned()]).is_ok());

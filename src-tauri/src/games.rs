@@ -101,7 +101,7 @@ fn load_playtime(app: &tauri::AppHandle) -> Value {
 
 fn persist_playtime(app: &tauri::AppHandle, map: &Value) {
     if let Ok(s) = serde_json::to_string_pretty(map) {
-        let _ = std::fs::write(store_path(app, PLAYTIME_FILE), s);
+        let _ = crate::write_atomic(store_path(app, PLAYTIME_FILE), s);
     }
 }
 

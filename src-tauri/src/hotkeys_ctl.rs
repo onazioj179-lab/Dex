@@ -110,7 +110,7 @@ fn read_bindings(app: &tauri::AppHandle) -> Value {
 // Persist the whole store object (pretty), preserving sibling keys. Returns ok.
 fn write_store(app: &tauri::AppHandle, data: &Value) -> bool {
     match serde_json::to_string_pretty(data) {
-        Ok(s) => std::fs::write(store_path(app), s).is_ok(),
+        Ok(s) => crate::write_atomic(store_path(app), s).is_ok(),
         Err(_) => false,
     }
 }

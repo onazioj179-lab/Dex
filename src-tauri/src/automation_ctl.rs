@@ -136,7 +136,7 @@ fn store(app: &tauri::AppHandle, rules: &[Value]) {
         "rules": rules,
     });
     if let Ok(s) = serde_json::to_string_pretty(&payload) {
-        let _ = std::fs::write(rules_path(app), s);
+        let _ = crate::write_atomic(rules_path(app), s);
     }
 }
 
@@ -334,7 +334,7 @@ fn store_exec_doc(app: &tauri::AppHandle, executions: &[Value], run_counts: &Map
         "runCounts": Value::Object(run_counts.clone()),
     });
     if let Ok(s) = serde_json::to_string_pretty(&payload) {
-        let _ = std::fs::write(exec_path(app), s);
+        let _ = crate::write_atomic(exec_path(app), s);
     }
 }
 

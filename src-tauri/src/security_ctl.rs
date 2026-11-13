@@ -440,7 +440,7 @@ fn log_security_event(app: &tauri::AppHandle, event: &str, details: &str) {
     while log.len() > MAX_LOG_EVENTS {
         log.remove(0);
     }
-    let _ = std::fs::write(
+    let _ = crate::write_atomic(
         security_file(app, AUDIT_LOG_FILE),
         serde_json::to_string_pretty(&Value::Array(log)).unwrap_or_else(|_| "[]".into()),
     );
@@ -474,7 +474,7 @@ fn toggle_permission(app: &tauri::AppHandle, id: &str, enabled: bool) -> Value {
             Err(_) => Map::new(),
         };
     overrides.insert(id.to_string(), json!(enabled));
-    let _ = std::fs::write(
+    let _ = crate::write_atomic(
         security_file(app, PERMISSIONS_FILE),
         serde_json::to_string_pretty(&Value::Object(overrides)).unwrap_or_else(|_| "{}".into()),
     );
@@ -508,7 +508,7 @@ fn export_audit(app: &tauri::AppHandle) -> Value {
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(AUDIT_EXPORT_FILE);
 
-    match std::fs::write(
+    match crate::write_atomic(
         &audit_path,
         serde_json::to_string_pretty(&Value::Object(audit)).unwrap_or_else(|_| "{}".into()),
     ) {

@@ -30,7 +30,7 @@ fn read_managed(app: &tauri::AppHandle) -> Value {
 
 fn write_managed(app: &tauri::AppHandle, data: &Value) -> bool {
     match serde_json::to_string_pretty(data) {
-        Ok(s) => std::fs::write(store_path(app), s).is_ok(),
+        Ok(s) => crate::write_atomic(store_path(app), s).is_ok(),
         Err(_) => false,
     }
 }

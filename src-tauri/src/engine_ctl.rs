@@ -245,7 +245,7 @@ fn load_config(app: &tauri::AppHandle) -> Map<String, Value> {
 
 fn save_config(app: &tauri::AppHandle, cfg: &Map<String, Value>) {
     let data = serde_json::to_string_pretty(&Value::Object(cfg.clone())).unwrap_or_default();
-    let _ = std::fs::write(config_path(app), data);
+    let _ = crate::write_atomic(config_path(app), data);
 }
 
 fn get_config(app: &tauri::AppHandle) -> Value {

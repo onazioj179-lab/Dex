@@ -124,7 +124,7 @@ fn load_records(app: &tauri::AppHandle) -> Vec<Value> {
 fn save_records(app: &tauri::AppHandle, records: &[Value]) -> Result<(), String> {
     let body = json!({ "plugins": records });
     let data = serde_json::to_string(&body).map_err(|e| e.to_string())?;
-    std::fs::write(store_path(app), data).map_err(|e| e.to_string())
+    crate::write_atomic(store_path(app), data).map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn register(app: &tauri::AppHandle, manifest: &Value, source: &str) -> Value {
     let now = now_ms();
 
     // Write source file (best-effort, mirrors Electron's non-fatal write).
-    if let Err(e) = std::fs::write(source_path(app, id), source.as_bytes()) {
+    if let Err(e) = crate::write_atomic(source_path(app, id), source.as_bytes()) {
         eprintln!("[plugin-gate] failed to write source for {}: {}", id, e);
     }
 

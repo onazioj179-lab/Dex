@@ -114,7 +114,7 @@ fn load_config(app: &tauri::AppHandle) -> Value {
 // wrapper, pretty-printed with two spaces — matching JSON.stringify(cfg, null, 2)).
 fn save_config(app: &tauri::AppHandle, cfg: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(cfg) {
-        let _ = std::fs::write(store_path(app, CONFIG_FILE), raw);
+        let _ = crate::write_atomic(store_path(app, CONFIG_FILE), raw);
     }
 }
 

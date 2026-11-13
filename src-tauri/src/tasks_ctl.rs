@@ -415,7 +415,7 @@ fn create_task(app: &tauri::AppHandle, data: &Value) -> Value {
         }
     }
 
-    let _ = std::fs::write(
+    let _ = crate::write_atomic(
         task_path(app, &id),
         serde_json::to_string_pretty(&task).unwrap_or_default(),
     );
@@ -456,7 +456,7 @@ fn update_task(app: &tauri::AppHandle, id: &str, data: &Value) -> Value {
 
     obj.insert("updatedAt".to_string(), json!(now_ms()));
 
-    let _ = std::fs::write(
+    let _ = crate::write_atomic(
         task_path(app, id),
         serde_json::to_string_pretty(&task).unwrap_or_default(),
     );

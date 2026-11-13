@@ -117,7 +117,7 @@ fn save_crashes(app: &tauri::AppHandle, crashes: &[Value]) {
     let start = crashes.len().saturating_sub(MAX_STORED_CRASHES);
     let trimmed = &crashes[start..];
     if let Ok(serialized) = serde_json::to_string_pretty(trimmed) {
-        let _ = std::fs::write(store_path(app), serialized);
+        let _ = crate::write_atomic(store_path(app), serialized);
     }
 }
 

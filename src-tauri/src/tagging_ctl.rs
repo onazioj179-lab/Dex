@@ -120,13 +120,13 @@ fn load_array(path: &PathBuf) -> Vec<Value> {
 // Electron writes JSON.stringify(..., null, 2); we match the pretty layout.
 fn save_tags(app: &tauri::AppHandle, tags: &[Value]) {
     if let Ok(raw) = serde_json::to_string_pretty(&tags) {
-        let _ = std::fs::write(tags_path(app), raw);
+        let _ = crate::write_atomic(tags_path(app), raw);
     }
 }
 
 fn save_metadata(app: &tauri::AppHandle, metadata: &[Value]) {
     if let Ok(raw) = serde_json::to_string_pretty(&metadata) {
-        let _ = std::fs::write(metadata_path(app), raw);
+        let _ = crate::write_atomic(metadata_path(app), raw);
     }
 }
 

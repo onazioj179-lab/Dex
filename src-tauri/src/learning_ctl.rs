@@ -60,7 +60,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 fn write_models(app: &tauri::AppHandle, models: Vec<Value>) -> bool {
     let payload = json!({ "models": models });
     match serde_json::to_string(&payload) {
-        Ok(raw) => std::fs::write(store_path(app, MODELS_FILE), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(store_path(app, MODELS_FILE), raw).is_ok(),
         Err(_) => false,
     }
 }

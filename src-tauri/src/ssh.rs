@@ -31,7 +31,7 @@ fn read_profiles(app: &tauri::AppHandle) -> Vec<Value> {
 }
 fn write_profiles(app: &tauri::AppHandle, list: &[Value]) -> bool {
     match serde_json::to_string_pretty(list) {
-        Ok(s) => std::fs::write(profiles_path(app), s).is_ok(),
+        Ok(s) => crate::write_atomic(profiles_path(app), s).is_ok(),
         Err(_) => false,
     }
 }

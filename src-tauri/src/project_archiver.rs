@@ -139,7 +139,7 @@ fn archive_project(
         return Value::Null;
     }
     let archive_path = archive_dir.join(filename);
-    if std::fs::write(&archive_path, &compressed).is_err() {
+    if crate::write_atomic(&archive_path, &compressed).is_err() {
         return Value::Null;
     }
     let archive_path_str = archive_path.to_string_lossy().to_string();

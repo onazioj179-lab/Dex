@@ -330,7 +330,7 @@ mod tests {
         let mut s = SecurityState::default();
         let path = std::env::temp_dir().join("dex-integrity-test.txt");
         let path_str = path.to_string_lossy().to_string();
-        std::fs::write(&path, b"original contents").unwrap();
+        crate::write_atomic(&path, b"original contents").unwrap();
 
         // Register baseline -> verified, 64-hex hash.
         let reg = register_integrity(&mut s, &path_str);
@@ -341,7 +341,7 @@ mod tests {
         assert_eq!(verify_integrity(&mut s, &path_str)["status"], json!("verified"));
 
         // Tamper -> verify flips to "modified".
-        std::fs::write(&path, b"tampered, different length").unwrap();
+        crate::write_atomic(&path, b"tampered, different length").unwrap();
         assert_eq!(verify_integrity(&mut s, &path_str)["status"], json!("modified"));
 
         // The modification recorded an integrity threat, surfaced + resolvable

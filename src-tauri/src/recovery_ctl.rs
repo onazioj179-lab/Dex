@@ -119,7 +119,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 // report `{ success }` exactly like the TS handlers.
 fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     match serde_json::to_string_pretty(value) {
-        Ok(raw) => std::fs::write(store_path(app, name), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(store_path(app, name), raw).is_ok(),
         Err(_) => false,
     }
 }

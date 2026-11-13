@@ -108,7 +108,7 @@ pub fn usage(app: &tauri::AppHandle) -> Value {
 pub fn clear_caches() -> Value {
     let root = local_root();
     let _ = std::fs::create_dir_all(&root);
-    let scheduled = std::fs::write(root.join(MARKER), b"1").is_ok();
+    let scheduled = crate::write_atomic(root.join(MARKER), b"1").is_ok();
     // Logs aren't held open between writes, so they can go immediately.
     let logs = crate::webview2::log_dir();
     let log_bytes = dir_size(&logs);
@@ -180,9 +180,9 @@ mod tests {
     fn clears_only_listed_dirs_and_reports_bytes() {
         let root = tmp("clear");
         std::fs::create_dir_all(root.join("Default/Cache")).unwrap();
-        std::fs::write(root.join("Default/Cache/blob"), vec![0u8; 4096]).unwrap();
+        crate::write_atomic(root.join("Default/Cache/blob"), vec![0u8; 4096]).unwrap();
         std::fs::create_dir_all(root.join("Default/Local Storage")).unwrap();
-        std::fs::write(root.join("Default/Local Storage/keep"), b"settings").unwrap();
+        crate::write_atomic(root.join("Default/Local Storage/keep"), b"settings").unwrap();
         let (freed, skipped) = clear_dirs(&root, &["Default/Cache", "Default/Missing"]);
         assert_eq!((freed, skipped), (4096, 0));
         assert!(!root.join("Default/Cache").exists());
@@ -207,8 +207,8 @@ mod tests {
     fn dir_size_sums_nested_files() {
         let root = tmp("size");
         std::fs::create_dir_all(root.join("a/b")).unwrap();
-        std::fs::write(root.join("a/x"), vec![0u8; 10]).unwrap();
-        std::fs::write(root.join("a/b/y"), vec![0u8; 20]).unwrap();
+        crate::write_atomic(root.join("a/x"), vec![0u8; 10]).unwrap();
+        crate::write_atomic(root.join("a/b/y"), vec![0u8; 20]).unwrap();
         assert_eq!(dir_size(&root), 30);
         let _ = std::fs::remove_dir_all(&root);
     }

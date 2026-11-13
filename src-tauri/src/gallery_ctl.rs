@@ -127,7 +127,7 @@ fn write_state(app: &tauri::AppHandle, patch: &[(&str, Value)]) -> bool {
         }
     }
     match serde_json::to_string_pretty(&state) {
-        Ok(raw) => std::fs::write(store_path(app, STATE_FILE), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(store_path(app, STATE_FILE), raw).is_ok(),
         Err(_) => false,
     }
 }

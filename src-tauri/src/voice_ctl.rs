@@ -104,7 +104,7 @@ fn read_store(app: &tauri::AppHandle) -> Value {
 
 fn write_store(app: &tauri::AppHandle, store: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(store) {
-        let _ = std::fs::write(store_path(app, STORE_FILE), raw);
+        let _ = crate::write_atomic(store_path(app, STORE_FILE), raw);
     }
 }
 

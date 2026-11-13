@@ -626,7 +626,7 @@ fn extract_zip(file_path: &str, output_dir: &str) -> Value {
             Ok(d) => d,
             Err(e) => return op_result(false, 0, output_dir, Some(e)),
         };
-        if let Err(e) = std::fs::write(&dest, &data) {
+        if let Err(e) = crate::write_atomic(&dest, &data) {
             return op_result(false, 0, output_dir, Some(e.to_string()));
         }
         count += 1;
@@ -938,7 +938,7 @@ fn create_zip(files: &[(String, String)], output_path: &str) -> Value {
             }
         }
     }
-    if let Err(e) = std::fs::write(output_path, &buffer) {
+    if let Err(e) = crate::write_atomic(output_path, &buffer) {
         return op_result(false, 0, output_path, Some(e.to_string()));
     }
     // entryCount mirrors Electron: files.length (NOT the post-skip count).

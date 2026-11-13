@@ -169,14 +169,14 @@ impl NotificationStore {
         let keep = &persistent[start..];
         let _ = std::fs::create_dir_all(&self.data_dir);
         if let Ok(data) = serde_json::to_string_pretty(&keep) {
-            let _ = std::fs::write(self.persistent_path(), data);
+            let _ = crate::write_atomic(self.persistent_path(), data);
         }
     }
 
     fn save_config(&self) {
         let _ = std::fs::create_dir_all(&self.data_dir);
         if let Ok(data) = serde_json::to_string_pretty(&self.config) {
-            let _ = std::fs::write(self.config_path(), data);
+            let _ = crate::write_atomic(self.config_path(), data);
         }
     }
 

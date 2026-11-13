@@ -131,7 +131,7 @@ fn read_network_json(app: &tauri::AppHandle, name: &str) -> Value {
 fn write_network_json(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     let path = network_dir(app).join(name);
     match serde_json::to_string_pretty(value) {
-        Ok(s) => std::fs::write(path, s).is_ok(),
+        Ok(s) => crate::write_atomic(path, s).is_ok(),
         Err(_) => false,
     }
 }
@@ -498,7 +498,7 @@ fn hygiene_store(app: &tauri::AppHandle) -> Value {
 fn hygiene_save(app: &tauri::AppHandle, doc: &Value) -> bool {
     let path = app_data_dir(app).join(HYGIENE_FILE);
     match serde_json::to_string_pretty(doc) {
-        Ok(s) => std::fs::write(path, s).is_ok(),
+        Ok(s) => crate::write_atomic(path, s).is_ok(),
         Err(_) => false,
     }
 }

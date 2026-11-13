@@ -74,7 +74,7 @@ fn load(app: &tauri::AppHandle) -> Vec<Value> {
 fn save(app: &tauri::AppHandle, rules: &[Value]) -> std::io::Result<()> {
     let body = serde_json::to_string_pretty(&rules)
         .unwrap_or_else(|_| "[]".to_string());
-    std::fs::write(store_path(app), body)
+    crate::write_atomic(store_path(app), body)
 }
 
 fn now_millis() -> i64 {

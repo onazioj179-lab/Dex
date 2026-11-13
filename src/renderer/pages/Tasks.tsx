@@ -406,8 +406,8 @@ const loadTasksFromStorage = (): Task[] => {
 const saveTasksToBackend = async (tasks: Task[]): Promise<boolean> => {
   try {
     if (window.dex?.invoke) {
-      await window.dex.invoke('capability:storage:set', 'dex-tasks', tasks);
-      return true;
+      const res = await window.dex.invoke('capability:storage:set', 'dex-tasks', tasks);
+      return res?.success !== false;
     }
   } catch (e) {
     if (import.meta.env.DEV) console.warn('[Tasks] Backend save failed');

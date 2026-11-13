@@ -153,8 +153,8 @@ mod tests {
     fn never_overwrites() {
         let dir = std::env::temp_dir().join(format!("dex-dl-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("a.zip"), b"x").unwrap();
-        std::fs::write(dir.join("a (1).zip"), b"x").unwrap();
+        crate::write_atomic(dir.join("a.zip"), b"x").unwrap();
+        crate::write_atomic(dir.join("a (1).zip"), b"x").unwrap();
         assert_eq!(unique_path(&dir, "a.zip").file_name().unwrap(), "a (2).zip");
         assert_eq!(unique_path(&dir, "b.zip").file_name().unwrap(), "b.zip");
         let _ = std::fs::remove_dir_all(&dir);

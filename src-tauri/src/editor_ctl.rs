@@ -90,7 +90,7 @@ fn read_state(app: &tauri::AppHandle) -> Value {
 
 fn write_state(app: &tauri::AppHandle, state: &Value) {
     if let Ok(raw) = serde_json::to_string(state) {
-        let _ = std::fs::write(store_path(app, STATE_FILE), raw);
+        let _ = crate::write_atomic(store_path(app, STATE_FILE), raw);
     }
 }
 
@@ -461,12 +461,12 @@ fn save(app: &tauri::AppHandle, args: &Value) -> Value {
             format!("{}{}_{}.{}", stem, ORIGINALS_SUFFIX, epoch_ms(), ext)
         };
         let dest = originals_dir(app).join(fname);
-        if std::fs::write(&dest, &bytes).is_ok() {
+        if crate::write_atomic(&dest, &bytes).is_ok() {
             original_path = Some(dest.to_string_lossy().to_string());
         }
     }
 
-    if std::fs::write(&output_path, &bytes).is_err() {
+    if crate::write_atomic(&output_path, &bytes).is_err() {
         return Value::Null;
     }
 

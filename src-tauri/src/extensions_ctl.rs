@@ -92,7 +92,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 // Pretty-write the whole store back (electron-store writes 2-space-indented JSON).
 fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     match serde_json::to_string_pretty(value) {
-        Ok(raw) => std::fs::write(store_path(app, name), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(store_path(app, name), raw).is_ok(),
         Err(_) => false,
     }
 }

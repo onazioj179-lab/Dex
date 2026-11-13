@@ -145,7 +145,7 @@ fn persist_timeline(app: &tauri::AppHandle, store: &TimelineStore) {
         .filter_map(|id| store.events.get(id).cloned())
         .collect();
     if let Ok(text) = serde_json::to_string(&Value::Array(arr)) {
-        let _ = std::fs::write(store_path(app, TIMELINE_FILE), text);
+        let _ = crate::write_atomic(store_path(app, TIMELINE_FILE), text);
     }
 }
 
@@ -176,7 +176,7 @@ fn record_timer_metric(app: &tauri::AppHandle, name: &str, value: i64, timestamp
         }
     }
     if let Ok(text) = serde_json::to_string_pretty(&file) {
-        let _ = std::fs::write(path, text);
+        let _ = crate::write_atomic(path, text);
     }
 }
 
@@ -528,7 +528,7 @@ fn generate_report(app: &tauri::AppHandle) -> Value {
     // Persist the report as the durable "export" artifact and return its path too.
     let path = store_path(app, REPORT_FILE);
     if let Ok(text) = serde_json::to_string_pretty(&report) {
-        let _ = std::fs::write(&path, text);
+        let _ = crate::write_atomic(&path, text);
     }
     let mut out = report;
     if let Some(obj) = out.as_object_mut() {

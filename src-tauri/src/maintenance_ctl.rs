@@ -141,7 +141,7 @@ fn set_state(app: &tauri::AppHandle, new_state: &Value) {
         map.insert(MAINTENANCE_KEY.to_string(), new_state.clone());
     }
     if let Ok(raw) = serde_json::to_string_pretty(&root) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
 }
 

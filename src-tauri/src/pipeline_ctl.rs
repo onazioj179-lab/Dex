@@ -99,7 +99,7 @@ fn read_json(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_json(app: &tauri::AppHandle, name: &str, data: &Value) -> bool {
     match serde_json::to_string_pretty(data) {
-        Ok(s) => std::fs::write(pipeline_path(app, name), s).is_ok(),
+        Ok(s) => crate::write_atomic(pipeline_path(app, name), s).is_ok(),
         Err(_) => false,
     }
 }
@@ -470,7 +470,7 @@ fn save_output(app: &tauri::AppHandle, job: &Value, result: &Value, opts: &Value
     match format {
         "note" => {
             let content = format_as_note(job, result);
-            let _ = std::fs::write(out_dir.join(format!("{}.md", job_id)), content);
+            let _ = crate::write_atomic(out_dir.join(format!("{}.md", job_id)), content);
         }
         "metadata" => {
             let meta = json!({
@@ -479,7 +479,7 @@ fn save_output(app: &tauri::AppHandle, job: &Value, result: &Value, opts: &Value
                 "result": result,
             });
             if let Ok(s) = serde_json::to_string_pretty(&meta) {
-                let _ = std::fs::write(out_dir.join(format!("{}.json", job_id)), s);
+                let _ = crate::write_atomic(out_dir.join(format!("{}.json", job_id)), s);
             }
         }
         "file" => {
@@ -488,7 +488,7 @@ fn save_output(app: &tauri::AppHandle, job: &Value, result: &Value, opts: &Value
                     let _ = std::fs::create_dir_all(parent);
                 }
                 if let Ok(s) = serde_json::to_string_pretty(result) {
-                    let _ = std::fs::write(out_path, s);
+                    let _ = crate::write_atomic(out_path, s);
                 }
             }
         }

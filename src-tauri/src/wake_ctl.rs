@@ -116,7 +116,7 @@ fn save_enabled(app: &tauri::AppHandle, enabled: bool) -> bool {
         Ok(s) => s,
         Err(_) => return false,
     };
-    std::fs::write(store_path(app, ENABLED_FILE), serialized).is_ok()
+    crate::write_atomic(store_path(app, ENABLED_FILE), serialized).is_ok()
 }
 
 // wake:get-state -> getWakeState() == { ...this.wakeState }.

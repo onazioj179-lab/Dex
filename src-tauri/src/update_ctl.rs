@@ -123,7 +123,7 @@ fn read_json(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_json(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     match serde_json::to_string_pretty(value) {
-        Ok(s) => std::fs::write(data_path(app, name), s).is_ok(),
+        Ok(s) => crate::write_atomic(data_path(app, name), s).is_ok(),
         Err(_) => false,
     }
 }

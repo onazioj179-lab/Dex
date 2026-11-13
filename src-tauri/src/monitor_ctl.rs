@@ -454,7 +454,7 @@ fn save_digest(app: &tauri::AppHandle, digest: &Value) {
         digests.drain(0..drop);
     }
     let data = serde_json::to_string_pretty(&Value::Array(digests)).unwrap_or_default();
-    let _ = std::fs::write(store_path(app, DIGEST_FILE), data);
+    let _ = crate::write_atomic(store_path(app, DIGEST_FILE), data);
 }
 
 // Update + persist perf-baseline.json from a digest — port of updateBaseline().
@@ -486,7 +486,7 @@ fn update_baseline(app: &tauri::AppHandle, digest: &Value) {
     base.insert("lastUpdated".into(), json!(now_ms()));
 
     let data = serde_json::to_string_pretty(&Value::Object(base)).unwrap_or_default();
-    let _ = std::fs::write(store_path(app, BASELINE_FILE), data);
+    let _ = crate::write_atomic(store_path(app, BASELINE_FILE), data);
 }
 
 // monitor:stop — clear running, build + persist the digest, update the baseline.

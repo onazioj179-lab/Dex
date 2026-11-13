@@ -151,7 +151,7 @@ fn now_ms() -> u64 {
 fn write_json(app: &tauri::AppHandle, file: &str, value: &Value) -> bool {
     let path = privacy_dir(app).join(file);
     match serde_json::to_string_pretty(value) {
-        Ok(s) => std::fs::write(path, s).is_ok(),
+        Ok(s) => crate::write_atomic(path, s).is_ok(),
         Err(_) => false,
     }
 }

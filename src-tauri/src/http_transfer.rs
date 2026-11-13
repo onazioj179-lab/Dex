@@ -440,7 +440,7 @@ fn resolve_upload(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, id: &st
     if accept {
         if let Some(bytes) = bytes {
             let save_path = std::path::Path::new(&dir).join(&file_name);
-            if std::fs::write(&save_path, &bytes).is_ok() {
+            if crate::write_atomic(&save_path, &bytes).is_ok() {
                 crate::native_ops::emit_event(
                     app,
                     "http-transfer:upload-complete",

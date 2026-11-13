@@ -115,7 +115,7 @@ fn read_cache_object(app: &tauri::AppHandle) -> Map<String, Value> {
 
 fn write_cache(app: &tauri::AppHandle, cache: &Map<String, Value>) {
     if let Ok(raw) = serde_json::to_string(&Value::Object(cache.clone())) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
 }
 

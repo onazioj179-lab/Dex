@@ -125,7 +125,7 @@ fn read_file(app: &tauri::AppHandle, name: &str, fallback: Value) -> Value {
 // pretty output so the persisted file matches what Electron wrote.
 fn write_file(app: &tauri::AppHandle, name: &str, data: &Value) {
     if let Ok(s) = serde_json::to_string_pretty(data) {
-        let _ = std::fs::write(store_path(app, name), s);
+        let _ = crate::write_atomic(store_path(app, name), s);
     }
 }
 

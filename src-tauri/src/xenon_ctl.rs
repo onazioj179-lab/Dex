@@ -86,7 +86,7 @@ fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
 // file stays byte-compatible with what the Electron Xenon engine would read.
 fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(store_path(app, name), raw);
+        let _ = crate::write_atomic(store_path(app, name), raw);
     }
 }
 

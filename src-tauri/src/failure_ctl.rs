@@ -197,7 +197,7 @@ fn now_ms() -> i64 {
 fn write_records(app: &tauri::AppHandle, records: Vec<Value>) {
     let payload = json!({ "records": records });
     if let Ok(raw) = serde_json::to_string(&payload) {
-        let _ = std::fs::write(store_path(app, LOG_FILE), raw);
+        let _ = crate::write_atomic(store_path(app, LOG_FILE), raw);
     }
 }
 

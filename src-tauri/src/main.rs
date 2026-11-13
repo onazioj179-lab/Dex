@@ -597,6 +597,22 @@ fn system_processes() -> Value {
 }
 
 #[cfg(test)]
+mod write_atomic_tests {
+    #[test]
+    fn replaces_existing_and_leaves_no_temp() {
+        let dir = std::env::temp_dir().join(format!("dex-atomic-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("kv.json");
+        super::write_atomic(&p, b"{\"a\":1}").unwrap();
+        super::write_atomic(&p, b"{\"a\":2}").unwrap();
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), "{\"a\":2}");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "no temp file left behind");
+        assert!(super::write_atomic(&dir.join("missing/x.json"), b"x").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
 mod process_ranking_tests {
     use super::{rank_processes, ProcInfo};
 
@@ -917,7 +933,7 @@ mod shell_open_policy_tests {
         let dir = scratch_dir("allow");
         for name in ["report.pdf", "photo.JPG", "notes.txt", "Makefile"] {
             let f = dir.join(name);
-            std::fs::write(&f, b"x").unwrap();
+            crate::write_atomic(&f, b"x").unwrap();
             assert!(check_open_path(&f).is_ok(), "{name} should be allowed");
         }
         assert!(check_open_path(&dir).is_ok(), "folders open in the file manager");
@@ -932,7 +948,7 @@ mod shell_open_policy_tests {
             "screen.scr", "site.url", "page.hta", "tool.jar", "x.py", "x.sh", "x.reg",
         ] {
             let f = dir.join(name);
-            std::fs::write(&f, b"x").unwrap();
+            crate::write_atomic(&f, b"x").unwrap();
             let err = check_open_path(&f).expect_err(name);
             assert!(err.contains("executable"), "{name}: {err}");
         }
@@ -956,7 +972,7 @@ mod shell_open_policy_tests {
     fn path_refuses_alternate_data_streams_and_device_paths() {
         let dir = scratch_dir("ads");
         let f = dir.join("notes.txt");
-        std::fs::write(&f, b"x").unwrap();
+        crate::write_atomic(&f, b"x").unwrap();
         let ads = PathBuf::from(format!("{}:payload.exe", f.display()));
         assert!(check_open_path(&ads).is_err());
         assert!(check_open_path(Path::new("\\\\?\\C:\\Windows\\System32\\calc.exe")).is_err());
@@ -970,7 +986,7 @@ mod shell_open_policy_tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = scratch_dir("exec");
         let f = dir.join("payload");
-        std::fs::write(&f, b"#!/bin/sh\n").unwrap();
+        crate::write_atomic(&f, b"#!/bin/sh\n").unwrap();
         std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
         assert!(check_open_path(&f).is_err());
         let _ = std::fs::remove_dir_all(&dir);
@@ -1029,10 +1045,31 @@ pub(crate) fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
     let mut map = kv_load(app);
     map.insert(key.to_string(), value);
     let data = serde_json::to_string(&Value::Object(map)).unwrap_or_default();
-    match std::fs::write(kv_path(app), data) {
+    match write_atomic(kv_path(app), data.as_bytes()) {
         Ok(()) => json!({ "success": true }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }
+}
+
+/// Write via a temp file + rename so a crash or full disk mid-write never
+/// leaves a truncated file. The KV file holds every app's settings; a plain
+/// `fs::write` that died half way used to lose all of them.
+pub(crate) fn write_atomic<P: AsRef<std::path::Path>, C: AsRef<[u8]>>(path: P, contents: C) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let path = path.as_ref();
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+    let tmp = path.with_file_name(format!(".{name}.{}-{}.tmp", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
+    let result = (|| {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(contents.as_ref())?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, path)
+    })();
+    if result.is_err() { let _ = std::fs::remove_file(&tmp); }
+    result
 }
 
 /// Settings > Reset DEX: set the KV file aside (renamed, not deleted, so a
@@ -1545,7 +1582,7 @@ fn save_snapshot(app: &tauri::AppHandle, snap: &dex_scanner::Snapshot) {
         let path = snapshot_path(app);
         let tmp = path.with_extension("json.tmp");
         // write-then-rename so a crash mid-write never leaves a torn snapshot
-        if std::fs::write(&tmp, bytes).is_ok() {
+        if crate::write_atomic(&tmp, bytes).is_ok() {
             let _ = std::fs::rename(&tmp, &path);
         }
     }

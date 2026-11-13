@@ -112,7 +112,7 @@ fn write_store(app: &tauri::AppHandle, mut store: Value) {
         obj.entry("derivationParams".to_string()).or_insert_with(|| json!({}));
     }
     if let Ok(serialized) = serde_json::to_string_pretty(&store) {
-        let _ = std::fs::write(store_path(app), serialized);
+        let _ = crate::write_atomic(store_path(app), serialized);
     }
 }
 

@@ -96,7 +96,7 @@ fn write_flags(app: &tauri::AppHandle, flags: serde_json::Map<String, Value>) ->
         Ok(s) => s,
         Err(_) => return false,
     };
-    std::fs::write(store_path(app), serialized).is_ok()
+    crate::write_atomic(store_path(app), serialized).is_ok()
 }
 
 // store.get('featureFlags') with the electron-store default of {}.

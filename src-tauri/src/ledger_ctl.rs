@@ -127,7 +127,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let picked = app.dialog().file().set_title("Save CSV").set_file_name(&name).add_filter("CSV", &["csv"]).blocking_save_file().and_then(fp_to_string);
             let Some(path) = picked else { return okv(json!({ "canceled": true })) };
             // UTF-8 BOM so spreadsheet apps read non-ASCII payees correctly.
-            match std::fs::write(&path, format!("\u{feff}{content}")) {
+            match crate::write_atomic(&path, format!("\u{feff}{content}")) {
                 Ok(_) => okv(json!({ "canceled": false, "path": path })),
                 Err(e) => fail(format!("Couldn't save the file: {e}")),
             }
@@ -173,7 +173,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let name = safe_file_name(&name, "receipt");
             let picked = app.dialog().file().set_title("Save receipt").set_file_name(&name).blocking_save_file().and_then(fp_to_string);
             let Some(path) = picked else { return okv(json!({ "canceled": true })) };
-            match std::fs::write(&path, bytes) {
+            match crate::write_atomic(&path, bytes) {
                 Ok(_) => okv(json!({ "canceled": false, "path": path })),
                 Err(e) => fail(e.to_string()),
             }

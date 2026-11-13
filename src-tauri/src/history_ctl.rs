@@ -112,7 +112,7 @@ fn write_events(app: &tauri::AppHandle, events: &[Value]) -> std::io::Result<()>
         events
     };
     let data = serde_json::to_string(&Value::Array(trimmed.to_vec())).unwrap_or_else(|_| "[]".into());
-    std::fs::write(store_path(app, HISTORY_FILE), data)
+    crate::write_atomic(store_path(app, HISTORY_FILE), data)
 }
 
 // --- event field accessors --------------------------------------------------
@@ -341,7 +341,7 @@ fn export_history(app: &tauri::AppHandle, file_path: &str) -> Value {
         Ok(d) => d,
         Err(e) => return json!({ "success": false, "error": e.to_string() }),
     };
-    match std::fs::write(file_path, data) {
+    match crate::write_atomic(file_path, data) {
         Ok(()) => json!({ "success": true }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }

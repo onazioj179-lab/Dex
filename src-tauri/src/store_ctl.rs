@@ -109,7 +109,7 @@ fn get_installed(app: &tauri::AppHandle) -> Vec<Value> {
 // failure is swallowed exactly as the Electron `log.warn` path did.
 fn write_array(app: &tauri::AppHandle, name: &str, arr: &[Value]) {
     if let Ok(raw) = serde_json::to_string_pretty(&Value::Array(arr.to_vec())) {
-        let _ = std::fs::write(store_path(app, name), raw);
+        let _ = crate::write_atomic(store_path(app, name), raw);
     }
 }
 

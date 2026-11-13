@@ -122,7 +122,7 @@ fn write_state(app: &tauri::AppHandle, recent: &[String]) {
         "folders": folders,
     });
     if let Ok(pretty) = serde_json::to_string_pretty(&state) {
-        let _ = std::fs::write(store_path(app, STATE_FILE), pretty);
+        let _ = crate::write_atomic(store_path(app, STATE_FILE), pretty);
     }
 }
 
@@ -428,7 +428,7 @@ fn save_file(app: &tauri::AppHandle, file: &Value) -> Value {
     // undefined would throw in Node, but the renderer always sends a string).
     let content = file.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
-    match std::fs::write(&file_path, content.as_bytes()) {
+    match crate::write_atomic(&file_path, content.as_bytes()) {
         Ok(()) => {
             add_to_recent(app, &file_path);
             json!(true)

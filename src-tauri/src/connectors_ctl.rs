@@ -97,7 +97,7 @@ fn read_connectors(app: &tauri::AppHandle) -> Vec<Value> {
 fn write_connectors(app: &tauri::AppHandle, connectors: &[Value]) {
     let data = json!({ "version": 1, "connectors": connectors });
     if let Ok(raw) = serde_json::to_string_pretty(&data) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
     // Native equivalent of the renderer re-fetching after a mutation.
     crate::native_ops::emit_event(app, "connectors:changed", &Value::Null);
@@ -139,7 +139,7 @@ fn log_op(
         log = log[start..].to_vec();
     }
     if let Ok(raw) = serde_json::to_string(&log) {
-        let _ = std::fs::write(log_path(app), raw);
+        let _ = crate::write_atomic(log_path(app), raw);
     }
 }
 
@@ -452,7 +452,7 @@ fn write_file_b64(app: &tauri::AppHandle, connector_id: &str, relative_path: &st
     if let Some(dir) = full.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    match std::fs::write(&full, &bytes) {
+    match crate::write_atomic(&full, &bytes) {
         Ok(_) => {
             touch_last_accessed(app, connector_id);
             log_op(app, connector_id, "write", relative_path, true, None);
@@ -503,7 +503,7 @@ fn copy_to_local(app: &tauri::AppHandle, connector_id: &str, relative_path: &str
     if let Some(dir) = dest.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    match std::fs::write(&dest, &bytes) {
+    match crate::write_atomic(&dest, &bytes) {
         Ok(_) => {
             log_op(app, connector_id, "copy", relative_path, true, None);
             json!(true)
@@ -522,7 +522,7 @@ fn touch_last_accessed(app: &tauri::AppHandle, connector_id: &str) {
         }
         let data = json!({ "version": 1, "connectors": connectors });
         if let Ok(raw) = serde_json::to_string_pretty(&data) {
-            let _ = std::fs::write(store_path(app), raw);
+            let _ = crate::write_atomic(store_path(app), raw);
         }
     }
 }

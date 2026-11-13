@@ -329,7 +329,7 @@ fn export_to_path(app: &tauri::AppHandle, target_path: &str, options: &Value) ->
     // the field was cosmetic and never drove the written item set).
 
     let content = pretty(&Value::Object(export));
-    if let Err(e) = std::fs::write(target_path, content.as_bytes()) {
+    if let Err(e) = crate::write_atomic(target_path, content.as_bytes()) {
         return json!({ "success": false, "error": format!("{}", e) });
     }
 
@@ -410,7 +410,7 @@ fn import_from_path(app: &tauri::AppHandle, source_path: &str) -> Value {
     let (imp_operations, s4) = merge_field(&mut current, &parsed, "operations");
     skipped += s1 + s2 + s3 + s4;
 
-    if let Err(e) = std::fs::write(&data_path, pretty(&current).as_bytes()) {
+    if let Err(e) = crate::write_atomic(&data_path, pretty(&current).as_bytes()) {
         return import_error(&format!("{}", e));
     }
 
@@ -440,7 +440,7 @@ fn import_from_path(app: &tauri::AppHandle, source_path: &str) -> Value {
             }
         }
         sobj.insert("sessions".into(), Value::Array(merged));
-        if let Err(e) = std::fs::write(&sessions_path, pretty(&sdata).as_bytes()) {
+        if let Err(e) = crate::write_atomic(&sessions_path, pretty(&sdata).as_bytes()) {
             return import_error(&format!("{}", e));
         }
     }

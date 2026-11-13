@@ -112,7 +112,7 @@ fn read_store_obj(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
 // human-readable JSON). Best-effort: IO errors are swallowed like the read path.
 fn write_store(app: &tauri::AppHandle, obj: &serde_json::Map<String, Value>) {
     if let Ok(raw) = serde_json::to_string_pretty(&Value::Object(obj.clone())) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
 }
 

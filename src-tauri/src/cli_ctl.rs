@@ -75,7 +75,7 @@ fn read_store(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_store(app: &tauri::AppHandle, name: &str, value: &Value) -> bool {
     match serde_json::to_string_pretty(value) {
-        Ok(raw) => std::fs::write(store_path(app, name), raw).is_ok(),
+        Ok(raw) => crate::write_atomic(store_path(app, name), raw).is_ok(),
         Err(_) => false,
     }
 }
@@ -477,7 +477,7 @@ fn export_items(app: &tauri::AppHandle, ty: Option<&str>, opts: &serde_json::Map
     };
 
     let raw = serde_json::to_string_pretty(&data).unwrap_or_default();
-    match std::fs::write(&full_path, raw) {
+    match crate::write_atomic(&full_path, raw) {
         Ok(_) => result(
             true,
             format!("Exported {ty} to: {}", full_path.to_string_lossy()),

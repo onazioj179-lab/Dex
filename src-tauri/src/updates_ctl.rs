@@ -94,7 +94,7 @@ fn read_json(app: &tauri::AppHandle, name: &str) -> Value {
 // exactly as the TS logs-and-continues path does.
 fn write_json(app: &tauri::AppHandle, name: &str, value: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(data_path(app, name), raw);
+        let _ = crate::write_atomic(data_path(app, name), raw);
     }
 }
 

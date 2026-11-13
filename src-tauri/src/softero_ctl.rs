@@ -118,7 +118,7 @@ fn read_json(app: &tauri::AppHandle, name: &str) -> Value {
 
 fn write_json(app: &tauri::AppHandle, name: &str, value: &Value) {
     if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(softero_dir(app).join(name), raw);
+        let _ = crate::write_atomic(softero_dir(app).join(name), raw);
     }
 }
 
@@ -725,7 +725,7 @@ fn quarantine_file(
     let q_path = quarantine_dir(app).join(format!("{}.quarantine", id));
     let key = xor_key_for(&id);
     let encrypted = xor_transform(&file_data, &key);
-    if std::fs::write(&q_path, &encrypted).is_err() {
+    if crate::write_atomic(&q_path, &encrypted).is_err() {
         return Value::Null;
     }
     // Remove original (best-effort; if it fails, roll back the blob).
@@ -785,7 +785,7 @@ fn restore_quarantine(app: &tauri::AppHandle, id: &str) -> Value {
     if let Some(parent) = Path::new(&original).parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if std::fs::write(&original, &decrypted).is_err() {
+    if crate::write_atomic(&original, &decrypted).is_err() {
         return json!(false);
     }
     let _ = std::fs::remove_file(&q_path);

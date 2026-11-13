@@ -499,7 +499,7 @@ fn save_audit(app: &tauri::AppHandle, data: &Value) {
         }
     }
     if let Ok(s) = serde_json::to_string_pretty(&out) {
-        let _ = std::fs::write(audit_path(app), s);
+        let _ = crate::write_atomic(audit_path(app), s);
     }
 }
 

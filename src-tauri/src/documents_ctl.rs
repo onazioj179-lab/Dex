@@ -111,7 +111,7 @@ fn read_custom(app: &tauri::AppHandle) -> Vec<Value> {
 fn write_custom(app: &tauri::AppHandle, custom: &[Value]) -> bool {
     let body = json!({ "templates": custom });
     match serde_json::to_string_pretty(&body) {
-        Ok(s) => std::fs::write(store_path(app), s).is_ok(),
+        Ok(s) => crate::write_atomic(store_path(app), s).is_ok(),
         Err(_) => false,
     }
 }
@@ -457,7 +457,7 @@ fn create_document(app: &tauri::AppHandle, request: &Value) -> Value {
     }
 
     // Write + stat.
-    match std::fs::write(&output_path, content.as_bytes()) {
+    match crate::write_atomic(&output_path, content.as_bytes()) {
         Ok(()) => match std::fs::metadata(&output_path) {
             Ok(meta) => {
                 set(&mut result, "success", json!(true));

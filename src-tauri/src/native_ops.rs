@@ -168,7 +168,7 @@ pub fn write_text(args: &Value) -> Value {
     if path.is_empty() { return json!({ "ok": false, "error": "No file path." }); }
     let target = std::path::Path::new(path);
     let tmp = target.with_extension(format!("{}.dex-tmp", target.extension().and_then(|e| e.to_str()).unwrap_or("")));
-    if let Err(e) = std::fs::write(&tmp, content.as_bytes()) {
+    if let Err(e) = crate::write_atomic(&tmp, content.as_bytes()) {
         return json!({ "ok": false, "error": e.to_string() });
     }
     match std::fs::rename(&tmp, target) {
@@ -307,7 +307,7 @@ pub fn changelog_export(app: &tauri::AppHandle, args: &Value) -> Value {
         Some(p) => p,
         None => return Value::Null,
     };
-    match std::fs::write(&path, md.as_bytes()) {
+    match crate::write_atomic(&path, md.as_bytes()) {
         Ok(()) => json!(path),
         Err(_) => Value::Null,
     }
@@ -359,7 +359,7 @@ pub fn note_save_export(app: &tauri::AppHandle, args: &Value) -> Value {
         .blocking_save_file()
         .and_then(fp_to_string);
     let Some(path) = picked else { return json!({ "success": false, "cancelled": true }) };
-    match std::fs::write(&path, text.as_bytes()) {
+    match crate::write_atomic(&path, text.as_bytes()) {
         Ok(()) => json!({ "success": true, "path": path }),
         Err(e) => json!({ "success": false, "error": format!("couldn't write the file: {e}") }),
     }
@@ -982,14 +982,14 @@ mod note_import_tests {
         let dir = std::env::temp_dir().join(format!("dex-note-import-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let md = dir.join("a.md");
-        std::fs::write(&md, b"\xEF\xBB\xBF# Hi\nthere").unwrap();
+        crate::write_atomic(&md, b"\xEF\xBB\xBF# Hi\nthere").unwrap();
         let r = note_read_import(&json!([md.to_string_lossy()]));
         assert_eq!(r["success"], true);
         assert_eq!(r["name"], "a.md");
         assert_eq!(r["text"], "# Hi\nthere");
 
         let bin = dir.join("b.png");
-        std::fs::write(&bin, [0x89u8, 0x50, 0x00, 0x01]).unwrap();
+        crate::write_atomic(&bin, [0x89u8, 0x50, 0x00, 0x01]).unwrap();
         assert_eq!(note_read_import(&json!([bin.to_string_lossy()]))["success"], false);
         assert_eq!(note_read_import(&json!([dir.join("missing.md").to_string_lossy()]))["success"], false);
         assert_eq!(note_read_import(&json!([dir.to_string_lossy()]))["success"], false);

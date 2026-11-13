@@ -99,7 +99,7 @@ fn load(app: &tauri::AppHandle) -> Value {
 
 fn save(app: &tauri::AppHandle, patterns: &Value) {
     if let Ok(s) = serde_json::to_string_pretty(patterns) {
-        let _ = std::fs::write(store_path(app), s);
+        let _ = crate::write_atomic(store_path(app), s);
     }
 }
 

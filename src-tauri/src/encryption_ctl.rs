@@ -127,7 +127,7 @@ fn read_store(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
 
 fn write_store(app: &tauri::AppHandle, data: &serde_json::Map<String, Value>) -> bool {
     match serde_json::to_string_pretty(&Value::Object(data.clone())) {
-        Ok(s) => std::fs::write(store_path(app), s).is_ok(),
+        Ok(s) => crate::write_atomic(store_path(app), s).is_ok(),
         Err(_) => false,
     }
 }

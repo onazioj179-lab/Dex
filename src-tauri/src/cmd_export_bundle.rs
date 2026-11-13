@@ -339,7 +339,7 @@ pub fn create(app: &tauri::AppHandle, args: &Value) -> Value {
 
     // --- gzip (zlib.gzipSync default == level 6) and write -------------------
     let compressed = crate::zlib::gzip(json_bundle.as_bytes());
-    match std::fs::write(&file_path, &compressed) {
+    match crate::write_atomic(&file_path, &compressed) {
         Ok(()) => json!(file_path),
         Err(_) => Value::Null, // matches the TS try/catch -> return null
     }

@@ -183,7 +183,7 @@ fn save_memo(conn: &Connection, data_dir: &Path, args: &Value) -> Value {
     let now = now_ms();
     let filename = format!("memo_{}_{}.opus", now, rand_suffix());
     let filepath = memos_dir.join(filename);
-    if std::fs::write(&filepath, &audio).is_err() {
+    if crate::write_atomic(&filepath, &audio).is_err() {
         return Value::Null;
     }
     let filepath_str = filepath.to_string_lossy().to_string();

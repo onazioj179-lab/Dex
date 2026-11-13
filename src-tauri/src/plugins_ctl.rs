@@ -98,7 +98,7 @@ fn read_store(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
 // pretty JSON; we match that so the file stays human-diffable).
 fn write_store(app: &tauri::AppHandle, root: &serde_json::Map<String, Value>) -> bool {
     let data = serde_json::to_string_pretty(&Value::Object(root.clone())).unwrap_or_default();
-    std::fs::write(store_path(app, PLUGINS_FILE), data).is_ok()
+    crate::write_atomic(store_path(app, PLUGINS_FILE), data).is_ok()
 }
 
 // The `plugins` map from the store (default {} when unset / file missing).

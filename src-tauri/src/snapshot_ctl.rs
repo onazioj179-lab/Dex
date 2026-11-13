@@ -86,7 +86,7 @@ fn read_file(app: &tauri::AppHandle) -> Value {
 
 fn write_file(app: &tauri::AppHandle, root: &Value) {
     if let Ok(raw) = serde_json::to_string(root) {
-        let _ = std::fs::write(store_path(app), raw);
+        let _ = crate::write_atomic(store_path(app), raw);
     }
 }
 
