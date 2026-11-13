@@ -24,7 +24,7 @@ import { paintRackPlayhead } from './ImosionRackPlayhead';
 import { evenChopBounds, computeChopSegments } from './ImosionChop';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave } from '../../utils/useAutoSave';
+import { saveBothCopies } from '../../utils/saveBothCopies';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS } from '../../utils/adaptiveCanvas';
@@ -2227,21 +2227,20 @@ ChannelRackRow.displayName = 'ChannelRackRow';
 
 // ==================== COMPONENT ====================
 const Imosion: React.FC = () => {
+  // Save status from real writes. Before, the indicator followed an isDirty
+  // flag that only the two import paths set: ordinary edits never showed
+  // "Saved", a failed save never showed "Not saved", and the leave-page guard
+  // stayed off while work was not being kept. (A useAutoSave call stored the
+  // constant {isDirty:true} as its "recovery copy"; removed.)
   const [isDirty, setIsDirty] = useState(false);
-  useUnsavedGuard(isDirty);
-  // Creative app settings from Settings page
-  useAutoSave('imosion', useCallback(() => ({ isDirty: true }), []), isDirty, 30_000);
-  // Imosion persists on a 500ms debounce that flips isDirty back to false, so the
-  // dirty flag is a faithful save signal: dirty -> "Saving...", clean -> "Saved".
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [autosaveLastSavedAt, setAutosaveLastSavedAt] = useState<number | null>(null);
-  const wasDirtyRef = useRef(false);
-  const autosaveState: AutosaveState = isDirty ? 'saving' : (autosaveLastSavedAt ? 'saved' : 'idle');
-  useEffect(() => {
-    // Only stamp a save time on a real dirty -> clean transition, so a freshly
-    // opened, untouched project stays "Up to date" rather than flashing "Saved".
-    if (!isDirty && wasDirtyRef.current) setAutosaveLastSavedAt(Date.now());
-    wasDirtyRef.current = isDirty;
-  }, [isDirty]);
+  useUnsavedGuard(isDirty || saveError !== null);
+  // Loading the stored project at start is not an edit: "Saved Ns ago" appears
+  // only once the user has pressed a key or the pointer inside Imosion.
+  const userTouchedRef = useRef(false);
+  const autosaveState: AutosaveState = saveError ? 'error' : (autosaveLastSavedAt ? 'saved' : 'idle');
+  const autosaveLabel = saveError ? 'Not saved' : (autosaveLastSavedAt ? undefined : 'Up to date');
   const collab = useCollaborationFeatures({ appId: 'imosion', projectName: 'IMOSION Project', autoCheckpointInterval: 300000 });
 
   const { dropProps, dropOverlayStyle } = useFileDrop(
@@ -4039,29 +4038,38 @@ const Imosion: React.FC = () => {
   // Save data (dual-write: localStorage + IPC) — debounced to avoid heavy serialization on every change
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveFailedRef = useRef(false);
+  const saveSeqRef = useRef(0);
+  const lastSavedJsonRef = useRef<string | null>(null);
   const saveProjectData = useCallback((showToast = false) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
     const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
-    // Native copy first, so a full app store can't skip it. A failed local
-    // write used to throw inside the autosave timer: nothing was shown, Save
-    // did nothing, and the project still looked saved.
-    (window as any).dex?.invoke?.('capability:storage:set', 'imosion-data', json)?.catch?.((e: unknown) => { console.warn('[DEX]', e); });
-    try {
-      localStorage.setItem('imosion-data', json);
-    } catch (e) {
-      console.warn('[Imosion] save failed', e);
-      if (showToast || !saveFailedRef.current) {
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "Imosion couldn't save the project: app storage is full. Export your mix now and remove unused clips." } }));
+    // Nothing changed since the last good save (re-renders, playback): no write.
+    if (!showToast && json === lastSavedJsonRef.current) return;
+    const seq = ++saveSeqRef.current;
+    // Both copies; the save counts when either is written. A failed local
+    // write used to throw inside the autosave timer, and the native reply was
+    // never read.
+    void saveBothCopies('imosion-data', json, 'the Imosion project').then((res) => {
+      if (seq !== saveSeqRef.current) return; // a newer save superseded this one
+      if (!res.ok) {
+        const why = `${res.error ?? 'Not saved.'} Export your mix now (File › Export) and remove unused clips.`;
+        setSaveError(why);
+        if (showToast || !saveFailedRef.current) {
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: why } }));
+        }
+        saveFailedRef.current = true;
+        return;
       }
-      saveFailedRef.current = true;
-      return;
-    }
-    saveFailedRef.current = false;
-    setIsDirty(false);
-    if (showToast) {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));
-    }
+      lastSavedJsonRef.current = json;
+      saveFailedRef.current = false;
+      setSaveError(null);
+      setIsDirty(false);
+      if (userTouchedRef.current || showToast) setAutosaveLastSavedAt(Date.now());
+      if (showToast) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));
+      }
+    });
   }, [bitDepth, bpm, buses, installedPlugins, masterSettings, sampleRate, templates, tracks]);
 
   useEffect(() => {
@@ -6765,7 +6773,7 @@ const Imosion: React.FC = () => {
   const selectedTrackData = selectedTrack ? tracks.find(t => t.id === selectedTrack) ?? null : null;
 
   return (
-    <div ref={containerRef} {...dropProps} className="imosion-root dex-theme-dark" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', userSelect: 'none', position: 'relative', transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style', minWidth: 0 } as React.CSSProperties}>
+    <div ref={containerRef} {...dropProps} onPointerDownCapture={() => { userTouchedRef.current = true; }} onKeyDownCapture={() => { userTouchedRef.current = true; }} className="imosion-root dex-theme-dark" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', userSelect: 'none', position: 'relative', transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style', minWidth: 0 } as React.CSSProperties}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop audio files to import</div>}
       {/* Hidden file input for audio import */}
       <input 
@@ -6916,7 +6924,9 @@ const Imosion: React.FC = () => {
             <img src={new URL('../../../../appicons/imosion.png', import.meta.url).href} alt="Imosion" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>Imosion</span>
           </div>
-          <AutosaveIndicator state={autosaveState} lastSavedAt={autosaveLastSavedAt} />
+          <span title={saveError ?? 'Imosion keeps the project in app storage as you work'}>
+            <AutosaveIndicator state={autosaveState} lastSavedAt={autosaveLastSavedAt} label={autosaveLabel} />
+          </span>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* File Menu */}
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFileMenu(false)}>

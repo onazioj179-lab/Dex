@@ -3603,3 +3603,8 @@ These need DSP/ML or native hosting we don't fake.
 - UI unslop pass 2: decorative 135° gradients flattened (Home icon fallbacks, splash, Imosion, Settings, Share, PRISM swatches, VINX offline clip); 19 dead gradient CSS rules and the unused `DEX_THEME` removed (#167). Left: header heights, Control Center.
 - AXL: true save status, a full store no longer throws inside edits, checked Open Project, New/Open keep the old project as a checkpoint, drop/import use the real mesh importer, export failures shown (#168).
 - Next: Imosion/Canvas save indicators and Forge (#77), `{success:false}` sweep on non-file channels (#61), test-only orphan pruning (#53), packaged runs listed at the end of the backlog.
+
+## Checkpoint 2026-11-12 (Imosion, Canvas, Forge save status)
+
+- Every creative app now shows a save state that comes from real writes (#169). New `utils/saveBothCopies.ts` writes app storage and the native store and reads the native reply; `persistSetStrict` lets IndexedDB failures surface (Canvas's warning could never fire before). Forge's queue autosave is real (it was a timed fake "Saved").
+- Next on #77: workflow-by-workflow audit; Rewind, Gallery, Pixel Art save paths.

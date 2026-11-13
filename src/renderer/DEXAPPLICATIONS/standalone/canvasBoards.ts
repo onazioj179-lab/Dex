@@ -14,7 +14,7 @@
 // is migrated into a first board exactly once.
 //
 
-import { persistGet, persistSet, persistDel } from '../../utils/persistentStore';
+import { persistGet, persistSetStrict, persistDel } from '../../utils/persistentStore';
 
 export interface BoardLayer { id: string; name: string; visible: boolean; opacity: number; data: string }
 export interface BoardPayload { layers: BoardLayer[]; activeLayerId?: string; /** Whiteboard objects (see canvasObjects.ts). */ objects?: unknown[] }
@@ -32,7 +32,8 @@ export interface BoardStore {
   set<T>(key: string, value: T): Promise<void>;
   del(key: string): Promise<void>;
 }
-export const idbBoardStore: BoardStore = { get: persistGet, set: persistSet, del: persistDel };
+// Writes reject on failure (quota, blocked store) so Canvas can show "Not saved".
+export const idbBoardStore: BoardStore = { get: persistGet, set: persistSetStrict, del: persistDel };
 
 let seq = 0;
 export const newBoardId = () => `board-${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -98,7 +99,8 @@ export async function loadIndex(store: BoardStore = idbBoardStore, ls: Pick<Stor
       }
     } catch { /* corrupt legacy drawing: start clean, keep the old key untouched */ }
   }
-  await store.set(INDEX_KEY, index);
+  // First run: if the list cannot be written yet, open anyway; the next save reports it.
+  try { await store.set(INDEX_KEY, index); } catch { /* reported by the next board save */ }
   return index;
 }
 

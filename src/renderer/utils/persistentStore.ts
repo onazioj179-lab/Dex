@@ -14,6 +14,11 @@ export async function persistGet<T>(key: string): Promise<T | undefined> {
 export async function persistSet<T>(key: string, value: T): Promise<void> {
   try { await idbSet(PREFIX + key, value); } catch (e) { console.warn('[persist]', key, e); }
 }
+/** Like persistSet, but a failed write rejects so the caller can say "Not saved".
+    persistSet swallowed it, which hid every Canvas board-save failure. */
+export async function persistSetStrict<T>(key: string, value: T): Promise<void> {
+  await idbSet(PREFIX + key, value);
+}
 export async function persistDel(key: string): Promise<void> {
   try { await idbDel(PREFIX + key); } catch (e) { console.warn('[persist]', key, e); }
 }
