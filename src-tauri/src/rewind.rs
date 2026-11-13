@@ -45,6 +45,14 @@ fn now_ms() -> i64 {
 /// `AppHandle`: on Windows `%APPDATA%/DEX`, else `$HOME/.config/DEX`, with a
 /// temp-dir fallback so a write is always possible.
 fn rewind_dir() -> PathBuf {
+    // `DEX_DATA_DIR` (test runs, CDP checks) wins, like every other DEX
+    // store; this module used to ignore it, so an isolated test run still
+    // wrote to the real profile's Rewind log.
+    if let Some(dir) = crate::paths::data_dir_override() {
+        let dir = dir.join("rewind");
+        let _ = std::fs::create_dir_all(&dir);
+        return dir;
+    }
     #[cfg(windows)]
     let base = std::env::var_os("APPDATA").map(PathBuf::from);
     #[cfg(not(windows))]
@@ -73,6 +81,16 @@ fn load_events() -> Vec<dex_rewind::ActivityEvent> {
         .filter(|l| !l.trim().is_empty())
         .filter_map(|l| serde_json::from_str::<dex_rewind::ActivityEvent>(l).ok())
         .collect()
+}
+
+/// Delete the recorded activity log at `path` (the only data this module
+/// writes). A missing log is not an error: there was nothing to delete.
+fn delete_activity_log_at(path: &std::path::Path) -> Value {
+    match std::fs::remove_file(path) {
+        Ok(()) => json!({ "success": true, "deleted": true }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({ "success": true, "deleted": false }),
+        Err(e) => json!({ "success": false, "error": e.to_string() }),
+    }
 }
 
 /// Append one already-serialized event line to the activity log.
@@ -244,6 +262,10 @@ pub fn dispatch(channel: &str, args: &Value) -> Value {
             summarize_day(&load_events(), &date)
         }
 
+        // `rewind:deleteAllData` -> `{ success, deleted }`. Settings › Danger
+        // Zone. Had no handler (answered null) while the screen said done.
+        "rewind:deleteAllData" => delete_activity_log_at(&activity_log_path()),
+
         _ => Value::Null,
     }
 }
@@ -305,6 +327,27 @@ fn summarize_day(events: &[dex_rewind::ActivityEvent], date: &str) -> Value {
         "topApps": top_apps,
         "hours": hours.to_vec(),
     })
+}
+
+#[cfg(test)]
+mod delete_tests {
+    use super::delete_activity_log_at;
+
+    #[test]
+    fn deletes_the_log_and_treats_missing_as_nothing_to_delete() {
+        let dir = std::env::temp_dir().join(format!("dex-rewind-del-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("activity-log.ndjson");
+        std::fs::write(&log, "{}\n").unwrap();
+        let r = delete_activity_log_at(&log);
+        assert_eq!(r["success"], true);
+        assert_eq!(r["deleted"], true);
+        assert!(!log.exists());
+        let again = delete_activity_log_at(&log);
+        assert_eq!(again["success"], true);
+        assert_eq!(again["deleted"], false);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 #[cfg(test)]

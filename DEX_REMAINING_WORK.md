@@ -73,7 +73,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8 checks.
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 61 | File-op failures reported as success | FIXED (+ Notes save failures, Organize by type) | The bridge resolves `{success:false}`; Files, PowerRename and Workflows now treat it as a failure | `Files.tsx` `fileOp()` | Other apps may ignore `{success:false}` on non-file channels; sweep them | — | P2 |
+| 61 | File-op failures reported as success | FIXED (+ Notes save failures, Organize by type) | The bridge resolves `{success:false}`; Files, PowerRename and Workflows now treat it as a failure | `Files.tsx` `fileOp()` | Shell opens swept in #191 (`openWithShell`); still to sweep: other non-file channels that answer `{success:false}` | — | P2 |
 | 62 | DEX Recycle Bin "Restore" did nothing | FIXED | Notes are un-trashed or recreated, Kanban cards go back to their column; the row is removed only afterwards. Old Files rows say they can't be restored | `recycleRestore.ts`, `RecycleBin.tsx`, `KanbanApp.tsx` | Rows written by `content_expiry`/`bulk_metadata` are shown as not restorable | — | P3 |
 | 65 | Launch latency grows with open windows | FIXED (p50 29 ms with 59 open, was 172 ms) | p50 48 ms (10 open) → 172 ms (59 open); each launch re-renders work proportional to open windows | `AppManager.tsx` | Profile a launch with 30 open; memoise per-window chrome | — | P2 |
 
@@ -148,6 +148,12 @@ Completed rows (nothing left to do or check) moved to `docs/reports/DEX_COMPLETE
 |---|---|---|---|---|---|---|
 | 167 | Shell / apps | UI unslop pass 2 (#164 follow-up) | MEDIUM | PARTIAL (tests) | Flat fills instead of decorative 135° gradients: Home icon fallbacks (and their 12 px shadows cut to 2 px), startup splash logo (blue→purple), Imosion buttons (a gradient of one colour twice) and track avatars, Settings app tints, Share dialog note, PRISM filter swatches, VINX offline-clip placeholder (navy gradient; now flat and says "Media not loaded"). Dead CSS removed: 19 rules for classes no component uses (`vault-item-icon`, `voice-orb`, `automation-icon`, `device-card`, `transfer-icon`, `learning-icon`, `plugin-icon`, six `*-accent-gradient`, `vinx-clip`), and the unused `DEX_THEME` constant (gradient backgrounds, 14–20 px radii). Kept: live wallpapers and LUT thumbnails (content), the resize grip. `ui-unslop-guard.test.ts` gained a pass-2 check | Header heights; Control Center (owner taste) |
 
+## Session 2026-11-13 (`claude/save-sweep`): Rewind honesty
+
+| # | App | Requirement | Priority | Status | Evidence / blocker | Next action |
+|---|---|---|---|---|---|---|
+| 192 | Rewind | Rewind captures nothing in the Tauri app; controls that did nothing | HIGH | PARTIAL (honest now; capture is an owner decision) | Nothing in the app calls `rewind:record`, so the activity log stays empty; most Electron-era channels (`getSettings`, `toggleRecording`, `getBackupSettings`, `runBackupNow`, `restoreBackupFromPicker`, workspace profiles, plugins, `runIntegrityCheck`, `deleteAllData`) have no Tauri handler and answer null. The screen still showed a red recording dot (state started as true), working-looking Backup / Profiles / Plugins sections, an integrity check that read null as a pass, and "Delete All Rewind Data" cleared the screen while nothing was deleted. Now: recording starts off and both record toggles are disabled with "activity capture is not part of this version"; sections whose channel answers null are hidden with one note; the integrity check says it is unavailable; `rewind:deleteAllData` is real (removes the activity log; Rust test) and the screen clears only on success. Also: the Rewind log path ignored `DEX_DATA_DIR`, so isolated test runs wrote to the real profile; it now follows it. Preview: Settings showed the note, no Backup/Profiles/Plugins buttons, "Not recording" disabled | Owner: build activity capture (changes `PRIVACY.md`) or retire Rewind |
+
 ## Done, waiting on a check or an owner decision
 
 The work in these rows is finished; what is left is a run in the packaged/installed app, on hardware, or an owner choice. Full detail is in `docs/reports/DEX_COMPLETED_WORK.md` under the same number.
@@ -201,6 +207,7 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 163 | FLUX: True save state; unsaved flag that clears; Open Project that checks the … | Packaged-app run |
 | 165 | Browser: block ads and trackers in WebView2 itself, before requests leave … | Packaged-app run |
 | 168 | AXL: Save state that is true; Open/New that cannot lose work; honest export … | Packaged-app run |
+| 191 | Gallery, Pixel Art, Files, Home, Settings, Terminal: silent failures and a Gallery crash … | Packaged-app run |
 | 9 | Cloud model catalog is dated | Provider key |
 | 11 | Agent resume after app restart | Provider key |
 | 159 | UKI: UKI can schedule reminders and background requests (ROADMAP GOAL track 2 … | Provider key |

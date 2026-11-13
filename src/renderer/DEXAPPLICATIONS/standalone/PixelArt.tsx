@@ -32,6 +32,15 @@ interface PersistedState {
 
 const STORAGE_KEY = 'dex-pixelart-state';
 const MAX_FRAMES = 8;
+const GRID_SIZES: readonly number[] = [8, 16, 32, 64];
+
+/** True when every frame is a size x size grid of colour strings or null. */
+export function framesFit(frames: unknown, size: number): frames is Frame[] {
+  return Array.isArray(frames) && frames.length > 0 && frames.length <= MAX_FRAMES
+    && frames.every((fr) => Array.isArray(fr) && fr.length === size
+      && fr.every((row) => Array.isArray(row) && row.length === size
+        && row.every((px) => px === null || typeof px === 'string')));
+}
 
 const toast = (type: 'success' | 'error' | 'info', message: string) => {
   try {
@@ -172,13 +181,22 @@ const PixelArt: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isDrawingRef = useRef(false);
 
-  // Load persisted state
+  // Load persisted state. A stored drawing whose frames do not match its grid
+  // used to load anyway and crash the first draw; it is now kept aside under
+  // an `.unreadable-<time>` key (never overwritten) and the user is told.
+  const loadedRef = useRef(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as PersistedState;
-        if (parsed.size && parsed.frames && Array.isArray(parsed.frames)) {
+        let parsed: PersistedState | null = null;
+        try { parsed = JSON.parse(raw) as PersistedState; } catch { parsed = null; }
+        const ok = !!parsed && GRID_SIZES.includes(parsed.size) && framesFit(parsed.frames, parsed.size);
+        if (!ok) {
+          try { localStorage.setItem(`${STORAGE_KEY}.unreadable-${Date.now()}`, raw); } catch { /* store full: original key is left as is until the next edit */ }
+          toast('error', "Your saved Pixel Art couldn't be read, so a new drawing was started. The old data was kept in app storage.");
+        }
+        if (ok && parsed) {
           setSize(parsed.size);
           setFrames(parsed.frames);
           setCurrentFrame(Math.min(parsed.currentFrame ?? 0, parsed.frames.length - 1));
@@ -194,11 +212,17 @@ const PixelArt: React.FC = () => {
         }
       }
     } catch { /* ignore */ }
+    loadedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist
+  // Persist. The first run is the defaults, before the loaded state has been
+  // applied; writing them replaced the stored drawing for a moment, and for
+  // good if the load then failed.
+  const firstPersistRef = useRef(true);
   useEffect(() => {
+    if (firstPersistRef.current) { firstPersistRef.current = false; return; }
+    if (!loadedRef.current) return;
     const state: PersistedState = { size, frames, currentFrame, color, tool, mirror, onion, fps, exportScale, tilePreview, paletteLock, lockedPalette };
     try { persistOrWarn(STORAGE_KEY, JSON.stringify(state), 'your Pixel Art'); } catch { /* serialisation failed */ }
   }, [size, frames, currentFrame, color, tool, mirror, onion, fps, exportScale, tilePreview, paletteLock, lockedPalette]);
