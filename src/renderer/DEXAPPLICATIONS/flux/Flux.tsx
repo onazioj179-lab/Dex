@@ -19,6 +19,7 @@ import { clampEventToViewport } from '../../utils/menuPosition';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave, type AutoSaveResult } from '../../utils/useAutoSave';
 import { parseFluxProject } from './fluxProject';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { rewardUnlocks } from '../../services/achievementEngine';
@@ -2331,6 +2332,17 @@ const Flux: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: dropped ? 'warning' : 'success', message: `Saved ${a.download}.${dropped ? ` ${dropped} image/video layer(s) keep their settings but not the media itself; add the media again after opening.` : ''}` } }));
   }, [layers, fps, duration, canvasSize, is3DMode]);
 
+  // Apply a checked project (Open Project or a Collab Hub checkpoint). The
+  // layer change is an undo step like any other (history tracks layers).
+  const applyOpenedProject = useCallback((opened: Layer[], settings: ReturnType<typeof parseFluxProject>['settings']) => {
+    setLayers(opened);
+    if (settings.fps !== undefined) setFps(settings.fps);
+    if (settings.duration !== undefined) setDuration(settings.duration);
+    if (settings.canvasSize) setCanvasSize(settings.canvasSize);
+    if (settings.is3DMode !== undefined) setIs3DModeGated(settings.is3DMode);
+    setSelectedLayerId(opened[0]?.id ?? null);
+  }, [setIs3DModeGated]);
+
   // ===== OPEN PROJECT =====
   const openProject = useCallback(() => {
     const input = document.createElement('input');
@@ -2346,19 +2358,38 @@ const Flux: React.FC = () => {
         if (file.size > 100 * 1024 * 1024) throw new Error('The file is larger than 100 MB.');
         const { layers: opened, settings, warnings } = parseFluxProject<Layer>(await file.text());
         if (isDirtyRef.current && !window.confirm('Replace the current composition with this project? Changes since your last Save Project will be lost.')) return;
-        setLayers(opened);
-        if (settings.fps !== undefined) setFps(settings.fps);
-        if (settings.duration !== undefined) setDuration(settings.duration);
-        if (settings.canvasSize) setCanvasSize(settings.canvasSize);
-        if (settings.is3DMode !== undefined) setIs3DModeGated(settings.is3DMode);
-        setSelectedLayerId(opened[0]?.id ?? null);
+        applyOpenedProject(opened, settings);
         toast(warnings.length ? 'warning' : 'success', `Opened ${file.name} (${opened.length} layer${opened.length === 1 ? '' : 's'}).${warnings.length ? ' ' + warnings.join(' ') : ''}`);
       } catch (err) {
         toast('error', `Could not open ${file.name}: ${(err as Error).message}`);
       }
     };
     input.click();
-  }, [setIs3DModeGated]);
+  }, [applyOpenedProject]);
+
+  // Saved versions on this device, listed and restored in Collab Hub
+  // (autosaved every 5 minutes when the composition changed, or File >
+  // Save Checkpoint). Same content as Save Project, without the timestamp so
+  // an unchanged composition is not saved again. Backlog #58.
+  const checkpoints = useAppCheckpoints({
+    appId: 'flux',
+    appName: 'FLUX',
+    getSnapshot: () => (layers.length === 0 ? null : JSON.stringify({
+      version: 1,
+      appId: 'flux',
+      layers: layers.map(l => ({ ...l, content: typeof l.content === 'string' ? l.content : undefined })),
+      settings: { fps, duration, canvasSize, is3DMode },
+    })),
+    onRestore: (data, name) => {
+      const { layers: opened, settings, warnings } = parseFluxProject<Layer>(data);
+      applyOpenedProject(opened, settings);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: warnings.length ? 'warning' : 'success', message: `Restored "${name}". Undo brings back what was there.${warnings.length ? ' ' + warnings.join(' ') : ''}` } }));
+    },
+  });
+  const saveCheckpointNow = useCallback(() => {
+    const r = checkpoints.saveNow();
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: r.ok ? { type: 'success', message: 'Checkpoint saved. Find it in Collab Hub.' } : { type: 'error', message: r.error } }));
+  }, [checkpoints]);
 
   // ===== EXPORT VIDEO =====
   const exportVideo = useCallback(async () => {
@@ -2599,6 +2630,7 @@ const Flux: React.FC = () => {
         { label: 'Import Media…', shortcut: 'Ctrl+I', onSelect: () => importMedia() },
         { label: 'Open Project…', shortcut: 'Ctrl+O', onSelect: () => openProject() },
         { label: 'Save Project', shortcut: 'Ctrl+S', onSelect: () => saveProject() },
+        { label: 'Save Checkpoint', onSelect: () => saveCheckpointNow() },
         { separator: true },
         { label: 'Export Video…', shortcut: 'Ctrl+E', onSelect: () => exportVideo() },
       ],

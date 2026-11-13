@@ -3663,3 +3663,7 @@ These need DSP/ML or native hosting we don't fake.
 
 - Rewind retired (owner): gone from every app list, cannot be opened, data left in place (#193).
 - Release build (7.0.1 serial 18o tree) passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).
+
+## Checkpoint 2026-11-13 (checkpoints in every creative app)
+
+- PRISM, FLUX and Presentation join VINX, AXL, Imosion and Canvas: saved versions on this device, listed and restored in Collab Hub, restore is an undo step (#58 done).

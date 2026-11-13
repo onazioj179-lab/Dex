@@ -61,7 +61,6 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 |---|---|---|---|---|---|---|---|
 | 47 | Browser features the native view cannot provide yet | PARTIAL (2026-11-11: back/forward state and the failed-load error page VERIFIED live on an isolated profile — a dead .com host shows "This site's address can't be found" (the earlier .invalid test had become a web search). Element fullscreen wired but UNVERIFIED: the test window wasn't frontmost, so DEX hid the view. Credential capture deliberately not added: it would scrape passwords from web pages. 18f: downloads had no native handler (stuck at "downloading" forever); now download_ctl.rs saves to Downloads, verified live) | Credential capture (`ipc-message`), per-request ad-block count (`console-message`), load-error page (WebView2 shows its own), HTML fullscreen events, true `canGoBack` | `Browser.tsx` | Add a page-to-host bridge for the browser view only | — | P2 |
 | 53 | Dead code | DONE (132 files, ~89k lines) | Unreachable from the app entry and unreferenced by tests/scripts/configs/CSS; includes simulated downloads (`BrowserFeatures.ts`) and a random "threat" scanner (`SystemSecurity.ts`). Verified: tsc 0, production build, full unit suite (521/521 files after merging main) | `src/renderer`, `src/shared` | ~380 more orphan files are still imported by tests only; prune with their tests | — | P3 |
-| 58 | Restore a collaboration checkpoint | DONE for VINX, AXL, Imosion and Canvas (2026-11-13: Imosion File › Save Checkpoint + 5-min autosave, restore verified in the preview; Canvas autosave + restore of the open board, verified in the preview; a restore at start is not overwritten by the late native load) | Per-app checkpoints on this device (10 per app, 2 MB cap), saved by hand or automatically when the project changes; Collab Hub lists them with Restore and Delete (`app-checkpoints.test.ts`) | `appCheckpoints.ts`, `useAppCheckpoints.ts` | Add PRISM, FLUX and Presentation; click-through | Tester | P3 |
 
 ## Release status
 
@@ -209,6 +208,7 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 168 | AXL: Save state that is true; Open/New that cannot lose work; honest export … | Packaged-app run |
 | 169 | Imosion, Canvas, Forge: True save status in the remaining creative apps (#77) | Packaged-app run |
 | 191 | Gallery, Pixel Art, Files, Home, Settings, Terminal: silent failures and a Gallery crash … | Packaged-app run |
+| 58 | Restore a collaboration checkpoint (all creative apps) | Packaged-app run |
 | 9 | Cloud model catalog is dated | Provider key |
 | 11 | Agent resume after app restart | Provider key |
 | 159 | UKI: UKI can schedule reminders and background requests (ROADMAP GOAL track 2 … | Provider key |

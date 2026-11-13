@@ -15,6 +15,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActio
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { AutosaveIndicator, type AutosaveState } from '../../components/AutosaveIndicator';
 import { downloadText } from '../../improvements500/downloadBlob';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import {
   loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
   historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
@@ -288,6 +289,29 @@ const PresentationBuilder: React.FC = () => {
       toast('error', `Could not open ${file.name}: ${(e as Error).message}`);
     }
   }, []);
+
+  // Saved versions on this device, listed and restored in Collab Hub
+  // (autosaved every 5 minutes when the deck changed, or the Checkpoint
+  // button). Same content as Save Deck with a fixed date, so an unchanged deck
+  // is not saved again. A restore is undoable like Open Deck. Backlog #58.
+  const checkpoints = useAppCheckpoints({
+    appId: 'presentation',
+    appName: 'Presentation',
+    getSnapshot: () => serializeDeck(slides, themeId, new Date(0)),
+    onRestore: (data, name) => {
+      const deck = parseDeck(data, migrateSlide);
+      setSlides(deck.slides);
+      if (deck.theme && THEMES.some(t => t.id === deck.theme)) setThemeId(deck.theme);
+      setCurrentIdx(0);
+      setSelectedBlockId(null);
+      toast('success', `Restored "${name}" (${deck.slides.length} slides). Undo returns the previous deck.`);
+    },
+  });
+  const saveCheckpointNow = useCallback(() => {
+    const r = checkpoints.saveNow();
+    if (r.ok) toast('success', 'Checkpoint saved. Find it in Collab Hub.');
+    else toast('error', r.error);
+  }, [checkpoints]);
 
   // Undo / redo keys (not while presenting, and not inside a text field, which has its own undo).
   useEffect(() => {
@@ -837,6 +861,7 @@ const PresentationBuilder: React.FC = () => {
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
           <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
           <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
+          <button onClick={saveCheckpointNow} style={toolbarBtn} title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
           <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
             const f = e.target.files?.[0]; e.target.value = '';
