@@ -193,6 +193,26 @@ export function isReduceMotion(): boolean {
   return _reduceMotion;
 }
 
+/**
+ * Set the user's Reduce Motion choice (Settings › Appearance). `true` forces
+ * the calm path; `null` follows the OS. Updates the `.reduce-motion` class
+ * (global CSS kill switch), `isReduceMotion()` and every listener at once.
+ * Before this existed the Settings toggle only shortened CSS duration tokens,
+ * so JS-driven motion (springs, menus, view transitions) ignored it.
+ */
+export function setReduceMotionOverride(value: boolean | null): void {
+  try {
+    if (value === null) localStorage.removeItem('dex-reduce-motion');
+    else localStorage.setItem('dex-reduce-motion', String(value));
+  } catch { /* storage unavailable: still apply for this session */ }
+  const next = value ?? (_mediaQuery?.matches
+    ?? (typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches));
+  const changed = next !== _reduceMotion;
+  _reduceMotion = next;
+  if (typeof document !== 'undefined') applyClass(next);
+  if (changed) _listeners.forEach(fn => fn(next));
+}
+
 export function onReduceMotionChange(fn: (reduced: boolean) => void): () => void {
   _listeners.add(fn);
   return () => { _listeners.delete(fn); };

@@ -58,6 +58,7 @@ import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
 import { applyTheme } from '../utils/theme';
 import { withViewTransition } from '../utils/viewTransition';
+import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 
 // ===========================================================================
@@ -941,6 +942,9 @@ const applySettings = (settings: Record<string, unknown>) => {
     // Shared duration source (was 80/150/250/300 ms here, conflicting with
     // the stylesheet and TierManager).
     applyMotionDurations(root, { reduce: Boolean(settings.reduceMotion) });
+    // Reach JS-driven motion too (isReduceMotion + the .reduce-motion class).
+    // Off = follow the OS setting, not "force motion on".
+    setReduceMotionOverride(settings.reduceMotion ? true : null);
     root.style.setProperty('--animation-duration', settings.reduceMotion ? '0ms' : '200ms');
 
     // Sync App Tab Bar visibility to localStorage + notify AppManager
