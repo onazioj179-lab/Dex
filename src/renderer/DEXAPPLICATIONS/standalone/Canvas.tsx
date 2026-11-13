@@ -14,6 +14,8 @@ import {
   takeCanvasRequest, CANVAS_REQUEST_EVENT,
 } from './canvasBoards';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import AutosaveIndicator from '../../components/AutosaveIndicator';
+import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -326,7 +328,13 @@ const Canvas: React.FC = () => {
     objects: objectsRef.current,
   }), []);
 
+  // Save status from real writes: the toolbar shows Saving / Saved Ns ago /
+  // Not saved, and leaving warns while a write is in flight or has failed.
+  // Before, a failed write was one toast and the board looked saved after.
   const saveFailedRef = useRef(false);
+  const saveSeqRef = useRef(0);
+  const [saveState, setSaveState] = useState<{ pending: boolean; savedAt: number | null; error: string | null }>({ pending: false, savedAt: null, error: null });
+  useUnsavedGuard(saveState.pending || saveState.error !== null);
   const persist = useCallback(() => {
     const idx = boardsRef.current;
     if (!idx || !idx.activeId) return;
@@ -334,14 +342,32 @@ const Canvas: React.FC = () => {
     const next = touchBoard(idx, idx.activeId);
     boardsRef.current = next;
     setBoards(next);
+    const seq = ++saveSeqRef.current;
+    setSaveState((st) => ({ ...st, pending: true }));
     // A failed IndexedDB write used to vanish (void promise); say so once.
-    Promise.all([saveBoard(idx.activeId, payload), saveIndex(next)]).then(() => { saveFailedRef.current = false; }, (e) => {
+    Promise.all([saveBoard(idx.activeId, payload), saveIndex(next)]).then(() => {
+      saveFailedRef.current = false;
+      if (seq === saveSeqRef.current) setSaveState({ pending: false, savedAt: Date.now(), error: null });
+    }, (e) => {
       console.warn('[Canvas] save failed', e);
+      if (seq === saveSeqRef.current) {
+        setSaveState((st) => ({ pending: false, savedAt: st.savedAt, error: `Couldn't save this board: ${(e as { name?: string } | null)?.name === 'QuotaExceededError' ? 'storage is full' : 'the store refused the write'}. Export it as an image so your latest changes aren't lost.` }));
+      }
       if (saveFailedRef.current) return;
       saveFailedRef.current = true;
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: "Couldn't save this board. Export it as an image so your latest changes aren't lost." } }));
     });
   }, [snapshot]);
+
+  // Board-list writes (switch, new, rename, move, delete) report a failure in
+  // the toolbar instead of rejecting halfway through the action.
+  const saveIndexReported = useCallback(async (index: BoardsIndex) => {
+    try { await saveIndex(index); }
+    catch (e) {
+      console.warn('[Canvas] board list not saved', e);
+      setSaveState((st) => ({ ...st, error: "Couldn't save the board list. Your boards may not appear after a restart." }));
+    }
+  }, []);
 
   // Replace the layer stack with a stored board (or one blank layer).
   const restorePayload = useCallback((payload: BoardPayload | undefined) => {
@@ -410,7 +436,7 @@ const Canvas: React.FC = () => {
     const next = { ...(boardsRef.current ?? idx), activeId: id };
     boardsRef.current = next;
     setBoards(next);
-    await saveIndex(next);
+    await saveIndexReported(next);
     restorePayload(await loadBoard(id));
     syncHistoryFlags();
   }, [persist, restorePayload, syncHistoryFlags]);
@@ -423,7 +449,7 @@ const Canvas: React.FC = () => {
     const next = addBoard(boardsRef.current ?? idx, `Board ${idx.boards.length + 1}`, current?.folder ?? UNFILED);
     boardsRef.current = next;
     setBoards(next);
-    await saveIndex(next);
+    await saveIndexReported(next);
     restorePayload(undefined);
     syncHistoryFlags();
   }, [persist, restorePayload, syncHistoryFlags]);
@@ -437,7 +463,7 @@ const Canvas: React.FC = () => {
     boardsRef.current = next;
     setBoards(next);
     setBoardEdit(null);
-    await saveIndex(next);
+    await saveIndexReported(next);
   }, [boardEdit]);
 
   const deleteActiveBoard = useCallback(async () => {
@@ -450,7 +476,7 @@ const Canvas: React.FC = () => {
     boardsRef.current = next;
     setBoards(next);
     await deleteBoardData(current.id);
-    await saveIndex(next);
+    await saveIndexReported(next);
     restorePayload(await loadBoard(next.activeId));
     syncHistoryFlags();
   }, [restorePayload, syncHistoryFlags]);
@@ -575,7 +601,7 @@ const Canvas: React.FC = () => {
       const named = renameBoard(idx, idx.activeId, tpl.name);
       boardsRef.current = named;
       setBoards(named);
-      await saveIndex(named);
+      await saveIndexReported(named);
     }
     commitObjects([], tpl.build());
   };
@@ -1241,6 +1267,13 @@ const Canvas: React.FC = () => {
 
         {/* Actions */}
         <div style={s.actionGroup}>
+          <span title={saveState.error ?? 'Canvas saves the board as you work'} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 4 }}>
+            <AutosaveIndicator
+              state={saveState.error ? 'error' : saveState.pending ? 'saving' : saveState.savedAt ? 'saved' : 'idle'}
+              lastSavedAt={saveState.savedAt}
+              label={saveState.error ? 'Not saved' : (!saveState.pending && !saveState.savedAt ? 'Up to date' : undefined)}
+            />
+          </span>
           <button style={{ ...s.actionBtn, ...(historyState.canUndo ? {} : s.actionBtnDisabled) }} onClick={undo} disabled={!historyState.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
             <DexIcon name="undo" size={16} />
           </button>
