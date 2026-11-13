@@ -9,8 +9,9 @@ import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
-import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
+import { loadAutoSave } from '../../utils/useAutoSave';
+import AutosaveIndicator from '../../components/AutosaveIndicator';
+import { persistOrWarn } from '../../utils/persistOrWarn';
 import { useToastHelpers } from '../../components/Toast';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
@@ -282,8 +283,6 @@ const getFormatIcon = (format: string): React.ReactNode => {
 
 // ==================== COMPONENT ====================
 const Forge: React.FC = () => {
-  const [isDirty, setIsDirty] = useState(false);
-  useUnsavedGuard(isDirty);
   // Creative app settings from Settings page
   const collab = useCollaborationFeatures({ appId: 'forge', projectName: 'FORGE Queue', autoCheckpointInterval: 300000 });
 
@@ -312,7 +311,6 @@ const Forge: React.FC = () => {
         inputSize: 0,
       };
       setJobs(prev => prev.length < MAX_QUEUE_JOBS ? [...prev, newJob] : prev);
-      setIsDirty(true);
     }
     toast.success(`Imported "${asset.name}" from ${asset.sourceApp}`);
   }, [toast]));
@@ -339,23 +337,59 @@ const Forge: React.FC = () => {
   // Strip outputBlobUrl before persisting: blob: URLs are per-session and become
   // dangling references after a reload, so a recovered "completed" job would show
   // a broken download link. Everything else (metadata, settings, progress) keeps.
-  useAutoSave('forge', useCallback(() => ({
-    jobs: jobs.map(j => { const copy = { ...j }; delete copy.outputBlobUrl; return copy; }),
-    presets,
-  }), [jobs, presets]), isDirty, 30_000);
-  // Queue autosave status surfaced in the header. The encode queue has no manual
-  // save, so this reassures the user their queue/presets are being persisted.
-  const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  // The queue has no Save button, so it is kept as it changes: written 1 s
+  // after the last change (at most 10 s apart while an encode updates
+  // progress), and when the window hides or Forge closes. The header shows
+  // what really happened. Before, it turned "Saved" 800 ms after any change
+  // whether or not anything was written; only an inbox import marked the
+  // queue changed, the flag never cleared (leave warning forever), and other
+  // queue edits were not written at all until such an import happened.
+  const queueSnapshot = useCallback(() => JSON.stringify({
+    jobs: jobsRef.current.map(j => { const copy = { ...j }; delete copy.outputBlobUrl; return copy; }),
+    presets: presetsRef.current,
+  }), []);
+  const jobsRef = useRef(jobs); jobsRef.current = jobs;
+  const presetsRef = useRef(presets); presetsRef.current = presets;
+  const lastQueueJsonRef = useRef<string | null>(null);
+  const firstPendingAtRef = useRef<number | null>(null);
+  const [queueSave, setQueueSave] = useState<{ pending: boolean; savedAt: number | null; error: string | null }>({ pending: false, savedAt: null, error: null });
+  useUnsavedGuard(queueSave.pending || queueSave.error !== null);
+  const writeQueue = useCallback((): void => {
+    firstPendingAtRef.current = null;
+    let json: string;
+    try { json = queueSnapshot(); } catch { return; }
+    if (json === lastQueueJsonRef.current) { setQueueSave(st => (st.pending ? { ...st, pending: false } : st)); return; }
+    if (persistOrWarn('dex-autosave-forge', json, 'the Forge queue')) {
+      lastQueueJsonRef.current = json;
+      setQueueSave({ pending: false, savedAt: Date.now(), error: null });
+    } else {
+      setQueueSave(st => ({ pending: false, savedAt: st.savedAt, error: 'App storage is full. Remove finished jobs or large imported media from the queue.' }));
+    }
+  }, [queueSnapshot]);
+  const writeQueueRef = useRef(writeQueue); writeQueueRef.current = writeQueue;
+  const queueMountedRef = useRef(false);
   useEffect(() => {
-    if (!isDirty) return;
-    setAutosaveState('saving');
-    const t = setTimeout(() => {
-      setAutosaveState('saved');
-      setLastSavedAt(Date.now());
-    }, 800);
+    // The queue restored at start is the baseline, not a change.
+    if (!queueMountedRef.current) {
+      queueMountedRef.current = true;
+      try { lastQueueJsonRef.current = queueSnapshot(); } catch { /* unserialisable: next write tries */ }
+      return;
+    }
+    const now = Date.now();
+    if (firstPendingAtRef.current === null) firstPendingAtRef.current = now;
+    setQueueSave(st => (st.pending ? st : { ...st, pending: true }));
+    const wait = now - firstPendingAtRef.current >= 10_000 ? 0 : 1000;
+    const t = setTimeout(() => writeQueueRef.current(), wait);
     return () => clearTimeout(t);
-  }, [isDirty, jobs, presets]);
+  }, [jobs, presets, queueSnapshot]);
+  useEffect(() => {
+    const onHidden = () => { if (document.hidden && firstPendingAtRef.current !== null) writeQueueRef.current(); };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      if (firstPendingAtRef.current !== null) writeQueueRef.current(); // closing with a change pending
+    };
+  }, []);
 
   // Undo/redo for queue operations
   const [undoStack, setUndoStack] = useState<Job[][]>([]);
@@ -472,9 +506,7 @@ const Forge: React.FC = () => {
   // Without this each added watch folder leaks a 'watch:fileAdded' handler.
   const watchHandlersRef = useRef<Array<(data: any) => void>>([]);
 
-  // Cleanup blob URLs on unmount to prevent memory leaks
-  const jobsRef = useRef(jobs);
-  jobsRef.current = jobs;
+  // Cleanup blob URLs on unmount to prevent memory leaks (jobsRef is declared with the queue autosave)
   useEffect(() => {
     return () => {
       jobsRef.current.forEach(j => {
@@ -1308,7 +1340,7 @@ const Forge: React.FC = () => {
     stat: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' },
     queueList: { flex: 1, minHeight: 0, overflow: 'auto', padding: '10px' },
     jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
-    jobItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
+    jobItemSelected: { border: '1px solid var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
     jobInfo: { flex: 1, minWidth: 0 },
     jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -1327,7 +1359,7 @@ const Forge: React.FC = () => {
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
     presetItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
-    presetItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
+    presetItemSelected: { border: '1px solid var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
@@ -1514,7 +1546,13 @@ const Forge: React.FC = () => {
         <div style={styles.headerCenter}>
           <button style={styles.btn} onClick={addFiles} aria-label="Add files to encode">{Icons.plus} Add Files</button>
           <button style={styles.btn} onClick={addFolder} aria-label="Add folder to encode">{Icons.folderPlus} Add Folder</button>
-          <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
+          <span title={queueSave.error ?? 'Forge keeps the queue and your presets as they change'}>
+            <AutosaveIndicator
+              state={queueSave.error ? 'error' : queueSave.pending ? 'saving' : queueSave.savedAt ? 'saved' : 'idle'}
+              lastSavedAt={queueSave.savedAt}
+              label={queueSave.error ? 'Not saved' : (!queueSave.pending && !queueSave.savedAt ? 'Up to date' : undefined)}
+            />
+          </span>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           {isEncoding ? (
             <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={pauseQueue} aria-label="Pause encoding queue">{Icons.pause} Pause</button>
@@ -1611,8 +1649,8 @@ const Forge: React.FC = () => {
                 </select>
                 {showPresetInput ? (
                   <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-3)', width: '100%' }}>
-                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 4, padding: '4px var(--space-2)', color: '#fff', fontSize: 11, outline: 'none' }} />
-                    <button onClick={() => { if (!newPresetName.trim()) return; const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)', background: '#1e3a28', color: 'var(--color-success)', border: '1px solid #2a5e3a' }}>Save</button>
+                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; persistOrWarn('forge-custom-presets', JSON.stringify(customOnly), 'your Forge presets'); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 4, padding: '4px var(--space-2)', color: '#fff', fontSize: 11, outline: 'none' }} />
+                    <button onClick={() => { if (!newPresetName.trim()) return; const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; persistOrWarn('forge-custom-presets', JSON.stringify(customOnly), 'your Forge presets'); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)', background: '#1e3a28', color: 'var(--color-success)', border: '1px solid #2a5e3a' }}>Save</button>
                     <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)' }}>Cancel</button>
                   </div>
                 ) : (
