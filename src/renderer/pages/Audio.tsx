@@ -9,6 +9,7 @@
  * Clean audio player with playlist
  */
 
+import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
@@ -99,7 +100,7 @@ const loadTracks = async (): Promise<{ tracks: Track[]; pendingEnrich: Track[] }
       if (files && Array.isArray(files) && files.length > 0) {
         const baseTracks = files.slice(0, 100).map((f: { path?: string; name?: string; extension?: string; size?: number; modified?: string }, i: number) => {
           const rawPath = f.path || '';
-          const fileUrl = rawPath ? `file://${rawPath.replace(/\\/g, '/')}` : '';
+          const fileUrl = rawPath ? toMediaUrl(rawPath) : '';
           return {
             id: rawPath || String(i),
             title: f.name?.replace(/\.[^/.]+$/, '') || 'Unknown',
@@ -848,8 +849,10 @@ export const Audio: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'audioTracksPlayed', amount: 1 } }));
     if (audioRef.current && (track.url || track.id)) {
       let src = track.url || track.id;
-      if (!src.startsWith('http') && !src.startsWith('file://') && !src.startsWith('blob:') && !src.startsWith('data:')) {
-        src = `file://${src.replace(/\\/g, '/')}`;
+      // Local tracks (file:// URLs or paths) go through dexmedia in the desktop
+      // app, where file:// is blocked from the http origin.
+      if (!src.startsWith('http') && !src.startsWith('blob:') && !src.startsWith('data:')) {
+        src = toMediaUrl(src.startsWith('file://') || /^[a-zA-Z]:[\\/]/.test(src) ? src : `file:///${src.replace(/\\/g, '/')}`);
       }
       // Crossfade fades the master gain out to 0 near a track's end. Ramp it
       // back up so the incoming track fades IN rather than starting silent.
@@ -1082,7 +1085,7 @@ export const Audio: React.FC = () => {
         album: 'Unknown Album',
         duration: 0,
         artwork: '',
-        url: filePath ? `file://${filePath.replace(/\\/g, '/')}` : blobUrl!,
+        url: filePath ? toMediaUrl(filePath) : blobUrl!,
       };
     });
     setTracks(prev => {

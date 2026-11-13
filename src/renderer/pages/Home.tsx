@@ -10,6 +10,7 @@
  * Right-click context menu. 60s auto-refresh.
  */
 
+import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
 import { shellFailure } from '../utils/openWithShell';
@@ -459,8 +460,9 @@ export const Home: React.FC = () => {
   const wallpaperBg: React.CSSProperties = useMemo(() => {
     if (wpMode === 'image') {
       let url = wpValue;
-      if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('file://') && !url.startsWith('blob:')) {
-        url = `file://${url.replace(/\\/g, '/')}`;
+      if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('blob:')) {
+        // A wallpaper picked from disk: dexmedia in the desktop app (file:// is blocked there).
+        url = toMediaUrl(url.startsWith('file://') || /^[a-zA-Z]:[\\/]/.test(url) ? url : `file:///${url.replace(/\\/g, '/')}`);
       }
       return { backgroundImage: `url("${url}")`, backgroundSize: 'cover', backgroundPosition: 'center' };
     }
