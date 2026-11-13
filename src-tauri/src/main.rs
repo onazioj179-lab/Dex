@@ -255,6 +255,7 @@ mod live_collaboration;
 mod localization_engine;
 mod migration;
 mod metadata_strip;
+mod media_protocol;
 mod multi_monitor;
 mod multi_window;
 mod unified_notification_hub;
@@ -3101,6 +3102,12 @@ fn main() {
     let result = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        // Local photos/music/video/PDF for DEX's own pages (file:// is blocked
+        // from the http://tauri.localhost origin). See media_protocol.rs.
+        .register_asynchronous_uri_scheme_protocol(media_protocol::SCHEME, |ctx, request, responder| {
+            let label = ctx.webview_label().to_string();
+            std::thread::spawn(move || responder.respond(media_protocol::handle(&label, &request)));
+        })
         .setup(|app| {
             // Vault state lives for the app lifetime; the key is only set while
             // unlocked. File is stored in the app config dir.

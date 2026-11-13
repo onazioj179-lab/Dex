@@ -61,6 +61,7 @@ import { MiniPlayer } from './components/MiniPlayer';
 import { LiveActivityHost } from './components/LiveActivityHost';
 import { QuickLookHost } from './shell/QuickLookHost';
 import { EasterEggHost } from './shell/EasterEggHost';
+import { installMediaLinkGuard } from './utils/mediaUrl';
 import { WorkspaceTimeline } from './shell/WorkspaceTimeline';
 import MiniPulse from './components/MiniPulse';
 import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
@@ -225,6 +226,8 @@ export const App: React.FC = () => {
   // the moment the panel opens). Idempotent; runs once for the app's lifetime.
   // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
+  // Local-file links (dexmedia) download instead of navigating DEX away.
+  useEffect(() => installMediaLinkGuard(), []);
   // Local diagnostics (Nexus > Diagnostics): counters only, nothing leaves this computer.
   useEffect(() => { startLocalMetrics(); requestAnimationFrame(() => requestAnimationFrame(markShellReady)); }, []);
   // Background scheduler: fire due recurring UKI tasks on the shared heartbeat.

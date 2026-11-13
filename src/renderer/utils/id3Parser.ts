@@ -9,6 +9,7 @@
  * Supports ID3v2.3/v2.4 (header) and ID3v1 (footer fallback).
  * Reads metadata without external dependencies.
  */
+import { toMediaUrl } from './mediaUrl';
 
 export interface AudioMetadata {
   title?: string;
@@ -274,8 +275,8 @@ export async function loadAudioMetadata(filePath: string): Promise<AudioMetadata
     }
 
     // Fallback: fetch
-    const url = filePath.startsWith('file://') ? filePath
-      : filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath) ? `file://${filePath.replace(/\\/g, '/')}` : filePath;
+    // dexmedia in the desktop app (file:// is blocked from its http origin).
+    const url = toMediaUrl(filePath);
 
     const response = await fetch(url);
     const buffer = await response.arrayBuffer();

@@ -10,6 +10,7 @@
  * Grid + list views, favorites, albums, lightbox with video playback.
  */
 
+import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -219,7 +220,8 @@ const loadAllMedia = async (): Promise<MediaItem[]> => {
           const isImage = IMAGE_EXTENSIONS.test(`.${ext}`);
           const type: 'image' | 'video' = isVideo ? 'video' : isImage ? 'image' : fallbackType;
 
-          const filePath = f.path ? `file://${f.path.replace(/\\/g, '/')}` : '';
+          // dexmedia in the desktop app (file:// is blocked there); see utils/mediaUrl.
+          const filePath = f.path ? toMediaUrl(f.path) : '';
           allMedia.push({
             id: f.path || `media-${allMedia.length}`,
             type,
@@ -659,12 +661,17 @@ export const Gallery: React.FC = () => {
     if (toExport.length > 20 && !confirm(`Export ${toExport.length} files? This may take a moment.`)) return;
     let failed = 0;
     toExport.forEach((m, i) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
+          // Download through a blob: `download` is ignored for a cross-origin
+          // href (dexmedia), and the click would navigate DEX itself away.
+          const blob = await (await fetch(m.src)).blob();
+          const href = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = m.src;
+          a.href = href;
           a.download = m.name;
           a.click();
+          setTimeout(() => URL.revokeObjectURL(href), 10_000);
         } catch { failed++; }
         if (i === toExport.length - 1 && failed > 0) toast.error(`${failed} file(s) failed to download`);
       }, i * 200);
@@ -796,7 +803,7 @@ export const Gallery: React.FC = () => {
       const blob = await res.blob();
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
     } catch {
-      try { await navigator.clipboard.writeText(selectedMedia.src); } catch { toast.error('Failed to copy to clipboard'); }
+      try { await navigator.clipboard.writeText(fileUrlToPath(selectedMedia.src)); } catch { toast.error('Failed to copy to clipboard'); }
     }
   }, [selectedMedia]);
 
@@ -1869,7 +1876,7 @@ export const Gallery: React.FC = () => {
                 {favorites.includes(selectedMedia.id) ? Icons.heart : Icons.heartOutline}
               </button>
               <button style={styles.lightboxBtn} onClick={copyImageToClipboard} aria-label="Copy image">{Icons.copy}</button>
-              <button style={styles.lightboxBtn} onClick={() => { if (navigator.clipboard && selectedMedia) navigator.clipboard.writeText(selectedMedia.src); }} aria-label="Share">{Icons.share}</button>
+              <button style={styles.lightboxBtn} onClick={() => { if (navigator.clipboard && selectedMedia) navigator.clipboard.writeText(fileUrlToPath(selectedMedia.src)); }} aria-label="Share">{Icons.share}</button>
               {selectedMedia.type === 'image' && (
                 <button style={{...styles.lightboxBtn, color: 'var(--color-success)'}} aria-label="Edit in PRISM" title="Edit in PRISM" onClick={() => {
                   sendToApp({ name: selectedMedia.name, kind: 'image', data: selectedMedia.src, sourceApp: 'gallery' }, 'prism');

@@ -9,6 +9,13 @@
 
 ---
 
+## dexmedia protocol — local media in the Tauri build (2026-11-13)
+
+- `file://` subresources are refused from the `http://tauri.localhost` origin (proven in a release exe over CDP), so every
+  Electron-era `file://` media URL was dead. `media_protocol.rs` registers `dexmedia` (`http://dexmedia.localhost/<encoded path>`
+  on Windows): own webviews only, DEX Referer only, media types only, Range support. Renderer: always build local media URLs with
+  `toMediaUrl()` (utils/mediaUrl.ts); get the path back with `mediaPathOf()` before calling native fs channels.
+
 ## 7.0.2 (001z) — IPC ABI lock, metadata strip (2026-11-12)
 
 - `src-tauri/ipc-abi.lock.json` + `scripts/ipc-abi.mjs`: every `dex_ipc` channel (src-tauri and `core/*`) is ABI;
