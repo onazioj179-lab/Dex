@@ -27,6 +27,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
+import { AIM_GRACE_MS, isAimingAtRect, type Pt } from '../utils/safeTriangle';
 import { zIndex as zIndexTokens, radius, colors, transition } from '../styles/tokens';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,8 @@ export interface UnifiedDropdownProps {
 export interface DropdownRef {
   focus: () => void;
   close: () => void;
+  /** The open menu surface's rect (null while closed). */
+  getRect: () => DOMRect | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,13 +216,23 @@ function getInitialTransform(placement: DropdownPlacement): string {
 // closeRoot.
 // ---------------------------------------------------------------------------
 
+interface SubmenuController {
+  setOpen: (open: boolean) => void;
+  /** The flyout's on-screen rect, or null while it is closed. */
+  getRect: () => DOMRect | null;
+}
+
 interface DropdownSubmenuItemProps {
   item: DropdownItem;
   itemStyle: React.CSSProperties;
   isFocused: boolean;
   registerRef: (el: HTMLButtonElement | null) => void;
-  registerOpener: (fn: ((open: boolean) => void) | null) => void;
-  onFocus: () => void;
+  registerController: (ctl: SubmenuController | null) => void;
+  /** Hover intent on this row; the parent decides (safe triangle) whether it wins. */
+  onHover: () => void;
+  /** Pointer moved over this row (keeps the safe-triangle apex current). */
+  onRowPointer: (pt: Pt) => void;
+  onToggle: () => void;
   onSelect?: (item: DropdownItem) => void;
   closeOnSelect: boolean;
   closeRoot: () => void;
@@ -230,32 +243,25 @@ const DropdownSubmenuItem: React.FC<DropdownSubmenuItemProps> = ({
   itemStyle,
   isFocused,
   registerRef,
-  registerOpener,
-  onFocus,
+  registerController,
+  onHover,
+  onRowPointer,
+  onToggle,
   onSelect,
   closeOnSelect,
   closeRoot,
 }) => {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flyoutRef = useRef<DropdownRef | null>(null);
 
+  // The parent menu owns open/close (one submenu at a time, safe-triangle
+  // aware). The row used to close itself 180 ms after the pointer left it,
+  // which also closed the flyout the pointer was moving into.
   useEffect(() => {
-    registerOpener(setOpen);
-    return () => registerOpener(null);
-  }, [registerOpener]);
-
-  const clearCloseTimer = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-  const scheduleClose = () => {
-    clearCloseTimer();
-    closeTimer.current = setTimeout(() => setOpen(false), 180);
-  };
-  useEffect(() => clearCloseTimer, []);
+    registerController({ setOpen, getRect: () => flyoutRef.current?.getRect() ?? null });
+    return () => registerController(null);
+  }, [registerController]);
 
   return (
     <>
@@ -266,9 +272,10 @@ const DropdownSubmenuItem: React.FC<DropdownSubmenuItemProps> = ({
         aria-expanded={open}
         tabIndex={isFocused ? 0 : -1}
         style={itemStyle}
-        onClick={() => setOpen((o) => !o)}
-        onMouseEnter={() => { clearCloseTimer(); onFocus(); setOpen(true); }}
-        onMouseLeave={scheduleClose}
+        onClick={onToggle}
+        onMouseEnter={onHover}
+        onMouseMove={(e) => onRowPointer({ x: e.clientX, y: e.clientY })}
+        onMouseLeave={(e) => onRowPointer({ x: e.clientX, y: e.clientY })}
       >
         {item.icon && <span style={styles.itemIcon}>{item.icon}</span>}
         <span style={styles.itemLabel}>{item.label}</span>
@@ -279,6 +286,7 @@ const DropdownSubmenuItem: React.FC<DropdownSubmenuItemProps> = ({
         </span>
       </button>
       <UnifiedDropdown
+        ref={flyoutRef}
         triggerRef={btnRef}
         open={open}
         onClose={() => setOpen(false)}
@@ -325,13 +333,86 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     const [focusedIndex, setFocusedIndex] = useState(-1);
     const [animState, setAnimState] = useState<'entering' | 'visible' | 'exiting'>('entering');
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-    const submenuOpeners = useRef<Map<string, (open: boolean) => void>>(new Map());
+    const submenus = useRef<Map<string, SubmenuController>>(new Map());
+    // Safe-triangle state: which submenu is open, where the pointer left its
+    // row (apex), the latest pointer, and a hover deferred while aiming.
+    const openSubId = useRef<string | null>(null);
+    const aimApex = useRef<Pt | null>(null);
+    const pointer = useRef<Pt | null>(null);
+    const pendingHover = useRef<{ index: number; subId: string | null } | null>(null);
+    const aimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
       focus: () => containerRef.current?.focus(),
       close: onClose,
+      getRect: () => containerRef.current?.getBoundingClientRect() ?? null,
     }));
+
+    const clearAimTimer = () => {
+      if (aimTimer.current) {
+        clearTimeout(aimTimer.current);
+        aimTimer.current = null;
+      }
+    };
+    useEffect(() => clearAimTimer, []);
+
+    /** Open exactly one submenu (or none). */
+    const showSubmenu = useCallback((subId: string | null) => {
+      if (openSubId.current && openSubId.current !== subId) {
+        submenus.current.get(openSubId.current)?.setOpen(false);
+      }
+      openSubId.current = subId;
+      if (subId) {
+        aimApex.current = pointer.current;
+        submenus.current.get(subId)?.setOpen(true);
+      }
+    }, []);
+
+    const applyHover = useCallback((index: number, subId: string | null) => {
+      clearAimTimer();
+      pendingHover.current = null;
+      setFocusedIndex(index);
+      showSubmenu(subId);
+    }, [showSubmenu]);
+
+    /**
+     * Hover on a row. If another submenu is open and the pointer is still
+     * travelling toward its flyout (inside the safe triangle), the hover waits;
+     * it wins once the pointer leaves the triangle or rests for AIM_GRACE_MS.
+     */
+    const requestHover = useCallback((index: number, subId: string | null) => {
+      const open = openSubId.current;
+      if (open && open !== subId && aimApex.current && pointer.current) {
+        const rect = submenus.current.get(open)?.getRect();
+        if (rect && isAimingAtRect(aimApex.current, pointer.current, rect)) {
+          pendingHover.current = { index, subId };
+          clearAimTimer();
+          aimTimer.current = setTimeout(() => {
+            const p = pendingHover.current;
+            if (p) applyHover(p.index, p.subId);
+          }, AIM_GRACE_MS);
+          return;
+        }
+      }
+      applyHover(index, subId);
+    }, [applyHover]);
+
+    const onMenuPointerMove = (e: React.MouseEvent) => {
+      pointer.current = { x: e.clientX, y: e.clientY };
+      const p = pendingHover.current;
+      if (p) requestHover(p.index, p.subId);
+    };
+
+    // A closed menu forgets its submenu state.
+    useEffect(() => {
+      if (!open) {
+        clearAimTimer();
+        openSubId.current = null;
+        pendingHover.current = null;
+        aimApex.current = null;
+      }
+    }, [open]);
 
     // Get flattened selectable items (skip dividers)
     const selectableItems = items?.filter(item => !item.divider && !item.disabled && !item.header) || [];
@@ -512,7 +593,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
             const it = selectableItems[focusedIndex];
             if (it?.children?.length) {
               e.preventDefault();
-              submenuOpeners.current.get(it.id)?.(true);
+              showSubmenu(it.id);
             }
             break;
           }
@@ -532,7 +613,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
 
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [open, onClose, focusedIndex, selectableItems, triggerRef]);
+    }, [open, onClose, focusedIndex, selectableItems, triggerRef, showSubmenu]);
 
     // Focus first item on open
     useEffect(() => {
@@ -555,14 +636,14 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     const handleItemSelect = useCallback((item: DropdownItem) => {
       if (item.disabled) return;
       if (item.children && item.children.length > 0) {
-        submenuOpeners.current.get(item.id)?.(true);
+        showSubmenu(item.id);
         return;
       }
       onSelect?.(item);
       if (closeOnSelect) {
         rootClose();
       }
-    }, [onSelect, closeOnSelect, rootClose]);
+    }, [onSelect, closeOnSelect, rootClose, showSubmenu]);
 
     if (!open) return null;
 
@@ -630,11 +711,20 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
               itemStyle={itemStyle}
               isFocused={isFocused}
               registerRef={(el) => { itemRefs.current[currentSelectableIndex] = el; }}
-              registerOpener={(fn) => {
-                if (fn) submenuOpeners.current.set(item.id, fn);
-                else submenuOpeners.current.delete(item.id);
+              registerController={(ctl) => {
+                if (ctl) submenus.current.set(item.id, ctl);
+                else submenus.current.delete(item.id);
               }}
-              onFocus={() => setFocusedIndex(currentSelectableIndex)}
+              onHover={() => requestHover(currentSelectableIndex, item.id)}
+              onRowPointer={(pt) => {
+                pointer.current = pt;
+                if (openSubId.current === item.id) aimApex.current = pt;
+              }}
+              onToggle={() => {
+                // Ask the flyout itself: it may have closed on its own (Escape).
+                const isOpen = openSubId.current === item.id && submenus.current.get(item.id)?.getRect() != null;
+                showSubmenu(isOpen ? null : item.id);
+              }}
               onSelect={onSelect}
               closeOnSelect={closeOnSelect}
               closeRoot={rootClose}
@@ -652,7 +742,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
             aria-disabled={item.disabled}
             style={itemStyle}
             onClick={() => handleItemSelect(item)}
-            onMouseEnter={() => !item.disabled && setFocusedIndex(currentSelectableIndex)}
+            onMouseEnter={() => !item.disabled && requestHover(currentSelectableIndex, null)}
           >
             {item.icon && <span style={styles.itemIcon}>{item.icon}</span>}
             <span style={styles.itemLabel}>{item.label}</span>
@@ -673,6 +763,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           aria-label={ariaLabel || 'Dropdown menu'}
           className={`dex-liquid-glass${className ? ` ${className}` : ''}`}
           style={containerStyle}
+          onMouseMove={onMenuPointerMove}
         >
           <div style={contentStyle}>
             {renderItems()}

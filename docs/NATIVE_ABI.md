@@ -86,3 +86,31 @@ float dex_audio_peak(const DexAudioEngine*, uint32_t channel);
 - ⏳ `DexAudioEngine` graph + WASAPI/ASIO backend wiring — next; builds on the
   primitives above (ROADMAP-600 §3.S).
 - ⏳ Vinx C++ frame pipeline (FFmpeg + GPU) — ROADMAP-600 §3.T.
+
+## Renderer ⇄ native IPC ABI ("we do not break userspace")
+
+The second ABI is the one apps actually use: the `dex_ipc` channel names the
+renderer, apps, plugins and saved automations call. A channel that shipped is
+treated as a stable system call. Removing or renaming one doesn't fail loudly;
+the call just resolves to `null` and the feature goes dead. So:
+
+- `src-tauri/ipc-abi.lock.json` lists every channel the native side answers
+  (`src-tauri/src` plus the `core/*` crates it dispatches into, such as
+  `dex-ledger`), and the known renderer calls that nothing answers.
+- `npm run abi:check` (also part of `npm run lint` and the unit tests,
+  `tests/unit/ipc-abi-compat.test.ts`) fails when a locked channel disappears or
+  when new renderer code calls a channel with no native arm and no
+  `rendererShims` handler.
+- Adding channels is always fine. To retire one, keep an alias arm that maps the
+  old name to the new behaviour. If it truly has to go, run `npm run abi:update`
+  and write down here what replaced it.
+- The unhandled list may only shrink: when you wire one up, run
+  `npm run abi:update` so the fix can't regress.
+
+First run (2026-11-12): 1,919 native channels locked. It found one real dead
+call: Quick Look's text preview used `files:read`, which nothing answers, so text
+previews were always blank in the desktop app (now `fs:readText`). The 7
+remaining unhandled calls all degrade honestly (`dexnotes:favorite` and
+`dexnotes:get-word-suggestions` are served by the Notes local backend,
+`optimization:*` and `memory:report` fall back to defaults, and
+`screencapture:getSources` falls back to the system picker).

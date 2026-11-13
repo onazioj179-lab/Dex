@@ -11,6 +11,7 @@
  * ENHANCED v2.0: Smart understanding with typo correction, slang support,
  * screen reading, improved TTS/STT, and accessibility tools
  */
+import { discoverEasterEgg } from '../services/easterEggs';
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { AssistedTextarea } from './AssistedTextarea';
 import { useUkiStore } from '../store/ukiStore';
@@ -939,9 +940,11 @@ function tryFunResponse(text: string): string | null {
     return "La la la. I'm better at helping than singing, but I appreciate you asking!";
   }
   if (/dance/.test(lower)) {
+    discoverEasterEgg('uki-dance');
     return "*does a little digital dance* There you go! What else can I help with?";
   }
   if (/meaning of life|42/.test(lower)) {
+    discoverEasterEgg('uki-42');
     return "42, according to the classic answer. What can I help you with?";
   }
   if (/i love you/.test(lower)) {

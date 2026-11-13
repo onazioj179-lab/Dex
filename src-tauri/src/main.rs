@@ -254,6 +254,7 @@ mod link_preview;
 mod live_collaboration;
 mod localization_engine;
 mod migration;
+mod metadata_strip;
 mod multi_monitor;
 mod multi_window;
 mod unified_notification_hub;
@@ -2498,6 +2499,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "dialog:showSaveDialog" => native_ops::show_save_dialog(&app, &args),
         "fs:readText" => native_ops::read_text(&args),
         "fs:writeText" => native_ops::write_text(&args),
+        "fs:stripMetadata" => metadata_strip::strip_file(&args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
         // (project-archiver:* and media-library:* run their fs work inside

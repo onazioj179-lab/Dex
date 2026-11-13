@@ -67,10 +67,12 @@ async function readText(path: string): Promise<string | null> {
   const bridge = (window as any).dex;
   if (!bridge?.invoke) return null;
   try {
-    // Canonical contract: files:read({ path, encoding }) -> { content, bytes }.
-    const res = await bridge.invoke('files:read', { path, encoding: 'utf-8' });
+    // Native `fs:readText(path)` -> { ok, content } | { ok: false, error }.
+    // (This used `files:read`, which no native arm answers, so text previews
+    // were always blank in the desktop app. Found by the IPC ABI guard.)
+    const res = await bridge.invoke('fs:readText', path);
     if (typeof res === 'string') return res;
-    if (res && typeof res.content === 'string') return res.content;
+    if (res && res.ok !== false && typeof res.content === 'string') return res.content;
     return null;
   } catch {
     return null;

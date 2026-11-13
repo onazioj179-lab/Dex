@@ -60,6 +60,7 @@ import { PictureInPicture, usePiPState, closePiP } from './components/PictureInP
 import { MiniPlayer } from './components/MiniPlayer';
 import { LiveActivityHost } from './components/LiveActivityHost';
 import { QuickLookHost } from './shell/QuickLookHost';
+import { EasterEggHost } from './shell/EasterEggHost';
 import { WorkspaceTimeline } from './shell/WorkspaceTimeline';
 import MiniPulse from './components/MiniPulse';
 import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
@@ -629,6 +630,11 @@ export const App: React.FC = () => {
       {/* Global Quick Look — any surface can preview a file via the dex-quicklook event */}
       <AppErrorBoundary instanceId="quicklook" appId="quicklook" appName="Quick Look" appColor="#0A84FF">
         <QuickLookHost />
+      </AppErrorBoundary>
+
+      {/* Hidden easter eggs (Konami code, version taps) — services/easterEggs.ts */}
+      <AppErrorBoundary instanceId="easter-eggs" appId="easter-eggs" appName="Easter Eggs" appColor="#0A84FF">
+        <EasterEggHost />
       </AppErrorBoundary>
 
       {/* Workspace Time Machine — scrub back through auto-captured layout snapshots */}

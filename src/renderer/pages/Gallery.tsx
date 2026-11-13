@@ -950,6 +950,31 @@ export const Gallery: React.FC = () => {
 
   const currentExif = selectedMedia ? exifCache[selectedMedia.id] ?? null : null;
 
+  // Privacy: save a copy with camera/date/location metadata removed
+  // (native fs:stripMetadata — lossless, the original is never touched).
+  const [stripState, setStripState] = useState<{ busy: boolean; message?: string; error?: boolean }>({ busy: false });
+  useEffect(() => { setStripState({ busy: false }); }, [selectedMedia?.id]);
+  const canStripMetadata = !!(window as any).dex?.invoke && !!selectedMedia && selectedMedia.type === 'image'
+    && /\.(jpe?g|png)$/i.test(selectedMedia.src);
+  const stripSelectedMetadata = useCallback(async () => {
+    const dex = (window as any).dex;
+    if (!dex?.invoke || !selectedMedia) return;
+    setStripState({ busy: true });
+    try {
+      const r = await dex.invoke('fs:stripMetadata', selectedMedia.src);
+      if (!r || r.ok === false) {
+        setStripState({ busy: false, error: true, message: r?.error || 'Could not remove the metadata.' });
+      } else if (!r.outPath) {
+        setStripState({ busy: false, message: r.message || 'Nothing to remove.' });
+      } else {
+        const name = String(r.outPath).split(/[\\/]/).pop();
+        setStripState({ busy: false, message: `Saved ${name}. Removed: ${(r.removed as string[]).join(', ')}.` });
+      }
+    } catch (e) {
+      setStripState({ busy: false, error: true, message: e instanceof Error ? e.message : 'Could not remove the metadata.' });
+    }
+  }, [selectedMedia]);
+
   // Recent media (last 24h) for the "recently recorded" section at bottom
   const recentMedia = useMemo(() => {
     const dayAgo = Date.now() - 24 * 3600 * 1000;
@@ -1569,6 +1594,18 @@ export const Gallery: React.FC = () => {
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 00-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 00-5-5zm0 7a2 2 0 110-4 2 2 0 010 4z" fill="currentColor"/></svg>No GPS Data</span>
               )}
             </div>
+            {canStripMetadata && (
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <button
+                  onClick={stripSelectedMetadata}
+                  disabled={stripState.busy}
+                  style={{ width: '100%', minHeight: 28, padding: '6px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, cursor: stripState.busy ? 'progress' : 'pointer' }}
+                >{stripState.busy ? 'Removing…' : 'Save a copy without metadata'}</button>
+                <div role="status" aria-live="polite" style={{ fontSize: 10, lineHeight: 1.4, marginTop: 4, color: stripState.error ? 'var(--color-error)' : 'var(--color-text-tertiary)' }}>
+                  {stripState.message ?? 'Removes camera, date and location details. The original stays as it is.'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
