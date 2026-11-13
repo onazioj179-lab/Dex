@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 /**
  * DEX Platform - Weather data (Open-Meteo, keyless).
  * Shared by the Weather app and the Home weather widget so both read the same
