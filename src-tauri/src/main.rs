@@ -83,6 +83,7 @@ mod deeplink_ctl;
 mod devplatform_ctl;
 mod documents_ctl;
 mod dtp_ctl;
+mod dtp_transfer;
 mod editor_ctl;
 mod embedding_ctl;
 mod encryption_ctl;

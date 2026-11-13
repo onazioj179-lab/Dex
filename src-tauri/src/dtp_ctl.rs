@@ -38,15 +38,11 @@
 //     computed reads over the native discovery/transfer state so prefix-routing is
 //     total, and are flagged degraded for that reason.
 //
-// WHAT GENUINELY CANNOT BE NATIVE HERE
-// ------------------------------------
-//   * The TCP server (`startServer`/`stopServer`) and the whole inbound/outbound
-//     transfer engine (`sendFiles`, `cancelSend`, `pauseSend`, `resumeSend`,
-//     `approveDevice`, `denyDevice`, `pauseReceive`, `cancelReceive`) require the
-//     full DTP wire protocol: X25519 DH key exchange, per-frame AEAD, multi-stream
-//     chunking, manifest/ACK handshakes, resume DB — none of which exists in this
-//     shell and none of which can be faked. They return the documented honest
-//     degrade { success:false, error:"not ported (needs native runtime)" }.
+// TRANSFERS (DTPServer / DTPClient) — native since 7.0.2, in dtp_transfer.rs over
+// the `core/dex-dtp` wire protocol: X25519 key exchange per connection, AES-256-GCM
+// frames, SHA-256 per file, a 6-digit match code both screens show, and an approval
+// prompt in the renderer before any byte is written. Pause/resume and retry are not
+// supported (partial files are discarded) and say so.
 //
 // ids -> crate::util::pseudo_uuid_v4(); timestamps -> epoch millis. Uses only
 // serde_json, std, tauri, and crate:: helpers.
@@ -60,7 +56,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // --- DTP protocol constants (mirror DTPProtocol.ts / DeviceDiscovery.ts) -----
-const DTP_PORT: u16 = 58432;
+pub(crate) const DTP_PORT: u16 = 58432;
 const DISCOVERY_PORT: u16 = 58433;
 const BROADCAST_INTERVAL_MS: u64 = 15_000;
 const PEER_TIMEOUT_MS: i64 = 10_000;
@@ -73,7 +69,7 @@ const DTP_MAGIC_STR: &str = "1145128497";
 const BANDWIDTH_TEST_MS: u64 = 1500;
 
 // --- KV keys ----------------------------------------------------------------
-const KEY_HISTORY: &str = "dtp:history";
+pub(crate) const KEY_HISTORY: &str = "dtp:history";
 const KEY_TRUSTED: &str = "dtp:trusted";
 
 fn now_ms() -> i64 {
@@ -81,10 +77,6 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
-}
-
-fn not_ported() -> Value {
-    json!({ "success": false, "error": "not ported (needs native runtime)" })
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +130,7 @@ fn refresh_flag() -> &'static AtomicBool {
 /// Stable per-machine id, mirroring DeviceDiscovery.getMachineId (hostname-based
 /// fallback; we do not have a no-dep MAC reader, so use the hostname+user hash
 /// analog: a short hex digest of the hostname). Self-packets are filtered by id.
-fn machine_id() -> String {
+pub(crate) fn machine_id() -> String {
     let host = hostname();
     // Simple stable 32-hex derivation (FNV-1a over host, repeated to 32 chars).
     let mut h: u64 = 0xcbf29ce484222325;
@@ -150,7 +142,7 @@ fn machine_id() -> String {
     format!("{}{}", base, base)
 }
 
-fn hostname() -> String {
+pub(crate) fn hostname() -> String {
     #[cfg(windows)]
     {
         std::env::var("COMPUTERNAME").unwrap_or_else(|_| "dex-device".into())
@@ -161,7 +153,7 @@ fn hostname() -> String {
     }
 }
 
-fn device_type() -> &'static str {
+pub(crate) fn device_type() -> &'static str {
     if cfg!(windows) {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -469,7 +461,7 @@ impl FirstAddr for String {
 // History + trusted devices (KV-backed, exact renderer shapes)
 // ---------------------------------------------------------------------------
 
-fn load_history(app: &tauri::AppHandle) -> Vec<Value> {
+pub(crate) fn load_history(app: &tauri::AppHandle) -> Vec<Value> {
     match crate::kv_get(app, KEY_HISTORY) {
         Value::Array(a) => a,
         _ => Vec::new(),
@@ -494,14 +486,10 @@ fn clear_history(app: &tauri::AppHandle) -> Value {
     }
 }
 
-/// retryTransfer mirrors DTPServer.retryTransfer: a transfer can only be retried
-/// when it is in the active map in a failed/cancelled state. There is no live
-/// transfer engine here, so there is nothing to flip back to 'transferring'.
-/// Electron returned { success:true } unconditionally (the no-op guard was
-/// internal), so we mirror that success while the actual restart needs the
-/// native transfer runtime.
+/// A failed DEX-to-DEX send can't be resumed: the receiver discards partial files.
+/// Say so instead of reporting a retry that never happens.
 fn retry_transfer(_app: &tauri::AppHandle, _args: &Value) -> Value {
-    json!({ "success": true })
+    json!({ "success": false, "error": "Failed transfers can't be resumed. Send the files again." })
 }
 
 fn get_trusted(app: &tauri::AppHandle) -> Value {
@@ -535,7 +523,7 @@ fn remove_trusted(app: &tauri::AppHandle, args: &Value) -> Value {
 
 fn get_status() -> Value {
     json!({
-        "serverRunning": false,
+        "serverRunning": crate::dtp_transfer::server_running(),
         "discoveryRunning": discovery_running().load(Ordering::SeqCst),
         "deviceCount": peers().lock().map(|p| p.len()).unwrap_or(0),
         "port": DTP_PORT,
@@ -575,16 +563,17 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "dtp:getProgress" => get_progress(),
 
         // -- TCP server lifecycle (no native server runtime) ----------------
-        "dtp:startServer" | "dtp:stopServer" => not_ported(),
+        "dtp:startServer" => crate::dtp_transfer::start_server(app, args),
+        "dtp:stopServer" => crate::dtp_transfer::stop_server(),
 
         // -- Outbound transfer engine (DTP protocol + crypto) ---------------
-        "dtp:sendFiles" | "dtp:cancelSend" | "dtp:pauseSend" | "dtp:resumeSend" => not_ported(),
+        "dtp:sendFiles" => crate::dtp_transfer::send_files(app, args),
+        "dtp:cancelSend" | "dtp:cancelReceive" => crate::dtp_transfer::cancel(args),
+        "dtp:pauseSend" | "dtp:resumeSend" | "dtp:pauseReceive" => crate::dtp_transfer::pause_unsupported(),
 
         // -- Inbound transfer engine (server-side approval + control) -------
-        "dtp:approveDevice"
-        | "dtp:denyDevice"
-        | "dtp:pauseReceive"
-        | "dtp:cancelReceive" => not_ported(),
+        "dtp:approveDevice" => crate::dtp_transfer::approve(args),
+        "dtp:denyDevice" => crate::dtp_transfer::deny(args),
 
         _ => Value::Null,
     }
