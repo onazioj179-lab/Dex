@@ -5,16 +5,17 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * PluginMarketplace -- C2/C3
- * Browse, install, and publish DEX plugins (.dexplug-v1 envelopes).
- * Backed by main-process IPC: plugins:list / plugins:browseRegistry /
- * plugins:downloadAndInstall / plugins:package / plugins:publish.
+ * Plugins (Settings).
+ * Lists installed plugins and installs one from a local folder (plugins:install
+ * copies it into DEX's plugin directory after checking its manifest).
+ * There is no plugin registry and no plugin runtime in this version: the old
+ * Discover / Publish tabs called channels that do not exist, and enabling a
+ * plugin only records its state. The page says both plainly.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { GlassSurface, GlassToolbar, SectionHeader, StatusDot } from './ui';
 
-type Tab = 'installed' | 'discover' | 'publish';
 
 interface InstalledRow {
   manifest: { id: string; name: string; version: string; description?: string; author?: string };
@@ -23,21 +24,12 @@ interface InstalledRow {
   installedAt: number;
 }
 
-interface RegistryEntry {
-  format: string;
-  manifest: { id: string; name: string; version: string; description?: string; author?: string };
-  files: Record<string, string>;
-  published: { author: string; version: string; sha256: string; downloadUrl?: string; downloads?: number; publishedAt: number };
-}
-
 // A getter, not a captured value: this module is evaluated before the Tauri
 // bridge (window.dex) is installed, so a module-level copy was undefined.
 const bridge = (): any => (window as any).dex;
 
 export const PluginMarketplace: React.FC = () => {
-  const [tab, setTab] = useState<Tab>('installed');
   const [installed, setInstalled] = useState<InstalledRow[]>([]);
-  const [registry, setRegistry] = useState<RegistryEntry[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
 
@@ -49,25 +41,19 @@ export const PluginMarketplace: React.FC = () => {
     } catch (e: any) { setStatus(`List failed: ${e?.message ?? e}`); }
   }, []);
 
-  // ----- Registry ------------------------------------------------------------
-  const refreshRegistry = useCallback(async () => {
-    try {
-      const entries = await bridge()?.invoke?.('plugins:browseRegistry');
-      setRegistry(Array.isArray(entries) ? entries : []);
-    } catch (e: any) { setStatus(`Registry failed: ${e?.message ?? e}`); }
-  }, []);
+  useEffect(() => { refreshInstalled(); }, [refreshInstalled]);
 
-  useEffect(() => {
-    refreshInstalled();
-    refreshRegistry();
-  }, [refreshInstalled, refreshRegistry]);
-
-  const install = async (entry: RegistryEntry) => {
-    setBusyId(entry.manifest.id);
-    setStatus(`Installing ${entry.manifest.name}…`);
+  const installFromFolder = async () => {
+    const dex = bridge();
+    if (!dex?.invoke) { setStatus('Installing plugins needs the DEX desktop app.'); return; }
     try {
-      await bridge()?.invoke?.('plugins:downloadAndInstall', entry);
-      setStatus(`Installed ${entry.manifest.name} v${entry.manifest.version}`);
+      const pick = await dex.invoke('dialog:showOpenDialog', { properties: ['openDirectory'], title: 'Choose a plugin folder' });
+      if (!pick || pick.canceled || !pick.filePaths?.length) return;
+      setBusyId('__install');
+      setStatus('Installing…');
+      const res = await dex.invoke('plugins:install', pick.filePaths[0]);
+      if (!res || res.error) throw new Error(res?.error || 'DEX did not answer.');
+      setStatus(`Installed ${res.manifest?.name ?? 'plugin'} v${res.manifest?.version ?? '?'}.`);
       await refreshInstalled();
     } catch (e: any) { setStatus(`Install failed: ${e?.message ?? e}`); }
     setBusyId(null);
@@ -76,7 +62,8 @@ export const PluginMarketplace: React.FC = () => {
   const enableToggle = async (row: InstalledRow) => {
     setBusyId(row.manifest.id);
     try {
-      await bridge()?.invoke?.(row.enabled ? 'plugins:disable' : 'plugins:enable', row.manifest.id);
+      const res = await bridge()?.invoke?.(row.enabled ? 'plugins:disable' : 'plugins:enable', row.manifest.id);
+      if (!res) throw new Error('that plugin is no longer installed.');
       await refreshInstalled();
     } catch (e: any) { setStatus(`Toggle failed: ${e?.message ?? e}`); }
     setBusyId(null);
@@ -85,45 +72,22 @@ export const PluginMarketplace: React.FC = () => {
   const uninstall = async (row: InstalledRow) => {
     setBusyId(row.manifest.id);
     try {
-      await bridge()?.invoke?.('plugins:uninstall', row.manifest.id);
+      const ok = await bridge()?.invoke?.('plugins:uninstall', row.manifest.id);
+      if (ok !== true) throw new Error('its files could not be removed.');
+      setStatus(`Uninstalled ${row.manifest.name}.`);
       await refreshInstalled();
     } catch (e: any) { setStatus(`Uninstall failed: ${e?.message ?? e}`); }
     setBusyId(null);
   };
 
-  // ----- Publish wizard ------------------------------------------------------
-  const [publishDir, setPublishDir] = useState('');
-  const publish = async () => {
-    if (!publishDir.trim()) { setStatus('Provide a source directory path'); return; }
-    setStatus('Packaging…');
-    try {
-      const pkg = await bridge()?.invoke?.('plugins:package', publishDir.trim());
-      if (!pkg?.envelope) throw new Error('Package returned no envelope');
-      setStatus(`Packaged ${pkg.envelope.manifest.name} v${pkg.envelope.manifest.version}; publishing locally…`);
-      const res = await bridge()?.invoke?.('plugins:publish', pkg.envelope);
-      if (res?.ok) {
-        setStatus(`Published to ${res.registryUrl}`);
-        await refreshRegistry();
-      } else {
-        setStatus(`Publish refused: ${res?.reason ?? 'unknown'}`);
-      }
-    } catch (e: any) { setStatus(`Publish failed: ${e?.message ?? e}`); }
-  };
-
   return (
     <div style={{ padding: 0, fontSize: 13, color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', height: '100%' }}>
       <GlassToolbar
-        title="Plugin Marketplace"
+        title="Plugins"
         trailing={
-          <div style={{ display: 'flex', gap: 4, minWidth: 0, maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'thin' }}>
-            {(['installed', 'discover', 'publish'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={tabBtnStyle(tab === t)}
-              >{t}</button>
-            ))}
-          </div>
+          <button disabled={busyId === '__install'} onClick={installFromFolder} style={btnStyle('accent')}>
+            {busyId === '__install' ? 'Installing…' : 'Install from folder…'}
+          </button>
         }
       />
 
@@ -133,11 +97,11 @@ export const PluginMarketplace: React.FC = () => {
           style={{ padding: 'var(--space-3)', marginBottom: 'var(--space-3)', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))' }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
-            Plugin Policy
+            About plugins
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-            Plugins can access files, network, credentials, automation, and user content only through declared permissions.
-            DEX may review, block, quarantine, disable, delist, remove, or rate-limit plugins that create risk or violate policy.
+            A plugin is a folder with a <code>manifest.json</code>. DEX checks the manifest and copies the folder into its plugin directory.
+            This version has no plugin store and does not run plugin code yet: enabling a plugin only records that you want it on.
           </div>
         </GlassSurface>
 
@@ -150,8 +114,7 @@ export const PluginMarketplace: React.FC = () => {
           </GlassSurface>
         )}
 
-        {tab === 'installed' && (
-          <div>
+        <div>
             <SectionHeader>Installed</SectionHeader>
             {installed.length === 0 && <div style={emptyStyle}>No plugins installed.</div>}
             {installed.map(row => (
@@ -171,68 +134,13 @@ export const PluginMarketplace: React.FC = () => {
                 <button disabled={busyId === row.manifest.id} onClick={() => uninstall(row)} style={btnStyle('danger')}>Uninstall</button>
               </GlassSurface>
             ))}
-          </div>
-        )}
-
-        {tab === 'discover' && (
-          <div>
-            <SectionHeader trailing={<button onClick={refreshRegistry} style={btnStyle('muted')}>Refresh</button>}>Discover</SectionHeader>
-            {registry.length === 0 && <div style={emptyStyle}>Registry is empty. Publish a plugin to populate it.</div>}
-            {registry.map(entry => (
-              <GlassSurface key={`${entry.manifest.id}@${entry.published.version}`} variant="card" style={rowSurfaceStyle}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={titleLineStyle}>
-                    <StatusDot tone="teal" title="Available" />
-                    <span style={{ fontWeight: 600 }}>{entry.manifest.name}</span>
-                    <span style={versionStyle}>v{entry.published.version}</span>
-                  </div>
-                  {entry.manifest.description && <div style={subtitleStyle}>{entry.manifest.description}</div>}
-                  <div style={metaStyle}>by {entry.published.author} — sha256 {entry.published.sha256.slice(0, 12)}…</div>
-                </div>
-                <button disabled={busyId === entry.manifest.id} onClick={() => install(entry)} style={btnStyle('accent')}>
-                  {busyId === entry.manifest.id ? 'Installing…' : 'Install'}
-                </button>
-              </GlassSurface>
-            ))}
-          </div>
-        )}
-
-        {tab === 'publish' && (
-          <GlassSurface variant="card" style={{ padding: 14 }}>
-            <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              Package a plugin source directory into a <code>.dexplug-v1</code> envelope and publish it to the local registry.
-            </div>
-            <input
-              type="text"
-              value={publishDir}
-              onChange={e => setPublishDir(e.target.value)}
-              placeholder="Absolute path to plugin source folder"
-              style={inputStyle}
-            />
-            <button onClick={publish} style={btnStyle('accent')}>Package &amp; Publish</button>
-          </GlassSurface>
-        )}
+        </div>
       </div>
     </div>
   );
 };
 
 // --- Local style helpers ---------------------------------------------------
-
-const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-  padding: '4px 10px',
-  borderRadius: 4,
-  border: '1px solid var(--pg-border)',
-  background: active ? 'var(--pg-row-active)' : 'transparent',
-  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-  cursor: 'pointer',
-  textTransform: 'capitalize',
-  fontSize: 12,
-  fontWeight: active ? 600 : 500,
-  boxShadow: active ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
-  whiteSpace: 'nowrap',
-  flexShrink: 0,
-});
 
 const rowSurfaceStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
@@ -261,16 +169,6 @@ const metaStyle: React.CSSProperties = {
 
 const emptyStyle: React.CSSProperties = {
   padding: 'var(--space-3) 4px', color: 'var(--color-text-tertiary)', fontSize: 12,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6,
-  border: '1px solid var(--pg-border-strong)',
-  background: 'var(--color-bg-inset, rgba(0,0,0,0.35))',
-  color: 'var(--color-text-primary)',
-  marginBottom: 10,
-  outline: 'none',
-  fontSize: 12.5,
 };
 
 const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {

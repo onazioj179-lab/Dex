@@ -177,6 +177,7 @@ mod workflow_ctl;
 mod changelog;
 mod color_labels;
 mod ledger_legacy;
+mod renderer_log;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -1293,6 +1294,16 @@ fn os_info() -> Value {
         "memTotalMB": sys.total_memory() / (1024 * 1024),
         "hostname": sysinfo::System::host_name(),
     })
+}
+
+/// The signed-in Windows account, for the Home greeting. Only the account
+/// name: no SID, profile path or anything else leaves this function.
+fn user_info() -> Value {
+    let username = std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default();
+    if username.trim().is_empty() {
+        return json!({ "success": false, "error": "The account name is not available." });
+    }
+    json!({ "success": true, "username": username })
 }
 
 fn disk_usage() -> Value {
@@ -2465,6 +2476,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 
         // --- System / power -------------------------------------------------
         "system:getStatus" => system_status(),
+        "system:getUserInfo" => user_info(),
+        "log:renderer" | "render-error:report" | "renderer:memory-critical" => renderer_log::dispatch(&channel, &args),
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
@@ -2482,6 +2495,9 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // --- Native dialogs (Tauri dialog plugin) --------------------------
         // Electron dialog.showOpenDialog parity: { canceled, filePaths }.
         "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
+        "dialog:showSaveDialog" => native_ops::show_save_dialog(&app, &args),
+        "fs:readText" => native_ops::read_text(&args),
+        "fs:writeText" => native_ops::write_text(&args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
         // (project-archiver:* and media-library:* run their fs work inside

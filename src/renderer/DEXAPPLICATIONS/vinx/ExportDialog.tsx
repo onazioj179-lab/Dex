@@ -13,7 +13,6 @@ import React, { useCallback, useState, memo, useMemo, useRef, useEffect } from '
 import { useVinxStore } from './VinxStore';
 import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
-import { getDiskInfo } from '../../utils/nativeBridge';
 import { planExport } from '../../../shared/video/pipeline';
 import { isNativeOnlyFormat } from './quickExport';
 import DexIcon from '../../components/DexIcon';
@@ -147,16 +146,12 @@ export const ExportDialog: React.FC = memo(() => {
     let cancelled = false;
     (async () => {
       try {
-        const disks = await getDiskInfo();
-        if (cancelled || !Array.isArray(disks) || disks.length === 0) return;
-        // Pick the disk with the most free space (typically the user's primary working drive).
-        const largest = disks.reduce((best: any, d: any) => {
-          const free = Number(d?.available ?? d?.free ?? 0);
-          const bestFree = Number(best?.available ?? best?.free ?? 0);
-          return free > bestFree ? d : best;
-        }, disks[0]);
-        const freeBytes = Number(largest?.available ?? largest?.free ?? 0);
-        if (freeBytes > 0) setDiskFreeGB(freeBytes / (1024 ** 3));
+        const res = await (window as any).dex?.invoke?.('system:getDiskUsage');
+        const disks: Array<{ availableGB?: number }> = Array.isArray(res?.disks) ? res.disks : [];
+        if (cancelled || disks.length === 0) return;
+        // The disk with the most free space (typically the user's working drive).
+        const freeGB = Math.max(...disks.map(d => Number(d?.availableGB) || 0));
+        if (freeGB > 0) setDiskFreeGB(freeGB);
       } catch { /* native unavailable -- hide indicator */ }
     })();
     return () => { cancelled = true; };

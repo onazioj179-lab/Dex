@@ -6,13 +6,14 @@
 // =============================================================================
 /**
  * VINX -- Real-time scopes panel
- * Samples a video element each frame and renders waveform / vectorscope / histogram.
+ * Samples a video element each frame and renders waveform / vectorscope /
+ * histogram / RGB parade from the actual pixels (no simulated data).
  */
 
 import React, { useEffect, useRef } from 'react';
 import { useAppActive } from '../../utils/perfAware';
 
-export type ScopeMode = 'waveform' | 'vectorscope' | 'histogram';
+export type ScopeMode = 'waveform' | 'vectorscope' | 'histogram' | 'parade';
 
 interface Props {
   videoEl: HTMLVideoElement | null;
@@ -149,6 +150,23 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
           const py = cy - (cr / 128) * scale;
           ctx.fillRect(px, py, 1, 1);
         }
+      } else if (mode === 'parade') {
+        // RGB parade: one waveform per channel, side by side (R | G | B).
+        const third = w / 3;
+        const colScale = third / SAMPLE_W;
+        const fills = ['rgba(255,90,90,0.30)', 'rgba(90,230,120,0.30)', 'rgba(90,150,255,0.30)'];
+        for (let c = 0; c < 3; c++) {
+          ctx.fillStyle = fills[c];
+          const x0 = c * third;
+          for (let y = 0; y < SAMPLE_H; y++) {
+            for (let x = 0; x < SAMPLE_W; x++) {
+              const v = data[(y * SAMPLE_W + x) * 4 + c];
+              ctx.fillRect(x0 + x * colScale, ((255 - v) / 255) * h, Math.max(1, colScale), 1);
+            }
+          }
+        }
+        ctx.strokeStyle = 'rgba(70,70,70,1)';
+        for (let c = 1; c < 3; c++) { ctx.beginPath(); ctx.moveTo(c * third, 0); ctx.lineTo(c * third, h); ctx.stroke(); }
       } else {
         // histogram
         const rB = new Uint32Array(256);

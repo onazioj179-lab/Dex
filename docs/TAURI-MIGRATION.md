@@ -9,6 +9,13 @@
 
 ---
 
+## 18n — renderer log, user info, honest plugins (2026-11-12)
+
+- New channels: `log:renderer` (warn/error only), `render-error:report`, `renderer:memory-critical` → `renderer_log.rs` → `<logs>/renderer.log` (JSON lines, 4000-char cap per entry, rotates to `renderer.log.1` at 512 KB). Removed from the renderer TELEMETRY_SINKS shim so they reach native.
+- `system:getUserInfo` → `{ success, username }` (account name only).
+- Removed renderer callers of channels that never existed: `native:*` helper (`utils/nativeBridge.ts`, `NativeSpringBatch.ts`), `batch:*` store, `plugins:browseRegistry/downloadAndInstall/package/publish`, `app:launch`.
+- Unhandled-channel scan script idea: collect `invoke('ns:name')` literals under `src/renderer`, diff against `"ns:name"` literals in `src-tauri/src` + `core`, then subtract `rendererShims.ts` keys.
+
 ## PART 16 — DEX Ledger native engine + pinning (2026-11-04)
 
 - New native subsystem: `ledger:*` → `src-tauri/src/ledger_ctl.rs` → `core/dex-ledger` (rusqlite + `backup` feature). Own file `<data>/databases/ledger.db`, backups in `<data>/backups/ledger/`. Not routed through `db_dispatch`/dex.db on purpose (financial data isolated; its own restore path). `dex_ipc` gained a `webview: tauri::Webview` param to refuse ledger calls from child webviews.

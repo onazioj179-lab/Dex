@@ -37,9 +37,17 @@ import {
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { POST_FILTER_TYPES, applyPostEffects } from './postEffects';
+import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
+import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
+import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
+import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
 const FLUX_ACCENT = '#bf5af2';
+/** No move, 100% scale: a group with this draws its layers exactly where they were. */
+const IDENTITY_TRANSFORM = { x: 0, y: 0, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 };
 /** The accent at `pct` percent opacity. */
 const fluxTint = (pct: number) => `color-mix(in srgb, ${FLUX_ACCENT} ${pct}%, transparent)`;
 
@@ -77,6 +85,12 @@ interface Layer {
   shapeStyle?: { fill: string; stroke: string; strokeWidth: number; type: 'rectangle' | 'ellipse' | 'polygon' | 'star' };
   particleEmitter?: { birthRate: number; life: number; lifeRange: number; speed: number; speedRange: number; angle: number; angleRange: number; spin: number; spinRange: number; scale: number; scaleRange: number; color: string; colorRange: number; opacity: number; shape: 'circle' | 'point' | 'rectangle' | 'line' | 'image' };
   animations?: Animation[];
+  /** Camera layers only: lens and depth of field (see fluxCamera.ts). */
+  camera?: CameraSettings;
+  /** Text layers only: per character/word/line reveal (see textAnimator.ts). */
+  textAnimator?: TextAnimator;
+  /** Generator layers: a GLSL fragment shader drawn every frame (see shaderLayer.ts). */
+  shader?: ShaderSpec;
   // Live per-frame expressions keyed by transform property name (e.g. 'x',
   // 'opacity', 'rotationZ'). Evaluated every frame during render/preview; a
   // malformed expression degrades to the static/keyframe value. See expressions.ts.
@@ -729,6 +743,10 @@ const Flux: React.FC = () => {
   const [maskExpansion, setMaskExpansion] = useState(0);
   const [maskOpacity, setMaskOpacity] = useState(100);
   const [shaderCode, setShaderCode] = useState(`precision mediump float;\nuniform float u_time;\nuniform vec2 u_resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / u_resolution;\n  vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0,2,4));\n  gl_FragColor = vec4(col, 1.0);\n}`);
+  const shaderPoolRef = useRef(new ShaderPool());
+  const postCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => () => shaderPoolRef.current.prune(new Set()), []);
+  const [shaderStatus, setShaderStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [shaderUniforms, setShaderUniforms] = useState({ u_time: 0, u_speed: 50, u_intensity: 25, u_color: '#bf5af2' }); // hex: the shader parses it
   // 2. Precompose
   const [showPrecompose, setShowPrecompose] = useState(false);
@@ -753,12 +771,12 @@ const Flux: React.FC = () => {
   const [showEffectsStack, setShowEffectsStack] = useState(false);
   // 8. Camera Rig
   const [showCameraRig, setShowCameraRig] = useState(false);
-  const [cameraRigType, setCameraRigType] = useState<'orbit' | 'twoNode' | 'poi'>('orbit');
   const [cameraFov, setCameraFov] = useState(50);
   const [cameraDof, setCameraDof] = useState(false);
-  const [cameraFocusDistance, setCameraFocusDistance] = useState(1000);
+  const [cameraFocusDistance, setCameraFocusDistance] = useState(0);
   // 10. Render Queue
   const [showRenderQueue, setShowRenderQueue] = useState(false);
+  const renderClockRef = useRef({ time: 0, duration: 1 });
   const [renderQueue, setRenderQueue] = useState<{ id: string; name: string; format: string; status: 'queued' | 'rendering' | 'done' | 'error'; progress: number }[]>([]);
   // 11. Timeline Markers
   const [showMarkers, setShowMarkers] = useState(false);
@@ -1093,6 +1111,7 @@ const Flux: React.FC = () => {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const mainCtx = ctx as CanvasRenderingContext2D;
     if (!ctx) {
       setCanvasError(true);
       return;
@@ -1106,16 +1125,85 @@ const Flux: React.FC = () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
     
+    renderClockRef.current = { time: currentTime, duration };
     // Render layers from bottom to top (reversed order)
-    const visibleLayers = layers.filter(l => l.visible && currentTime >= l.inPoint && currentTime <= l.outPoint).reverse();
+    const inTime = (l: Layer) => l.visible && currentTime >= l.inPoint && currentTime <= l.outPoint;
+    // The topmost active Camera layer frames the shot; cameras are never drawn.
+    const camLayer = layers.find(l => l.type === 'camera' && inTime(l));
+    const camView: CameraView | null = camLayer ? (() => {
+      const settings = { ...DEFAULT_CAMERA, ...(camLayer.camera || {}) };
+      return {
+        x: getAnimatedValue(camLayer, 'x', currentTime) ?? camLayer.transform.x,
+        y: getAnimatedValue(camLayer, 'y', currentTime) ?? camLayer.transform.y,
+        z: getAnimatedValue(camLayer, 'z', currentTime) ?? camLayer.transform.z ?? 0,
+        roll: getAnimatedValue(camLayer, 'rotationZ', currentTime) ?? camLayer.transform.rotationZ,
+        zoom: fovZoom(settings.fov),
+        focal: focalLength(settings.fov, canvasSize.height),
+        settings,
+      };
+    })() : null;
+    shaderPoolRef.current.prune(new Set(layers.filter(l => l.shader).map(l => l.id)));
+    const visibleLayers = layers.filter(l => l.type !== 'camera' && (l.type as string) !== 'null' && inTime(l)).reverse();
+    const parentTransformAt = (l: Layer): ParentTransform => ({
+      x: getAnimatedValue(l, 'x', currentTime) ?? l.transform.x,
+      y: getAnimatedValue(l, 'y', currentTime) ?? l.transform.y,
+      rotationZ: getAnimatedValue(l, 'rotationZ', currentTime) ?? l.transform.rotationZ,
+      scaleX: getAnimatedValue(l, 'scaleX', currentTime) ?? l.transform.scaleX,
+      scaleY: getAnimatedValue(l, 'scaleY', currentTime) ?? l.transform.scaleY,
+      anchorX: l.transform.anchorX, anchorY: l.transform.anchorY,
+    });
     
     // Cache per-frame constants outside the layer loop
     const cachedTier = getPerfTier();
     const cachedMaxParticles = cachedTier === 'low' ? 60 : cachedTier === 'mid' ? 250 : cachedTier === 'high' ? 500 : 1000;
     const defaultParticleEmitter = DEFAULT_PARTICLE_EMITTER;
     
-    for (const layer of visibleLayers) {
+    // One layer, fully drawn. Groups (pre-comps) call it for their children
+    // inside the group's own transform; the camera is applied once, at the top.
+    const drawLayer = (layer: Layer, nested: boolean, target: CanvasRenderingContext2D = mainCtx, inPost = false): void => {
+      const ctx = target;
+      // Chromatic aberration / vignette need the layer's pixels: draw it to an
+      // offscreen frame with the same transform, process, then composite.
+      if (!inPost && (layer.filters || []).some(f => f.enabled && POST_FILTER_TYPES.has(f.type))) {
+        const off = postCanvasRef.current ?? (postCanvasRef.current = document.createElement('canvas'));
+        if (off.width !== canvas.width || off.height !== canvas.height) { off.width = canvas.width; off.height = canvas.height; }
+        const oc = off.getContext('2d', { willReadFrequently: true });
+        if (oc) {
+          oc.setTransform(1, 0, 0, 1, 0, 0);
+          oc.clearRect(0, 0, off.width, off.height);
+          oc.setTransform(ctx.getTransform());
+          oc.globalAlpha = ctx.globalAlpha;
+          drawLayer(layer, nested, oc, true);
+          oc.setTransform(1, 0, 0, 1, 0, 0);
+          const img = oc.getImageData(0, 0, off.width, off.height);
+          applyPostEffects(img, layer.filters);
+          oc.putImageData(img, 0, 0);
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.drawImage(off, 0, 0);
+          ctx.restore();
+          return;
+        }
+      }
       ctx.save();
+
+      // Camera: frame the view, then perspective-scale this layer about the
+      // camera's look point by its Z distance; behind the camera = not drawn.
+      let camBlur = 0;
+      if (camView && !nested) {
+        applyCameraView(ctx, camView, canvasSize.width, canvasSize.height);
+        const depth = (getAnimatedValue(layer, 'z', currentTime) ?? layer.transform.z ?? 0) - camView.z;
+        const p = perspectiveScale(depth, camView.focal);
+        if (p === null) { ctx.restore(); return; }
+        if (p !== 1) { ctx.translate(camView.x, camView.y); ctx.scale(p, p); ctx.translate(-camView.x, -camView.y); }
+        camBlur = dofBlur(depth, camView.settings);
+      }
+
+      // Parenting: draw inside every ancestor's transform, root first.
+      if (layer.parent) {
+        for (const anc of ancestorChain(layers, layer)) applyParentTransform(ctx, parentTransformAt(anc));
+      }
       
       // Compute local time for this layer
       const localTime = currentTime - layer.inPoint;
@@ -1137,9 +1225,12 @@ const Flux: React.FC = () => {
         const cosY = Math.cos((tRotY * Math.PI) / 180);
         // Simulate 3D perspective via scale + skew approximation
         ctx.transform(cosY, 0, 0, cosX, 0, 0);
-        const depth = layer.transform.z || 0;
-        const perspScale = 1000 / (1000 + depth);
-        ctx.scale(perspScale, perspScale);
+        if (!camView) {
+          // No camera: a fixed 1000px lens for Z depth.
+          const depth = layer.transform.z || 0;
+          const perspScale = 1000 / (1000 + depth);
+          ctx.scale(perspScale, perspScale);
+        }
       }
       ctx.rotate((tRotZ * Math.PI) / 180);
       ctx.scale(tScaleX / 100, tScaleY / 100);
@@ -1187,11 +1278,12 @@ const Flux: React.FC = () => {
               if (fs.hueRotate) filterParts.push(`hue-rotate(${fs.hueRotate}deg)`);
               break;
             }
-            case 'vignette': filterParts.push(`brightness(${1 - (fs.amount ?? 0.3)})`); break;
+            // vignette and chromaticAberration: pixel post pass (postEffects.ts)
             case 'stylize': {
               if (fs.sepia) filterParts.push(`sepia(${fs.sepia / 100})`);
               if (fs.grayscale) filterParts.push(`grayscale(${fs.grayscale / 100})`);
               if (fs.invert) filterParts.push(`invert(${fs.invert / 100})`);
+              if (typeof fs.customFilter === 'string' && fs.customFilter) filterParts.push(fs.customFilter);
               break;
             }
             default: break;
@@ -1201,10 +1293,19 @@ const Flux: React.FC = () => {
           ctx.filter = filterParts.join(' ');
         }
       }
+      if (camBlur > 0) {
+        const f = ctx.filter && ctx.filter !== 'none' ? `${ctx.filter} ` : '';
+        ctx.filter = `${f}blur(${camBlur}px)`;
+      }
       
       // Render based on layer type
       switch (layer.type) {
         case 'generator':
+          if (layer.shader) {
+            const out = shaderPoolRef.current.get(layer.id).render(layer.shader, canvasSize.width, canvasSize.height, localTime / fps);
+            if (out) ctx.drawImage(out as CanvasImageSource, -canvasSize.width / 2, -canvasSize.height / 2, canvasSize.width, canvasSize.height);
+            break;
+          }
           // Gradient background
           const gradient = ctx.createLinearGradient(0, 0, 200, 200);
           gradient.addColorStop(0, '#0e0e12');
@@ -1215,8 +1316,8 @@ const Flux: React.FC = () => {
           
         case 'shape':
           const style = layer.shapeStyle || { fill: 'var(--color-accent)', stroke: 'var(--color-accent)', strokeWidth: 2, type: 'rectangle' as const };
-          ctx.fillStyle = style.fill;
-          ctx.strokeStyle = style.stroke;
+          ctx.fillStyle = resolveCanvasColor(style.fill);
+          ctx.strokeStyle = resolveCanvasColor(style.stroke);
           ctx.lineWidth = style.strokeWidth;
           // Stroke effects
           if (strokeDash > 0 || strokeGap > 0) ctx.setLineDash([strokeDash, strokeGap]);
@@ -1322,10 +1423,37 @@ const Flux: React.FC = () => {
               ctx.fillText(textContent, -0.5, -0.5);
             }
           }
-          ctx.fillStyle = textStyle.color;
-          ctx.fillText(textContent, 0, 0);
+          ctx.fillStyle = resolveCanvasColor(textStyle.color);
+          if (layer.textAnimator) {
+            drawAnimatedText(ctx, textContent, layer.textAnimator, (localTime / fps) * 1000, textStyle.align, textStyle.fontSize * 1.2);
+          } else {
+            ctx.fillText(textContent, 0, 0);
+          }
           break;
           
+        case 'light': {
+          // A 2D point light: an additive radial glow that brightens whatever is
+          // under it. Size follows Scale, strength follows Opacity.
+          const r = 320;
+          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+          g.addColorStop(0, 'rgba(255,244,214,0.85)');
+          g.addColorStop(0.35, 'rgba(255,236,190,0.35)');
+          g.addColorStop(1, 'rgba(255,230,180,0)');
+          const prevOp = ctx.globalCompositeOperation;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = g;
+          ctx.fillRect(-r, -r, r * 2, r * 2);
+          ctx.globalCompositeOperation = prevOp;
+          break;
+        }
+
+        case 'group': {
+          // Pre-comp: draw its layers (bottom to top) inside this transform.
+          const kids = (layer.children || []).filter(c => c.visible && c.type !== 'camera' && currentTime >= c.inPoint && currentTime <= c.outPoint);
+          for (let k = kids.length - 1; k >= 0; k--) drawLayer(kids[k], true, ctx, inPost);
+          break;
+        }
+
         case 'image':
           if (layer.content instanceof HTMLImageElement && layer.content.complete) {
             ctx.drawImage(layer.content, -layer.content.width / 2, -layer.content.height / 2);
@@ -1341,6 +1469,7 @@ const Flux: React.FC = () => {
         case 'particle': {
           // Real particle system using emitter settings (cached defaults)
           const emitter = layer.particleEmitter || defaultParticleEmitter;
+          const particleColor = resolveCanvasColor(emitter.color); // once per layer, not per particle
           const maxParticles = cachedMaxParticles;
           const particleCount = Math.min(emitter.birthRate * (emitter.life / fps), maxParticles);
           const baseAngle = (emitter.angle * Math.PI) / 180;
@@ -1372,7 +1501,7 @@ const Flux: React.FC = () => {
             ctx.translate(px * frictionFactor, py * frictionFactor);
             ctx.rotate(rotation);
             ctx.globalAlpha *= emitter.opacity * fadeIn * fadeOut;
-            ctx.fillStyle = emitter.color;
+            ctx.fillStyle = particleColor;
             const size = 4 * pScale * (1 - lifeProgress * 0.5);
             
             if (emitter.shape === 'circle' || emitter.shape === 'point') {
@@ -1382,7 +1511,7 @@ const Flux: React.FC = () => {
             } else if (emitter.shape === 'rectangle') {
               ctx.fillRect(-size, -size, size * 2, size * 2);
             } else if (emitter.shape === 'line') {
-              ctx.strokeStyle = emitter.color;
+              ctx.strokeStyle = particleColor;
               ctx.lineWidth = Math.max(0.5, size * 0.3);
               ctx.beginPath();
               ctx.moveTo(-size, 0);
@@ -1448,7 +1577,8 @@ const Flux: React.FC = () => {
       // Reset filter after each layer
       ctx.filter = 'none';
       ctx.restore();
-    }
+    };
+    for (const layer of visibleLayers) drawLayer(layer, false);
 
     // Motion blur post-process
     if (showMotionBlur && motionBlurSamples > 1) {
@@ -1686,9 +1816,18 @@ const Flux: React.FC = () => {
         }
         case 'wiggle': {
           const amplitude = s.amplitude ?? 10;
-          const frequency = s.frequency ?? 0.3;
-          result.x = (result.x ?? 0) + Math.sin(localTime * frequency) * amplitude;
-          result.y = (result.y ?? 0) + Math.cos(localTime * frequency * 0.83) * amplitude;
+          // Auto Wiggle panel stores `property` and a frequency in wiggles per
+          // second; the plain behavior uses radians per frame.
+          const w = s.property ? (2 * Math.PI * (s.frequency ?? 5)) / fps : (s.frequency ?? 0.3);
+          const a = Math.sin(localTime * w), b = Math.cos(localTime * w * 0.83);
+          switch (s.property) {
+            case 'rotation': result.rotation = (result.rotation ?? 0) + a * amplitude; break;
+            case 'scale': result.scale = (result.scale ?? 1) * Math.max(0, 1 + (a * amplitude) / 100); break;
+            case 'opacity': result.opacity = (result.opacity ?? 1) * Math.min(1, Math.max(0, 1 - (Math.abs(a) * amplitude) / 100)); break;
+            default:
+              result.x = (result.x ?? 0) + a * amplitude;
+              result.y = (result.y ?? 0) + b * amplitude;
+          }
           break;
         }
         case 'drift': {
@@ -1768,7 +1907,7 @@ const Flux: React.FC = () => {
     }
     
     return result;
-  }, [ease, canvasSize]);
+  }, [ease, canvasSize, fps]);
 
   // ===== TOOLS =====
   const tools = useMemo(() => [
@@ -1909,12 +2048,12 @@ const Flux: React.FC = () => {
     ));
   }, []);
 
-  const addFilter = useCallback((layerId: string, filterType: string) => {
+  const addFilter = useCallback((layerId: string, filterType: string, settings: Record<string, any> = {}) => {
     const newFilter: Filter = {
-      id: `filter-${Date.now()}`,
+      id: `filter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: filterType as Filter['type'],
       enabled: true,
-      settings: {},
+      settings: { ...settings },
     };
     setLayers(prev => prev.map(l => 
       l.id === layerId ? { ...l, filters: [...l.filters, newFilter] } : l
@@ -2857,25 +2996,25 @@ const Flux: React.FC = () => {
                       <>
                         <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Glow</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'glow').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.sparkle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Blur</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'blur').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.filter}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Color</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'color').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.sliders}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
                         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Other</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'distort' || p.category === 'stylize').map(preset => (
-                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
+                          <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type, f.settings))}>
                             {Icons.wand}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
@@ -3057,6 +3196,45 @@ const Flux: React.FC = () => {
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Scale" min={0} max={400} value={selectedLayer.transform.scaleX} unit="%" onChange={(v) => updateLayerTransform({ scaleX: v, scaleY: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
                     <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
+                    <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Depth (Z)" min={-900} max={5000} value={selectedLayer.transform.z || 0} displayValue={Math.round(selectedLayer.transform.z || 0)} onChange={(v) => updateLayerTransform({ z: v })} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', width: 70 }}>Parent</span>
+                      <select aria-label="Parent layer" value={selectedLayer.parent || ''} onChange={e => {
+                        const pid = e.target.value || undefined;
+                        setLayers(prev => {
+                          const me = prev.find(l => l.id === selectedLayer.id);
+                          if (!me || (pid && wouldCycle(prev, me.id, pid))) return prev;
+                          const t = reparentPosition(prev, me, pid);
+                          return prev.map(l => l.id === me.id ? { ...l, parent: pid, transform: { ...l.transform, ...t } } : l);
+                        });
+                      }} style={{ flex: 1, minWidth: 0, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-primary)', fontSize: 11 }}>
+                        <option value="">None</option>
+                        {layers.filter(l => l.id !== selectedLayer.id && l.type !== 'camera' && !wouldCycle(layers, selectedLayer.id, l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </div>
+                    {selectedLayer.type === 'camera' && (() => {
+                      const cam = { ...DEFAULT_CAMERA, ...(selectedLayer.camera || {}) };
+                      const setCam = (patch: Partial<CameraSettings>) => setLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, camera: { ...cam, ...patch } } : l));
+                      return (
+                        <>
+                          <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Camera</div>
+                          <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Field of view" min={10} max={120} value={cam.fov} unit="°" onChange={(v) => setCam({ fov: v })} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)', margin: '6px 0' }}>
+                            <input type="checkbox" checked={cam.dof} onChange={e => setCam({ dof: e.target.checked })} style={{ accentColor: FLUX_ACCENT }} />
+                            Depth of field
+                          </label>
+                          {cam.dof && (
+                            <>
+                              <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Focus at" min={0} max={5000} value={cam.focusDistance} displayValue={Math.round(cam.focusDistance)} onChange={(v) => setCam({ focusDistance: v })} />
+                              <CreativeSlider accentColor={FLUX_ACCENT} labelWidth={70} label="Blur strength" min={0} max={100} value={Math.round(cam.aperture * 1000)} onChange={(v) => setCam({ aperture: v / 1000 })} />
+                            </>
+                          )}
+                          <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.45, marginTop: 4 }}>
+                            The camera's position is the centre of the shot and its rotation rolls it. Layers with a larger Depth look further away{cam.dof ? ' and blur away from the focus distance' : ''}.
+                          </div>
+                        </>
+                      );
+                    })()}
                     
                     {/* Easing curve editor */}
                     <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
@@ -3318,24 +3496,19 @@ const Flux: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Cascade Delay</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{textAnimCascade}ms</span></div>
             <input type="range" min="0" max="200" value={textAnimCascade} onChange={e => setTextAnimCascade(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Presets</div>
-            {['Typewriter', 'Fade Up', 'Scale Pop', 'Rotate In', 'Slide Left', 'Blur Reveal'].map(p => (
+            {(() => { const sel = layers.find(l => l.id === selectedLayerId); return sel?.type === 'text' ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                {sel.textAnimator ? <>Applied: {sel.textAnimator.preset} by {sel.textAnimator.mode} <button aria-label="Remove text animation" onClick={() => setLayers(prev => prev.map(l => l.id === sel.id ? { ...l, textAnimator: undefined } : l))} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 11 }}>Remove</button></> : 'No animation on this text yet.'}
+              </div>
+            ) : <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Select a text layer to animate it.</div>; })()}
+            {TEXT_ANIM_PRESETS.map((p: TextAnimPreset) => (
               <button key={p} aria-label={`Apply ${p} text animation preset`} onClick={() => {
-                if (!selectedLayerId) return;
-                const presetMap: Record<string, { property: string; startVal: number; endVal: number }> = {
-                  'Typewriter': { property: 'opacity', startVal: 0, endVal: 100 },
-                  'Fade Up': { property: 'opacity', startVal: 0, endVal: 100 },
-                  'Scale Pop': { property: 'scale', startVal: 0, endVal: 100 },
-                  'Rotate In': { property: 'rotation', startVal: -180, endVal: 0 },
-                  'Slide Left': { property: 'x', startVal: -200, endVal: 0 },
-                  'Blur Reveal': { property: 'opacity', startVal: 0, endVal: 100 },
-                };
-                const cfg = presetMap[p];
-                if (!cfg) return;
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? {
-                  ...l,
-                  textAnimator: { mode: textAnimMode, cascade: textAnimCascade, preset: p },
-                  behaviors: [...l.behaviors, { id: `beh-${Date.now()}`, type: 'textAnim' as any, enabled: true, settings: { preset: p, mode: textAnimMode, cascade: textAnimCascade } }],
-                } as any : l));
+                const sel = layers.find(l => l.id === selectedLayerId);
+                if (!sel || sel.type !== 'text') {
+                  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Select a text layer first.' } }));
+                  return;
+                }
+                setLayers(prev => prev.map(l => l.id === sel.id ? { ...l, textAnimator: { mode: textAnimMode, cascade: textAnimCascade, preset: p } } : l));
                 setShowTextAnimator(false);
               }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>{p}</button>
             ))}
@@ -3798,7 +3971,7 @@ const Flux: React.FC = () => {
                   compTemplateCategory === 'intros' ? ['Logo Reveal', 'Particle Burst', 'Glitch', 'Cinematic', 'Geometric', 'Gradient Flow'] :
                   compTemplateCategory === 'social' ? ['Instagram Post', 'Story 9:16', 'YouTube End Card', 'TikTok', 'Twitter Banner', 'Facebook Cover'] :
                   ['Title Card', 'Chapter', 'Credit Roll', 'Subtitle', 'Quote', 'Name Plate']).map(t => (
-                  <button key={t} aria-label={`Apply ${t} template`} onClick={() => { const templateLayers = [{ id: `layer_${Date.now()}`, name: t, type: 'shape' as const, visible: true, locked: false, solo: false, startTime: 0, duration: compTemplateCategory === 'intros' ? 150 : 90, inPoint: 0, outPoint: compTemplateCategory === 'intros' ? 150 : 90, transform: { x: canvasSize.width / 2 - 200, y: canvasSize.height / 2 - 50, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 }, behaviors: [], filters: [], animations: [{ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' as const }, { time: 15, value: 100, easing: 'easeOut' as const }] }] }]; setLayers(prev => [...templateLayers, ...prev]); setSelectedLayerId(templateLayers[0].id); setShowCompTemplates(false); }} style={{ padding: 'var(--space-3)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
+                  <button key={t} aria-label={`Apply ${t} template`} onClick={() => { const templateLayers = [{ id: `layer_${Date.now()}`, name: t, type: 'shape' as const, visible: true, locked: false, solo: false, startTime: 0, duration: compTemplateCategory === 'intros' ? 150 : 90, inPoint: 0, outPoint: compTemplateCategory === 'intros' ? 150 : 90, transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 }, behaviors: [], filters: [], animations: [{ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' as const }, { time: 15, value: 100, easing: 'easeOut' as const }] }] }]; setLayers(prev => [...templateLayers, ...prev]); setSelectedLayerId(templateLayers[0].id); setShowCompTemplates(false); }} style={{ padding: 'var(--space-3)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ height: 50, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: 18 }}>*</span>
                     </div>
@@ -3821,11 +3994,28 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <button aria-label="Create null object" onClick={() => {
               const id = addLayer('shape');
-              const parent = layers.find(pl => pl.id === nullParentId);
-              setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, x: (parent ? parent.transform.x : l.transform.x) + nullOffsets.x, y: (parent ? parent.transform.y : l.transform.y) + nullOffsets.y, rotationZ: nullOffsets.rotation, scaleX: nullOffsets.scale / 100, scaleY: nullOffsets.scale / 100, opacity: 0 } } : l));
+              // Null object: an invisible layer that other layers can be parented to.
+              // With a control layer chosen, the null sits on it (plus offsets) and
+              // that layer becomes its child, so moving the null moves the layer.
+              const target = layers.find(pl => pl.id === nullParentId);
+              const nullT = {
+                ...IDENTITY_TRANSFORM,
+                x: (target ? target.transform.x : canvasSize.width / 2) + nullOffsets.x,
+                y: (target ? target.transform.y : canvasSize.height / 2) + nullOffsets.y,
+                rotationZ: nullOffsets.rotation, scaleX: nullOffsets.scale, scaleY: nullOffsets.scale, opacity: 0,
+              };
+              const nullName = `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`;
+              setLayers(prev => prev.map(l => {
+                if (l.id === id) return { ...l, name: nullName, type: 'null' as any, transform: nullT };
+                if (target && l.id === target.id) {
+                  const local = fromParentSpace({ x: l.transform.x, y: l.transform.y }, nullT);
+                  return { ...l, parent: id, transform: { ...l.transform, x: local.x, y: local.y, rotationZ: l.transform.rotationZ - nullT.rotationZ, scaleX: l.transform.scaleX * 100 / (nullT.scaleX || 100), scaleY: l.transform.scaleY * 100 / (nullT.scaleY || 100) } };
+                }
+                return l;
+              }));
             }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
             <div style={{ marginBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Parent Layer</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Control layer (optional)</span>
               <select value={nullParentId} onChange={e => setNullParentId(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                 <option value="">None</option>
                 {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -3892,7 +4082,7 @@ const Flux: React.FC = () => {
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotation', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotationZ', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -4057,12 +4247,33 @@ const Flux: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>
               <textarea value={shaderCode} onChange={e => setShaderCode(e.target.value)} style={{ width: '100%', height: 180, padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.4))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical', lineHeight: 1.5 }} />
-              <button aria-label="Compile and apply shader" onClick={() => { if (!selectedLayerId) return; const intensity = shaderUniforms.u_intensity / 50; const hex = shaderUniforms.u_color; const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let hue = 0; if (mx !== mn) { const d = mx - mn; hue = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; } const hueDelta = Math.round(hue - 280); const filterStr = `contrast(${1 + intensity * 0.2}) saturate(${1 + intensity * 0.3}) brightness(${1 + intensity * 0.1}) hue-rotate(${hueDelta}deg)`; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { sepia: shaderUniforms.u_speed, grayscale: 0, invert: 0, customFilter: filterStr } }] } : l)); }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
+              <button aria-label="Compile and apply shader" onClick={() => {
+                const spec: ShaderSpec = { code: shaderCode, speed: Math.max(0.05, shaderUniforms.u_speed / 50), intensity: shaderUniforms.u_intensity / 100, color: shaderUniforms.u_color };
+                const sel = layers.find(l => l.id === selectedLayerId);
+                const targetId = sel?.type === 'generator' ? sel.id : `layer-shader-${Date.now()}`;
+                const err = shaderPoolRef.current.get(targetId).compile(spec.code);
+                if (err) { setShaderStatus({ ok: false, text: err }); return; }
+                setShaderStatus({ ok: true, text: sel?.type === 'generator' ? `Applied to ${sel.name}.` : 'Added as a new Shader layer.' });
+                if (sel?.type === 'generator') {
+                  setLayers(prev => prev.map(l => l.id === sel.id ? { ...l, shader: spec } : l));
+                } else {
+                  const layer: Layer = {
+                    id: targetId, name: 'Shader', type: 'generator', visible: true, locked: false, solo: false,
+                    startTime: 0, duration, inPoint: 0, outPoint: duration,
+                    transform: { ...IDENTITY_TRANSFORM, x: canvasSize.width / 2, y: canvasSize.height / 2 },
+                    behaviors: [], filters: [], animations: [], shader: spec,
+                  };
+                  setLayers(prev => [layer, ...prev]);
+                  setSelectedLayerId(layer.id);
+                }
+                setIsDirty(true);
+              }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
+              {shaderStatus && <pre style={{ marginTop: 6, whiteSpace: 'pre-wrap', fontSize: 10.5, fontFamily: 'var(--font-mono)', color: shaderStatus.ok ? 'var(--color-text-secondary)' : 'var(--color-error)', maxHeight: 90, overflow: 'auto' }}>{shaderStatus.text}</pre>}
             </div>
             {/* Uniforms & Presets */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, fontWeight: 600 }}>Uniforms</div>
-              {[{ name: 'u_time', val: shaderUniforms.u_time }, { name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: shaderUniforms.u_color }].map(u => (
+              {[{ name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: shaderUniforms.u_color }].map(u => (
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
@@ -4074,8 +4285,8 @@ const Flux: React.FC = () => {
               ))}
               <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Presets</div>
-                {[{ n: 'Chromatic Aberration', f: 'hue-rotate(5deg) saturate(1.5) contrast(1.1)' }, { n: 'Noise Grain', f: 'contrast(1.3) brightness(0.95)' }, { n: 'Barrel Distortion', f: 'contrast(1.2) brightness(1.05)' }, { n: 'RGB Split', f: 'saturate(2) hue-rotate(10deg) contrast(1.15)' }, { n: 'CRT Scanlines', f: 'contrast(1.4) brightness(0.9) saturate(0.8)' }].map(p => (
-                  <button key={p.n} aria-label={`Apply ${p.n} shader preset`} onClick={() => { if (!selectedLayerId) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { customFilter: p.f } }] } : l)); setShowShaderEffects(false); }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.n}</button>
+                {SHADER_PRESETS.map(p => (
+                  <button key={p.name} aria-label={`Load ${p.name} shader preset`} onClick={() => { setShaderCode(p.code); setShaderStatus(null); }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.name}</button>
                 ))}
               </div>
             </div>
@@ -4140,9 +4351,11 @@ const Flux: React.FC = () => {
                 visible: true, locked: false, solo: false,
                 startTime: selected.startTime, duration: compDuration,
                 inPoint: precompAdjustDuration ? selected.inPoint : 0, outPoint: precompAdjustDuration ? selected.outPoint : compDuration,
-                transform: precompMoveAttrs ? { ...selected.transform } : { x: 0, y: 0, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 },
+                transform: precompMoveAttrs ? { ...selected.transform } : { ...IDENTITY_TRANSFORM },
                 behaviors: [], filters: [], animations: precompMoveAttrs ? [...(selected.animations || [])] : [],
-                children: [selected],
+                // Moving attributes hands the transform and its keyframes to the
+                // group, so the layer inside must not apply them a second time.
+                children: [precompMoveAttrs ? { ...selected, transform: { ...IDENTITY_TRANSFORM, anchorX: selected.transform.anchorX, anchorY: selected.transform.anchorY }, animations: [] } : selected],
               } as any;
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
               setSelectedLayerId(groupLayer.id);
@@ -4324,12 +4537,6 @@ const Flux: React.FC = () => {
             <button aria-label="Close Camera Rig panel" onClick={() => setShowCameraRig(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Rig Type</span>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              {(['orbit', 'twoNode', 'poi'] as const).map(t => (
-                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid ' + (cameraRigType === t ? fluxTint(30) : 'var(--color-bg-hover)'), background: cameraRigType === t ? fluxTint(12) : 'var(--color-border-subtle)', color: cameraRigType === t ? FLUX_ACCENT : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
-              ))}
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30 }}>FOV</span>
               <input type="range" min="10" max="120" value={cameraFov} onChange={e => setCameraFov(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
@@ -4354,10 +4561,11 @@ const Flux: React.FC = () => {
                 startTime: 0, duration: duration, inPoint: 0, outPoint: duration,
                 transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 },
                 behaviors: [], filters: [], animations: [],
+                camera: { ...DEFAULT_CAMERA, fov: cameraFov, dof: cameraDof, focusDistance: cameraFocusDistance },
               };
               setLayers(prev => [rigLayer, ...prev]);
               setSelectedLayerId(rigLayer.id);
-              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? `, DOF @ ${cameraFocusDistance}` : ''})`, type: 'success' } }));
+              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera added: it now frames the view (FOV ${cameraFov}°${cameraDof ? `, focus at ${cameraFocusDistance}` : ''}). Move or keyframe it to move the shot.`, type: 'success' } }));
               setShowCameraRig(false);
             }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>
@@ -4372,7 +4580,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Render Queue panel" onClick={() => setShowRenderQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
+            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'WebM (VP9)', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: `1px solid ${fluxTint(20)}`, background: fluxTint(8), color: FLUX_ACCENT, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {renderQueue.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>Queue is empty</div>}
               {renderQueue.map(job => (
@@ -4391,22 +4599,38 @@ const Flux: React.FC = () => {
             {renderQueue.length > 0 && (
               <div style={{ display: 'flex', gap: 4, marginTop: 'var(--space-2)' }}>
                 <button aria-label="Start rendering" onClick={() => {
-                  const queuedJobs = renderQueue.filter(j => j.status === 'queued');
-                  if (queuedJobs.length === 0) return;
-                  // Mark first queued as rendering, then export
-                  setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: 'rendering' as const, progress: 0 } : j));
-                  exportVideo();
-                  // After export completes, mark done. Safety cap prevents
-                  // an unbounded poll if the recorder never enters 'inactive'.
-                  const startedAt = Date.now();
-                  const MAX_POLL_MS = 10 * 60 * 1000; // 10 minutes
-                  const checkDone = setInterval(() => {
-                    const expired = Date.now() - startedAt > MAX_POLL_MS;
-                    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive' || expired) {
-                      clearInterval(checkDone);
-                      setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
-                    }
-                  }, 500);
+                  // Render every queued job in turn. Progress follows the
+                  // playhead while recording; a job is done when its recorder stops.
+                  const MAX_POLL_MS = 10 * 60 * 1000;
+                  const runNext = () => {
+                    let next: string | null = null;
+                    setRenderQueue(prev => {
+                      const job = prev.find(j => j.status === 'queued');
+                      next = job ? job.id : null;
+                      return job ? prev.map(j => j.id === job.id ? { ...j, status: 'rendering' as const, progress: 0 } : j) : prev;
+                    });
+                    setTimeout(() => {
+                      if (!next) return;
+                      const id = next;
+                      const previous = mediaRecorderRef.current;
+                      exportVideo();
+                      const startedAt = Date.now();
+                      const poll = setInterval(() => {
+                        const rec = mediaRecorderRef.current === previous ? null : mediaRecorderRef.current;
+                        const expired = Date.now() - startedAt > MAX_POLL_MS || (!rec && Date.now() - startedAt > 3000);
+                        const { time, duration: d } = renderClockRef.current;
+                        if (rec && rec.state === 'recording' && !expired) {
+                          setRenderQueue(prev => prev.map(j => j.id === id ? { ...j, progress: Math.min(99, Math.round((time / Math.max(1, d)) * 100)) } : j));
+                          return;
+                        }
+                        if (rec && rec.state !== 'inactive' && !expired) return; // not started yet
+                        clearInterval(poll);
+                        setRenderQueue(prev => prev.map(j => j.id === id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
+                        if (!expired) setTimeout(runNext, 300);
+                      }, 400);
+                    }, 0);
+                  };
+                  runNext();
                 }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>
                 <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px var(--space-3)', borderRadius: 9999, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
               </div>

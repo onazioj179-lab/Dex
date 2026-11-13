@@ -3548,8 +3548,7 @@ These need DSP/ML or native hosting we don't fake.
 > the concurrent chat's shared `.vite` cache, so the few remaining deep click-paths (Imosion
 > Reverse/Invert post-state, Vinx Split/Duplicate click, Flux keyframe-delete click) are tsc-clean +
 > wired into menus already clicked-verified this session — high confidence, not yet click-captured.
-- Still queued (genuinely new work): Flux draggable keyframes + wiring its dead controls (camera DOF /
-  distribute / A-B snapshot); Forge real waveform + trim scrubber; Vinx color-wheel RGB readouts.
+- Still queued (genuinely new work): Flux draggable keyframes (camera DOF DONE 18n: real camera layers in `flux/fluxCamera.ts`; distribute already wired); Forge real waveform + trim scrubber; Vinx color-wheel RGB readouts.
 
 ### After Imosion (queued)
 - Games app — UI/UX pass, Apple-inspired internals
@@ -3603,3 +3602,11 @@ These need DSP/ML or native hosting we don't fake.
 - UI unslop pass 2: decorative 135° gradients flattened (Home icon fallbacks, splash, Imosion, Settings, Share, PRISM swatches, VINX offline clip); 19 dead gradient CSS rules and the unused `DEX_THEME` removed (#167). Left: header heights, Control Center.
 - AXL: true save status, a full store no longer throws inside edits, checked Open Project, New/Open keep the old project as a checkpoint, drop/import use the real mesh importer, export failures shown (#168).
 - Next: Imosion/Canvas save indicators and Forge (#77), `{success:false}` sweep on non-file channels (#61), test-only orphan pruning (#53), packaged runs listed at the end of the backlog.
+
+## Checkpoint 2026-11-12 (18n: no fake data, unhandled native calls)
+
+- Mock / fake data sweep (owner, 2026-11-05) merged with main; `DEX_REMAINING_WORK.md` #180. Main's `download_ctl.rs` kept over this branch's `download.rs`; main's Ledger (opt-in starter categories) and Bio (labelled opt-in sample) kept.
+- Renderer calls with no native handler: 60 of 229 → 11 of 186, all honest degrades (#181). New `renderer_log.rs` keeps renderer crashes, memory alerts and warn/error logs in `<logs>/renderer.log` (check it first when the packaged app misbehaves).
+- Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
+- Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
+- 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #182), Flux camera + invisible-shape fix (#183), Weather widget icon, collaboration PIN from the CSPRNG.

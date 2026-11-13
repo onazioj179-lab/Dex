@@ -4,6 +4,7 @@
  * Pro Recording DAW - Mixer Routing, Sample Manipulation, 32-bit Float
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
+import { resolveCanvasColor } from '../../utils/canvasTheme';
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { clampEventToViewport } from '../../utils/menuPosition';
@@ -6133,10 +6134,15 @@ const Imosion: React.FC = () => {
         const filePath = (file as any).path as string | undefined;
         let usedNativePath = false;
         if (filePath) {
-          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
-          if (waveData?.peaksPositive?.length > 0) {
-            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
-            newClip.duration = waveData.durationSecs;
+          const dexIpc = (window as any).dex;
+          const [waveData, meta] = await Promise.all([
+            dexIpc?.invoke?.('audio:getWaveform', filePath, 50),
+            dexIpc?.invoke?.('audio:getMetadata', filePath),
+          ]);
+          const seconds = Number(meta?.duration_ms ?? meta?.durationMs) / 1000;
+          if (waveData?.success && waveData.peaks?.length > 0 && seconds > 0) {
+            newClip.waveform = Array.from(waveData.peaks) as number[];
+            newClip.duration = seconds;
             usedNativePath = true;
           }
         }
@@ -6210,10 +6216,15 @@ const Imosion: React.FC = () => {
         const filePath = (file as any).path as string | undefined;
         let usedNativePath = false;
         if (filePath) {
-          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
-          if (waveData?.peaksPositive?.length > 0) {
-            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
-            newClip.duration = waveData.durationSecs;
+          const dexIpc = (window as any).dex;
+          const [waveData, meta] = await Promise.all([
+            dexIpc?.invoke?.('audio:getWaveform', filePath, 50),
+            dexIpc?.invoke?.('audio:getMetadata', filePath),
+          ]);
+          const seconds = Number(meta?.duration_ms ?? meta?.durationMs) / 1000;
+          if (waveData?.success && waveData.peaks?.length > 0 && seconds > 0) {
+            newClip.waveform = Array.from(waveData.peaks) as number[];
+            newClip.duration = seconds;
             usedNativePath = true;
           }
         }
@@ -10235,7 +10246,7 @@ const Imosion: React.FC = () => {
                   for (let i = 0; i < wf.length; i++) { ctx.lineTo((i / wf.length) * w, mid - wf[i] * mid * 0.9); }
                   ctx.stroke();
                   // dB scale
-                  ctx.fillStyle = 'var(--color-border-strong)'; ctx.font = '9px monospace';
+                  ctx.fillStyle = resolveCanvasColor('var(--color-border-strong)'); ctx.font = '9px monospace';
                   ctx.fillText('0 dB', 4, 12);
                   ctx.fillText('-6 dB', 4, mid * 0.5 + 4);
                   ctx.fillText('-inf', 4, mid + 4);

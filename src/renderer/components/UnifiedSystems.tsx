@@ -25,7 +25,6 @@ import {
   useMediaLibraryStore,
   useVersionHistoryStore,
   useWorkspaceLayoutStore,
-  useBatchStore,
   useLocalizationStore,
   useMultiWindowStore,
 } from '../store/unifiedSystemsStore';
@@ -768,67 +767,6 @@ export function RecycleBinView(): React.ReactElement {
   );
 }
 
-// ==========================================================================
-// BATCH ACTION BAR
-// ==========================================================================
-export function BatchActionBar(): React.ReactElement | null {
-  const { selectedItems, batchBarVisible, availableActions, executeBatch, clearSelection } = useBatchStore();
-
-  if (!batchBarVisible || selectedItems.size === 0) return null;
-
-  const actionLabels: Record<string, string> = {
-    delete: 'Delete All',
-    export: 'Export All',
-    move: 'Move All',
-    markComplete: 'Mark Complete',
-    changeDueDate: 'Change Due Date',
-    addToTimeline: 'Add to Timeline',
-    removeFromProject: 'Remove from Project',
-    exportClips: 'Export Clips',
-    removeFromLibrary: 'Remove from Library',
-  };
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '40px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'var(--color-bg-surface)',
-        border: '1px solid var(--color-border, #3a3a3c)',
-        borderRadius: '10px',
-        boxShadow: 'var(--pg-shadow-popover)',
-        zIndex: 'var(--z-dock)' as any,
-        padding: 'var(--space-2) var(--space-4)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-      }}
-    >
-      <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px', fontWeight: 600 }}>
-        {selectedItems.size} selected
-      </span>
-      <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-      {availableActions.map((action) => (
-        <button
-          key={action}
-          onClick={() => executeBatch(action)}
-          aria-label={`Batch action: ${actionLabels[action] || action}`}
-          style={{
-            ...pillBtnStyle,
-            color: action === 'delete' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
-            borderColor: action === 'delete' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
-          }}
-        >
-          {actionLabels[action] || action}
-        </button>
-      ))}
-      <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-      <button onClick={clearSelection} aria-label="Deselect all items" style={pillBtnStyle}>Deselect</button>
-    </div>
-  );
-}
 
 // ==========================================================================
 // DETACH BUTTON (for inner app headers)
