@@ -56,11 +56,6 @@ const APP_META: Record<CreativeAppId, { label: string; color: string; icon: JSX.
     color: 'var(--color-warning)',
     icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
   },
-  rewind: {
-    label: 'Rewind',
-    color: 'var(--color-error)',
-    icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF453A" strokeWidth="2" strokeLinecap="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>,
-  },
 };
 
 interface SendToMenuProps {

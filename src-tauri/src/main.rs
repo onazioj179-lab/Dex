@@ -1131,18 +1131,72 @@ fn theme_apply_preset(app: &tauri::AppHandle, preset_id: &str) -> Value {
 }
 
 // --- Batch 3: reveal in file manager ---------------------------------------
+/// Why a path cannot be revealed, or Ok. Answered before Explorer starts:
+/// it used to be spawned for any string and the reply was always success, so
+/// "Show in File Explorer" on a moved or deleted file opened some other folder
+/// and the app said nothing.
+fn reveal_check(path: &str) -> Result<(), String> {
+    let p = path.trim();
+    if p.is_empty() {
+        return Err("no file given".into());
+    }
+    // A quote would end the /select argument early (see raw_arg below).
+    if p.contains('"') {
+        return Err("the path contains a quote".into());
+    }
+    if !std::path::Path::new(p).exists() {
+        return Err("it no longer exists".into());
+    }
+    Ok(())
+}
+
 fn reveal_in_explorer(path: &str) -> Value {
+    if let Err(e) = reveal_check(path) {
+        return json!({ "success": false, "error": e });
+    }
     #[cfg(windows)]
     {
-        let _ = std::process::Command::new("explorer.exe")
-            .arg(format!("/select,{}", path))
-            .spawn();
-        json!({ "success": true })
+        use std::os::windows::process::CommandExt;
+        // Explorer wants /select,"C:\a b\c.txt" literally. Command::arg would
+        // quote the whole argument, which Explorer misreads for paths with
+        // spaces and opens Documents instead.
+        match std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", path.trim()))
+            .spawn()
+        {
+            Ok(_) => json!({ "success": true }),
+            Err(e) => json!({ "success": false, "error": e.to_string() }),
+        }
     }
     #[cfg(not(windows))]
     {
-        let _ = open::that(path);
-        json!({ "success": true })
+        match open::that(path) {
+            Ok(()) => json!({ "success": true }),
+            Err(e) => json!({ "success": false, "error": e.to_string() }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod reveal_tests {
+    use super::reveal_check;
+
+    #[test]
+    fn refuses_missing_empty_and_quoted_paths() {
+        assert!(reveal_check("").is_err());
+        assert!(reveal_check("   ").is_err());
+        assert_eq!(reveal_check("C:\\dex-does-not-exist\\nope.txt").unwrap_err(), "it no longer exists");
+        assert!(reveal_check("C:\\a\"b.txt").is_err());
+    }
+
+    #[test]
+    fn accepts_an_existing_file_with_spaces() {
+        let dir = std::env::temp_dir().join(format!("dex reveal {}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("a file.txt");
+        std::fs::write(&f, "x").unwrap();
+        assert!(reveal_check(&f.to_string_lossy()).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 

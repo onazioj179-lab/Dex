@@ -196,7 +196,6 @@ const Uki = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Uki'));
 const Calculator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Calculator'));
 const Calendar = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Calendar'));
 const PasswordGenerator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PasswordGenerator'));
-const Rewind = lazyRetry(() => import('../DEXAPPLICATIONS/rewind/Rewind'));
 
 const KanbanApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/KanbanApp'));
 const AchievementsApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Achievements'));
@@ -242,7 +241,7 @@ const ExtensionsManager = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
   | 'notes' | 'tasks' | 'power' | 'workflows' | 'gallery' | 'audio' | 'store' | 'games'
   | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl' | 'uki'
-  | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
+  | 'calculator' | 'calendar' | 'passwordgenerator' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'creativehub' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
@@ -259,7 +258,6 @@ const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
   forge: 'forge',
   axl: 'axl',
   notes: 'notes',
-  rewind: 'rewind',
 };
 
 function inferAssetKindFromPath(filePath: string): AssetKind {
@@ -341,7 +339,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
   uki: Uki,
   calculator: Calculator, calendar: Calendar, passwordgenerator: PasswordGenerator,
-  rewind: Rewind, kanban: KanbanApp, achievements: AchievementsApp,
+  kanban: KanbanApp, achievements: AchievementsApp,
   recyclebin: RecycleBin,
   powerrename: PowerRename,
   axl: Axl,
@@ -410,7 +408,6 @@ const Icons: Record<string, JSX.Element> = {
   gallery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="2" y="2" width="9" height="9" rx="1.5"/><rect x="13" y="2" width="9" height="9" rx="1.5"/><rect x="2" y="13" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="9" height="9" rx="1.5"/></svg>,
   audio: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
   passwordgenerator: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-  rewind: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 8 14"/><path d="M4.93 4.93l2.83 2.83"/><path d="M2 12h2"/></svg>,
 
   kanban: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   achievements: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 22V8h4v14"/><path d="M8 9h8l-1 5H9L8 9z"/></svg>,
@@ -486,7 +483,6 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'calculator', label: 'Calculator' },
   { id: 'passwordgenerator', label: 'Passwords' },
   { id: 'transfers', label: 'Share' },
-  { id: 'rewind', label: 'Rewind' },
   { id: 'stopwatch', label: 'Stopwatch' },
   { id: 'unitconverter', label: 'Converter' },
   { id: 'pomodoro', label: 'Pomodoro' },
@@ -538,7 +534,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Engineering', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
     videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
-    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
+    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', powerrename: 'Tools',
     stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
     weather: 'Tools', worldclock: 'Tools',
     canvas: 'Creative Suite', creativehub: 'Creative Suite', timer: 'Tools',
@@ -2974,7 +2970,6 @@ export const AppManager: React.FC = () => {
       flux: ['motion', 'graphics', 'animation', 'after effects', 'vfx', 'particles'],
       forge: ['encode', 'convert', 'render', 'export', 'compress', 'handbrake', 'ffmpeg'],
       axl: ['cad', '3d', 'model', 'design', 'engineering', 'blueprint'],
-      rewind: ['history', 'activity', 'time machine', 'backup'],
       kanban: ['project', 'board', 'trello', 'agile', 'sprint'],
       achievements: ['trophies', 'badges', 'awards'],
       recyclebin: ['trash', 'delete', 'recycle', 'bin'],

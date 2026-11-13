@@ -50,7 +50,6 @@ export const TIPS: { id: string; text: string; icon: string }[] = [
   { id: 'tip-imosion', text: 'Imosion DAW (Alt+I) is a full music production studio -- make beats!', icon: 'music' },
   { id: 'tip-prism', text: 'PRISM Image Editor (Alt+R) handles layers, filters, and batch edits.', icon: 'image' },
   { id: 'tip-flux', text: 'FLUX Motion (Alt+F) creates animations and motion graphics.', icon: 'sparkles' },
-  { id: 'tip-rewind', text: 'Rewind acts like a DVR for your computer -- replay your activity!', icon: 'rewind' },
   { id: 'tip-pin', text: 'Pin your favorite apps on the Home page for lightning-fast access.', icon: 'pin' },
   { id: 'tip-fullscreen', text: 'Press F11 to toggle fullscreen mode for a distraction-free workspace.', icon: 'maximize' },
   { id: 'tip-launchpad', text: 'Use the dock to launch any app -- just one click away.', icon: 'grid' },
@@ -64,7 +63,6 @@ export const TIPS: { id: string; text: string; icon: string }[] = [
   { id: 'tip-streak', text: 'Use DEX daily to build your streak -- unlock special achievements!', icon: 'flame' },
   { id: 'tip-achievements', text: 'Open the Trophies app to see your progress across 5000 achievements!', icon: 'trophy' },
   { id: 'tip-kanban', text: 'Use Kanban boards to organize projects visually.', icon: 'columns' },
-  { id: 'tip-rewind2', text: 'Rewind captures snapshots so you can jump back in time.', icon: 'clock' },
   { id: 'tip-shortcuts', text: 'Learn keyboard shortcuts to speed up your workflow dramatically.', icon: 'terminal' },
   { id: 'tip-gallery', text: 'Gallery organizes all your images with smart categorization.', icon: 'image' },
 ];
