@@ -3663,3 +3663,8 @@ These need DSP/ML or native hosting we don't fake.
 
 - Rewind retired (owner): gone from every app list, cannot be opened, data left in place (#193).
 - Release build (7.0.1 serial 18o tree) passed the bundle gate; packaged smoke on an isolated profile passed; it caught Show in File Explorer reporting success for missing files (fixed natively). Install test still needs a VM (#102, #144).
+
+## Checkpoint 2026-11-13 (packaged verification batch)
+
+- Release build of main (7.0.2 / 001z) passed the bundle gate; run on an isolated profile. Verified in the exe: clean exit with no stack overflow (#44), Recycle Bin delete (#59), copy/move/rename never overwrite (#60), WSL only listed with a distribution (#153), text read for Quick Look (#202), metadata-stripped JPEG copy (#203); 16 apps open without a crash. Gallery gained a regression test for the removed fake face groups (#208).
+- Still open for B018 / #6 / #102: the installer itself (install, upgrade, uninstall) on a clean machine, and signing (#30).
