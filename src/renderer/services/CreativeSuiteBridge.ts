@@ -16,7 +16,7 @@ import { create } from 'zustand';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type CreativeAppId = 'imosion' | 'videoeditor' | 'flux' | 'prism' | 'forge' | 'axl' | 'notes' | 'rewind';
+export type CreativeAppId = 'imosion' | 'videoeditor' | 'flux' | 'prism' | 'forge' | 'axl' | 'notes';
 
 export type SourceAppId = CreativeAppId | 'gallery' | 'audio' | 'files';
 
@@ -60,7 +60,6 @@ const ACCEPTS: Record<CreativeAppId, AssetKind[]> = {
   forge:       ['video', 'audio', 'image', 'model'],
   axl:         ['model', 'image', 'drawing'],
   notes:       ['document', 'image'],
-  rewind:      ['video', 'image'],
 };
 
 const PENDING_STORAGE_KEY = 'dex-creative-pending';
@@ -278,7 +277,7 @@ export function sendBackToSource(
 ): boolean {
   const target = originalAsset.sourceApp;
   // Can only reply to creative apps (not 'gallery', 'audio', 'files')
-  const creativeApps: CreativeAppId[] = ['imosion', 'videoeditor', 'flux', 'prism', 'forge', 'axl', 'notes', 'rewind'];
+  const creativeApps: CreativeAppId[] = ['imosion', 'videoeditor', 'flux', 'prism', 'forge', 'axl', 'notes'];
   if (!creativeApps.includes(target as CreativeAppId)) return false;
   const replyAsset: SharedAsset = {
     id: createAssetId(),

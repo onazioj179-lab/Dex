@@ -16,6 +16,7 @@ import {
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
+import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -359,6 +360,21 @@ const Canvas: React.FC = () => {
     });
   }, [snapshot]);
 
+  // Saved versions of the open board on this device, listed and restored in
+  // Collab Hub (autosaved every 5 minutes when it changed). Backlog #58.
+  // A restore replaces the open board's layers and objects, then saves it.
+  useAppCheckpoints({
+    appId: 'canvas',
+    appName: 'Canvas',
+    getSnapshot: () => (boardsRef.current?.activeId ? JSON.stringify(snapshot()) : null),
+    onRestore: (data) => {
+      const payload = JSON.parse(data) as BoardPayload;
+      if (!payload || typeof payload !== 'object' || !Array.isArray(payload.layers)) throw new Error('not a Canvas board');
+      restorePayloadRef.current(payload);
+      window.setTimeout(() => persistRef.current(), 300); // after the layers have redrawn
+    },
+  });
+
   // Board-list writes (switch, new, rename, move, delete) report a failure in
   // the toolbar instead of rejecting halfway through the action.
   const saveIndexReported = useCallback(async (index: BoardsIndex) => {
@@ -409,6 +425,10 @@ const Canvas: React.FC = () => {
       ? payload.activeLayerId
       : restoredLayers[restoredLayers.length - 1].id);
   }, [composite]);
+  const restorePayloadRef = useRef(restorePayload);
+  restorePayloadRef.current = restorePayload;
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
 
   // Initial load (once): board index (migrating the old single drawing) + active board.
   const loadedRef = useRef(false);

@@ -157,7 +157,7 @@ describe('Performance Regression: Bulk Operations Speed', () => {
       'home', 'files', 'browser', 'settings', 'transfers', 'power',
       'notes', 'tasks', 'workflows', 'gallery', 'audio',
       'vinx', 'imosion', 'prism', 'flux', 'forge',
-      'calculator', 'calendar', 'password-generator', 'rewind',
+      'calculator', 'calendar', 'password-generator', 'stopwatch',
       'kanban', 'achievements',
     ];
 

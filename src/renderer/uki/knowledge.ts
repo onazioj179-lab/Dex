@@ -106,7 +106,6 @@ export const DEX_GLOBAL_SHORTCUTS: Readonly<Record<string, string>> = {
   'close window': `${_M}+W`,
   'new window': `${_M}+N`,
   'settings': `${_M}+,`,
-  'rewind': `${_M}+Shift+Z`,
   'focus mode': `${_M}+Shift+F`,
 };
 

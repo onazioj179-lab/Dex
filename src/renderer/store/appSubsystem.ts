@@ -462,22 +462,6 @@ export const APP_REGISTRY: AppDefinition[] = [
   },
   
   // -------------------------------------------------------------------------
-  // DEX Rewind
-  // -------------------------------------------------------------------------
-  {
-    id: 'rewind',
-    name: 'Rewind',
-    icon: 'rewind',
-    color: '#0078d4',
-    description: 'Activity logger and search -- DVR for your desktop day',
-    version: APP_VERSION,
-    permissions: ['filesystem.read', 'clipboard.read', 'system.info'],
-    singleton: true,
-    supportsMultiWindow: false,
-    category: 'utility',
-  },
-  
-  // -------------------------------------------------------------------------
   // Collab Hub
   // -------------------------------------------------------------------------
   {

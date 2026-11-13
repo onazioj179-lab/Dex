@@ -64,6 +64,12 @@ export const useRunningApps = create<RunningAppsState>()(
       sessionHistory: [],
   
       launchApp: (app) => {
+        // Retired apps never open again, whatever asks (a pin, a restored
+        // session, an old shortcut, UKI).
+        if (RETIRED_APPS[app.id]) {
+          try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: RETIRED_APPS[app.id] } })); } catch { /* non-DOM */ }
+          return;
+        }
         const { runningApps, currentAppId } = get();
         const existing = runningApps.find(a => a.id === app.id);
     
@@ -209,6 +215,13 @@ export const useRunningApps = create<RunningAppsState>()(
         currentAppId: state.currentAppId,
         sessionHistory: state.sessionHistory,
       }),
+      // A stored session that was on a retired app comes back on Home.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<RunningAppsState>;
+        const currentAppId = p.currentAppId && !RETIRED_APPS[p.currentAppId] ? p.currentAppId : current.currentAppId;
+        const sessionHistory = Array.isArray(p.sessionHistory) ? p.sessionHistory.filter((id) => !RETIRED_APPS[id]) : current.sessionHistory;
+        return { ...current, ...p, currentAppId, sessionHistory };
+      },
     }
   )
 );
@@ -316,6 +329,14 @@ const PLATFORM_BUILD_DATE = '2026-11-01';
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 const _O = platform.isMac ? '⌥' : 'Alt';
 
+/**
+ * Apps that were removed. Their id maps to what the user is told if
+ * something still tries to open one. Their data is left where it was.
+ */
+export const RETIRED_APPS: Record<string, string> = {
+  rewind: 'Rewind was retired: it could not record activity in this version of DEX. Your old Rewind data was left in place.',
+};
+
 export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon: string; shortcut?: string; version?: string; buildDate?: string; description?: string; category?: 'creative' | 'system' | 'productivity' | 'utility' | 'media' }> = {
   // Core System Apps
   home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: `${_M}+1`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'The desktop: clock, search, recent items and open apps' },
@@ -356,7 +377,6 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   axl: { name: 'AXL', color: 'var(--color-accent)', icon: 'axl', shortcut: `${_O}+X`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Engineering design studio with parametric modeling, simulation, and technical drawing', category: 'creative' },
 
   // DEX Rewind
-  rewind: { name: 'Rewind', color: 'var(--color-accent)', icon: 'rewind', shortcut: `${_O}+W`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'A local log of your activity that you can search; nothing leaves this computer' },
 
   // Project Management
   kanban: { name: 'Kanban', color: '#5E5CE6', icon: 'kanban', shortcut: `${_M}+9`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Plan work on boards with columns and cards' },

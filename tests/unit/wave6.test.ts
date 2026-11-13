@@ -6,10 +6,9 @@
 // =============================================================================
 import { describe, it, expect } from 'vitest';
 import { pickEncoder } from '../../src/shared/video/hwEncoder';
-import { diffText, diffBinary } from '../../src/shared/rewind/diff';
 import { autoLink, type NexusNode } from '../../src/shared/nexus/autoLink';
 
-describe('Wave 6 — Forge / Rewind / Nexus', () => {
+describe('Wave 6 — Forge / Nexus', () => {
   describe('pickEncoder', () => {
     it('picks NVENC on nvidia win32', () => {
       const c = pickEncoder('h264', { platform: 'win32', gpu: 'nvidia' });
@@ -29,29 +28,6 @@ describe('Wave 6 — Forge / Rewind / Nexus', () => {
       const c = pickEncoder('av1', { platform: 'linux', gpu: 'unknown' });
       expect(c.hardware).toBe(false);
       expect(c.encoder).toBe('libsvtav1');
-    });
-  });
-
-  describe('diff', () => {
-    it('detects added lines', () => {
-      const r = diffText('a\nb\nc', 'a\nb\nc\nd');
-      expect(r.added).toBe(1);
-      expect(r.deleted).toBe(0);
-    });
-    it('detects deleted lines', () => {
-      const r = diffText('a\nb\nc', 'a\nc');
-      expect(r.deleted).toBe(1);
-      expect(r.added).toBe(0);
-    });
-    it('reports zero changes for identical text', () => {
-      const r = diffText('hello\nworld', 'hello\nworld');
-      expect(r.added).toBe(0);
-      expect(r.deleted).toBe(0);
-    });
-    it('binary diff equality', () => {
-      const a = new Uint8Array([1, 2, 3]);
-      const b = new Uint8Array([1, 2, 3]);
-      expect(diffBinary(a, b).equal).toBe(true);
     });
   });
 

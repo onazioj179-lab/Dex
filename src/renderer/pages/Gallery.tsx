@@ -1607,6 +1607,9 @@ export const Gallery: React.FC = () => {
         </div>
       )}
 
+      {/* Face grouping was removed: it invented "Person 1..N" groups from the
+          media count with no face detection (DEX_REMAINING_WORK #208). */}
+
       {/* Tag System */}
       {showTagSystem && (
         <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", right: 20, top: 120, width: 'min(240px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
