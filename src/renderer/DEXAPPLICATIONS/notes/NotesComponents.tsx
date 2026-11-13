@@ -265,6 +265,15 @@ const NAMED_NOTE_COLORS: Record<string, string> = {
   purple: '#BF5AF2',
 };
 
+/** The named colour for a stored label, including legacy raw values the row menu used to store. */
+export function noteColorName(color_label: string | null): string | null {
+  if (!color_label) return null;
+  const key = color_label.toLowerCase();
+  if (key in NAMED_NOTE_COLORS) return key;
+  const hit = Object.entries(NAMED_NOTE_COLORS).find(([, v]) => v.toLowerCase() === key);
+  return hit ? hit[0] : null;
+}
+
 function resolveNoteColor(color_label: string | null): string | null {
   if (!color_label) return null;
   const key = color_label.toLowerCase();
@@ -367,12 +376,21 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
     }
     if (onDuplicate) items.push({ id: 'dup', label: 'Duplicate', onClick: () => onDuplicate(note.id) });
     if (onSetColor) {
-      items.push({ id: 'div-color', label: '', divider: true });
-      const noteColors = ['var(--color-error)','var(--color-warning)','#FFD60A','var(--color-success)','#64d2ff','#bf5af2','#ff375f'];
-      noteColors.forEach(c => items.push({
-        id: `color-${c}`, label: c === note.color_label ? `● ${c}` : `○ ${c}`,
-        onClick: () => onSetColor(note.id, c === note.color_label ? null : c),
-      }));
+      // Same named colours as the toolbar picker. This menu used to list raw CSS
+      // values ("○ var(--color-error)") and store them, so a colour set here never
+      // showed as selected in the toolbar.
+      const current = noteColorName(note.color_label);
+      const swatch = (hex: string) => <span aria-hidden="true" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: hex, border: '1px solid var(--color-border-subtle)' }} />;
+      items.push({
+        id: 'color-label', label: 'Color Label',
+        submenu: [
+          ...COLOR_LABELS.filter(c => c.value).map(c => ({
+            id: `color-${c.value}`, label: c.label, icon: swatch(c.hex), shortcut: c.value === current ? '✓' : undefined,
+            onClick: () => onSetColor(note.id, c.value === current ? null : c.value),
+          })),
+          ...(note.color_label ? [{ id: 'color-none', label: 'None', onClick: () => onSetColor(note.id, null) }] : []),
+        ],
+      });
     }
     items.push(
       { id: 'div-del', label: '', divider: true },
@@ -906,7 +924,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
             >
               <span style={{
                 display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                background: note.color_label ? (COLOR_LABELS.find(c => c.value === note.color_label)?.hex || '#fff') : 'var(--color-text-tertiary)',
+                background: note.color_label ? (resolveNoteColor(note.color_label) || '#fff') : 'var(--color-text-tertiary)',
                 border: '1px solid var(--color-text-tertiary)',
               }} />
             </ToolbarIconButton>
@@ -924,7 +942,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                     style={{
                       width: 18, height: 18, borderRadius: '50%', cursor: 'pointer',
                       background: c.hex === 'transparent' ? 'var(--color-bg-hover)' : c.hex,
-                      border: note.color_label === c.value ? '2px solid #fff' : '2px solid transparent',
+                      border: (noteColorName(note.color_label) ?? null) === c.value ? '2px solid #fff' : '2px solid transparent',
                     }}
                     onClick={() => { onColorLabel(c.value); setShowColorMenu(false); }}
                   />

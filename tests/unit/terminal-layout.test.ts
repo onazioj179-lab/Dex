@@ -6,7 +6,7 @@
 // =============================================================================
 import { describe, it, expect } from 'vitest';
 import {
-  initialLayout, addTab, splitPane, closePane, closeTab, resizeDivider, cyclePane, cycleTab, parseLayout, MAX_PANES, MIN_FRACTION,
+  initialLayout, addTab, splitPane, canSplit, closePane, closeTab, resizeDivider, cyclePane, cycleTab, parseLayout, MAX_PANES, MIN_FRACTION,
 } from '../../src/renderer/components/terminalLayout';
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
@@ -19,12 +19,17 @@ describe('terminal layout', () => {
     expect(t.dir).toBe('column');
     expect(t.activePane).toBe('p2');
     expect(t.sizes).toEqual([0.5, 0.5]);
-    l = splitPane(l, 't1', 'row');
+    // The other direction is refused (it used to add another column pane anyway).
+    expect(splitPane(l, 't1', 'row')).toBe(l);
+    expect(canSplit(l.tabs[0], 'row')).toBe(false);
+    expect(canSplit(l.tabs[0], 'column')).toBe(true);
+    l = splitPane(l, 't1', 'column');
     expect(l.tabs[0].dir).toBe('column');
     expect(l.tabs[0].sizes).toEqual([0.5, 0.25, 0.25]);
-    l = splitPane(l, 't1', 'row');
+    l = splitPane(l, 't1', 'column');
     expect(l.tabs[0].panes).toHaveLength(MAX_PANES);
-    expect(splitPane(l, 't1', 'row')).toBe(l);
+    expect(splitPane(l, 't1', 'column')).toBe(l);
+    expect(canSplit(l.tabs[0], 'column')).toBe(false);
     expect(sum(l.tabs[0].sizes)).toBeCloseTo(1);
   });
 
