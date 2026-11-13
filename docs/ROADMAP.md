@@ -3610,3 +3610,4 @@ These need DSP/ML or native hosting we don't fake.
 - Home Weather widget refreshes itself through `standalone/weatherData.ts` (shared with the Weather app).
 - Release exe (isolated profile) verified: text write/read, renderer.log, plugin install/enable/uninstall + Settings › Plugins page, user info, Open-Meteo under the packaged CSP. Still open: backup export through the save dialog (needs a person).
 - 18n also: drag and drop fixed in built DEX (Tauri drop handler off, #182), Flux camera + invisible-shape fix (#183), Weather widget icon, collaboration PIN from the CSPRNG.
+- #53 pass 2 (18n): 796 unreachable source modules (500 in `improvements500/`) and 273 tests that only tested them deleted, ~99k lines; tsc, vite build and the affected test files green. Reachability script: follow import/export/`import()`/`new URL(..., import.meta.url)` from `src/renderer/main.tsx` + scripts + vite/vitest configs; anything else under src that only tests reach is test-only.

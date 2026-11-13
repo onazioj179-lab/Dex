@@ -1223,7 +1223,7 @@ const Rewind: React.FC = () => {
 
       {/* -- PROBLEMS: load failures and a failed integrity check used to be set and never shown -- */}
       {(backgroundErrorBanner || integrityWarning) && (
-        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '6px 12px 0', padding: '8px 12px', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--color-warning, #ff9f0a) 40%, transparent)', background: 'color-mix(in srgb, var(--color-warning, #ff9f0a) 10%, transparent)', fontSize: 12, color: 'var(--color-text-primary)' }}>
+        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '6px 12px 0', padding: '8px 12px', borderRadius: 10, border: '1px solid color-mix(in srgb, var(--color-warning, #ff9f0a) 40%, transparent)', background: 'color-mix(in srgb, var(--color-warning, #ff9f0a) 10%, transparent)', fontSize: 12, color: 'var(--color-text-primary)' }}>
           {integrityWarning && <span>The last integrity check failed: some Rewind records may have been changed or damaged. Settings › Security › Run Integrity Check runs it again.</span>}
           {backgroundErrorBanner && (
             <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
