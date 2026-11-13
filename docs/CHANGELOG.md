@@ -13,7 +13,7 @@ history (`git tag --list`) and on the GitHub Releases page.
 ## v7.0.2 (001z) — unreleased
 
 Owner roadmap "we do not break userspace". Details in docs/ROADMAP.md (top) and
-DEX_REMAINING_WORK.md #191–#198.
+DEX_REMAINING_WORK.md #201–#208.
 
 - The native IPC channel set is now locked (`npm run abi:check`): a channel that
   shipped can't be removed by accident, and new code can't call a channel that

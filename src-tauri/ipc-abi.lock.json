@@ -1373,6 +1373,7 @@
     "resource:getSnapshot",
     "resource:getThrottleLevel",
     "rewind:buildTimeline",
+    "rewind:deleteAllData",
     "rewind:getDaySummary",
     "rewind:getState",
     "rewind:reconstruct",
