@@ -10,6 +10,7 @@
  * Auto-categorization, fast search by name/date/type/time
  */
 
+import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
 import { openWithShell } from '../utils/openWithShell';
@@ -806,6 +807,19 @@ export const Files: React.FC = () => {
       loadFiles(history[historyIndex + 1]);
     }
   };
+
+  // System Back (Alt+Left, mouse side buttons, edge swipe) goes to the previous
+  // folder first, and only leaves Files when there is none.
+  useBackHandler('files', {
+    canGoBack: () => historyIndex > 0,
+    goBack,
+    canGoForward: () => historyIndex < history.length - 1,
+    goForward,
+    backLabel: () => {
+      const prev = history[historyIndex - 1];
+      return prev ? (prev.split(/[\/]/).filter(Boolean).pop() || prev) : null;
+    },
+  });
 
   const handleItemClick = (file: FileItem) => {
     if (file.isDirectory) {
