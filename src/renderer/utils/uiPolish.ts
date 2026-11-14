@@ -27,20 +27,6 @@ export const PANEL_ANIMATION_STYLE = `
 // ===== Item 70: Toolbar button transition =====
 export const TOOLBAR_TRANSITION = 'background-color 150ms ease, color 150ms ease, border-color 150ms ease';
 
-// ===== Item 71: Slider hover/drag styles =====
-export const SLIDER_STYLES = `
-input[type="range"]::-webkit-slider-thumb {
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.2);
-}
-input[type="range"]:active::-webkit-slider-thumb {
-  transform: scale(1.3);
-  box-shadow: 0 0 8px rgba(10,132,255,0.4);
-}
-`;
-
 // ===== Item 75: Standardized panel header =====
 export const PANEL_HEADER_HEIGHT = 38;
 export const panelHeaderStyle: React.CSSProperties = {
@@ -84,14 +70,6 @@ export const destructiveButtonStyle: React.CSSProperties = {
   cursor: 'pointer',
   transition: TOOLBAR_TRANSITION,
 };
-
-// ===== Item 81: Focus-visible outline =====
-export const FOCUS_VISIBLE_STYLES = `
-button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid #0a84ff;
-  outline-offset: 2px;
-}
-`;
 
 // ===== Item 80: Scroll fade gradient =====
 export const scrollFadeTopStyle: React.CSSProperties = {
@@ -157,7 +135,8 @@ html[data-perf-tier="low"] [data-tip]::after {
 }
 `;
 
-// Combined CSS injection for items 69, 71, 81, tooltips, and perf-tier adaptations
+// Combined CSS injection: panel animation, tooltips and perf-tier adaptations.
+// Slider and focus styles live in the shared stylesheets (one focus ring, flat hover).
 const PERF_TIER_CSS = `
 /* Low-tier device: zero visual overhead */
 html[data-perf-tier="low"] * {
@@ -190,6 +169,6 @@ html[data-perf-tier="mid"] * {
 }
 `;
 
-export const GLOBAL_POLISH_CSS = PANEL_ANIMATION_STYLE + SLIDER_STYLES + FOCUS_VISIBLE_STYLES + TOOLTIP_STYLES + PERF_TIER_CSS;
+export const GLOBAL_POLISH_CSS = PANEL_ANIMATION_STYLE + TOOLTIP_STYLES + PERF_TIER_CSS;
 
 import React from 'react';

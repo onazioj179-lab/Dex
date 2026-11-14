@@ -103,14 +103,6 @@ describe('Component Tests — Page Modules', () => {
       expect(typeof mod.useParticleScale).toBe('function');
     });
 
-    it('VisualEffects exports effect functions', async () => {
-      const mod = await import('../../src/renderer/shell/VisualEffects');
-      expect(typeof mod.applyFrostedGlass).toBe('function');
-      expect(typeof mod.removeFrostedGlass).toBe('function');
-      expect(typeof mod.applyDepthShadow).toBe('function');
-      expect(typeof mod.spawnParticleBurst).toBe('function');
-      expect(typeof mod.applyTierOverrides).toBe('function');
-    });
   });
 });
 

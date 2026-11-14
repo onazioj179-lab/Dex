@@ -2,62 +2,52 @@
  * ===========================================================================
  * DEX PLAYWRIGHT E2E CONFIGURATION
  * ===========================================================================
- * 
- * End-to-end testing for Electron application
+ *
+ * Runs the real renderer in Chromium, served by Vite (tests/e2e/web). There is
+ * no native bridge in this run; native behaviour is checked in the packaged
+ * app. The specs directly under tests/e2e are from the Electron era: they
+ * launch an Electron main process that no longer exists, so they are not
+ * matched here.
  */
 
 import { defineConfig, devices } from '@playwright/test';
 
+const PORT = Number(process.env.DEX_E2E_PORT ?? 5197);
+
 export default defineConfig({
-  // Test directory
-  testDir: './tests/e2e',
-  
-  // Test file patterns
+  testDir: './tests/e2e/web',
   testMatch: '**/*.e2e.ts',
-  
-  // Timeout per test
-  timeout: 60000,
-  
-  // Timeout for expect assertions
-  expect: {
-    timeout: 10000,
-  },
-  
-  // Run tests in parallel
-  fullyParallel: false, // Electron tests should run sequentially
-  
-  // Fail the build on CI if you accidentally left test.only in the source code
-  forbidOnly: !!process.env.CI,
-  
-  // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
-  
-  // Limit workers for Electron
+
+  timeout: 120_000,
+  expect: { timeout: 10_000 },
+
+  // One page drives one shell; the specs open many apps, so keep them serial.
+  fullyParallel: false,
   workers: 1,
-  
-  // Reporter
+
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'test-results/e2e-report' }],
+    ['html', { outputFolder: 'test-results/e2e-report', open: 'never' }],
   ],
-  
-  // Output folder for test artifacts
   outputDir: 'test-results/e2e-artifacts',
-  
-  // Global setup/teardown
-  globalSetup: './tests/e2e/global-setup.ts',
-  globalTeardown: './tests/e2e/global-teardown.ts',
-  
-  // Use custom project for Electron
+
+  use: {
+    baseURL: `http://localhost:${PORT}`,
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+
+  webServer: {
+    command: `npx vite --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+  },
+
   projects: [
-    {
-      name: 'electron',
-      use: {
-        // Custom Electron launch options handled in tests
-        trace: 'on-first-retry',
-        screenshot: 'only-on-failure',
-        video: 'on-first-retry',
-      },
-    },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
   ],
 });

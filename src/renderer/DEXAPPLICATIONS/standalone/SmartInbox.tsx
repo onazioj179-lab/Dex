@@ -754,7 +754,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-    padding: 'var(--space-4) var(--space-5)', flexShrink: 0,
+    padding: 'var(--space-1) var(--space-5)', flexShrink: 0,
+    minHeight: 'var(--app-header-height)', boxSizing: 'border-box',
     borderBottom: '1px solid var(--color-border)',
   },
   titleWrap: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },

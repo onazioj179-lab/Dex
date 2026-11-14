@@ -141,12 +141,8 @@ export const DexButton = forwardRef<HTMLButtonElement, DexButtonProps>(({
     ...style,
   };
 
-  // Focus-visible ring style (applied via CSS-in-JS workaround)
-  const focusStyle = `:focus-visible { box-shadow: 0 0 0 2px var(--color-accent, #4A9EFF); }`;
-
   return (
     <>
-      <style>{`.dex-btn:focus-visible { box-shadow: 0 0 0 2px var(--color-accent, #4A9EFF); outline: none; }`}</style>
       <button
         ref={ref}
         className="dex-btn"
