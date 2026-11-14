@@ -440,6 +440,9 @@ fn self_sample() -> Value {
         "hostMemoryMB": (host_mem as f64 / 1048576.0).round() as i64,
         // Share of the whole machine (all cores = 100%).
         "cpuPercent": (cpu / cores * 10.0).round() / 10.0,
+        // false when this call had to take a new CPU baseline (first call, or
+        // none in the last minute) and so waited the minimum interval.
+        "baselineReused": !fresh_baseline,
     })
 }
 
@@ -498,11 +501,11 @@ mod tests {
     #[test]
     fn self_sample_reuses_its_baseline() {
         let _ = super::self_sample();
-        let t = std::time::Instant::now();
         let v = super::self_sample();
         assert_eq!(v["available"], true);
         // A warm call refreshes once instead of rebuilding the process table and
-        // re-taking a CPU baseline.
-        assert!(t.elapsed() < std::time::Duration::from_millis(1500), "warm sample took {:?}", t.elapsed());
+        // re-taking a CPU baseline. Checked by behaviour, not wall time: the old
+        // "< 1.5 s" assert failed whenever the machine was busy.
+        assert_eq!(v["baselineReused"], true);
     }
 }
