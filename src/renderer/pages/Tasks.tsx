@@ -22,6 +22,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { searchLines } from '../../shared/search/textSearch';
 import { DexSearchInput } from '../styles/components';
 import { keyEventForApp } from '../shell/input/appKeyScope';
+import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
 
 // ===========================================================================
 // TYPES
@@ -2219,22 +2220,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-2) var(--space-5)',
     minHeight: 'var(--app-header-height)', boxSizing: 'border-box', flexShrink: 0,
     borderRadius: 0,
+    borderTop: 'none', borderLeft: 'none', borderRight: 'none',
     borderBottom: '1px solid var(--color-border)',
   },
   headerTitle: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
   },
-  titleText: {
-    fontSize: '18px',
-    fontWeight: 600,
-    letterSpacing: '-0.01em',
-  },
-  taskCount: {
-    fontSize: '12px',
-    color: 'var(--color-text-muted)',
-  },
+  titleText: APP_TITLE,
+  taskCount: APP_SUBTITLE,
   toggleCompleted: {
     padding: '5px 10px',
     borderRadius: '10px',

@@ -30,6 +30,7 @@ import {
   PERMISSION_LABELS,
   type PermissionId,
 } from '../../store/permissionStore';
+import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
 
 function toast(type: 'info' | 'success' | 'warning' | 'error', message: string): void {
   try {
@@ -322,8 +323,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface-solid, #1C1C1E)',
   },
-  title: { fontSize: '15px', fontWeight: 600, margin: 0, letterSpacing: '-0.2px' },
-  subtitle: { fontSize: '11px', color: 'var(--color-text-tertiary)' },
+  title: APP_TITLE,
+  subtitle: APP_SUBTITLE,
   primaryBtn: {
     padding: '8px 14px',
     background: 'var(--color-accent-fill)',

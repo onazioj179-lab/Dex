@@ -37,7 +37,12 @@ async function open(page: Page, id: string): Promise<void> {
     window.__dexRunningApps!.getState().launchApp({ id: appId, name: appId, icon: appId, color: '#888888' });
   }, id);
   // The lazy chunk shows a loading placeholder until the app has mounted.
-  await page.waitForFunction(() => !document.querySelector('[data-app-loading]'), null, { timeout: 90_000 });
+  // Mounted = its container exists, the lazy-load placeholder is gone and it drew something.
+  await page.waitForFunction((appId) => {
+    // Inline apps sit in [data-app-id]; windowed ones in [data-floating-window].
+    const el = document.querySelector(`[data-app-id="${appId}"], [data-floating-window="${appId}"]`);
+    return !!el && !el.querySelector('[data-app-loading]') && (el.textContent ?? '').trim().length > 0;
+  }, id, { timeout: 90_000 });
   await page.waitForTimeout(150);
 }
 
