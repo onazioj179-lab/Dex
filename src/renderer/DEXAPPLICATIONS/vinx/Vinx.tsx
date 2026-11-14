@@ -2367,7 +2367,7 @@ const VinxEditor: React.FC = () => {
                 { cat: 'View', shortcuts: [[(_plat.isMac?'⌘':'Ctrl')+'+S', 'Save'], [(_plat.isMac?'⌘':'Ctrl')+'+E', 'Export'], ['=', 'Zoom In'], ['-', 'Zoom Out'], ['Shift+Z', 'Reset Zoom'], ['F', 'Fullscreen Viewer']] },
               ].map(group => (
                 <div key={group.cat} style={{ marginBottom: 'var(--space-4)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group.cat}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group.cat}</div>
                   {group.shortcuts.map(([key, action]) => (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{action}</span>

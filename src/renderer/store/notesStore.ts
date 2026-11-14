@@ -77,7 +77,8 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
     case 'dexnotes:list': {
       const opts = (args[0] || {}) as { folder_id?: string | null };
       const folder = opts.folder_id;
-      let list = Object.values(s.notes).map(fbToList);
+      // Trashed notes stay in storage (so Undo / Restore can bring them back) but are not listed.
+      let list = Object.values(s.notes).filter((n: any) => !n.trashed_at).map(fbToList);
       if (folder !== undefined) list = list.filter(n => n.folder_id === folder);
       list.sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
       return list;
@@ -110,12 +111,23 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       return true;
     }
     case 'dexnotes:delete': {
+      // Same contract as native: move to Trash unless `permanent` (args[1]) is set.
       const id = args[0] as string;
-      delete s.notes[id];
+      if (!s.notes[id]) return false;
+      if (args[1]) delete s.notes[id];
+      else s.notes[id] = { ...s.notes[id], trashed_at: now };
       fbSave(s);
       return true;
     }
-    case 'dexnotes:restore': return true;
+    case 'dexnotes:restore': {
+      // Was a bare `true`: Undo after a delete reported success and restored nothing.
+      const id = args[0] as string;
+      if (!s.notes[id] || !s.notes[id].trashed_at) return false;
+      const { trashed_at: _t, ...rest } = s.notes[id];
+      s.notes[id] = { ...rest, updated_at: now };
+      fbSave(s);
+      return true;
+    }
     case 'dexnotes:duplicate': {
       const id = args[0] as string;
       const orig = s.notes[id];
@@ -184,11 +196,12 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       return true;
     }
     case 'dexnotes:getStats': {
-      const total_notes = Object.keys(s.notes).length;
+      const live = Object.values(s.notes).filter((n: any) => !n.trashed_at);
+      const total_notes = live.length;
       const total_folders = Object.keys(s.folders).length;
       const tagSet = new Set<string>();
       let total_words = 0;
-      Object.values(s.notes).forEach((n: any) => {
+      live.forEach((n: any) => {
         (n.tags || []).forEach((t: string) => tagSet.add(t));
         total_words += n.word_count || 0;
       });
@@ -210,6 +223,7 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       const terms = raw.split(/\s+/).filter(Boolean);
       const results: NoteSearchResult[] = [];
       for (const n of Object.values(s.notes) as any[]) {
+        if (n.trashed_at) continue;
         const title = (n.title || '').toLowerCase();
         const plain = n.plain_text || '';
         const body = plain.toLowerCase();

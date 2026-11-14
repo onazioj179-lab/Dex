@@ -1360,7 +1360,7 @@ const Forge: React.FC = () => {
     inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, borderRadius: 0, borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', overflow: 'auto' },
     inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     inspectorSection: { marginBottom: 'var(--space-3)' },
-    sectionTitle: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', letterSpacing: '0.5px', fontWeight: 600 },
+    sectionTitle: { fontSize: '11px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', letterSpacing: '0.5px', fontWeight: 600 },
     infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '11px' },
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
@@ -1369,7 +1369,7 @@ const Forge: React.FC = () => {
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
-    categoryHeader: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', padding: 'var(--space-3) 0 var(--space-2)', marginTop: 'var(--space-2)', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
+    categoryHeader: { fontSize: '11px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', padding: 'var(--space-3) 0 var(--space-2)', marginTop: 'var(--space-2)', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
     statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'var(--color-bg-surface)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     checkbox: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
@@ -1655,7 +1655,7 @@ const Forge: React.FC = () => {
                     <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)' }}>Cancel</button>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)', background: 'var(--color-success-muted, rgba(48,209,88,0.1))', border: '1px solid var(--color-success-muted, rgba(48,209,88,0.3))', color: 'var(--color-success)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
+                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
                 )}
                 
                 {['Professional', 'Modern Codecs', 'Standard', 'Web', 'Social Media', 'Broadcast', 'Audio', 'Other']
@@ -2456,7 +2456,7 @@ const Forge: React.FC = () => {
           </div>
           <div style={{ padding: 14, display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', marginBottom: 4, textTransform: 'uppercase' }}>Source</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Source</div>
               <div style={{ borderRadius: 4, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {previewSourceUrl ? (
                   <video controls muted style={{ width: '100%', maxHeight: 200 }}

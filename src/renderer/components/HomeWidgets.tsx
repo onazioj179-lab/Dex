@@ -366,10 +366,10 @@ const QuickActionsWidget: React.FC = () => {
             color: a.color, fontSize: 11, fontWeight: 600, 
             cursor: 'pointer', transition: 'background 0.15s, transform 0.1s' 
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = `${a.color}35`; e.currentTarget.style.transform = 'scale(1.02)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${a.color}35`; }}
           onMouseLeave={e => { e.currentTarget.style.background = `${a.color}20`; e.currentTarget.style.transform = 'scale(1)'; }}
           onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
-          onMouseUp={e => e.currentTarget.style.transform = 'scale(1.02)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
         >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
             {a.icon ? <DexIcon name={a.icon} size={15} color={a.color} /> : null}
