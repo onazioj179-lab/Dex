@@ -212,24 +212,16 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 190 | Render Queue: "Render All" rendered only the first job, jobs were labelled "MP4 … | Packaged-app run (render queue) |
 | 193 | 7.0.2: retire Rewind; release build and packaged smoke run; Show in File Explore… | Packaged-app run (path with spaces) |
 | 201 | Native IPC ABI guard (B001/B002/B016) | Next CI run (own step, #229) |
-| 204 | Hover submenus closed while the pointer moved into them; no safe triangle | Packaged-app run |
-| 207 | Hit slop, continuous corners, view-transition theme fade (B013) | Packaged-app run (WebView2 corner-shape) |
-| 209 | Settings › Reduce Motion didn't reach JS motion (B012) | Packaged-app run |
 | 210 | Swipe-to-dismiss needed half the banner width; no flick, no cancel (B013) | Hardware (touch screen) |
 | 212 | Release builds didn't run the ABI check (B001) | Next release tag run |
-| 213 | Double Enter / double click could create a transaction or account twice (B013 id… | Packaged-app run |
 | 214 | EXIF read and "Save a copy without metadata" got `file://` URLs | Packaged-app run |
 | 215 | Back ignored the app's own history; mouse side buttons did nothing (B013 predict… | Packaged-app run (mouse side button) |
 | 216 | Local photos, music, video, PDFs and disk wallpapers never loaded in the desktop… | Packaged-app run |
 | 217 | "Split down" on a side-by-side tab added a third column | Owner decision (tree splits) |
-| 218 | Row colour menu showed raw CSS ("○ var(--color-error)") and stored it, so the to… | Packaged-app run |
 | 219 | Send Files to a nearby DEX did nothing (fake control) | Two PCs on one network |
 | 220 | Failures reported as success (#61 sweep) | Packaged-app run |
 | 222 | Attach file, open and remove attachment did nothing | Packaged-app run |
-| 223 | Do Not Disturb silenced nothing | Packaged-app run |
-| 224 | Scratchpad text was never saved | Packaged-app run |
 | 226 | Every `dex.<ns>.onY(cb)` subscription was a silent no-op under Tauri | Packaged-app run (detached Vault / PIN change) |
-| 225 | Send Feedback said "Report saved" with no file; system info preview empty | Packaged-app run |
 
 ## Session 2026-11-13 (`claude/backlog-cleanup-conflicts-16b9e3`): unslop passes 4 and 5, style leak between apps, web e2e in CI
 
