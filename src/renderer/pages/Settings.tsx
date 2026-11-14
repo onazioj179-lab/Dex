@@ -60,6 +60,7 @@ import { applyTheme } from '../utils/theme';
 import { withViewTransition } from '../utils/viewTransition';
 import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
+import { colorInputValue } from '../utils/canvasTheme';
 
 // ===========================================================================
 // TYPES
@@ -2423,7 +2424,7 @@ export const Settings: React.FC = () => {
             </div>
             <input
               type="color"
-              value={prefs.glassTint}
+              value={colorInputValue(prefs.glassTint)}
               onChange={(e) => prefs.setGlassTint(e.target.value)}
               style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
               aria-label="Liquid Glass tint color"

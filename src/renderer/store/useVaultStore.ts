@@ -14,6 +14,7 @@
  */
 
 import { create } from 'zustand';
+import { suppressClipboardCapture } from '../services/ClipboardMonitor';
 
 // ===========================================================================
 // Types
@@ -351,7 +352,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       
       const result = await window.dex!.vault.addCredential(credential);
       
-      if (result.success && result.id) {
+      // Native answers the saved entry (with its id), or { success: false, error }.
+      if (result && result.success !== false && result.id) {
         await get().loadCredentials();
         return result.id;
       } else {
@@ -444,7 +446,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       
       const result = await window.dex!.vault.addAuthenticator(entry);
       
-      if (result.success && result.id) {
+      // Native answers the saved entry (with its id), or { success: false, error }.
+      if (result && result.success !== false && result.id) {
         await get().loadAuthenticators();
         return result.id;
       } else {
@@ -506,7 +509,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   generateTOTP: async (id: string) => {
     try {
-      return await window.dex!.vault.generateTOTP(id);
+      // Native answers { code, remaining }; older builds used remainingSeconds.
+      const r = await window.dex!.vault.generateTOTP(id) as { code?: string; remaining?: number; remainingSeconds?: number } | null;
+      if (!r || !r.code) return null;
+      return { code: r.code, remainingSeconds: Number(r.remaining ?? r.remainingSeconds ?? 0) };
     } catch (error) {
       set({ error: String(error) });
       return null;
@@ -537,7 +543,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   copyToClipboard: async (text: string, autoClear = true) => {
     try {
-      // Convert boolean to number (30 seconds if true, undefined if false)
+      // Never kept in clipboard history; native wipes it after 30 s unless
+      // something else was copied in between.
+      suppressClipboardCapture(text);
       const clearTimeout = autoClear ? 30 : undefined;
       await window.dex!.vault.copyToClipboard(text, clearTimeout);
     } catch (error) {
@@ -601,7 +609,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       const result = await window.dex!.vault.addCategory(category);
       
-      if (result.success && result.id) {
+      // Native answers the saved entry (with its id), or { success: false, error }.
+      if (result && result.success !== false && result.id) {
         await get().loadCategories();
         return result.id;
       } else {

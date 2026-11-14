@@ -38,7 +38,7 @@ import {
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
-import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { resolveCanvasColor, colorInputValue } from '../../utils/canvasTheme';
 import { POST_FILTER_TYPES, applyPostEffects } from './postEffects';
 import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
@@ -4309,7 +4309,7 @@ const Flux: React.FC = () => {
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
-                    <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
+                    <input type="color" value={colorInputValue(u.val as string)} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
                   ) : (
                     <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: FLUX_ACCENT, marginTop: 2 }} />
                   )}

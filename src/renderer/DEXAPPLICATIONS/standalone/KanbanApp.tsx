@@ -11,6 +11,7 @@ import { textIncludesAll, priorityRank, byField } from '../../../shared/collecti
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { persistOrWarn } from '../../utils/persistOrWarn';
+import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
 
 // -- Types --------------------------------------------------------------
 
@@ -813,12 +814,12 @@ const KanbanApp: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base, #0e0e0e)', overflow: 'hidden' },
-  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-5)', minHeight: 'var(--app-header-height)', boxSizing: 'border-box', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
+  topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-5)', minHeight: 'var(--app-header-height)', boxSizing: 'border-box', borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   topLeft: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' },
   topRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  boardTitle: { fontSize: 18, fontWeight: 600, margin: 0, letterSpacing: '-0.3px' },
-  boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
+  boardTitle: APP_TITLE,
+  boardMeta: APP_SUBTITLE,
   progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 },
   boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 },
   boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },

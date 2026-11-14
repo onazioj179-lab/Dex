@@ -106,6 +106,7 @@ import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../.
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { colorInputValue } from '../../utils/canvasTheme';
 import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
 
 // Swatches must be real colours: the canvas cannot paint a CSS variable, so the
@@ -3340,14 +3341,14 @@ const Prism: React.FC = () => {
             <div style={{ position: 'relative', width: '32px', height: '32px', margin: '0 auto' }}>
               <input
                 type="color"
-                value={foregroundColor}
+                value={colorInputValue(foregroundColor)}
                 onChange={(e) => setForegroundColor(e.target.value)}
                 aria-label="Foreground color"
                 style={{ position: 'absolute', top: 0, left: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
               <input
                 type="color"
-                value={backgroundColor}
+                value={colorInputValue(backgroundColor)}
                 onChange={(e) => setBackgroundColor(e.target.value)}
                 aria-label="Background color"
                 style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
@@ -5270,7 +5271,7 @@ const Prism: React.FC = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Color:</span>
-              <input type="color" value={photoFilterColor} onChange={e => setPhotoFilterColor(e.target.value)} style={{ width: 24, height: 18, border: 'none', background: 'none', cursor: 'pointer' }} />
+              <input type="color" value={colorInputValue(photoFilterColor)} onChange={e => setPhotoFilterColor(e.target.value)} style={{ width: 24, height: 18, border: 'none', background: 'none', cursor: 'pointer' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{photoFilterColor}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -5377,12 +5378,12 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Source</span>
-                <input type="color" value={replaceColorSource} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={colorInputValue(replaceColorSource)} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
               <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>→</span>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Target</span>
-                <input type="color" value={replaceColorTarget} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={colorInputValue(replaceColorTarget)} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
@@ -5611,7 +5612,7 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 'var(--space-2)' }}>
               {gradientMapStops.map((stop, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <input type="color" value={stop.color} onChange={e => setGradientMapStops(prev => { const n = [...prev]; n[i] = { ...n[i], color: e.target.value }; return n; })} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', background: 'none' }} />
+                  <input type="color" value={colorInputValue(stop.color)} onChange={e => setGradientMapStops(prev => { const n = [...prev]; n[i] = { ...n[i], color: e.target.value }; return n; })} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', background: 'none' }} />
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{Math.round(stop.offset * 100)}%</span>
                 </div>
               ))}

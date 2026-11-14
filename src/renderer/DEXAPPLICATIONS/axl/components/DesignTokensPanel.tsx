@@ -19,6 +19,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore } from '../stores/uiStore';
 import { persistOrWarn } from '../../../utils/persistOrWarn';
+import { colorInputValue } from '../../../utils/canvasTheme';
 
 // ─── Token model ────────────────────────────────────────────────────────────
 type TokenKind = 'color' | 'number';
@@ -187,7 +188,7 @@ const DesignTokensPanel: React.FC = () => {
       <div key={tok.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4 }}>
         <input
           type="color"
-          value={swatch}
+          value={colorInputValue(swatch)}
           onChange={e => updateColorValue(tok.id, e.target.value)}
           aria-label={`${tok.name} color`}
           style={{ width: 18, height: 18, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
@@ -256,7 +257,7 @@ const DesignTokensPanel: React.FC = () => {
       <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Token name" aria-label="New token name" style={inputStyle} />
       {newKind === 'color' ? (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <input type="color" value={normalizeHex(newColor) ?? '#4a90d9'} onChange={e => setNewColor(e.target.value)} aria-label="New token color"
+          <input type="color" value={colorInputValue(normalizeHex(newColor) ?? '#4a90d9')} onChange={e => setNewColor(e.target.value)} aria-label="New token color"
             style={{ width: 28, height: 26, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
           <input value={newColor} onChange={e => setNewColor(e.target.value)} placeholder="#4a90d9" aria-label="New token hex" style={{ ...inputStyle, flex: 1, fontVariantNumeric: 'tabular-nums' }} />
         </div>
