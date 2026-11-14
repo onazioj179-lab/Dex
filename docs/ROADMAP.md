@@ -3688,3 +3688,7 @@ These need DSP/ML or native hosting we don't fake.
 
 - CI is red on GitHub because the jobs never start (account billing / spending limit, #246); the same steps pass locally on main.
 - LAN load: the DEX-to-DEX receiver runs at most 8 receives at once, discovery keeps at most 64 devices, and server threads recover from a panic. 36 more lock sites recover from poisoning (#247 to #250).
+
+## Checkpoint 2026-11-14 (robustness pass 3)
+
+- Poisoned-lock paths that answered "busy" forever (search index, Vault, notifications, terminal, ledger, startup) now recover; the phone-share server prunes expired shares and old answers (#251 to #253).

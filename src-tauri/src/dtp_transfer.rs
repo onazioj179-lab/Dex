@@ -215,10 +215,14 @@ static ACTIVE_RECEIVES: AtomicUsize = AtomicUsize::new(0);
 struct ReceiveSlot;
 impl ReceiveSlot {
     fn try_take() -> Option<Self> {
-        ACTIVE_RECEIVES
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| (n < MAX_ACTIVE_RECEIVES).then_some(n + 1))
-            .ok()
-            .map(|_| ReceiveSlot)
+        let mut n = ACTIVE_RECEIVES.load(Ordering::SeqCst);
+        while n < MAX_ACTIVE_RECEIVES {
+            match ACTIVE_RECEIVES.compare_exchange(n, n + 1, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(_) => return Some(ReceiveSlot),
+                Err(now) => n = now,
+            }
+        }
+        None
     }
 }
 impl Drop for ReceiveSlot {
