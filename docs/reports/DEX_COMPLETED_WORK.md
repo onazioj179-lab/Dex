@@ -445,3 +445,16 @@ A scan of every channel the renderer calls by name against native arms that answ
 | 224 | Shell | Scratchpad text was never saved | HIGH | FIXED (cargo test) | `scratchpad:updateContent` answered "not ported": the scratchpad came back empty after a restart. Now written to the row (renderer debounces 300 ms) | Type, restart DEX |
 | 225 | Shell | Send Feedback said "Report saved" with no file; system info preview empty | MEDIUM | FIXED (cargo test) | Submit now writes `<data>/feedback/feedback-<ms>.json` (description + optional DEX version, OS, arch, active app, last 10 renderer log lines) and shows its path; failures toast. Nothing is sent anywhere | Submit a report, open the file |
 
+## Session 2026-11-13 (`claude/backlog-pass-1113b`)
+
+
+### Packaged checks 2026-11-13 (release exe 7.0.2 / 001z with the #231 fix, isolated profile)
+
+- FLUX, VINX, PRISM, AXL, Imosion, Canvas, Forge, Presentation all open with "Up to date" (no fake "Saved").
+- #152 VINX: renaming the project showed "Unsaved changes", then "Saved just now" within 3 s; `dex-vinx-project` in localStorage and the native copy (`capability:storage:get`) both had the new name and a `modifiedAt` stamp. Crash-recovery banner not re-run.
+- #142 Dock: app menu on Ledger offered "Pin to Dock"; Ledger appeared in the Dock; the menu then offered "Unpin from Dock" and Ledger left the Dock. Reorder not exercised.
+- #46/#231 Browser: in the rebuilt exe pages load (title read from inside the page) and the page view follows the Browser window size. The minimize-then-open case was not re-run cleanly (the window was un-minimized by hand mid-test).
+- Edit → Saved in the same exe: FLUX "Add layer" → "Unsaved changes" → "Saved just now" at the 30 s tick; Canvas "Add sticky note" → "Saved just now" within 3 s; Imosion "Add new track" (1 → 2 tracks) → "Saved just now" within 4 s (Saved shows only after a real pointer/key in Imosion: by design, so a load is not an edit); AXL parameter "probe_w" added → "Saved just now". Forge: its status covers the encode queue, which needs a real file; the preset menu is not part of it, so "Up to date" stayed correct.
+- #152 VINX crash recovery: VINX open with a saved project, then the test DEX was force-killed (Stop-Process -Force, own PID only) and relaunched; opening VINX showed "VINX did not close normally last time. Restored the project as last saved (… 10:40:50 AM); edits after that were not saved." with the project name restored. #152 now fully VERIFIED in the packaged app.
+- #163 FLUX Open Project: a PRISM file was refused ("Could not open wrong.json: Not a FLUX project."); a project with one bad layer opened 1 layer at 24 fps and 1280×720 with a warning toast. #163 now fully VERIFIED in the packaged app.
+- #168 AXL: dropping a file without an assembly said "Not an AXL project (no assembly)."; a valid project opened ("Opened Packaged AXL probe. The previous project is in Collab Hub checkpoints.", checkpoint "Before opening another project" saved); Ctrl+N started a new project after saving "Before starting a new project". Export not run (it downloads a file).
