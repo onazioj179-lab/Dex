@@ -3357,7 +3357,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     padding: 'var(--space-10)',
     zIndex: 1,
-    background: 'radial-gradient(ellipse at 50% 40%, var(--color-accent-soft, rgba(74,158,255,0.08)) 0%, transparent 70%)',
   },
   brand: {
     fontSize: '38px',

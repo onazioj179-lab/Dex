@@ -9,6 +9,16 @@
 
 ---
 
+## Robustness pass (2026-11-13)
+
+- Lock with `crate::util::LockSafe` (`m.lock_safe()`), never `m.lock().unwrap()`: a panic caught by the `dex_ipc` guard
+  otherwise leaves the mutex poisoned and the channel dead until restart.
+- Threads outside `dex_ipc` (servers, watchers) are not covered by its panic guard: wrap per-request work in `catch_unwind`.
+- Random bytes: `dex_vault::crypto::random_bytes` (in-process OS CSPRNG). Don't shell out for randomness.
+- HTTP header values must be ASCII (tiny_http); build file names with `content_disposition()` in `http_transfer.rs`.
+- New channel `dexnotes:topWords` (ABI lock updated); 6 known unhandled renderer calls remain, all in never-started code
+  (`PerformanceOptimization` store) or with a fallback (`screencapture:getSources` → picker).
+
 ## dexmedia protocol — local media in the Tauri build (2026-11-13)
 
 - `file://` subresources are refused from the `http://tauri.localhost` origin (proven in a release exe over CDP), so every

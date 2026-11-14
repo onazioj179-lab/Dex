@@ -3144,35 +3144,35 @@ const Flux: React.FC = () => {
                 {activeTab === 'library' && (
                   <div style={styles.libraryGrid}>
                     <div style={styles.libraryItem} onClick={importMedia}>
-                      <div style={{ color: 'var(--color-success)', marginBottom: '4px' }}>{Icons.image}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.image}</div>
                       <span style={{ fontSize: '11px' }}>Image</span>
                     </div>
                     <div style={styles.libraryItem} onClick={importMedia}>
-                      <div style={{ color: '#ff375f', marginBottom: '4px' }}>{Icons.video}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.video}</div>
                       <span style={{ fontSize: '11px' }}>Video</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('text')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.text}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.text}</div>
                       <span style={{ fontSize: '11px' }}>Text</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('shape')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.shape}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.shape}</div>
                       <span style={{ fontSize: '11px' }}>Shape</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('particle')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.particle}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.particle}</div>
                       <span style={{ fontSize: '11px' }}>Particles</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('generator')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.grid}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.grid}</div>
                       <span style={{ fontSize: '11px' }}>Generator</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('camera')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.camera}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.camera}</div>
                       <span style={{ fontSize: '11px' }}>Camera</span>
                     </div>
                     <div style={styles.libraryItem} onClick={() => addLayer('light')}>
-                      <div style={{ color: 'var(--color-accent)', marginBottom: '4px' }}>{Icons.light}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }}>{Icons.light}</div>
                       <span style={{ fontSize: '11px' }}>Light</span>
                     </div>
                   </div>

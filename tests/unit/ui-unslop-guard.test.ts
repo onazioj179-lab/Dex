@@ -103,6 +103,16 @@ describe('UI unslop guards', () => {
       expect(strip(read('styles/design-system.css'))).not.toMatch(halo);
     });
 
+    it('shared CSS hover adds no big shadow bloom (blur >= 10px)', () => {
+      for (const file of ['styles/design-system.css', 'styles/globals.css']) {
+        const css = strip(read(file));
+        const bad = [...css.matchAll(/([^{}]*:hover[^{}]*)\{([^{}]*)\}/g)]
+          .filter(([, , body]) => { const b = /box-shadow:\s*([^;]*)/.exec(body); return !!b && [...b[1].matchAll(/(-?\d+)px\s+(\d+)px(\s+-?\d+px)?\s+(rgba|#|var|color-mix|hsl)/g)].some((x) => Number(x[2]) >= 10); })
+          .map(([, sel]) => `${file}: ${sel.trim().replace(/\s+/g, ' ').slice(0, 80)}`);
+        expect(bad).toEqual([]);
+      }
+    });
+
     it('no glow wider than 4px on app chrome', () => {
       const glow = /(?:box-shadow|boxShadow|drop-shadow)[^;\n]*?\b0 0 (\d+)px (?!rgba\(0, ?0, ?0)/g;
       const wide = apps.flatMap(({ f, src }) => [...src.matchAll(glow)]
