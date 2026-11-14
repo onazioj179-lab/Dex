@@ -50,6 +50,7 @@
 // engine only orchestrated state, timers and the store, all of which IS ported).
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -176,7 +177,7 @@ fn gen_counter() -> &'static AtomicU64 {
 // 'disabled'. Only applies while still in the pristine 'disabled' default and no
 // session has run (timer_gen == 0), so it never clobbers a live session.
 fn ensure_started(app: &tauri::AppHandle) {
-    let mut eng = engine().lock().unwrap();
+    let mut eng = engine().lock_safe();
     if eng.timer_gen == 0 && eng.state == "disabled" && eng.current_session.is_null() {
         let enabled = config_get(app)
             .get("enabled")
@@ -211,7 +212,7 @@ fn notify_transcript(app: &tauri::AppHandle, transcript: &str) {
 
 fn microphone_status(app: &tauri::AppHandle) -> Value {
     ensure_started(app);
-    let active = engine().lock().unwrap().state == "listening";
+    let active = engine().lock_safe().state == "listening";
     json!({
         "available": true,
         "permissionGranted": true,
@@ -243,7 +244,7 @@ fn save_session(app: &tauri::AppHandle, session: &Value) {
 // stopListening: end+save the live session, return to idle, emit events. Returns
 // whether a transition happened (Electron returns true unconditionally; we mirror).
 fn stop_listening(app: &tauri::AppHandle) -> bool {
-    let mut eng = engine().lock().unwrap();
+    let mut eng = engine().lock_safe();
     if eng.state != "listening" && eng.state != "processing" {
         return true;
     }
@@ -277,14 +278,14 @@ fn arm_timeouts(app: &tauri::AppHandle, my_gen: u64, max_ms: u64, silence_ms: u6
     let app_a = app.clone();
     crate::util::spawn_named("voice", move || {
         std::thread::sleep(Duration::from_millis(max_ms.max(1)));
-        if engine().lock().unwrap().timer_gen == my_gen {
+        if engine().lock_safe().timer_gen == my_gen {
             stop_listening(&app_a);
         }
     });
     let app_b = app.clone();
     crate::util::spawn_named("voice", move || {
         std::thread::sleep(Duration::from_millis(silence_ms.max(1)));
-        if engine().lock().unwrap().timer_gen == my_gen {
+        if engine().lock_safe().timer_gen == my_gen {
             stop_listening(&app_b);
         }
     });
@@ -309,7 +310,7 @@ fn start_listening(app: &tauri::AppHandle) -> bool {
 
     let my_gen = gen_counter().fetch_add(1, Ordering::SeqCst);
     {
-        let mut eng = engine().lock().unwrap();
+        let mut eng = engine().lock_safe();
         if eng.state == "listening" || eng.state == "processing" {
             return true; // Already listening.
         }
@@ -337,7 +338,7 @@ fn start_listening(app: &tauri::AppHandle) -> bool {
 
 fn cancel_command(app: &tauri::AppHandle) -> bool {
     {
-        let mut eng = engine().lock().unwrap();
+        let mut eng = engine().lock_safe();
         if !eng.current_session.is_null() {
             if let Some(obj) = eng.current_session.as_object_mut() {
                 obj.insert("cancelled".to_string(), json!(true));
@@ -352,7 +353,7 @@ fn cancel_command(app: &tauri::AppHandle) -> bool {
 }
 
 fn process_transcript(app: &tauri::AppHandle, transcript: &str) {
-    let mut eng = engine().lock().unwrap();
+    let mut eng = engine().lock_safe();
     if eng.current_session.is_null() {
         return;
     }
@@ -384,7 +385,7 @@ fn enable(app: &tauri::AppHandle) -> bool {
 
     // initializeEngine(): state -> idle, broadcast.
     {
-        let mut eng = engine().lock().unwrap();
+        let mut eng = engine().lock_safe();
         eng.state = "idle".to_string();
         if eng.timer_gen == 0 {
             eng.timer_gen = 1;
@@ -404,7 +405,7 @@ fn disable(app: &tauri::AppHandle) -> bool {
     store_set(app, "config", config);
 
     {
-        let mut eng = engine().lock().unwrap();
+        let mut eng = engine().lock_safe();
         eng.state = "disabled".to_string();
         // Keep timer_gen non-zero so ensure_started won't re-derive 'idle'.
         if eng.timer_gen == 0 {
@@ -519,9 +520,9 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         // --- state ---
         "voice:getState" => {
             ensure_started(app);
-            json!(engine().lock().unwrap().state)
+            json!(engine().lock_safe().state)
         }
-        "voice:getCurrentSession" => engine().lock().unwrap().current_session.clone(),
+        "voice:getCurrentSession" => engine().lock_safe().current_session.clone(),
 
         // --- config ---
         "voice:getConfig" => config_get(app),

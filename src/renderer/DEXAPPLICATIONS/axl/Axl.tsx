@@ -1751,7 +1751,7 @@ const AXL: React.FC = () => {
   // ═════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="axl-root" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden', minHeight: 0, fontFamily: 'var(--font-family)', fontSize: '11px', position: 'relative', contain: 'layout style' } as React.CSSProperties} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
+    <div className="axl-root dex-theme-dark" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden', minHeight: 0, fontFamily: 'var(--font-family)', fontSize: '11px', position: 'relative', contain: 'layout style' } as React.CSSProperties} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       <style>{`
         .axl-ctx-item:hover { background: var(--color-bg-hover) !important; }
         .axl-ctx-item:active { background: var(--color-bg-active) !important; }

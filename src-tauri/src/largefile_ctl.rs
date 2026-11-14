@@ -40,6 +40,7 @@
 // Helpers: std + serde_json only (no extra deps).
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -120,7 +121,7 @@ fn session_store() -> &'static Mutex<HashMap<String, FileSession>> {
 fn next_counter() -> u64 {
     static COUNTER: OnceLock<Mutex<u64>> = OnceLock::new();
     let m = COUNTER.get_or_init(|| Mutex::new(0));
-    let mut c = m.lock().unwrap();
+    let mut c = m.lock_safe();
     *c += 1;
     *c
 }
@@ -154,9 +155,9 @@ fn format_bytes(bytes: u64) -> String {
 // runs this on a 60s timer; we run it lazily before each routed channel, which
 // produces the same observable session lifetime without a background thread.
 fn prune_idle_sessions() {
-    let timeout = config_store().lock().unwrap().session_timeout;
+    let timeout = config_store().lock_safe().session_timeout;
     let now = current_millis();
-    let mut sessions = session_store().lock().unwrap();
+    let mut sessions = session_store().lock_safe();
     sessions.retain(|_, s| now - s.last_access <= timeout);
 }
 
@@ -183,7 +184,7 @@ fn get_file_info(file_path: &str) -> Value {
     let size = meta.len();
     let is_large = size > 10 * 1024 * 1024; // > 10 MiB
 
-    let default_chunk = config_store().lock().unwrap().default_chunk_size;
+    let default_chunk = config_store().lock_safe().default_chunk_size;
     let recommended_chunk_size: u64 = if size > 1024 * 1024 * 1024 {
         256 * 1024 // > 1 GiB
     } else if size > 100 * 1024 * 1024 {
@@ -205,7 +206,7 @@ fn get_file_info(file_path: &str) -> Value {
 // ---------------------------------------------------------------------------
 
 fn open_session(file_path: &str, chunk_size: Option<u64>) -> Value {
-    let cfg = config_store().lock().unwrap().clone();
+    let cfg = config_store().lock_safe().clone();
 
     // stat first; non-existent / unreadable path -> { error }.
     let meta = match std::fs::metadata(file_path) {
@@ -216,7 +217,7 @@ fn open_session(file_path: &str, chunk_size: Option<u64>) -> Value {
         return json!({ "error": "Not a file" });
     }
 
-    let mut sessions = session_store().lock().unwrap();
+    let mut sessions = session_store().lock_safe();
 
     // Concurrency cap: evict the oldest before inserting (Electron does this
     // when at/over the limit prior to creating the new session).
@@ -252,7 +253,7 @@ fn open_session(file_path: &str, chunk_size: Option<u64>) -> Value {
 // ---------------------------------------------------------------------------
 
 fn close_session(session_id: &str) -> Value {
-    let mut sessions = session_store().lock().unwrap();
+    let mut sessions = session_store().lock_safe();
     if sessions.remove(session_id).is_some() {
         json!({ "success": true })
     } else {
@@ -296,7 +297,7 @@ fn read_chunk(request: &Value) -> Value {
     let start_byte = request.get("startByte").and_then(|v| v.as_u64()).unwrap_or(0);
     let end_byte = request.get("endByte").and_then(|v| v.as_u64()).unwrap_or(0);
 
-    let max_chunk = config_store().lock().unwrap().max_chunk_size;
+    let max_chunk = config_store().lock_safe().max_chunk_size;
     let length = end_byte.saturating_sub(start_byte);
 
     if length > max_chunk {
@@ -338,7 +339,7 @@ fn read_next_chunk(session_id: &str) -> Value {
     // Pull the data we need under the lock, then release before the read so a
     // long read does not block the whole table.
     let (file_path, start_byte, chunk_size, size) = {
-        let mut sessions = session_store().lock().unwrap();
+        let mut sessions = session_store().lock_safe();
         let session = match sessions.get_mut(session_id) {
             Some(s) if s.is_open => s,
             _ => return json!({ "error": "Session not found or closed" }),
@@ -369,7 +370,7 @@ fn read_next_chunk(session_id: &str) -> Value {
     // Advance the cursor to the requested end (Electron sets currentPosition =
     // endByte regardless of short reads).
     if result.get("error").is_none() {
-        let mut sessions = session_store().lock().unwrap();
+        let mut sessions = session_store().lock_safe();
         if let Some(s) = sessions.get_mut(session_id) {
             s.current_position = end_byte;
         }
@@ -384,9 +385,9 @@ fn read_next_chunk(session_id: &str) -> Value {
 fn read_lines(session_id: &str, line_count: u64) -> Value {
     // Read config FIRST (consistent config-before-sessions lock ordering with
     // open_session/set_config — avoids any cross-lock deadlock).
-    let line_buffer_size = config_store().lock().unwrap().line_buffer_size;
+    let line_buffer_size = config_store().lock_safe().line_buffer_size;
     let (file_path, mut position, size) = {
-        let mut sessions = session_store().lock().unwrap();
+        let mut sessions = session_store().lock_safe();
         let session = match sessions.get_mut(session_id) {
             Some(s) if s.is_open => s,
             _ => return json!({ "error": "Session not found or closed" }),
@@ -449,7 +450,7 @@ fn read_lines(session_id: &str, line_count: u64) -> Value {
     // length (Electron: position - Buffer.byteLength(buffer, encoding)).
     let new_position = position.saturating_sub(buffer.len() as u64);
     {
-        let mut sessions = session_store().lock().unwrap();
+        let mut sessions = session_store().lock_safe();
         if let Some(s) = sessions.get_mut(session_id) {
             s.current_position = new_position;
         }
@@ -466,7 +467,7 @@ fn read_lines(session_id: &str, line_count: u64) -> Value {
 // ---------------------------------------------------------------------------
 
 fn seek(session_id: &str, position: i64) -> Value {
-    let mut sessions = session_store().lock().unwrap();
+    let mut sessions = session_store().lock_safe();
     let session = match sessions.get_mut(session_id) {
         Some(s) if s.is_open => s,
         _ => return json!({ "success": false, "error": "Session not found or closed" }),
@@ -484,7 +485,7 @@ fn seek(session_id: &str, position: i64) -> Value {
 // ---------------------------------------------------------------------------
 
 fn get_session(session_id: &str) -> Value {
-    let sessions = session_store().lock().unwrap();
+    let sessions = session_store().lock_safe();
     match sessions.get(session_id) {
         Some(s) => s.to_value(),
         None => Value::Null,
@@ -496,7 +497,7 @@ fn get_session(session_id: &str) -> Value {
 // ---------------------------------------------------------------------------
 
 fn list_sessions() -> Value {
-    let sessions = session_store().lock().unwrap();
+    let sessions = session_store().lock_safe();
     Value::Array(sessions.values().map(|s| s.to_value()).collect())
 }
 
@@ -505,7 +506,7 @@ fn list_sessions() -> Value {
 // ---------------------------------------------------------------------------
 
 fn set_config(partial: &Value) -> Value {
-    let mut cfg = config_store().lock().unwrap();
+    let mut cfg = config_store().lock_safe();
     if let Some(v) = partial.get("defaultChunkSize").and_then(|v| v.as_u64()) {
         cfg.default_chunk_size = v;
     }

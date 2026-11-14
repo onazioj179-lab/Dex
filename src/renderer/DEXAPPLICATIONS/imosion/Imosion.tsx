@@ -8449,7 +8449,7 @@ const Imosion: React.FC = () => {
               <div style={{ flex: 1, padding: 'var(--space-4) var(--space-5)', overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
                 {/* Stereo Image */}
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid var(--color-border-subtle)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Stereo Image</div>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Stereo Image</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Width" min={0} max={200} step={1} value={masterSettings.stereoWidth} onChange={v => setMasterSettings(s => ({ ...s, stereoWidth: v }))} accentColor="var(--color-accent)" unit="%" />
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="M/S Balance" min={-100} max={100} step={1} value={masterSettings.midSideBalance} onChange={v => setMasterSettings(s => ({ ...s, midSideBalance: v }))} accentColor="var(--color-accent)" format={v => `${v > 0 ? '+' : ''}${v}`} />
@@ -8458,7 +8458,7 @@ const Imosion: React.FC = () => {
                 
                 {/* Tone */}
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid var(--color-border-subtle)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tone</div>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tone</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Low Shelf" min={-12} max={12} step={0.5} value={masterSettings.lowShelf} onChange={v => setMasterSettings(s => ({ ...s, lowShelf: v }))} accentColor="var(--color-accent)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
                     <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="High Shelf" min={-12} max={12} step={0.5} value={masterSettings.highShelf} onChange={v => setMasterSettings(s => ({ ...s, highShelf: v }))} accentColor="var(--color-accent)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />

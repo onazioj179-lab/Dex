@@ -230,7 +230,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     lineHeight: 1.7,
     fontFamily: 'var(--dex-font-ui)',
-    caretColor: '#64d2ff',
+    caretColor: 'var(--color-accent)',
     wordWrap: 'break-word' as const,
     overflowWrap: 'break-word' as const,
   },
@@ -283,8 +283,8 @@ const styles: Record<string, React.CSSProperties> = {
   dropOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'rgba(100,210,255,0.08)',
-    border: '2px dashed rgba(100,210,255,0.6)',
+    background: 'var(--color-accent-soft)',
+    border: '2px dashed var(--color-accent)',
     borderRadius: 'var(--radius-md, 8px)',
     display: 'flex',
     alignItems: 'center',
@@ -1397,7 +1397,7 @@ const EDITOR_CSS = `
 }
 .checklist-item input[type="checkbox"] {
   margin-top: 5px;
-  accent-color: #64d2ff;
+  accent-color: var(--color-accent);
   cursor: pointer;
 }
 .checklist-item[data-checked="true"] {
@@ -1412,7 +1412,7 @@ div[contenteditable] h5 { font-size: 14px; font-weight: 600; margin: 10px 0 4px;
 div[contenteditable] h6 { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
 div[contenteditable] p { margin: 4px 0; }
 div[contenteditable] blockquote {
-  border-left: 3px solid rgba(100,210,255,0.3);
+  border-left: 3px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
   padding-left: 16px;
   margin: 12px 0;
   color: var(--color-text-secondary);
@@ -1508,12 +1508,12 @@ div[contenteditable] blockquote {
 }
 .dexnotes-editable code,
 .dexnotes-preview code {
-  background: rgba(100,210,255,0.08);
+  background: var(--color-accent-soft);
   padding: 1px 5px;
   border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 13px;
-  color: #64d2ff;
+  color: var(--color-accent);
 }
 .dexnotes-editable pre code,
 .dexnotes-preview pre code {
@@ -1536,7 +1536,7 @@ div[contenteditable] hr {
   margin: 20px 0;
 }
 div[contenteditable] a {
-  color: #64d2ff;
+  color: var(--color-accent);
   text-decoration: none;
 }
 div[contenteditable] a:hover {

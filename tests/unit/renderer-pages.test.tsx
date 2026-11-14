@@ -260,7 +260,9 @@ describe('Settings Page', () => {
     const { default: Settings } = await import('../../src/renderer/pages/Settings');
     const { container } = render(<WithToast><Settings /></WithToast>);
     expect(container).toBeTruthy();
-  });
+    // Settings is the largest page: the first import + render takes ~9-10 s in
+    // jsdom, so the default 10 s timeout failed it on any loaded machine.
+  }, 30_000);
 });
 
 // ===========================================================================

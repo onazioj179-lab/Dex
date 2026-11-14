@@ -149,3 +149,43 @@ mod spawn_named_tests {
         assert_eq!(name.as_deref(), Some("dex-probe"));
     }
 }
+
+/// Poison-tolerant locking. `Mutex::lock().unwrap()` turns one panic inside a
+/// critical section (caught by the `dex_ipc` panic guard) into a permanent
+/// failure: the mutex stays poisoned and every later call on that channel
+/// panics again, so the subsystem is dead until DEX restarts. DEX's guarded
+/// state is plain data (maps, configs, counters) that is still consistent
+/// enough to keep serving, so recover the guard instead of re-panicking.
+pub trait LockSafe<T: ?Sized> {
+    fn lock_safe(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T: ?Sized> LockSafe<T> for std::sync::Mutex<T> {
+    fn lock_safe(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(|poisoned| {
+            self.clear_poison();
+            poisoned.into_inner()
+        })
+    }
+}
+
+#[cfg(test)]
+mod lock_safe_tests {
+    use super::LockSafe;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn recovers_after_a_panic_while_locked() {
+        let m = Arc::new(Mutex::new(1));
+        let m2 = m.clone();
+        let _ = std::thread::spawn(move || {
+            let _g = m2.lock().unwrap();
+            panic!("boom");
+        })
+        .join();
+        assert!(m.is_poisoned());
+        *m.lock_safe() += 1;
+        assert_eq!(*m.lock_safe(), 2);
+        assert!(!m.is_poisoned(), "poison is cleared so plain lock() callers work again");
+    }
+}

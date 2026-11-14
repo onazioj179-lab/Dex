@@ -403,7 +403,7 @@ export async function populateTrieFromBackend(
   try {
     const dex = (window as any).dex;
     if (!dex?.invoke) return;
-    const words: Array<{ word: string; frequency: number }> = await dex.invoke('dexnotes:get-word-suggestions', '');
+    const words: Array<{ word: string; frequency: number }> = await dex.invoke('dexnotes:topWords', 2000);
     if (Array.isArray(words)) {
       for (const { word, frequency } of words) {
         trie.insert(word, frequency);

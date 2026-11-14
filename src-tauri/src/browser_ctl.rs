@@ -28,6 +28,7 @@
 //   browser:actionCompleted — emitted at the same points BrowserBridge emits.
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Map, Value};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -116,7 +117,7 @@ fn record_action(state: &mut Map<String, Value>, action: Value) {
 
 // BrowserBridge.getStatus() — the in-memory status triple, now read from KV.
 fn get_status(app: &tauri::AppHandle) -> Value {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let state = load_state(app);
     json!({
         "status": state.get("status").cloned().unwrap_or(Value::String("disconnected".into())),
@@ -140,7 +141,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
         Ok(l) => l,
         Err(_) => {
             // Mirror Electron's error path: status stays disconnected, return false.
-            let _g = STATE_LOCK.lock();
+            let _g = STATE_LOCK.lock_safe();
             let mut state = load_state(app);
             state.insert("status".into(), Value::String("disconnected".into()));
             save_state(app, state);
@@ -156,7 +157,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
     SERVER_STOP.store(false, Ordering::SeqCst);
 
     {
-        let _g = STATE_LOCK.lock();
+        let _g = STATE_LOCK.lock_safe();
         let mut state = load_state(app);
         state.insert("status".into(), Value::String("disconnected".into()));
         save_state(app, state);
@@ -193,7 +194,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
 // connection. Void channel -> returns true (matches the handler's `return true`).
 fn stop_server(app: &tauri::AppHandle) -> Value {
     SERVER_STOP.store(true, Ordering::SeqCst);
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     state.insert("status".into(), Value::String("disconnected".into()));
     state.insert("connection".into(), Value::Null);
@@ -217,7 +218,7 @@ fn start_pairing(app: &tauri::AppHandle) -> Value {
     });
 
     {
-        let _g = STATE_LOCK.lock();
+        let _g = STATE_LOCK.lock_safe();
         let mut state = load_state(app);
         state.insert("pairing".into(), pairing.clone());
         state.insert("status".into(), Value::String("pairing".into()));
@@ -229,7 +230,7 @@ fn start_pairing(app: &tauri::AppHandle) -> Value {
 
 // BrowserBridge.cancelPairing(): clear pairing, back to disconnected. Void -> true.
 fn cancel_pairing(app: &tauri::AppHandle) -> Value {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     state.insert("pairing".into(), Value::Null);
     state.insert("status".into(), Value::String("disconnected".into()));
@@ -241,7 +242,7 @@ fn cancel_pairing(app: &tauri::AppHandle) -> Value {
 // disconnected, emit browser:disconnected. Void -> true.
 fn disconnect(app: &tauri::AppHandle) -> Value {
     {
-        let _g = STATE_LOCK.lock();
+        let _g = STATE_LOCK.lock_safe();
         let mut state = load_state(app);
         state.insert("connection".into(), Value::Null);
         state.insert("status".into(), Value::String("disconnected".into()));
@@ -264,7 +265,7 @@ fn create_action(
     target: &str,
     params: Option<Value>,
 ) -> Value {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     let connected = get_status_str(&state) == "connected";
 
@@ -308,6 +309,8 @@ struct ParsedReq {
     path: String,
     query: String,
     body: String,
+    /// `X-Dex-Connection` header: the secret /pair handed out.
+    token: String,
 }
 
 // Minimal HTTP/1.1 request parse. Reads headers, then up to Content-Length bytes
@@ -347,10 +350,13 @@ fn read_request(stream: &mut std::net::TcpStream) -> Option<ParsedReq> {
     };
 
     let mut content_length: usize = 0;
+    let mut token = String::new();
     for line in lines {
         if let Some((k, v)) = line.split_once(':') {
             if k.trim().eq_ignore_ascii_case("content-length") {
                 content_length = v.trim().parse().unwrap_or(0);
+            } else if k.trim().eq_ignore_ascii_case("x-dex-connection") {
+                token = v.trim().to_string();
             }
         }
     }
@@ -377,6 +383,7 @@ fn read_request(stream: &mut std::net::TcpStream) -> Option<ParsedReq> {
         path,
         query,
         body: String::from_utf8_lossy(&body).to_string(),
+        token,
     })
 }
 
@@ -387,14 +394,12 @@ fn write_response(stream: &mut std::net::TcpStream, code: u16, body: &str) {
         401 => "Unauthorized",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        429 => "Too Many Requests",
         _ => "OK",
     };
     let resp = format!(
         "HTTP/1.1 {} {}\r\n\
          Content-Type: application/json\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: Content-Type, X-Pairing-Code\r\n\
          Content-Length: {}\r\n\
          Connection: close\r\n\
          \r\n{}",
@@ -405,6 +410,30 @@ fn write_response(stream: &mut std::net::TcpStream, code: u16, body: &str) {
     );
     let _ = stream.write_all(resp.as_bytes());
     let _ = stream.flush();
+}
+
+const MAX_PAIR_FAILS: u64 = 5;
+
+fn new_token() -> String {
+    dex_vault::crypto::random_bytes(32).iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Constant-time byte comparison (no early exit on the first difference).
+fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+/// Is `supplied` the secret handed out by the last successful /pair? The bridge
+/// listens on localhost, where every web page in every browser can send it
+/// requests; before this, any page could read the pending actions or forge
+/// results once an extension had paired.
+fn token_ok(app: &tauri::AppHandle, supplied: &str) -> bool {
+    let _g = STATE_LOCK.lock_safe();
+    let state = load_state(app);
+    match state.get("connectionToken").and_then(|v| v.as_str()) {
+        Some(t) if !t.is_empty() && !supplied.is_empty() => ct_eq(supplied.as_bytes(), t.as_bytes()),
+        _ => false,
+    }
 }
 
 fn handle_conn(app: &tauri::AppHandle, mut stream: std::net::TcpStream) {
@@ -424,6 +453,9 @@ fn handle_conn(app: &tauri::AppHandle, mut stream: std::net::TcpStream) {
     match req.path.as_str() {
         "/status" => handle_http_status(app, &mut stream),
         "/pair" => handle_http_pair(app, &req, &mut stream),
+        "/action" | "/result" | "/heartbeat" if !token_ok(app, &req.token) => {
+            write_response(&mut stream, 401, "{\"error\":\"Not paired\"}")
+        }
         "/action" => handle_http_action(app, &mut stream),
         "/result" => handle_http_result(app, &req, &mut stream),
         "/heartbeat" => handle_http_heartbeat(app, &req, &mut stream),
@@ -432,7 +464,7 @@ fn handle_conn(app: &tauri::AppHandle, mut stream: std::net::TcpStream) {
 }
 
 fn handle_http_status(app: &tauri::AppHandle, stream: &mut std::net::TcpStream) {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let state = load_state(app);
     let status = get_status_str(&state);
     let pending = pending_vec(&state).len();
@@ -455,7 +487,7 @@ fn handle_http_pair(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::n
     let data: Value = serde_json::from_str(&req.body).unwrap_or(Value::Null);
     let supplied = data.get("code").and_then(|v| v.as_str()).unwrap_or("");
 
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     let pairing = state.get("pairing").cloned().unwrap_or(Value::Null);
     if pairing.is_null() {
@@ -471,10 +503,24 @@ fn handle_http_pair(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::n
         return;
     }
     let code = pairing.get("code").and_then(|v| v.as_str()).unwrap_or("");
-    if supplied != code {
-        write_response(stream, 401, "{\"error\":\"Invalid pairing code\"}");
+    if !ct_eq(supplied.as_bytes(), code.as_bytes()) {
+        // A 6-hex-digit code falls to guessing without a limit: after
+        // MAX_PAIR_FAILS wrong codes the pairing is cancelled.
+        let fails = state.get("pairFails").and_then(|v| v.as_u64()).unwrap_or(0) + 1;
+        if fails >= MAX_PAIR_FAILS {
+            state.insert("pairing".into(), Value::Null);
+            state.insert("pairFails".into(), json!(0));
+            state.insert("status".into(), Value::String("disconnected".into()));
+            save_state(app, state);
+            write_response(stream, 429, "{\"error\":\"Too many wrong codes; start pairing again in DEX\"}");
+        } else {
+            state.insert("pairFails".into(), json!(fails));
+            save_state(app, state);
+            write_response(stream, 401, "{\"error\":\"Invalid pairing code\"}");
+        }
         return;
     }
+    let token = new_token();
 
     let conn_id = format!("conn_{}", now_ms());
     let connection = json!({
@@ -486,22 +532,26 @@ fn handle_http_pair(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::n
         "tabCount": data.get("tabCount").and_then(|v| v.as_i64()).unwrap_or(1),
     });
     state.insert("connection".into(), connection.clone());
+    state.insert("connectionToken".into(), Value::String(token.clone()));
     state.insert("pairing".into(), Value::Null);
+    state.insert("pairFails".into(), json!(0));
     state.insert("status".into(), Value::String("connected".into()));
     save_state(app, state);
     drop(_g);
 
     crate::native_ops::emit_event(app, "browser:connected", &connection);
+    // The extension sends `token` back as `X-Dex-Connection` on /action,
+    // /result and /heartbeat; nothing else on this machine knows it.
     write_response(
         stream,
         200,
-        &json!({ "success": true, "connectionId": conn_id }).to_string(),
+        &json!({ "success": true, "connectionId": conn_id, "token": token }).to_string(),
     );
 }
 
 // /action (GET): hand the browser its pending actions, marking them "sent".
 fn handle_http_action(app: &tauri::AppHandle, stream: &mut std::net::TcpStream) {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     if get_status_str(&state) != "connected" {
         write_response(stream, 401, "{\"error\":\"Not connected\"}");
@@ -530,7 +580,7 @@ fn handle_http_result(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std:
         write_response(stream, 405, "{\"error\":\"Method not allowed\"}");
         return;
     }
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     if get_status_str(&state) != "connected" {
         write_response(stream, 401, "{\"error\":\"Not connected\"}");
@@ -576,7 +626,7 @@ fn handle_http_result(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std:
 
 // /heartbeat: refresh lastActivity and optional tabCount.
 fn handle_http_heartbeat(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::net::TcpStream) {
-    let _g = STATE_LOCK.lock();
+    let _g = STATE_LOCK.lock_safe();
     let mut state = load_state(app);
     if get_status_str(&state) == "connected" {
         // Parse tabCount from the query string (tabCount=N).
@@ -642,5 +692,23 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         }
         "browser:click" => create_action(app, "click", &arg_str(0), None),
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod bridge_auth_tests {
+    use super::{ct_eq, new_token};
+
+    #[test]
+    fn tokens_are_long_random_hex_and_compare_exactly() {
+        let a = new_token();
+        let b = new_token();
+        assert_eq!(a.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_ne!(a, b);
+        assert!(ct_eq(a.as_bytes(), a.clone().as_bytes()));
+        assert!(!ct_eq(a.as_bytes(), b.as_bytes()));
+        assert!(!ct_eq(a.as_bytes(), &a.as_bytes()[..63]));
+        assert!(!ct_eq(b"", a.as_bytes()));
     }
 }
