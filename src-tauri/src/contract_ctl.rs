@@ -54,6 +54,7 @@
 //     reproduced verbatim here (same ids/order/fields) rather than stored.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -355,7 +356,7 @@ fn check_compliance(app: &tauri::AppHandle) -> Value {
 // Electron signature). Void return (Value::Null).
 fn set_state(state: &str) {
     if matches!(state, "idle" | "active" | "background") {
-        if let Ok(mut s) = current_state().lock() {
+        { let mut s = current_state().lock_safe();
             *s = state.to_string();
         }
     }

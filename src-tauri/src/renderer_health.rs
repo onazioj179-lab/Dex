@@ -70,6 +70,7 @@
 //     (Date.now() precedent).
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -100,7 +101,7 @@ static EMERGENCY_STATE: Mutex<Option<Value>> = Mutex::new(None);
 const MAX_FLAGS: usize = 100;
 
 fn push_flag(flag: Value) {
-    if let Ok(mut flags) = ACTIVE_FLAGS.lock() {
+    { let mut flags = ACTIVE_FLAGS.lock_safe();
         flags.push(flag);
         while flags.len() > MAX_FLAGS {
             flags.remove(0);
@@ -245,7 +246,7 @@ fn recover(app: &tauri::AppHandle, args: &Value) -> Value {
     // Save the emergency state if one was provided (Electron save-emergency-state).
     let saved = match args.get(0) {
         Some(state) if !state.is_null() => {
-            if let Ok(mut slot) = EMERGENCY_STATE.lock() {
+            { let mut slot = EMERGENCY_STATE.lock_safe();
                 *slot = Some(state.clone());
             }
             true

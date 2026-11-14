@@ -5,7 +5,7 @@
 // =============================================================================
 // Source the app never loads must not pile up again. Walks imports from the
 // app entry (static, dynamic, `new URL(..., import.meta.url)`, CSS @import)
-// and counts files under src/ it never reaches. 2026-11-14 (#250): 797 such
+// and counts files under src/ it never reaches. 2026-11-14 (#260): 797 such
 // source files (500 of them in improvements500) were removed together with
 // the 271 test files that were their only users; 81 remain, still imported by
 // tests that also cover live code. The count may only go down. Wire new code

@@ -27,6 +27,7 @@
 //! Multiple methods coexist: a user may enrol any combination of password, PIN
 //! and biometric; `derive_method` reports the active combination.
 
+use crate::util::LockSafe;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
@@ -239,7 +240,7 @@ fn clear_expired_lockout(app: &tauri::AppHandle) {
 /// Mint a fresh in-memory session token.
 fn issue_token() -> String {
     let token = to_hex(&crate::keys_ctl::os_random_bytes(32));
-    if let Ok(mut set) = session_tokens().lock() {
+    { let mut set = session_tokens().lock_safe();
         set.insert(token.clone());
     }
     token
@@ -499,7 +500,7 @@ fn clear_credentials(app: &tauri::AppHandle, current_password: Option<&str>) -> 
         }
     }
     if save_credentials(app, Map::new()) {
-        if let Ok(mut set) = session_tokens().lock() {
+        { let mut set = session_tokens().lock_safe();
             set.clear();
         }
         json!({ "success": true })
@@ -741,17 +742,14 @@ fn recover_account(app: &tauri::AppHandle, args: &Value) -> Value {
 
 fn verify_session(token: &str) -> Value {
     let ok = !token.is_empty()
-        && session_tokens()
-            .lock()
-            .map(|set| set.contains(token))
-            .unwrap_or(false);
+        && session_tokens().lock_safe().contains(token);
     json!(ok)
 }
 
 /// `auth:lock` — drop all live session tokens. Locking is explicit only; DEX
 /// never locks on idle/sleep/resume, so there is no timer here.
 fn lock(_app: &tauri::AppHandle) -> Value {
-    if let Ok(mut set) = session_tokens().lock() {
+    { let mut set = session_tokens().lock_safe();
         set.clear();
     }
     Value::Null

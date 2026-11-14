@@ -150,6 +150,15 @@ mod spawn_named_tests {
     }
 }
 
+/// Run one unit of work on a long-lived server thread, recovering if it
+/// panics. Those threads are outside the `dex_ipc` panic guard: an unguarded
+/// panic ends the thread, and the server silently stops answering.
+pub fn guard_panic<F: FnOnce()>(what: &str, f: F) {
+    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).is_err() {
+        eprintln!("[dex] recovered from a panic while handling a {what}");
+    }
+}
+
 /// Poison-tolerant locking. `Mutex::lock().unwrap()` turns one panic inside a
 /// critical section (caught by the `dex_ipc` panic guard) into a permanent
 /// failure: the mutex stays poisoned and every later call on that channel

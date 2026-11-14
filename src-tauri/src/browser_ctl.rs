@@ -174,7 +174,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
                     let app2 = app_for_thread.clone();
                     // Each connection handled inline (low volume, single browser).
                     let _ = stream.set_nonblocking(false);
-                    handle_conn(&app2, stream);
+                    crate::util::guard_panic("browser bridge request", || handle_conn(&app2, stream));
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
