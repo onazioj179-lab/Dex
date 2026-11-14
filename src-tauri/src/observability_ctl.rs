@@ -56,6 +56,7 @@
 //     the renderer-facing getMetrics handler was.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -251,10 +252,7 @@ fn start_event(app: &tauri::AppHandle, args: &Value) -> Value {
         "status": "running",
     });
 
-    let mut guard = match timeline_store().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut guard = timeline_store().lock_safe();
     ensure_timeline_loaded(app, &mut guard);
 
     if !guard.events.contains_key(&id) {
@@ -290,10 +288,7 @@ fn end_event(app: &tauri::AppHandle, args: &Value) -> Value {
     let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
     let status = args.get(1).and_then(|v| v.as_str()).unwrap_or("completed").to_string();
 
-    let mut guard = match timeline_store().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut guard = timeline_store().lock_safe();
     ensure_timeline_loaded(app, &mut guard);
 
     let (event, metric_name, duration, end_time) = match guard.events.get_mut(&id) {
@@ -322,10 +317,7 @@ fn end_event(app: &tauri::AppHandle, args: &Value) -> Value {
 // getTimeline(options?) -> TimelineEvent[]. Filters by category/since, sorts by
 // startTime descending, then head-slices to `limit` (Electron used slice(0, limit)).
 fn get_timeline(app: &tauri::AppHandle, options: &Value) -> Value {
-    let mut guard = match timeline_store().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut guard = timeline_store().lock_safe();
     ensure_timeline_loaded(app, &mut guard);
 
     let mut events: Vec<Value> = guard

@@ -170,7 +170,7 @@ fn quarantine_entries(app: &tauri::AppHandle) -> Vec<Value> {
 
 // softero:get-scan-history -> ScanResult[] (process-session history; `limit` tail).
 fn get_scan_history(limit: usize) -> Value {
-    let history = SCAN_HISTORY.lock().map(|h| h.clone()).unwrap_or_default();
+    let history = SCAN_HISTORY.lock_safe().clone();
     let start = history.len().saturating_sub(limit);
     json!(history[start..].to_vec())
 }

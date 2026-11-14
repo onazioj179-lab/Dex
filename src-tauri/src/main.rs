@@ -262,6 +262,7 @@ mod multi_monitor;
 mod multi_window;
 mod unified_notification_hub;
 
+use crate::util::LockSafe;
 use paths::DexPaths;
 use dex_smart_router::{route_for_prompt, RouteCandidate, RoutingGoal};
 use serde_json::{json, Value};
@@ -1486,7 +1487,7 @@ fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Val
     // Clone the (Arc-backed) index handle out of the guard and release the lock
     // immediately, so a concurrent rebuild can't block this search.
     let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = { state.lock().ok()?.as_ref()?.clone() };
+    let idx = { state.lock_safe().as_ref()?.clone() };
     if idx.count() == 0 {
         return None;
     }
@@ -1500,10 +1501,7 @@ fn index_rebuild(app: &tauri::AppHandle) -> Value {
     // the same underlying Tantivy index (internally synchronized).
     let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
     let idx = {
-        let guard = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "success": false, "error": "index busy" }),
-        };
+        let guard = state.lock_safe();
         match guard.as_ref() {
             Some(i) => i.clone(),
             None => return json!({ "success": false, "error": "index unavailable" }),
@@ -1540,7 +1538,7 @@ fn index_stats(app: &tauri::AppHandle) -> Value {
 /// releasing the mutex before any indexing work. `None` when unavailable.
 fn index_handle(app: &tauri::AppHandle) -> Option<dex_search::SearchIndex> {
     let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = state.lock().ok()?.as_ref()?.clone();
+    let idx = state.lock_safe().as_ref()?.clone();
     Some(idx)
 }
 
@@ -1613,10 +1611,7 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
     // Clone the (Arc-backed) index handle and release the search lock immediately.
     let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
     let idx = {
-        let guard = match search_state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "success": false, "error": "index busy" }),
-        };
+        let guard = search_state.lock_safe();
         match guard.as_ref() {
             Some(i) => i.clone(),
             None => return json!({ "success": false, "error": "index unavailable" }),
@@ -1632,10 +1627,7 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
     // Hold the snapshot lock for the whole sync so two syncs can't interleave; it
     // is a different mutex from the search index, so queries stay responsive.
     let snap_state = app.state::<std::sync::Mutex<dex_scanner::Snapshot>>();
-    let mut prev = match snap_state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "snapshot busy" }),
-    };
+    let mut prev = snap_state.lock_safe();
 
     if prev.is_empty() {
         *prev = load_snapshot(app, Some(&idx));
@@ -1853,10 +1845,7 @@ fn vault_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value 
     let val = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
 
     let state = app.state::<std::sync::Mutex<dex_vault::VaultManager>>();
-    let mut vault = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "vault busy" }),
-    };
+    let mut vault = state.lock_safe();
 
     let res = |r: Result<(), String>| match r {
         Ok(()) => json!({ "success": true }),
@@ -1959,10 +1948,7 @@ fn vault_audit(vault: &dex_vault::VaultManager) -> Value {
 /// (the portable core of the Electron SecurityController).
 fn security_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let state = app.state::<std::sync::Mutex<security::SecurityState>>();
-    let mut guard = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return Value::Null,
-    };
+    let mut guard = state.lock_safe();
     security::dispatch(&mut guard, channel, args)
 }
 
@@ -1997,10 +1983,7 @@ fn system_kill_tree(pid: u32) -> Value {
 
 fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let state = app.state::<db::DbState>();
-    let guard = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return Value::Null,
-    };
+    let guard = state.lock_safe();
     let conn = match guard.as_ref() {
         Some(c) => c,
         None => return Value::Null,
@@ -2224,10 +2207,7 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
 /// NotificationCenter return shapes exactly (see src/main/core/NotificationCenter.ts).
 fn notifications_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let state = app.state::<std::sync::Mutex<notifications::NotificationStore>>();
-    let mut store = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "notifications busy" }),
-    };
+    let mut store = state.lock_safe();
     let s = |i: usize| args.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string();
     let arg = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
 

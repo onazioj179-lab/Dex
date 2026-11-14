@@ -11,6 +11,7 @@
 //! event-loop deadlock the migration notes warn about. Sync command bodies run
 //! on a Tauri worker thread, so the `blocking_*` dialog calls are safe here.
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -30,10 +31,7 @@ pub(crate) fn now_ms() -> i64 {
 /// DB is unavailable (same as db_dispatch), so fs ops never panic on a missing DB.
 pub(crate) fn with_conn<F: FnOnce(&Connection) -> Value>(app: &tauri::AppHandle, f: F) -> Value {
     let state = app.state::<crate::db::DbState>();
-    let guard = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return Value::Null,
-    };
+    let guard = state.lock_safe();
     match guard.as_ref() {
         Some(c) => f(c),
         None => Value::Null,
@@ -724,10 +722,7 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
     let _w = gate.write().unwrap_or_else(|e| e.into_inner());
 
     let state = app.state::<crate::db::DbState>();
-    let mut guard = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return fail("database busy"),
-    };
+    let mut guard = state.lock_safe();
     // Close the live connection (drops it) so the file can be replaced on Windows.
     let _ = guard.take();
 

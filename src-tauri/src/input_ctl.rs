@@ -37,6 +37,7 @@
 //     verbatim (empty -> 0; percentile index = ceil(p/100 * len) - 1, clamped).
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::sync::{Mutex, OnceLock};
 
@@ -112,10 +113,7 @@ fn controller() -> &'static Mutex<Controller> {
 /// Lock the controller, recovering from a poisoned lock (a panic in a prior
 /// holder must not wedge the whole namespace).
 fn lock_ctl() -> std::sync::MutexGuard<'static, Controller> {
-    match controller().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    }
+    controller().lock_safe()
 }
 
 fn calculate_average(values: &[f64]) -> f64 {
