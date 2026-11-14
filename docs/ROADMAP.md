@@ -3687,3 +3687,12 @@ These need DSP/ML or native hosting we don't fake.
 
 - Backlog trimmed: finished rows (#53, #61, #62, #65, #107, #157, #180–#226) moved to `docs/reports/DEX_COMPLETED_WORK.md`; the ones still needing a packaged run are one-liners in the waiting table.
 - Native: poisoned mutexes recover (`util::LockSafe`); the phone-share server survives non-ASCII names and caps waiting uploads; random bytes come from the in-process CSPRNG, not PowerShell; the localhost browser bridge needs a paired secret. Notes reads its learned vocabulary (`dexnotes:topWords`) (#240–#244).
+
+## Checkpoint 2026-11-13 (robustness pass 2)
+
+- CI is red on GitHub because the jobs never start (account billing / spending limit, #246); the same steps pass locally on main.
+- LAN load: the DEX-to-DEX receiver runs at most 8 receives at once, discovery keeps at most 64 devices, and server threads recover from a panic. 36 more lock sites recover from poisoning (#247 to #250).
+
+## Checkpoint 2026-11-14 (robustness pass 3)
+
+- Poisoned-lock paths that answered "busy" forever (search index, Vault, notifications, terminal, ledger, startup) now recover; the phone-share server prunes expired shares and old answers (#251 to #253).

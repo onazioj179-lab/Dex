@@ -1021,6 +1021,9 @@ export const useSystemEvents = create<SystemEventsState>((set, get) => ({
       if (typeof window !== 'undefined') {
         const events = (window.__DEX_CRITICAL_EVENTS__ as unknown as any[]) || [];
         events.push(event);
+        // Keep the newest 100: this debug list lives for the whole session and
+        // grew without bound when something emitted critical events in a loop.
+        if (events.length > 100) events.splice(0, events.length - 100);
         (window as any).__DEX_CRITICAL_EVENTS__ = events;
       }
     }

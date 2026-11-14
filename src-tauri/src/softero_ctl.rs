@@ -65,6 +65,7 @@
 //     and applies the `limit` tail.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
@@ -169,7 +170,7 @@ fn quarantine_entries(app: &tauri::AppHandle) -> Vec<Value> {
 
 // softero:get-scan-history -> ScanResult[] (process-session history; `limit` tail).
 fn get_scan_history(limit: usize) -> Value {
-    let history = SCAN_HISTORY.lock().map(|h| h.clone()).unwrap_or_default();
+    let history = SCAN_HISTORY.lock_safe().clone();
     let start = history.len().saturating_sub(limit);
     json!(history[start..].to_vec())
 }
@@ -398,7 +399,7 @@ fn run_heuristics(_path: &Path, buffer: &[u8], ext: &str, sensitivity: &str) -> 
 // --- scan engine ------------------------------------------------------------
 
 fn record_history(result: &Value) {
-    if let Ok(mut h) = SCAN_HISTORY.lock() {
+    { let mut h = SCAN_HISTORY.lock_safe();
         h.push(result.clone());
         if h.len() > 10_000 {
             let drop = h.len() - 10_000;

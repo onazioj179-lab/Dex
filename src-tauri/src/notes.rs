@@ -106,6 +106,11 @@ pub fn ensure_schema(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_words_freq ON word_suggestions_history(frequency DESC);",
     );
 
+    // Favorites were kept only in a renderer localStorage overlay, so they never
+    // reached dex.db (lost from backups, other profiles, restores). Older
+    // databases lack the column; adding it twice is an error we ignore.
+    let _ = conn.execute("ALTER TABLE notes ADD COLUMN favorite INTEGER DEFAULT 0", []);
+
     // FTS5 virtual table for full text search (TS wraps in try/catch; ignore err).
     let _ = conn.execute_batch(
         "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
@@ -155,7 +160,7 @@ pub fn ensure_schema(conn: &Connection) {
 // ---------------------------------------------------------------------------
 
 const NOTE_COLS: &str =
-    "id, title, content, plain_text, word_count, created_at, updated_at, pinned, pin_order, locked, color_label, folder_id, is_daily_note, is_template, deleted, deleted_at";
+    "id, title, content, plain_text, word_count, created_at, updated_at, pinned, pin_order, locked, color_label, folder_id, is_daily_note, is_template, deleted, deleted_at, favorite";
 
 /// One notes row -> the raw NotesDbNote shape (`SELECT *` column order/casing
 /// exactly as better-sqlite3 returned it: integer booleans stay integers).
@@ -178,6 +183,7 @@ fn note_row_to_json(row: &Row) -> rusqlite::Result<Value> {
         "is_template": row.get::<_, i64>(13)?,
         "deleted": row.get::<_, i64>(14)?,
         "deleted_at": row.get::<_, Option<i64>>(15)?,
+        "favorite": row.get::<_, Option<i64>>(16)?.unwrap_or(0),
     }))
 }
 
@@ -662,6 +668,18 @@ fn duplicate_note(conn: &Connection, id: &str) -> Value {
     create_note(conn, &data)
 }
 
+/// dexnotes:favorite — favorite(id, on). Returns { success } (false when no
+/// such note).
+fn set_favorite(conn: &Connection, id: &str, on: bool) -> Value {
+    let n = conn
+        .execute(
+            "UPDATE notes SET favorite = ? WHERE id = ?",
+            params![if on { 1 } else { 0 }, id],
+        )
+        .unwrap_or(0);
+    json!({ "success": n > 0 })
+}
+
 /// dexnotes:pin — pinNote(id, pinned). Enforces the 20-pin limit and assigns
 /// the next pin_order; unpinning resets pin_order to 0. Returns { success }.
 fn pin_note(conn: &Connection, id: &str, pinned: bool) -> Value {
@@ -827,6 +845,7 @@ fn list_notes(conn: &Connection, opts: &Value) -> Value {
                 "folder_id": row.get("folder_id").cloned().unwrap_or(Value::Null),
                 "is_daily_note": get_int(row, "is_daily_note") == 1,
                 "is_template": get_int(row, "is_template") == 1,
+                "favorite": get_int(row, "favorite"),
                 "tags": list_tag_ids(conn, id),
             })
         })
@@ -1701,6 +1720,7 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         "dexnotes:restore" => restore_note(conn, &s(0)),
         "dexnotes:duplicate" => duplicate_note(conn, &s(0)),
         "dexnotes:pin" => pin_note(conn, &s(0), b(1)),
+        "dexnotes:favorite" => set_favorite(conn, &s(0), b(1)),
         "dexnotes:lock" => lock_note(conn, &s(0), b(1)),
         "dexnotes:setColor" => {
             set_note_color(conn, &s(0), args.get(1).unwrap_or(&Value::Null))
@@ -1799,6 +1819,28 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         "dexnotes:getDailyNote" => get_or_create_daily_note(conn),
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod favorite_tests {
+    use super::*;
+
+    #[test]
+    fn favorite_is_stored_in_the_note_row_and_listed() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn);
+        ensure_schema(&conn); // the ALTER runs again on every start: must be harmless
+        let created = dispatch(&conn, "dexnotes:create", &json!([{ "title": "Fav" }]));
+        let id = created["id"].as_str().unwrap().to_string();
+        assert_eq!(dispatch(&conn, "dexnotes:favorite", &json!([id, true]))["success"], true);
+        let list = dispatch(&conn, "dexnotes:list", &json!([{}]));
+        let row = list.as_array().unwrap().iter().find(|n| n["id"] == id).unwrap().clone();
+        assert_eq!(row["favorite"], 1);
+        assert_eq!(dispatch(&conn, "dexnotes:get", &json!([id]))["favorite"], 1);
+        dispatch(&conn, "dexnotes:favorite", &json!([id, false]));
+        assert_eq!(dispatch(&conn, "dexnotes:get", &json!([id]))["favorite"], 0);
+        assert_eq!(dispatch(&conn, "dexnotes:favorite", &json!(["nope", true]))["success"], false);
     }
 }
 

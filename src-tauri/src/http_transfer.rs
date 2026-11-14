@@ -73,7 +73,30 @@ struct ServerData {
     counter: u64,
 }
 
+/// Answered uploads kept so a phone polling /upload-status still gets its answer.
+const KEEP_ANSWERED: usize = 64;
+
 impl ServerData {
+    /// Drop expired shares and all but the newest answered uploads. Both maps
+    /// only ever grew while the server ran (a long-running share session kept
+    /// every entry it ever had).
+    fn prune(&mut self, now: i64) {
+        self.shared.retain(|_, f| f.expires_at > now);
+        let mut answered: Vec<String> = self
+            .pending
+            .iter()
+            .filter(|(_, u)| u.data.is_none() && u.status != "pending")
+            .map(|(id, _)| id.clone())
+            .collect();
+        if answered.len() > KEEP_ANSWERED {
+            // Ids start with the creation time in hex, so they sort oldest first.
+            answered.sort();
+            for id in &answered[..answered.len() - KEEP_ANSWERED] {
+                self.pending.remove(id);
+            }
+        }
+    }
+
     fn next_id(&mut self) -> String {
         self.counter = self.counter.wrapping_add(1);
         format!("{:x}{:04x}", now_ms(), self.counter & 0xffff)
@@ -424,6 +447,7 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
                 let _ = request.respond(resp_json(json!({ "error": msg })).with_status_code(429));
                 return;
             }
+            guard.prune(now_ms());
             let id = guard.next_id();
             let size = file_data.len() as i64;
             let auto = guard.auto_accept;
@@ -528,10 +552,7 @@ fn resolve_upload(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, id: &st
 
 fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
     let state = app.state::<HttpTransferState>();
-    let mut slot = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "state unavailable" }),
-    };
+    let mut slot = state.lock_safe();
     if let Some(running) = slot.as_ref() {
         let url = format!("http://{}:{}", local_ip(), running.port);
         return json!({ "success": true, "url": url, "qrData": url });
@@ -584,12 +605,7 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
         while let Ok(request) = server_t.recv() {
             // One bad request must not kill the share server for every later
             // phone: this thread is outside the dex_ipc panic guard.
-            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                handle_request(&app_t, &data_t, request);
-            }));
-            if r.is_err() {
-                eprintln!("[http_transfer] recovered from a panic while serving a request");
-            }
+            crate::util::guard_panic("phone share request", || handle_request(&app_t, &data_t, request));
         }
     });
 
@@ -600,10 +616,7 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
 
 fn stop_server(app: &tauri::AppHandle) -> Value {
     let state = app.state::<HttpTransferState>();
-    let mut slot = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": true }),
-    };
+    let mut slot = state.lock_safe();
     if let Some(mut running) = slot.take() {
         running.server.unblock();
         if let Some(t) = running.thread.take() {
@@ -623,10 +636,7 @@ fn share_files(app: &tauri::AppHandle, paths: &[String]) -> Value {
         }
     }
     let state = app.state::<HttpTransferState>();
-    let slot = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "fileIds": [] }),
-    };
+    let slot = state.lock_safe();
     let running = match slot.as_ref() {
         Some(r) => r,
         None => return json!({ "success": false, "fileIds": [] }),
@@ -634,6 +644,7 @@ fn share_files(app: &tauri::AppHandle, paths: &[String]) -> Value {
     let mut ids = Vec::new();
     {
         let mut d = running.data.lock_safe();
+        d.prune(now_ms());
         for p in paths {
             if let Ok(meta) = std::fs::metadata(p) {
                 let id = d.next_id();
@@ -667,10 +678,7 @@ fn share_files(app: &tauri::AppHandle, paths: &[String]) -> Value {
 
 fn server_info(app: &tauri::AppHandle) -> Value {
     let state = app.state::<HttpTransferState>();
-    let slot = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return Value::Null,
-    };
+    let slot = state.lock_safe();
     let ip = local_ip();
     match slot.as_ref() {
         Some(running) => {
@@ -707,10 +715,7 @@ fn server_info(app: &tauri::AppHandle) -> Value {
 
 fn pending_uploads(app: &tauri::AppHandle) -> Value {
     let state = app.state::<HttpTransferState>();
-    let slot = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!([]),
-    };
+    let slot = state.lock_safe();
     match slot.as_ref() {
         Some(running) => {
             let guard = running.data.lock_safe();
@@ -729,10 +734,7 @@ fn pending_uploads(app: &tauri::AppHandle) -> Value {
 fn accept_upload(app: &tauri::AppHandle, id: &str, accept: bool) -> Value {
     let state = app.state::<HttpTransferState>();
     let data = {
-        let slot = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "success": false }),
-        };
+        let slot = state.lock_safe();
         match slot.as_ref() {
             Some(r) => r.data.clone(),
             None => return json!({ "success": false }),
@@ -769,7 +771,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "httpTransfer:unshare" => {
             let id = args.get(0).and_then(|v| v.as_str()).unwrap_or_default();
             let state = app.state::<HttpTransferState>();
-            if let Ok(slot) = state.lock() {
+            { let slot = state.lock_safe();
                 if let Some(r) = slot.as_ref() {
                     r.data.lock_safe().shared.remove(id);
                 }
@@ -802,6 +804,22 @@ mod tests {
 
     fn pending(n: usize) -> PendingUpload {
         PendingUpload { id: String::new(), file_name: String::new(), file_size: n as i64, sender_ip: String::new(), status: "pending".into(), data: Some(vec![0; n]) }
+    }
+
+    #[test]
+    fn prune_drops_expired_shares_and_old_answers_only() {
+        let mut d = ServerData::default();
+        for i in 0..(KEEP_ANSWERED + 10) {
+            let mut u = pending(1);
+            u.data = None;
+            u.status = "accepted".into();
+            d.pending.insert(format!("{:04}", i), u);
+        }
+        d.pending.insert("zzzz-waiting".into(), pending(1));
+        d.prune(0);
+        assert_eq!(d.pending.len(), KEEP_ANSWERED + 1, "newest answers + the waiting one");
+        assert!(d.pending.contains_key("zzzz-waiting"));
+        assert!(!d.pending.contains_key("0000"), "oldest answer dropped");
     }
 
     #[test]

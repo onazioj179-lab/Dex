@@ -24,6 +24,7 @@
 //! back to the UI), which the current tauriCompat layer no-ops. Only the config
 //! insert (`addFolder`) and the on-demand `importFile` are in scope.
 
+use crate::util::LockSafe;
 use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -140,10 +141,7 @@ fn start_watch(
         return;
     }
     let state = app.state::<FileWatchState>();
-    let mut map = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
+    let mut map = state.lock_safe();
     if map.contains_key(&folder_id) {
         return; // already watching
     }
@@ -171,10 +169,7 @@ fn start_watch(
 /// Stop and drop the live watcher for a folder id (no-op if none).
 fn stop_watch(app: &tauri::AppHandle, folder_id: i64) {
     let state = app.state::<FileWatchState>();
-    let mut map = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
+    let mut map = state.lock_safe();
     map.remove(&folder_id);
 }
 
@@ -183,10 +178,7 @@ fn stop_watch(app: &tauri::AppHandle, folder_id: i64) {
 pub fn start_all(app: tauri::AppHandle) {
     let folders: Vec<(i64, String, String, String)> = {
         let state = app.state::<crate::db::DbState>();
-        let guard = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return,
-        };
+        let guard = state.lock_safe();
         let conn = match guard.as_ref() {
             Some(c) => c,
             None => return,

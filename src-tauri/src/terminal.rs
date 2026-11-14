@@ -33,6 +33,7 @@
 //! threads finishes second emits `pty:exit`, so trailing output always arrives
 //! before the exit event.
 
+use crate::util::LockSafe;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -279,10 +280,7 @@ fn cap_buffer(buf: &mut String) {
 /// has been torn down, trailing output lands in its exit record instead.
 fn push_session_buffer(app: &tauri::AppHandle, id: &str, data: &str) {
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
+    let mut inner = state.lock_safe();
     if let Some(s) = inner.sessions.get_mut(id) {
         s.buffer.push_str(data);
         cap_buffer(&mut s.buffer);
@@ -366,7 +364,7 @@ fn spawn_waiter(
 ) {
     crate::util::spawn_named("terminal-wait", move || {
         let code = child.wait().ok().map(|st| st.exit_code() as i32);
-        if let Ok(mut c) = td.code.lock() {
+        { let mut c = td.code.lock_safe();
             *c = code;
         }
         let state = app.state::<TerminalState>();
@@ -428,10 +426,7 @@ fn clamp_dim(v: Option<u64>, default: u16, min: u16) -> u16 {
 fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     {
         let state = app.state::<TerminalState>();
-        let inner = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "error": "terminal state unavailable" }),
-        };
+        let inner = state.lock_safe();
         if inner.sessions.len() >= MAX_SESSIONS {
             return json!({ "error": format!("Maximum {} terminal sessions reached.", MAX_SESSIONS) });
         }
@@ -492,10 +487,7 @@ fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
 
     let id = {
         let state = app.state::<TerminalState>();
-        let mut inner = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "error": "terminal state unavailable" }),
-        };
+        let mut inner = state.lock_safe();
         inner.next_id += 1;
         let id = format!("pty-{}", inner.next_id);
         inner.sessions.insert(
@@ -526,10 +518,7 @@ fn write_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let data = opts.get("data").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "terminal state unavailable" }),
-    };
+    let mut inner = state.lock_safe();
     match inner.sessions.get_mut(sid) {
         Some(s) => match s.writer.write_all(data.as_bytes()).and_then(|_| s.writer.flush()) {
             Ok(_) => json!({ "success": true }),
@@ -542,10 +531,7 @@ fn write_session(app: &tauri::AppHandle, opts: &Value) -> Value {
 fn resize_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false }),
-    };
+    let mut inner = state.lock_safe();
     match inner.sessions.get_mut(sid) {
         Some(s) => {
             let cols = clamp_dim(opts.get("cols").and_then(|v| v.as_u64()), s.cols, MIN_COLS);
@@ -569,10 +555,7 @@ fn resize_session(app: &tauri::AppHandle, opts: &Value) -> Value {
 fn kill_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false }),
-    };
+    let mut inner = state.lock_safe();
     // Kill but leave the entry; the waiter reaps the child, tears the session
     // down and (with the reader) emits `pty:exit` — one teardown path.
     match inner.sessions.get_mut(sid) {
@@ -586,10 +569,7 @@ fn kill_session(app: &tauri::AppHandle, opts: &Value) -> Value {
 
 fn list_sessions(app: &tauri::AppHandle) -> Value {
     let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "sessions": [] }),
-    };
+    let inner = state.lock_safe();
     let sessions: Vec<Value> = inner
         .sessions
         .values()
@@ -602,10 +582,7 @@ fn list_sessions(app: &tauri::AppHandle) -> Value {
 fn get_size(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "found": false, "cols": 0, "rows": 0 }),
-    };
+    let inner = state.lock_safe();
     match inner.sessions.get(sid) {
         Some(s) => json!({ "found": true, "cols": s.cols, "rows": s.rows }),
         None => json!({ "found": false, "cols": 0, "rows": 0 }),
@@ -618,10 +595,7 @@ fn get_size(app: &tauri::AppHandle, opts: &Value) -> Value {
 fn get_status(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "alive": false, "exists": false }),
-    };
+    let inner = state.lock_safe();
     if let Some(s) = inner.sessions.get(sid) {
         return json!({
             "alive": true,
@@ -645,10 +619,7 @@ fn get_status(app: &tauri::AppHandle, opts: &Value) -> Value {
 fn read_session(app: &tauri::AppHandle, opts: &Value) -> Value {
     let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "terminal state unavailable", "data": "" }),
-    };
+    let mut inner = state.lock_safe();
     if let Some(s) = inner.sessions.get_mut(sid) {
         let data = std::mem::take(&mut s.buffer);
         return json!({ "success": true, "alive": true, "data": data });

@@ -16,6 +16,7 @@
 //!   through a native dialog opened HERE, so the user picks the path.
 //! - Nothing in this module or the engine makes a network request.
 
+use crate::util::LockSafe;
 use crate::native_ops::fp_to_string;
 use crate::paths::DexPaths;
 use dex_ledger::Ledger;
@@ -52,10 +53,7 @@ fn payload(args: &Value) -> Value {
 /// Run `f` with the open ledger, opening it on first use.
 fn with_ledger(app: &tauri::AppHandle, f: impl FnOnce(&mut Ledger) -> Value) -> Value {
     let state = tauri::Manager::state::<LedgerState>(app);
-    let mut guard = match state.0.lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut guard = state.0.lock_safe();
     if guard.is_none() {
         let Some((db, backups)) = paths(app) else { return fail("DEX can't find its data folder") };
         match Ledger::open(&db, &backups) {
@@ -213,10 +211,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let action = p.get("action").and_then(|v| v.as_str()).unwrap_or("");
             let Some((db, backups)) = paths(app) else { return fail("no data folder") };
             let state = tauri::Manager::state::<LedgerState>(app);
-            let mut guard = match state.0.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = state.0.lock_safe();
             *guard = None;
             let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
             let kept = db.with_file_name(format!("ledger.damaged-{stamp}.db"));

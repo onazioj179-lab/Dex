@@ -59,7 +59,7 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 47 | Browser features the native view cannot provide yet | PARTIAL (2026-11-11: back/forward state and the failed-load error page VERIFIED live on an isolated profile — a dead .com host shows "This site's address can't be found" (the earlier .invalid test had become a web search). Element fullscreen wired but UNVERIFIED: the test window wasn't frontmost, so DEX hid the view. Credential capture deliberately not added: it would scrape passwords from web pages. 18f: downloads had no native handler (stuck at "downloading" forever); now download_ctl.rs saves to Downloads, verified live) | Credential capture (`ipc-message`), per-request ad-block count (`console-message`), load-error page (WebView2 shows its own), HTML fullscreen events, true `canGoBack` | `Browser.tsx` | Add a page-to-host bridge for the browser view only | — | P2 |
+| 47 | Browser features the native view cannot provide yet | PARTIAL (2026-11-11: back/forward state and the failed-load error page VERIFIED live on an isolated profile — a dead .com host shows "This site's address can't be found" (the earlier .invalid test had become a web search). Element fullscreen wired but UNVERIFIED: the test window wasn't frontmost, so DEX hid the view. Credential capture deliberately not added: it would scrape passwords from web pages. 18f: downloads had no native handler (stuck at "downloading" forever); now download_ctl.rs saves to Downloads, verified live) | Done since: per-request block count (native `blocked` events from #165), load-error page, `canGoBack`/`canGoForward`. Left: element fullscreen check with the window frontmost; credential capture stays out on purpose | `Browser.tsx`, `browser_view.rs` | Packaged run: page enters element fullscreen with DEX frontmost | — | P2 |
 
 ## Release status
 
@@ -242,11 +242,31 @@ Backlog cleanup: `main` had row #221 twice (unslop pass 3, and the auth/bridge f
 
 | # | App | Item | Priority | Status | What changed | Next check |
 |---|---|---|---|---|---|---|
-| 240 | Platform (native) | One panic inside a locked section killed that subsystem until restart | HIGH | FIXED (cargo test) | `util::LockSafe::lock_safe()` recovers a poisoned mutex and clears the poison; used by voice, large files, render governor, phone share, browser bridge and site permissions (was `.lock().unwrap()`, which re-panicked on every later call) | Remaining `if let Ok(..) = m.lock()` sites skip their work after a poison; convert when touched |
+| 240 | Platform (native) | One panic inside a locked section killed that subsystem until restart | HIGH | FIXED (cargo test; 36 more sites converted in #250) | `util::LockSafe::lock_safe()` recovers a poisoned mutex and clears the poison; used by voice, large files, render governor, phone share, browser bridge and site permissions (was `.lock().unwrap()`, which re-panicked on every later call) | — |
 | 241 | Transfers (phone share) | Sharing a file with a non-English name crashed the share server; uploads could fill memory | HIGH | FIXED (4 cargo tests) | Download header is RFC 6266 ASCII + `filename*` (tiny_http refused "café.jpg" and the `unwrap` killed the server thread); request loop guarded; waiting uploads capped at 16 files / 1 GiB (HTTP 429); declined uploads free their bytes (they stayed in memory until the server stopped); accepted files no longer overwrite an existing file; a failed save is reported, not "accepted" | Share "café.jpg" to a phone; upload two files with the same name |
 | 242 | Security, Auth, Keys | Random bytes started PowerShell for every call, with a clock+pid fallback | HIGH | FIXED (auth/keys/encryption cargo tests) | `keys_ctl` / `encryption_ctl` `os_random_bytes` use the in-process OS CSPRNG (`dex_vault::crypto::random_bytes`): sign-in session tokens, salts, recovery codes and keys no longer cost a PowerShell start (~0.3–1 s) and can no longer fall back to a predictable stream | Time a PIN sign-in in the packaged app |
 | 243 | Browser bridge | Any web page could read the bridge's pending actions or forge results once paired | MEDIUM | FIXED (cargo test) | 127.0.0.1:19847 (dormant: nothing in DEX starts it today): `/pair` returns a 256-bit secret that `/action`, `/result`, `/heartbeat` require as `X-Dex-Connection`; 5 wrong pairing codes cancel the pairing; no wildcard CORS; constant-time compares | — |
 | 244 | Notes | Learned words were recorded but never loaded into suggestions | LOW | FIXED (cargo test, ABI lock) | The editor asked for `dexnotes:get-word-suggestions`, which nothing answered; new `dexnotes:topWords` returns the vocabulary with counts | Type a rare word in a note, reopen Notes, start typing it |
+
+## Session 2026-11-13 (`claude/robustness-pass-2`): CI status, LAN load limits
+
+CI on `main` and on every PR since 2026-11-14 00:13 UTC is red without running: GitHub refused to start the jobs ("recent account payments have failed or your spending limit needs to be increased"). Not a code failure. The same steps were run locally on `main` (aa80201a): type check 0, watermark check 0, ABI check OK, `cargo test --bin dex-tauri` 143/143, Vitest 5367 passed. 14 tests failed in the full run while cargo built in parallel (11 were 10 s timeouts); all 14 pass when run alone.
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 246 | CI | GitHub Actions jobs not starting | HIGH | BLOCKED (owner: billing) | Nothing to change in the repo | Owner fixes Billing & plans, then re-run the latest `main` run |
+| 247 | Transfers (DEX to DEX) | The receiver started one thread per incoming connection with no limit | HIGH | FIXED (cargo test) | At most 8 receives at once; extra connections are refused; the slot is freed however a receive ends | Send to one PC from two others at once |
+| 248 | Transfers (discovery) | Announces with made-up device ids grew the nearby-device list and its UI events without bound | MEDIUM | FIXED | List capped at 64 devices; existing devices still update | — |
+| 249 | Platform (native) | A panic on a server thread (phone share, browser bridge, sync) stopped that server for good | MEDIUM | FIXED | `util::guard_panic` around each request; those threads are outside the `dex_ipc` guard | — |
+| 250 | Auth, Encryption, DTP | After one panic, sign-in sessions never verified, encryption read as locked, and Devices listed nothing | HIGH | FIXED (cargo test) | 36 more lock sites in 14 files moved to `lock_safe()`; the rest followed in #251 | — |
+
+## Session 2026-11-14 (`claude/robustness-pass-3`): last poisoned-lock paths, share-server growth
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 251 | Search, Vault, Notifications, Terminal, Ledger, startup | After one panic: search said "index busy", Vault "vault busy", notifications "busy" and terminal sessions failed until DEX restarted | HIGH | FIXED (cargo check; cargo test 143/144, the one failure is a timing assert in an untouched module that passes alone) | 59 more `match m.lock() { Ok(g) => g, Err(_) => return … }` / `.lock().ok()?` / read-only sites in 15 files use `lock_safe()` | — |
+| 252 | Transfers (phone share) | Expired shares and answered uploads stayed in memory for as long as the server ran | LOW | FIXED (cargo test) | `ServerData::prune`: expired shares dropped and only the newest 64 answered uploads kept, on every share and upload | — |
+| 253 | Shell | `window.__DEX_CRITICAL_EVENTS__` debug list grew for the whole session | LOW | FIXED (tsc) | Keeps the newest 100 | — |
 
 ## Session 2026-11-14 (`claude/apps-ui-ux-floating-dock-8698e7`): apps UI/UX, Liquid Glass, side by side
 
