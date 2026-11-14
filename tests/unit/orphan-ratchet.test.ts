@@ -7,15 +7,16 @@
 // app entry (static, dynamic, `new URL(..., import.meta.url)`, CSS @import)
 // and counts files under src/ it never reaches. 2026-11-14 (#260): 797 such
 // source files (500 of them in improvements500) were removed together with
-// the 271 test files that were their only users; 81 remain, still imported by
-// tests that also cover live code. The count may only go down. Wire new code
+// the 271 test files that were their only users; 81 remained, still imported by
+// tests that also cover live code (80 once secretRedactor was wired into UKI).
+// The count may only go down. Wire new code
 // into the app, or don't add it.
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, dirname, relative, sep } from 'node:path';
 
 const ROOT = resolve(__dirname, '../..');
-const BASELINE = 81;
+const BASELINE = 80;
 
 const SRC = /\.(tsx?|jsx?|mjs|css)$/;
 const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) =>

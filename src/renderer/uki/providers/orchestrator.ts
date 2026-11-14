@@ -19,6 +19,7 @@ import { nativeOllamaFetch } from './ollama';
 const isCloudProvider = (id: string) => !!getProvider(id as never)?.requiresKey;
 import { getApiKey } from '../keystore';
 import type { ChatMessage, ChatResponse } from './types';
+import { guardAndNotify } from './outboundGuard';
 import { getProcessingMode, getManualModel } from './modelPrefs';
 import { endpointAllowed, processingModeLabel, type ProcessingMode } from '../../../shared/uki/assistantPolicy';
 
@@ -84,7 +85,7 @@ export async function chat(
   }
 
   const httpReq = provider.buildChatRequest(
-    { model: modelId, messages, temperature: opts.temperature, maxTokens: opts.maxTokens },
+    { model: modelId, messages: guardAndNotify(messages, provider), temperature: opts.temperature, maxTokens: opts.maxTokens },
     { apiKey, baseUrl: opts.baseUrl },
   );
 
