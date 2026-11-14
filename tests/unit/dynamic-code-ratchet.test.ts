@@ -21,7 +21,6 @@ const ALLOWED: Record<string, { count: number; why: string }> = {
   'renderer/DEXAPPLICATIONS/flux/expressions.ts': { count: 2, why: 'token allowlist runs before compilation (#161)' },
   'renderer/DEXAPPLICATIONS/standalone/dexCode/runtime.ts': { count: 1, why: 'runs code the user typed on purpose' },
   'renderer/components/NativeWebview.tsx': { count: 1, why: 'syntax check only, never called' },
-  'renderer/services/WorkerPool.ts': { count: 3, why: "DEX's own strings, inside a worker" },
 };
 
 const SITE = /\bnew\s+Function\s*\(|(?<![.\w])eval\s*\(/g;

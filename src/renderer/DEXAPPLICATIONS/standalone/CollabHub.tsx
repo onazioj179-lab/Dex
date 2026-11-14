@@ -29,6 +29,7 @@ import {
   CollabChatMessage,
 } from '../../services/collabSession';
 import { persistOrWarn } from '../../utils/persistOrWarn';
+import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -67,18 +68,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 600,
-    letterSpacing: '-0.01em',
-    margin: 0,
-    color: 'var(--color-text-primary)',
-  },
-  subtitle: {
-    fontSize: 12,
-    color: 'var(--color-text-tertiary, #8e8e93)',
-    marginTop: 2,
-  },
+  title: APP_TITLE,
+  subtitle: APP_SUBTITLE,
   headerActions: {
     display: 'flex',
     gap: 'var(--space-2)',
