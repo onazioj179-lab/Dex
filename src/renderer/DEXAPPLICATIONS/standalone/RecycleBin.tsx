@@ -208,7 +208,7 @@ const ItemRow = memo(({ item, selected, busy, onToggleSelect, onRestore, onDelet
           {!notRestorable && (
             <button
               disabled={busy}
-              style={{ ...btnSmall, background: 'color-mix(in srgb, var(--color-success) 18%, transparent)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
+              style={{ ...btnSmall, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', opacity: busy ? 0.5 : 1 }}
               onClick={() => onRestore(item.id)}
               aria-label={`Restore ${item.item_name || 'item'}`}
             >Restore</button>
@@ -626,7 +626,7 @@ const RecycleBin: React.FC = () => {
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 disabled={busy}
-                style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)', opacity: busy ? 0.5 : 1 }}
+                style={{ ...btnSmall, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', opacity: busy ? 0.5 : 1 }}
                 onClick={handleRestoreSelected}
               >Restore {selected.size}</button>
               <button

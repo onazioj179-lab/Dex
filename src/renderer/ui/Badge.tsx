@@ -21,34 +21,23 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   dot?: boolean;
 }
 
+// Restrained colour (owner direction): no green "success" pills or tinted
+// warning badges. Every tone is the same quiet neutral chip; warning and error
+// only tint the TEXT, because there the colour carries meaning. Accent stays
+// the one filled (DEX Blue) badge.
+const NEUTRAL = {
+  bg: 'rgba(255,255,255,0.06)',
+  fg: 'var(--color-text-secondary, #B8B8BD)',
+  border: 'transparent',
+};
 const TONES: Record<BadgeTone, { bg: string; fg: string; border: string }> = {
-  neutral: {
-    bg: 'var(--color-bg-hover, #1E1E22)',
-    fg: 'var(--color-text-secondary, #B8B8BD)',
-    border: 'var(--color-border-subtle, rgba(255,255,255,0.08))',
-  },
-  info: {
-    bg: 'rgba(74,158,255,0.10)',
-    fg: '#6CB2FF',
-    border: 'rgba(74,158,255,0.30)',
-  },
-  success: {
-    bg: 'rgba(52,199,89,0.10)',
-    fg: '#34C759',
-    border: 'rgba(52,199,89,0.30)',
-  },
-  warning: {
-    bg: 'rgba(255,159,10,0.10)',
-    fg: '#FF9F0A',
-    border: 'rgba(255,159,10,0.30)',
-  },
-  error: {
-    bg: 'rgba(255,69,58,0.10)',
-    fg: '#FF6B61',
-    border: 'rgba(255,69,58,0.30)',
-  },
+  neutral: NEUTRAL,
+  info: NEUTRAL,
+  success: NEUTRAL,
+  warning: { ...NEUTRAL, fg: '#FF9F0A' },
+  error: { ...NEUTRAL, fg: '#FF6B61' },
   accent: {
-    bg: 'var(--color-accent, #4A9EFF)',
+    bg: 'var(--color-accent, #0A84FF)',
     fg: '#fff',
     border: 'transparent',
   },

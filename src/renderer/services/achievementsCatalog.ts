@@ -14,6 +14,11 @@
 // -- Expanded Stats Interface ---------------------------------------------
 
 export interface UserStats {
+  // Derived, never persisted: filled in from the unlocked set by the engine and
+  // the Trophies view, so the meta tiers (points / hunter) have ONE threshold
+  // source -- the catalog -- instead of a second, different table in the engine.
+  achievementPoints?: number;
+  achievementsUnlocked?: number;
   // Core
   totalSessions: number;
   appsUsed: string[];
@@ -920,19 +925,15 @@ const ACHIEVEMENTS_RAW: Achievement[] = [
 
   // Points milestones (8)
   ...tiered('points', 'Point Collector', 'Earn {n} achievement points', 'star', 'mastery',
-    s => {
-      // Calculate points dynamically -- use a proxy since we don't store points in stats
-      // This is a rough estimate based on unlocked count
-      return 0; // Will be overridden by the engine
-    },
+    s => s.achievementPoints ?? 0,
     [[100, 20, 'common'], [250, 40, 'common'], [500, 70, 'rare'], [1000, 110, 'rare'],
      [2500, 175, 'epic'], [5000, 275, 'epic'], [10000, 450, 'legendary'], [25000, 750, 'legendary']],
     ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Emerald', 'Ruby', 'Obsidian']
   ),
 
   // Achievement hunter (meta) (8)
-  ...tiered('ach-count', 'Achievement Hunter', 'Unlock {n} achievements', 'trophy', 'mastery',
-    s => 0, // Will be overridden by custom logic in engine
+  ...tiered('ach-count', 'Trophy', 'Unlock {n} achievements', 'trophy', 'mastery',
+    s => s.achievementsUnlocked ?? 0,
     [[10, 25, 'common'], [25, 50, 'common'], [50, 80, 'rare'], [100, 130, 'rare'],
      [200, 200, 'epic'], [300, 300, 'epic'], [400, 450, 'legendary'], [500, 1000, 'legendary']],
     ['Collector', 'Hunter', 'Seeker', 'Conqueror', 'Dominator', 'Champion', 'Ascendant', 'Completionist']

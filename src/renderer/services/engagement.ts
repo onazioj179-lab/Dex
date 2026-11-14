@@ -171,19 +171,17 @@ export function checkAchievements(
   const now = Date.now();
   const unlockedCount = unlocked.length;
   const pts = totalPoints ?? getTotalPoints(unlocked);
+  const derivedStats = { ...state.stats, achievementPoints: pts, achievementsUnlocked: unlockedCount };
 
   for (const ach of ACHIEVEMENTS) {
     if (unlockedSet.has(ach.id)) continue;
 
     let passes = false;
-    if (ach.id.startsWith('ach-count-')) {
-      const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [15, 40, 75, 150, 250, 500, 1000, 1500, 2000, 3000, 4000, 5000];
-      passes = unlockedCount >= (thresholds[idx] || 99999);
-    } else if (ach.id.startsWith('points-')) {
-      const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [200, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 200000, 500000];
-      passes = pts >= (thresholds[idx] || 9999999);
+    if (ach.id.startsWith('ach-count-') || ach.id.startsWith('points-')) {
+      // The catalog's own threshold (the one its description shows). The engine
+      // used to keep a second table that disagreed: "Earn 10,000 points"
+      // unlocked at 2,500.
+      passes = ach.condition(derivedStats);
     } else if (ach.id.startsWith('final-') && ach.id.includes('-unlock')) {
       const num = parseInt(ach.id.replace('final-', '').replace('-unlock', '')) || 0;
       passes = unlockedCount >= num;

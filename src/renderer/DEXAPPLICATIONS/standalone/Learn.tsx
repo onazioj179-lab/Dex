@@ -651,7 +651,7 @@ const Learn: React.FC = () => {
             </div>
           </div>
           {done && (
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-success)', background: 'rgba(48,209,88,.14)', padding: '2px 6px', borderRadius: 4 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-text-primary)', background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 4 }}>
               Done
             </span>
           )}

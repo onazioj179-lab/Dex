@@ -37,6 +37,24 @@ const EXPAND_KEY = 'dex-nook-expanded';
 const SEARCH_W_KEY = 'dex-nook-search-w';
 const SEARCH_W_DEFAULT = 240;
 const DOCKED_KEY = 'dex-bar-docked';
+const ORB = 44;           // folded search orb diameter
+const MAGNET = 24;        // px within which a released bar snaps to an edge / centre
+
+/**
+ * Edge magnet for a released bar or orb: within MAGNET px of an edge (or the
+ * horizontal centre) it settles exactly there, so the user can pin it flush to
+ * any edge or corner without pixel-hunting. Pure: takes the clamped position.
+ */
+export function magnetBar(px: number, py: number, vw: number, vh: number, w: number, h: number): { x: number; y: number } {
+  let x = px, y = py;
+  const right = vw - w - EDGE_PAD, bottom = vh - h - EDGE_PAD, centre = Math.round((vw - w) / 2);
+  if (Math.abs(x - EDGE_PAD) < MAGNET) x = EDGE_PAD;
+  else if (Math.abs(x - right) < MAGNET) x = right;
+  else if (Math.abs(x - centre) < MAGNET) x = centre;
+  if (Math.abs(y - EDGE_PAD) < MAGNET) y = EDGE_PAD;
+  else if (Math.abs(y - bottom) < MAGNET) y = bottom;
+  return { x: Math.max(EDGE_PAD, Math.round(x)), y: Math.max(EDGE_PAD, Math.round(y)) };
+}
 
 // --- calendar (reads the same store the Calendar app + Home widget write) ----
 interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string }
@@ -89,6 +107,9 @@ export interface FloatingLauncherProps {
 
 export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSearch }) => {
   const { x, y, enabled, setPosition, setEnabled } = useFloatingLauncher();
+  const folded = useFloatingLauncher(s => s.folded);
+  const setFolded = useFloatingLauncher(s => s.setFolded);
+  const setReserveBottom = useFloatingLauncher(s => s.setReserveBottom);
 
   // Widgets are opt-in: OFF by default. Persisted so they only ever show once
   // the user has turned them on.
@@ -191,6 +212,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   // --- drag state -----------------------------------------------------------
   const containerRef = useRef<HTMLDivElement>(null);
   const sizeRef = useRef({ w: 240, h: BAR_H });
+  const lastBarWRef = useRef(560);
   // Default placement: a padded BOTTOM-centre dock, clearly separate from the
   // top window chrome. Unset store (x < 0) resolves this; clampNow corrects it
   // to the measured size right after mount.
@@ -206,6 +228,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     return { x, y };
   });
   const [dragging, setDragging] = useState(false);
+  // Set when a press turned into a drag, so the orb's click (which still fires
+  // on release) doesn't also unfold it.
+  const justDraggedRef = useRef(false);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingRef = useRef<{ clientX: number; clientY: number } | null>(null);
@@ -232,7 +257,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     });
   }, []);
 
-  useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
+  useLayoutEffect(() => { clampNow(); }, [expanded, folded, clampNow]);
 
   // Docked = against the bottom edge (like the macOS Dock). A bar left floating
   // higher up stays put. Nothing reserves space: the bar floats over apps.
@@ -318,11 +343,13 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (!d || !d.moved) { setDragging(false); return; }
     setDragging(false);
+    justDraggedRef.current = true;
     const p = pendingRef.current;
     let fx = pos.x, fy = pos.y;
     if (p) {
       const { w, h } = sizeRef.current;
-      const c = clampBarToBounds(d.origX + (p.clientX - d.startX), d.origY + (p.clientY - d.startY), window.innerWidth, window.innerHeight, w, h);
+      const c0 = clampBarToBounds(d.origX + (p.clientX - d.startX), d.origY + (p.clientY - d.startY), window.innerWidth, window.innerHeight, w, h);
+      const c = magnetBar(c0.x, c0.y, window.innerWidth, window.innerHeight, w, h);
       fx = c.x; fy = c.y; setPos(c);
     }
     pendingRef.current = null;
@@ -330,7 +357,70 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     try { localStorage.setItem(DOCKED_KEY, window.innerHeight - (fy + sizeRef.current.h) <= 64 ? '1' : '0'); } catch { /* quota */ }
   }, [pos.x, pos.y, setPosition]);
 
+  // Publish the strip the docked bar occupies so maximized / tiled windows
+  // stop above it (never under it). Folded, floating, hidden or off = 0.
+  const reserve = enabled && docked && !hidden && !folded ? Math.max(0, vhNow - pos.y) : 0;
+  useEffect(() => { setReserveBottom(reserve); }, [reserve, setReserveBottom]);
+  useEffect(() => () => setReserveBottom(0), [setReserveBottom]);
+
+  // Fold the bar into one search orb, centred where the bar was; unfold it back
+  // around the orb (clampNow then pulls it on-screen). Position persists.
+  const fold = useCallback(() => {
+    const { w, h } = sizeRef.current;
+    if (w > ORB + 40) lastBarWRef.current = w;
+    const nx = Math.round(pos.x + w / 2 - ORB / 2);
+    const ny = Math.round(pos.y + h / 2 - ORB / 2);
+    const c = clampBarToBounds(nx, ny, window.innerWidth, window.innerHeight, ORB, ORB);
+    setPos(c); setPosition(c.x, c.y); setFolded(true);
+  }, [pos.x, pos.y, setPosition, setFolded]);
+  const unfold = useCallback(() => {
+    if (justDraggedRef.current) { justDraggedRef.current = false; return; }
+    const barW = lastBarWRef.current;
+    const nx = Math.round(pos.x + ORB / 2 - barW / 2);
+    const ny = Math.round(pos.y + ORB / 2 - BAR_H / 2);
+    const c = clampBarToBounds(nx, ny, window.innerWidth, window.innerHeight, barW, BAR_H);
+    setPos(c); setPosition(c.x, c.y); setFolded(false);
+    // Unfolding is "I want to search": put the caret in the field.
+    window.setTimeout(() => {
+      const input = containerRef.current?.querySelector('input');
+      if (input instanceof HTMLInputElement) input.focus();
+    }, 60);
+  }, [pos.x, pos.y, setPosition, setFolded]);
+
   if (!enabled) return null;
+
+  if (folded) {
+    return (
+      <div
+        ref={containerRef}
+        role="button"
+        tabIndex={0}
+        data-dex-chrome="dex-bar"
+        data-dex-nook
+        data-folded=""
+        aria-label="Search (unfold the DEX menu)"
+        title="Search: click to unfold, drag to move"
+        className="dex-liquid-glass dex-glass-specular dex-glass-refract dex-bar-orb"
+        onPointerDown={beginDrag}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragUp}
+        onPointerCancel={onDragUp}
+        onClick={unfold}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); justDraggedRef.current = false; unfold(); } }}
+        style={{
+          position: 'fixed', left: pos.x, top: pos.y, zIndex: 'var(--z-dock)' as unknown as number,
+          width: ORB, height: ORB, borderRadius: '50%', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-text-primary)', cursor: dragging ? 'grabbing' : 'pointer',
+          touchAction: 'none', userSelect: 'none',
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.2" y2="16.2" />
+        </svg>
+      </div>
+    );
+  }
 
   // --- shared styles --------------------------------------------------------
   const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
@@ -357,7 +447,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
       data-dex-nook
       data-autohidden={hidden ? '' : undefined}
       onFocusCapture={() => { if (autoHide) setRevealed(true); }}
-      className="dex-liquid-glass"
+      className="dex-liquid-glass dex-glass-specular dex-glass-refract"
       style={{
         // IMPORTANT: position via left/top, NOT transform. DEX has global rules
         // (globals.css `[data-perf-tier="low"] *:hover/active/focus` and
@@ -487,6 +577,21 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
 
         <div style={vDivider(11)} />
 
+        {/* fold -- collapse the whole bar into one search orb */}
+        <button
+          type="button"
+          aria-label="Fold into search orb"
+          title="Fold into search orb"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={fold}
+          style={{ ...ctrlBtn, width: 28 }}
+          onMouseEnter={hoverIn}
+          onMouseLeave={hoverOut}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        </button>
         {/* expand toggle -- turns widgets on/off (opt-in) */}
         <button
           type="button"

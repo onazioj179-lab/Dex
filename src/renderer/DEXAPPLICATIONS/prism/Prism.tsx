@@ -5684,7 +5684,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               <button aria-label="Add horizontal guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'h', position: Math.round(canvasSize.height / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Horizontal</button>
-              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid rgba(48,209,88,0.2)', background: 'rgba(48,209,88,0.08)', color: 'var(--color-success)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
+              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {guides.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No guides yet</div>}
@@ -5720,7 +5720,7 @@ const Prism: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{a.name}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button aria-label={`Play action ${a.name}`} onClick={() => runAction(a)} style={{ background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: 9999, color: 'var(--color-success)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+                      <button aria-label={`Play action ${a.name}`} onClick={() => runAction(a)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9999, color: 'var(--color-text-primary)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
                       <button aria-label={`Delete action ${a.name}`} onClick={() => setActions(prev => prev.filter(aa => aa.id !== a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
                     </div>
                   </div>

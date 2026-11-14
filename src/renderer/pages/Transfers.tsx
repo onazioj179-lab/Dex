@@ -879,7 +879,7 @@ const Transfers: React.FC = () => {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '3px 10px', borderRadius: 4,
-              background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)',
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)',
               fontSize: 11, fontWeight: 500, color: 'var(--color-success)',
             }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)' }} />
@@ -993,7 +993,7 @@ const Transfers: React.FC = () => {
                     </div>
                     <button onClick={() => sendToDevice(device)} disabled={sending} style={{
                       padding: 'var(--space-2) 18px', borderRadius: 'var(--radius-md)', border: 'none',
-                      background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
+                      background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)',
                       fontSize: 12, fontWeight: 600, cursor: sending ? 'default' : 'pointer',
                       display: 'flex', alignItems: 'center', gap: 6, opacity: sending ? 0.5 : 1,
                     }}>{Icons.send} Send Files</button>
@@ -1035,7 +1035,7 @@ const Transfers: React.FC = () => {
                     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                       <button onClick={() => approveDevice(pd.deviceId)} style={{
                         padding: '6px 14px', borderRadius: 'var(--radius-md)', border: 'none',
-                        background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
+                        background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)',
                         fontSize: 12, fontWeight: 600, cursor: 'pointer',
                       }}>Accept</button>
                       <button onClick={() => denyDevice(pd.deviceId)} style={{
@@ -1322,7 +1322,7 @@ const Transfers: React.FC = () => {
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => acceptUpload(u.id, true)} style={{
                             padding: '5px var(--space-3)', borderRadius: 'var(--radius-md)', border: 'none',
-                            background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
+                            background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)',
                             fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           }}>Accept</button>
                           <button onClick={() => acceptUpload(u.id, false)} style={{

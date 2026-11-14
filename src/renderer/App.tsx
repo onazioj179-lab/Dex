@@ -17,6 +17,8 @@
  * ===========================================================================
  */
 
+import { installSelectionGuard } from './shell/selectionGuard';
+import { GlassFilters } from './components/GlassFilters';
 import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import packageJson from '../../package.json';
 import { useAuthStore } from './store/useAuthStore';
@@ -225,6 +227,8 @@ export const App: React.FC = () => {
   // holds what you copied while working (not just whatever is on the clipboard
   // the moment the panel opens). Idempotent; runs once for the app's lifetime.
   // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
+  // Ctrl+A outside a text field never selects the whole shell.
+  useEffect(() => installSelectionGuard(), []);
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
   // Local-file links (dexmedia) download instead of navigating DEX away.
   useEffect(() => installMediaLinkGuard(), []);
@@ -517,6 +521,7 @@ export const App: React.FC = () => {
     <div style={rootStyles.container}>
       {/* The shell's own global rules (html, body, *). App style blocks must stay scoped. */}
       <style data-dex-shell-style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
+      <GlassFilters />
       
       {/* Window drag region for frameless window (Windows) */}
       <div className="dex-window-titlebar" aria-hidden="true" />

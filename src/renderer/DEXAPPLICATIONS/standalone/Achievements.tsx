@@ -80,6 +80,12 @@ const Achievements: React.FC = () => {
   const unlocked = useMemo(() => new Set(engagement.unlockedAchievements), [engagement.unlockedAchievements]);
   const stats = useMemo(() => getAchievementStats(engagement.unlockedAchievements), [engagement.unlockedAchievements]);
   const rank = stats.rank;
+  // Stats plus the derived meta values, so the points / hunter tiers show real
+  // progress (they always read 0 before).
+  const progressStats = useMemo(
+    () => ({ ...engagement.stats, achievementPoints: stats.points, achievementsUnlocked: engagement.unlockedAchievements.length }),
+    [engagement.stats, stats.points, engagement.unlockedAchievements.length],
+  );
   const unlockedAt = engagement.unlockedAt || {};
   const byId = useMemo(() => new Map(ACHIEVEMENTS.map(a => [a.id, a])), []);
 
@@ -99,12 +105,12 @@ const Achievements: React.FC = () => {
     let bestPct = -1;
     for (const a of ACHIEVEMENTS) {
       if (unlocked.has(a.id) || a.secret) continue;
-      const p = a.progress ? a.progress(engagement.stats) : null;
+      const p = a.progress ? a.progress(progressStats) : null;
       const pct = p && p.target > 0 ? p.current / p.target : 0;
       if (pct > bestPct) { bestPct = pct; best = a; }
     }
     return best ? { ach: best, isUnlocked: false, ts: 0 } : null;
-  }, [recentUnlocks, unlocked, engagement.stats]);
+  }, [recentUnlocks, unlocked, progressStats]);
 
   // Per-category progress (the core "see progress" view, replacing the award list).
   const categoryProgress = useMemo(() => {
@@ -122,7 +128,7 @@ const Achievements: React.FC = () => {
     const arr: { ach: Achievement; cur: number; tgt: number; pct: number }[] = [];
     for (const a of ACHIEVEMENTS) {
       if (unlocked.has(a.id) || a.secret) continue;
-      const p = a.progress ? a.progress(engagement.stats) : null;
+      const p = a.progress ? a.progress(progressStats) : null;
       if (!p || p.target <= 0) continue;
       const pct = Math.min(100, (p.current / p.target) * 100);
       if (pct <= 0 || pct >= 100) continue;
@@ -130,7 +136,7 @@ const Achievements: React.FC = () => {
     }
     arr.sort((x, y) => y.pct - x.pct);
     return arr.slice(0, 4);
-  }, [unlocked, engagement.stats]);
+  }, [unlocked, progressStats]);
 
   const shareProgress = useCallback(() => {
     const lines = [
@@ -227,12 +233,12 @@ const Achievements: React.FC = () => {
                       <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
                       <div style={{ fontSize: 11, color: TXT_DIM, marginTop: 1 }}>{c.got} / {c.total} unlocked</div>
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: done ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: done ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                       {Math.round(c.pct)}%
                     </div>
                   </div>
-                  <div style={{ height: 7, borderRadius: 4, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
-                    <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 4, background: done ? 'var(--color-text-primary)' : 'var(--color-text-primary)', transition: 'width .2s ease' }} />
+                  <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-tertiary)', overflow: 'hidden' }}>
+                    <div style={{ width: `${c.pct}%`, height: '100%', borderRadius: 2, background: done ? 'var(--color-text-primary)' : 'var(--color-text-primary)', transition: 'width .2s ease' }} />
                   </div>
                 </div>
               );
@@ -329,10 +335,6 @@ const HeroSpotlight: React.FC<{
       borderLeft: `1px solid ${BORDER}`,
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
     }}>
-      {/* Faint oversized glyph */}
-      <div style={{ position: 'absolute', right: -16, bottom: -28, opacity: 0.06, pointerEvents: 'none' }}>
-        <DexIcon name={ach.icon} size={180} color="var(--color-text-secondary)" />
-      </div>
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
@@ -378,11 +380,14 @@ const StatsRing: React.FC<{
   completion: number; totalUnlocked: number; totalAchievements: number;
   points: number; streak: number; level: { level: number; title: string };
 }> = memo(({ completion, totalUnlocked, totalAchievements, points, streak, level }) => {
-  const pct = Math.max(0, Math.min(100, completion));
+  // Exact share, so 16 of 5,178 reads 0.3%, not a flat "0%" beside 16 unlocks.
+  const exact = totalAchievements > 0 ? (totalUnlocked / totalAchievements) * 100 : 0;
+  const pct = Math.max(0, Math.min(100, exact || completion));
+  const pctLabel = pct > 0 && pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
   const tiles = [
     { icon: 'star', label: 'Points', value: points.toLocaleString() },
     { icon: 'flame', label: 'Streak', value: `${streak}d` },
-    { icon: 'award', label: 'Rank', value: `${level.level}` },
+    { icon: 'award', label: 'Level', value: `${level.level}` },
   ];
   return (
     <div style={{ borderRadius: 18, padding: 20, minHeight: 188, background: PANEL, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -391,7 +396,7 @@ const StatsRing: React.FC<{
         <div style={{ position: 'relative', width: 104, height: 104, flexShrink: 0 }}>
           <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: `conic-gradient(${GOLD} ${pct}%, var(--color-bg-active) ${pct}%)` }} />
           <div style={{ position: 'absolute', inset: 11, borderRadius: '50%', background: PANEL, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{pctLabel}</div>
             <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 2 }}>complete</div>
           </div>
         </div>

@@ -2051,8 +2051,8 @@ const UkiOverlay: React.FC = () => {
                   <div style={{
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
                     lineHeight: 1.5, padding: '6px var(--space-2)', marginBottom: 6,
-                    background: 'var(--color-bg-hover)', borderLeft: '2px solid var(--color-accent-light)',
-                    borderRadius: 4,
+                    background: 'var(--color-bg-hover)',
+                    borderRadius: 6,
                   }}>
                     {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2097,9 +2097,8 @@ const UkiOverlay: React.FC = () => {
             <div style={{
               display: 'flex', flexDirection: 'column', gap: 4,
               padding: '6px var(--space-2)', marginBottom: 'var(--space-2)',
-              background: 'var(--color-accent-soft)',
-              borderLeft: '2px solid var(--color-accent)',
-              borderRadius: 4,
+              background: 'var(--color-bg-hover)',
+              borderRadius: 6,
             }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -2151,8 +2150,8 @@ const UkiOverlay: React.FC = () => {
           {error && (
             <div role="alert" style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
-              padding: '6px var(--space-2)', background: 'var(--color-error-muted)',
-              borderRadius: 4, borderLeft: '2px solid var(--color-error)',
+              padding: '6px var(--space-2)', background: 'var(--color-bg-hover)',
+              borderRadius: 6,
             }}>
               {error}
             </div>
