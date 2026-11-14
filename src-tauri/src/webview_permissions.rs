@@ -123,7 +123,7 @@ fn record(kind_id: &str, decision: Option<&'static str>) {
 /// Load the saved policy and hook the main window's webview. Call once from setup.
 pub fn install(app: &tauri::AppHandle) {
     if let Value::Object(saved) = crate::kv_get(app, KV_KEY) {
-        if let Ok(mut m) = policies().lock() {
+        { let mut m = policies().lock_safe();
             *m = saved.into_iter().filter(|(k, v)| kind_def(k).is_some() && v.as_str().map(valid_policy).unwrap_or(false)).collect();
         }
     }
@@ -223,7 +223,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             if !valid_policy(policy) {
                 return json!({ "success": false, "error": "Policy must be allow, ask or deny" });
             }
-            if let Ok(mut m) = policies().lock() {
+            { let mut m = policies().lock_safe();
                 if policy == def.default { m.remove(id); } else { m.insert(id.to_string(), json!(policy)); }
             }
             persist(app)

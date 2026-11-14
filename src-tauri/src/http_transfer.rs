@@ -584,12 +584,7 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
         while let Ok(request) = server_t.recv() {
             // One bad request must not kill the share server for every later
             // phone: this thread is outside the dex_ipc panic guard.
-            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                handle_request(&app_t, &data_t, request);
-            }));
-            if r.is_err() {
-                eprintln!("[http_transfer] recovered from a panic while serving a request");
-            }
+            crate::util::guard_panic("phone share request", || handle_request(&app_t, &data_t, request));
         }
     });
 
@@ -769,7 +764,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "httpTransfer:unshare" => {
             let id = args.get(0).and_then(|v| v.as_str()).unwrap_or_default();
             let state = app.state::<HttpTransferState>();
-            if let Ok(slot) = state.lock() {
+            { let slot = state.lock_safe();
                 if let Some(r) = slot.as_ref() {
                     r.data.lock_safe().shared.remove(id);
                 }
