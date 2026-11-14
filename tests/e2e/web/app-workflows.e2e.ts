@@ -80,7 +80,14 @@ test.describe('App workflows (web renderer)', () => {
     const heights: Record<string, number[]> = {};
     for (const id of ['collabhub', 'extensions', 'kanban', 'tasks', 'workflows', 'store', 'inbox']) {
       await open(page, id);
-      await page.waitForTimeout(300);
+      // The first app opened (CollabHub) can still be settling 300 ms after it
+      // mounts on a cold CI runner; wait until its bar is laid out and on top.
+      await page.waitForFunction((appId) =>
+        [...document.querySelectorAll<HTMLElement>(`[data-app-id="${appId}"] [style*="app-header-height"]`)].some((e) => {
+          const r = e.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return r.width > 300 && !!top && (e === top || e.contains(top));
+        }), id, { timeout: 15_000 }).catch(() => { /* measured below; the assertion reports it */ });
       heights[id] = await page.evaluate((appId) =>
         [...document.querySelectorAll<HTMLElement>(`[data-app-id="${appId}"] [style*="app-header-height"]`)]
           .filter((e) => {
