@@ -11,6 +11,7 @@ import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { useVaultStore } from '../../store/useVaultStore';
+import { VaultGate, VaultList, AuthenticatorList } from './PasswordVault';
 import {
   generatePassword, generatePassphrase, strengthFor,
   MIN_LENGTH, MIN_WORDS, MAX_WORDS,
@@ -31,6 +32,8 @@ export function passwordEntropyBits(pwd: string): number {
 }
 
 type Mode = 'password' | 'passphrase';
+type View = 'generate' | 'vault' | 'codes';
+const VIEWS: { id: View; label: string }[] = [{ id: 'generate', label: 'Generate' }, { id: 'vault', label: 'Vault' }, { id: 'codes', label: '2FA codes' }];
 
 interface RecentEntry {
   id: number;
@@ -118,6 +121,7 @@ const PasswordGenerator: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
+  const [view, setView] = useState<View>('generate');
   const [legacy, setLegacy] = useState(loadLegacy);
   const vaultExists = useVaultStore(s => s.vaultExists);
   const addCredential = useVaultStore(s => s.addCredential);
@@ -244,6 +248,7 @@ const PasswordGenerator: React.FC = () => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!keyEventForApp(e, APP_ID)) return; // key meant for another app
+      if (view !== 'generate') return;
       if (isTypingTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       if (!mod && !e.altKey && (e.key === 'Enter' || e.key.toLowerCase() === 'r')) {
@@ -257,7 +262,7 @@ const PasswordGenerator: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [generate, copy]);
+  }, [generate, copy, view]);
 
   const setPw = (patch: Partial<PasswordOptions>) => setPrefs(p => ({ ...p, password: { ...p.password, ...patch } }));
   const setPp = (patch: Partial<PassphraseOptions>) => setPrefs(p => ({ ...p, passphrase: { ...p.passphrase, ...patch } }));
@@ -266,7 +271,7 @@ const PasswordGenerator: React.FC = () => {
   const pp = prefs.passphrase;
 
   return (
-    <div style={S.container} role="region" aria-label="Password Generator">
+    <div style={S.container} role="region" aria-label="Passwords">
       <style>{`
         .pwg-btn:hover:not(:disabled) { background: var(--color-bg-hover); }
         .pwg-primary:hover:not(:disabled) { filter: brightness(1.08); }
@@ -274,8 +279,21 @@ const PasswordGenerator: React.FC = () => {
       `}</style>
 
       <div style={S.header}>
-        <h1 style={S.title}>Password Generator</h1>
-        <div role="tablist" aria-label="Type" style={S.segmented}>
+        <div role="tablist" aria-label="Section" style={S.segmented}>
+          {VIEWS.map(v => (
+            <button
+              key={v.id}
+              role="tab"
+              aria-selected={view === v.id}
+              className="pwg-seg"
+              style={{ ...S.seg, ...(view === v.id ? S.segOn : {}) }}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        {view === 'generate' && <div role="tablist" aria-label="Type" style={S.segmented}>
           {(['password', 'passphrase'] as Mode[]).map(m => (
             <button
               key={m}
@@ -288,9 +306,15 @@ const PasswordGenerator: React.FC = () => {
               {m === 'password' ? 'Password' : 'Passphrase'}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
+      {view !== 'generate' ? (
+        <div style={S.main}>
+          <VaultGate>{view === 'vault' ? <VaultList flash={flash} /> : <AuthenticatorList flash={flash} />}</VaultGate>
+          <div style={S.status} aria-live="polite">{status ?? ''}</div>
+        </div>
+      ) : (
       <div style={S.main}>
         <section style={S.card}>
           <output aria-live="polite" aria-label="Generated value" style={S.value}>
@@ -437,6 +461,7 @@ const PasswordGenerator: React.FC = () => {
           </section>
         )}
       </div>
+      )}
     </div>
   );
 };

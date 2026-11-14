@@ -1004,6 +1004,15 @@ fn clipboard_write(text: &str) -> Value {
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }
 }
+/// Wait, then empty the clipboard only if it still holds `text`.
+fn clipboard_clear_if_unchanged(text: &str, after: std::time::Duration) {
+    std::thread::sleep(after);
+    if let Ok(mut c) = arboard::Clipboard::new() {
+        if c.get_text().map(|t| t == text).unwrap_or(false) {
+            let _ = c.clear();
+        }
+    }
+}
 fn clipboard_read() -> Value {
     match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
         Ok(t) => json!(t),
@@ -2672,8 +2681,17 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "os:lockScreen" => os_lock(),
 
         // --- Batch 1: Clipboard --------------------------------------------
-        "clipboard:writeText" | "vault:copyToClipboard" => {
-            clipboard_write(&arg_str(0).unwrap_or_default())
+        "clipboard:writeText" => clipboard_write(&arg_str(0).unwrap_or_default()),
+        // A Vault secret is wiped after the given seconds (5..600), unless
+        // something else has been copied since. No timeout = left in place.
+        "vault:copyToClipboard" => {
+            let text = arg_str(0).unwrap_or_default();
+            let out = clipboard_write(&text);
+            let clear_after = args.get(1).and_then(|v| v.as_u64()).map(|n| n.clamp(5, 600));
+            if let (Some(secs), true) = (clear_after, out.get("success") == Some(&json!(true))) {
+                std::thread::spawn(move || clipboard_clear_if_unchanged(&text, std::time::Duration::from_secs(secs)));
+            }
+            out
         }
         "clipboard:readText" => clipboard_read(),
 
