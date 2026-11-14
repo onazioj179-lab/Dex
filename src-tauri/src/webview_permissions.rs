@@ -21,6 +21,7 @@
 //! * "Ask" hands the request back to WebView2 unchanged, so the platform prompt
 //!   and its saved decision still apply.
 
+use crate::util::LockSafe;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -255,7 +256,7 @@ mod tests {
     #[test]
     fn defaults_answer_clipboard_and_sysex_and_leave_the_rest_to_webview2() {
         let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        policies().lock().unwrap().clear();
+        policies().lock_safe().clear();
         let dex = "http://tauri.localhost/";
         assert_eq!(decide("clipboardRead", dex), Some("allow"));
         assert_eq!(decide("midiSysex", dex), Some("deny"));
@@ -267,11 +268,11 @@ mod tests {
     #[test]
     fn stored_choice_overrides_the_default() {
         let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        policies().lock().unwrap().insert("clipboardRead".into(), json!("deny"));
+        policies().lock_safe().insert("clipboardRead".into(), json!("deny"));
         assert_eq!(decide("clipboardRead", "http://tauri.localhost/"), Some("deny"));
-        policies().lock().unwrap().insert("clipboardRead".into(), json!("ask"));
+        policies().lock_safe().insert("clipboardRead".into(), json!("ask"));
         assert_eq!(decide("clipboardRead", "http://tauri.localhost/"), None);
-        policies().lock().unwrap().clear();
+        policies().lock_safe().clear();
     }
 
     #[test]

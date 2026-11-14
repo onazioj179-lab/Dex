@@ -10,7 +10,7 @@
 >   `npm run lint` and `tests/unit/ipc-abi-compat.test.ts`: fails if a shipped channel disappears, or if new renderer
 >   code calls a channel nothing answers (that list only shrinks). Rules in `docs/NATIVE_ABI.md`. First run found a real
 >   break: Quick Look text previews called `files:read`, which nothing answers (always blank in the desktop app), now
->   `fs:readText`. Not done: CI doesn't yet run `npm run lint` as its own step (the unit tests cover it).
+>   `fs:readText`. CI runs the ABI check as its own step (2026-11-13, #229).
 > - **B003/B011 privacy + metadata controls: SHIPPED (first slice).** Native `fs:stripMetadata`
 >   (`src-tauri/src/metadata_strip.rs`, 5 cargo tests): lossless JPEG/PNG copy without EXIF/GPS, XMP, IPTC, comments,
 >   PNG text/time chunks. Keeps colour profiles, EXIF orientation (rewritten as a 1-entry block) and C2PA content
@@ -3678,3 +3678,8 @@ These need DSP/ML or native hosting we don't fake.
 
 - Release build of main (7.0.2 / 001z) passed the bundle gate; run on an isolated profile. Verified in the exe: clean exit with no stack overflow (#44), Recycle Bin delete (#59), copy/move/rename never overwrite (#60), WSL only listed with a distribution (#153), text read for Quick Look (#202), metadata-stripped JPEG copy (#203); 16 apps open without a crash. Gallery gained a regression test for the removed fake face groups (#208).
 - Still open for B018 / #6 / #102: the installer itself (install, upgrade, uninstall) on a clean machine, and signing (#30).
+
+## Checkpoint 2026-11-13 (robustness pass: crash-proofing, security, speed)
+
+- Backlog trimmed: finished rows (#53, #61, #62, #65, #107, #157, #180–#226) moved to `docs/reports/DEX_COMPLETED_WORK.md`; the ones still needing a packaged run are one-liners in the waiting table.
+- Native: poisoned mutexes recover (`util::LockSafe`); the phone-share server survives non-ASCII names and caps waiting uploads; random bytes come from the in-process CSPRNG, not PowerShell; the localhost browser bridge needs a paired secret. Notes reads its learned vocabulary (`dexnotes:topWords`) (#240–#244).

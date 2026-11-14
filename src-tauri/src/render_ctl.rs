@@ -40,6 +40,7 @@
 //   render:stateChanged event -> { previous, current, gpuState }
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 
@@ -288,13 +289,13 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         // DATA reads — both lock, ensure detection has run, then read live state.
         "render:getConfig" => {
-            let mut g = governor().lock().unwrap();
+            let mut g = governor().lock_safe();
             g.ensure_detected();
             g.config()
         }
         // getSnapshot is the canonical read; getState is the brief's alias for it.
         "render:getSnapshot" | "render:getState" => {
-            let mut g = governor().lock().unwrap();
+            let mut g = governor().lock_safe();
             g.ensure_detected();
             g.snapshot()
         }
@@ -305,7 +306,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "render:frameMetrics" => {
             let f = parse_frame(args);
             let change = {
-                let mut g = governor().lock().unwrap();
+                let mut g = governor().lock_safe();
                 g.record_frame(f)
             };
             if let Some((prev, gpu)) = change {
@@ -316,7 +317,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "render:stateChange" => {
             let state = parse_state(args);
             let change = {
-                let mut g = governor().lock().unwrap();
+                let mut g = governor().lock_safe();
                 g.set_render_state(&state)
             };
             if let Some((prev, gpu)) = change {
@@ -326,7 +327,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         }
         "render:inputEvent" => {
             let change = {
-                let mut g = governor().lock().unwrap();
+                let mut g = governor().lock_safe();
                 g.last_input_time = now_ms();
                 if g.render_state == "idle" {
                     g.set_render_state("active")
