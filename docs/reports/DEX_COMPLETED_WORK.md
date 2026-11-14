@@ -356,16 +356,21 @@ Same release exe (7.0.2 / 001z at a9bbdbfa), isolated profile, driven over CDP; 
 | 205 | Notes: Move to Trash asked every time; no undo | VERIFIED. Right-click › Delete Note on a probe note: no confirm dialog, note count 2 → 1, toast "“DEX probe note …” moved to Trash" with Undo; Undo restored it (count 2). |
 | 84 | Browser address bar: localhost / IPs searched instead of opened; other schemes … | VERIFIED. `example.com` → https://example.com/, `localhost:9` → http://localhost:9/, `192.168.0.1:9` → http://192.168.0.1:9/, plain words → a DuckDuckGo search. |
 
+## Packaged Browser check 2026-11-13 (`claude/browser-minimized-create`)
+
+| # | Item | Packaged result |
+|---|---|---|
+| 46 | Browser blank in the packaged app | VERIFIED (release exe, isolated profile, DEX window restored before opening Browser). `example.com` loaded: the tab title became "Example Domain", reading inside the page returned "Example Domain | https://example.com/", and the active page view was visible at the slot size (2880×1557 px at 2.25×) while the inactive tab's view was hidden. The earlier inconclusive run was caused by the test window being minimized, which exposed a real bug (#231). |
+
 ## Session 2026-11-13 (`claude/backlog-pass-1113b`)
 
-| 226 (renumbered) | Backlog | Two rows were numbered #221 on main (unslop pass 3, and the `dex.<ns>.onY` no-op fix) | FIXED | The auth/vault/platform row is now #226 (#222-#225 were taken by #134) |
 
-### Packaged checks 2026-11-13 (release exe 7.0.2 / 001z with the #222 fix, isolated profile)
+### Packaged checks 2026-11-13 (release exe 7.0.2 / 001z with the #231 fix, isolated profile)
 
 - FLUX, VINX, PRISM, AXL, Imosion, Canvas, Forge, Presentation all open with "Up to date" (no fake "Saved").
 - #152 VINX: renaming the project showed "Unsaved changes", then "Saved just now" within 3 s; `dex-vinx-project` in localStorage and the native copy (`capability:storage:get`) both had the new name and a `modifiedAt` stamp. Crash-recovery banner not re-run.
 - #142 Dock: app menu on Ledger offered "Pin to Dock"; Ledger appeared in the Dock; the menu then offered "Unpin from Dock" and Ledger left the Dock. Reorder not exercised.
-- #46/#222 Browser: in the rebuilt exe pages load (title read from inside the page) and the page view follows the Browser window size. The minimize-then-open case was not re-run cleanly (the window was un-minimized by hand mid-test).
+- #46/#231 Browser: in the rebuilt exe pages load (title read from inside the page) and the page view follows the Browser window size. The minimize-then-open case was not re-run cleanly (the window was un-minimized by hand mid-test).
 - Edit → Saved in the same exe: FLUX "Add layer" → "Unsaved changes" → "Saved just now" at the 30 s tick; Canvas "Add sticky note" → "Saved just now" within 3 s; Imosion "Add new track" (1 → 2 tracks) → "Saved just now" within 4 s (Saved shows only after a real pointer/key in Imosion: by design, so a load is not an edit); AXL parameter "probe_w" added → "Saved just now". Forge: its status covers the encode queue, which needs a real file; the preset menu is not part of it, so "Up to date" stayed correct.
 - #152 VINX crash recovery: VINX open with a saved project, then the test DEX was force-killed (Stop-Process -Force, own PID only) and relaunched; opening VINX showed "VINX did not close normally last time. Restored the project as last saved (… 10:40:50 AM); edits after that were not saved." with the project name restored. #152 now fully VERIFIED in the packaged app.
 - #163 FLUX Open Project: a PRISM file was refused ("Could not open wrong.json: Not a FLUX project."); a project with one bad layer opened 1 layer at 24 fps and 1280×720 with a warning toast. #163 now fully VERIFIED in the packaged app.
