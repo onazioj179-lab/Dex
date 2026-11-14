@@ -63,6 +63,7 @@ import { rewardUnlocks } from '../../services/achievementEngine';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { colorInputValue } from '../../utils/canvasTheme';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
 export const VINX_BUILD_DATE = '2026-04-11';
@@ -2240,7 +2241,7 @@ const VinxEditor: React.FC = () => {
                 </div>
               ))}
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 4 }}>
-                <input type="color" defaultValue={clip.color} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
+                <input type="color" defaultValue={colorInputValue(clip.color)} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', alignSelf: 'center' }}>Clip Color Label</span>
               </div>
             </div>

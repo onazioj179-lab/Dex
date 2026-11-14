@@ -24,6 +24,11 @@ function appIds(): string[] {
 async function boot(page: Page): Promise<string[]> {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Console errors count too, and the browser's warning for a form control
+  // given a value it rejects (e.g. a theme token in <input type="color">).
+  page.on('console', (m) => {
+    if (m.type() === 'error' || /does not conform to the required format/.test(m.text())) errors.push(`console: ${m.text()}`);
+  });
   await page.goto('/');
   await page.waitForFunction(
     () => !!window.__dexRunningApps && (document.getElementById('root')?.childElementCount ?? 0) > 0,
@@ -54,7 +59,7 @@ test.describe('DEX shell (web renderer)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('every app opens without an error boundary or a page error', async ({ page }) => {
+  test('every app opens without an error boundary, a page error or a console error', async ({ page }) => {
     test.setTimeout(20 * 60_000);
     const ids = appIds().filter((id) => id !== 'home');
     expect(ids.length).toBeGreaterThan(40);
