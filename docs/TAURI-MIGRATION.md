@@ -16,7 +16,7 @@
 - Side by side: `tileWindow` pairs the opposite half with the front-most window or the current tab. Min sizes capped to half the work area.
 - Material: `GlassFilters` (SVG `#dex-glass-refract`) + `.dex-glass-specular`, `.dex-glass-refract`, `.dex-pill(-tinted)`, `.dex-notif-card` in design-system.css.
 - Preview gotcha: with the pane hidden, rAF and the animation clock stop; a banner dismisses the moment a screenshot wakes the page (its rAF timer sees the whole hidden time). Not a product bug.
-- Rows #251–#256 in DEX_REMAINING_WORK.md.
+- Rows #260–#268 in DEX_REMAINING_WORK.md.
 
 ## Robustness pass (2026-11-13)
 

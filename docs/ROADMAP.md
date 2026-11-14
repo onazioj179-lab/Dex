@@ -33,10 +33,11 @@
 >   **Userspace break fixed (#216):** local media never loaded in the Tauri build (`file://` is blocked from
 >   `http://tauri.localhost`; proven in a release exe). New native `dexmedia` protocol + `toMediaUrl` for Gallery,
 >   Audio, Files previews, Quick Look, PDF and disk wallpapers.
-> - **Apps UI/UX + tinted Liquid Glass (2026-11-14, #251–#256):** apps are a padded floating stage that stops above
+> - **Apps UI/UX + tinted Liquid Glass (2026-11-14, #260–#268):** apps are a padded floating stage that stops above
 >   the docked DEX Bar; side by side pairs two halves with no overlap; the bar folds into one search orb and pins flush to
 >   any edge; refraction + specular glass on dock/orb/notifications; green/warning pills and Notes stripes removed; Ctrl+A
->   no longer selects the shell. Not yet run in the packaged app.
+>   no longer selects the shell; the global orange [role=alert] stripe is gone; Trophies points tiers fixed; Terminal chrome
+>   sharpened. Not yet run in the packaged app.
 > - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
 >   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
 >   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),
