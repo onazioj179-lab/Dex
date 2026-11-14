@@ -38,7 +38,7 @@ import {
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 import { getCompiled, validateExpression, type ExpressionContext } from './expressions';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
-import { resolveCanvasColor } from '../../utils/canvasTheme';
+import { resolveCanvasColor, colorInputValue } from '../../utils/canvasTheme';
 import { POST_FILTER_TYPES, applyPostEffects } from './postEffects';
 import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
@@ -2605,7 +2605,7 @@ const Flux: React.FC = () => {
     timelineTracks: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     layerList: { width: '170px', flexShrink: 0, minHeight: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin' } as any,
     layerItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px var(--space-2)', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' },
-    layerItemSelected: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', borderLeft: '2px solid var(--dex-focus-color, #fff)' },
+    layerItemSelected: { background: 'rgba(255,255,255,0.09)' },
     layerIcon: { width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' },
     layerName: { flex: 1, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 },
     trackArea: { flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
@@ -4309,7 +4309,7 @@ const Flux: React.FC = () => {
                 <div key={u.name} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
-                    <input type="color" value={u.val as string} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
+                    <input type="color" value={colorInputValue(u.val as string)} onChange={e => setShaderUniforms(prev => ({ ...prev, u_color: e.target.value }))} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 2 }} />
                   ) : (
                     <input type="range" min="0" max="100" value={u.val as number} onChange={e => setShaderUniforms(prev => ({ ...prev, [u.name]: Number(e.target.value) }))} style={{ width: '100%', accentColor: FLUX_ACCENT, marginTop: 2 }} />
                   )}

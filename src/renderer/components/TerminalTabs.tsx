@@ -65,11 +65,11 @@ function allPanes(l: TermLayout): string[] {
 }
 
 const menuRow: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '5px 10px', background: 'transparent', border: 'none',
+  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '5px 10px', background: 'transparent', border: 'none', borderRadius: 6,
   color: 'var(--color-text-primary, #e0e0e0)', fontSize: 12, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
 };
 const stepBtn: React.CSSProperties = {
-  width: 22, height: 20, borderRadius: 4, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)',
+  width: 22, height: 20, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.08)',
   color: 'var(--color-text-primary, #e0e0e0)', fontSize: 12, lineHeight: 1, cursor: 'pointer', padding: 0, fontFamily: 'inherit',
 };
 
@@ -300,8 +300,8 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0, flex: 1, width: '100%', minWidth: 0 }}>
       {/* Tab strip */}
-      <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, background: '#0a0a0a', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div role="tablist" aria-label="Terminal sessions" style={{ display: 'flex', alignItems: 'stretch', gap: 2, padding: '2px 4px', flex: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, background: '#131417', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div role="tablist" aria-label="Terminal sessions" style={{ display: 'flex', alignItems: 'stretch', gap: 2, padding: '4px 6px', flex: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {layout.tabs.map((t, i) => {
             const active = t.id === layout.activeId;
             const label = labelFor(t, i);
@@ -320,7 +320,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                 }}
                 title={`${label}${t.panes.length > 1 ? ` · ${t.panes.length} panes` : ''} — double-click to rename`}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
                   fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                   color: active ? 'var(--color-text-primary, #e0e0e0)' : 'var(--color-text-tertiary, #8a8a8a)',
                   background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
@@ -339,7 +339,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                       else if (e.key === 'Escape') { e.preventDefault(); setEditingId(null); setEditName(''); }
                     }}
                     aria-label={`Rename ${label}`}
-                    style={{ width: 96, background: '#141414', color: '#e0e0e0', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 4, outline: 'none', fontFamily: 'inherit', fontSize: 11, fontWeight: 600, padding: '0 4px' }}
+                    style={{ width: 96, background: '#141414', color: '#e0e0e0', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, outline: 'none', fontFamily: 'inherit', fontSize: 11, fontWeight: 600, padding: '0 6px' }}
                   />
                 ) : (
                   <span style={{ maxWidth: 140, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
@@ -367,7 +367,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {menuOpen && (
-            <div role="menu" aria-label="Shells and text size" style={{ position: 'absolute', top: '100%', right: 4, marginTop: 2, zIndex: 20, minWidth: 236, padding: '4px 0', borderRadius: 6, background: '#161617', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 6px 18px rgba(0,0,0,0.5)' }}>
+            <div role="menu" aria-label="Shells and text size" style={{ position: 'absolute', top: '100%', right: 4, marginTop: 2, zIndex: 20, minWidth: 236, padding: '4px', borderRadius: 10, background: '#1c1e22', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <div style={{ padding: '4px 10px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary, #8a8a8a)' }}>New tab with</div>
               {shells.length === 0 && (
                 <div style={{ padding: '4px 10px 6px', fontSize: 12, color: 'var(--color-text-secondary, #b8b8bd)' }}>No shells found. New tabs use the system shell.</div>
@@ -382,7 +382,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                     {isDefault ? (
                       <span style={{ padding: '0 10px', fontSize: 11, color: 'var(--color-text-tertiary, #8a8a8a)' }}>Default</span>
                     ) : (
-                      <button type="button" className="dex-hover-bg" aria-label={`Make ${s.label} the default shell`} title="New tabs start this shell" onClick={() => setSettings((prev) => ({ ...prev, defaultShell: s.default ? null : s.path }))} style={{ ...menuRow, width: 'auto', padding: '5px 10px', fontSize: 11, color: 'var(--color-accent, #0A84FF)' }}>
+                      <button type="button" className="dex-hover-bg" aria-label={`Make ${s.label} the default shell`} title="New tabs start this shell" onClick={() => setSettings((prev) => ({ ...prev, defaultShell: s.default ? null : s.path }))} style={{ ...menuRow, width: 'auto', padding: '5px 10px', fontSize: 11, color: 'var(--color-text-secondary, #aeaeb2)' }}>
                         Set default
                       </button>
                     )}

@@ -106,6 +106,12 @@ import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../.
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { colorInputValue } from '../../utils/canvasTheme';
+import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
+
+// Swatches must be real colours: the canvas cannot paint a CSS variable, so the
+// old `var(--color-error)` swatches left the brush colour unusable.
+const PRISM_SWATCHES = ['#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#0a84ff', '#bf5af2', '#ff375f'];
 
 // Prism's value sliders all share the app accent (#ff375f) and an 80px label
 // column; this thin wrapper bakes those in so call sites stay declarative and the
@@ -692,6 +698,8 @@ const Prism: React.FC = () => {
   // Asset Library
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [assetCategory, setAssetCategory] = useState<'shapes' | 'patterns' | 'gradients' | 'swatches'>('shapes');
+  // Colours saved in any app (Colors, PRISM) via the shared AssetLibrary palette.
+  const savedSwatches = useSavedColors();
   // Slice/Export for Web
   const [showSliceExport, setShowSliceExport] = useState(false);
   const [slices, setSlices] = useState<{ id: string; name: string; x: number; y: number; width: number; height: number; format: string; quality: number }[]>([]);
@@ -3333,14 +3341,14 @@ const Prism: React.FC = () => {
             <div style={{ position: 'relative', width: '32px', height: '32px', margin: '0 auto' }}>
               <input
                 type="color"
-                value={foregroundColor}
+                value={colorInputValue(foregroundColor)}
                 onChange={(e) => setForegroundColor(e.target.value)}
                 aria-label="Foreground color"
                 style={{ position: 'absolute', top: 0, left: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
               />
               <input
                 type="color"
-                value={backgroundColor}
+                value={colorInputValue(backgroundColor)}
                 onChange={(e) => setBackgroundColor(e.target.value)}
                 aria-label="Background color"
                 style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', border: '2px solid var(--color-text-muted)', borderRadius: '2px', cursor: 'pointer' }}
@@ -4595,12 +4603,24 @@ const Prism: React.FC = () => {
               {(assetCategory === 'shapes' ? ['Rectangle', 'Circle', 'Triangle', 'Star', 'Arrow', 'Heart', 'Diamond', 'Pentagon'] :
                 assetCategory === 'patterns' ? ['Dots', 'Lines', 'Grid', 'Chevron', 'Waves', 'Crosses', 'Hexagons', 'Moire'] :
                 assetCategory === 'gradients' ? ['Sunset', 'Ocean', 'Forest', 'Flame', 'Sky', 'Neon', 'Pastel', 'Mono'] :
-                ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64d2ff', 'var(--color-accent)', '#bf5af2', 'var(--prism-accent)']).map((item, i) => (
+                [...savedSwatches, ...PRISM_SWATCHES.filter((c) => !savedSwatches.includes(c))]).map((item, i) => (
                 <div key={`${item}-${i}`} onClick={() => { if (assetCategory === 'swatches') { setForegroundColor(item); } else { const newLayer = { id: `asset-${Date.now()}`, name: `${item}`, type: 'shape' as const, visible: true, locked: false, opacity: 100, blendMode: 'normal' as BlendMode, x: Math.round(canvasSize.width / 2 - 50), y: Math.round(canvasSize.height / 2 - 50), width: 100, height: 100, rotation: 0, imageData: undefined }; setLayers(prev => [newLayer, ...prev]); pushHistory(`Insert ${item}`); } }} style={{ aspectRatio: '1', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: assetCategory === 'swatches' ? item : 'var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   {assetCategory !== 'swatches' && item}
                 </div>
               ))}
             </div>
+            {assetCategory === 'swatches' && (
+              <button
+                onClick={() => saveColor(foregroundColor, 'prism')}
+                disabled={!normalizeHex(foregroundColor) || savedSwatches.includes(normalizeHex(foregroundColor) ?? '')}
+                aria-label="Save the current colour to the shared library"
+                className="prism-btn"
+                style={{ ...styles.btn, marginTop: 8, width: '100%', justifyContent: 'center' }}
+              >
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: foregroundColor, border: '1px solid var(--color-border)' }} />
+                {savedSwatches.includes(normalizeHex(foregroundColor) ?? '') ? 'Current colour is saved' : 'Save current colour'}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -5251,7 +5271,7 @@ const Prism: React.FC = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Color:</span>
-              <input type="color" value={photoFilterColor} onChange={e => setPhotoFilterColor(e.target.value)} style={{ width: 24, height: 18, border: 'none', background: 'none', cursor: 'pointer' }} />
+              <input type="color" value={colorInputValue(photoFilterColor)} onChange={e => setPhotoFilterColor(e.target.value)} style={{ width: 24, height: 18, border: 'none', background: 'none', cursor: 'pointer' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{photoFilterColor}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -5358,12 +5378,12 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Source</span>
-                <input type="color" value={replaceColorSource} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={colorInputValue(replaceColorSource)} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
               <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>→</span>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Target</span>
-                <input type="color" value={replaceColorTarget} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={colorInputValue(replaceColorTarget)} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
@@ -5592,7 +5612,7 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 'var(--space-2)' }}>
               {gradientMapStops.map((stop, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <input type="color" value={stop.color} onChange={e => setGradientMapStops(prev => { const n = [...prev]; n[i] = { ...n[i], color: e.target.value }; return n; })} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', background: 'none' }} />
+                  <input type="color" value={colorInputValue(stop.color)} onChange={e => setGradientMapStops(prev => { const n = [...prev]; n[i] = { ...n[i], color: e.target.value }; return n; })} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', background: 'none' }} />
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{Math.round(stop.offset * 100)}%</span>
                 </div>
               ))}
@@ -5663,7 +5683,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               <button aria-label="Add horizontal guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'h', position: Math.round(canvasSize.height / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Horizontal</button>
-              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid rgba(48,209,88,0.2)', background: 'rgba(48,209,88,0.08)', color: 'var(--color-success)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
+              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {guides.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No guides yet</div>}
@@ -5699,7 +5719,7 @@ const Prism: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{a.name}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button aria-label={`Play action ${a.name}`} onClick={() => runAction(a)} style={{ background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: 9999, color: 'var(--color-success)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+                      <button aria-label={`Play action ${a.name}`} onClick={() => runAction(a)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9999, color: 'var(--color-text-primary)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
                       <button aria-label={`Delete action ${a.name}`} onClick={() => setActions(prev => prev.filter(aa => aa.id !== a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
                     </div>
                   </div>

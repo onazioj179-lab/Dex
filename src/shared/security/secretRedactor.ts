@@ -17,7 +17,8 @@
 
 export interface SecretFinding {
   kind: 'aws-access-key' | 'aws-secret' | 'github-token' | 'slack-token'
-       | 'stripe-key' | 'jwt' | 'private-key-block' | 'generic-high-entropy';
+       | 'stripe-key' | 'jwt' | 'private-key-block' | 'generic-high-entropy'
+       | 'openai-key' | 'anthropic-key' | 'google-api-key';
   start: number;
   end: number;
   preview: string;          // first/last 4 chars only
@@ -30,6 +31,9 @@ const PATTERNS: Array<{ kind: SecretFinding['kind']; re: RegExp }> = [
   { kind: 'slack-token',        re: /\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/g },
   { kind: 'stripe-key',         re: /\b(?:sk|pk)_(?:test|live)_[A-Za-z0-9]{24,99}\b/g },
   { kind: 'jwt',                re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
+  { kind: 'anthropic-key',      re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
+  { kind: 'openai-key',         re: /\bsk-(?!ant-)(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g },
+  { kind: 'google-api-key',     re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
   { kind: 'private-key-block',  re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/g },
 ];
 
@@ -88,4 +92,30 @@ export function redactSecrets(input: string, placeholder: (kind: SecretFinding['
 /** True if the input contains anything secret. */
 export function containsSecret(input: string): boolean {
   return findSecrets(input).length > 0;
+}
+
+/**
+ * Kinds precise enough to remove without asking: a match is almost never
+ * anything but a credential. 'aws-secret' (any 40-char base64 run, e.g. every
+ * git commit hash) and 'generic-high-entropy' (file hashes, ids) are not.
+ */
+export const HIGH_CONFIDENCE_SECRET_KINDS: ReadonlySet<SecretFinding['kind']> = new Set([
+  'aws-access-key', 'github-token', 'slack-token', 'stripe-key', 'jwt', 'private-key-block',
+  'openai-key', 'anthropic-key', 'google-api-key',
+]);
+
+/** Redact only high-confidence secrets; returns the text and what was removed. */
+export function redactHighConfidenceSecrets(input: string): { text: string; removed: SecretFinding['kind'][] } {
+  const findings = findSecrets(input).filter((f) => HIGH_CONFIDENCE_SECRET_KINDS.has(f.kind));
+  if (findings.length === 0) return { text: input, removed: [] };
+  let out = '';
+  let cursor = 0;
+  const removed: SecretFinding['kind'][] = [];
+  for (const f of findings) {
+    if (f.start < cursor) continue;
+    out += input.slice(cursor, f.start) + `[REDACTED:${f.kind}]`;
+    cursor = f.end;
+    removed.push(f.kind);
+  }
+  return { text: out + input.slice(cursor), removed };
 }

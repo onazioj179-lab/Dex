@@ -9,6 +9,15 @@
 
 ---
 
+## Apps UI/UX + Liquid Glass pass (2026-11-14)
+
+- Work area: `getShellWorkspace` subtracts the docked DEX Bar (`floatingLauncherStore.reserveBottom`, published by the bar); maximized = work area inset by the snap gutter (default now 8). Tabs use `--dex-win-inset` / `--dex-reserved-bottom`. The bar no longer auto-hides over tabs (only in focus mode).
+- Re-fit: `dex-work-area-changed` (fired on a timeout, not rAF, so it runs while hidden) re-fits maximized windows and edge-anchored tiles.
+- Side by side: `tileWindow` pairs the opposite half with the front-most window or the current tab. Min sizes capped to half the work area.
+- Material: `GlassFilters` (SVG `#dex-glass-refract`) + `.dex-glass-specular`, `.dex-glass-refract`, `.dex-pill(-tinted)`, `.dex-notif-card` in design-system.css.
+- Preview gotcha: with the pane hidden, rAF and the animation clock stop; a banner dismisses the moment a screenshot wakes the page (its rAF timer sees the whole hidden time). Not a product bug.
+- Rows #270–#278 in DEX_REMAINING_WORK.md.
+
 ## Robustness pass (2026-11-13)
 
 - Lock with `crate::util::LockSafe` (`m.lock_safe()`), never `m.lock().unwrap()`: a panic caught by the `dex_ipc` guard
@@ -1254,3 +1263,4 @@ return results. **Add a degrade-log:** have `tauriCompat` count which unported
 channels get hit at runtime — that data orders P3 (port what's actually used).
 
 - 2026-11-04 (Part 17): new `ledger:load|save|stats` channels (`src-tauri/src/ledger.rs`, shared dex.db, atomic replace-all save, routed through `db_dispatch`, schema in `ensure_all_schemas`).
+- 2026-11-14 (deep wiring): new `dexnotes:favorite` (+ `notes.favorite` column, migrated on start); `AssetLibrary` persists to `capability:storage` key `dex-asset-library-v1`; dead `optimization:*` / `memory:report` / `user:activity` renderer calls removed. ABI unhandled renderer calls now 1 (`screencapture:getSources`, picker fallback).

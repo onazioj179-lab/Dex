@@ -381,6 +381,7 @@
     "dexnotes:deleteFolder",
     "dexnotes:duplicate",
     "dexnotes:emptyTrash",
+    "dexnotes:favorite",
     "dexnotes:get",
     "dexnotes:getAllTags",
     "dexnotes:getAttachments",
@@ -1925,11 +1926,6 @@
     "xenon:throttle"
   ],
   "unhandledRendererCalls": [
-    "dexnotes:favorite",
-    "memory:report",
-    "optimization:getDirective",
-    "optimization:getTier",
-    "optimization:reportGPU",
     "screencapture:getSources"
   ]
 }

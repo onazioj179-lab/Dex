@@ -24,6 +24,7 @@ import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useInstalledAppsStore, canRemoveApp, appTier, type AppTier } from '../store/installedAppsStore';
+import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
 
 const TIER_LABEL: Record<AppTier, string> = { core: 'Core', recommended: 'Recommended', optional: 'Optional' };
 const TIER_HINT: Record<AppTier, string> = {
@@ -770,8 +771,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-accent-soft, rgba(10,132,255,0.28))',
   },
-  title: { margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.15 },
-  subtitle: { marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' },
+  title: APP_TITLE,
+  subtitle: APP_SUBTITLE,
   controls: {
     display: 'flex',
     alignItems: 'center',

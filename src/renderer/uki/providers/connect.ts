@@ -24,6 +24,7 @@ import { assertWithinCap, recordUsage, estimateTokens } from './usage';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
 import type { ChatMessage, ProviderId } from './types';
+import { guardAndNotify } from './outboundGuard';
 
 /**
  * Preference order when several providers are configured. Hosted, higher-quality
@@ -316,7 +317,7 @@ export async function streamConfiguredLLM(
   const httpReq = provider.buildChatRequest(
     {
       model: modelId,
-      messages,
+      messages: guardAndNotify(messages, provider),
       temperature: opts.chatOptions?.temperature ?? 0.7,
       maxTokens: opts.chatOptions?.maxTokens ?? 600,
       stream: true,

@@ -150,7 +150,6 @@ const Banner: React.FC<{
   onClick?: (notification: BannerNotification) => void;
 }> = ({ notification, index, onDismiss, onClick }) => {
   const [hovered, setHovered] = useState(false);
-  const [progress, setProgress] = useState(1);
   const [swipeX, setSwipeX] = useState(0);
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef(performance.now());
@@ -164,7 +163,7 @@ const Banner: React.FC<{
     // duration <= 0 means "persistent" (critical urgency / alarm / incoming-call
     // scenarios per the freedesktop+MS notification model): never auto-dismiss,
     // keep the progress bar full, and rely on manual dismissal.
-    if (duration <= 0) { setProgress(1); return; }
+    if (duration <= 0) return;
     startTimeRef.current = performance.now();
     const tick = () => {
       if (pausedAtRef.current !== null) {
@@ -177,7 +176,6 @@ const Banner: React.FC<{
         onDismiss(notification.id);
         return;
       }
-      setProgress(remaining);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -251,14 +249,9 @@ const Banner: React.FC<{
     onClick?.(notification);
   }, [onClick, notification]);
 
-  const iconColor = (() => {
-    switch (notification.icon) {
-      case 'success': return 'var(--color-success)';
-      case 'warning': return 'var(--color-warning)';
-      case 'error': return 'var(--color-error)';
-      default: return 'var(--color-accent)';
-    }
-  })();
+  // Restrained colour: glyphs are monochrome; only an error keeps red, because
+  // there the colour carries meaning. No green/yellow badge decoration.
+  const iconColor = notification.icon === 'error' ? 'var(--color-error)' : 'var(--color-text-primary)';
 
   const iconSvg = (() => {
     switch (notification.icon) {
@@ -277,7 +270,7 @@ const Banner: React.FC<{
     <div
       ref={bannerRef}
       role="alert"
-      className="dex-liquid-glass"
+      className="dex-liquid-glass dex-glass-specular dex-glass-refract dex-notif-card"
       aria-live={notification.icon === 'error' ? 'assertive' : 'polite'}
       aria-label={`${notification.icon || 'info'} notification: ${notification.title}`}
       onMouseEnter={() => setHovered(true)}
@@ -288,101 +281,75 @@ const Banner: React.FC<{
       onPointerCancel={handlePointerCancel}
       onClick={handleClick}
       style={{
-        // Apple-style frosted notification: background/blur/border + specular rim
-        // come from .dex-liquid-glass (auto-solid in lite mode). Keep the floating
-        // drop shadow inline (composed with the class's specular insets).
+        // Floating notification card: Liquid Glass (refraction + specular edge
+        // from the classes), soft elevation, compact. Swipe right to dismiss.
         width: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
-        minHeight: 64,
-        borderRadius: 14,
-        boxShadow: 'var(--pg-shadow-panel), inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
-        overflow: 'hidden',
+        minHeight: 60,
         cursor: 'pointer',
+        position: 'relative',
         transform: `translateX(${swipeX}px)`,
         opacity: swipeX > 0 ? Math.max(0, 1 - swipeX / BANNER_WIDTH) : 1,
         transition: (swipeX === 0 || leaving) && !isReduceMotion()
-          ? `transform ${leaving ? '0.18s' : '0.25s'} cubic-bezier(0.23,1,0.32,1), opacity ${leaving ? '0.18s' : '0.25s'} cubic-bezier(0.23,1,0.32,1)`
+          ? `transform ${leaving ? '0.2s' : '0.42s'} cubic-bezier(0.34,1.36,0.64,1), opacity 0.2s ease`
           : 'none',
-        animation: isReduceMotion() ? 'none' : `bannerSlideIn 0.22s cubic-bezier(0.23,1,0.32,1)`,
-        position: 'relative',
+        // Spring entrance: drops in from above with a small overshoot.
+        animation: isReduceMotion() ? 'none' : 'dexNotifIn 0.46s cubic-bezier(0.34,1.3,0.64,1) backwards',
+        animationDelay: isReduceMotion() ? undefined : `${Math.min(index, 3) * 40}ms`,
         touchAction: 'pan-y',
+        userSelect: 'none',
       }}
     >
-      <div style={{ padding: 'var(--space-3) 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+      <div style={{ padding: '11px 14px', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-          background: `color-mix(in srgb, ${iconColor} 8%, transparent)`,
+          width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+          background: 'rgba(255,255,255,0.10)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {iconSvg}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3 }}>
-            {notification.title}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {notification.title}
+            </div>
+            {notification.source && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0, textTransform: 'capitalize' }}>
+                {notification.source}
+              </span>
+            )}
           </div>
           {notification.body && (
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
               {notification.body}
             </div>
           )}
-          {/* Source tag */}
-          {notification.source && (
-            <div style={{ 
-              fontSize: 10, color: 'var(--color-text-tertiary)', 
-              marginTop: 4, opacity: 0.8,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-              <span style={{ 
-                width: 4, height: 4, borderRadius: '50%', 
-                background: iconColor, opacity: 0.6 
-              }} />
-              {notification.source}
-            </div>
-          )}
-          {/* Actions on hover (including undo) */}
-          {hovered && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 'var(--space-2)' }}>
-              {/* Undo button if available */}
+          {/* Actions (and Undo) on hover, as glass pills; the first real
+              action is the tinted one. */}
+          {hovered && (notification.undoAction || (notification.actions && notification.actions.length > 0)) && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               {notification.undoAction && (
                 <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    notification.undoAction?.(); 
-                    onDismiss(notification.id); 
+                  type="button"
+                  className="dex-pill"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    notification.undoAction?.();
+                    onDismiss(notification.id);
                   }}
-                  style={{
-                    padding: '4px 10px', borderRadius: 4,
-                    background: 'var(--color-warning)',
-                    color: '#000',
-                    border: 'none', fontSize: 11, fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'opacity 0.1s ease',
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                 >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M3 10h10a5 5 0 0 1 5 5v2"/>
-                    <polyline points="3 10 8 5 3 10 8 15"/>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 10h11a6 6 0 0 1 0 12h-3" /><polyline points="7 6 3 10 7 14" />
                   </svg>
                   Undo
                 </button>
               )}
-              {/* Custom actions */}
               {notification.actions && notification.actions.map((action, i) => (
                 <button
                   key={i}
+                  type="button"
+                  className={i === 0 && !notification.undoAction ? 'dex-pill dex-pill-tinted' : 'dex-pill'}
                   onClick={(e) => { e.stopPropagation(); action.onClick(); onDismiss(notification.id); }}
-                  style={{
-                    padding: '4px 10px', borderRadius: 4,
-                    background: i === 0 && !notification.undoAction ? 'var(--color-accent-fill)' : 'var(--color-border-subtle)',
-                    color: i === 0 && !notification.undoAction ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
-                    border: 'none', fontSize: 11, fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'opacity 0.1s ease',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                 >
                   {action.label}
                 </button>
@@ -391,28 +358,6 @@ const Banner: React.FC<{
           )}
         </div>
       </div>
-
-      {/* Priority indicator for urgent notifications */}
-      {notification.priority === 'urgent' && (
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, height: 2,
-          background: 'linear-gradient(90deg, var(--color-error), var(--color-warning))',
-          borderRadius: '10px 10px 0 0',
-        }} />
-      )}
-
-      {/* Progress indicator */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0, left: 0,
-        width: `${progress * 100}%`,
-        height: 2,
-        background: iconColor,
-        opacity: 0.4,
-        borderRadius: '0 1px 0 0',
-        transition: 'width 0.05s linear',
-      }} />
     </div>
   );
 };
@@ -611,13 +556,6 @@ export function useBannerNotifications() {
 // NOTIFICATION CENTER PANEL (with grouping and timeline)
 // ---------------------------------------------------------------------------
 
-const ICON_COLORS: Record<string, string> = {
-  info: 'var(--color-accent)',
-  success: 'var(--color-success)',
-  warning: 'var(--color-warning)',
-  error: 'var(--color-error)',
-};
-
 type ViewMode = 'timeline' | 'grouped';
 
 // ---------------------------------------------------------------------------
@@ -638,7 +576,8 @@ const CenterCard: React.FC<{
   onDismiss?: (id: string) => void;
 }> = ({ n, onMarkAsRead, onActivate, showSource, onDismiss }) => {
   const [hovered, setHovered] = useState(false);
-  const color = n.color ?? ICON_COLORS[n.icon ?? 'info'] ?? 'var(--color-accent)';
+  // Unread = one DEX Blue dot; only errors keep red. No rainbow of status dots.
+  const color = n.icon === 'error' ? 'var(--color-error)' : 'var(--color-accent)';
   const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
   const target = readHubTarget(n.action);
   const closures = n.actions ?? [];
@@ -654,9 +593,9 @@ const CenterCard: React.FC<{
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '10px var(--space-3)', borderRadius: 10, marginBottom: 6,
-        background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
-        border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
+        padding: '10px var(--space-3)', borderRadius: 14, marginBottom: 6,
+        background: n.read ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.07)',
+        border: '1px solid var(--color-border-subtle)',
         cursor: 'pointer',
         transition: isReduceMotion() ? 'none' : 'background 0.15s ease, border-color 0.15s ease',
       }}
@@ -825,10 +764,6 @@ export const NotificationCenter: React.FC<{
           @keyframes notifCenterIn {
             from { opacity: 0; transform: translateX(24px) scale(0.96); }
             to { opacity: 1; transform: translateX(0) scale(1); }
-          }
-          @keyframes bannerSlideIn {
-            0% { opacity: 0; transform: translateX(40px) scale(0.95); }
-            100% { opacity: 1; transform: translateX(0) scale(1); }
           }
         `}</style>
         {/* Header */}

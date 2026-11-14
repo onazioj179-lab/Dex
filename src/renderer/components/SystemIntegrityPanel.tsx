@@ -161,7 +161,7 @@ const SystemIntegrityPanel: React.FC = () => {
           {alerts.slice(-8).reverse().map(a => (
             <div key={a.id} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6,
-              background: 'var(--color-bg-hover)', borderLeft: `2px solid ${a.severity === 'critical' ? HEALTH_TONE.error : HEALTH_TONE.warning}`,
+              background: 'var(--color-bg-hover)',
             }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0 }}>{a.message}</span>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>{ago(a.timestamp)}</span>
