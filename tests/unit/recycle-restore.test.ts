@@ -29,6 +29,11 @@ describe('unrestorableReason', () => {
     expect(unrestorableReason(item({ app: 'mystery' }))).toBeTruthy();
     expect(unrestorableReason(item({ app: 'kanban', item_data: 'not json' }))).toBeTruthy();
   });
+  it('says expiry-rule rows hold no copy (content_expiry.rs writes only the id)', () => {
+    const data = JSON.stringify({ expired: true, item_id: 'n1', source: 'content-expiry' });
+    expect(unrestorableReason(item({ item_data: data }))).toMatch(/expiry rule/);
+    expect(unrestorableReason(item({ app: 'kanban', item_data: data }))).toMatch(/expiry rule/);
+  });
   it('accepts notes and kanban cards', () => {
     expect(unrestorableReason(item({ item_data: '{"id":"n1"}' }))).toBeNull();
     expect(unrestorableReason(item({ app: 'kanban', item_data: '{"id":"c1"}' }))).toBeNull();

@@ -18,7 +18,8 @@ import {
   sortByPriority,
 } from '../../shared/notifications/group';
 import { readHubMeta } from '../services/notify';
-import { osToastFlags } from '../utils/notificationsAllowed';
+import { osToastFlags, doNotDisturbOn, setDoNotDisturbFlag } from '../utils/notificationsAllowed';
+import { useRunningApps } from './runningApps';
 
 // ==========================================================================
 // IPC Helper
@@ -108,7 +109,7 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
   notifications: [],
   unreadCount: 0,
   panelOpen: false,
-  doNotDisturb: false,
+  doNotDisturb: doNotDisturbOn(),
   loading: false,
 
   setPanelOpen: (open) => set({ panelOpen: open }),
@@ -166,8 +167,10 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
     await get().loadUnreadCount();
   },
 
+  // Renderer-owned and persisted: banners, sounds and Windows toasts all read it
+  // through notificationsAllowed(); notifications still land in the center.
   setDoNotDisturb: async (active) => {
-    await invoke('notification-center:setDnd', active);
+    setDoNotDisturbFlag(active);
     set({ doNotDisturb: active });
   },
 }));
@@ -590,6 +593,8 @@ interface ScratchpadState {
   sendToNotes: () => Promise<{ content: string } | null>;
 }
 
+let scratchpadSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useScratchpadStore = create<ScratchpadState>((set, get) => ({
   content: '',
   isOpen: false,
@@ -599,9 +604,15 @@ export const useScratchpadStore = create<ScratchpadState>((set, get) => ({
   setOpen: (open) => set({ isOpen: open }),
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
 
+  // Saved natively (debounced) — this used to hit a "not ported" arm, so the
+  // scratchpad came back empty after every restart.
   setContent: (content) => {
     set({ content });
-    invoke('scratchpad:updateContent', content);
+    if (scratchpadSaveTimer) clearTimeout(scratchpadSaveTimer);
+    scratchpadSaveTimer = setTimeout(() => {
+      scratchpadSaveTimer = null;
+      void invoke('scratchpad:updateContent', content);
+    }, 300);
   },
 
   loadState: async () => {
@@ -676,13 +687,19 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     const { reportType, description, includeSystemInfo } = get();
     if (!description.trim()) return;
     set({ submitting: true });
-    const result = await invoke('feedback:submit', reportType, description, includeSystemInfo);
-    set({ submitting: false, submitted: true, savedPath: result?.filePath || '' });
+    const activeApp = useRunningApps.getState().currentAppId || '';
+    const result = await invoke('feedback:submit', reportType, description, includeSystemInfo, activeApp);
+    if (!result || result.success !== true) {
+      set({ submitting: false });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: result?.error || "Couldn't save the report" } }));
+      return;
+    }
+    set({ submitting: false, submitted: true, savedPath: result.filePath || '' });
   },
 
   loadSystemInfoPreview: async () => {
-    const info = await invoke('feedback:getSystemInfoPreview');
-    set({ systemInfoPreview: info });
+    const info = await invoke('feedback:getSystemInfoPreview', useRunningApps.getState().currentAppId || '');
+    set({ systemInfoPreview: info && info.success !== false ? info : null });
   },
 
   reset: () => set({
