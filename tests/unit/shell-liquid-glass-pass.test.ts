@@ -81,3 +81,30 @@ describe('achievement meta tiers use the catalog threshold', () => {
     expect(tier.progress!({ achievementPoints: n / 2 } as never)).toEqual({ current: n / 2, target: n });
   });
 });
+
+describe('meta trophy repair (revoke early unlocks)', () => {
+  it('takes back points tiers the old table granted early and keeps real trophies', async () => {
+    const { repairMetaUnlocks, getTotalPoints } = await import('../../src/renderer/services/engagement');
+    const { ACHIEVEMENTS } = await import('../../src/renderer/services/achievementsCatalog');
+    const real = ACHIEVEMENTS.filter(a => !/^(points-|ach-count-|rank-|final-)/.test(a.id)).slice(0, 5).map(a => a.id);
+    const state = {
+      stats: {} as never, lastTipIndex: 0, dismissedTips: [],
+      unlockedAchievements: [...real, 'points-4', 'points-6', 'rank-legend'],
+      unlockedAt: Object.fromEntries([...real, 'points-4', 'points-6', 'rank-legend'].map(id => [id, 1])),
+    };
+    const out = repairMetaUnlocks(state);
+    for (const id of real) expect(out.unlockedAchievements).toContain(id);
+    expect(out.unlockedAchievements).not.toContain('points-6');
+    expect(out.unlockedAchievements).not.toContain('rank-legend');
+    expect(getTotalPoints(out.unlockedAchievements)).toBeLessThan(getTotalPoints(state.unlockedAchievements));
+    expect(Object.keys(out.unlockedAt!).length).toBe(out.unlockedAchievements.length);
+  });
+  it('runs once on load and persists the flag', async () => {
+    const { loadEngagement } = await import('../../src/renderer/services/engagement');
+    localStorage.setItem('dex-engagement-state', JSON.stringify({ unlockedAchievements: ['points-8'], stats: {} }));
+    const s = loadEngagement();
+    expect(s.metaRepairV1).toBe(true);
+    expect(s.unlockedAchievements).not.toContain('points-8');
+    expect(JSON.parse(localStorage.getItem('dex-engagement-state')!).metaRepairV1).toBe(true);
+  });
+});
