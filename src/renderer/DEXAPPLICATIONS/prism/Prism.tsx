@@ -107,6 +107,11 @@ import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
+
+// Swatches must be real colours: the canvas cannot paint a CSS variable, so the
+// old `var(--color-error)` swatches left the brush colour unusable.
+const PRISM_SWATCHES = ['#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#0a84ff', '#bf5af2', '#ff375f'];
 
 // Prism's value sliders all share the app accent (#ff375f) and an 80px label
 // column; this thin wrapper bakes those in so call sites stay declarative and the
@@ -693,6 +698,8 @@ const Prism: React.FC = () => {
   // Asset Library
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [assetCategory, setAssetCategory] = useState<'shapes' | 'patterns' | 'gradients' | 'swatches'>('shapes');
+  // Colours saved in any app (Colors, PRISM) via the shared AssetLibrary palette.
+  const savedSwatches = useSavedColors();
   // Slice/Export for Web
   const [showSliceExport, setShowSliceExport] = useState(false);
   const [slices, setSlices] = useState<{ id: string; name: string; x: number; y: number; width: number; height: number; format: string; quality: number }[]>([]);
@@ -4596,12 +4603,24 @@ const Prism: React.FC = () => {
               {(assetCategory === 'shapes' ? ['Rectangle', 'Circle', 'Triangle', 'Star', 'Arrow', 'Heart', 'Diamond', 'Pentagon'] :
                 assetCategory === 'patterns' ? ['Dots', 'Lines', 'Grid', 'Chevron', 'Waves', 'Crosses', 'Hexagons', 'Moire'] :
                 assetCategory === 'gradients' ? ['Sunset', 'Ocean', 'Forest', 'Flame', 'Sky', 'Neon', 'Pastel', 'Mono'] :
-                ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', '#64d2ff', 'var(--color-accent)', '#bf5af2', 'var(--prism-accent)']).map((item, i) => (
+                [...savedSwatches, ...PRISM_SWATCHES.filter((c) => !savedSwatches.includes(c))]).map((item, i) => (
                 <div key={`${item}-${i}`} onClick={() => { if (assetCategory === 'swatches') { setForegroundColor(item); } else { const newLayer = { id: `asset-${Date.now()}`, name: `${item}`, type: 'shape' as const, visible: true, locked: false, opacity: 100, blendMode: 'normal' as BlendMode, x: Math.round(canvasSize.width / 2 - 50), y: Math.round(canvasSize.height / 2 - 50), width: 100, height: 100, rotation: 0, imageData: undefined }; setLayers(prev => [newLayer, ...prev]); pushHistory(`Insert ${item}`); } }} style={{ aspectRatio: '1', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: assetCategory === 'swatches' ? item : 'var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   {assetCategory !== 'swatches' && item}
                 </div>
               ))}
             </div>
+            {assetCategory === 'swatches' && (
+              <button
+                onClick={() => saveColor(foregroundColor, 'prism')}
+                disabled={!normalizeHex(foregroundColor) || savedSwatches.includes(normalizeHex(foregroundColor) ?? '')}
+                aria-label="Save the current colour to the shared library"
+                className="prism-btn"
+                style={{ ...styles.btn, marginTop: 8, width: '100%', justifyContent: 'center' }}
+              >
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: foregroundColor, border: '1px solid var(--color-border)' }} />
+                {savedSwatches.includes(normalizeHex(foregroundColor) ?? '') ? 'Current colour is saved' : 'Save current colour'}
+              </button>
+            )}
           </div>
         </div>
       )}

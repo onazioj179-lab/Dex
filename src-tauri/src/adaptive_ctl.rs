@@ -82,6 +82,7 @@
 // the monitor loop remain absent, matching the documented divergences below.
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::sync::{Mutex, OnceLock};
 use sysinfo::System;
@@ -326,10 +327,7 @@ fn set_activity(app: &tauri::AppHandle, args: &Value, is_export: bool) -> Value 
         Some(other) => !other.is_null(), // JS-truthy: any present non-null value
     };
     {
-        let mut g = match engine().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut g = engine().lock_safe();
         if is_export {
             g.export_active = active;
         } else {
@@ -351,10 +349,7 @@ fn set_focused_app(load: &Load, args: &Value) -> Value {
         None => "home".to_string(),
     };
     {
-        let mut g = match engine().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut g = engine().lock_safe();
         g.focused_app = app_id;
     }
     current_policy(load)
