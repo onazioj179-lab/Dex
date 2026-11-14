@@ -187,7 +187,6 @@ export const GlassNavItem: React.FC<GlassNavItemProps> = ({
             width: 2,
             background: 'var(--color-accent-fill)',
             borderRadius: 2,
-            boxShadow: '0 0 6px rgba(74,158,255,0.55)',
           }}
         />
       )}
@@ -351,7 +350,7 @@ export const StatusDot: React.FC<StatusDotProps> = ({
         height: size ?? 'var(--pg-dot-size)',
         borderRadius: '50%',
         background: color,
-        boxShadow: `0 0 0 1px rgba(0,0,0,0.4), 0 0 6px ${color}`,
+        boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
         animation: pulse ? 'pg-dot-pulse 1.6s ease-in-out infinite' : undefined,
         ...style,
       }}

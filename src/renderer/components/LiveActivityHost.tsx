@@ -104,7 +104,6 @@ const HOST_CSS = `
   flex-shrink: 0; width: 22px; height: 22px; border-radius: 9999px; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center; background: transparent; color: var(--color-text-secondary);
 }
-.dex-live-activity__btn:focus-visible, .dex-live-activity__close:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .dex-live-activity__bar { transition: none; }
   .dex-live-activity__bar.is-indeterminate { animation-duration: 2.6s; }

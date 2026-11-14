@@ -806,12 +806,6 @@ export function injectScrollbarStyles(): void {
       transition: opacity 0.2s ease;
     }
 
-    /* Focus ring for keyboard nav */
-    :focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
     /* Window focus state — DEX does NOT dim or change when it loses OS focus.
        (The old rule dimmed the whole app to opacity 0.95 on blur, part of the
        "DEX looks dead until you tap it" annoyance.) Kept as full-opacity no-ops
