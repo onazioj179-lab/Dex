@@ -36,6 +36,7 @@ import { loadWatermarkImage, type SubtitleSpec, type WatermarkPosition } from '.
 import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMenuBar';
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { colorInputValue } from '../../utils/canvasTheme';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -2316,7 +2317,7 @@ const Forge: React.FC = () => {
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Pad Color</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-              <input type="color" value={padColor} onChange={e => setPadColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
+              <input type="color" value={colorInputValue(padColor)} onChange={e => setPadColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{padColor}</span>
             </div>
             <button aria-label="Apply crop and pad" onClick={() => {

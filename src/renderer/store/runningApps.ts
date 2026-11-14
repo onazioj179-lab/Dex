@@ -366,7 +366,7 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   // Utility Apps
   power: { name: 'Power', color: 'var(--color-error)', icon: 'power', shortcut: `${_O}+P`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Battery, power mode and energy use' },
   calculator: { name: 'Calculator', color: 'var(--color-text-tertiary)', icon: 'calculator', shortcut: `${_O}+C`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Standard and scientific calculator' },
-  passwordgenerator: { name: 'Password Generator', color: 'var(--color-accent)', icon: 'key', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Generate strong passwords and passphrases' },
+  passwordgenerator: { name: 'Password Generator', color: 'var(--color-accent)', icon: 'key', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Generate passwords, keep them in the Vault, and get 2FA codes' },
 
   // DEX Creative Suite
   videoeditor: { name: 'VINX', color: '#BF5AF2', icon: 'videoeditor', shortcut: `${_O}+V`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Professional video editing with multi-track timeline, effects, and color grading', category: 'creative' },

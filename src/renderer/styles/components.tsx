@@ -4425,7 +4425,7 @@ export const DexColorInput: React.FC<DexColorInputProps> = ({ value, onChange, l
     <div className={className} style={{ display: "flex", alignItems: "center", gap: space[2], ...style }}>
       {label && <span style={{ fontSize: fontSize.sm, color: "var(--color-text-secondary)" }}>{label}</span>}
       <div onClick={() => !disabled && inputRef.current?.click()} style={{ width: 32, height: 32, borderRadius: radius.md, backgroundColor: value, border: "2px solid var(--color-border)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }} />
-      <input ref={inputRef} type="color" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} style={{ display: "none" }} />
+      <input ref={inputRef} type="color" value={colorInputValue(value)} onChange={(e) => onChange(e.target.value)} disabled={disabled} style={{ display: "none" }} />
     </div>
   );
 };
@@ -5027,7 +5027,7 @@ export const DexPropertyPanel: React.FC<DexPropertyPanelProps> = ({
                 {item.type === 'color' && (
                   <input
                     type="color"
-                    value={item.value as string}
+                    value={colorInputValue(item.value as string)}
                     onChange={(e) => onChange(item.id, e.target.value)}
                     style={{ width: 32, height: 32, border: 'none', cursor: 'pointer' }}
                   />
@@ -5424,3 +5424,4 @@ export {
   padding,
   colors,
 } from './tokens';
+import { colorInputValue } from '../utils/canvasTheme';

@@ -53,3 +53,33 @@ export function resolveCanvasColor(color: string | undefined | null, el?: Elemen
   const v = canvasColor(m[1], el);
   return v === '#ffffff' && m[2] && !(m[1] in FALLBACKS) ? m[2] : v;
 }
+
+/**
+ * A value an `<input type="color">` accepts. The control takes ONLY lowercase
+ * `#rrggbb`; anything else (`var(--token)`, `rgb()`, `#fff`, a name) is
+ * rejected with a console warning and the swatch shows black, so the picker
+ * opens on the wrong colour. Resolves tokens, drops alpha, expands short hex.
+ */
+export function colorInputValue(color: string | undefined | null, fallback = '#000000', el?: Element | null): string {
+  const c = resolveCanvasColor(color || fallback, el).trim();
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(c);
+  if (hex) {
+    const h = hex[1].length <= 4 ? hex[1].slice(0, 3).split('').map((d) => d + d).join('') : hex[1].slice(0, 6);
+    return `#${h.toLowerCase()}`;
+  }
+  const rgb = /^rgba?\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+(-?[\d.]+)/i.exec(c);
+  if (rgb) {
+    return '#' + [rgb[1], rgb[2], rgb[3]].map((n) => Math.max(0, Math.min(255, Math.round(Number(n)))).toString(16).padStart(2, '0')).join('');
+  }
+  // Named colours and anything else: let the browser parse it.
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#010203';
+      ctx.fillStyle = c;
+      const out = String(ctx.fillStyle);
+      if (out !== '#010203' || c.toLowerCase() === '#010203') return out.startsWith('#') ? out.slice(0, 7).toLowerCase() : colorInputValue(out, fallback);
+    }
+  } catch { /* non-DOM environment */ }
+  return c === fallback ? '#000000' : colorInputValue(fallback, '#000000');
+}

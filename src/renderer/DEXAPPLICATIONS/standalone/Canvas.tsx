@@ -17,6 +17,7 @@ import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
+import { colorInputValue } from '../../utils/canvasTheme';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -1186,7 +1187,7 @@ const Canvas: React.FC = () => {
           ))}
           <input
             type="color"
-            value={color}
+            value={colorInputValue(color)}
             onChange={e => setColor(e.target.value)}
             style={s.colorPicker}
             title="Custom color"
