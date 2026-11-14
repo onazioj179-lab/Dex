@@ -214,7 +214,7 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 189 | Pixel tools baked the whole screen (checkerboard + every visible layer) into the… | Packaged-app run |
 | 190 | Render Queue: "Render All" rendered only the first job, jobs were labelled "MP4 … | Packaged-app run (render queue) |
 | 193 | 7.0.2: retire Rewind; release build and packaged smoke run; Show in File Explore… | Packaged-app run (path with spaces) |
-| 201 | Native IPC ABI guard (B001/B002/B016) | CI step (done this pass) |
+| 201 | Native IPC ABI guard (B001/B002/B016) | Next CI run (own step added, #245) |
 | 204 | Hover submenus closed while the pointer moved into them; no safe triangle | Packaged-app run |
 | 207 | Hit slop, continuous corners, view-transition theme fade (B013) | Packaged-app run (WebView2 corner-shape) |
 | 209 | Settings › Reduce Motion didn't reach JS motion (B012) | Packaged-app run |
@@ -239,3 +239,14 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | # | App | Item | Priority | Status | What changed | Next check |
 |---|---|---|---|---|---|---|
 | 46 | Browser | Page render in the packaged app | — | INCONCLUSIVE (2026-11-13) | Address bar and native page view both work up to creation; the page view was created while the test window was minimized and stayed 810×2 px, a new tab got correct bounds but stayed hidden, and `browserView:evalResult` timed out on both. The DEX window was not on screen during the run, so this is not a fair test | Repeat with DEX in front: open a page, check it draws, back/forward |
+
+## Session 2026-11-13 (`claude/robustness-pass-1113`): crash-proofing under load, security, speed
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 240 | Platform (native) | One panic inside a locked section killed that subsystem until restart | HIGH | FIXED (cargo test) | `util::LockSafe::lock_safe()` recovers a poisoned mutex and clears the poison; used by voice, large files, render governor, phone share, browser bridge and site permissions (was `.lock().unwrap()`, which re-panicked on every later call) | Remaining `if let Ok(..) = m.lock()` sites skip their work after a poison; convert when touched |
+| 241 | Transfers (phone share) | Sharing a file with a non-English name crashed the share server; uploads could fill memory | HIGH | FIXED (4 cargo tests) | Download header is RFC 6266 ASCII + `filename*` (tiny_http refused "café.jpg" and the `unwrap` killed the server thread); request loop guarded; waiting uploads capped at 16 files / 1 GiB (HTTP 429); declined uploads free their bytes (they stayed in memory until the server stopped); accepted files no longer overwrite an existing file; a failed save is reported, not "accepted" | Share "café.jpg" to a phone; upload two files with the same name |
+| 242 | Security, Auth, Keys | Random bytes started PowerShell for every call, with a clock+pid fallback | HIGH | FIXED (auth/keys/encryption cargo tests) | `keys_ctl` / `encryption_ctl` `os_random_bytes` use the in-process OS CSPRNG (`dex_vault::crypto::random_bytes`): sign-in session tokens, salts, recovery codes and keys no longer cost a PowerShell start (~0.3–1 s) and can no longer fall back to a predictable stream | Time a PIN sign-in in the packaged app |
+| 243 | Browser bridge | Any web page could read the bridge's pending actions or forge results once paired | MEDIUM | FIXED (cargo test) | 127.0.0.1:19847 (dormant: nothing in DEX starts it today): `/pair` returns a 256-bit secret that `/action`, `/result`, `/heartbeat` require as `X-Dex-Connection`; 5 wrong pairing codes cancel the pairing; no wildcard CORS; constant-time compares | — |
+| 244 | Notes | Learned words were recorded but never loaded into suggestions | LOW | FIXED (cargo test, ABI lock) | The editor asked for `dexnotes:get-word-suggestions`, which nothing answered; new `dexnotes:topWords` returns the vocabulary with counts | Type a rare word in a note, reopen Notes, start typing it |
+| 245 | CI | ABI check ran inside one "lint" step | LOW | FIXED | `ci.yml`: Type check, Watermark check and Native IPC ABI check are separate steps (#201 next action) | Next CI run |
