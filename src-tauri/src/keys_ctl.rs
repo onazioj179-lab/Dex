@@ -174,8 +174,8 @@ fn get_key(app: &tauri::AppHandle, id: &str) -> Value {
 // SecureKeyManager.generateKey / deleteKey are now ported with genuine native
 // implementations rather than degraded. Key MATERIAL is handled exactly as
 // Electron handled it:
-//   - 32 random bytes from the OS CSPRNG (Windows RNGCryptoServiceProvider via
-//     PowerShell; /dev/urandom on unix), matching crypto.randomBytes(32).
+//   - 32 random bytes from the OS CSPRNG (in process, via dex-vault),
+//     matching crypto.randomBytes(32).
 //   - The raw key is wrapped at rest with Windows DPAPI (CurrentUser scope) and
 //     stored under `keychain.dex-key-<id>` — the SAME store path and the SAME
 //     intent as Electron's safeStorage.encryptString (which is DPAPI on Windows).
@@ -213,38 +213,6 @@ fn b64_encode(data: &[u8]) -> String {
     out
 }
 
-fn b64_val(c: u8) -> Option<u32> {
-    match c {
-        b'A'..=b'Z' => Some((c - b'A') as u32),
-        b'a'..=b'z' => Some((c - b'a' + 26) as u32),
-        b'0'..=b'9' => Some((c - b'0' + 52) as u32),
-        b'+' => Some(62),
-        b'/' => Some(63),
-        _ => None,
-    }
-}
-
-fn b64_decode(s: &str) -> Option<Vec<u8>> {
-    let cleaned: Vec<u8> = s
-        .bytes()
-        .filter(|&c| c != b'=' && !c.is_ascii_whitespace())
-        .collect();
-    let mut out = Vec::with_capacity(cleaned.len() / 4 * 3);
-    for chunk in cleaned.chunks(4) {
-        let mut n = 0u32;
-        let mut bits = 0;
-        for &c in chunk {
-            n = (n << 6) | b64_val(c)?;
-            bits += 6;
-        }
-        n <<= 24 - bits;
-        let nbytes = bits / 8;
-        let be = n.to_be_bytes();
-        out.extend_from_slice(&be[1..1 + nbytes]);
-    }
-    Some(out)
-}
-
 // --- sha256 raw digest (via the shell's single SHA-256 in licensing.rs) ------
 
 fn hex_to_bytes(hex: &str) -> Vec<u8> {
@@ -270,44 +238,11 @@ fn compute_checksum(key: &[u8]) -> String {
 // --- OS CSPRNG (crypto.randomBytes equivalent) ------------------------------
 
 pub(crate) fn os_random_bytes(n: usize) -> Vec<u8> {
-    #[cfg(unix)]
-    {
-        use std::io::Read;
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            let mut buf = vec![0u8; n];
-            if f.read_exact(&mut buf).is_ok() {
-                return buf;
-            }
-        }
-    }
-    #[cfg(windows)]
-    {
-        let script = format!(
-            "$b=New-Object byte[] {n};(New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($b);[Console]::Out.Write([Convert]::ToBase64String($b))"
-        );
-        if let Some(out) = run_powershell(&script) {
-            if let Some(bytes) = b64_decode(out.trim()) {
-                if bytes.len() >= n {
-                    return bytes[..n].to_vec();
-                }
-            }
-        }
-    }
-    // Fallback: SplitMix64 stream seeded from clock + pid (non-repeating).
-    let mut seed = (now_ms() as u64)
-        ^ ((std::process::id() as u64) << 32)
-        ^ 0x9E37_79B9_7F4A_7C15;
-    let mut out = Vec::with_capacity(n);
-    while out.len() < n {
-        seed = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = seed;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^= z >> 31;
-        out.extend_from_slice(&z.to_le_bytes());
-    }
-    out.truncate(n);
-    out
+    // OS CSPRNG through rand's ThreadRng (ChaCha reseeded from the OS), the
+    // same source the vault uses. This used to start PowerShell for every call
+    // (a login, a new key, a salt: ~0.3-1 s each) and, if that failed, fell
+    // back to a clock+pid stream that an attacker could reproduce.
+    dex_vault::crypto::random_bytes(n)
 }
 
 // --- Windows DPAPI key-at-rest (real safeStorage equivalent) ----------------

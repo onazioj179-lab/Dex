@@ -221,52 +221,15 @@ fn get_status(app: &tauri::AppHandle) -> Value {
 }
 
 // =============================================================================
-// Randomness — pull CSPRNG bytes from the OS.
-// On Windows uses BCryptGenRandom via PowerShell RNGCryptoServiceProvider; on
-// Unix reads /dev/urandom. Falls back to a SplitMix64 mix of high-res clock +
-// pid only if the OS source is unavailable (best-effort, still non-repeating).
+// Randomness — OS CSPRNG (see os_random_bytes).
 // =============================================================================
 
 fn os_random_bytes(n: usize) -> Vec<u8> {
-    #[cfg(unix)]
-    {
-        use std::io::Read;
-        // /dev/urandom is an infinite stream; read EXACTLY n bytes, never the
-        // whole "file" (which would never EOF).
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            let mut buf = vec![0u8; n];
-            if f.read_exact(&mut buf).is_ok() {
-                return buf;
-            }
-        }
-    }
-    #[cfg(windows)]
-    {
-        // RNGCryptoServiceProvider -> base64 -> stdout (hidden console).
-        let script = format!(
-            "$b=New-Object byte[] {n};(New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($b);[Console]::Out.Write([Convert]::ToBase64String($b))"
-        );
-        if let Some(out) = run_powershell(&script) {
-            if let Some(bytes) = b64_decode(out.trim()) {
-                if bytes.len() >= n {
-                    return bytes[..n].to_vec();
-                }
-            }
-        }
-    }
-    // Fallback: SplitMix64 stream seeded from clock + pid (non-repeating).
-    let mut seed = (now_ms() as u64) ^ ((std::process::id() as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
-    let mut out = Vec::with_capacity(n);
-    while out.len() < n {
-        seed = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = seed;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^= z >> 31;
-        out.extend_from_slice(&z.to_le_bytes());
-    }
-    out.truncate(n);
-    out
+    // OS CSPRNG through rand's ThreadRng (ChaCha reseeded from the OS), the
+    // same source the vault uses. This used to start PowerShell for every call
+    // (a login, a new key, a salt: ~0.3-1 s each) and, if that failed, fell
+    // back to a clock+pid stream that an attacker could reproduce.
+    dex_vault::crypto::random_bytes(n)
 }
 
 // =============================================================================

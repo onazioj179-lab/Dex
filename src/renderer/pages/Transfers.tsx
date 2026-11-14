@@ -485,8 +485,11 @@ const Transfers: React.FC = () => {
     const handleUploadRequest = (req: { id: string; fileName: string; fileSize: number; senderIp: string }) => {
       setPendingUploads(prev => [...prev, req]);
     };
-    const handleUploadComplete = (data: { id: string }) => {
+    const handleUploadComplete = (data: { id: string; fileName?: string; savePath?: string; error?: string }) => {
       setPendingUploads(prev => prev.filter(u => u.id !== data.id));
+      if (data?.error) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't save ${data.fileName || 'the file'}: ${data.error}` } }));
+      }
     };
     window.dex?.on?.('http-transfer:files-updated', handleFilesUpdated);
     window.dex?.on?.('http-transfer:upload-request', handleUploadRequest);

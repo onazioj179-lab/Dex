@@ -23,6 +23,7 @@
 //! Electron server never implemented them either (its start() took no args). The
 //! port honors `downloadDir` and `autoAccept` as faithful, useful behavior.
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Read;
@@ -35,6 +36,11 @@ use crate::native_ops::{fp_to_string, now_ms};
 
 const BASE_PORT: u16 = 47633;
 const MAX_UPLOAD_SIZE: usize = 500 * 1024 * 1024; // 500MB
+/// Uploads wait in memory until someone presses Accept. Without a cap, a phone
+/// (or anything else on the network) could queue upload after upload until DEX
+/// ran out of memory. Past either limit the sender is told to wait.
+const MAX_PENDING_BYTES: usize = 1024 * 1024 * 1024; // 1 GiB waiting in total
+const MAX_PENDING_UPLOADS: usize = 16;
 const EXPIRY_MS: i64 = 30 * 60 * 1000; // 30 minutes
 
 struct SharedFile {
@@ -258,6 +264,28 @@ fn header_value(request: &tiny_http::Request, name: &'static str) -> Option<Stri
         .map(|h| h.value.as_str().to_string())
 }
 
+/// `Content-Disposition` for a download. Header values must be ASCII
+/// (tiny_http refuses anything else, which used to panic the server thread on
+/// a file named "café.jpg"), and a quote, backslash or line break in the name
+/// must not end the value early. ASCII fallback for old clients plus the
+/// RFC 6266 / 5987 `filename*` with the real UTF-8 name.
+fn content_disposition(name: &str) -> String {
+    let fallback: String = name
+        .chars()
+        .map(|c| if c.is_ascii() && !c.is_ascii_control() && c != '"' && c != '\\' { c } else { '_' })
+        .collect();
+    let mut encoded = String::new();
+    for b in name.as_bytes() {
+        let c = *b as char;
+        if c.is_ascii_alphanumeric() || "!#$&+-.^_`|~".contains(c) {
+            encoded.push(c);
+        } else {
+            encoded.push_str(&format!("%{:02X}", b));
+        }
+    }
+    format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
+}
+
 fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut request: tiny_http::Request) {
     let method = request.method().as_str().to_string();
     let url = request.url().to_string();
@@ -266,7 +294,7 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
     // GET / -> web UI
     if method == "GET" && path == "/" {
         let now = now_ms();
-        let guard = data.lock().unwrap();
+        let guard = data.lock_safe();
         let live: Vec<&SharedFile> = guard.shared.values().filter(|f| f.expires_at > now).collect();
         let html = generate_web_ui(&live, &guard.hostname);
         drop(guard);
@@ -281,7 +309,7 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
     if method == "GET" && path.starts_with("/download/") {
         let id = path.trim_start_matches("/download/").to_string();
         let (file_path, name, mime) = {
-            let mut guard = data.lock().unwrap();
+            let mut guard = data.lock_safe();
             let now = now_ms();
             match guard.shared.get_mut(&id) {
                 Some(f) if f.expires_at > now => {
@@ -296,10 +324,16 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
         };
         match std::fs::File::open(&file_path) {
             Ok(file) => {
-                let cd = format!("attachment; filename=\"{}\"", name);
-                let resp = tiny_http::Response::from_file(file)
-                    .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], mime.as_bytes()).unwrap())
-                    .with_header(tiny_http::Header::from_bytes(&b"Content-Disposition"[..], cd.as_bytes()).unwrap());
+                let cd = content_disposition(&name);
+                let ctype = tiny_http::Header::from_bytes(&b"Content-Type"[..], mime.as_bytes())
+                    .or_else(|_| tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/octet-stream"[..]));
+                let mut resp = tiny_http::Response::from_file(file);
+                if let Ok(h) = ctype {
+                    resp = resp.with_header(h);
+                }
+                if let Ok(h) = tiny_http::Header::from_bytes(&b"Content-Disposition"[..], cd.as_bytes()) {
+                    resp = resp.with_header(h);
+                }
                 crate::native_ops::emit_event(app, "http-transfer:download", &json!({ "fileId": id, "fileName": name }));
                 let _ = request.respond(resp);
             }
@@ -313,7 +347,7 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
     // GET /upload-status/<id>
     if method == "GET" && path.starts_with("/upload-status/") {
         let id = path.trim_start_matches("/upload-status/").to_string();
-        let guard = data.lock().unwrap();
+        let guard = data.lock_safe();
         match guard.pending.get(&id) {
             Some(u) => {
                 let _ = request.respond(resp_json(json!({ "status": u.status })));
@@ -328,7 +362,7 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
     // GET /api/files
     if method == "GET" && path == "/api/files" {
         let now = now_ms();
-        let guard = data.lock().unwrap();
+        let guard = data.lock_safe();
         let files: Vec<Value> = guard
             .shared
             .values()
@@ -351,6 +385,15 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
                 return;
             }
         };
+        if request.body_length().map(|n| n > MAX_UPLOAD_SIZE).unwrap_or(false) {
+            let _ = request.respond(resp_json(json!({ "error": "File too large (500MB limit)" })).with_status_code(413));
+            return;
+        }
+        let admitted = admit_upload(&data.lock_safe(), request.body_length().unwrap_or(0));
+        if let Err(msg) = admitted {
+            let _ = request.respond(resp_json(json!({ "error": msg })).with_status_code(429));
+            return;
+        }
         let mut buf = Vec::new();
         if request.as_reader().take((MAX_UPLOAD_SIZE + 1) as u64).read_to_end(&mut buf).is_err() {
             let _ = request.respond(resp_json(json!({ "error": "Read error" })).with_status_code(400));
@@ -372,8 +415,15 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
             .map(|a| a.ip().to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
+        drop(buf);
         let (upload_id, auto) = {
-            let mut guard = data.lock().unwrap();
+            let mut guard = data.lock_safe();
+            // Re-check with the real size: other uploads may have arrived meanwhile.
+            if let Err(msg) = admit_upload(&guard, file_data.len()) {
+                drop(guard);
+                let _ = request.respond(resp_json(json!({ "error": msg })).with_status_code(429));
+                return;
+            }
             let id = guard.next_id();
             let size = file_data.len() as i64;
             let auto = guard.auto_accept;
@@ -421,31 +471,55 @@ fn file_data_len(data: &Arc<Mutex<ServerData>>, id: &str) -> i64 {
 
 /// Accept or reject a pending upload. On accept, write the held bytes into the
 /// configured download dir and emit `http-transfer:upload-complete`.
+/// May another upload of `incoming` bytes wait for Accept right now?
+fn admit_upload(d: &ServerData, incoming: usize) -> Result<(), &'static str> {
+    let waiting: Vec<usize> = d.pending.values().filter_map(|u| u.data.as_ref().map(|b| b.len())).collect();
+    if waiting.len() >= MAX_PENDING_UPLOADS {
+        return Err("Too many files are waiting to be accepted. Try again after the receiver answers.");
+    }
+    if waiting.iter().sum::<usize>().saturating_add(incoming) > MAX_PENDING_BYTES {
+        return Err("Too much data is waiting to be accepted. Try again after the receiver answers.");
+    }
+    Ok(())
+}
+
 fn resolve_upload(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, id: &str, accept: bool) -> bool {
     let (file_name, bytes, dir) = {
-        let mut guard = data.lock().unwrap();
+        let mut guard = data.lock_safe();
         let dir = guard.download_dir.clone();
         match guard.pending.get_mut(id) {
             Some(u) if u.status == "pending" => {
                 u.status = if accept { "accepted".into() } else { "rejected".into() };
-                if accept {
-                    (u.file_name.clone(), u.data.take(), dir)
-                } else {
-                    (u.file_name.clone(), None, dir)
-                }
+                // Take the bytes either way: a declined upload used to keep its
+                // whole file in memory until the server stopped.
+                let bytes = u.data.take();
+                (u.file_name.clone(), if accept { bytes } else { None }, dir)
             }
             _ => return false,
         }
     };
     if accept {
         if let Some(bytes) = bytes {
-            let save_path = std::path::Path::new(&dir).join(&file_name);
-            if std::fs::write(&save_path, &bytes).is_ok() {
-                crate::native_ops::emit_event(
+            // Never overwrite a file already in the folder: "photo.jpg" becomes
+            // "photo (1).jpg", like a browser download.
+            let save_path = crate::download_ctl::unique_path(std::path::Path::new(&dir), &file_name);
+            match std::fs::write(&save_path, &bytes) {
+                Ok(()) => crate::native_ops::emit_event(
                     app,
                     "http-transfer:upload-complete",
                     &json!({ "id": id, "fileName": file_name, "savePath": save_path.to_string_lossy() }),
-                );
+                ),
+                Err(e) => {
+                    if let Some(u) = data.lock_safe().pending.get_mut(id) {
+                        u.status = "failed".into();
+                    }
+                    crate::native_ops::emit_event(
+                        app,
+                        "http-transfer:upload-complete",
+                        &json!({ "id": id, "fileName": file_name, "error": e.to_string() }),
+                    );
+                    return false;
+                }
             }
         }
     }
@@ -508,7 +582,14 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
     let app_t = app.clone();
     let thread = crate::util::spawn_named("http_transfer", move || {
         while let Ok(request) = server_t.recv() {
-            handle_request(&app_t, &data_t, request);
+            // One bad request must not kill the share server for every later
+            // phone: this thread is outside the dex_ipc panic guard.
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                handle_request(&app_t, &data_t, request);
+            }));
+            if r.is_err() {
+                eprintln!("[http_transfer] recovered from a panic while serving a request");
+            }
         }
     });
 
@@ -552,7 +633,7 @@ fn share_files(app: &tauri::AppHandle, paths: &[String]) -> Value {
     };
     let mut ids = Vec::new();
     {
-        let mut d = running.data.lock().unwrap();
+        let mut d = running.data.lock_safe();
         for p in paths {
             if let Ok(meta) = std::fs::metadata(p) {
                 let id = d.next_id();
@@ -595,7 +676,7 @@ fn server_info(app: &tauri::AppHandle) -> Value {
         Some(running) => {
             let url = format!("http://{}:{}", ip, running.port);
             let now = now_ms();
-            let guard = running.data.lock().unwrap();
+            let guard = running.data.lock_safe();
             let files: Vec<Value> = guard
                 .shared
                 .values()
@@ -632,7 +713,7 @@ fn pending_uploads(app: &tauri::AppHandle) -> Value {
     };
     match slot.as_ref() {
         Some(running) => {
-            let guard = running.data.lock().unwrap();
+            let guard = running.data.lock_safe();
             let list: Vec<Value> = guard
                 .pending
                 .values()
@@ -690,7 +771,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let state = app.state::<HttpTransferState>();
             if let Ok(slot) = state.lock() {
                 if let Some(r) = slot.as_ref() {
-                    r.data.lock().unwrap().shared.remove(id);
+                    r.data.lock_safe().shared.remove(id);
                 }
             }
             json!({ "success": true })
@@ -718,6 +799,42 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pending(n: usize) -> PendingUpload {
+        PendingUpload { id: String::new(), file_name: String::new(), file_size: n as i64, sender_ip: String::new(), status: "pending".into(), data: Some(vec![0; n]) }
+    }
+
+    #[test]
+    fn waiting_uploads_are_capped_by_count_and_bytes() {
+        let mut d = ServerData::default();
+        assert!(admit_upload(&d, 10).is_ok());
+        for i in 0..MAX_PENDING_UPLOADS {
+            d.pending.insert(i.to_string(), pending(1));
+        }
+        assert!(admit_upload(&d, 1).is_err(), "count cap");
+        // Answered uploads no longer hold bytes and stop counting.
+        for u in d.pending.values_mut() {
+            u.data = None;
+        }
+        assert!(admit_upload(&d, 1).is_ok());
+        assert!(admit_upload(&d, MAX_PENDING_BYTES + 1).is_err(), "byte cap");
+    }
+
+    #[test]
+    fn content_disposition_is_ascii_and_cannot_be_broken_out_of() {
+        for name in ["café.jpg", "照片.png", "a\"b.txt", "line\r\nX-Evil: 1.txt", "plain name.pdf"] {
+            let cd = content_disposition(name);
+            assert!(cd.is_ascii(), "{cd}");
+            assert!(!cd.contains('\r') && !cd.contains('\n'), "{cd}");
+            assert!(tiny_http::Header::from_bytes(&b"Content-Disposition"[..], cd.as_bytes()).is_ok(), "{cd}");
+            // Only the two quotes around the fallback name.
+            assert_eq!(cd.matches('"').count(), 2, "{cd}");
+        }
+        assert_eq!(
+            content_disposition("café.jpg"),
+            "attachment; filename=\"caf_.jpg\"; filename*=UTF-8''caf%C3%A9.jpg"
+        );
+    }
 
     #[test]
     fn parse_multipart_extracts_name_and_data() {

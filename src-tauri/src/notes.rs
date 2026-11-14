@@ -1384,6 +1384,29 @@ fn get_word_suggestions(conn: &Connection, prefix: &str, limit: Option<i64>) -> 
     json!(out)
 }
 
+/// dexnotes:topWords — the learned vocabulary (most used first) with counts,
+/// so the editor's suggestion trie starts with what the user actually types.
+/// The renderer called a channel that never existed here, so learned words
+/// were recorded but never read back.
+fn top_words(conn: &Connection, limit: Option<i64>) -> Value {
+    let lim = limit.unwrap_or(2000).clamp(1, 10_000);
+    let mut stmt = match conn.prepare(
+        "SELECT word, frequency FROM word_suggestions_history ORDER BY frequency DESC, last_used DESC LIMIT ?",
+    ) {
+        Ok(s) => s,
+        Err(_) => return json!([]),
+    };
+    let rows = match stmt.query_map(params![lim], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))) {
+        Ok(r) => r,
+        Err(_) => return json!([]),
+    };
+    let out: Vec<Value> = rows
+        .filter_map(|r| r.ok())
+        .map(|(word, frequency)| json!({ "word": word, "frequency": frequency }))
+        .collect();
+    json!(out)
+}
+
 /// dexnotes:getBigrams — getBigramSuggestions(lastWord, limit?). Frequency-based
 /// next-word list excluding the given word.
 fn get_bigram_suggestions(conn: &Connection, last_word: &str, limit: Option<i64>) -> Value {
@@ -1746,6 +1769,7 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
             let limit = args.get(1).and_then(|v| v.as_i64());
             get_word_suggestions(conn, &s(0), limit)
         }
+        "dexnotes:topWords" => top_words(conn, args.get(0).and_then(|v| v.as_i64())),
         "dexnotes:getBigrams" => {
             let limit = args.get(1).and_then(|v| v.as_i64());
             get_bigram_suggestions(conn, &s(0), limit)
@@ -1775,5 +1799,25 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         "dexnotes:getDailyNote" => get_or_create_daily_note(conn),
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod word_history_tests {
+    use super::*;
+
+    #[test]
+    fn top_words_returns_recorded_vocabulary_most_used_first() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn);
+        record_words(&conn, &[json!("Alpha"), json!("beta"), json!("beta"), json!("x")]);
+        let out = dispatch(&conn, "dexnotes:topWords", &json!([]));
+        let arr = out.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "one-letter words are not recorded");
+        assert_eq!(arr[0]["word"], "beta");
+        assert_eq!(arr[0]["frequency"], 2);
+        assert_eq!(arr[1]["word"], "alpha");
+        let one = dispatch(&conn, "dexnotes:topWords", &json!([1]));
+        assert_eq!(one.as_array().unwrap().len(), 1);
     }
 }
