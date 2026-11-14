@@ -28,6 +28,8 @@ export interface EngagementState {
   unlockedAt?: Record<string, number>;
   lastTipIndex: number;
   dismissedTips: string[];
+  /** Set once the meta-trophy repair has run (see repairMetaUnlocks). */
+  metaRepairV1?: boolean;
 }
 
 const DEFAULT_STATE: EngagementState = {
@@ -76,11 +78,19 @@ export function loadEngagement(): EngagementState {
     const raw = localStorage.getItem(ENGAGEMENT_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return {
+      const state: EngagementState = {
         ...DEFAULT_STATE,
         ...parsed,
         stats: { ...DEFAULT_STATS, ...parsed.stats, appUsageCounts: { ...parsed.stats?.appUsageCounts } },
       };
+      // One-time repair (owner-approved 2026-11-14): take back meta trophies the
+      // old engine unlocked against its own, lower threshold table.
+      if (!state.metaRepairV1) {
+        const repaired: EngagementState = { ...repairMetaUnlocks(state), metaRepairV1: true };
+        saveEngagement(repaired);
+        return repaired;
+      }
+      return state;
     }
   } catch (e) { console.warn('[DEX]', e); }
   return { ...DEFAULT_STATE, stats: { ...DEFAULT_STATS } };
@@ -250,6 +260,51 @@ export function getUserRank(points: number): { title: string; icon: string; next
   if (points >= 250)    return { title: 'Regular',        icon: 'shield',    next: 'Pro',            pointsNeeded: 800 - points, level: 2 };
   if (points >= 50)     return { title: 'Beginner',       icon: 'seedling',  next: 'Regular',        pointsNeeded: 250 - points, level: 1 };
   return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 50 - points, level: 0 };
+}
+
+const RANK_POINTS: Record<string, number> = {
+  'rank-beginner': 50, 'rank-regular': 250, 'rank-pro': 800, 'rank-expert': 2000,
+  'rank-legend': 4000, 'rank-champion': 8000, 'rank-transcend': 15000, 'rank-grandmaster': 25000,
+  'rank-titan': 50000, 'rank-mythical': 100000, 'rank-celestial': 250000, 'rank-eternal': 500000,
+};
+const FINAL_PTS: Record<string, number> = { '10k': 10000, '25k': 25000, '50k': 50000, '100k': 100000 };
+
+/**
+ * Drop meta trophies (points tiers, trophy-count tiers, rank and "final" point /
+ * count milestones) that the current points and unlock count don't earn. Runs to
+ * a fixed point, because taking one back lowers the points that earned others.
+ * Non-meta trophies are never touched.
+ */
+export function repairMetaUnlocks(state: EngagementState): EngagementState {
+  let unlocked = [...state.unlockedAchievements];
+  const byId = new Map(ACHIEVEMENTS.map(a => [a.id, a]));
+  for (let pass = 0; pass < 50; pass++) {
+    const pts = getTotalPoints(unlocked);
+    const count = unlocked.length;
+    const derived = { ...state.stats, achievementPoints: pts, achievementsUnlocked: count };
+    const next = unlocked.filter(id => {
+      if (id.startsWith('points-') || id.startsWith('ach-count-')) {
+        const a = byId.get(id);
+        return a ? a.condition(derived) : true;
+      }
+      if (id in RANK_POINTS) return pts >= RANK_POINTS[id];
+      if (id.startsWith('final-') && id.endsWith('-pts')) {
+        const need = FINAL_PTS[id.replace('final-', '').replace('-pts', '')];
+        return need === undefined || pts >= need;
+      }
+      if (id.startsWith('final-') && id.endsWith('-unlock')) {
+        const need = parseInt(id.replace('final-', '').replace('-unlock', ''), 10) || 0;
+        return count >= need;
+      }
+      return true;
+    });
+    if (next.length === unlocked.length) break;
+    unlocked = next;
+  }
+  if (unlocked.length === state.unlockedAchievements.length) return state;
+  const keep = new Set(unlocked);
+  const unlockedAt = Object.fromEntries(Object.entries(state.unlockedAt || {}).filter(([id]) => keep.has(id)));
+  return { ...state, unlockedAchievements: unlocked, unlockedAt };
 }
 
 /** Get achievement stats summary */
