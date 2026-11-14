@@ -107,6 +107,7 @@ import { clampEventToViewport } from '../../utils/menuPosition';
 import { readImageMetadata, formatExifDate, type ImageMetadata } from './imageMetadata';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
+import { ASSET_SHAPES, ASSET_PATTERNS, ASSET_GRADIENTS, GRADIENT_STOPS, renderAsset } from './assetRender';
 
 // Swatches must be real colours: the canvas cannot paint a CSS variable, so the
 // old `var(--color-error)` swatches left the brush colour unusable.
@@ -4599,11 +4600,11 @@ const Prism: React.FC = () => {
           </div>
           <div style={{ flex: 1, minHeight: 0, padding: 10, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-              {(assetCategory === 'shapes' ? ['Rectangle', 'Circle', 'Triangle', 'Star', 'Arrow', 'Heart', 'Diamond', 'Pentagon'] :
-                assetCategory === 'patterns' ? ['Dots', 'Lines', 'Grid', 'Chevron', 'Waves', 'Crosses', 'Hexagons', 'Moire'] :
-                assetCategory === 'gradients' ? ['Sunset', 'Ocean', 'Forest', 'Flame', 'Sky', 'Neon', 'Pastel', 'Mono'] :
+              {(assetCategory === 'shapes' ? [...ASSET_SHAPES] as string[] :
+                assetCategory === 'patterns' ? [...ASSET_PATTERNS] as string[] :
+                assetCategory === 'gradients' ? [...ASSET_GRADIENTS] as string[] :
                 [...savedSwatches, ...PRISM_SWATCHES.filter((c) => !savedSwatches.includes(c))]).map((item, i) => (
-                <div key={`${item}-${i}`} onClick={() => { if (assetCategory === 'swatches') { setForegroundColor(item); } else { const newLayer = { id: `asset-${Date.now()}`, name: `${item}`, type: 'shape' as const, visible: true, locked: false, opacity: 100, blendMode: 'normal' as BlendMode, x: Math.round(canvasSize.width / 2 - 50), y: Math.round(canvasSize.height / 2 - 50), width: 100, height: 100, rotation: 0, imageData: undefined }; setLayers(prev => [newLayer, ...prev]); pushHistory(`Insert ${item}`); } }} style={{ aspectRatio: '1', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: assetCategory === 'swatches' ? item : 'var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                <div key={`${item}-${i}`} onClick={() => { if (assetCategory === 'swatches') { setForegroundColor(item); return; } const r = renderAsset(assetCategory, item, normalizeHex(foregroundColor) ?? '#000000', canvasSize); if (!r) return; pushHistory(`Insert ${item}`); const newLayer: Layer = { id: `asset-${Date.now()}`, name: item, type: 'image', visible: true, locked: false, opacity: 100, blendMode: 'normal' as BlendMode, x: r.x, y: r.y, width: r.width, height: r.height, rotation: 0, imageData: r.dataUrl }; setLayers(prev => [newLayer, ...prev]); setSelectedLayerId(newLayer.id); }} style={{ aspectRatio: '1', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: assetCategory === 'swatches' ? item : assetCategory === 'gradients' ? `linear-gradient(to bottom right, ${(GRADIENT_STOPS[item as keyof typeof GRADIENT_STOPS] ?? []).join(', ')})` : 'var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   {assetCategory !== 'swatches' && item}
                 </div>
               ))}
@@ -4616,7 +4617,7 @@ const Prism: React.FC = () => {
                 className="prism-btn"
                 style={{ ...styles.btn, marginTop: 8, width: '100%', justifyContent: 'center' }}
               >
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: foregroundColor, border: '1px solid var(--color-border)' }} />
+                <span style={{ width: 12, height: 12, borderRadius: 4, background: foregroundColor, border: '1px solid var(--color-border)' }} />
                 {savedSwatches.includes(normalizeHex(foregroundColor) ?? '') ? 'Current colour is saved' : 'Save current colour'}
               </button>
             )}
