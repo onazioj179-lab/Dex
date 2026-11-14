@@ -33,7 +33,7 @@ pub fn mark(name: &'static str) {
 
 fn snapshot() -> Value {
     let total_ms = anchor().elapsed().as_millis() as u64;
-    let marks = MARKS.lock().map(|m| m.clone()).unwrap_or_default();
+    let marks = MARKS.lock_safe().clone();
     let mut prev = 0u64;
     let phases: Vec<Value> = marks
         .into_iter()

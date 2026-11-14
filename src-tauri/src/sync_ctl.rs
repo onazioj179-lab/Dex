@@ -66,6 +66,7 @@
 //   update-config / remove-device are pure-data writes and remain ported.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Map, Value};
@@ -425,10 +426,7 @@ fn store_key_for_type(item_type: &str) -> Option<(&'static str, &'static str)> {
 // pending; return bool. Returns false when the itemId is not pending — which,
 // with no native sync run to populate PENDING_CONFLICTS, is always the case.
 fn resolve_conflict(app: &tauri::AppHandle, item_id: &str, resolution: &str) -> Value {
-    let mut conflicts = match PENDING_CONFLICTS.lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut conflicts = PENDING_CONFLICTS.lock_safe();
 
     let index = conflicts
         .iter()

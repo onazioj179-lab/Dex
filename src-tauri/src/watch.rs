@@ -32,10 +32,7 @@ fn start(app: &tauri::AppHandle, args: &Value) -> Value {
         return json!({ "success": false, "error": "path does not exist" });
     }
     let state = app.state::<GenericWatchState>();
-    let mut map = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "watch state busy" }),
-    };
+    let mut map = state.lock_safe();
     if map.contains_key(&id) {
         return json!({ "success": true }); // already watching (idempotent, matches TS)
     }

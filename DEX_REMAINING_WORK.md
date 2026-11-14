@@ -258,4 +258,12 @@ CI on `main` and on every PR since 2026-11-14 00:13 UTC is red without running: 
 | 247 | Transfers (DEX to DEX) | The receiver started one thread per incoming connection with no limit | HIGH | FIXED (cargo test) | At most 8 receives at once; extra connections are refused; the slot is freed however a receive ends | Send to one PC from two others at once |
 | 248 | Transfers (discovery) | Announces with made-up device ids grew the nearby-device list and its UI events without bound | MEDIUM | FIXED | List capped at 64 devices; existing devices still update | — |
 | 249 | Platform (native) | A panic on a server thread (phone share, browser bridge, sync) stopped that server for good | MEDIUM | FIXED | `util::guard_panic` around each request; those threads are outside the `dex_ipc` guard | — |
-| 250 | Auth, Encryption, DTP | After one panic, sign-in sessions never verified, encryption read as locked, and Devices listed nothing | HIGH | FIXED (cargo test) | 36 more lock sites in 14 files moved to `lock_safe()`. A few read-only reads (`renderer_health` status, search doc count) still show an empty value after a poison | — |
+| 250 | Auth, Encryption, DTP | After one panic, sign-in sessions never verified, encryption read as locked, and Devices listed nothing | HIGH | FIXED (cargo test) | 36 more lock sites in 14 files moved to `lock_safe()`; the rest followed in #251 | — |
+
+## Session 2026-11-14 (`claude/robustness-pass-3`): last poisoned-lock paths, share-server growth
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 251 | Search, Vault, Notifications, Terminal, Ledger, startup | After one panic: search said "index busy", Vault "vault busy", notifications "busy" and terminal sessions failed until DEX restarted | HIGH | FIXED (cargo check; cargo test 143/144, the one failure is a timing assert in an untouched module that passes alone) | 59 more `match m.lock() { Ok(g) => g, Err(_) => return … }` / `.lock().ok()?` / read-only sites in 15 files use `lock_safe()` | — |
+| 252 | Transfers (phone share) | Expired shares and answered uploads stayed in memory for as long as the server ran | LOW | FIXED (cargo test) | `ServerData::prune`: expired shares dropped and only the newest 64 answered uploads kept, on every share and upload | — |
+| 253 | Shell | `window.__DEX_CRITICAL_EVENTS__` debug list grew for the whole session | LOW | FIXED (tsc) | Keeps the newest 100 | — |

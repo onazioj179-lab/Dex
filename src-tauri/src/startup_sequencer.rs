@@ -78,6 +78,7 @@
 //   Phase/step lifecycle is pushed to the renderer with crate::native_ops::emit_event.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -225,10 +226,7 @@ fn phase_to_json(p: &PhaseTiming) -> Value {
 /// any run, steps/phases are empty and totalMs == 0 (totalEnd - totalStart);
 /// after runAll/runPhase, these hold the real measured values.
 fn get_report() -> Value {
-    let st = match state().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let st = state().lock_safe();
     let steps: Vec<Value> = st.steps.iter().map(step_to_json).collect();
     let phases: Vec<Value> = st.phase_timings.iter().map(phase_to_json).collect();
 
@@ -299,10 +297,7 @@ fn add_step(args: &Value) -> Value {
         error: None,
     };
 
-    let mut st = match state().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let mut st = state().lock_safe();
     st.steps.push(step);
 
     json!({
@@ -327,10 +322,7 @@ fn run_step(app: &tauri::AppHandle, args: &Value) -> Value {
     };
 
     let result = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         match st.steps.iter_mut().find(|s| s.name == name) {
             None => None,
             Some(step) => {
@@ -436,10 +428,7 @@ fn run_phase_inner(st: &mut SequencerState, phase: &str) -> (bool, f64, Vec<Stri
 fn run_phase(app: &tauri::AppHandle, args: &Value) -> Value {
     let phase = norm_phase(args.get(0));
     let (success, duration_ms, failed_steps) = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         run_phase_inner(&mut st, &phase)
     };
 
@@ -471,66 +460,45 @@ fn run_phase(app: &tauri::AppHandle, args: &Value) -> Value {
 fn run_all(app: &tauri::AppHandle) -> Value {
     let total_start = perf_now();
     {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         st.total_start = total_start;
     }
 
     // Phase A.
     let a_ok = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         run_phase_inner(&mut st, "A").0
     };
     crate::native_ops::emit_event(app, "startup-sequencer:phase", &json!({ "phase": "A", "success": a_ok }));
     if !a_ok {
         let total = perf_now() - total_start;
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         st.total_end = perf_now();
         return json!({ "success": false, "totalMs": total });
     }
 
     // Phase B.
     let b_ok = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         run_phase_inner(&mut st, "B").0
     };
     crate::native_ops::emit_event(app, "startup-sequencer:phase", &json!({ "phase": "B", "success": b_ok }));
     if !b_ok {
         let total = perf_now() - total_start;
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         st.total_end = perf_now();
         return json!({ "success": false, "totalMs": total });
     }
 
     // Phase C — non-blocking.
     let c_ok = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         run_phase_inner(&mut st, "C").0
     };
     crate::native_ops::emit_event(app, "startup-sequencer:phase", &json!({ "phase": "C", "success": c_ok }));
 
     let total_ms = {
-        let mut st = match state().lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
+        let mut st = state().lock_safe();
         st.total_end = perf_now();
         st.total_end - st.total_start
     };
@@ -594,26 +562,17 @@ fn write_heartbeat(app: &tauri::AppHandle) {
 // ---------------------------------------------------------------------------
 
 fn phase_timings_json() -> Value {
-    let st = match state().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let st = state().lock_safe();
     Value::Array(st.phase_timings.iter().map(phase_to_json).collect())
 }
 
 fn total_duration() -> Value {
-    let st = match state().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let st = state().lock_safe();
     json!(st.total_end - st.total_start)
 }
 
 fn is_complete() -> Value {
-    let st = match state().lock() {
-        Ok(g) => g,
-        Err(p) => p.into_inner(),
-    };
+    let st = state().lock_safe();
     // steps.length > 0 && every(status != pending && status != running)
     let complete = !st.steps.is_empty()
         && st

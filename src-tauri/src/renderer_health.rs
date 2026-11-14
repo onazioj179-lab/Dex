@@ -148,10 +148,7 @@ fn current_report() -> Value {
 // `current` is a fresh self-report so the developer panel always has one live
 // reading.
 fn get_status() -> Value {
-    let flags: Vec<Value> = ACTIVE_FLAGS
-        .lock()
-        .map(|f| f.iter().rev().take(50).rev().cloned().collect())
-        .unwrap_or_default();
+    let flags: Vec<Value> = ACTIVE_FLAGS.lock_safe().iter().rev().take(50).rev().cloned().collect();
     json!({
         "reports": [],
         "flags": flags,
@@ -226,10 +223,7 @@ fn monitor(app: &tauri::AppHandle) -> Value {
         "running": true,
         "intervalMs": 60_000,
         "current": first,
-        "flags": ACTIVE_FLAGS
-            .lock()
-            .map(|f| f.iter().rev().take(50).rev().cloned().collect::<Vec<Value>>())
-            .unwrap_or_default(),
+        "flags": ACTIVE_FLAGS.lock_safe().iter().rev().take(50).rev().cloned().collect::<Vec<Value>>(),
         "timestamp": now_ms()
     })
 }
@@ -256,11 +250,7 @@ fn recover(app: &tauri::AppHandle, args: &Value) -> Value {
 
     // Echo whether a recovery snapshot is now held (reads the saved state back so
     // a caller can confirm what would be restored). null when none has been saved.
-    let snapshot = EMERGENCY_STATE
-        .lock()
-        .ok()
-        .and_then(|s| s.clone())
-        .unwrap_or(Value::Null);
+    let snapshot = EMERGENCY_STATE.lock_safe().clone().unwrap_or(Value::Null);
 
     json!({
         "success": true,
