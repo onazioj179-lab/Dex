@@ -14,6 +14,7 @@ import React, { useCallback, useRef, useState, useEffect, memo, useMemo } from '
 import { useVinxStore } from './VinxStore';
 import { ProgramLutOverlay } from './ProgramLutOverlay';
 import { formatTimecode } from './VinxTypes';
+import { toMediaUrl } from '../../utils/mediaUrl';
 import type { Clip, MediaItem } from './VinxTypes';
 
 // ---------------------------------------------------------------------------
@@ -152,7 +153,8 @@ const VideoLayer: React.FC<{
         const clipStartSec = frameToSec(clip.startFrame, frameRate);
         const clipEndSec = frameToSec(clip.endFrame, frameRate);
         const isVisible = currentSec >= clipStartSec && currentSec < clipEndSec;
-        const src = media?.path || media?.proxyPath || '';
+        // Disk paths (desktop import) load through the dexmedia protocol; blob:/http pass through.
+        const src = toMediaUrl(media?.path || media?.proxyPath || '');
 
         // Transition opacity: fade in/out at clip boundaries
         let transitionOpacity = 1;
@@ -232,6 +234,9 @@ const VideoLayer: React.FC<{
                 }
               }}
               src={src}
+              // dexmedia (disk paths) is another origin that sends CORS for the
+              // app; anonymous keeps the frames readable for scopes and export.
+              crossOrigin="anonymous"
               muted
               playsInline
               preload="auto"

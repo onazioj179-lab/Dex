@@ -63,6 +63,7 @@ import { rewardUnlocks } from '../../services/achievementEngine';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { toMediaUrl } from '../../utils/mediaUrl';
 import { colorInputValue } from '../../utils/canvasTheme';
 // ==================== APP IDENTITY ====================
 export const VINX_VERSION = '1.0.0';
@@ -299,7 +300,9 @@ const VinxEditor: React.FC = () => {
     ['video/*', 'mp4', 'mov', 'webm', 'mkv', 'avi'],
     useCallback((files) => {
       for (const file of files) {
-        const url = file.path;
+        // The drop hook gives a real disk path only where the shell provides one;
+        // in the desktop app it is just the file name, so play from a blob URL.
+        const url = file.path && file.path !== file.name ? file.path : (file.file ? URL.createObjectURL(file.file) : file.path);
         const isVideo = file.type.startsWith('video/');
         const isAudio = file.type.startsWith('audio/');
         addMedia({
@@ -502,7 +505,7 @@ const VinxEditor: React.FC = () => {
       if (!clip) return { outcome: 'skipped', note: 'select a clip first' };
       const media = clip.mediaId ? project.mediaBin.find(m => m.id === clip.mediaId) : undefined;
       if (!media || !media.path) return { outcome: 'skipped', note: 'clip has no decodable media' };
-      const decoded = await decodeAudioToMono(media.path);
+      const decoded = await decodeAudioToMono(toMediaUrl(media.path));
       if (!decoded) return { outcome: 'skipped', note: 'could not decode clip audio (needs the desktop app with media loaded)' };
       const fr = project.frameRate || 30;
       const region = slicePCM(decoded.pcm, decoded.sampleRate, clip.mediaInFrame / fr, clip.mediaOutFrame / fr);

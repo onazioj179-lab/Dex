@@ -9,6 +9,8 @@ import { useState, useCallback, DragEvent } from 'react';
 export interface FileDropResult {
   name: string;
   path: string;
+  /** The dropped File, for callers that need its bytes (no disk path in the desktop app). */
+  file?: File;
   type: string;
   size: number;
 }
@@ -41,6 +43,7 @@ export function useFileDrop(acceptTypes: string[], onFiles: (files: FileDropResu
       onFiles(accepted.map(f => ({
         name: f.name,
         path: (f as any).path || f.name,
+        file: f,
         type: f.type,
         size: f.size,
       })));
