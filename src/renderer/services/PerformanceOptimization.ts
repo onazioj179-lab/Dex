@@ -9,12 +9,12 @@
 // ==========================================================================
 // Client-side Zustand store that receives optimization directives from the
 // main process. Every inner app subscribes to this store and adjusts its
-// quality settings in real time. Also handles GPU detection reporting,
-// canvas context safety, memory reporting, and RAF cleanup tracking.
+// quality settings in real time. Also handles canvas context safety and RAF
+// cleanup tracking. (The GPU/memory reporters and the tier/directive fetch
+// called channels native never had and were never started; removed.)
 // ==========================================================================
 
 import { create } from 'zustand';
-import { sharedTick } from './SharedTick';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,7 +94,6 @@ interface PerformanceOptimizationActions {
   setIdle: (idle: boolean) => void;
   addNotification: (n: { type: string; message: string; key: string }) => void;
   dismissNotification: (key: string) => void;
-  initialize: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,36 +127,7 @@ const DEFAULT_POWER: PowerState = {
   isCharging: false,
 };
 
-// ---------------------------------------------------------------------------
-// IPC bridge helper
-// ---------------------------------------------------------------------------
 
-function getIPC(): any {
-  const w = window as unknown as Record<string, unknown>;
-  return w.dex || null;
-}
-
-function ipcSend(channel: string, data?: any): void {
-  const ipc = getIPC();
-  if (ipc && typeof ipc.send === 'function') {
-    ipc.send(channel, data);
-  }
-}
-
-function ipcOn(channel: string, handler: (...args: any[]) => void): void {
-  const ipc = getIPC();
-  if (ipc && typeof ipc.on === 'function') {
-    ipc.on(channel, handler);
-  }
-}
-
-function ipcInvoke(channel: string, ...args: any[]): Promise<any> {
-  const ipc = getIPC();
-  if (ipc && typeof ipc.invoke === 'function') {
-    return ipc.invoke(channel, ...args);
-  }
-  return Promise.resolve(null);
-}
 
 // ---------------------------------------------------------------------------
 // Store
@@ -205,128 +175,9 @@ export const usePerformanceOptimization = create<PerformanceOptimizationState & 
       set({ notifications: get().notifications.filter(n => n.key !== key) });
     },
 
-    initialize: () => {
-      // Report GPU info
-      detectAndReportGPU();
-
-      // Start memory reporting
-      startMemoryReporting();
-
-      // Listen for main process events
-      ipcOn('dex:app-directive', (_: any, directive: AppDirective) => {
-        get().setDirective(directive);
-      });
-
-      ipcOn('dex:capability-tier-changed', (_: any, data: any) => {
-        get().setTier(data.tier, data.tierNumeric);
-      });
-
-      ipcOn('dex:thermal-state', (_: any, state: ThermalState) => {
-        get().setThermalState(state);
-        // Re-broadcast to AdaptivePerfMonitor (avoids circular import)
-        try {
-          window.dispatchEvent(new CustomEvent('dex:thermal-hint', { detail: { state: state.state } }));
-        } catch { /* non-fatal */ }
-      });
-
-      ipcOn('dex:power-state', (_: any, state: PowerState) => {
-        get().setPowerState(state);
-      });
-
-      ipcOn('dex:memory-pressure', (_: any, data: any) => {
-        get().setMemoryPressure(data.level);
-      });
-
-      ipcOn('dex:game-settings-changed', (_: any, settings: GameSettings) => {
-        get().setGameSettings(settings);
-      });
-
-      ipcOn('dex:idle-start', () => {
-        get().setIdle(true);
-      });
-
-      ipcOn('dex:idle-end', () => {
-        get().setIdle(false);
-      });
-
-      ipcOn('dex:notification', (_: any, n: any) => {
-        get().addNotification(n);
-      });
-
-      ipcOn('dex:memory-emergency', (_: any, data: any) => {
-        get().addNotification({
-          type: 'critical',
-          message: data.message,
-          key: 'memory-emergency',
-        });
-      });
-
-      // Fetch initial state
-      ipcInvoke('optimization:getTier').then((data: any) => {
-        if (data) get().setTier(data.tier, data.tierNumeric);
-      });
-
-      ipcInvoke('optimization:getDirective').then((directive: AppDirective | null) => {
-        if (directive) get().setDirective(directive);
-      });
-    },
   })
 );
 
-// ---------------------------------------------------------------------------
-// GPU detection and reporting
-// ---------------------------------------------------------------------------
-
-function detectAndReportGPU(): void {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (gl) {
-      const ext = gl.getExtension('WEBGL_debug_renderer_info');
-      if (ext) {
-        const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
-        const vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || '';
-        ipcSend('optimization:reportGPU', { renderer, vendor });
-      }
-      const loseExt = gl.getExtension('WEBGL_lose_context');
-      if (loseExt) loseExt.loseContext();
-    }
-    canvas.remove();
-  } catch {
-    // GPU detection not available
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Memory reporting (every 10s)
-// ---------------------------------------------------------------------------
-
-function startMemoryReporting(): void {
-  const report = () => {
-    const perf = performance as any;
-    if (perf.memory) {
-      ipcSend('memory:report', {
-        processId: `renderer-${window.location.hash || 'main'}`,
-        category: 'renderer',
-        heapUsedMB: Math.round(perf.memory.usedJSHeapSize / (1024 * 1024)),
-        heapTotalMB: Math.round(perf.memory.totalJSHeapSize / (1024 * 1024)),
-        rssMB: Math.round((perf.memory.totalJSHeapSize || 0) / (1024 * 1024)),
-        timestamp: Date.now(),
-      });
-    }
-  };
-  report();
-  // Ride the shared tick instead of a dedicated 10s reporter: memory reports are
-  // background telemetry to the main process, so they pause while the window is
-  // hidden (the renderer is idle then) and resume on focus -- one shared runtime
-  // timer for the whole shell rather than another always-running interval.
-  sharedTick.subscribe('perf-mem-report', report, 10_000);
-  if (typeof window !== 'undefined') {
-    window.addEventListener('unload', () => sharedTick.unsubscribe('perf-mem-report'));
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Selector-based subscriptions (item 146) — minimize re-renders
@@ -428,29 +279,3 @@ export function createManagedRAF(): {
   };
 }
 
-// ---------------------------------------------------------------------------
-// User input reporter (call from app root)
-// ---------------------------------------------------------------------------
-
-export function startInputActivityReporting(): () => void {
-  let lastReport = 0;
-  const THROTTLE_MS = 500;
-
-  const handler = () => {
-    const now = Date.now();
-    if (now - lastReport > THROTTLE_MS) {
-      lastReport = now;
-      ipcSend('user:activity');
-    }
-  };
-
-  window.addEventListener('pointerdown', handler, { passive: true });
-  window.addEventListener('keydown', handler, { passive: true });
-  window.addEventListener('wheel', handler, { passive: true });
-
-  return () => {
-    window.removeEventListener('pointerdown', handler);
-    window.removeEventListener('keydown', handler);
-    window.removeEventListener('wheel', handler);
-  };
-}
