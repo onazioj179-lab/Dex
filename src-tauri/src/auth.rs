@@ -742,10 +742,7 @@ fn recover_account(app: &tauri::AppHandle, args: &Value) -> Value {
 
 fn verify_session(token: &str) -> Value {
     let ok = !token.is_empty()
-        && session_tokens()
-            .lock()
-            .map(|set| set.contains(token))
-            .unwrap_or(false);
+        && session_tokens().lock_safe().contains(token);
     json!(ok)
 }
 

@@ -111,6 +111,9 @@ impl Peer {
     }
 }
 
+/// Nearby devices kept at once (a home or office has a handful).
+const MAX_PEERS: usize = 64;
+
 fn peers() -> &'static Mutex<Vec<Peer>> {
     static PEERS: OnceLock<Mutex<Vec<Peer>>> = OnceLock::new();
     PEERS.get_or_init(|| Mutex::new(Vec::new()))
@@ -256,7 +259,7 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
         // Already running.
         return json!({ "success": true });
     }
-    peers().lock().map(|mut p| p.clear()).ok();
+    peers().lock_safe().clear();
 
     let bind = UdpSocket::bind(("0.0.0.0", DISCOVERY_PORT));
     let socket = match bind {
@@ -291,15 +294,17 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
                     if let Some(peer) = parse_announce(&buf[..n], &src_addr, &id_listen) {
                         let event;
                         {
-                            let mut list = match peers().lock() {
-                                Ok(l) => l,
-                                Err(_) => continue,
-                            };
+                            let mut list = peers().lock_safe();
                             if let Some(existing) =
                                 list.iter_mut().find(|p| p.device_id == peer.device_id)
                             {
                                 *existing = peer.clone();
                                 event = "dtp:device-updated";
+                            } else if list.len() >= MAX_PEERS {
+                                // Anything on the network can send announces with
+                                // made-up ids; don't let that grow the list (and
+                                // the UI's event stream) without bound.
+                                continue;
                             } else {
                                 list.push(peer.clone());
                                 event = "dtp:device-found";
@@ -346,10 +351,7 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
             if since_broadcast % CLEANUP_INTERVAL_MS < tick {
                 let now = now_ms();
                 let lost: Vec<Peer> = {
-                    let mut list = match peers().lock() {
-                        Ok(l) => l,
-                        Err(_) => continue,
-                    };
+                    let mut list = peers().lock_safe();
                     let mut removed = Vec::new();
                     list.retain(|p| {
                         if now - p.last_seen > PEER_TIMEOUT_MS {
@@ -387,10 +389,7 @@ fn refresh_devices() -> Value {
 }
 
 fn get_devices() -> Value {
-    let list = peers()
-        .lock()
-        .map(|l| l.iter().map(|p| p.to_json()).collect::<Vec<_>>())
-        .unwrap_or_default();
+    let list = peers().lock_safe().iter().map(|p| p.to_json()).collect::<Vec<_>>();
     Value::Array(list)
 }
 
@@ -526,7 +525,7 @@ fn get_status() -> Value {
     json!({
         "serverRunning": crate::dtp_transfer::server_running(),
         "discoveryRunning": discovery_running().load(Ordering::SeqCst),
-        "deviceCount": peers().lock().map(|p| p.len()).unwrap_or(0),
+        "deviceCount": peers().lock_safe().len(),
         "port": DTP_PORT,
     })
 }

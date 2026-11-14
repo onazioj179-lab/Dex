@@ -93,10 +93,7 @@ fn clear_unlocked() {
 }
 
 fn is_unlocked() -> bool {
-    key_state()
-        .lock()
-        .map(|g| g.as_ref().map(|s| s.unlocked).unwrap_or(false))
-        .unwrap_or(false)
+    key_state().lock_safe().as_ref().map(|s| s.unlocked).unwrap_or(false)
 }
 
 fn with_key<T>(f: impl FnOnce(&[u8; KEY_LENGTH]) -> T) -> Option<T> {
