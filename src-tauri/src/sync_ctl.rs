@@ -376,7 +376,7 @@ fn start_server(app: &tauri::AppHandle, port: u16) -> Value {
             match listener.accept() {
                 Ok((stream, _addr)) => {
                     let _ = stream.set_nonblocking(false);
-                    handle_conn(&app_for_thread, stream);
+                    crate::util::guard_panic("sync request", || handle_conn(&app_for_thread, stream));
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(std::time::Duration::from_millis(50));

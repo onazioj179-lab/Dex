@@ -33,6 +33,7 @@
 //! threads finishes second emits `pty:exit`, so trailing output always arrives
 //! before the exit event.
 
+use crate::util::LockSafe;
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -366,7 +367,7 @@ fn spawn_waiter(
 ) {
     crate::util::spawn_named("terminal-wait", move || {
         let code = child.wait().ok().map(|st| st.exit_code() as i32);
-        if let Ok(mut c) = td.code.lock() {
+        { let mut c = td.code.lock_safe();
             *c = code;
         }
         let state = app.state::<TerminalState>();

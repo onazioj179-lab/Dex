@@ -8,6 +8,7 @@
 // durationMs, atMs }] } where durationMs is the time since the previous mark.
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
@@ -23,7 +24,7 @@ pub fn anchor() -> Instant {
 /// Record a named point (first occurrence of each name only).
 pub fn mark(name: &'static str) {
     let at = anchor().elapsed().as_millis() as u64;
-    if let Ok(mut m) = MARKS.lock() {
+    { let mut m = MARKS.lock_safe();
         if !m.iter().any(|(n, _)| *n == name) {
             m.push((name, at));
         }

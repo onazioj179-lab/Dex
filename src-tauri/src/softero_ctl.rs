@@ -65,6 +65,7 @@
 //     and applies the `limit` tail.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
@@ -398,7 +399,7 @@ fn run_heuristics(_path: &Path, buffer: &[u8], ext: &str, sensitivity: &str) -> 
 // --- scan engine ------------------------------------------------------------
 
 fn record_history(result: &Value) {
-    if let Ok(mut h) = SCAN_HISTORY.lock() {
+    { let mut h = SCAN_HISTORY.lock_safe();
         h.push(result.clone());
         if h.len() > 10_000 {
             let drop = h.len() - 10_000;

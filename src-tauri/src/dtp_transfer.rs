@@ -13,12 +13,13 @@
 //! (prompt, trusted device or auto-accept) and answers with approve/deny; no answer in
 //! 90 s is a "no".
 
+use crate::util::LockSafe;
 use dex_dtp::{Decision, Identity, Offer, ReceiveHooks, SendHooks};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -56,14 +57,14 @@ fn cancels() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
 
 fn register_cancel(id: &str) -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(false));
-    if let Ok(mut m) = cancels().lock() {
+    { let mut m = cancels().lock_safe();
         m.insert(id.to_string(), flag.clone());
     }
     flag
 }
 
 fn drop_cancel(id: &str) {
-    if let Ok(mut m) = cancels().lock() {
+    { let mut m = cancels().lock_safe();
         m.remove(id);
     }
 }
@@ -150,7 +151,7 @@ impl ReceiveHooks for Incoming {
     fn decide(&self, offer: &Offer) -> Decision {
         let (tx, rx) = mpsc::channel();
         {
-            let Ok(mut map) = pending().lock() else { return Decision::Deny("busy".into()) };
+            let mut map = pending().lock_safe();
             if map.contains_key(&offer.peer.device_id) {
                 return Decision::Deny("Another request from this device is waiting.".into());
             }
@@ -173,11 +174,11 @@ impl ReceiveHooks for Incoming {
             }),
         );
         let answer = rx.recv_timeout(APPROVAL_TIMEOUT).unwrap_or_else(|_| Decision::Deny("No answer on the other device.".into()));
-        if let Ok(mut map) = pending().lock() {
+        { let mut map = pending().lock_safe();
             map.remove(&offer.peer.device_id);
         }
         if matches!(answer, Decision::Accept) {
-            if let Ok(mut s) = self.started.lock() {
+            { let mut s = self.started.lock_safe();
                 *s = Instant::now();
             }
         } else {
@@ -187,7 +188,7 @@ impl ReceiveHooks for Incoming {
     }
 
     fn progress(&self, offer: &Offer, received: u64) {
-        let Ok(mut last) = self.last.lock() else { return };
+        let mut last = self.last.lock_safe();
         if last.elapsed() < PROGRESS_EVERY && received < offer.total_bytes {
             return;
         }
@@ -201,6 +202,28 @@ impl ReceiveHooks for Incoming {
 
     fn cancelled(&self) -> bool {
         self.cancel.load(Ordering::SeqCst)
+    }
+}
+
+/// Receives in progress at once. Each one is a thread; without a cap, anything
+/// on the network that opened connection after connection made DEX start a
+/// thread per connection until it ran out of memory.
+const MAX_ACTIVE_RECEIVES: usize = 8;
+static ACTIVE_RECEIVES: AtomicUsize = AtomicUsize::new(0);
+
+/// Holds one receive slot; frees it however the receive ends (even a panic).
+struct ReceiveSlot;
+impl ReceiveSlot {
+    fn try_take() -> Option<Self> {
+        ACTIVE_RECEIVES
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| (n < MAX_ACTIVE_RECEIVES).then_some(n + 1))
+            .ok()
+            .map(|_| ReceiveSlot)
+    }
+}
+impl Drop for ReceiveSlot {
+    fn drop(&mut self) {
+        ACTIVE_RECEIVES.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -247,9 +270,9 @@ fn dest_from(app: &tauri::AppHandle, opts: &Value) -> Option<PathBuf> {
 pub fn start_server(app: &tauri::AppHandle, args: &Value) -> Value {
     let opts = args.get(0).cloned().unwrap_or(Value::Null);
     let Some(dest) = dest_from(app, &opts) else { return fail("Couldn't find the Downloads folder.") };
-    let Ok(mut guard) = server().lock() else { return fail("server state unavailable") };
+    let mut guard = server().lock_safe();
     if let Some(s) = guard.as_ref() {
-        if let Ok(mut d) = s.dest.lock() {
+        { let mut d = s.dest.lock_safe();
             *d = Some(dest);
         }
         return json!({ "success": true, "port": s.port, "running": true });
@@ -268,11 +291,19 @@ pub fn start_server(app: &tauri::AppHandle, args: &Value) -> Value {
                 break;
             }
             let Ok(stream) = conn else { continue };
-            let Some(folder) = dest2.lock().ok().and_then(|d| d.clone()) else { continue };
+            let Some(folder) = dest2.lock_safe().clone() else { continue };
+            let Some(slot) = ReceiveSlot::try_take() else {
+                // Busy: refuse instead of queueing another thread.
+                let _ = stream.shutdown(Shutdown::Both);
+                continue;
+            };
             let app3 = app2.clone();
             let _ = std::thread::Builder::new()
                 .name("dtp-receive".into())
-                .spawn(move || handle_connection(app3, stream, folder));
+                .spawn(move || {
+                    let _slot = slot;
+                    handle_connection(app3, stream, folder)
+                });
         }
     });
     if let Err(e) = spawned {
@@ -283,7 +314,7 @@ pub fn start_server(app: &tauri::AppHandle, args: &Value) -> Value {
 }
 
 pub fn stop_server() -> Value {
-    let Ok(mut guard) = server().lock() else { return fail("server state unavailable") };
+    let mut guard = server().lock_safe();
     if let Some(s) = guard.take() {
         s.stop.store(true, Ordering::SeqCst);
         // Wake the blocking accept so the thread sees the flag and exits.
@@ -355,7 +386,7 @@ impl Outgoing {
 
 impl SendHooks for Outgoing {
     fn handshake(&self, peer: &Identity, code: &str) {
-        if let Ok(mut n) = self.peer_name.lock() {
+        { let mut n = self.peer_name.lock_safe();
             *n = peer.device_name.clone();
         }
         let mut p = progress_json(&self.id, &peer.device_name, 0, self.total, Instant::now(), "awaiting-approval");
@@ -364,10 +395,10 @@ impl SendHooks for Outgoing {
     }
 
     fn progress(&self, sent: u64, total: u64) {
-        let Ok(mut last) = self.last.lock() else { return };
+        let mut last = self.last.lock_safe();
         let first = sent > 0 && sent <= CHUNK_SIZE;
         if first {
-            if let Ok(mut s) = self.started.lock() {
+            { let mut s = self.started.lock_safe();
                 *s = Instant::now();
             }
         }
@@ -445,4 +476,18 @@ pub fn send_files(app: &tauri::AppHandle, args: &Value) -> Value {
         return fail(format!("Couldn't start the transfer: {e}"));
     }
     json!({ "success": true, "transferId": id })
+}
+
+#[cfg(test)]
+mod receive_slot_tests {
+    use super::{ReceiveSlot, MAX_ACTIVE_RECEIVES};
+
+    #[test]
+    fn receive_slots_are_capped_and_freed_on_drop() {
+        let held: Vec<_> = (0..MAX_ACTIVE_RECEIVES).filter_map(|_| ReceiveSlot::try_take()).collect();
+        assert_eq!(held.len(), MAX_ACTIVE_RECEIVES);
+        assert!(ReceiveSlot::try_take().is_none(), "past the cap a connection is refused");
+        drop(held);
+        assert!(ReceiveSlot::try_take().is_some(), "slots come back when receives end");
+    }
 }

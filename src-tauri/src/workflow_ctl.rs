@@ -46,6 +46,7 @@
 //     same file); it also means out-of-band writes are picked up immediately.
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -140,13 +141,13 @@ fn active_runs() -> &'static Mutex<HashMap<String, ActiveRun>> {
 }
 
 fn register_run(exec_id: &str, abort: Arc<AtomicBool>) {
-    if let Ok(mut g) = active_runs().lock() {
+    { let mut g = active_runs().lock_safe();
         g.insert(exec_id.to_string(), ActiveRun { abort });
     }
 }
 
 fn unregister_run(exec_id: &str) {
-    if let Ok(mut g) = active_runs().lock() {
+    { let mut g = active_runs().lock_safe();
         g.remove(exec_id);
     }
 }
@@ -799,7 +800,7 @@ fn channel_execute(app: &tauri::AppHandle, args: &Value) -> Value {
 // id is given, matching WorkflowEngine.abort()'s arg-less signature). Void.
 fn channel_cancel(args: &Value) {
     let target = args.get(0).and_then(|v| v.as_str());
-    if let Ok(g) = active_runs().lock() {
+    { let g = active_runs().lock_safe();
         match target {
             Some(id) if !id.is_empty() => {
                 if let Some(run) = g.get(id) {

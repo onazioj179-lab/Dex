@@ -9,6 +9,7 @@
 // watcher stops when dropped, so removing the entry tears the watch down.
 // =============================================================================
 
+use crate::util::LockSafe;
 use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -78,7 +79,7 @@ fn stop(app: &tauri::AppHandle, args: &Value) -> Value {
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    if let Ok(mut map) = app.state::<GenericWatchState>().lock() {
+    { let st = app.state::<GenericWatchState>(); let mut map = st.lock_safe();
         map.remove(&id);
     }
     json!({ "success": true })

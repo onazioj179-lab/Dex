@@ -48,6 +48,7 @@
 // serde_json, std, tauri, and crate:: helpers.
 // =============================================================================
 
+use crate::util::LockSafe;
 use serde_json::{json, Value};
 use std::io::Write;
 use std::net::{TcpStream, UdpSocket};
@@ -372,7 +373,7 @@ fn start_discovery(app: &tauri::AppHandle) -> Value {
 
 fn stop_discovery() -> Value {
     discovery_running().store(false, Ordering::SeqCst);
-    if let Ok(mut p) = peers().lock() {
+    { let mut p = peers().lock_safe();
         p.clear();
     }
     json!({ "success": true })

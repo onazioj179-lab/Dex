@@ -40,6 +40,7 @@
 // helpers are handled at the bottom of dispatch().
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -77,13 +78,13 @@ fn key_state() -> &'static Mutex<Option<KeyState>> {
 }
 
 fn set_unlocked(key: [u8; KEY_LENGTH]) {
-    if let Ok(mut g) = key_state().lock() {
+    { let mut g = key_state().lock_safe();
         *g = Some(KeyState { key, unlocked: true });
     }
 }
 
 fn clear_unlocked() {
-    if let Ok(mut g) = key_state().lock() {
+    { let mut g = key_state().lock_safe();
         if let Some(s) = g.as_mut() {
             s.key.fill(0); // zero key material in memory, like Electron lock()
         }
