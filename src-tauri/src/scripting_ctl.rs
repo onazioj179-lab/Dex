@@ -61,6 +61,7 @@
 //     mutates those fields, matching Electron (only execute touches them).
 // =============================================================================
 
+use crate::util::LockSafe;
 use crate::paths::DexPaths;
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
@@ -234,13 +235,13 @@ fn running_set() -> &'static Mutex<HashSet<String>> {
 }
 
 fn mark_running(id: &str) {
-    if let Ok(mut set) = running_set().lock() {
+    { let mut set = running_set().lock_safe();
         set.insert(id.to_string());
     }
 }
 
 fn unmark_running(id: &str) {
-    if let Ok(mut set) = running_set().lock() {
+    { let mut set = running_set().lock_safe();
         set.remove(id);
     }
 }
