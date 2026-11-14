@@ -9,6 +9,15 @@
 
 ---
 
+## Apps UI/UX + Liquid Glass pass (2026-11-14)
+
+- Work area: `getShellWorkspace` subtracts the docked DEX Bar (`floatingLauncherStore.reserveBottom`, published by the bar); maximized = work area inset by the snap gutter (default now 8). Tabs use `--dex-win-inset` / `--dex-reserved-bottom`. The bar no longer auto-hides over tabs (only in focus mode).
+- Re-fit: `dex-work-area-changed` (fired on a timeout, not rAF, so it runs while hidden) re-fits maximized windows and edge-anchored tiles.
+- Side by side: `tileWindow` pairs the opposite half with the front-most window or the current tab. Min sizes capped to half the work area.
+- Material: `GlassFilters` (SVG `#dex-glass-refract`) + `.dex-glass-specular`, `.dex-glass-refract`, `.dex-pill(-tinted)`, `.dex-notif-card` in design-system.css.
+- Preview gotcha: with the pane hidden, rAF and the animation clock stop; a banner dismisses the moment a screenshot wakes the page (its rAF timer sees the whole hidden time). Not a product bug.
+- Rows #251–#256 in DEX_REMAINING_WORK.md.
+
 ## Robustness pass (2026-11-13)
 
 - Lock with `crate::util::LockSafe` (`m.lock_safe()`), never `m.lock().unwrap()`: a panic caught by the `dex_ipc` guard

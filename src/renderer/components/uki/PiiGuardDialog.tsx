@@ -100,7 +100,6 @@ function Pane({ title, body, tone }: { title: string; body: string; tone: 'succe
       background: colors.bg.inset,
       borderRadius: radius.md,
       padding: space[2],
-      borderLeft: `3px solid ${accent}`,
       maxHeight: 160,
       overflow: 'auto',
     }}>

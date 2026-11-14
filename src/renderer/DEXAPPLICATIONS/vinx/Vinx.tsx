@@ -1713,7 +1713,7 @@ const VinxEditor: React.FC = () => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
-                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
+                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
                     <button aria-label="Delete tracker" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).filter(tr => tr.id !== t.id) } }));
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 9999, marginLeft: 'auto', color: 'var(--color-error)' }}><DexIcon name="close" size={10} /></button>
@@ -2038,7 +2038,7 @@ const VinxEditor: React.FC = () => {
                   <SegmentedControl options={['Auto', 'Stabilize Only', 'Smooth']} value={stabCropMode} onChange={setStabCropMode} accentColor="var(--color-accent)" variant="outlined" fill size="sm" style={{ marginTop: 4 }} />
                 </div>
                 <CreativeSlider label="Rolling Shutter" min={0} max={100} step={1} value={stabRollingShutter} onChange={setStabRollingShutter} accentColor="var(--color-accent)" unit="%" layout="stacked" />
-                <button onClick={() => { if (selectedClipIds.length > 0) setClipStabilization(selectedClipIds[0], { enabled: true, smoothness: stabSmoothness, method: stabMethod.toLowerCase().replace('+', '_') as any, cropMode: stabCropMode.toLowerCase().replace(' ', '_') as any, rollingShutter: stabRollingShutter }); }} aria-label="Apply stabilization" style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stabilization</button>
+                <button onClick={() => { if (selectedClipIds.length > 0) setClipStabilization(selectedClipIds[0], { enabled: true, smoothness: stabSmoothness, method: stabMethod.toLowerCase().replace('+', '_') as any, cropMode: stabCropMode.toLowerCase().replace(' ', '_') as any, rollingShutter: stabRollingShutter }); }} aria-label="Apply stabilization" style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stabilization</button>
               </>
             )}
           </div>
@@ -2068,7 +2068,7 @@ const VinxEditor: React.FC = () => {
                 ].map(s => (
                   <CreativeSlider key={s.label} label={s.label} min={0} max={100} step={1} value={s.val} onChange={s.set} accentColor="var(--color-accent)" unit="%" layout="stacked" />
                 ))}
-                <button onClick={() => { if (selectedClipIds.length > 0) setClipNoiseReduction(selectedClipIds[0], { enabled: true, temporalStrength: nrTemporal, spatialStrength: nrSpatial, detailPreservation: nrDetail, method: nrMethod.toLowerCase() as any }); }} aria-label="Apply noise reduction" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Noise Reduction</button>
+                <button onClick={() => { if (selectedClipIds.length > 0) setClipNoiseReduction(selectedClipIds[0], { enabled: true, temporalStrength: nrTemporal, spatialStrength: nrSpatial, detailPreservation: nrDetail, method: nrMethod.toLowerCase() as any }); }} aria-label="Apply noise reduction" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Noise Reduction</button>
               </>
             )}
           </div>

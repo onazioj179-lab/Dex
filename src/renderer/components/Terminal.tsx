@@ -132,11 +132,28 @@ const THEME: ITheme = {
 };
 
 const toolbarBtn = (active = false): React.CSSProperties => ({
-  background: 'transparent',
-  color: active ? 'var(--color-accent, #0a84ff)' : 'var(--color-text-tertiary, #8e8e93)',
-  border: 'none', fontSize: 11, cursor: 'pointer', padding: '2px 6px', fontWeight: 500,
-  fontFamily: 'inherit', borderRadius: 4,
+  background: active ? 'rgba(255,255,255,0.10)' : 'transparent',
+  color: active ? 'var(--color-text-primary, #f2f2f7)' : 'var(--color-text-tertiary, #8e8e93)',
+  border: 'none', fontSize: 11, cursor: 'pointer', padding: '2px 8px', fontWeight: 500,
+  fontFamily: 'inherit', borderRadius: 6, height: 22,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
 });
+/** Square icon button for the header toolbar (labels live in title/aria). */
+const iconBtn = (active = false): React.CSSProperties => ({ ...toolbarBtn(active), width: 24, padding: 0 });
+
+/** Stroke glyphs for the toolbar: one set, one weight, no text-glyph "✕". */
+const TI: Record<'find' | 'snippets' | 'notes' | 'clear' | 'close' | 'up' | 'down', React.ReactNode> = {
+  find: <><circle cx="11" cy="11" r="6.5" /><line x1="20" y1="20" x2="15.8" y2="15.8" /></>,
+  snippets: <><polyline points="7 8 3 12 7 16" /><polyline points="17 8 21 12 17 16" /><line x1="13.5" y1="5" x2="10.5" y2="19" /></>,
+  notes: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><polyline points="14 3 14 8 19 8" /><line x1="9" y1="13" x2="15" y2="13" /></>,
+  clear: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /></>,
+  close: <><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></>,
+  up: <polyline points="6 15 12 9 18 15" />,
+  down: <polyline points="6 9 12 15 18 9" />,
+};
+const Glyph: React.FC<{ name: keyof typeof TI; size?: number }> = ({ name, size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{TI[name]}</svg>
+);
 
 type Status = 'starting' | 'running' | 'exited' | 'unavailable' | 'no-bridge';
 
@@ -540,7 +557,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         background: THEME.background,
         color: THEME.foreground,
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 4,
+        borderRadius: 10,
         overflow: 'hidden',
         position: 'relative',
         fontSize: 11,
@@ -549,8 +566,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       <div
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          height: 26, padding: '0 6px 0 10px', flexShrink: 0,
-          background: '#15171a',
+          height: 30, padding: '0 6px 0 12px', flexShrink: 0,
+          background: '#131417',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           color: 'var(--color-text-tertiary, #8e8e93)',
         }}
@@ -559,49 +576,60 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           <span
             aria-hidden
             style={{
+              // One quiet state light: DEX Blue while a shell runs, grey otherwise.
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: status === 'running' ? '#5fd38a' : status === 'starting' ? '#e5c07b' : '#6b7078',
+              background: status === 'running' ? 'var(--color-accent, #0a84ff)' : status === 'starting' ? '#8e8e93' : '#4a4d53',
             }}
           />
           <span title={status === 'running' && sessionCwd ? `Started in ${sessionCwd}` : undefined} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{statusLabel}</span>
         </span>
-        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           {(status === 'exited' || status === 'unavailable') && (
             <button type="button" onClick={restart} title="Start a new shell" aria-label="Restart terminal" style={toolbarBtn(true)}>Restart</button>
           )}
           <button
             type="button"
             onClick={() => { setFind((f) => (f ? null : { q: '', hit: null })); setTimeout(() => findInputRef.current?.focus(), 0); }}
-            title="Find in output (Ctrl+F)" aria-label="Search scrollback" aria-pressed={!!find} style={toolbarBtn(!!find)}
-          >Find</button>
-          <button type="button" onClick={() => setShowSnippets((o) => !o)} title="Saved commands" aria-label="Saved snippets" aria-pressed={showSnippets} style={toolbarBtn(showSnippets)}>Snippets</button>
-          <button type="button" onClick={toNotes} title="Send output (or selection) to Notes" aria-label="Send to Notes" style={toolbarBtn()}>To Notes</button>
+            title="Find in output (Ctrl+F)" aria-label="Search scrollback" aria-pressed={!!find} style={iconBtn(!!find)}
+          ><Glyph name="find" /></button>
+          <button type="button" onClick={() => setShowSnippets((o) => !o)} title="Saved commands" aria-label="Saved snippets" aria-pressed={showSnippets} style={iconBtn(showSnippets)}><Glyph name="snippets" /></button>
+          <button type="button" onClick={toNotes} title="Send output (or selection) to Notes" aria-label="Send to Notes" style={iconBtn()}><Glyph name="notes" /></button>
           <button
             type="button"
             onClick={() => { termRef.current?.clear(); termRef.current?.focus(); }}
-            title="Clear scrollback" aria-label="Clear terminal" style={toolbarBtn()}
-          >Clear</button>
+            title="Clear scrollback" aria-label="Clear terminal" style={iconBtn()}
+          ><Glyph name="clear" /></button>
           {onClose && (
-            <button type="button" onClick={() => onCloseRef.current?.()} title="Close panel" aria-label="Close terminal panel" style={toolbarBtn()}>✕</button>
+            <button type="button" onClick={() => onCloseRef.current?.()} title="Close panel" aria-label="Close terminal panel" style={iconBtn()}><Glyph name="close" /></button>
           )}
         </div>
       </div>
 
-      {(status === 'unavailable' || status === 'no-bridge' || (error && status !== 'running')) && (
+      {status === 'no-bridge' && (
+        // No native PTY here (web preview / no bridge): say so plainly in the
+        // body instead of a banner over an empty black pane.
+        <div role="alert" style={{ position: 'absolute', inset: '30px 0 0 0', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: 'none', textAlign: 'center', padding: 24 }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary, #8e8e93)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><polyline points="7 10 10 13 7 16" /><line x1="12" y1="16" x2="16" y2="16" /></svg>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #f2f2f7)' }}>{error || 'The terminal needs the DEX desktop app.'}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary, #8e8e93)', maxWidth: 320 }}>Shells run through the native backend, which this window can't reach.</div>
+        </div>
+      )}
+
+      {(status === 'unavailable' || (error && status !== 'running' && status !== 'no-bridge')) && (
         <div
           role="alert"
           style={{
             display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-            padding: '6px 10px', fontSize: 12,
-            background: 'rgba(255,107,107,0.08)', borderBottom: '1px solid rgba(255,107,107,0.25)',
-            color: '#ffb3b3',
+            padding: '7px 12px', fontSize: 12,
+            background: '#131417', borderBottom: '1px solid rgba(255,255,255,0.06)',
+            color: '#ff8a80',
           }}
         >
           <span style={{ flex: 1, minWidth: 0 }}>
-            {status === 'no-bridge' ? error : `The shell couldn't start. ${error ?? ''}`}
+            {`The shell couldn't start. ${error ?? ''}`}
           </span>
           {status === 'unavailable' && (
-            <button type="button" onClick={restart} style={{ ...toolbarBtn(true), border: '1px solid currentColor' }}>Retry</button>
+            <button type="button" onClick={restart} style={toolbarBtn(true)}>Retry</button>
           )}
         </div>
       )}
@@ -619,7 +647,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: '#6b7078', marginBottom: 2 }}>
             <span>{dexResult.cmd}</span>
-            <button type="button" aria-label="Dismiss" onClick={() => { setDexResult(null); termRef.current?.focus(); }} style={toolbarBtn()}>✕</button>
+            <button type="button" aria-label="Dismiss" onClick={() => { setDexResult(null); termRef.current?.focus(); }} style={iconBtn()}><Glyph name="close" size={11} /></button>
           </div>
           {dexResult.text}
         </div>
@@ -634,10 +662,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       {find && (
         <div
           style={{
-            position: 'absolute', top: 30, right: 10, zIndex: 3,
-            display: 'flex', alignItems: 'center', gap: 4, padding: 4,
-            background: '#1c1e22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            position: 'absolute', top: 36, right: 10, zIndex: 3,
+            display: 'flex', alignItems: 'center', gap: 2, padding: 4,
+            background: '#1c1e22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
           }}
         >
           <input
@@ -651,15 +679,15 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
               else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
             }}
             style={{
-              width: 180, height: 22, padding: '0 6px', fontSize: 12, fontFamily: 'inherit',
+              width: 180, height: 24, padding: '0 10px', fontSize: 12, fontFamily: 'inherit',
               background: '#0e0f11', color: THEME.foreground,
-              border: `1px solid ${find.hit === false ? 'rgba(255,107,107,0.6)' : 'rgba(255,255,255,0.12)'}`,
-              borderRadius: 4, outline: 'none',
+              border: `1px solid ${find.hit === false ? 'rgba(255,107,107,0.6)' : 'transparent'}`,
+              borderRadius: 9999, outline: 'none',
             }}
           />
-          <button type="button" aria-label="Previous match" title="Previous (Shift+Enter)" onClick={() => runFind(find.q, true)} style={toolbarBtn()}>↑</button>
-          <button type="button" aria-label="Next match" title="Next (Enter)" onClick={() => runFind(find.q)} style={toolbarBtn()}>↓</button>
-          <button type="button" aria-label="Close find" title="Close (Esc)" onClick={closeFind} style={toolbarBtn()}>✕</button>
+          <button type="button" aria-label="Previous match" title="Previous (Shift+Enter)" onClick={() => runFind(find.q, true)} style={iconBtn()}><Glyph name="up" /></button>
+          <button type="button" aria-label="Next match" title="Next (Enter)" onClick={() => runFind(find.q)} style={iconBtn()}><Glyph name="down" /></button>
+          <button type="button" aria-label="Close find" title="Close (Esc)" onClick={closeFind} style={iconBtn()}><Glyph name="close" size={11} /></button>
         </div>
       )}
 
@@ -668,23 +696,23 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           role="dialog"
           aria-label="Saved snippets"
           style={{
-            position: 'absolute', top: 30, right: 10, zIndex: 4, width: 320, maxHeight: '70%',
-            display: 'flex', flexDirection: 'column',
-            background: '#1c1e22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)', fontSize: 12,
+            position: 'absolute', top: 36, right: 10, zIndex: 4, width: 320, maxHeight: '70%',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            background: '#1c1e22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.45)', fontSize: 12,
           }}
         >
           <div style={{ display: 'flex', gap: 4, padding: 6, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <input
               aria-label="Snippet name" placeholder="Name" value={snippetName}
               onChange={(e) => setSnippetName(e.target.value)}
-              style={{ width: 80, height: 22, padding: '0 6px', fontSize: 12, background: '#0e0f11', color: THEME.foreground, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, outline: 'none' }}
+              style={{ width: 80, height: 22, padding: '0 6px', fontSize: 12, background: '#0e0f11', color: THEME.foreground, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, outline: 'none' }}
             />
             <input
               aria-label="Snippet command" placeholder="Command" value={snippetCmd}
               onChange={(e) => setSnippetCmd(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSnippet(); } }}
-              style={{ flex: 1, minWidth: 0, height: 22, padding: '0 6px', fontSize: 12, fontFamily: '"Cascadia Mono", Consolas, monospace', background: '#0e0f11', color: THEME.foreground, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, height: 22, padding: '0 6px', fontSize: 12, fontFamily: '"Cascadia Mono", Consolas, monospace', background: '#0e0f11', color: THEME.foreground, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, outline: 'none' }}
             />
             <button type="button" onClick={addSnippet} disabled={!snippetCmd.trim()} style={toolbarBtn(true)}>Save</button>
           </div>
@@ -700,7 +728,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
                 </div>
                 <button type="button" title="Insert without running" aria-label={`Insert ${s.name}`} disabled={status !== 'running'} onClick={() => insertSnippet(s, false)} style={toolbarBtn()}>Insert</button>
                 <button type="button" title="Run" aria-label={`Run ${s.name}`} disabled={status !== 'running'} onClick={() => insertSnippet(s, true)} style={toolbarBtn(true)}>Run</button>
-                <button type="button" title="Delete" aria-label={`Delete ${s.name}`} onClick={() => removeSnippet(s.id)} style={toolbarBtn()}>✕</button>
+                <button type="button" title="Delete" aria-label={`Delete ${s.name}`} onClick={() => removeSnippet(s.id)} style={iconBtn()}><Glyph name="close" size={11} /></button>
               </div>
             ))}
           </div>
