@@ -2368,9 +2368,10 @@ export const DexErrorBanner: React.FC<DexErrorBannerProps> = ({
     alignItems: 'center',
     gap: space[3],
     padding: `${space[3]} ${space[4]}`,
-    backgroundColor: colorScheme.bg,
-    borderLeft: `3px solid ${colorScheme.border}`,
-    borderRadius: radius.md,
+    // Quiet card: the icon carries the tone. No coloured side stripe.
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+    borderRadius: radius.lg,
     ...style,
   };
 

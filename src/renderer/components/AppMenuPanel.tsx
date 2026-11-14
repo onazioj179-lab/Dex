@@ -128,7 +128,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 40, height: 40, borderRadius: 10,
           background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)',
-          boxShadow: isActive ? '0 0 0 1.5px var(--color-accent)' : 'none', overflow: 'hidden',
+          overflow: 'hidden',
         }}>
           {renderIcon(app.id, 22)}
         </div>
@@ -171,6 +171,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
         <input
           ref={inputRef}
           type="text"
+          className="dex-search-field"
           role="combobox"
           aria-expanded={!!q}
           aria-controls="dex-app-menu-results"
@@ -181,17 +182,21 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={onSearchKey}
+          // A pill, like the dock search: no border, no focus ring glow --
+          // the caret and a slightly brighter fill say it's focused.
           style={{
-            width: '100%', boxSizing: 'border-box', height: 34, padding: '0 32px 0 32px', borderRadius: 10,
-            border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.25))',
+            width: '100%', boxSizing: 'border-box', height: 34, padding: '0 32px 0 32px', borderRadius: 9999,
+            border: 'none', background: 'rgba(255,255,255,0.08)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
             color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
+            transition: 'background 0.15s ease',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+          onFocus={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
+          onBlur={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
         />
         {query && (
           <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 22, height: 22, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 22, height: 22, border: 'none', borderRadius: 9999, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <DexIcon name="close" size={12} color="currentColor" />
           </button>
         )}
@@ -213,7 +218,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
               onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 10, cursor: 'pointer',
-                background: i === active ? 'var(--color-accent-light, rgba(10,132,255,0.14))' : 'transparent',
+                background: i === active ? 'rgba(255,255,255,0.08)' : 'transparent',
               }}
             >
               <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
@@ -224,7 +229,6 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{h.kind === 'action' ? `Action · ${h.detail}` : h.detail || 'App'}</span>
               </span>
               {runningIds.has(h.appId) && h.kind === 'app' && <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>Running</span>}
-              {i === active && <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '0 4px' }}>Enter</span>}
             </div>
           ))}
         </div>
@@ -246,10 +250,6 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           ))}
         </div>
       )}
-      <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <span>Right-click an app for options</span>
-        <span>Drag an app to the Dock to pin it</span>
-      </div>
     </>
   );
 };

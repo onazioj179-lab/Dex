@@ -820,7 +820,7 @@ const styles: Record<string, React.CSSProperties> = {
   boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   boardTitle: APP_TITLE,
   boardMeta: APP_SUBTITLE,
-  progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
+  progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px var(--space-3)', borderRadius: 6, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 },
   boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 },
   boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   boardTabActive: { background: 'var(--color-bg-elevated, #2c2c2e)', color: 'var(--color-text-primary, #fafafa)', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' },
