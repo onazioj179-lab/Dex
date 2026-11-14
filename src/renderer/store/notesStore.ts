@@ -263,11 +263,11 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
 // ---------------------------------------------------------------------------
 // Favorites overlay
 // ---------------------------------------------------------------------------
-// Favorites are persisted in a small localStorage set keyed by note id, layered
-// on top of whatever the backend returns. This keeps the star working and
-// durable whether notes come from the native SQLite backend (which may not have
-// a favorite column) or the localStorage fallback -- a single source of truth
-// the UI reads, mirroring how pane sizes persist outside the note row.
+// The favorite flag lives in the note row (native `notes.favorite`, or the
+// fallback store). This localStorage set is legacy: favorites used to be kept
+// only here, so they never reached dex.db or a backup. loadNotes moves any
+// entry the backend lacks into the row and drops it from the set; the set is
+// also the last resort when a backend cannot store the flag.
 
 const FAVORITES_KEY = 'dex-notes-favorites-v1';
 
@@ -293,9 +293,33 @@ function favSet(id: string, on: boolean): Set<string> {
   return s;
 }
 
-/** Stamp the persisted favorite flag onto a note list item (or full note). */
-function applyFavorite<T extends { id: string; favorite?: number }>(note: T, favs: Set<string>): T {
-  return { ...note, favorite: favs.has(note.id) ? 1 : 0 };
+/** Favorite flag for a note: the backend's column, or a not-yet-migrated overlay entry. */
+function applyFavorite<T extends { id: string; favorite?: number | boolean }>(note: T, favs: Set<string>): T {
+  const stored = note.favorite === true || Number(note.favorite) === 1;
+  return { ...note, favorite: stored || favs.has(note.id) ? 1 : 0 };
+}
+
+/** The backend answered a favorite write as stored ({ success: true } natively, true in the fallback). */
+const favoriteStored = (r: unknown): boolean => r === true || (!!r && typeof r === 'object' && (r as { success?: unknown }).success === true);
+
+/**
+ * Favorites used to live only in the localStorage overlay (native Notes had no
+ * column, so they never reached dex.db or a backup). Move any overlay entry the
+ * backend does not have yet into the note row, then drop it from the overlay.
+ */
+async function migrateOverlayFavorites(rows: Array<{ id: string; favorite?: number | boolean }>, favs: Set<string>): Promise<void> {
+  if (favs.size === 0) return;
+  let changed = false;
+  for (const row of rows) {
+    if (!favs.has(row.id)) continue;
+    const stored = row.favorite === true || Number(row.favorite) === 1;
+    if (!stored) {
+      const r = await ipc('dexnotes:favorite', row.id, true).catch(() => null);
+      if (!favoriteStored(r)) continue;
+    }
+    favs.delete(row.id); changed = true;
+  }
+  if (changed) favSave(favs);
 }
 
 async function ipc(channel: string, ...args: any[]): Promise<any> {
@@ -591,6 +615,7 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
     if (result) {
       const favs = favLoad();
       set({ notes: (result as NoteListItem[]).map(n => applyFavorite(n, favs)) });
+      void migrateOverlayFavorites(result as NoteListItem[], favs);
     }
   },
 
@@ -732,16 +757,16 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
     const { notes, activeNote } = get();
     const note = notes.find(n => n.id === id);
     const newFavorite = note ? !note.favorite : true;
-    // Persist to the favorites overlay (durable across backends); best-effort
-    // notify the backend too in case a native favorite column exists.
-    favSet(id, newFavorite);
-    void ipc('dexnotes:favorite', id, newFavorite);
     set({
       notes: notes.map(n => n.id === id ? { ...n, favorite: newFavorite ? 1 : 0 } : n),
     });
     if (activeNote && activeNote.id === id) {
       set({ activeNote: { ...activeNote, favorite: newFavorite ? 1 : 0 } });
     }
+    // The note row is the source of truth; the overlay only covers a backend
+    // that could not store it (and is cleared for this note once it can).
+    const r = await ipc('dexnotes:favorite', id, newFavorite).catch(() => null);
+    favSet(id, favoriteStored(r) ? false : newFavorite);
   },
 
   // -- Folders -------------------------------------------------------------

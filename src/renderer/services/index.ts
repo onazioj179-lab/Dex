@@ -156,5 +156,4 @@ export {
   safeGetWebGLContext,
   registerContextLossHandlers,
   createManagedRAF,
-  startInputActivityReporting,
 } from './PerformanceOptimization';
