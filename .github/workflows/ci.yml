@@ -4,6 +4,10 @@
 # Packaging and publishing live in release.yml (one official setup).
 # =============================================================================
 
+# Runners are pinned to ubuntu-24.04: the ubuntu-latest label moved to Ubuntu 26.04,
+# where Playwright cannot install Chromium and the E2E job failed before running a test.
+# Move the pin forward only after `npx playwright install --with-deps chromium` works there.
+
 name: CI
 
 on:
