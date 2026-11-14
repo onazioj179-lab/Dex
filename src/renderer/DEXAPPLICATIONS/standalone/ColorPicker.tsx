@@ -5,6 +5,7 @@
  */
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { sendToNotes } from '../../services/sendTo';
+import { useSavedColors, saveColor, removeColor } from '../../services/sharedColors';
 
 interface HSL { h: number; s: number; l: number }
 
@@ -128,6 +129,9 @@ const ColorPicker: React.FC = () => {
   }, []);
 
   const previewOnDark = relLuminance(hex) > 0.35;
+  // Shared library (AssetLibrary 'palette'): saved here, shown in PRISM, kept in dex.db.
+  const saved = useSavedColors();
+  const isSaved = saved.includes(hex.toLowerCase());
 
   return (
     <div style={s.container}>
@@ -222,6 +226,16 @@ const ColorPicker: React.FC = () => {
           <span style={s.valueLabel}>SEND</span>
           <span style={s.valueText}>Notes</span>
         </button>
+        <button
+          onClick={() => (isSaved ? removeColor(hex) : saveColor(hex, 'colorpicker'))}
+          className="dex-liquid-glass cp-chip"
+          style={s.valueChip}
+          aria-pressed={isSaved}
+          title={isSaved ? 'Remove from the shared colour library' : 'Save to the shared colour library (PRISM shows it too)'}
+        >
+          <span style={s.valueLabel}>LIBRARY</span>
+          <span style={s.valueText}>{isSaved ? 'Saved' : 'Save'}</span>
+        </button>
       </div>
 
       {copied && <div style={s.copiedToast}>Copied</div>}
@@ -238,6 +252,21 @@ const ColorPicker: React.FC = () => {
           aria-label="Hex color value"
         />
       </div>
+
+      {/* Saved (shared library) */}
+      {saved.length > 0 && (
+        <div style={s.section}>
+          <div className="dex-label-caps" style={s.sectionLabel}>Saved</div>
+          <div style={s.palette}>
+            {saved.map((c) => (
+              <button key={c} onClick={() => setHsl(hexToHsl(c))}
+                onContextMenu={(e) => { e.preventDefault(); removeColor(c); }}
+                style={{ ...s.swatch, background: c, boxShadow: c === hex.toLowerCase() ? '0 0 0 2px var(--color-accent)' : 'none' }}
+                title={`${c.toUpperCase()} (right-click to remove)`} aria-label={`Use saved color ${c}`} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Presets */}
       <div style={s.section}>
@@ -336,7 +365,7 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
   },
   values: {
-    display: 'flex', gap: 'var(--space-2)', padding: '0 var(--space-5) var(--space-3)',
+    display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '0 var(--space-5) var(--space-3)',
   },
   valueChip: {
     flex: 1, display: 'flex', flexDirection: 'column', gap: 2,
