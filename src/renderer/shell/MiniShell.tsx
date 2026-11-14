@@ -205,7 +205,6 @@ const miniCss = `
   [data-compact] .mini-action { transition: ${cssTransitions(['background', 'color', 'transform'], 'micro')}; }
   [data-compact] .mini-action:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)); color: var(--color-text-primary); }
   [data-compact] .mini-action:active { transform: scale(0.92); }
-  [data-compact] .mini-expand:hover { color: var(--color-accent); }
 `;
 
 export default MiniShell;

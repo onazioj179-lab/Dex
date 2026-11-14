@@ -243,10 +243,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
     >
       <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.96) translateY(-2px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .dex-ctx-item { background: transparent; transition: background 100ms var(--ease-out, ease-out), color 100ms var(--ease-out, ease-out); }
-.dex-ctx-item:hover:not([aria-disabled="true"]), .dex-ctx-item[data-focused="true"]:not([aria-disabled="true"]) { background: var(--color-accent-light); }
-.dex-ctx-item:active:not([aria-disabled="true"]) { background: var(--color-accent-muted, var(--color-accent-light)); }
+.dex-ctx-item:hover:not([aria-disabled="true"]), .dex-ctx-item[data-focused="true"]:not([aria-disabled="true"]) { background: var(--color-bg-hover); }
+.dex-ctx-item:active:not([aria-disabled="true"]) { background: var(--color-bg-active); }
 .dex-ctx-sub { background: transparent; transition: background 100ms var(--ease-out, ease-out), color 100ms var(--ease-out, ease-out); }
-.dex-ctx-sub:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }`}</style>
+.dex-ctx-sub:hover:not([aria-disabled="true"]) { background: var(--color-bg-hover); }`}</style>
       {items.map((item, i) => {
         if (item.divider && !item.label) {
           return <div key={item.id ?? ('div-' + i)} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />;

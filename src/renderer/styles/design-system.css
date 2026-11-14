@@ -791,13 +791,7 @@
 }
 
 /* 912. Magnetic snap feedback */
-.dex-magnetic {
-  transition: transform var(--transition-spring);
-}
 
-.dex-magnetic:hover {
-  transform: scale(1.02);
-}
 
 /* 913. Parallax depth layers */
 .dex-parallax-bg { transform: translateZ(-2px) scale(1.5); }
@@ -1309,21 +1303,13 @@ html[data-darkroom="on"] {
 .dex-elev-3 { box-shadow: var(--elev-3); }
 .dex-elev-4 { box-shadow: var(--elev-4); }
 
-/* Sharp hover lift — a 1px rise + one rung of elevation, fast and reversible.
-   Opt-in so it never fights a component that manages its own hover state. */
-.dex-hover-lift {
-  transition: transform var(--duration-fast) var(--ease-out),
-              box-shadow var(--duration-fast) var(--ease-out);
+/* Wallpaper picker tile: the border carries hover and the chosen state. */
+.dex-wp-tile {
+  border: 2px solid var(--color-border-subtle);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
-.dex-hover-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--elev-2);
-}
-.dex-hover-lift:active {
-  transform: translateY(0);
-  box-shadow: var(--elev-1);
-  transition-duration: 30ms;
-}
+.dex-wp-tile:hover { border-color: var(--color-border-strong); }
+.dex-wp-tile[aria-pressed="true"] { border-color: var(--color-accent); }
 
 /* Tabular numerals — for any surface where digits change in place (clocks,
    timers, counters, progress) so they don't jitter as values tick. */
@@ -1333,26 +1319,10 @@ html[data-darkroom="on"] {
 }
 
 /* Premium button with spring interaction */
-.dex-btn-premium {
-  transition: all var(--transition-spring);
-  box-shadow: var(--shadow-premium-sm);
-}
 
-.dex-btn-premium:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-premium-md);
-}
 
-.dex-btn-premium:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: var(--shadow-premium-sm);
-}
 
 /* Premium focus state */
-.dex-focus-premium:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring-premium);
-}
 
 /* Noise texture overlay */
 .dex-noise::before {
@@ -1381,41 +1351,11 @@ html[data-darkroom="on"] {
 }
 
 /* Hover glow container */
-.dex-hover-glow {
-  position: relative;
-  overflow: hidden;
-}
 
-.dex-hover-glow::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(74, 158, 255, 0.15), transparent 50%);
-  opacity: 0;
-  transition: opacity 200ms ease;
-  pointer-events: none;
-}
 
-.dex-hover-glow:hover::before {
-  opacity: 1;
-}
 
 /* Radial accent glow at top */
-.dex-accent-glow {
-  position: relative;
-}
 
-.dex-accent-glow::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 50%;
-  background: var(--gradient-accent-radial);
-  pointer-events: none;
-  border-radius: inherit;
-}
 
 /* Smooth theme transition */
 .theme-transitioning,
@@ -1467,20 +1407,6 @@ html[data-darkroom="on"] {
 .creative-btn:disabled { opacity: 0.3; pointer-events: none; }
 
 /* Creative header bars -- flat top bar */
-.creative-header {
-  display: flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 12px;
-  background: rgba(30, 30, 34, 0.90);
-  backdrop-filter: var(--blur-md) saturate(150%);
-  -webkit-backdrop-filter: var(--blur-md) saturate(150%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  flex-shrink: 0;
-  gap: 6px;
-  position: relative;
-  z-index: 50;
-}
 
 /* Creative sidebar panels */
 .creative-sidebar {
@@ -2217,35 +2143,11 @@ img, svg {
    List Row
    ───────────────────────────────────────────────────────────────────────── */
 
-.list-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-surface);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-default);
-}
 
-.list-row:hover {
-  background: var(--color-bg-inset);
-}
 
 /* Sharp 2.0: selected rows carry an accent tint + a crisp 2px accent left-bar
    (inset shadow, so it never shifts layout). Covers the common selected/active
    class names and the accessible aria-selected state for free. */
-.list-row.active,
-.list-row.selected,
-.list-row[aria-selected="true"] {
-  background: var(--color-accent-light);
-  box-shadow: inset 2px 0 0 var(--color-accent);
-}
-.list-row.active .list-row-title,
-.list-row.selected .list-row-title,
-.list-row[aria-selected="true"] .list-row-title {
-  color: var(--color-accent);
-}
 
 .list-row-icon {
   flex-shrink: 0;
@@ -2311,20 +2213,7 @@ img, svg {
    Card
    ───────────────────────────────────────────────────────────────────────── */
 
-.card {
-  background: var(--color-bg-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  box-shadow: var(--shadow-md), inset 0 0.5px 0 rgba(255,255,255,0.04);
-  transition: box-shadow var(--duration-normal) var(--ease-out), transform var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
-}
 
-.card:hover {
-  border-color: var(--color-border-default);
-  box-shadow: var(--shadow-card-hover), inset 0 0.5px 0 rgba(255,255,255,0.06);
-  transform: translateY(-1px);
-}
 
 .card-header {
   display: flex;
@@ -2519,9 +2408,6 @@ img, svg {
   max-width: 280px;
 }
 
-.empty-state-action {
-  margin-top: var(--space-4);
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Checkbox
@@ -2688,20 +2574,7 @@ img, svg {
   gap: var(--space-2);
 }
 
-.app-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-default);
-}
 
-.app-item:hover {
-  background: var(--color-bg-hover);
-}
 
 .app-icon {
   width: 44px;
@@ -2901,18 +2774,6 @@ img, svg {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Interactive depth for clickable elements */
-.depth-interactive {
-  box-shadow: var(--shadow-depth-1);
-  transition: box-shadow 0.12s ease, transform 0.12s ease;
-}
-.depth-interactive:hover {
-  box-shadow: var(--shadow-depth-2);
-  transform: translateY(-1px);
-}
-.depth-interactive:active {
-  box-shadow: var(--shadow-inset);
-  transform: translateY(0);
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 8: REDUCED MOTION
@@ -3203,12 +3064,10 @@ body,
 .bottomnav,
 .sidebar,
 .main-content,
-.card,
 .modal,
 .popover,
 .btn,
 .input-wrapper,
-.list-row,
 .tabs,
 .tab {
   transition: 
@@ -3415,8 +3274,6 @@ html[data-perf-tier="low"] *::after {
 .shadow-md { box-shadow: var(--shadow-md) !important; }
 .shadow-lg { box-shadow: var(--shadow-lg) !important; }
 .shadow-xl { box-shadow: var(--shadow-xl) !important; }
-.shadow-float { box-shadow: var(--shadow-float) !important; }
-.shadow-glow { box-shadow: var(--shadow-glow) !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 18.5: VISUAL SOUL -- Subtle life and depth
@@ -3440,34 +3297,8 @@ html[data-perf-tier="low"] *::after {
 }
 
 /* Card hover lift with subtle glow */
-.dex-card-interactive {
-  transition: transform var(--duration-fast) var(--ease-default),
-              box-shadow var(--duration-fast) var(--ease-default);
-}
-.dex-card-interactive:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card-hover);
-}
 
 /* Subtle surface shine on glass elements */
-.dex-glass-shine {
-  position: relative;
-  overflow: hidden;
-}
-.dex-glass-shine::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    transparent 40%,
-    transparent 60%,
-    rgba(255, 255, 255, 0.015) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
-}
 
 /* Accent dot for active states (dock, tabs) */
 .dex-dot-active {
@@ -3492,10 +3323,7 @@ html[data-perf-tier="low"] *::after {
   .dex-pulse {
     animation: none;
   }
-  .dex-card-interactive:hover {
-    transform: none;
   }
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SECTION 19: DEX APP SPECIFIC TRANSPARENT STYLES
@@ -4002,33 +3830,6 @@ button[aria-disabled="true"],
 }
 
 /* --- Tahoe Slider --- */
-.tahoe-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 3px;
-  background: var(--color-bg-active);
-  border-radius: var(--radius-full);
-  outline: none;
-  cursor: pointer;
-}
-.tahoe-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-primary);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-  cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-spring);
-}
-.tahoe-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-}
-.tahoe-slider::-webkit-slider-thumb:active {
-  transform: scale(1.05);
-}
 
 /* --- Tahoe Tooltip (dark pill) --- */
 .tahoe-tooltip {
@@ -4699,7 +4500,6 @@ button[aria-disabled="true"],
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* 1. CSS containment for list items — prevent layout thrashing */
-.list-row,
 .tahoe-select-option,
 .track-item,
 .settings-item,
@@ -4781,7 +4581,6 @@ svg, img.icon, [data-icon] {
 @media (pointer: coarse) {
   .btn,
   .nav-item,
-  .list-row,
   .tahoe-select-option,
   [role="menuitem"],
   [role="button"] {
@@ -4818,7 +4617,6 @@ svg, img.icon, [data-icon] {
   .tahoe-checkbox-box { border: 2px solid ButtonText; }
   .tahoe-checkbox-box.checked { background: Highlight; border-color: Highlight; }
   :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
-  .list-row:hover,
   .tahoe-select-option:hover { background: Highlight; color: HighlightText; }
   .tahoe-slider-fill { background: Highlight; }
   .tahoe-badge { border: 1px solid ButtonText; }
@@ -4835,12 +4633,7 @@ svg, img.icon, [data-icon] {
 
 /* 15. Subgrid for uniform card layouts */
 @supports (grid-template-rows: subgrid) {
-  .card-grid > .card {
-    display: grid;
-    grid-template-rows: subgrid;
-    grid-row: span 3;
   }
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4969,29 +4762,8 @@ svg, img.icon, [data-icon] {
 }
 
 /* Interactive card */
-.card-interactive {
-  transition: transform var(--transition-fast), box-shadow var(--transition-normal);
-  cursor: pointer;
-}
-.card-interactive:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card-hover);
-}
-.card-interactive:active {
-  transform: translateY(0) scale(0.99);
-  transition-duration: 40ms;
-}
 
 /* Glass shine */
-.glass-shine::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%);
-  z-index: 1;
-}
 
 /* Scroll-auto (thin scrollbar on hover) */
 .scroll-auto::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -5071,8 +4843,6 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
 .border-inset-accent { box-shadow: inset 0 0 0 1px var(--color-accent); }
 
 /* Hover scale */
-.hover-scale-sm:hover { transform: scale(1.01); }
-.hover-scale-md:hover { transform: scale(1.02); }
 
 /* Divider with dot */
 .divider-dot { display: flex; align-items: center; gap: 8px; }
@@ -5119,7 +4889,6 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-6px); }
 }
-.animate-float { animation: float 3s ease-in-out infinite; }
 
 /* Menu in/out */
 @keyframes menuIn {
@@ -5264,11 +5033,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--color-text-primary); border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
   cursor: pointer; transition: transform 0.15s var(--ease-out);
 }
-input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
 input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.05); }
-input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--focus-ring-color), 0 1px 4px rgba(0,0,0,0.3);
-}
 
 /* Pro analog console sliders for the creative apps (Vinx / Prism / Forge):
    a recessed track with a bevelled metal cap, matching Imosion's hardware feel.
@@ -5415,9 +5180,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
     --shadow-lg: none;
   }
   .btn { border: 1px solid var(--color-border-strong); }
-  .card, .tahoe-card { border: 1px solid var(--color-border); }
-  .list-row { border-bottom: 1px solid var(--color-border-subtle); }
-}
+  .tahoe-card { border: 1px solid var(--color-border); }
+  }
 
 /* Touch target (WCAG 2.1 AA) */
 .touch-target { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
@@ -5568,7 +5332,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   60% { transform: scale(1.15); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
-.dex-success-pop { animation: dex-success-pop 0.35s ease-out both; }
 
 /* Item 161: Dock bounce animation */
 @keyframes dex-bounce {
@@ -5585,13 +5348,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .dex-page-enter { animation: dex-page-enter 0.15s ease-out both; }
 
 /* Item 159: Dock magnification scale */
-.dex-dock-magnify {
-  transition: transform 0.12s ease-out;
-}
-.dex-dock-magnify:hover {
-  transform: scale(1.25);
-  z-index: 10;
-}
 
 /* Item 187: Count-up animation for statistics */
 @keyframes dex-count-up {
@@ -5901,26 +5657,8 @@ button:active:not(:disabled),
 }
 
 /* Responsive toolbar buttons */
-.creative-toolbar button,
-.creative-header button {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  transition: all 0.06s ease;
-}
 
-.creative-toolbar button:hover,
-.creative-header button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.02);
-}
 
-.creative-toolbar button:active,
-.creative-header button:active {
-  transform: scale(0.96);
-  background: rgba(255, 255, 255, 0.06);
-}
 
 /* Sharp panel transitions */
 .creative-panel,
@@ -5996,37 +5734,14 @@ input[type="range"]::-webkit-slider-thumb {
   transition: transform 0.1s ease;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-}
-
 input[type="range"]::-webkit-slider-thumb:active {
   cursor: grabbing;
   transform: scale(1.05);
 }
 
 /* Color swatch buttons */
-.color-swatch,
-[data-color-swatch] {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform 0.1s ease, border-color 0.1s ease;
-}
 
-.color-swatch:hover,
-[data-color-swatch]:hover {
-  transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.3);
-}
 
-.color-swatch.active,
-[data-color-swatch].active {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 8px rgba(10, 132, 255, 0.4);
-}
 
 /* Dropdown menus in creative apps */
 .creative-dropdown {
@@ -6311,21 +6026,8 @@ html, body {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Smooth hover lift */
-.hover-lift {
-  transition: transform 150ms var(--ease-spring), box-shadow 150ms var(--ease-default);
-}
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-depth-2);
-}
 
 /* Scale on hover */
-.hover-scale {
-  transition: transform 150ms var(--ease-spring);
-}
-.hover-scale:hover {
-  transform: scale(1.02);
-}
 
 /* Press effect */
 .press-effect {
@@ -6335,21 +6037,14 @@ html, body {
   transform: scale(0.97);
 }
 
-/* Pressable — opt-in tactile feedback for buttons / interactive controls that
-   want a fuller Apple-style response (subtle hover lift + crisp press-down)
-   than the global button:active rule. Add class="dex-pressable" to any control
-   that owns its layout but reads flat. Intentionally OPT-IN rather than a new
-   global button rule: a global button:active { transform } already exists, and
-   re-declaring transform globally would fight controls that set their own. The
-   :where() base keeps specificity at zero so a component's own transform still
-   wins; the :hover/:active states use translate (not scale) so they compose
-   cleanly without clobbering an element's existing scale. */
+/* Pressable — opt-in press-down feedback for controls that own their layout.
+   Hover stays flat (no lift); only the press moves. Opt-in rather than a
+   global button rule: a global button:active { transform } already exists.
+   The :where() base keeps specificity at zero so a component's own transform
+   still wins. */
 :where(.dex-pressable) {
   transition: transform 120ms var(--ease-out, ease-out),
               box-shadow 120ms var(--ease-out, ease-out);
-}
-.dex-pressable:hover:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(-0.5px);
 }
 .dex-pressable:active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(0.5px) scale(0.985);
@@ -6463,10 +6158,7 @@ html, body {
 .animate-fadeInScale { animation: fadeInScale 200ms var(--ease-spring) forwards; }
 .animate-slideInRight { animation: slideInRight 250ms var(--ease-out) forwards; }
 .animate-slideInLeft { animation: slideInLeft 250ms var(--ease-out) forwards; }
-.animate-bounceIn { animation: bounceIn 500ms var(--ease-spring) forwards; }
-.animate-pulse { animation: pulse 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
-.animate-float { animation: float 3s ease-in-out infinite; }
 
 /* Success checkmark animation */
 @keyframes checkmark {
@@ -6953,19 +6645,7 @@ html, body {
   color: var(--color-text-tertiary);
 }
 
-.creative-scrubber {
-  width: 12px;
-  height: 20px;
-  background: var(--color-accent-fill);
-  border-radius: var(--radius-xs);
-  cursor: ew-resize;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
 
-.creative-scrubber:hover {
-  background: var(--color-accent-hover);
-  transform: scaleY(1.1);
-}
 
 .creative-panel-header {
   display: flex;
@@ -7125,10 +6805,7 @@ html, body {
   .animate-fadeInScale,
   .animate-slideInRight,
   .animate-slideInLeft,
-  .animate-bounceIn,
-  .animate-pulse,
-  .animate-spin,
-  .animate-float {
+  .animate-spin {
     animation: none !important;
   }
 }
@@ -7290,25 +6967,7 @@ body.modal-open {
   line-height: 1.5;
 }
 
-.empty-state-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: var(--color-accent-fill);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-lg);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
 
-.empty-state-action:hover {
-  background: var(--color-accent-hover);
-  transform: translateY(-1px);
-}
 
 /* ----------------------------------------------------------------------- */
 /* Settings Control Polish Layer (Phase 6 slice 3)                         */
@@ -7337,10 +6996,6 @@ input[type="range"]::-moz-range-thumb {
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 input[type="range"]::-moz-range-thumb:active { cursor: grabbing; transform: scale(1.05); }
-input[type="range"]::-moz-range-thumb:hover { transform: scale(1.18); box-shadow: 0 3px 10px rgba(10,132,255,0.45); }
-input[type="range"]:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px rgba(10,132,255,0.35), 0 2px 6px rgba(0,0,0,0.35);
-}
 input[type="range"]:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
 
 /* Checkboxes - subtle elevation + accent check */
@@ -8086,9 +7741,6 @@ input[type="search"] {
   75% { transform: translateY(-6px); }
 }
 
-.dock-bounce {
-  animation: dockBounce 0.5s ease-out;
-}
 
 /* Running indicator pulse */
 @keyframes runningPulse {
@@ -8457,7 +8109,6 @@ input[type="search"] {
   .tab-content-exit,
   .panel-slide-left,
   .panel-slide-right,
-  .dock-bounce,
   .dock-running-indicator,
   .snap-preview,
   .window-snap,

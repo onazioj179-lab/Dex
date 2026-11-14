@@ -139,7 +139,7 @@ export const liquidGlassButton: React.CSSProperties = {
 export const liquidGlassButtonHover: React.CSSProperties = {
   background: 'var(--color-text-tertiary)',
   borderColor: 'var(--color-text-tertiary)',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.11), 0 0 8px rgba(74,158,255,0.08), inset 0 0.5px 0 var(--color-border)',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.11), inset 0 0.5px 0 var(--color-border)',
 };
 
 /** Liquid glass input / text field */

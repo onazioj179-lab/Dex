@@ -1751,7 +1751,7 @@ const AXL: React.FC = () => {
   // ═════════════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden', minHeight: 0, fontFamily: 'var(--font-family)', fontSize: '11px', position: 'relative', contain: 'layout style' } as React.CSSProperties} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
+    <div className="axl-root" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden', minHeight: 0, fontFamily: 'var(--font-family)', fontSize: '11px', position: 'relative', contain: 'layout style' } as React.CSSProperties} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       <style>{`
         .axl-ctx-item:hover { background: var(--color-bg-hover) !important; }
         .axl-ctx-item:active { background: var(--color-bg-active) !important; }
@@ -1762,16 +1762,16 @@ const AXL: React.FC = () => {
           transition: background 0.12s ease, color 0.12s ease;
         }
         .axl-close:hover { background: rgba(255,255,255,0.08); color: var(--color-text-primary); }
-        button { font-family: inherit; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
-        input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
+        :where(.axl-root) button { font-family: inherit; }
+        :where(.axl-root) button:active { transform: scale(0.97); }
+        :where(.axl-root), :where(.axl-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; }
+        :where(.axl-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.axl-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.axl-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
+        :where(.axl-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
+        :where(.axl-root) input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        :where(.axl-root) input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; }
+        :where(.axl-root) input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
       `}</style>
 
       <ConfirmHost />
