@@ -1236,11 +1236,11 @@ export const Tasks: React.FC = () => {
       <style>{`
         .dex-tasks-root button { font-family: inherit; transition: all 0.12s ease; }
         .dex-tasks-root button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.dex-tasks-root), :where(.dex-tasks-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.dex-tasks-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-tasks-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-tasks-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.dex-tasks-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
         /* Pointer focus stays clean; keyboard focus uses the one global ring. */
         .dex-tasks-root input:focus:not(:focus-visible),
         .dex-tasks-root select:focus:not(:focus-visible),
@@ -2216,7 +2216,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 'var(--space-3) var(--space-5)',
+    padding: 'var(--space-2) var(--space-5)',
+    minHeight: 'var(--app-header-height)', boxSizing: 'border-box', flexShrink: 0,
     borderRadius: 0,
     borderBottom: '1px solid var(--color-border)',
   },

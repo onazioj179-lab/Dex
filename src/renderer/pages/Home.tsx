@@ -831,17 +831,14 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       onClick={() => setWallpaper(p)}
                       aria-label={`Select ${p.name} wallpaper`}
                       title={p.name}
-                      className="dex-hover-lift"
+                      aria-pressed={isActive}
+                      className="dex-wp-tile"
                       style={{
                         width: '100%', aspectRatio: '16/10', borderRadius: 10,
                         background: bg,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        border: isActive ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-border-subtle)',
                         cursor: 'pointer', position: 'relative', overflow: 'hidden',
-                        transition: 'border-color 0.2s, transform 0.15s',
-                        transform: 'none',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                       }}
                     >
                       {isActive && (

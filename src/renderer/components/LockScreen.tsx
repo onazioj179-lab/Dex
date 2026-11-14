@@ -785,7 +785,6 @@ const styles: Record<string, React.CSSProperties> = {
   pinDotFilled: {
     background: 'var(--color-text-primary, #ffffff)',
     borderColor: 'var(--color-text-primary)',
-    boxShadow: '0 0 8px var(--color-text-tertiary)',
   },
   numpad: {
     display: 'grid',
@@ -958,13 +957,8 @@ const lockScreenCSS = `
     transform: scale(0.95);
   }
 
-  .lock-numpad-key:focus-visible {
-    box-shadow: 0 0 0 2px var(--color-accent, #0a84ff);
-  }
-
   .lock-password-input:focus {
-    border-color: rgba(10,132,255,0.6) !important;
-    box-shadow: 0 0 0 3px rgba(10,132,255,0.15);
+    border-color: var(--color-border-strong) !important;
   }
 
   .lock-unlock-btn:hover:not(:disabled) {

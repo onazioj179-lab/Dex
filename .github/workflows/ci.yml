@@ -39,8 +39,18 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Type check & watermark check
-        run: npm run lint
+      # The three parts of `npm run lint`, as separate steps so a red run names
+      # which one failed.
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Watermark check
+        run: npm run watermark:check
+
+      # "We do not break userspace": a shipped native channel may not vanish,
+      # and the renderer may not call a channel nothing answers.
+      - name: IPC ABI check
+        run: npm run abi:check
 
   # ---------------------------------------------------------------------------
   # Unit tests (Vitest)
@@ -87,6 +97,43 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Web smoke run (Playwright): the real renderer in Chromium, served by Vite.
+  # Boots the shell and opens every app; fails on an error boundary, a page
+  # error, or an app whose styles leak onto other apps.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E (web renderer)
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run web smoke tests
+        run: npm run test:e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: test-results/
+          retention-days: 7
 
   # Installers are NOT built here. The one official Windows setup (Tauri NSIS)
   # is built and published by .github/workflows/release.yml on a v* tag.

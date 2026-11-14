@@ -2705,30 +2705,30 @@ const Flux: React.FC = () => {
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
-        .flux-ctx-item:hover { background: ${fluxTint(15)} !important; }
-        .flux-ctx-item:active { background: ${fluxTint(25)} !important; }
-        .flux-btn-primary:hover { background: #c96ef5 !important; }
-        .flux-layer-item:hover { background: ${fluxTint(6)} !important; border-color: ${fluxTint(20)} !important; }
-        .flux-tool-btn:hover { background: ${fluxTint(10)} !important; color: ${FLUX_ACCENT} !important; }
-        .flux-behavior-item:hover { border-color: ${fluxTint(20)} !important; background: ${fluxTint(4)} !important; }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { 
+        :where(.flux-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.flux-root) button:active { transform: scale(0.97); }
+        .flux-ctx-item:hover { background: var(--color-bg-hover) !important; }
+        .flux-ctx-item:active { background: var(--color-bg-active) !important; }
+        .flux-btn-primary:hover { background: color-mix(in srgb, ${FLUX_ACCENT} 88%, #fff) !important; }
+        .flux-layer-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
+        .flux-tool-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+        .flux-behavior-item:hover { border-color: var(--color-border-strong) !important; background: var(--color-bg-hover) !important; }
+        :where(.flux-root), :where(.flux-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.flux-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.flux-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.flux-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.flux-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.flux-root) input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        :where(.flux-root) input[type="range"]::-webkit-slider-thumb { 
           -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; 
           background: ${FLUX_ACCENT}; cursor: pointer; margin-top: -4px; border: none;
         }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: ${fluxTint(15)}; border-radius: 2px; }
-        .flux-tab:hover { color: ${FLUX_ACCENT} !important; background: ${fluxTint(4)} !important; }
-        .flux-transport-btn:hover { background: ${fluxTint(12)} !important; border-color: ${fluxTint(20)} !important; }
+        :where(.flux-root) input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: ${fluxTint(15)}; border-radius: 2px; }
+        .flux-tab:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
+        .flux-transport-btn:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-strong) !important; }
         .flux-dropdown-item { transition: background 0.12s ease; }
-        .flux-dropdown-item:hover { background: ${fluxTint(12)} !important; }
-        .flux-dropdown-item:active { background: ${fluxTint(20)} !important; }
+        .flux-dropdown-item:hover { background: var(--color-bg-hover) !important; }
+        .flux-dropdown-item:active { background: var(--color-bg-active) !important; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>

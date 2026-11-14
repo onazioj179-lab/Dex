@@ -1121,20 +1121,20 @@ export const Audio: React.FC = () => {
 
   return (
     <div
-      style={styles.container}
+      className="dex-audio-root" style={styles.container}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <style>{`
-        button { font-family: inherit; transition: all 0.12s ease; }
-        button:active { transform: scale(0.97); }
-        * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.dex-audio-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.dex-audio-root) button:active { transform: scale(0.97); }
+        :where(.dex-audio-root), :where(.dex-audio-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.dex-audio-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-audio-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-audio-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.dex-audio-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
       `}</style>
       {/* Drag overlay */}
       {isDragging && (

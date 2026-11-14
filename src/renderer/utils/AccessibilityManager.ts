@@ -49,17 +49,12 @@ class AccessibilityManager {
     const style = document.createElement('style');
     style.id = id;
     style.textContent = `
-      :focus-visible {
-        outline: 3px solid var(--color-accent-primary, #2563eb);
-        outline-offset: 2px;
-      }
-
       :focus:not(:focus-visible) {
         outline: none;
       }
 
       .dex-focus-visible:focus {
-        outline: 3px solid var(--color-accent-primary, #2563eb);
+        outline: 2px solid var(--dex-focus-color, #ffffff);
         outline-offset: 2px;
       }
 
