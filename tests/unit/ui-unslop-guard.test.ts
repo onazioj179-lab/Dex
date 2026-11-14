@@ -103,32 +103,6 @@ describe('UI unslop guards', () => {
       expect(strip(read('styles/design-system.css'))).not.toMatch(halo);
     });
 
-    it('hover is not tinted with an app brand colour helper either (Flux)', () => {
-      expect(hits(/:hover[^{}`]*\{[^}]*(fluxTint|FLUX_ACCENT)[^}]*\}/g)).toEqual([]);
-    });
-
-    it('app <style> blocks do not restyle the whole OS (bare element rules are @scope-d or root-prefixed)', () => {
-      const bare = /^\s*(\*|button|select|input|textarea|::-webkit-scrollbar[\w-]*)(\[[^\]]*\])?((:[\w-]+(\([^)]*\))?)|(::[\w-]+))*\s*[,{]/;
-      const leaks: string[] = [];
-      for (const { f, src } of apps) {
-        for (const block of src.matchAll(/<style>\{`([\s\S]*?)`\}<\/style>/g)) {
-          for (const line of block[1].split(/\r?\n/)) if (bare.test(line)) leaks.push(`${f}: ${line.trim().slice(0, 80)}`);
-        }
-      }
-      expect(leaks).toEqual([]);
-    });
-
-    it('shared CSS hover never lifts or grows (dock magnify and slider thumbs excepted)', () => {
-      for (const file of ['styles/design-system.css', 'styles/globals.css']) {
-        const css = strip(read(file));
-        const bad = [...css.matchAll(/([^{}]*:hover[^{}]*)\{([^{}]*)\}/g)]
-          .filter(([, sel]) => !/dock-magnify|slider-thumb|range-thumb/.test(sel))
-          .filter(([, , body]) => /transform:\s*[^;]*(translate[XY]?\(-?[1-9]|translate[XY]?\(-?0\.[1-9]|scale\(1\.[0-9]*[1-9])/.test(body))
-          .map(([, sel]) => `${file}: ${sel.trim().replace(/\s+/g, ' ').slice(0, 80)}`);
-        expect(bad).toEqual([]);
-      }
-    });
-
     it('shared CSS hover adds no big shadow bloom (blur >= 10px)', () => {
       for (const file of ['styles/design-system.css', 'styles/globals.css']) {
         const css = strip(read(file));
@@ -144,6 +118,105 @@ describe('UI unslop guards', () => {
       const wide = apps.flatMap(({ f, src }) => [...src.matchAll(glow)]
         .filter((m) => Number(m[1]) > 4).map((m) => `${f}: ${m[0].slice(0, 100)}`));
       expect(wide).toEqual([]);
+    });
+
+    // Pass 4. Apps stay mounted while others are open, so a bare `button`,
+    // `*`, `select` or scrollbar rule in one app's <style> restyles them all.
+    it('pass 4: app style blocks do not leak element selectors onto other apps', () => {
+      const leaks: string[] = [];
+      for (const { f, src } of apps) {
+        for (const m of src.matchAll(/<style[^>]*>\{`([\s\S]*?)`\}<\/style>/g)) {
+          const css = strip(m[1]).replace(/\$\{[^{}]*\}/g, 'X');
+          let depth = 0, start = 0, kf = -1, print = -1;
+          for (let i = 0; i < css.length; i++) {
+            const c = css[i];
+            if (c === '{') {
+              const sel = css.slice(start, i).trim();
+              if (sel.startsWith('@')) {
+                if (/^@(-webkit-)?keyframes/.test(sel)) kf = depth;
+                if (/^@media\s+print/.test(sel)) print = depth;
+              } else if (kf < 0 && print < 0) {
+                for (const part of sel.split(/,(?![^(]*\))/)) {
+                  const p = part.trim();
+                  if (p && !/[.#]|\[data-|\[class|\[aria-|\[role|:root|:host|:where\(\./.test(p)) leaks.push(`${f}: ${p.slice(0, 60)}`);
+                }
+              }
+              depth++; start = i + 1;
+            } else if (c === '}') {
+              depth--; if (kf === depth) kf = -1; if (print === depth) print = -1; start = i + 1;
+            } else if (c === ';') start = i + 1;
+          }
+        }
+      }
+      expect(leaks).toEqual([]);
+    });
+
+    it('pass 4: hover is not tinted with a per-app accent constant', () => {
+      const found = hits(/[^\s{}`,]*:hover[^{}`]*\{[^}]*?\$\{\w*(ACCENT|Tint)\w*[^}]*\}[^}]*\}/g)
+        .filter((h) => !/btn-primary/.test(h));
+      expect(found).toEqual([]);
+    });
+  });
+
+  // Pass 5. The shell layer (shell/, services/, utils/, components/, styles/*.ts)
+  // writes CSS from script too; passes 1-4 only looked at apps and .css files.
+  describe('pass 5: shell layer CSS-in-JS', () => {
+    const skip = new Set(['DEXAPPLICATIONS', 'pages']);
+    const walk = (d: string, top = false): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? (top && skip.has(e.name) ? [] : walk(join(d, e.name))) : /\.tsx?$/.test(e.name) ? [join(d, e.name)] : []);
+    const shell = walk(R, true).map((f) => ({ f: f.slice(R.length + 1).replace(/\\/g, '/'), src: readFileSync(f, 'utf8') }));
+    const hits = (re: RegExp, keep: (m: RegExpMatchArray) => boolean = () => true) => shell.flatMap(({ f, src }) =>
+      [...src.matchAll(re)].filter(keep).map((m) => `${f}: ${m[0].replace(/\s+/g, ' ').slice(0, 120)}`));
+
+    it('hover never lifts, grows or spins', () => {
+      expect(hits(/[^\s{}`,]*:hover[^{}`]*\{[^}]*(translate[XY]?\(-?[1-9]|scale\(1\.[0-9]|rotate\()[^}]*\}/g)).toEqual([]);
+    });
+
+    it('no accent focus ring besides the canonical one', () => {
+      expect(hits(/[^\s{}`,]*:focus(-visible|-within)?[^{}`]*\{[^}]*(--color-accent|#0a84ff|#4a9eff|rgba\(74, ?158, ?255|rgba\(10, ?132, ?255)[^}]*\}/gi)).toEqual([]);
+    });
+
+    it('hover is not accent-tinted', () => {
+      expect(hits(/[^\s{}`,]*:hover[^{}`]*\{[^}]*(--color-accent(?!-fill)|rgba\(10, ?132, ?255|rgba\(74, ?158, ?255)[^}]*\}/g)).toEqual([]);
+    });
+
+    it('no glow wider than 4px', () => {
+      expect(hits(/(?:box-shadow|boxShadow|drop-shadow)[^;\n]*?\b0 0 (\d+)px (?!rgba\(0, ?0, ?0)/g, (m) => Number(m[1]) > 4)).toEqual([]);
+    });
+
+    it('the unused VisualEffects stylesheet injector stays gone', () => {
+      expect(shell.some(({ f }) => f === 'shell/VisualEffects.ts')).toBe(false);
+    });
+  });
+
+  describe('pass 4: shared CSS', () => {
+    const shared = ['styles/design-system.css', 'styles/globals.css'].map((f) => ({ f, css: strip(read(f)) }));
+
+    it('no shared hover rule lifts, grows or spins', () => {
+      const moved = shared.flatMap(({ f, css }) =>
+        [...css.matchAll(/([^{}]*:hover[^{}]*)\{([^}]*)\}/g)]
+          .filter((m) => /transform:\s*[^;]*(translate|scale|rotate)/.test(m[2]))
+          .map((m) => `${f}: ${m[1].trim().replace(/\s+/g, ' ').slice(0, 80)}`));
+      expect(moved).toEqual([]);
+    });
+
+    it('the retired lift / glow utilities stay gone', () => {
+      for (const { f, css } of shared) {
+        expect(css, f).not.toMatch(/\.(dex-hover-lift|hover-lift|hover-scale|dex-hover-glow|dex-magnetic|dex-btn-premium|dex-dock-magnify|dex-accent-glow)\b/);
+        expect(css, f).not.toMatch(/\[data-hover-lift\]/);
+      }
+    });
+
+    it('sliders take the canonical focus ring: no halo on the thumb', () => {
+      for (const { f, css } of shared) {
+        expect(css, f).not.toMatch(/input\[type="range"\]:focus-visible::(-webkit-slider|-moz-range)-thumb/);
+      }
+    });
+
+    it('shared menu-item hover is neutral, not accent', () => {
+      const m = /:where\(\[role="menuitem"\]\):hover\s*\{([^}]*)\}/.exec(shared[1].css);
+      expect(m).not.toBeNull();
+      expect(m![1]).not.toMatch(/--color-accent/);
     });
   });
 });

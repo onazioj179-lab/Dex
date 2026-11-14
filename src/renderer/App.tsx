@@ -515,7 +515,8 @@ export const App: React.FC = () => {
     <UnifiedSystemsProvider>
     <ModalProvider>
     <div style={rootStyles.container}>
-      <style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
+      {/* The shell's own global rules (html, body, *). App style blocks must stay scoped. */}
+      <style data-dex-shell-style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
       
       {/* Window drag region for frameless window (Windows) */}
       <div className="dex-window-titlebar" aria-hidden="true" />

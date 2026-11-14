@@ -841,17 +841,17 @@ const Transfers: React.FC = () => {
   ], [sendToDevice, trustedDevices, toggleTrusted, deviceNicknames, setNickname]);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-base, #1C1C20)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
+    <div className="dex-transfers-root" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-base, #1C1C20)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
       onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
     >
       <style>{`
-        @scope { button { font-family: inherit; transition: all 0.12s ease; } }
-        @scope { button:active { transform: scale(0.97); } }
-        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; } }
-        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
-        @scope { ::-webkit-scrollbar-track { background: transparent; } }
-        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; } }
-        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); } }
+        :where(.dex-transfers-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.dex-transfers-root) button:active { transform: scale(0.97); }
+        :where(.dex-transfers-root), :where(.dex-transfers-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle, #333) transparent; }
+        :where(.dex-transfers-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-transfers-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-transfers-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
+        :where(.dex-transfers-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
       `}</style>
       {/* Drag overlay */}
       {dragOver && (

@@ -3075,8 +3075,8 @@ const Prism: React.FC = () => {
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop images to import</div>}
       <style>{`
         /* === PRISM - PROFESSIONAL UI === */
-        .prism-root button { font-family: inherit; }
-        .prism-root button:active { transform: scale(0.97); }
+        :where(.prism-root) button { font-family: inherit; }
+        :where(.prism-root) button:active { transform: scale(0.97); }
         .prism-btn-primary:hover { background: color-mix(in srgb, var(--prism-accent) 88%, #fff) !important; }
         .prism-btn:not(:disabled):not(.prism-btn-active):hover { background: var(--color-bg-hover) !important; }
         .prism-layer-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
@@ -3085,19 +3085,19 @@ const Prism: React.FC = () => {
         .prism-tab:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
         .prism-ctx-item:hover { background: var(--color-bg-hover) !important; }
         .prism-ctx-item:active { background: var(--color-bg-active) !important; }
-        .prism-root * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        .prism-root ::-webkit-scrollbar { width: 6px; height: 6px; }
-        .prism-root ::-webkit-scrollbar-track { background: transparent; }
-        .prism-root ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        .prism-root ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        .prism-root input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        .prism-root input[type="range"]::-webkit-slider-thumb { 
+        :where(.prism-root), :where(.prism-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.prism-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.prism-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.prism-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.prism-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.prism-root) input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        :where(.prism-root) input[type="range"]::-webkit-slider-thumb { 
           -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; 
           background: var(--prism-accent); cursor: pointer; margin-top: -4px; border: none;
         }
-        .prism-root input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
-        .prism-root select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
-        .prism-root select:hover { border-color: var(--color-border-strong); }
+        :where(.prism-root) input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
+        :where(.prism-root) select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
+        :where(.prism-root) select:hover { border-color: var(--color-border-strong); }
         .prism-dropdown-item { transition: background 0.12s ease; }
         .prism-dropdown-item:hover { background: var(--color-bg-hover) !important; }
         .prism-dropdown-item:active { background: var(--color-bg-active) !important; }

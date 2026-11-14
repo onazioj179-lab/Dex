@@ -32,7 +32,9 @@ describe('bridge event subscriptions', () => {
     for (const file of walk(renderer)) {
       if (file.endsWith('tauriCompat.ts')) continue; // documents the rule
       readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-        const code = line.replace(/\/\/.*$/, '');
+        // Drop a CRLF's `\r` first: `.` does not match it, so on a Windows
+        // checkout the comment strip below would fail and flag comments.
+        const code = line.replace(/\r$/, '').replace(/\/\/.*$/, '');
         if (NS_EVENT.test(code)) offenders.push(`${file.slice(root.length + 1)}:${i + 1}`);
       });
     }

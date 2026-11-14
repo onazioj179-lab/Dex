@@ -1511,24 +1511,24 @@ const Forge: React.FC = () => {
     >
       <style>{`
         /* === FORGE - PROFESSIONAL UI === */
-        .forge-root button { font-family: inherit; }
-        .forge-root button:active { transform: scale(0.97); }
+        :where(.forge-root) button { font-family: inherit; }
+        :where(.forge-root) button:active { transform: scale(0.97); }
         .forge-icon-btn:hover { color: var(--color-text-primary) !important; background: var(--color-bg-hover) !important; }
         .forge-ctx-item:hover { background: var(--color-bg-hover) !important; }
         .forge-ctx-item:active { background: var(--color-bg-active) !important; }
-        .forge-root * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
-        .forge-root ::-webkit-scrollbar { width: 6px; height: 6px; }
-        .forge-root ::-webkit-scrollbar-track { background: transparent; }
-        .forge-root ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
-        .forge-root ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
-        .forge-root input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        .forge-root input[type="range"]::-webkit-slider-thumb { 
+        :where(.forge-root), :where(.forge-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.forge-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.forge-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.forge-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.forge-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.forge-root) input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        :where(.forge-root) input[type="range"]::-webkit-slider-thumb { 
           -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; 
           background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none;
         }
-        .forge-root input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
-        .forge-root select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
-        .forge-root select:hover { border-color: var(--color-border-strong); }
+        :where(.forge-root) input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
+        :where(.forge-root) select { outline: none; cursor: pointer; transition: border-color 0.12s ease; }
+        :where(.forge-root) select:hover { border-color: var(--color-border-strong); }
         .forge-dropdown-item { transition: background 0.12s ease; }
         .forge-dropdown-item:hover { background: var(--color-bg-hover) !important; }
         .forge-dropdown-item:active { background: var(--color-bg-active) !important; }
@@ -1655,7 +1655,7 @@ const Forge: React.FC = () => {
                     <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)' }}>Cancel</button>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)', }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
+                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
                 )}
                 
                 {['Professional', 'Modern Codecs', 'Standard', 'Web', 'Social Media', 'Broadcast', 'Audio', 'Other']

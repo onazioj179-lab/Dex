@@ -16,9 +16,10 @@
 
 import React, { memo, useCallback } from 'react';
 
-// Custom slider chrome injected ONCE: a filled track + a premium light thumb that
-// grows and glows on hover/drag, so every creative-app slider reads like a pro
-// control instead of a browser default. The fill itself is set inline per-render
+// Custom slider chrome injected ONCE: a filled track + a light thumb, so every
+// creative-app slider reads like a pro control instead of a browser default.
+// Hover is flat; the thumb only presses in on drag. Keyboard focus is the one
+// global ring on the input. The fill itself is set inline per-render
 // (it depends on the value), so the track here stays transparent.
 const CSLIDER_CSS = `
 .dex-cslider { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; outline: none; cursor: pointer; box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
@@ -27,9 +28,7 @@ const CSLIDER_CSS = `
 .dex-cslider::-moz-range-track { height: 5px; border-radius: 3px; background: transparent; }
 .dex-cslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; margin-top: -4px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #ffffff, #c9c9d2); border: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: transform 0.1s ease, box-shadow 0.1s ease; }
 .dex-cslider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #ffffff, #c9c9d2); border: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 3px rgba(0,0,0,0.55); }
-.dex-cslider:hover::-webkit-slider-thumb { transform: scale(1.12); }
-.dex-cslider:active::-webkit-slider-thumb { transform: scale(1.14); box-shadow: 0 0 0 3px var(--cs-accent, rgba(10,132,255,0.28)); }
-.dex-cslider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--cs-accent, rgba(10,132,255,0.4)); }
+.dex-cslider:active::-webkit-slider-thumb { transform: scale(1.05); }
 `;
 if (typeof document !== 'undefined' && !document.getElementById('dex-cslider-css')) {
   const _el = document.createElement('style');

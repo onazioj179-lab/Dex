@@ -25,6 +25,18 @@ const invoke: Invoke = (channel, ...args) =>
 
 export interface ViewRect { x: number; y: number; w: number; h: number }
 
+/** Smallest slot (CSS px) a native page view may be created in. */
+export const MIN_CREATE_SIDE = 40;
+
+/**
+ * Whether the page slot is big enough, and DEX visible, to create the native
+ * view now. A minimized DEX window lays the slot out ~1 px tall; a view made
+ * then never recovered after a restore.
+ */
+export function slotUsable(r: { width: number; height: number }, hidden: boolean = typeof document !== 'undefined' && document.hidden): boolean {
+  return !hidden && r.width >= MIN_CREATE_SIDE && r.height >= MIN_CREATE_SIDE;
+}
+
 /** Points to hit-test: centre plus four points inset from the corners, clipped to the viewport. */
 export function probePoints(r: DOMRectReadOnly | ViewRect, vw: number, vh: number): Array<[number, number]> {
   const x = 'left' in r ? r.left : r.x;
@@ -156,6 +168,8 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
   const created = useRef(false);
   const creating = useRef<Promise<void> | null>(null);
   const lastSrc = useRef<string>('');
+  /** A URL waiting for a usable slot (DEX minimized or the slot not laid out yet). */
+  const pendingUrl = useRef<string>('');
   const shown = useRef(false);
   const lastRect = useRef('');
   const state = useRef<{ url: string; title: string; loading: boolean; userZoom: number; appliedZoom: number; canGoBack?: boolean; canGoForward?: boolean }>({ url: '', title: '', loading: false, userZoom: 1, appliedZoom: 1 });
@@ -264,6 +278,11 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     const el = elRef.current;
     if (!el || created.current || creating.current || !/^https?:/i.test(url)) return;
     const r = el.getBoundingClientRect();
+    // A native view created while DEX is minimized (slot ~1 px tall) stays tiny
+    // and stops answering after DEX is restored: the page showed blank. Wait for
+    // a real slot; the keep-glued loop below retries every 250 ms.
+    if (!slotUsable(r)) { pendingUrl.current = url; return; }
+    pendingUrl.current = '';
     lastSrc.current = url;
     creating.current = sweepStale()
       .then(() => invoke('browserView:create', tabId, url, { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) || 1, h: Math.round(r.height) || 1 }, false))
@@ -310,7 +329,10 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     const frame = () => { sync(); if (dragging) raf = requestAnimationFrame(frame); };
     const down = () => { if (!dragging) { dragging = true; raf = requestAnimationFrame(frame); } };
     const up = () => { dragging = false; cancelAnimationFrame(raf); sync(); };
-    const timer = window.setInterval(sync, 250);
+    const timer = window.setInterval(() => {
+      if (!created.current && pendingUrl.current) createView(pendingUrl.current);
+      sync();
+    }, 250);
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => sync()) : null;
     if (el && ro) ro.observe(el);
     window.addEventListener('pointerdown', down, true);
@@ -326,7 +348,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
       window.removeEventListener('resize', sync);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [sync, alive]);
+  }, [sync, alive, createView]);
 
   useEffect(() => { sync(); }, [active, sync]);
 

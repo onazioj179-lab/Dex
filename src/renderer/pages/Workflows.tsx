@@ -1432,16 +1432,16 @@ export const Workflows: React.FC = () => {
 
   return (
     <>
-    <div style={styles.container}>
+    <div className="dex-workflows-root" style={styles.container}>
       <style>{`
-        @scope { button { font-family: inherit; transition: all 0.12s ease; } }
-        @scope { button:active { transform: scale(0.97); } }
-        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; } }
-        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
-        @scope { ::-webkit-scrollbar-track { background: transparent; } }
-        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; } }
-        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border); } }
-        @scope { input:focus { outline: none; } }
+        :where(.dex-workflows-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.dex-workflows-root) button:active { transform: scale(0.97); }
+        :where(.dex-workflows-root), :where(.dex-workflows-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.dex-workflows-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-workflows-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-workflows-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.dex-workflows-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.dex-workflows-root) input:focus { outline: none; }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
@@ -2096,7 +2096,8 @@ const styles: Record<string, React.CSSProperties> = {
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--space-3) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border)',
+    padding: 'var(--space-2) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border)',
+    minHeight: 'var(--app-header-height)', boxSizing: 'border-box', flexShrink: 0,
     gap: 'var(--space-3)', minWidth: 0,
   },
   headerLeft: { minWidth: 0 },

@@ -1528,16 +1528,16 @@ export const Files: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="dex-files-root" style={styles.container}>
       <style>{`
-        @scope { button { font-family: inherit; transition: all 0.12s ease; } }
-        @scope { button:active { transform: scale(0.97); } }
-        @scope { * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; } }
-        @scope { ::-webkit-scrollbar { width: 6px; height: 6px; } }
-        @scope { ::-webkit-scrollbar-track { background: transparent; } }
-        @scope { ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; } }
-        @scope { ::-webkit-scrollbar-thumb:hover { background: var(--color-border); } }
-        @scope { input:focus { outline: none; } }
+        :where(.dex-files-root) button { font-family: inherit; transition: all 0.12s ease; }
+        :where(.dex-files-root) button:active { transform: scale(0.97); }
+        :where(.dex-files-root), :where(.dex-files-root) * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
+        :where(.dex-files-root) ::-webkit-scrollbar { width: 6px; height: 6px; }
+        :where(.dex-files-root) ::-webkit-scrollbar-track { background: transparent; }
+        :where(.dex-files-root) ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+        :where(.dex-files-root) ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        :where(.dex-files-root) input:focus { outline: none; }
         .dex-crumb:not(:disabled):hover { background: var(--color-bg-hover); color: var(--color-text-primary) !important; }
         .dex-toolbtn:not(:disabled):hover { background: var(--color-bg-hover); }
         @keyframes dex-files-spin { to { transform: rotate(360deg); } }
