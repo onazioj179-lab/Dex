@@ -5,6 +5,7 @@
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import { qrMatrixToSVG } from '../../../shared/format/qrSvg';
+import { colorInputValue } from '../../utils/canvasTheme';
 
 type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo';
 type ECLevel = 'L' | 'M' | 'Q' | 'H';
@@ -406,11 +407,11 @@ const QRCodeGenerator: React.FC = () => {
         <div style={s.colorRow}>
           <label style={s.colorLabel}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>FG</span>
-            <input type="color" value={fgColor} onChange={e => setFgColor(e.target.value)} style={s.colorInput} title="Foreground color" aria-label="Foreground color" />
+            <input type="color" value={colorInputValue(fgColor)} onChange={e => setFgColor(e.target.value)} style={s.colorInput} title="Foreground color" aria-label="Foreground color" />
           </label>
           <label style={s.colorLabel}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>BG</span>
-            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={s.colorInput} title="Background color" aria-label="Background color" />
+            <input type="color" value={colorInputValue(bgColor)} onChange={e => setBgColor(e.target.value)} style={s.colorInput} title="Background color" aria-label="Background color" />
           </label>
         </div>
 

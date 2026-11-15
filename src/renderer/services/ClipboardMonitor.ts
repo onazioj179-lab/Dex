@@ -40,10 +40,21 @@ function currentSource(): { sourceAppId?: string; sourceAppName?: string } {
   }
 }
 
+/** Secrets DEX itself put on the clipboard (Vault passwords, 2FA codes). They
+ *  are never recorded in clipboard history, even when read back on focus. In
+ *  memory only, and only the latest few. */
+const suppressed: string[] = [];
+export function suppressClipboardCapture(text: string): void {
+  if (!text) return;
+  suppressed.push(text);
+  if (suppressed.length > 8) suppressed.shift();
+}
+
 /** Route a candidate string into the store (the store handles dedupe/typing) and
  *  feed the Context Engine so copies surface in the "Now" activity stream. */
 function ingest(text: string | null | undefined, source = currentSource()): void {
   if (!text) return;
+  if (suppressed.includes(text)) return;
   if (text === lastSeen) return;
   lastSeen = text;
   const entry = useClipboardStore.getState().add(text, source);

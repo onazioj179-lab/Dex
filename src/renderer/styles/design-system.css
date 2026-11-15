@@ -7291,44 +7291,34 @@ input[type="search"] {
 /* States: idle, saving, saved, error.                                     */
 /* ----------------------------------------------------------------------- */
 .dex-autosave {
+  /* Quiet status text, not a coloured badge: no green "Saved" pill, no yellow
+     "Saving" pill. Only an error is coloured, because there colour carries
+     meaning. */
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
+  gap: 5px;
+  padding: 0 2px;
+  white-space: nowrap;
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
   user-select: none;
-  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  transition: color 0.18s ease;
 }
 .dex-autosave-dot {
-  width: 6px;
-  height: 6px;
+  display: none;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
   flex-shrink: 0;
 }
-.dex-autosave[data-state="saving"] {
-  color: #FFD60A;
-  background: rgba(255,214,10,0.10);
-  border-color: rgba(255,214,10,0.25);
-}
 .dex-autosave[data-state="saving"] .dex-autosave-dot {
+  display: block;
   animation: dex-autosave-pulse 1.0s ease-in-out infinite;
 }
-.dex-autosave[data-state="saved"] {
-  color: #30D158;
-  background: rgba(48,209,88,0.10);
-  border-color: rgba(48,209,88,0.25);
-}
-.dex-autosave[data-state="error"] {
-  color: #FF453A;
-  background: rgba(255,69,58,0.10);
-  border-color: rgba(255,69,58,0.30);
-}
+.dex-autosave[data-state="error"] { color: #FF453A; }
+.dex-autosave[data-state="error"] .dex-autosave-dot { display: block; }
 @keyframes dex-autosave-pulse {
   0%, 100% { opacity: 0.45; transform: scale(0.85); }
   50%      { opacity: 1.0;  transform: scale(1.10); }
@@ -8366,4 +8356,103 @@ html:not([data-theme="light"]):not([data-darkroom="on"]):not([data-high-contrast
   ::view-transition-new(*) {
     animation: none !important;
   }
+}
+
+/* ══ Tinted Liquid Glass (Apple HIG-inspired) ════════════════════════════════
+   One material for floating controls: translucent glass that refracts what is
+   behind it, a specular sheen along the curved edge, adaptive contrast, and
+   spring motion. Accessibility first: reduce-transparency and glass-off fall
+   back to solid fills; reduce-motion drops the springs. */
+
+/* Specular highlight: a soft reflection on the upper edge that falls off, so
+   the surface reads as curved glass. Painted under the content (::before). */
+.dex-glass-specular { isolation: isolate; }
+.dex-glass-specular::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(120% 70% at 18% 0%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 38%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 42%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 1px 0 0 rgba(255, 255, 255, 0.07),
+    inset -1px 0 0 rgba(255, 255, 255, 0.07);
+}
+html[data-theme="light"] .dex-glass-specular::before {
+  background:
+    radial-gradient(120% 70% at 18% 0%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 64%);
+}
+
+/* Refraction: the background bends slightly through the glass (an SVG
+   displacement filter, #dex-glass-refract, mounted once by GlassFilters) on top
+   of the normal frosted blur. Only on small floating chrome (dock, orb,
+   notifications, pills) so the GPU cost stays tiny. */
+html:not([data-perf-tier="low"]):not([data-glass-effective-mode="off"]) .dex-glass-refract {
+  backdrop-filter: url(#dex-glass-refract) var(--glass-blur, blur(28px) saturate(180%));
+}
+@media (prefers-reduced-transparency: reduce) {
+  html .dex-glass-refract { backdrop-filter: none; }
+}
+
+/* Pills: the one shape for buttons and fields on glass. */
+.dex-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 0;
+  font: 500 12px/1 var(--font-family);
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dex-pill:hover { background: rgba(255, 255, 255, 0.16); }
+.dex-pill:active { transform: scale(0.96); }
+html[data-theme="light"] .dex-pill { background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+
+/* Tinted Liquid Glass: DEX Blue keeps its colour while still reading as glass
+   (translucent accent fill + specular top edge + soft accent elevation). */
+.dex-pill-tinted {
+  color: #fff;
+  background: color-mix(in srgb, var(--color-accent, #0A84FF) 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    0 2px 8px color-mix(in srgb, var(--color-accent, #0A84FF) 30%, transparent);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+}
+.dex-pill-tinted:hover { background: color-mix(in srgb, var(--color-accent, #0A84FF) 92%, transparent); }
+
+/* Floating notification card: compact, soft elevation, spring in. */
+.dex-notif-card {
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.14),
+    0 12px 32px -8px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+@keyframes dexNotifIn {
+  0%   { opacity: 0; transform: translateY(-14px) scale(0.94); }
+  55%  { opacity: 1; transform: translateY(2px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dexOrbIn {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.dex-bar-orb { animation: dexOrbIn 0.36s cubic-bezier(0.34, 1.4, 0.5, 1) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .dex-bar-orb { animation: none; }
 }

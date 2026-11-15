@@ -415,14 +415,14 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         }}
         style={{
           padding: viewMode === 'compact' ? '6px 10px' : '8px 12px',
-          borderRadius: 4,
+          // Selection is a quiet rounded fill. No left stripes: with many
+          // notes they stacked into a column of accent bars. A colour label
+          // shows as the small dot beside the title only.
+          borderRadius: 10,
           cursor: 'pointer',
-          background: isSelected ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
-          borderLeft: isSelected
-            ? '2px solid var(--dex-focus-color, #fff)'
-            : swatch ? `2px solid ${swatch}` : '2px solid transparent',
+          background: isSelected ? 'rgba(255,255,255,0.09)' : 'transparent',
           transition: 'background 0.1s',
-          marginBottom: 1,
+          marginBottom: 2,
         }}
         onClick={() => onSelect(note.id)}
       >
@@ -467,10 +467,14 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
             )}
             {note.pinned ? (
               <span
-                style={{ fontSize: 10, color: colors.pin, cursor: 'pointer' }}
+                role="button"
+                aria-label="Unpin"
+                style={{ display: 'flex', color: colors.textDim, cursor: 'pointer' }}
                 onClick={e => { e.stopPropagation(); onTogglePin(note.id); }}
                 title="Unpin"
-              >PIN</span>
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 3l5 5-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" /></svg>
+              </span>
             ) : null}
             <span style={{ fontSize: 11, color: colors.textDim }}>{formatDate(note.updated_at)}</span>
           </div>
@@ -492,10 +496,10 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
             {note.tags.slice(0, 3).map(tag => (
               <span key={tag} style={{
                 fontSize: 10,
-                color: colors.accent,
-                background: colors.accentDim,
-                padding: '1px 6px',
-                borderRadius: 6,
+                color: colors.textDim,
+                background: 'rgba(255,255,255,0.06)',
+                padding: '1px 7px',
+                borderRadius: 9999,
               }}>{tag}</span>
             ))}
             {note.tags.length > 3 && (

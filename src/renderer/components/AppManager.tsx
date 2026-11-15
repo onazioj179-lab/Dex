@@ -290,7 +290,7 @@ const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
 
 /** Settings > Frame Snapping prefs (written by AccessPanels.tsx). */
 function readSnapPrefs(): { enabled: boolean; gutter: number; cycleOnRepeat: boolean } {
-  const d = { enabled: true, gutter: 6, cycleOnRepeat: true };
+  const d = { enabled: true, gutter: 8, cycleOnRepeat: true };
   try {
     const p = JSON.parse(localStorage.getItem('dex.snap.preferences') || '{}');
     return {
@@ -306,7 +306,14 @@ const getUsableFloatingBounds = (
   bounds: { x: number; y: number; w: number; h: number },
   workspace: { x: number; y: number; w: number; h: number },
 ) => {
-  const min = APP_WINDOW_MIN_SIZES[appId] ?? { w: 360, h: 280 };
+  const raw = APP_WINDOW_MIN_SIZES[appId] ?? { w: 360, h: 280 };
+  // An app's min size never beats the tiling grid: capped to a half/quarter of
+  // the work area, so two snapped halves (or four quarters) can't be pushed
+  // wider than their tile and slide over each other.
+  const min = {
+    w: Math.min(raw.w, Math.floor((workspace.w - 24) / 2)),
+    h: Math.min(raw.h, Math.floor((workspace.h - 24) / 2)),
+  };
   return clampWindowToWorkspace(
     {
       ...bounds,
@@ -371,6 +378,7 @@ import imosionIconPng from '../../../appicons/imosion.png';
 import forgeIconPng from '../../../appicons/forge.png';
 import nexusIconPng from '../../../appicons/nexus.png';
 import { useDexSetting } from '../hooks/useDexSetting';
+import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { notificationsAllowed } from '../utils/notificationsAllowed';
 
 const AppIconPngs: Record<string, string> = {
@@ -987,6 +995,9 @@ export const AppManager: React.FC = () => {
   // use the full workspace width.
   const stageOffset = 0;
 
+  // The docked DEX Bar's strip (0 when folded / floating / hidden). Windows stop
+  // above it, so no app ever slides under the bar.
+  const barReserve = useFloatingLauncher(s => s.reserveBottom);
   const dockEdge = useDockStore(s => s.edge);
   const dockStyle = useDockStore(s => s.style);
   const dockHidden = useDockStore(s => s.hiddenForFullscreen);
@@ -1004,31 +1015,48 @@ export const AppManager: React.FC = () => {
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
     // Desktop Work Area Manager: the content surface already starts below the
-    // top bar, so the top bar is never covered. The Morphing Dock keeps a strip
-    // on its edge so it never covers window controls; the classic DEX Bar
-    // floats and keeps none. Workspace padding and display scale come from the
-    // same place for drag, resize from every edge, maximize, snap and recovery.
+    // top bar, so the top bar is never covered. The active Dock keeps its strip:
+    // the Morphing Dock on its edge, or a DEX Bar docked at the bottom (0 when
+    // it floats). Workspace padding and display scale come from the same place
+    // for drag, resize from every edge, maximize, snap and recovery.
+    const spatial = isSpatialEnabled();
+    const dock = dockStyle === 'morphing'
+      ? { edge: dockEdge, reserve: spatial ? 0 : dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) }
+      : { edge: 'bottom' as const, reserve: spatial ? 0 : barReserve };
     const { windows } = computeWorkArea({
       viewport: { width: w, height: h },
       topBar: 0,
       scale: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
-      dock: { edge: dockEdge, reserve: dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) },
+      dock,
       padding: padding + workspacePadding,
       minWindow: { w: 320, h: 260 },
     });
     if (stageOffset) { windows.x += stageOffset; windows.w = Math.max(320, windows.w - stageOffset); }
     return windows;
-  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, dockStyle, dockHidden, workspacePadding]);
+  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, dockStyle, dockHidden, workspacePadding, barReserve]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
   // creative app (Prism/Flux/Forge/Imosion/Axl) from spilling its bottom toolbar
   // under the dock and off the screen edge.
   const getMaximizedWindowBounds = useCallback(() => {
+    // Inset by the snap gutter on every side: a maximized app is a floating
+    // stage with the same margin as tiled halves, clear of the top bar and the
+    // docked DEX Bar -- never edge-to-edge under chrome.
     const ws = getShellWorkspace(0);
-    return { x: ws.x, y: ws.y, w: ws.w, h: ws.h };
+    const inset = snapPrefsRef.current.gutter;
+    return { x: ws.x + inset, y: ws.y + inset, w: ws.w - inset * 2, h: ws.h - inset * 2 };
   }, [getShellWorkspace]);
   getMaximizedWindowBoundsRef.current = getMaximizedWindowBounds;
+
+  // A window maximized by an older build sat edge-to-edge at 0,0 over the whole
+  // content surface. It is still "maximized", just without the new inset.
+  const isLegacyFullBleed = useCallback((b: { x: number; y: number; w: number; h: number }) => {
+    const el = contentRef.current;
+    if (!el || isSpatialEnabled()) return false;
+    return Math.abs(b.x) <= 2 && Math.abs(b.y) <= 2
+      && Math.abs(b.w - el.clientWidth) <= 6 && b.h >= el.clientHeight - 200;
+  }, []);
 
   // Work area for floating-window drag/resize clamps. On the spatial desktop the
   // windows live on an unbounded canvas, so the clamp area is the whole world
@@ -1242,11 +1270,19 @@ export const AppManager: React.FC = () => {
   //    the way), so all insets are zero -- windows fill the whole work area. --
   useEffect(() => {
     const root = document.documentElement;
+    const morph = dockStyle === 'morphing' ? dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) : 0;
+    const edgeOf = (e: 'bottom' | 'left' | 'right') => (dockStyle === 'morphing' ? (dockEdge === e ? morph : 0) : e === 'bottom' ? barReserve : 0);
     root.style.setProperty('--dex-reserved-top', '0px');
-    root.style.setProperty('--dex-reserved-right', '0px');
-    root.style.setProperty('--dex-reserved-bottom', '0px');
-    root.style.setProperty('--dex-reserved-left', '0px');
-  }, []);
+    root.style.setProperty('--dex-reserved-right', `${edgeOf('right')}px`);
+    root.style.setProperty('--dex-reserved-bottom', `${edgeOf('bottom')}px`);
+    root.style.setProperty('--dex-reserved-left', `${edgeOf('left')}px`);
+    root.style.setProperty('--dex-win-inset', `${snapPrefsRef.current.gutter}px`);
+    // Maximized / tiled windows re-fit to the new work area. Next frame: the
+    // re-fit listener is re-registered with the new work area by an effect that
+    // runs after this one, so a synchronous event would reach nobody.
+    const t = window.setTimeout(() => window.dispatchEvent(new CustomEvent('dex-work-area-changed')), 0);
+    return () => window.clearTimeout(t);
+  }, [barReserve, dockStyle, dockEdge, dockHidden, workspacePadding]);
 
   // When the dock hides for a fullscreen app (or returns on the desktop), the
   // work area changes -- re-fit maximized creative windows to the CURRENT work
@@ -1285,7 +1321,7 @@ export const AppManager: React.FC = () => {
       const next = new Map(prev);
       for (const id of unchecked) {
         const b = next.get(id);
-        if (b && !isSameWindowBounds(b, maxB, 1) && isShortMaximizedRect(b, ws)) {
+        if (b && !isSameWindowBounds(b, maxB, 1) && (isShortMaximizedRect(b, ws) || isLegacyFullBleed(b))) {
           next.set(id, { ...maxB, z: b.z });
           changed = true;
         }
@@ -1406,7 +1442,9 @@ export const AppManager: React.FC = () => {
   // A full-surface app (a tab, not a floating window) is in front. The DEX Bar
   // auto-hides over it so the app fills the whole viewport (reveal it at the
   // bottom edge), instead of every app reserving a strip under the bar.
-  const fullscreenFront = currentApp !== 'home' && !detachedApps.has(currentApp) && !spatialEnabled;
+  // The bar reserves its strip now (apps stop above it), so it only hides in
+  // immersive focus mode, where every piece of chrome steps aside.
+  const fullscreenFront = immersive && currentApp !== 'home' && !spatialEnabled;
   useEffect(() => {
     (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront = fullscreenFront;
     window.dispatchEvent(new CustomEvent('dex-fullscreen-front', { detail: fullscreenFront }));
@@ -2268,7 +2306,40 @@ export const AppManager: React.FC = () => {
       next.set(appId, { ...rect, z });
       return next;
     });
-  }, [detachedApps, detachApp, getMaximizedWindowBounds, getShellWorkspace]);
+
+    // Side by side, the way Windows does it: snapping one window to a half puts
+    // its partner in the other half, so the two never overlap. The partner is
+    // the front-most other visible window -- or the app open as a tab, which is
+    // turned into a window for it. Nothing to pair with = just the one half.
+    const opposite: Partial<Record<TilePosition, TilePosition>> = {
+      left: 'right', right: 'left', top: 'bottom', bottom: 'top',
+      'left-two-thirds': 'right-third', 'right-two-thirds': 'left-third',
+      'left-third': 'right-two-thirds', 'right-third': 'left-two-thirds',
+    };
+    const other = opposite[position];
+    if (!other) return;
+    let partner: AppId | null = null;
+    let topZ = -Infinity;
+    detachedApps.forEach((b, id) => {
+      if (id === appId || minimizedApps.has(id as AppId)) return;
+      if (b.z > topZ) { topZ = b.z; partner = id as AppId; }
+    });
+    if (!partner && currentApp && currentApp !== 'home' && currentApp !== appId) partner = currentApp;
+    if (!partner) return;
+    const pid: AppId = partner;
+    const pRect = positions[other]!;
+    if (!detachedApps.has(pid)) detachApp(pid);
+    setDetachedApps(prev => {
+      const cur = prev.get(pid);
+      if (cur && Math.abs(cur.x - pRect.x) <= 1 && Math.abs(cur.y - pRect.y) <= 1
+        && Math.abs(cur.w - pRect.w) <= 1 && Math.abs(cur.h - pRect.h) <= 1) return prev;
+      const next = new Map(prev);
+      restoredWindowBoundsRef.current.delete(pid);
+      // Just under the window that was snapped, so focus stays where it was.
+      next.set(pid, { ...pRect, z: Math.max(0, z - 1) });
+      return next;
+    });
+  }, [detachedApps, detachApp, getMaximizedWindowBounds, getShellWorkspace, minimizedApps, currentApp]);
 
   // Auto tile: arrange all detached windows evenly. Reads the window set from the
   // latest state inside the updater so it stays correct when called immediately
@@ -2310,7 +2381,7 @@ export const AppManager: React.FC = () => {
         top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
         bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
         center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
-        maximize:     { ...workspace },
+        maximize:     { ...getMaximizedWindowBounds() },
         'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'center-third': { x: LEFT + PAD * 2 + thirdW, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
         'right-third':  { x: LEFT + PAD * 3 + thirdW * 2, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
@@ -2375,7 +2446,7 @@ export const AppManager: React.FC = () => {
       });
       return next;
     });
-  }, [getShellWorkspace]);
+  }, [getShellWorkspace, getMaximizedWindowBounds]);
 
   // "Use all apps at once": detach every running, non-minimized app into a
   // floating window, then tile them together — the macOS/Windows multitasking
@@ -2495,8 +2566,29 @@ export const AppManager: React.FC = () => {
           const wasMaximized = CREATIVE_APPS.has(appId)
             || isSameWindowBounds(bounds, maxB, 1)
             || (prevMax !== null && isSameWindowBounds(bounds, prevMax, 1))
-            || isShortMaximizedRect(bounds, workspace);
-          const clamped = wasMaximized ? maxB : clampWindowToWorkspace(bounds, workspace);
+            || isShortMaximizedRect(bounds, workspace)
+            || isLegacyFullBleed(bounds);
+          let fitted = bounds;
+          if (!wasMaximized && prevMax) {
+            // A tiled window whose edge sat on the old work-area edge follows
+            // that edge (the docked bar folding / docking, the window resizing),
+            // so snapped halves keep their gutter and never slide under the bar.
+            const oldBottom = prevMax.y + prevMax.h, newBottom = maxB.y + maxB.h;
+            const oldRight = prevMax.x + prevMax.w, newRight = maxB.x + maxB.w;
+            if (Math.abs(bounds.y + bounds.h - oldBottom) <= 2 && oldBottom !== newBottom) {
+              fitted = { ...fitted, h: Math.max(220, newBottom - fitted.y) };
+            }
+            if (Math.abs(bounds.x + bounds.w - oldRight) <= 2 && oldRight !== newRight && prevMax.w > 0) {
+              // Right-anchored: keep the same share of the width.
+              const share = (bounds.x - prevMax.x) / prevMax.w;
+              const nx = Math.round(maxB.x + share * maxB.w);
+              fitted = { ...fitted, x: nx, w: Math.max(260, newRight - nx) };
+            } else if (Math.abs(bounds.x - prevMax.x) <= 2 && oldRight !== newRight && prevMax.w > 0) {
+              // Left-anchored tile: keep its share of the width.
+              fitted = { ...fitted, w: Math.max(260, Math.round(bounds.w / prevMax.w * maxB.w)) };
+            }
+          }
+          const clamped = wasMaximized ? maxB : clampWindowToWorkspace(fitted, workspace);
           if (!isSameWindowBounds(bounds, clamped, 1)) {
             next.set(appId, { ...clamped, z: bounds.z });
             changed = true;
@@ -2506,6 +2598,7 @@ export const AppManager: React.FC = () => {
       });
     };
     window.addEventListener('resize', onResize);
+    window.addEventListener('dex-work-area-changed', onResize);
     // The work area also changes without a window resize (the app tab bar or
     // title bar showing or hiding). Follow the content surface itself
     // (ResizeObserver already batches to at most once per frame) so maximized
@@ -2528,6 +2621,7 @@ export const AppManager: React.FC = () => {
     if (lastMaxBoundsRef.current) onResize();
     return () => {
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('dex-work-area-changed', onResize);
       ro?.disconnect();
     };
   }, [getMaximizedWindowBounds, getShellWorkspace]);
@@ -3921,7 +4015,7 @@ export const AppManager: React.FC = () => {
               height: visibleBounds.h,
               zIndex: detBounds.z,
               display: isMinimized ? 'none' : 'flex', flexDirection: 'column',
-              borderRadius: isMaximized ? 0 : 14, overflow: 'hidden',
+              borderRadius: 14, overflow: 'hidden',
               background: useGlass
                 ? 'var(--color-bg-glass-strong, rgba(26,26,30,0.85))'
                 : 'var(--color-bg-base, #0C0C0E)',
@@ -3930,8 +4024,8 @@ export const AppManager: React.FC = () => {
               // Focus hierarchy (Apple-style depth): the active window LIFTS with a
               // deeper shadow + a faint accent edge; inactive windows recede with a
               // softer, lower shadow. Animates via the box-shadow transition below.
-              border: isMaximized ? 'none' : `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
-              ...adaptiveShadow(isMaximized ? 'none' : isFocused
+              border: `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+              ...adaptiveShadow(isMaximized ? '0 8px 28px rgba(0,0,0,0.38), inset 0 0.5px 0 rgba(255,255,255,0.08)' : isFocused
                 ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(74,158,255,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)'
                 : '0 10px 28px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.05)'),
               contain: 'layout style paint',
@@ -4763,9 +4857,19 @@ export const AppManager: React.FC = () => {
                   const kept = !showInline ? spatialTabSizeRef.current.get(appId) : undefined;
                   if (showInline) spatialTabSizeRef.current.delete(appId);
                   if (kept) return { left: 0, top: 0, width: kept.w, height: kept.h };
-                  return spatialEnabled
-                    ? { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' }
-                    : { left: 'var(--dex-work-x, 0px)', top: 'var(--dex-work-y, 0px)', width: 'var(--dex-work-w, var(--dex-content-w, 100%))', height: 'var(--dex-work-h, var(--dex-content-h, 100%))' };
+                  // A tab sits in the same inset stage as a maximized window:
+                  // gutter on every side, inside the work area (so above or
+                  // beside the Dock, and inside the workspace padding).
+                  if (spatialEnabled || immersive) return { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
+                  return {
+                    left: 'calc(var(--dex-work-x, 0px) + var(--dex-win-inset, 8px))',
+                    top: 'calc(var(--dex-work-y, 0px) + var(--dex-win-inset, 8px))',
+                    width: 'calc(var(--dex-work-w, var(--dex-content-w, 100%)) - 2 * var(--dex-win-inset, 8px))',
+                    height: 'calc(var(--dex-work-h, var(--dex-content-h, 100%)) - 2 * var(--dex-win-inset, 8px))',
+                    borderRadius: 14, overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.38), inset 0 0.5px 0 rgba(255,255,255,0.08)',
+                  };
                 })()),
             display: 'flex',
             opacity: showInline ? 1 : 0,
@@ -4776,9 +4880,9 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
-            // Sized to the work area, so the Morphing Dock never covers the
-            // app's controls; the strip under the Dock shows the wallpaper.
-            willChange: showInline ? 'opacity, transform' : 'auto',
+            // Sized to the work area, so the Dock never covers the app's
+            // controls; the strip under the Dock shows the wallpaper.
+            willChange: 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
             // background apps to lose their painted layer during OS idle and
@@ -4798,7 +4902,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, immersive, mountedAppsSafeSnapshot.join(',')]);
 
   // -- AppLifecycle phase emitter ------------------------------------------
   // Keep-alive never unmounts apps; instead we broadcast a per-app phase so
@@ -5404,7 +5508,7 @@ export const AppManager: React.FC = () => {
         const origin = contentRef.current?.getBoundingClientRect();
         const originX = origin ? origin.left : 0;
         const originY = origin ? origin.top : 0;
-        const W = ws.w, H = ws.h, LEFT = ws.x, TOP = ws.y, PAD = 6;
+        const W = ws.w, H = ws.h, LEFT = ws.x, TOP = ws.y, PAD = snapPrefsRef.current.gutter;
         const halfW = Math.floor((W - PAD * 3) / 2);
         const halfH = Math.floor((H - PAD * 3) / 2);
         const zones: Record<string, { x: number; y: number; w: number; h: number }> = {
@@ -5416,7 +5520,7 @@ export const AppManager: React.FC = () => {
           'bottom-right': { x: LEFT + PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
           top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
           bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
-          maximize:     { x: LEFT, y: TOP, w: W, h: H },
+          maximize:     getMaximizedWindowBounds(),
         };
         const z = zones[snapPreviewZone];
         if (!z) return null;

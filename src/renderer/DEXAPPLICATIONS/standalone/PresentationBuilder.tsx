@@ -20,6 +20,7 @@ import {
   loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
   historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
 } from './presentationDeck';
+import { colorInputValue } from '../../utils/canvasTheme';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -995,7 +996,7 @@ const PresentationBuilder: React.FC = () => {
             <span>Background</span>
             <input
               type="color"
-              value={currentSlide?.background ?? '#000000'}
+              value={colorInputValue(currentSlide?.background ?? '#000000')}
               onChange={e => updateCurrentSlide(s => ({ ...s, background: e.target.value }))}
               style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
             />
@@ -1053,7 +1054,7 @@ const PresentationBuilder: React.FC = () => {
                     <span>Color</span>
                     <input
                       type="color"
-                      value={selectedBlock.style.color ?? '#ffffff'}
+                      value={colorInputValue(selectedBlock.style.color ?? '#ffffff')}
                       onChange={e => updateBlock(selectedBlock.id, { style: { color: e.target.value } })}
                       style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
                     />
@@ -1065,7 +1066,7 @@ const PresentationBuilder: React.FC = () => {
                   <span>Fill</span>
                   <input
                     type="color"
-                    value={selectedBlock.style.background ?? '#5E5CE6'}
+                    value={colorInputValue(selectedBlock.style.background ?? '#5E5CE6')}
                     onChange={e => updateBlock(selectedBlock.id, { style: { background: e.target.value } })}
                     style={{ width: '100%', height: 32, border: 'none', borderRadius: 10, background: 'transparent', cursor: 'pointer' }}
                   />

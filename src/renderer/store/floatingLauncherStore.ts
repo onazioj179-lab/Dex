@@ -28,6 +28,22 @@ export interface FloatingLauncherState {
   enabled: boolean;
   setPosition: (x: number, y: number) => void;
   setEnabled: (enabled: boolean) => void;
+  /**
+   * Px the bar takes from the bottom of the viewport when it sits docked at the
+   * bottom edge (0 when folded, floating elsewhere, hidden or disabled). The
+   * window manager subtracts it from the work area so maximized / tiled apps
+   * stop above the bar instead of sliding under it. Runtime only, not saved.
+   */
+  reserveBottom: number;
+  setReserveBottom: (px: number) => void;
+  /** Folded = the bar collapsed into a single search orb. Persisted. */
+  folded: boolean;
+  setFolded: (folded: boolean) => void;
+}
+
+const FOLD_KEY = 'dex-bar-folded';
+function loadFolded(): boolean {
+  try { return localStorage.getItem(FOLD_KEY) === '1'; } catch { return false; }
 }
 
 function load(): { x: number; y: number; enabled: boolean } {
@@ -51,6 +67,16 @@ export const useFloatingLauncher = create<FloatingLauncherState>((set, get) => (
   ...load(),
   setPosition: (x, y) => { set({ x, y }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
   setEnabled: (enabled) => { set({ enabled }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
+  reserveBottom: 0,
+  setReserveBottom: (px) => {
+    const v = Math.max(0, Math.round(px));
+    if (v !== get().reserveBottom) set({ reserveBottom: v });
+  },
+  folded: loadFolded(),
+  setFolded: (folded) => {
+    set({ folded });
+    try { localStorage.setItem(FOLD_KEY, folded ? '1' : '0'); } catch { /* quota */ }
+  },
 }));
 
 // Always-available recovery: a global shortcut toggles the DEX Bar even when it

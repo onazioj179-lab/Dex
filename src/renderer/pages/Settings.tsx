@@ -62,6 +62,7 @@ import { applyTheme } from '../utils/theme';
 import { withViewTransition } from '../utils/viewTransition';
 import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
+import { colorInputValue } from '../utils/canvasTheme';
 
 // ===========================================================================
 // TYPES
@@ -2469,7 +2470,7 @@ export const Settings: React.FC = () => {
             </div>
             <input
               type="color"
-              value={prefs.glassTint}
+              value={colorInputValue(prefs.glassTint)}
               onChange={(e) => prefs.setGlassTint(e.target.value)}
               style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
               aria-label="Liquid Glass tint color"
@@ -3112,7 +3113,7 @@ export const Settings: React.FC = () => {
       
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
-        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9,12 11,14 15,10"/></svg>
             Protected with: {[

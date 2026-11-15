@@ -21,6 +21,7 @@ import { validateWorkflow } from '../../shared/workflow/validate';
 import { useNotesStore } from '../store/notesStore';
 import { useClipboardStore } from '../store/clipboardStore';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
 
 // ===========================================================================
 // TYPES
@@ -2096,7 +2097,7 @@ const styles: Record<string, React.CSSProperties> = {
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--space-2) var(--space-5)', borderRadius: 0, borderBottom: '1px solid var(--color-border)',
+    padding: 'var(--space-2) var(--space-5)', borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: '1px solid var(--color-border)',
     minHeight: 'var(--app-header-height)', boxSizing: 'border-box', flexShrink: 0,
     gap: 'var(--space-3)', minWidth: 0,
   },
@@ -2105,8 +2106,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 'var(--space-2)',
     minWidth: 0, maxWidth: '100%', overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
-  title: { fontSize: '18px', fontWeight: 600, letterSpacing: '-0.01em', marginBottom: '2px' },
-  subtitle: { fontSize: '12px', color: 'var(--color-text-muted)' },
+  title: APP_TITLE,
+  subtitle: APP_SUBTITLE,
   searchBox: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
     background: 'var(--color-border-subtle)', borderRadius: '6px', color: 'var(--color-text-muted)',
