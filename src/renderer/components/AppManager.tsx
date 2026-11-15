@@ -29,6 +29,9 @@ import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
+import { MorphingDock } from './dock/MorphingDock';
+import { useDockStore, dockReserve } from '../store/dockStore';
+import { computeWorkArea } from '../../shared/shell/workArea';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
@@ -66,7 +69,7 @@ import { QuickControls } from '../shell/QuickControls';
 import ControlCenter from './ControlCenter';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
-import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
 import { computeTiling, type TilingLayout } from '../../shared/shell/tilingLayouts';
 import { zoneAtPoint, zoneToBounds, expandAcross, coveredZoneIds, layoutBounds, type ExpandDir } from '../../shared/shell/customZones';
 import { useZoneStore } from '../store/zoneStore';
@@ -994,7 +997,11 @@ export const AppManager: React.FC = () => {
 
   // The docked DEX Bar's strip (0 when folded / floating / hidden). Windows stop
   // above it, so no app ever slides under the bar.
-  const dockReserve = useFloatingLauncher(s => s.reserveBottom);
+  const barReserve = useFloatingLauncher(s => s.reserveBottom);
+  const dockEdge = useDockStore(s => s.edge);
+  const dockStyle = useDockStore(s => s.style);
+  const dockHidden = useDockStore(s => s.hiddenForFullscreen);
+  const workspacePadding = useDockStore(s => s.workspacePadding);
   const getShellWorkspace = useCallback((padding = 0) => {
     // OS-grade work area. Detached windows are positioned RELATIVE to the content
     // surface (it is their containing block via `contain: layout`), and that
@@ -1007,21 +1014,26 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
-    // A DEX Bar docked at the bottom edge reserves its strip (published by the
-    // bar itself); folded into the orb or floating elsewhere it reserves none.
-    return getWorkspaceBounds(
-      { width: w, height: h },
-      {
-        topReserve: 0,
-        dockReserve: isSpatialEnabled() ? 0 : dockReserve,
-        leftReserve: stageOffset,
-        rightReserve: 0,
-        padding,
-        minWidth: 320,
-        minHeight: 260,
-      },
-    );
-  }, [stageOffset, showAppTabBar, runningApps.length, dockReserve]);
+    // Desktop Work Area Manager: the content surface already starts below the
+    // top bar, so the top bar is never covered. The active Dock keeps its strip:
+    // the Morphing Dock on its edge, or a DEX Bar docked at the bottom (0 when
+    // it floats). Workspace padding and display scale come from the same place
+    // for drag, resize from every edge, maximize, snap and recovery.
+    const spatial = isSpatialEnabled();
+    const dock = dockStyle === 'morphing'
+      ? { edge: dockEdge, reserve: spatial ? 0 : dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) }
+      : { edge: 'bottom' as const, reserve: spatial ? 0 : barReserve };
+    const { windows } = computeWorkArea({
+      viewport: { width: w, height: h },
+      topBar: 0,
+      scale: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+      dock,
+      padding: padding + workspacePadding,
+      minWindow: { w: 320, h: 260 },
+    });
+    if (stageOffset) { windows.x += stageOffset; windows.w = Math.max(320, windows.w - stageOffset); }
+    return windows;
+  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, dockStyle, dockHidden, workspacePadding, barReserve]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -1258,17 +1270,19 @@ export const AppManager: React.FC = () => {
   //    the way), so all insets are zero -- windows fill the whole work area. --
   useEffect(() => {
     const root = document.documentElement;
+    const morph = dockStyle === 'morphing' ? dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) : 0;
+    const edgeOf = (e: 'bottom' | 'left' | 'right') => (dockStyle === 'morphing' ? (dockEdge === e ? morph : 0) : e === 'bottom' ? barReserve : 0);
     root.style.setProperty('--dex-reserved-top', '0px');
-    root.style.setProperty('--dex-reserved-right', '0px');
-    root.style.setProperty('--dex-reserved-bottom', `${dockReserve}px`);
-    root.style.setProperty('--dex-reserved-left', '0px');
+    root.style.setProperty('--dex-reserved-right', `${edgeOf('right')}px`);
+    root.style.setProperty('--dex-reserved-bottom', `${edgeOf('bottom')}px`);
+    root.style.setProperty('--dex-reserved-left', `${edgeOf('left')}px`);
     root.style.setProperty('--dex-win-inset', `${snapPrefsRef.current.gutter}px`);
     // Maximized / tiled windows re-fit to the new work area. Next frame: the
     // re-fit listener is re-registered with the new work area by an effect that
     // runs after this one, so a synchronous event would reach nobody.
     const t = window.setTimeout(() => window.dispatchEvent(new CustomEvent('dex-work-area-changed')), 0);
     return () => window.clearTimeout(t);
-  }, [dockReserve]);
+  }, [barReserve, dockStyle, dockEdge, dockHidden, workspacePadding]);
 
   // When the dock hides for a fullscreen app (or returns on the desktop), the
   // work area changes -- re-fit maximized creative windows to the CURRENT work
@@ -2602,6 +2616,9 @@ export const AppManager: React.FC = () => {
         })
       : null;
     if (ro && contentRef.current) ro.observe(contentRef.current);
+    // The work area also changes with the Dock (edge, style, padding): reflow
+    // open windows into the new area. Skipped on first mount.
+    if (lastMaxBoundsRef.current) onResize();
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('dex-work-area-changed', onResize);
@@ -3751,13 +3768,20 @@ export const AppManager: React.FC = () => {
     const publish = () => {
       el.style.setProperty('--dex-content-w', `${el.clientWidth}px`);
       el.style.setProperty('--dex-content-h', `${el.clientHeight}px`);
+      // Tab apps fill the work area (above the Dock strip, inside the padding);
+      // the Home wallpaper still runs under the Dock.
+      const wa = getShellWorkspace(0);
+      el.style.setProperty('--dex-work-x', `${wa.x}px`);
+      el.style.setProperty('--dex-work-y', `${wa.y}px`);
+      el.style.setProperty('--dex-work-w', `${wa.w}px`);
+      el.style.setProperty('--dex-work-h', `${wa.h}px`);
       useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
     };
     const ro = new ResizeObserver(publish);
     ro.observe(el);
     publish();
     return () => ro.disconnect();
-  }, [splitMode]);
+  }, [splitMode, getShellWorkspace]);
 
   // Canvas input: wheel pan / zoom, middle-drag and Space+drag pan, and keyboard
   // focus that follows into off-screen windows.
@@ -4834,12 +4858,14 @@ export const AppManager: React.FC = () => {
                   if (showInline) spatialTabSizeRef.current.delete(appId);
                   if (kept) return { left: 0, top: 0, width: kept.w, height: kept.h };
                   // A tab sits in the same inset stage as a maximized window:
-                  // gutter on every side, stopping above a docked DEX Bar.
+                  // gutter on every side, inside the work area (so above or
+                  // beside the Dock, and inside the workspace padding).
                   if (spatialEnabled || immersive) return { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
                   return {
-                    left: 'var(--dex-win-inset, 8px)', top: 'var(--dex-win-inset, 8px)',
-                    width: 'calc(var(--dex-content-w, 100%) - 2 * var(--dex-win-inset, 8px))',
-                    height: 'calc(var(--dex-content-h, 100%) - 2 * var(--dex-win-inset, 8px) - var(--dex-reserved-bottom, 0px))',
+                    left: 'calc(var(--dex-work-x, 0px) + var(--dex-win-inset, 8px))',
+                    top: 'calc(var(--dex-work-y, 0px) + var(--dex-win-inset, 8px))',
+                    width: 'calc(var(--dex-work-w, var(--dex-content-w, 100%)) - 2 * var(--dex-win-inset, 8px))',
+                    height: 'calc(var(--dex-work-h, var(--dex-content-h, 100%)) - 2 * var(--dex-win-inset, 8px))',
                     borderRadius: 14, overflow: 'hidden',
                     border: '1px solid rgba(255,255,255,0.08)',
                     boxShadow: '0 8px 28px rgba(0,0,0,0.38), inset 0 0.5px 0 rgba(255,255,255,0.08)',
@@ -4854,8 +4880,8 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
-            // No bottom reserve: the DEX Bar hides over a full-surface app.
-            // (A padded strip here painted a band under every app.)
+            // Sized to the work area, so the Dock never covers the app's
+            // controls; the strip under the Dock shows the wallpaper.
             willChange: 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -5382,7 +5408,7 @@ export const AppManager: React.FC = () => {
 
       {/* Content area -- supports split-screen tiling */}
       {splitMode === 'off' ? (
-        <div ref={contentRef} role="main" aria-label="App content" style={{
+        <div ref={contentRef} role="main" aria-label="App content" data-dex-content-surface="" style={{
           flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
           // Transparent so the Home desktop (the wallpaper layer, always mounted at
           // z0 inside here) is what shows behind floating app windows -- minimizing
@@ -5626,7 +5652,9 @@ export const AppManager: React.FC = () => {
       {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
-      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
+      {dockStyle === 'morphing'
+        ? <MorphingDock onOpenLauncher={() => { setShowAppMenu(true); }} />
+        : <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />}
 
       {/* Control Center -- right-side glass panel; self-manages open state via
           the `dex-toggle-control-center` window event dispatched from the top bar. */}
