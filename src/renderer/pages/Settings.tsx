@@ -26,6 +26,8 @@ import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
 import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled, getSoundVolume, setSoundVolume, playToggle } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
+import { useDockStore } from '../store/dockStore';
+const DOCK_SELECT: React.CSSProperties = { minHeight: 28, padding: '0 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit' };
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
 import {
@@ -1668,6 +1670,7 @@ export const Settings: React.FC = () => {
   const wallpaperOverlay = useWallpaperStore((s) => s.opacity);
   const uiSoundsOn = useSyncExternalStore(subscribeSoundEnabled, isSoundEnabled);
   const uiSoundVolume = useSyncExternalStore(subscribeSoundEnabled, getSoundVolume);
+  const dock = useDockStore();
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
   const dnd = useNotificationCenterStore((s) => s.doNotDisturb);
@@ -2399,6 +2402,48 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
+        <h3 style={styles.sectionTitle}>Dock</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Style</span>
+            <span style={styles.settingDesc}>The Morphing Dock opens from a search button and keeps windows clear of it. The DEX Bar is the floating command bar.</span>
+          </div>
+          <select value={dock.style} onChange={(e) => dock.setPrefs({ style: e.target.value === 'classic' ? 'classic' : 'morphing' })} aria-label="Dock style" style={DOCK_SELECT}>
+            <option value="morphing">Morphing Dock</option>
+            <option value="classic">DEX Bar</option>
+          </select>
+        </div>
+        {dock.style === 'morphing' && (
+          <>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>Position</span>
+                <span style={styles.settingDesc}>Windows and full-size apps stay clear of the Dock on this edge.</span>
+              </div>
+              <select value={dock.edge} onChange={(e) => dock.setPrefs({ edge: e.target.value as 'bottom' | 'left' | 'right' })} aria-label="Dock position" style={DOCK_SELECT}>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>Collapse automatically</span>
+                <span style={styles.settingDesc}>Return to the search button after opening an app, on Escape, or when the pointer leaves.</span>
+              </div>
+              <input type="checkbox" checked={dock.autoCollapse} onChange={(e) => dock.setPrefs({ autoCollapse: e.target.checked })} aria-label="Collapse the Dock automatically" />
+            </div>
+          </>
+        )}
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Workspace padding</span>
+            <span style={styles.settingDesc}>Space kept between windows and the screen edges, top bar and Dock: {dock.workspacePadding} px.</span>
+          </div>
+          <input type="range" min={0} max={48} step={4} value={dock.workspacePadding} onChange={(e) => dock.setPrefs({ workspacePadding: Number(e.target.value) })} aria-label="Workspace padding" />
+        </div>
+
+        {dock.style === 'classic' && (<>
         <h3 style={styles.sectionTitle}>DEX Bar</h3>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
@@ -2412,6 +2457,7 @@ export const Settings: React.FC = () => {
             aria-label="Show DEX Bar"
           />
         </div>
+        </>)}
 
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>
         <InterfaceTransparencyControl styles={styles} />

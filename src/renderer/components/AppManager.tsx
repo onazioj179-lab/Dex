@@ -29,6 +29,9 @@ import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
+import { MorphingDock } from './dock/MorphingDock';
+import { useDockStore, dockReserve } from '../store/dockStore';
+import { computeWorkArea } from '../../shared/shell/workArea';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
@@ -66,7 +69,7 @@ import { QuickControls } from '../shell/QuickControls';
 import ControlCenter from './ControlCenter';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
-import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
 import { computeTiling, type TilingLayout } from '../../shared/shell/tilingLayouts';
 import { zoneAtPoint, zoneToBounds, expandAcross, coveredZoneIds, layoutBounds, type ExpandDir } from '../../shared/shell/customZones';
 import { useZoneStore } from '../store/zoneStore';
@@ -984,6 +987,10 @@ export const AppManager: React.FC = () => {
   // use the full workspace width.
   const stageOffset = 0;
 
+  const dockEdge = useDockStore(s => s.edge);
+  const dockStyle = useDockStore(s => s.style);
+  const dockHidden = useDockStore(s => s.hiddenForFullscreen);
+  const workspacePadding = useDockStore(s => s.workspacePadding);
   const getShellWorkspace = useCallback((padding = 0) => {
     // OS-grade work area. Detached windows are positioned RELATIVE to the content
     // surface (it is their containing block via `contain: layout`), and that
@@ -996,21 +1003,22 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
-    // The DEX Bar floats over apps; it reserves no strip, so maximized and
-    // snapped windows use the full height (no blank band along the bottom).
-    return getWorkspaceBounds(
-      { width: w, height: h },
-      {
-        topReserve: 0,
-        dockReserve: 0,
-        leftReserve: stageOffset,
-        rightReserve: 0,
-        padding,
-        minWidth: 320,
-        minHeight: 260,
-      },
-    );
-  }, [stageOffset, showAppTabBar, runningApps.length]);
+    // Desktop Work Area Manager: the content surface already starts below the
+    // top bar, so the top bar is never covered. The Morphing Dock keeps a strip
+    // on its edge so it never covers window controls; the classic DEX Bar
+    // floats and keeps none. Workspace padding and display scale come from the
+    // same place for drag, resize from every edge, maximize, snap and recovery.
+    const { windows } = computeWorkArea({
+      viewport: { width: w, height: h },
+      topBar: 0,
+      scale: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+      dock: { edge: dockEdge, reserve: dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) },
+      padding: padding + workspacePadding,
+      minWindow: { w: 320, h: 260 },
+    });
+    if (stageOffset) { windows.x += stageOffset; windows.w = Math.max(320, windows.w - stageOffset); }
+    return windows;
+  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, dockStyle, dockHidden, workspacePadding]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -2515,6 +2523,9 @@ export const AppManager: React.FC = () => {
         })
       : null;
     if (ro && contentRef.current) ro.observe(contentRef.current);
+    // The work area also changes with the Dock (edge, style, padding): reflow
+    // open windows into the new area. Skipped on first mount.
+    if (lastMaxBoundsRef.current) onResize();
     return () => {
       window.removeEventListener('resize', onResize);
       ro?.disconnect();
@@ -3663,13 +3674,20 @@ export const AppManager: React.FC = () => {
     const publish = () => {
       el.style.setProperty('--dex-content-w', `${el.clientWidth}px`);
       el.style.setProperty('--dex-content-h', `${el.clientHeight}px`);
+      // Tab apps fill the work area (above the Dock strip, inside the padding);
+      // the Home wallpaper still runs under the Dock.
+      const wa = getShellWorkspace(0);
+      el.style.setProperty('--dex-work-x', `${wa.x}px`);
+      el.style.setProperty('--dex-work-y', `${wa.y}px`);
+      el.style.setProperty('--dex-work-w', `${wa.w}px`);
+      el.style.setProperty('--dex-work-h', `${wa.h}px`);
       useSpatialStore.getState().setViewport(el.clientWidth, el.clientHeight);
     };
     const ro = new ResizeObserver(publish);
     ro.observe(el);
     publish();
     return () => ro.disconnect();
-  }, [splitMode]);
+  }, [splitMode, getShellWorkspace]);
 
   // Canvas input: wheel pan / zoom, middle-drag and Space+drag pan, and keyboard
   // focus that follows into off-screen windows.
@@ -4744,9 +4762,10 @@ export const AppManager: React.FC = () => {
               : (() => {
                   const kept = !showInline ? spatialTabSizeRef.current.get(appId) : undefined;
                   if (showInline) spatialTabSizeRef.current.delete(appId);
-                  return kept
-                    ? { left: 0, top: 0, width: kept.w, height: kept.h }
-                    : { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
+                  if (kept) return { left: 0, top: 0, width: kept.w, height: kept.h };
+                  return spatialEnabled
+                    ? { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' }
+                    : { left: 'var(--dex-work-x, 0px)', top: 'var(--dex-work-y, 0px)', width: 'var(--dex-work-w, var(--dex-content-w, 100%))', height: 'var(--dex-work-h, var(--dex-content-h, 100%))' };
                 })()),
             display: 'flex',
             opacity: showInline ? 1 : 0,
@@ -4757,8 +4776,8 @@ export const AppManager: React.FC = () => {
             // the wallpaper shows. Every OTHER app is an opaque surface so it never
             // reveals the shell backdrop or lets the wallpaper bleed into it.
             background: appId === 'home' ? 'transparent' : 'var(--color-bg-base)',
-            // No bottom reserve: the DEX Bar hides over a full-surface app.
-            // (A padded strip here painted a band under every app.)
+            // Sized to the work area, so the Morphing Dock never covers the
+            // app's controls; the strip under the Dock shows the wallpaper.
             willChange: showInline ? 'opacity, transform' : 'auto',
             // Use only layout/style containment regardless of visibility.
             // 'paint' containment combined with content-visibility:auto caused
@@ -5285,7 +5304,7 @@ export const AppManager: React.FC = () => {
 
       {/* Content area -- supports split-screen tiling */}
       {splitMode === 'off' ? (
-        <div ref={contentRef} role="main" aria-label="App content" style={{
+        <div ref={contentRef} role="main" aria-label="App content" data-dex-content-surface="" style={{
           flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
           // Transparent so the Home desktop (the wallpaper layer, always mounted at
           // z0 inside here) is what shows behind floating app windows -- minimizing
@@ -5529,7 +5548,9 @@ export const AppManager: React.FC = () => {
       {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
-      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
+      {dockStyle === 'morphing'
+        ? <MorphingDock onOpenLauncher={() => { setShowAppMenu(true); }} />
+        : <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />}
 
       {/* Control Center -- right-side glass panel; self-manages open state via
           the `dex-toggle-control-center` window event dispatched from the top bar. */}
