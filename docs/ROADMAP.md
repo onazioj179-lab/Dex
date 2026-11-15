@@ -3699,3 +3699,7 @@ These need DSP/ML or native hosting we don't fake.
 ## Checkpoint 2026-11-14 (robustness pass 3)
 
 - Poisoned-lock paths that answered "busy" forever (search index, Vault, notifications, terminal, ledger, startup) now recover; the phone-share server prunes expired shares and old answers (#251 to #253).
+
+## Checkpoint 2026-11-14 (dead code pruned)
+
+- 254 source files nothing in DEX reaches, plus the 187 tests that covered only them, removed (54,651 lines, #254). Reachability = esbuild bundle of `src/renderer/main.tsx`; type-only imports re-checked with tsc. #47 closed.

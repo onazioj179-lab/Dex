@@ -59,7 +59,6 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
-| 47 | Browser features the native view cannot provide yet | PARTIAL (2026-11-11: back/forward state and the failed-load error page VERIFIED live on an isolated profile — a dead .com host shows "This site's address can't be found" (the earlier .invalid test had become a web search). Element fullscreen wired but UNVERIFIED: the test window wasn't frontmost, so DEX hid the view. Credential capture deliberately not added: it would scrape passwords from web pages. 18f: downloads had no native handler (stuck at "downloading" forever); now download_ctl.rs saves to Downloads, verified live) | Done since: per-request block count (native `blocked` events from #165), load-error page, `canGoBack`/`canGoForward`. Left: element fullscreen check with the window frontmost; credential capture stays out on purpose | `Browser.tsx`, `browser_view.rs` | Packaged run: page enters element fullscreen with DEX frontmost | — | P2 |
 
 ## Release status
 
@@ -267,6 +266,13 @@ CI on `main` and on every PR since 2026-11-14 00:13 UTC is red without running: 
 | 251 | Search, Vault, Notifications, Terminal, Ledger, startup | After one panic: search said "index busy", Vault "vault busy", notifications "busy" and terminal sessions failed until DEX restarted | HIGH | FIXED (cargo check; cargo test 143/144, the one failure is a timing assert in an untouched module that passes alone) | 59 more `match m.lock() { Ok(g) => g, Err(_) => return … }` / `.lock().ok()?` / read-only sites in 15 files use `lock_safe()` | — |
 | 252 | Transfers (phone share) | Expired shares and answered uploads stayed in memory for as long as the server ran | LOW | FIXED (cargo test) | `ServerData::prune`: expired shares dropped and only the newest 64 answered uploads kept, on every share and upload | — |
 | 253 | Shell | `window.__DEX_CRITICAL_EVENTS__` debug list grew for the whole session | LOW | FIXED (tsc) | Keeps the newest 100 | — |
+
+## Session 2026-11-14 (`claude/backlog-1114-c`): dead code pruned (#53 follow-up), #47 closed
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 254 | All | ~380 orphan files kept alive only by tests (#53 next action; ran alongside #260 on main, which pruned another set) | MEDIUM | DONE (tsc 0, `vite build` OK, ABI + watermark OK, Vitest 4128 passed; the 2 full-run failures pass alone) | 254 source files no part of DEX reaches (found by bundling `src/renderer/main.tsx` with esbuild, then adding back 7 files used only for types) and the 187 tests that covered only them: 54,651 lines. Kept: anything a remaining test, script or config touches. The dynamic-code ratchet lost `WorkerPool.ts` (deleted) | — |
+| 47 | Browser | Closed: every listed piece exists (see `DEX_COMPLETED_WORK.md`) | — | DONE | Moved to the waiting table: element fullscreen needs a run with DEX in front | Packaged-app run |
 
 ## Session 2026-11-14 (`claude/backlog-next-1114`): dead code and dead e2e specs
 
