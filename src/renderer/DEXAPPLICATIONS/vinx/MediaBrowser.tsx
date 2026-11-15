@@ -24,6 +24,20 @@ import { DexSearchInput } from '../../styles/components';
 import { buildClipFromMedia, resolveDropTrack, appendFrameForTrack } from './mediaClip';
 import { createAddClipCommand } from './VinxCommands';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
+import { toMediaUrl } from '../../utils/mediaUrl';
+import { isTauri } from '../../services/platform/tauriCompat';
+
+const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'];
+const AUDIO_EXT = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'];
+const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+/** MIME family from a file name (the native dialog returns paths, not File objects). */
+export function mimeForName(name: string): string {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (VIDEO_EXT.includes(ext)) return `video/${ext === 'mov' ? 'quicktime' : ext}`;
+  if (AUDIO_EXT.includes(ext)) return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
+  if (IMAGE_EXT.includes(ext)) return `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  return '';
+}
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -164,34 +178,29 @@ const MediaTab: React.FC = memo(() => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Inserted "${media.name}" at end of timeline` } }));
   }, []);
 
-  const handleImport = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = 'video/*,audio/*,image/*';
-    input.onchange = () => {
-      if (!input.files) return;
-      for (let i = 0; i < input.files.length; i++) {
-        const file = input.files[i];
-        const isVideo = file.type.startsWith('video/');
-        const isAudio = file.type.startsWith('audio/');
-        const isImage = file.type.startsWith('image/');
-        const objectUrl = URL.createObjectURL(file);
+  // One imported source -> probe metadata from `playUrl`, store `storedPath`.
+  // In the desktop app storedPath is the file's disk path (played through the
+  // dexmedia protocol), so the project reopens with its media and native tools
+  // (ffmpeg) can read it; in the browser it is a blob: URL.
+  const importSource = useCallback((name: string, mime: string, size: number, playUrl: string, storedPath: string) => {
+        const isVideo = mime.startsWith('video/');
+        const isAudio = mime.startsWith('audio/');
+        const isImage = mime.startsWith('image/');
 
         // Probe real metadata before adding to bin
         const addItem = (meta: { duration: number; width: number; height: number; frameRate: number; sampleRate: number; channels: number }) => {
           const item: MediaItem = {
             id: generateId('media'),
-            name: file.name,
+            name: name,
             type: isVideo ? 'video' : isAudio ? 'audio' : isImage ? 'image' : 'video',
-            path: objectUrl,
+            path: storedPath,
             duration: meta.duration,
             width: meta.width,
             height: meta.height,
             frameRate: meta.frameRate,
             sampleRate: meta.sampleRate,
             audioChannels: meta.channels,
-            fileSize: file.size,
+            fileSize: size,
             addedAt: Date.now(),
             thumbnailUrl: null,
             proxyPath: null,
@@ -204,6 +213,7 @@ const MediaTab: React.FC = memo(() => {
 
         if (isVideo) {
           const vid = document.createElement('video');
+          vid.crossOrigin = 'anonymous'; // dexmedia sends CORS: keeps the thumbnail canvas readable
           vid.preload = 'auto';
           vid.muted = true;
           vid.playsInline = true;
@@ -228,16 +238,16 @@ const MediaTab: React.FC = memo(() => {
             } catch (e) { console.warn('[Vinx] Thumbnail capture failed:', e); }
             const item: MediaItem = {
               id: generateId('media'),
-              name: file.name,
+              name: name,
               type: 'video',
-              path: objectUrl,
+              path: storedPath,
               duration: vid.duration || 0,
               width: vid.videoWidth || 1920,
               height: vid.videoHeight || 1080,
               frameRate: 30,
               sampleRate: 48000,
               audioChannels: 2,
-              fileSize: file.size,
+              fileSize: size,
               addedAt: Date.now(),
               thumbnailUrl: thumbUrl,
               proxyPath: null,
@@ -249,7 +259,7 @@ const MediaTab: React.FC = memo(() => {
             vid.src = '';
           };
           vid.onerror = () => addItem({ duration: 0, width: 1920, height: 1080, frameRate: 30, sampleRate: 48000, channels: 2 });
-          vid.src = objectUrl;
+          vid.src = playUrl;
         } else if (isAudio) {
           const aud = document.createElement('audio');
           aud.preload = 'metadata';
@@ -265,9 +275,10 @@ const MediaTab: React.FC = memo(() => {
             aud.src = '';
           };
           aud.onerror = () => addItem({ duration: 0, width: 0, height: 0, frameRate: 0, sampleRate: 48000, channels: 2 });
-          aud.src = objectUrl;
+          aud.src = playUrl;
         } else if (isImage) {
           const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.onload = () => {
             addItem({
               duration: 0,
@@ -279,14 +290,44 @@ const MediaTab: React.FC = memo(() => {
             });
           };
           img.onerror = () => addItem({ duration: 0, width: 1920, height: 1080, frameRate: 0, sampleRate: 0, channels: 0 });
-          img.src = objectUrl;
+          img.src = playUrl;
         } else {
           addItem({ duration: 0, width: 0, height: 0, frameRate: 0, sampleRate: 0, channels: 0 });
         }
+  }, [addMedia]);
+
+  const handleImport = useCallback(async () => {
+    const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<any> } }).dex;
+    if (isTauri() && dex?.invoke) {
+      // Desktop: pick by path, so the media survives a restart (blob: URLs do not).
+      try {
+        const res = await dex.invoke('dialog:showOpenDialog', {
+          title: 'Import media',
+          properties: ['openFile', 'multiSelections'],
+          filters: [{ name: 'Media', extensions: [...VIDEO_EXT, ...AUDIO_EXT, ...IMAGE_EXT] }],
+        });
+        if (!res || res.canceled || !Array.isArray(res.filePaths)) return;
+        for (const p of res.filePaths as string[]) {
+          const name = p.split(/[\\/]/).pop() || p;
+          importSource(name, mimeForName(name), 0, toMediaUrl(p), p);
+        }
+        return;
+      } catch { /* dialog unavailable: fall back to the browser picker */ }
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'video/*,audio/*,image/*';
+    input.onchange = () => {
+      if (!input.files) return;
+      for (let i = 0; i < input.files.length; i++) {
+        const file = input.files[i];
+        const objectUrl = URL.createObjectURL(file);
+        importSource(file.name, file.type, file.size, objectUrl, objectUrl);
       }
     };
     input.click();
-  }, [addMedia]);
+  }, [importSource]);
 
   const handleDelete = useCallback((id?: string) => {
     const target = id ?? selectedMediaId;
