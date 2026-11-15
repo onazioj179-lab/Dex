@@ -312,6 +312,8 @@
 >
 >   **2026-11-14 (#260, dead code):** 797 source files the app never loads (500 in `improvements500`) removed with the 271 tests that were their only users (~100k lines); `orphan-ratchet.test.ts` holds the remaining 81 and refuses template-string imports. Electron-era e2e specs deleted; their native-free flows ported to `tests/e2e/web/app-workflows.e2e.ts`.
 >
+>   **2026-11-14 (#290, Morphing Dock + Desktop Work Area Manager):** the Dock morphs from a search button (trigger fixed, ease-out, collapse faster, reduced-motion aware), bottom/left/right, pinned + running + launcher, pointer/touch/keyboard reorder; `shared/shell/workArea.ts` is the single source for the window area (top bar, Dock strip, scale, padding, min size), so no window or tab app goes under the top bar or the Dock and every window is recovered after a display change. Verified 17/17 in the real Tauri app.
+>
 > **CHECKPOINT (2026-06-30) — Released v6.0.1: scale (FrameScheduler) + traceability (Security Center) + UKI retrieval.**
 > Pre-repack health gate PASSED: full-project `tsc --noEmit` 0; watermark in compliance; 3541 test assertions
 > green / 0 failed-test markers (new suites 18/18: frame-scheduler, rewind-recall, text-search, use-app-active).
