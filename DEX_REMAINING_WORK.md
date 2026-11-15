@@ -18,7 +18,7 @@
 | 19 | Terms of Service legal review | PARTIAL | Not a legal reviewer | `TERMS.md` | Legal review | Legal | P2 |
 | 20 | Podcasts, shared albums, live captions | MISSING | Need backends/services | New apps | Product decision first | Services | P3 |
 | 21 | Multi-monitor test | NOT TESTED | Single display | Window manager | Test on two displays | Hardware | P3 |
-| 22 | Dock/taskbar visual rework | PARTIAL | Not in scope this pass | Shell | Design pass | — | P3 |
+| 22 | Dock/taskbar visual rework | DONE, owner look pending (2026-11-14, #290) | The Morphing Dock replaces the DEX Bar by default (the DEX Bar stays as a choice in Settings) | Shell | Owner looks at it in the installed app, light and dark | Owner | P3 |
 
 ## Part 5: spatial desktop and creative suite (2026-11-01)
 
@@ -108,7 +108,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
 
 | # | Requirement | Status | Detail | Next action | Priority |
 |---|---|---|---|---|---|
-| 116 | Remaining Part 13 batches | OPEN | Not started this pass: dock/system-surface geometry, per-app control consolidation beyond the top bar, creative/engineering app passes, multi-monitor/high-DPI tests, installer re-verification and old-executable cleanup | Next sessions | P2 |
+| 116 | Remaining Part 13 batches | PARTIAL | Done 2026-11-14 (#290): dock/system-surface geometry (one work area for windows, tabs and the Dock) and the high-DPI test (real app at 225%). Left: per-app control consolidation beyond the top bar, creative/engineering app passes, multi-monitor (one display here), installer re-verification and old-executable cleanup | Next sessions | P2 |
 
 ## Recovered from PR #81 (2026-11-04, `claude/diagnostics-figures-flakiness-b81412`)
 
