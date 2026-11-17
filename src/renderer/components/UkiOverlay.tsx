@@ -2154,6 +2154,19 @@ const UkiOverlay: React.FC = () => {
               borderRadius: 6,
             }}>
               {error}
+              {/Online speech recognition|microphone/i.test(String(error)) && (
+                // One click to the exact Windows page that fixes it (the user
+                // changes the system setting; DEX never flips it for them).
+                <button
+                  type="button"
+                  className="dex-pill"
+                  style={{ display: 'flex', marginTop: 6, height: 24, fontSize: 11 }}
+                  onClick={() => {
+                    const uri = /Online speech/i.test(String(error)) ? 'ms-settings:privacy-speech' : 'ms-settings:privacy-microphone';
+                    void (window as any).dex?.invoke?.('shell:openExternal', uri);
+                  }}
+                >Open Windows settings</button>
+              )}
             </div>
           )}
 
