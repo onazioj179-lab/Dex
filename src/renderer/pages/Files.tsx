@@ -1745,7 +1745,7 @@ export const Files: React.FC = () => {
       {/* Main Content */}
       <div style={styles.main}>
         {/* Toolbar */}
-        <div style={styles.toolbar}>
+        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">
           <div style={styles.navButtons}>
             <button
               className="dex-toolbtn"
@@ -2027,12 +2027,12 @@ export const Files: React.FC = () => {
             <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
             <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
-            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
-            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
-            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
+            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
+            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
-            <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
-            <button onClick={clearSelection} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
+            <button onClick={() => handleSelectAll()} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
+            <button onClick={clearSelection} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
           </div>
         )}
 
@@ -2590,14 +2590,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   
   // Toolbar
+  // Floating toolbar (shared frosted material, inset and rounded) instead of
+  // a full-width boxed strip.
   toolbar: {
-    minHeight: '52px',
+    minHeight: '44px',
     display: 'flex',
     alignItems: 'center',
-    padding: '10px var(--space-4)',
+    padding: '4px 10px',
     gap: 'var(--space-2)',
-    borderBottom: '1px solid var(--pg-border)',
-    background: 'var(--pg-toolbar)',
+    margin: '8px 8px 4px',
+    borderRadius: 14,
   },
   navButtons: {
     display: 'flex',
