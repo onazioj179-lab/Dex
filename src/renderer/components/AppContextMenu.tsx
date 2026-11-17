@@ -13,6 +13,7 @@
 // menu dispatches `dex-app-command` and AppManager performs it.
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { supportsMultipleWindows } from '../services/appWindows';
 import DexIcon from './DexIcon';
 import { getAppEntry, CATEGORY_LABEL, type AppEntry } from '../services/appRegistry';
 import { appPinning, usePinState } from '../services/appPinning';
@@ -114,6 +115,8 @@ const MenuBody: React.FC<{
   if (running && (!current || minimized)) primary.push({ id: 'front', label: 'Bring to Front', icon: 'maximize', run: act(() => sendAppCommand(entry.id, 'front')) });
   else if (!running) primary.push({ id: 'open', label: `Open ${entry.name}`, icon: 'external-link', run: act(() => sendAppCommand(entry.id, 'open')) });
   if (entry.supportsWindow && !floating) primary.push({ id: 'window', label: running ? 'Move to Own Window' : 'Open in New Window', icon: 'layers', run: act(() => sendAppCommand(entry.id, 'open-window')) });
+  // Another window of the same app (its own document and place); see services/appWindows.ts.
+  if (supportsMultipleWindows(entry.id)) primary.push({ id: 'new-window', label: 'New Window', icon: 'plus', run: act(() => { useRunningApps.getState().openNewWindow(entry.id); }) });
   sections.push(primary);
   if (entry.actions.length) sections.push(entry.actions.map(a => ({ id: `act-${a.id}`, label: a.label, icon: a.icon, run: act(() => runAppAction(entry.id, a.id)) })));
   if (entry.pinnable) {

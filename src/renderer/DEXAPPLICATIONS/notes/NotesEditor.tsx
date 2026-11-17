@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { useRef, useCallback, useEffect, useState, memo } from 'react';
+import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import DOMPurify from 'dompurify';
 import { platform } from '../../utils';
 import {
@@ -349,6 +350,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   onWikiLinkClick,
   onDropFiles,
 }) => {
+  const winId = useAppWindowId('notes');
   const editorRef = useRef<HTMLDivElement>(null);
   const undoMgr = useRef(new UndoManager(200));
   const lastContent = useRef(content);
@@ -425,6 +427,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // a title + the live selection) so the assistant is aware of the active note.
   // Reads live DOM at call time, so a one-time registration is enough.
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('notes', () => {
       const text = (editorRef.current?.textContent || '').trim();
       if (!text) return undefined;
@@ -482,7 +485,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       unregisterUkiAppAction('notes.search');
       unregisterUkiAppAction('notes.enhance');
     };
-  }, []);
+  }, [winId]);
 
   // Initial render: set editor HTML
   useEffect(() => {

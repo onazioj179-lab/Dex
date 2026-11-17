@@ -204,6 +204,45 @@ try {
   await sleep(15000);
   report.idleWithApps = { apps: APPS.length, ...(await idleCost(run.child.pid, wvDir)) };
 
+  // What the renderer does while "idle" with those apps open: a 10 s CPU
+  // profile of the shell page, self time bucketed by function + script line,
+  // plus timer/frame counts (wrapped for the same 10 s).
+  if (args.profile !== 'false') {
+    await run.cdp.send('Profiler.enable');
+    await run.cdp.send('Profiler.setSamplingInterval', { interval: 500 });
+    await evaluate(run.cdp, `(() => {
+      const c = window.__probeCounts = { raf: {}, timeout: {}, interval: {} };
+      const where = () => { const l = (new Error().stack || '').split('\\n')[3] || ''; return l.trim().slice(0, 160); };
+      const wrap = (name, key) => { const o = window[name]; window['__orig_' + name] = o; window[name] = function (fn, ...a) { const w = where(); c[key][w] = (c[key][w] || 0) + 1; return o.call(window, fn, ...a); }; };
+      wrap('requestAnimationFrame', 'raf'); wrap('setTimeout', 'timeout'); wrap('setInterval', 'interval');
+      return true;
+    })()`);
+    await run.cdp.send('Profiler.start');
+    await sleep(10000);
+    const { result } = await run.cdp.send('Profiler.stop');
+    const prof = result.profile;
+    const dt = new Map();
+    prof.samples.forEach((id, i) => dt.set(id, (dt.get(id) || 0) + (prof.timeDeltas[i] || 0)));
+    const byFn = new Map();
+    let total = 0;
+    for (const n of prof.nodes) {
+      const us = dt.get(n.id) || 0;
+      const f = n.callFrame;
+      if (f.functionName === '(idle)' || f.functionName === '(program)') continue;
+      total += us;
+      const k = `${f.functionName || '(anon)'} ${(f.url || '').split('/').pop()}:${f.lineNumber + 1}:${f.columnNumber + 1}`;
+      byFn.set(k, (byFn.get(k) || 0) + us);
+    }
+    const counts = await evaluate(run.cdp, `(() => { const c = window.__probeCounts; const top = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      for (const n of ['requestAnimationFrame','setTimeout','setInterval']) window[n] = window['__orig_' + n];
+      return { raf: top(c.raf), timeout: top(c.timeout), interval: top(c.interval) }; })()`).catch(() => null);
+    report.idleProfile = {
+      busyMsIn10s: Math.round(total / 1000),
+      topSelfTime: [...byFn.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, us]) => [k, Math.round(us / 1000)]),
+      scheduled: counts,
+    };
+  }
+
   run.cdp.close();
   await kill(run.child);
 

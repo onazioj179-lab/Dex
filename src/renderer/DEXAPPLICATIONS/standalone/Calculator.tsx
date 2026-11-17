@@ -4,6 +4,7 @@
  * Professional calculator with scientific mode
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import {
@@ -40,6 +41,7 @@ const Key: React.FC<{
 );
 
 const Calculator: React.FC = () => {
+  const winId = useAppWindowId('calculator');
   // ===== PATTERN LEARNING =====
   useAppTracking('calculator');
   const [naturalInput, setNaturalInput] = useState('');
@@ -295,6 +297,7 @@ const Calculator: React.FC = () => {
   const ukiCtxRef = useRef({ display, expression, mode });
   ukiCtxRef.current = { display, expression, mode };
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('calculator', () => {
       const s = ukiCtxRef.current;
       return {
@@ -307,7 +310,7 @@ const Calculator: React.FC = () => {
       };
     });
     return () => unregisterUkiAppContext('calculator');
-  }, []);
+  }, [winId]);
 
   const shown = waitingForOperand || display === 'Error' ? display : formatEntry(display);
   const displaySize = shown.length > 14 ? 24 : shown.length > 10 ? 30 : 40;

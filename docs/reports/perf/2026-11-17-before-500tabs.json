@@ -1,0 +1,180 @@
+{
+  "label": "before-500tabs",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/before-exe/dex-tauri.exe",
+  "at": "2026-11-17T21:10:58.434Z",
+  "machine": {
+    "os": "Windows 10.0.26300",
+    "cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+    "logicalCores": 8,
+    "ramGB": 16
+  },
+  "method": "release exe, isolated DEX_DATA_DIR + WebView2 profile, driven over CDP; timings are wall clock from process spawn",
+  "cold": {
+    "spawnToCdpMs": 3234,
+    "spawnToDesktopUsableMs": 4394,
+    "domContentLoadedMs": 891,
+    "loadMs": 896,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 161
+  },
+  "idleShell": {
+    "cpuPctOfOneCore": 11.3,
+    "processes": 7,
+    "workingSetMB": 813,
+    "privateMB": 500
+  },
+  "appLaunchMs": {
+    "notes": 42,
+    "files": 64,
+    "settings": 45,
+    "ledger": 72,
+    "calendar": 32,
+    "tasks": 51,
+    "dexcode": 32,
+    "taskmanager": 48,
+    "games": 54,
+    "calculator": null
+  },
+  "idleWithApps": {
+    "apps": 10,
+    "cpuPctOfOneCore": 107.3,
+    "processes": 7,
+    "workingSetMB": 765,
+    "privateMB": 482
+  },
+  "idleProfile": {
+    "busyMsIn10s": 88,
+    "topSelfTime": [
+      [
+        "ge app-standalone-nexus-D-IuCkcM.js:1:1611",
+        14
+      ],
+      [
+        "fs react-vendor-BbBaDjqq.js:17:239",
+        8
+      ],
+      [
+        "Cd react-vendor-BbBaDjqq.js:40:14621",
+        7
+      ],
+      [
+        "Xa react-vendor-BbBaDjqq.js:40:12469",
+        6
+      ],
+      [
+        "(garbage collector) :0:0",
+        5
+      ],
+      [
+        "(anon) dex-app-core-DZMyWFQ8.js:86:7594",
+        5
+      ],
+      [
+        "s react-vendor-BbBaDjqq.js:38:7082",
+        4
+      ],
+      [
+        "(anon) app-standalone-nexus-D-IuCkcM.js:2:7154",
+        4
+      ],
+      [
+        "g react-vendor-BbBaDjqq.js:38:8910",
+        4
+      ],
+      [
+        "te react-vendor-BbBaDjqq.js:40:14270",
+        2
+      ],
+      [
+        "_o react-vendor-BbBaDjqq.js:38:16831",
+        2
+      ],
+      [
+        "lc react-vendor-BbBaDjqq.js:40:39476",
+        1
+      ],
+      [
+        "Hi react-vendor-BbBaDjqq.js:40:31328",
+        1
+      ],
+      [
+        "Id react-vendor-BbBaDjqq.js:40:40026",
+        1
+      ],
+      [
+        "createElement :0:0",
+        1
+      ]
+    ],
+    "scheduled": {
+      "raf": [
+        [
+          "at nC (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:579:5722)",
+          73
+        ],
+        [
+          "at g (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:232:8751)",
+          62
+        ],
+        [
+          "at t (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:352:1662)",
+          6
+        ],
+        [
+          "at http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:577:14892",
+          4
+        ],
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:577:31668)",
+          3
+        ],
+        [
+          "at vw (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:579:5954)",
+          2
+        ],
+        [
+          "at l (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:232:8855)",
+          2
+        ]
+      ],
+      "timeout": [
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-DZMyWFQ8.js:577:14873)",
+          4
+        ]
+      ],
+      "interval": []
+    }
+  },
+  "warm": {
+    "spawnToCdpMs": 1107,
+    "spawnToDesktopUsableMs": 2482,
+    "domContentLoadedMs": 1002,
+    "loadMs": 1007,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 134
+  },
+  "browser": {
+    "savedTabs": 500,
+    "tabsKeptAfterRestore": 100,
+    "openMs": 43,
+    "livePageTargets": 1,
+    "mountedWebviewHosts": 40,
+    "settleMs": 10064,
+    "cpuPctOfOneCore": 2,
+    "processes": 8,
+    "workingSetMB": 917,
+    "privateMB": 573
+  },
+  "browserAfterVisits": {
+    "visited": 20,
+    "livePageTargets": 1,
+    "mountedWebviewHosts": 40,
+    "cpuPctOfOneCore": 4.7,
+    "processes": 8,
+    "workingSetMB": 747,
+    "privateMB": 437
+  }
+}

@@ -10,6 +10,7 @@
  */
 
 import { useBackHandler } from '../services/backNavigation';
+import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
@@ -291,6 +292,7 @@ interface DownloadItem {
 // ===============================================================================
 
 export const Browser: React.FC = () => {
+  const winId = useAppWindowId('browser'); // this window ('browser' or 'browser~2', ...)
   // ===== PATTERN LEARNING =====
   useAppTracking('browser');
   const toast = useToastHelpers();
@@ -299,7 +301,15 @@ export const Browser: React.FC = () => {
   // to a single blank tab when no valid session is saved. Computed once so the
   // tabs and activeTab initializers stay in sync.
   const initialSessionRef = useRef<{ tabs: Tab[]; activeTab: string }>();
-  if (!initialSessionRef.current) initialSessionRef.current = loadSession();
+  // An extra Browser window starts with its own blank tab (tab ids are native
+  // view ids, so they must not repeat across windows) and leaves the saved
+  // session to the first window.
+  if (!initialSessionRef.current) {
+    const fresh = `${winId}_tab_${Date.now().toString(36)}`;
+    initialSessionRef.current = isExtraWindow(winId)
+      ? { tabs: [{ ...makeDefaultTabs()[0], id: fresh }], activeTab: fresh }
+      : loadSession();
+  }
   const [tabs, setTabs] = useState<Tab[]>(() => initialSessionRef.current!.tabs);
   const [activeTab, setActiveTab] = useState(() => initialSessionRef.current!.activeTab);
   const [urlInput, setUrlInput] = useState(() => {
@@ -315,6 +325,7 @@ export const Browser: React.FC = () => {
   const ukiCtxRef = useRef({ tabs, activeTab });
   useEffect(() => { ukiCtxRef.current = { tabs, activeTab }; });
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('browser', () => {
       const c = ukiCtxRef.current;
       const tab = c.tabs.find(t => t.id === c.activeTab);
@@ -373,7 +384,7 @@ export const Browser: React.FC = () => {
       unregisterUkiAppAction('browser.listTabs');
       unregisterUkiAppAction('browser.openUrl');
     };
-  }, []);
+  }, [winId]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try {
       const saved = localStorage.getItem('dex-browser-bookmarks');
@@ -788,7 +799,7 @@ export const Browser: React.FC = () => {
   // Keyboard shortcuts (Ctrl+F find, Ctrl+Shift+I devtools)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'browser')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowFindBar(true);
@@ -893,6 +904,7 @@ export const Browser: React.FC = () => {
   // (debounced). Only durable fields are stored — transient loading/background/
   // nav state is dropped and rebuilt on restore.
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // the first window owns the saved session
     if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
     sessionSaveRef.current = setTimeout(() => {
       try {

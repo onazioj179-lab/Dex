@@ -13,6 +13,7 @@
  */
 
 import { create } from 'zustand';
+import { byAppId, baseAppId, nextWindowId, supportsMultipleWindows, windowName } from '../services/appWindows';
 import { useShallow } from 'zustand/react/shallow';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
@@ -47,6 +48,8 @@ interface RunningAppsState {
   /** Bring a running app to front (restore + focus), no-op if not running */
   bringToFront: (appId: string) => void;
   isAppRunning: (appId: string) => boolean;
+  /** Open another window of an app that supports several (Notes, Files, ...). Returns its window id, or null. */
+  openNewWindow: (appId: string) => string | null;
   getRunningApp: (appId: string) => RunningApp | undefined;
 }
 
@@ -66,8 +69,10 @@ export const useRunningApps = create<RunningAppsState>()(
       launchApp: (app) => {
         // Retired apps never open again, whatever asks (a pin, a restored
         // session, an old shortcut, UKI).
-        if (RETIRED_APPS[app.id]) {
-          try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: RETIRED_APPS[app.id] } })); } catch { /* non-DOM */ }
+        // A window id of an app that has only one window opens that window.
+        if (app.id !== baseAppId(app.id) && !supportsMultipleWindows(app.id)) app = { ...app, id: baseAppId(app.id) };
+        if (RETIRED_APPS[baseAppId(app.id)]) {
+          try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: RETIRED_APPS[baseAppId(app.id)] } })); } catch { /* non-DOM */ }
           return;
         }
         const { runningApps, currentAppId } = get();
@@ -199,6 +204,15 @@ export const useRunningApps = create<RunningAppsState>()(
         }));
       },
   
+      openNewWindow: (appId) => {
+        const base = baseAppId(appId);
+        const def = APP_DEFINITIONS_RAW[base];
+        if (!def || !supportsMultipleWindows(base)) return null;
+        const id = nextWindowId(base, get().runningApps.map(a => a.id));
+        get().launchApp({ id, name: windowName(def.name, id), icon: def.icon, color: def.color });
+        return id;
+      },
+
       isAppRunning: (appId) => {
         return get().runningApps.some(a => a.id === appId);
       },
@@ -337,7 +351,7 @@ export const RETIRED_APPS: Record<string, string> = {
   rewind: 'Rewind was retired: it could not record activity in this version of DEX. Your old Rewind data was left in place.',
 };
 
-export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon: string; shortcut?: string; version?: string; buildDate?: string; description?: string; category?: 'creative' | 'system' | 'productivity' | 'utility' | 'media' }> = {
+const APP_DEFINITIONS_RAW: Record<string, { name: string; color: string; icon: string; shortcut?: string; version?: string; buildDate?: string; description?: string; category?: 'creative' | 'system' | 'productivity' | 'utility' | 'media' }> = {
   // Core System Apps
   home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: `${_M}+1`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'The desktop: clock, search, recent items and open apps' },
   files: { name: 'Files', color: '#339AF0', icon: 'files', shortcut: `${_M}+3`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Browse, open, tag and manage the files on this computer' },
@@ -427,3 +441,6 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   terminal: { name: 'Terminal', color: '#8E8E93', icon: 'terminal', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Shell sessions on a real pseudoterminal: tabs, split panes, search, copy/paste' },
   security: { name: 'Security Center', color: '#FF9F0A', icon: 'lock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'UKI action audit trail — full traceability of everything the assistant does' },
 };
+
+/** App definitions; a window id ('notes~2') answers with its app's entry, named "Notes 2". */
+export const APP_DEFINITIONS = byAppId(APP_DEFINITIONS_RAW, (d, id) => ({ ...d, name: windowName(d.name, id), shortcut: undefined }));

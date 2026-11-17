@@ -7,6 +7,7 @@
 // DexCode — code editor for DexScript (DEX's scripting language).
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
@@ -129,6 +130,7 @@ const QuickOpenRow = memo(function QuickOpenRow({
 });
 
 const DexCode: React.FC = () => {
+  const winId = useAppWindowId('dexcode'); // this window ('dexcode' or 'dexcode~2', ...)
   const [code, setCode] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_CODE; } catch { return DEFAULT_CODE; }
   });
@@ -324,6 +326,7 @@ const DexCode: React.FC = () => {
   const ukiCtxRef = useRef({ fileName, currentFilePath, code, isModified, cursorPos });
   ukiCtxRef.current = { fileName, currentFilePath, code, isModified, cursorPos };
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('dexcode', () => {
       const s = ukiCtxRef.current;
       const ext = (s.fileName.split('.').pop() || '').toLowerCase();
@@ -391,7 +394,7 @@ const DexCode: React.FC = () => {
       unregisterUkiAppAction('dexcode.newFile');
       unregisterUkiAppAction('dexcode.search');
     };
-  }, []);
+  }, [winId]);
 
   // File system handlers. Failures are shown, never swallowed: a save that
   // didn't reach the disk must not look like it did.
@@ -633,7 +636,7 @@ const DexCode: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'dexcode')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         runCode();

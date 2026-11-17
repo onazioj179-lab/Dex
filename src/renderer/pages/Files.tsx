@@ -11,6 +11,7 @@
  */
 
 import { toMediaUrl } from '../utils/mediaUrl';
+import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
@@ -351,6 +352,7 @@ async function fileOp(channel: string, ...args: unknown[]): Promise<unknown> {
 }
 
 export const Files: React.FC = () => {
+  const winId = useAppWindowId('files'); // this window ('files' or 'files~2', ...)
   const { confirm, ConfirmHost } = useConfirm();
   // ===== PATTERN LEARNING =====
   useAppTracking('files');
@@ -516,6 +518,7 @@ export const Files: React.FC = () => {
   const ukiCtxRef = useRef({ currentPath, selectedFile, selectedFiles, files, selectedLocation, activeCollection });
   useEffect(() => { ukiCtxRef.current = { currentPath, selectedFile, selectedFiles, files, selectedLocation, activeCollection }; });
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('files', () => {
       const c = ukiCtxRef.current;
       const sel = c.selectedFile ? c.files.find(f => f.path === c.selectedFile) : undefined;
@@ -549,7 +552,7 @@ export const Files: React.FC = () => {
       unregisterUkiAppContext('files');
       unregisterUkiAppAction('files.listCurrentFolder');
     };
-  }, []);
+  }, [winId]);
 
   const saveSmartFolder = useCallback(() => {
     if (!filters.query && filters.category === 'all' && filters.dateRange === 'all' && filters.sizeRange === 'all') return;
@@ -755,7 +758,7 @@ export const Files: React.FC = () => {
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       const target = e.target as HTMLElement | null;
       // Don't hijack typing in inputs (rename, search, etc.)
       const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -911,7 +914,7 @@ export const Files: React.FC = () => {
   // Keyboard shortcuts for file operations
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard && !isTypingTarget(e.target)) {
         e.preventDefault();
         handlePasteFile();
@@ -1308,7 +1311,7 @@ export const Files: React.FC = () => {
   // hijacked, and gated on there being a selection (or a staged batch).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       const t = e.target as HTMLElement | null;
       const inEditable = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
       if (inEditable) return;
