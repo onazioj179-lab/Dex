@@ -377,7 +377,7 @@ import vinxIconPng from '../../../appicons/vinx.png';
 import imosionIconPng from '../../../appicons/imosion.png';
 import forgeIconPng from '../../../appicons/forge.png';
 import nexusIconPng from '../../../appicons/nexus.png';
-import { useDexSetting } from '../hooks/useDexSetting';
+import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { notificationsAllowed } from '../utils/notificationsAllowed';
 
@@ -1126,6 +1126,8 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
+    // Trophies › "Track progress" off: no usage stats are recorded at all.
+    if (!readDexSetting('achievementsEnabled', true)) return;
     try {
       const { state, newUnlocks } = checkAchievements(mutate(loadEngagement()));
       saveEngagement(state);

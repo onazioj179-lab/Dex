@@ -27,6 +27,7 @@ import {
   loadChallenges, getChallengeLevel, type DailyChallengeState,
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
+import { useDexSetting, writeDexSetting } from '../../hooks/useDexSetting';
 
 // DEX Blue Modern tokens, so Trophies follows light/dark and the window
 // material like every other app (it used to be hard-coded near-black + gold).
@@ -54,6 +55,9 @@ function relTime(ts: number): string {
 const Achievements: React.FC = () => {
   const [engagement, setEngagement] = useState<EngagementState>(() => loadEngagement());
   const [challenges, setChallenges] = useState<DailyChallengeState>(() => loadChallenges());
+  // Owner controls: tracking and unlock notifications are both optional.
+  const tracking = useDexSetting('achievementsEnabled', true);
+  const notifyOn = useDexSetting('achievementNotifications', true);
 
   // Live-update: the achievement engine fires these when an unlock or challenge
   // lands (from any app), so an open Trophies dashboard reflects it instantly.
@@ -193,6 +197,15 @@ const Achievements: React.FC = () => {
                 {engagement.stats.currentStreak}d streak
               </div>
             )}
+            {([
+              ['Track progress', tracking, 'achievementsEnabled', 'When off, DEX records no usage for trophies and nothing new unlocks. Earned trophies stay.'],
+              ['Notify me', notifyOn, 'achievementNotifications', 'Unlocks go to the Notification Center. Off keeps them quiet.'],
+            ] as const).map(([label, on, key, tip]) => (
+              <label key={key} title={tip} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: TXT_DIM, cursor: 'pointer' }}>
+                <input type="checkbox" checked={on} onChange={(e) => writeDexSetting(key, e.target.checked)} aria-label={label} />
+                {label}
+              </label>
+            ))}
             <button onClick={shareProgress} title="Copy progress summary" style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,

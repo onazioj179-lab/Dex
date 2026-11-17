@@ -27,6 +27,7 @@
 import type { Achievement } from './achievementsCatalog';
 import type { UserStats } from './achievementsCatalog';
 import { notifySuccess } from './notify';
+import { readDexSetting } from '../hooks/useDexSetting';
 import {
   loadChallenges, saveChallenges, recordChallengeProgress,
 } from './dailyChallenges';
@@ -67,6 +68,8 @@ function flushUnlocks(): void {
   // achievement banners popping over their work; they remain in the center +
   // Trophies app for anyone who wants to look.
   const viewAction = { label: 'View', onClick: openTrophies };
+  // Trophies › "Unlock notifications" off: unlocks are kept, just not announced.
+  if (!readDexSetting('achievementNotifications', true)) { emitUnlocked(unlocks.map(u => u.id)); return; }
   if (unlocks.length === 1) {
     const a = unlocks[0];
     notifySuccess(`Achievement unlocked: ${a.title}`, a.description, {
@@ -131,6 +134,7 @@ export function recordChallengeAction(
     const { state, newCompletions } = recordChallengeProgress(loadChallenges(), type, target, amount);
     saveChallenges(state);
     for (const ch of newCompletions) {
+      if (!readDexSetting('achievementNotifications', true)) break;
       notifySuccess('Challenge complete', `${ch.title} — +${ch.xpReward} XP`, {
         source: 'Challenges',
         action: { target: TROPHIES_DEEPLINK, label: 'View' },
