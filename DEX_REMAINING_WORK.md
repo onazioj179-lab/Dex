@@ -179,15 +179,15 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 79 | Maps "My location" failed silently | Packaged-app run |
 | 86 | FLUX undo/redo ran side effects inside state updaters | Packaged-app run |
 | 91 | Spatial canvas grew into a horizontal strip | Packaged-app run |
-| 99 | Nexus, Spotlight, context menus, dropdowns, notifications | Packaged-app run |
-| 113 | Telemetry / Task Manager redesign | Packaged-app run |
+| 99 | Nexus, Spotlight, context menus, dropdowns, notifications | Packaged-app run (2026-11-17 smoke: all 61 apps opened in the release exe on an isolated profile with no crash screen; menus/notifications still to click through) |
+| 113 | Telemetry / Task Manager redesign | VERIFIED 2026-11-17 (release exe: `system:getStatus` returned real cpu/memory/disk/network/uptime, CPU 27.7%) |
 | 115 | Live preview verification of 111-114 | Packaged-app run |
-| 128 | Terminal is a real terminal (§7) | Packaged-app run |
+| 128 | Terminal is a real terminal (§7) | VERIFIED 2026-11-17 (release exe, isolated profile: Terminal app started Windows PowerShell; typed `echo DEX_PTY_OK_42`, the shell printed it back) |
 | 133 | Windows PowerShell 5.1 `Read-Host` can receive keys out of order | Packaged-app run |
 | 142 | Dock / App Menu: reorder and running dots (pin/unpin verified 2026-11-13) | Packaged-app run |
 | 145 | Forge Watermark / Crop & Pad / Subtitle burn-in did nothing | Packaged-app run |
 | 150 | Bio: GenBank import/export with features; primer pair check | Packaged-app run |
-| 154 | Terminal: Live shells in the packaged app (extends #139/#146) | Packaged-app run |
+| 154 | Terminal: Live shells in the packaged app (extends #139/#146) | VERIFIED 2026-11-17 (same run as #128: live PowerShell session in the packaged app) |
 | 155 | Bio: GenBank + primers in the packaged app (extends #150) | Packaged-app run |
 | 158 | VINX: Real 3D LUT math (ROADMAP "Vinx 3D-LUT"); the built-in looks were … | Packaged-app run |
 | 165 | Browser: block ads and trackers in WebView2 itself, before requests leave … | Packaged-app run |
@@ -213,7 +213,7 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | 212 | Release builds didn't run the ABI check (B001) | Next release tag run |
 | 214 | EXIF read and "Save a copy without metadata" got `file://` URLs | Packaged-app run |
 | 215 | Back ignored the app's own history; mouse side buttons did nothing (B013 predict… | Packaged-app run (mouse side button) |
-| 216 | Local photos, music, video, PDFs and disk wallpapers never loaded in the desktop… | Packaged-app run |
+| 216 | Local photos, music, video, PDFs and disk wallpapers never loaded in the desktop… | VERIFIED 2026-11-17 (release exe: a local PNG served through dexmedia, 200 image/png 386 KB, decoded in an <img>; SVG is refused on purpose) |
 | 217 | "Split down" on a side-by-side tab added a third column | Owner decision (tree splits) |
 | 219 | Send Files to a nearby DEX did nothing (fake control) | Two PCs on one network |
 | 220 | Failures reported as success (#61 sweep) | Packaged-app run |
