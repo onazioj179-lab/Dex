@@ -9,6 +9,14 @@
 
 ---
 
+
+## Desktop fit follow-ups (2026-11-17, `claude/dock-overlay-followup`)
+
+- Dock = overlay: `getShellWorkspace` passes reserve 0; `dockReserve()` still sizes the Dock's own band. Open Dock centred on the anchor (`placeDockAroundTrigger(..., openLen / 2, ...)`).
+- `SpotlightEngine` re-indexes when actions register (apps were missing for the first 60 s). App Menu search appends score-filtered Spotlight results (settings/files/notes/commands).
+- VINX proxies: `video:transcode` `scale` (`proxy_scale_filter`, cargo-tested), `vinx/mediaProxy.ts`, `exportingOriginals` store flag.
+- Packaged test recipe used: `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` scratch dirs, CDP port 9371, scripts drive `window.__dexRunningApps` / `__dexDockStore`.
+
 ## Apps UI/UX + Liquid Glass pass (2026-11-14)
 
 - Work area: `getShellWorkspace` subtracts the docked DEX Bar (`floatingLauncherStore.reserveBottom`, published by the bar); maximized = work area inset by the snap gutter (default now 8). Tabs use `--dex-win-inset` / `--dex-reserved-bottom`. The bar no longer auto-hides over tabs (only in focus mode).

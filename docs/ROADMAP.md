@@ -38,6 +38,10 @@
 >   any edge; refraction + specular glass on dock/orb/notifications; green/warning pills and Notes stripes removed; Ctrl+A
 >   no longer selects the shell; the global orange [role=alert] stripe is gone; Trophies points tiers fixed; Terminal chrome
 >   sharpened. Not yet run in the packaged app.
+> - **Desktop fit follow-ups (2026-11-17, #300–#304, PR #151):** the Dock is an overlay (windows get no strip; maximized
+>   and tabs fill from the top bar to the bottom edge), centred on its edge open and collapsed; Dock search also finds
+>   Settings, files, notes and commands without an AI provider; VINX makes real editing proxies; Trophies repair.
+>   Packaged smoke at 225%: no strip, top bar clear, pins survive restart, 8 resize handles, Escape closes search.
 > - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
 >   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
 >   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),
