@@ -5,17 +5,19 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// FloatingLauncher -- "The DEX Bar". A single, clean, ROUNDED, draggable menu
-// the user can place ANYWHERE in DEX. It lives at the shell level and is
-// accessible on every screen. It is the only persistent surface of its kind:
-// there is no fixed dock, so it never shifts as apps open/close.
+// The DEX Dock -- a compact floating overlay that morphs between two states:
 //
-// Default (collapsed): a rounded capsule menu with a crisp, clear border --
-//   grip | apps | pinned dock apps | search | UKI | expand. No widgets.
+//   COLLAPSED  a 36 px search icon. Always visible, always usable.
+//   EXPANDED   the strip: App Menu, pinned + running apps, DEX Search, UKI.
 //
-// Widgets are OPT-IN. The user clicks the expand toggle to reveal a widget
-//   drawer (Now Playing + Calendar, both wired to real data). The choice
-//   persists, so widgets only ever appear once the user turns them on.
+// Activating the icon expands the strip around the same centre and puts the
+// caret in DEX Search. After an idle period it folds back (Settings > Dock),
+// never while the pointer is over it, focus is inside it, a query is typed or
+// it is being dragged. Escape folds it too.
+//
+// It is an overlay: it never reserves space or resizes windows. Position is an
+// anchor (centre x, top y) the user can drag anywhere below the top bar;
+// placement is clamped to the viewport whatever the strip's width.
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
@@ -23,38 +25,18 @@ import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
-import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
+import { DOCK_ROW, defaultDockAnchor, magnetDockAnchor, placeDock } from './floatingLauncherGeometry';
+import { isReduceMotion } from '../utils/MotionController';
 
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
 import { DockPins } from './DockPins';
 
-const MOVE_THRESHOLD = 6; // px before a press becomes a drag
-const BAR_H = 44;         // collapsed capsule height
-const PILL_R = BAR_H / 2; // full-capsule radius when collapsed
-const PANEL_R = 14;       // widget-drawer radius — matches --radius-xl / .dex-liquid-glass so it reads as menu-family
+const MOVE_THRESHOLD = 6;  // px before a press becomes a drag
+export const DOCK_IDLE_MS = 6000; // auto-collapse after this long untouched
+const SEARCH_W = 168;      // compact search field
+const MORPH_MS = 220;
 const EXPAND_KEY = 'dex-nook-expanded';
-const SEARCH_W_KEY = 'dex-nook-search-w';
-const SEARCH_W_DEFAULT = 240;
-const DOCKED_KEY = 'dex-bar-docked';
-const ORB = 44;           // folded search orb diameter
-const MAGNET = 24;        // px within which a released bar snaps to an edge / centre
-
-/**
- * Edge magnet for a released bar or orb: within MAGNET px of an edge (or the
- * horizontal centre) it settles exactly there, so the user can pin it flush to
- * any edge or corner without pixel-hunting. Pure: takes the clamped position.
- */
-export function magnetBar(px: number, py: number, vw: number, vh: number, w: number, h: number): { x: number; y: number } {
-  let x = px, y = py;
-  const right = vw - w - EDGE_PAD, bottom = vh - h - EDGE_PAD, centre = Math.round((vw - w) / 2);
-  if (Math.abs(x - EDGE_PAD) < MAGNET) x = EDGE_PAD;
-  else if (Math.abs(x - right) < MAGNET) x = right;
-  else if (Math.abs(x - centre) < MAGNET) x = centre;
-  if (Math.abs(y - EDGE_PAD) < MAGNET) y = EDGE_PAD;
-  else if (Math.abs(y - bottom) < MAGNET) y = bottom;
-  return { x: Math.max(EDGE_PAD, Math.round(x)), y: Math.max(EDGE_PAD, Math.round(y)) };
-}
 
 // --- calendar (reads the same store the Calendar app + Home widget write) ----
 interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string }
@@ -85,78 +67,184 @@ function readTodayEvents(): CalEvent[] {
 
 function currentWeek(): { letter: string; day: number; isToday: boolean }[] {
   const now = new Date();
-  // Monday-first week, matching the Calendar app grid.
   const monday = new Date(now);
   monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const todayN = now.getDate();
-  const todayM = now.getMonth();
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return { letter: letters[i], day: d.getDate(), isToday: d.getDate() === todayN && d.getMonth() === todayM };
+    return { letter: letters[i], day: d.getDate(), isToday: d.getDate() === now.getDate() && d.getMonth() === now.getMonth() };
   });
+}
+
+/** Bottom edge of the fixed top bar, measured live (falls back to 34). */
+function topBarHeight(): number {
+  if (typeof document === 'undefined') return 34;
+  const el = document.querySelector<HTMLElement>('[data-dex-chrome="topbar"]');
+  return el ? el.getBoundingClientRect().bottom : 34;
 }
 
 export interface FloatingLauncherProps {
-  /** Opens the launcher surface (app grid + search). */
+  /** Opens the App Menu (app grid + search). */
   onOpen: () => void;
-  /** Opens the universal Search overlay. */
+  /** Kept for callers; DEX Search lives in the Dock itself now. */
   onSearch?: () => void;
 }
 
-export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSearch }) => {
-  const { x, y, enabled, setPosition, setEnabled } = useFloatingLauncher();
-  const folded = useFloatingLauncher(s => s.folded);
-  const setFolded = useFloatingLauncher(s => s.setFolded);
-  const setReserveBottom = useFloatingLauncher(s => s.setReserveBottom);
+const GlyphSearch = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.2" y2="16.2" />
+  </svg>
+);
 
-  // Widgets are opt-in: OFF by default. Persisted so they only ever show once
-  // the user has turned them on.
-  const [expanded, setExpanded] = useState<boolean>(() => {
-    try { return localStorage.getItem(EXPAND_KEY) === '1'; } catch { return false; }
-  });
-  const toggleExpanded = useCallback(() => {
-    setExpanded(v => {
-      const next = !v;
-      try { localStorage.setItem(EXPAND_KEY, next ? '1' : '0'); } catch { /* quota */ }
-      return next;
-    });
+export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen }) => {
+  const cxStore = useFloatingLauncher(s => s.cx);
+  const yStore = useFloatingLauncher(s => s.y);
+  const enabled = useFloatingLauncher(s => s.enabled);
+  const expanded = useFloatingLauncher(s => s.expanded);
+  const autoCollapse = useFloatingLauncher(s => s.autoCollapse);
+  const setAnchor = useFloatingLauncher(s => s.setAnchor);
+  const setEnabled = useFloatingLauncher(s => s.setEnabled);
+  const setExpanded = useFloatingLauncher(s => s.setExpanded);
+
+  // Viewport, tracked so placement re-clamps on resize / display change.
+  const [vp, setVp] = useState(() => ({ w: typeof window !== 'undefined' ? window.innerWidth : 1280, h: typeof window !== 'undefined' ? window.innerHeight : 800 }));
+  useEffect(() => {
+    const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
   }, []);
 
-  // Search field width -- user-resizable with the mouse (drag the grip), persisted,
-  // defaults to a compact size. The dock search IS the search now (no separate
-  // overlay); it stretches to whatever width the user drags.
-  const [searchWidth, setSearchWidth] = useState<number>(() => {
-    try { const v = parseInt(localStorage.getItem(SEARCH_W_KEY) || '', 10); return Number.isFinite(v) && v >= 160 && v <= 520 ? v : SEARCH_W_DEFAULT; } catch { return SEARCH_W_DEFAULT; }
-  });
-  const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
-  const beginResize = useCallback((e: React.PointerEvent) => {
-    e.stopPropagation(); e.preventDefault();
-    resizeRef.current = { startX: e.clientX, startW: searchWidth };
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* unsupported */ }
-  }, [searchWidth]);
-  const onResizeMove = useCallback((e: React.PointerEvent) => {
-    const r = resizeRef.current; if (!r) return;
-    setSearchWidth(Math.max(160, Math.min(520, r.startW + (e.clientX - r.startX))));
-  }, []);
-  const onResizeUp = useCallback((e: React.PointerEvent) => {
-    if (!resizeRef.current) return;
-    resizeRef.current = null;
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* released */ }
-    setSearchWidth(w => { try { localStorage.setItem(SEARCH_W_KEY, String(w)); } catch { /* quota */ } return w; });
-  }, []);
+  // Anchor: saved, else bottom-centre.
+  const anchor = useMemo(() => {
+    if (cxStore < 0 || yStore < 0) return defaultDockAnchor(vp.w, vp.h);
+    return { cx: cxStore, y: yStore };
+  }, [cxStore, yStore, vp.w, vp.h]);
+  const [drag, setDrag] = useState<{ cx: number; y: number } | null>(null);
+  const live = drag ?? anchor;
 
-  // Now-playing (real audio engine bridge).
+  // Widgets drawer: opt-in, persisted.
+  const [widgets, setWidgets] = useState<boolean>(() => { try { return localStorage.getItem(EXPAND_KEY) === '1'; } catch { return false; } });
+  const toggleWidgets = useCallback(() => setWidgets(v => { const n = !v; try { localStorage.setItem(EXPAND_KEY, n ? '1' : '0'); } catch { /* quota */ } return n; }), []);
+
+  // --- strip width (measured) ------------------------------------------------
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [stripW, setStripW] = useState(420);
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const measure = () => setStripW(Math.ceil(el.scrollWidth));
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  const width = expanded ? stripW : DOCK_ROW;
+  const topBar = topBarHeight();
+  const place = placeDock(live.cx, live.y, width, vp.w, vp.h, topBar);
+
+  // Morph: clip while the width animates, so the strip reveals from the icon.
+  const reduce = isReduceMotion();
+  const [morphing, setMorphing] = useState(false);
+  const firstRef = useRef(true);
+  useEffect(() => {
+    if (firstRef.current) { firstRef.current = false; return; }
+    if (reduce) return;
+    setMorphing(true);
+    const t = window.setTimeout(() => setMorphing(false), MORPH_MS + 40);
+    return () => window.clearTimeout(t);
+  }, [expanded, reduce]);
+
+  // --- interaction state for auto-collapse ----------------------------------
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const [activity, setActivity] = useState(0);
+  const bump = useCallback(() => setActivity(n => n + 1), []);
+
+  useEffect(() => {
+    if (!expanded || !autoCollapse || hovered || focusWithin || drag || widgets) return;
+    const t = window.setTimeout(() => {
+      const q = rootRef.current?.querySelector('input')?.value ?? '';
+      if (q.trim()) { bump(); return; } // a typed query keeps it open
+      setExpanded(false);
+    }, DOCK_IDLE_MS);
+    return () => window.clearTimeout(t);
+  }, [expanded, autoCollapse, hovered, focusWithin, drag, widgets, activity, setExpanded, bump]);
+
+  const focusSearch = useCallback(() => {
+    window.setTimeout(() => {
+      const input = rootRef.current?.querySelector('input');
+      if (input instanceof HTMLInputElement) input.focus();
+    }, reduce ? 0 : 120);
+  }, [reduce]);
+
+  // Any surface can open DEX Search in the Dock (dispatch `dex-dock-search`).
+  useEffect(() => {
+    const onOpenSearch = () => { setExpanded(true); focusSearch(); };
+    window.addEventListener('dex-dock-search', onOpenSearch);
+    return () => window.removeEventListener('dex-dock-search', onOpenSearch);
+  }, [setExpanded, focusSearch]);
+
+  // --- drag (whole row; buttons and the field stop propagation) -------------
+  const dragRef = useRef<{ sx: number; sy: number; ocx: number; oy: number; moved: boolean } | null>(null);
+  const justDraggedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const pendingRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  const onDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ocx: live.cx, oy: live.y, moved: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+  }, [live.cx, live.y]);
+  const onMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved && Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
+    d.moved = true;
+    pendingRef.current = { x: d.ocx + dx, y: d.oy + dy };
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (pendingRef.current) setDrag({ cx: pendingRef.current.x, y: pendingRef.current.y });
+      });
+    }
+  }, []);
+  const onUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* released */ }
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (!d || !d.moved) { setDrag(null); return; }
+    justDraggedRef.current = true;
+    const p = pendingRef.current ?? { x: d.ocx, y: d.oy };
+    pendingRef.current = null;
+    // Save the PLACED anchor (a drag past an edge never stores an off-screen
+    // centre), then magnet to bottom / top / centre.
+    const w = expanded ? stripW : DOCK_ROW;
+    const tb = topBarHeight();
+    const placed = placeDock(p.x, p.y, w, window.innerWidth, window.innerHeight, tb);
+    const m = magnetDockAnchor(placed.left + w / 2, placed.top, window.innerWidth, window.innerHeight, tb);
+    setDrag(null);
+    setAnchor(m.cx, m.y);
+  }, [expanded, stripW, setAnchor]);
+
+  const activateIcon = useCallback(() => {
+    if (justDraggedRef.current) { justDraggedRef.current = false; return; }
+    setExpanded(true);
+    focusSearch();
+  }, [setExpanded, focusSearch]);
+
+  // --- data for the widget drawer -------------------------------------------
   const track = useNowPlaying(s => s.track);
   const isPlaying = useNowPlaying(s => s.isPlaying);
   const toggle = useNowPlaying(s => s.toggle);
   const next = useNowPlaying(s => s.next);
   const prev = useNowPlaying(s => s.prev);
 
-  // UKI presence: the mic button mirrors her live state so the bar is the one
-  // glanceable "is she awake?" signal across the whole shell. Awake+working ->
-  // accent glyph with a slow breathing glow; asleep (dormant) -> dimmed.
   const ukiState = useUkiStore(s => s.state);
   const ukiActive = ukiState === 'listening' || ukiState === 'processing' || ukiState === 'thinking' || ukiState === 'speaking';
   const ukiAsleep = ukiState === 'dormant';
@@ -166,10 +254,6 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     try { const def = APP_DEFINITIONS[id]; if (def) launchApp({ id, name: def.name, icon: def.icon, color: def.color }); } catch { /* not registered */ }
   }, [launchApp]);
 
-  // Suggested apps (quiet learning surface): learned ranking first (frequency,
-  // recency, time-of-day, app->app pairing from the silent learning store), then
-  // remaining slots filled from raw recency (sessionHistory) for cold start.
-  // Always excludes `home` and the current app; degrades to empty silently.
   const sessionHistory = useRunningApps(s => s.sessionHistory);
   const currentAppId = useRunningApps(s => s.currentAppId);
   const learningEnabled = useLearningStore(s => s.enabled);
@@ -181,578 +265,282 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     const push = (id: string) => {
       if (id === 'home' || id === currentAppId || seen.has(id)) return;
       const def = APP_DEFINITIONS[id];
-      if (!def) return; // unregistered / stale id — skip quietly
+      if (!def) return;
       seen.add(id);
       out.push({ id, name: def.name, icon: def.icon, color: def.color });
     };
-    void learningPatterns; // read so this recomputes as the model updates
-    if (learningEnabled) {
-      for (const id of getAppSuggestions(currentAppId, 5)) {
-        push(id);
-        if (out.length >= 5) break;
-      }
-    }
-    for (const id of sessionHistory) {
-      if (out.length >= 5) break;
-      push(id);
-    }
+    void learningPatterns;
+    if (learningEnabled) for (const id of getAppSuggestions(currentAppId, 5)) { push(id); if (out.length >= 5) break; }
+    for (const id of sessionHistory) { if (out.length >= 5) break; push(id); }
     return out;
   }, [sessionHistory, currentAppId, learningEnabled, learningPatterns, getAppSuggestions]);
-  const openRecent = useCallback((id: string) => {
-    // Launch directly via the same reliable path the music/calendar buttons use.
-    // The old code dispatched dex-open-app with { id }, but every handler keys
-    // off { appId } -- so the recent buttons silently did nothing. openApp works.
-    openApp(id);
-  }, [openApp]);
 
   const [today, setToday] = useState<CalEvent[]>([]);
   const week = useMemo(currentWeek, []);
   const monthLabel = useMemo(() => new Date().toLocaleDateString(undefined, { month: 'long' }), []);
+  useEffect(() => {
+    if (!widgets || !expanded) return;
+    setToday(readTodayEvents());
+    const onStorage = (e: StorageEvent) => { if (e.key === 'dex-calendar-events') setToday(readTodayEvents()); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [widgets, expanded]);
 
-  // --- drag state -----------------------------------------------------------
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sizeRef = useRef({ w: 240, h: BAR_H });
-  const lastBarWRef = useRef(560);
-  // Default placement: a padded BOTTOM-centre dock, clearly separate from the
-  // top window chrome. Unset store (x < 0) resolves this; clampNow corrects it
-  // to the measured size right after mount.
-  const [pos, setPos] = useState(() => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-    if (x < 0 || y < 0) return { x: Math.max(EDGE_PAD, Math.round((vw - 240) / 2)), y: Math.max(EDGE_PAD, vh - BAR_H - EDGE_PAD) };
-    // A bar the user left docked reopens docked, whatever the window height
-    // was when it was placed (the saved y alone is from the old size).
-    let dockedPref = false;
-    try { dockedPref = localStorage.getItem(DOCKED_KEY) === '1'; } catch { /* storage blocked */ }
-    if (dockedPref) return { x, y: Math.max(EDGE_PAD, vh - BAR_H - EDGE_PAD) };
-    return { x, y };
-  });
-  const [dragging, setDragging] = useState(false);
-  // Set when a press turned into a drag, so the orb's click (which still fires
-  // on release) doesn't also unfold it.
-  const justDraggedRef = useRef(false);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const pendingRef = useRef<{ clientX: number; clientY: number } | null>(null);
-
-  // Measure the rendered bar and pull it on-screen. Runs on mount, expand
-  // change, and resize -- not every render -- so there's no reflow loop.
-  // Last viewport the bar was laid out in, so a resize can tell whether it was
-  // docked against the bottom edge before the window changed size.
-  const lastVhRef = useRef<number>(typeof window !== 'undefined' ? window.innerHeight : 800);
-  const clampNow = useCallback(() => {
-    const el = containerRef.current;
-    if (el) sizeRef.current = { w: el.offsetWidth, h: el.offsetHeight };
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-    if (vw < 80 || vh < 80) return;
-    const prevVh = lastVhRef.current;
-    lastVhRef.current = vh;
-    setPos(p => {
-      // Docked at the bottom stays docked when the window grows (maximize,
-      // display change); left at its old y it floated mid-screen over apps.
-      const wasDocked = prevVh - (p.y + sizeRef.current.h) <= 64;
-      const y = wasDocked && prevVh !== vh ? vh - sizeRef.current.h - EDGE_PAD : p.y;
-      return clampBarToBounds(p.x, y, vw, vh, sizeRef.current.w, sizeRef.current.h);
-    });
-  }, []);
-
-  useLayoutEffect(() => { clampNow(); }, [expanded, folded, clampNow]);
-
-  // Docked = against the bottom edge (like the macOS Dock). A bar left floating
-  // higher up stays put. Nothing reserves space: the bar floats over apps.
-  const vhNow = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const docked = enabled && vhNow - (pos.y + sizeRef.current.h) <= 64;
-
-  // Over a full-surface app the docked bar auto-hides so the app fills the
-  // viewport; the pointer at the bottom edge (or keyboard focus) reveals it.
-  const [fullscreenFront, setFullscreenFront] = useState(
-    () => (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront === true,
-  );
+  // Focus mode hides the Dock (pointer at the bottom edge reveals it).
+  const [fullscreenFront, setFullscreenFront] = useState(() => (window as { __dexFullscreenFront?: boolean }).__dexFullscreenFront === true);
   useEffect(() => {
     const on = (e: Event) => setFullscreenFront((e as CustomEvent<boolean>).detail === true);
     window.addEventListener('dex-fullscreen-front', on);
     return () => window.removeEventListener('dex-fullscreen-front', on);
   }, []);
-  const autoHide = docked && fullscreenFront;
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
-    if (!autoHide) { setRevealed(false); return; }
-    let hideTimer: number | null = null;
-    const clearHide = () => { if (hideTimer != null) { window.clearTimeout(hideTimer); hideTimer = null; } };
+    if (!fullscreenFront) { setRevealed(false); return; }
     const onPointer = (e: PointerEvent) => {
-      const vh = window.innerHeight;
-      if (e.clientY >= vh - 6) { clearHide(); setRevealed(true); return; }
-      const el = containerRef.current;
-      const r = el?.getBoundingClientRect();
-      const near = !!r && e.clientY >= r.top - 32;
-      const focused = !!el && el.contains(document.activeElement);
-      if (near || focused || dragRef.current) { clearHide(); return; }
-      if (hideTimer == null) hideTimer = window.setTimeout(() => { hideTimer = null; setRevealed(false); }, 280);
+      if (e.clientY >= window.innerHeight - 6) setRevealed(true);
+      else if (!rootRef.current?.matches(':hover')) setRevealed(false);
     };
     window.addEventListener('pointermove', onPointer, { passive: true });
-    window.addEventListener('pointerdown', onPointer, { passive: true });
-    return () => { clearHide(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onPointer); };
-  }, [autoHide]);
-  const hidden = autoHide && !revealed && !dragging;
-
-  useEffect(() => {
-    window.addEventListener('resize', clampNow);
-    return () => window.removeEventListener('resize', clampNow);
-  }, [clampNow]);
-  useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
-
-  // Today's events -- only polled while the widget drawer is open.
-  useEffect(() => {
-    if (!expanded) return;
-    setToday(readTodayEvents());
-    const onStorage = (e: StorageEvent) => { if (e.key === 'dex-calendar-events') setToday(readTodayEvents()); };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [expanded]);
-
-  const beginDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* unsupported */ }
-  }, [pos.x, pos.y]);
-
-  const onDragMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
-    if (!d.moved && Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
-    if (!d.moved) { d.moved = true; setDragging(true); }
-    pendingRef.current = { clientX: e.clientX, clientY: e.clientY };
-    if (rafRef.current == null) {
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
-        const p = pendingRef.current, dd = dragRef.current;
-        if (!p || !dd) return;
-        const { w, h } = sizeRef.current;
-        setPos(clampBarToBounds(dd.origX + (p.clientX - dd.startX), dd.origY + (p.clientY - dd.startY), window.innerWidth, window.innerHeight, w, h));
-      });
-    }
-  }, []);
-
-  const onDragUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* released */ }
-    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    if (!d || !d.moved) { setDragging(false); return; }
-    setDragging(false);
-    justDraggedRef.current = true;
-    const p = pendingRef.current;
-    let fx = pos.x, fy = pos.y;
-    if (p) {
-      const { w, h } = sizeRef.current;
-      const c0 = clampBarToBounds(d.origX + (p.clientX - d.startX), d.origY + (p.clientY - d.startY), window.innerWidth, window.innerHeight, w, h);
-      const c = magnetBar(c0.x, c0.y, window.innerWidth, window.innerHeight, w, h);
-      fx = c.x; fy = c.y; setPos(c);
-    }
-    pendingRef.current = null;
-    setPosition(fx, fy);
-    try { localStorage.setItem(DOCKED_KEY, window.innerHeight - (fy + sizeRef.current.h) <= 64 ? '1' : '0'); } catch { /* quota */ }
-  }, [pos.x, pos.y, setPosition]);
-
-  // Publish the strip the docked bar occupies so maximized / tiled windows
-  // stop above it (never under it). Folded, floating, hidden or off = 0.
-  const reserve = enabled && docked && !hidden && !folded ? Math.max(0, vhNow - pos.y) : 0;
-  useEffect(() => { setReserveBottom(reserve); }, [reserve, setReserveBottom]);
-  useEffect(() => () => setReserveBottom(0), [setReserveBottom]);
-
-  // Fold the bar into one search orb, centred where the bar was; unfold it back
-  // around the orb (clampNow then pulls it on-screen). Position persists.
-  const fold = useCallback(() => {
-    const { w, h } = sizeRef.current;
-    if (w > ORB + 40) lastBarWRef.current = w;
-    const nx = Math.round(pos.x + w / 2 - ORB / 2);
-    const ny = Math.round(pos.y + h / 2 - ORB / 2);
-    const c = clampBarToBounds(nx, ny, window.innerWidth, window.innerHeight, ORB, ORB);
-    setPos(c); setPosition(c.x, c.y); setFolded(true);
-  }, [pos.x, pos.y, setPosition, setFolded]);
-  const unfold = useCallback(() => {
-    if (justDraggedRef.current) { justDraggedRef.current = false; return; }
-    const barW = lastBarWRef.current;
-    const nx = Math.round(pos.x + ORB / 2 - barW / 2);
-    const ny = Math.round(pos.y + ORB / 2 - BAR_H / 2);
-    const c = clampBarToBounds(nx, ny, window.innerWidth, window.innerHeight, barW, BAR_H);
-    setPos(c); setPosition(c.x, c.y); setFolded(false);
-    // Unfolding is "I want to search": put the caret in the field.
-    window.setTimeout(() => {
-      const input = containerRef.current?.querySelector('input');
-      if (input instanceof HTMLInputElement) input.focus();
-    }, 60);
-  }, [pos.x, pos.y, setPosition, setFolded]);
+    return () => window.removeEventListener('pointermove', onPointer);
+  }, [fullscreenFront]);
+  const hidden = fullscreenFront && !revealed && !drag;
 
   if (!enabled) return null;
 
-  if (folded) {
-    return (
-      <div
-        ref={containerRef}
-        role="button"
-        tabIndex={0}
-        data-dex-chrome="dex-bar"
-        data-dex-nook
-        data-folded=""
-        aria-label="Search (unfold the DEX menu)"
-        title="Search: click to unfold, drag to move"
-        className="dex-liquid-glass dex-glass-specular dex-glass-refract dex-bar-orb"
-        onPointerDown={beginDrag}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragUp}
-        onPointerCancel={onDragUp}
-        onClick={unfold}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); justDraggedRef.current = false; unfold(); } }}
-        style={{
-          position: 'fixed', left: pos.x, top: pos.y, zIndex: 'var(--z-dock)' as unknown as number,
-          width: ORB, height: ORB, borderRadius: '50%', boxSizing: 'border-box',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--color-text-primary)', cursor: dragging ? 'grabbing' : 'pointer',
-          touchAction: 'none', userSelect: 'none',
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.2" y2="16.2" />
-        </svg>
-      </div>
-    );
-  }
-
-  // --- shared styles --------------------------------------------------------
-  const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
-  const ctrlBtn: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 10, border: 'none', padding: 0,
+  // --- styles ----------------------------------------------------------------
+  const ctrl: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    width: 28, height: 28, borderRadius: 9999, border: 'none', padding: 0,
     background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer',
-    transition: 'background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease',
+    transition: 'background 0.12s ease, color 0.12s ease',
   };
-  // Premium "interactive glass" hover: soft fill, brighter glyph, and a faint
-  // inset rim so each control reads as its own lit glass chip (monochrome).
-  const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.10)'; };
-  const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
-  // UKI mic keeps its accent tint on hover-out while she is awake, so the
-  // presence cue never flickers off mid-interaction.
-  const ukiHoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = ukiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
+  const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'var(--color-text-primary)'; };
+  const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; };
+  const divider: React.CSSProperties = { width: 1, height: 16, background: 'rgba(255,255,255,0.12)', flexShrink: 0, margin: '0 2px' };
+  const stop = (e: React.PointerEvent) => e.stopPropagation();
+  const drawerUp = place.top > vp.h / 2;
+  const showDrawer = expanded && widgets && !morphing;
+  const clip = !expanded || morphing;
 
   return (
     <div
-      ref={containerRef}
+      ref={rootRef}
       role="region"
+      aria-label="Dock"
       data-dex-chrome="dex-bar"
-      aria-label="DEX menu"
       data-dex-nook
+      data-dock-state={expanded ? 'expanded' : 'collapsed'}
       data-autohidden={hidden ? '' : undefined}
-      onFocusCapture={() => { if (autoHide) setRevealed(true); }}
       className="dex-liquid-glass dex-glass-specular dex-glass-refract"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onPointerMove={bump}
+      onFocusCapture={() => { setFocusWithin(true); if (fullscreenFront) setRevealed(true); }}
+      onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false); }}
+      onKeyDown={e => {
+        bump();
+        if (e.key === 'Escape' && expanded) {
+          const q = e.target instanceof HTMLInputElement ? e.target.value : '';
+          if (!q) { e.preventDefault(); setExpanded(false); }
+        }
+      }}
       style={{
-        // IMPORTANT: position via left/top, NOT transform. DEX has global rules
-        // (globals.css `[data-perf-tier="low"] *:hover/active/focus` and
-        // ScreenGuardSystem `[role=button]:active`) that force `transform: none
-        // !important` on hover/press. A transform-positioned bar gets its
-        // position wiped the instant you touch it -> it snaps to the corner and
-        // "glitches back and forth". left/top is immune. This is the root cause
-        // of the long-standing drag glitch across every prior launcher design.
-        // Auto-hidden: parked just below the bottom edge (top, not transform --
-        // see above), faded, and click-through until revealed.
-        position: 'fixed', left: pos.x, top: hidden ? vhNow + 4 : pos.y, zIndex: 'var(--z-dock)' as unknown as number,
+        // left/top, never transform: global hover/press rules force
+        // `transform: none !important`, which would snap a transformed Dock.
+        position: 'fixed', left: place.left, top: hidden ? vp.h + 4 : place.top,
+        width, height: DOCK_ROW, boxSizing: 'border-box',
+        zIndex: 'var(--z-dock)' as unknown as number,
+        borderRadius: 9999,
+        overflow: clip ? 'hidden' : 'visible',
         opacity: hidden ? 0 : 1,
         pointerEvents: hidden ? 'none' : undefined,
-        boxSizing: 'border-box',
-        // Liquid glass via the .dex-liquid-glass class (real backdrop blur +
-        // saturation + specular rim; auto-solid in lite mode / reduced-transparency).
-        // Background/blur/border come from the class; only the DYNAMIC radius +
-        // drag-elevation shadow are inline. The inline box-shadow includes the
-        // specular insets so the lit-glass look survives the inline override.
-        borderRadius: expanded ? PANEL_R : PILL_R,
-        // visible (not hidden) so the search results dropdown can escape the bar.
-        // The glass bg + border still clip to border-radius (background respects
-        // the radius regardless of overflow); only overflowing children show.
-        overflow: 'visible',
-        // Elevation from the canonical popover shadow token (same float as every
-        // dropdown/menu) so the bar shares ONE elevation scale with menus; only
-        // the drag-lift delta + the specular glass rims stay inline.
-        boxShadow: (dragging
-          ? 'var(--pg-shadow-popover-strong, 0 10px 40px rgba(0,0,0,0.33)), 0 0 0 0.5px rgba(0,0,0,0.5)'
-          : 'var(--pg-shadow-popover, 0 10px 30px rgba(0,0,0,0.36)), 0 0 0 0.5px rgba(0,0,0,0.45)')
-          + ', inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
         userSelect: 'none',
-        // Premium one-time entrance: opacity-only (no transform) so it never
-        // fights the left/top drag positioning. Plays once on mount.
-        // backwards, not both: a held final keyframe would pin opacity at 1 and
-        // defeat the auto-hide fade.
-        animation: 'dexBarIn 0.34s ease backwards',
-        // No position transition: the bar tracks the pointer 1:1 while dragging
-        // and settles exactly where released -- no ease that could read as a
-        // snap-back. Only the chrome (shadow/radius) eases.
-        transition: dragging ? 'none' : 'box-shadow 0.16s ease, border-radius 0.16s ease'
-          + (autoHide ? ', top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease' : ''),
+        boxShadow: drag
+          ? '0 10px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.18)'
+          : '0 6px 22px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.18)',
+        // Shared-element morph: the icon's own box grows into the strip around
+        // the same centre (width + left together). No bounce.
+        transition: drag || reduce
+          ? 'none'
+          : `width ${MORPH_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1), left ${MORPH_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1), top 0.2s ease, opacity 0.16s ease, box-shadow 0.16s ease`,
       }}
     >
-      {/* The bar -- always visible. The whole row is the drag handle; the
-          buttons stop propagation so a click never drags. */}
+      {/* COLLAPSED: the search icon. Click (or Enter) opens DEX Search; drag moves. */}
       <div
-        onPointerDown={beginDrag}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragUp}
-        onPointerCancel={onDragUp}
+        role="button"
+        tabIndex={expanded ? -1 : 0}
+        aria-hidden={expanded}
+        aria-label="Open DEX Search"
+        title="Search · drag to move"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onClick={activateIcon}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); justDraggedRef.current = false; activateIcon(); } }}
         style={{
-          display: 'flex', alignItems: 'center', gap: 2, height: BAR_H, padding: '0 8px',
-          cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none',
+          position: 'absolute', left: 0, top: 0, width: DOCK_ROW, height: DOCK_ROW,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-text-primary)', cursor: drag ? 'grabbing' : 'pointer', touchAction: 'none',
+          opacity: expanded ? 0 : 1, pointerEvents: expanded ? 'none' : 'auto',
+          transition: reduce ? 'none' : 'opacity 0.14s ease',
         }}
       >
-        {/* grip */}
-        <div aria-hidden="true" style={{ width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="8" height="14" viewBox="0 0 8 14" fill="var(--color-text-tertiary, #8e8e93)" aria-hidden="true">
-            {[1, 7, 13].map(cy => [1.5, 6.5].map(cx => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1" />))}
-          </svg>
-        </div>
+        <GlyphSearch />
+      </div>
 
-        <button type="button" className="dex-pressable" aria-label="Open launcher" onPointerDown={e => e.stopPropagation()} onClick={onOpen} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      {/* EXPANDED: the strip. Measured for width; the row background drags. */}
+      <div
+        ref={stripRef}
+        aria-hidden={!expanded}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        style={{
+          position: 'absolute', left: 0, top: 0, height: DOCK_ROW,
+          display: 'flex', alignItems: 'center', gap: 2, padding: '0 5px', whiteSpace: 'nowrap',
+          opacity: expanded ? 1 : 0, pointerEvents: expanded ? 'auto' : 'none',
+          transition: reduce ? 'none' : `opacity ${expanded ? '0.18s' : '0.1s'} ease ${expanded ? '0.05s' : '0s'}`,
+          cursor: drag ? 'grabbing' : 'grab', touchAction: 'none',
+        }}
+      >
+        <button type="button" tabIndex={expanded ? 0 : -1} aria-label="Open App Menu" title="Apps" onPointerDown={stop} onClick={onOpen} style={ctrl} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+          <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
             {[[1, 1], [10, 1], [1, 10], [10, 10]].map(([rx, ry]) => <rect key={`${rx}-${ry}`} x={rx} y={ry} width="7" height="7" rx="2" fill="currentColor" />)}
           </svg>
         </button>
-        {/* Dock: pinned apps (shared pinning service) with running dots. */}
-        <DockPins maxWidth={360} />
-        <div style={vDivider(9)} />
-        {/* The dock search IS the search now: a real field whose results dropdown
-            drops straight from it (UP, since the dock sits near the bottom). The
-            old full-screen Spotlight overlay is gone. stopPropagation keeps typing/
-            clicking from dragging the bar; the grip beside it resizes the field. */}
-        <div
-          onPointerDown={e => e.stopPropagation()}
-          style={{ width: searchWidth, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center' }}
-        >
+        <DockPins maxWidth={Math.max(120, Math.min(420, vp.w - SEARCH_W - 180))} size={28} showRunning />
+        <div style={divider} />
+        <div onPointerDown={stop} style={{ width: SEARCH_W, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center' }}>
           <SpotlightSearch
             variant="home"
-            pillHeight={32}
-            dropUp={pos.y > (typeof window !== 'undefined' ? window.innerHeight : 800) / 2}
-            placeholder="Search"
+            pillHeight={26}
+            dropUp={drawerUp}
+            placeholder="Search DEX"
             hideVoice
             onNavigate={(appId) => openApp(appId)}
           />
         </div>
-        {/* Resize grip -- drag to widen / narrow the search; size persists. */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize search"
-          title="Drag to resize search"
-          onPointerDown={beginResize}
-          onPointerMove={onResizeMove}
-          onPointerUp={onResizeUp}
-          onPointerCancel={onResizeUp}
-          style={{ width: 8, alignSelf: 'stretch', flexShrink: 0, cursor: 'ew-resize', touchAction: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div style={{ width: 2, height: 16, borderRadius: 1, background: 'var(--color-border, rgba(255,255,255,0.16))' }} />
-        </div>
         <button
           type="button"
-          className={`dex-pressable${ukiActive ? ' dex-uki-awake' : ''}`}
+          tabIndex={expanded ? 0 : -1}
+          className={ukiActive ? 'dex-uki-awake' : undefined}
           aria-label={ukiActive ? 'UKI is active -- open assistant' : ukiAsleep ? 'UKI is asleep -- open assistant' : 'Open UKI assistant'}
-          title={ukiActive ? 'UKI is active' : ukiAsleep ? 'UKI is asleep' : 'Open UKI assistant'}
-          onPointerDown={e => e.stopPropagation()}
+          title={ukiActive ? 'UKI is active' : ukiAsleep ? 'UKI is asleep' : 'UKI'}
+          onPointerDown={stop}
           onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }}
-          style={{
-            ...ctrlBtn,
-            color: ukiActive ? 'var(--color-accent)' : ctrlBtn.color,
-            opacity: ukiAsleep ? 0.45 : 1,
-            // Glow + breath ride on `filter` (driven by the .dex-uki-awake
-            // keyframe) so the bar's hover handlers, which only touch
-            // background/color/box-shadow, can never clobber the presence cue.
-            animation: ukiActive ? 'dexUkiBreath 2.4s ease-in-out infinite' : 'none',
-            transition: 'opacity 0.25s ease, color 0.2s ease',
-          }}
+          style={{ ...ctrl, color: ukiActive ? 'var(--color-accent)' : ctrl.color, opacity: ukiAsleep ? 0.45 : 1, animation: ukiActive ? 'dexUkiBreath 2.4s ease-in-out infinite' : 'none' }}
           onMouseEnter={hoverIn}
-          onMouseLeave={ukiHoverOut}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = ukiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'; }}
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10v1a7 7 0 0 0 14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" />
           </svg>
         </button>
-
-        <div style={vDivider(11)} />
-
-        {/* fold -- collapse the whole bar into one search orb */}
-        <button
-          type="button"
-          aria-label="Fold into search orb"
-          title="Fold into search orb"
-          onPointerDown={e => e.stopPropagation()}
-          onClick={fold}
-          style={{ ...ctrlBtn, width: 28 }}
-          onMouseEnter={hoverIn}
-          onMouseLeave={hoverOut}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" />
+        <button type="button" tabIndex={expanded ? 0 : -1} aria-label={widgets ? 'Hide widgets' : 'Show widgets'} aria-expanded={widgets} title="Widgets" onPointerDown={stop} onClick={toggleWidgets} style={{ ...ctrl, width: 24 }} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+            style={{ transform: (widgets !== drawerUp) ? 'rotate(180deg)' : 'none', transition: 'transform 0.16s ease' }}>
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        {/* expand toggle -- turns widgets on/off (opt-in) */}
-        <button
-          type="button"
-          aria-label={expanded ? 'Hide widgets' : 'Show widgets'}
-          aria-expanded={expanded}
-          onPointerDown={e => e.stopPropagation()}
-          onClick={toggleExpanded}
-          style={{ ...ctrlBtn, width: 28 }}
-          onMouseEnter={hoverIn}
-          onMouseLeave={hoverOut}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.16s ease' }}>
-            <path d="M6 9l6 6 6-6" />
+        <button type="button" tabIndex={expanded ? 0 : -1} aria-label="Collapse Dock to the search icon" title="Collapse (Esc)" onPointerDown={stop} onClick={() => setExpanded(false)} style={{ ...ctrl, width: 24 }} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
           </svg>
         </button>
       </div>
 
-      {/* Widget drawer -- OPT-IN. Only present once the user expands. Springs in. */}
-      {expanded && (
-        <div className="dex-drawer-in">
-        <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
-          {/* Now Playing */}
-          <div style={{ width: 178, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-              <button
-                type="button" aria-label="Open Music" onClick={() => openApp('audio')}
-                style={{
-                  width: 42, height: 42, flexShrink: 0, borderRadius: 10, padding: 0, cursor: 'pointer',
-                  border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
-                  background: track?.artwork ? `center/cover no-repeat url(${JSON.stringify(track.artwork)})` : 'var(--color-bg-inset, #101012)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-                }}
-              >
-                {!track?.artwork && (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                  </svg>
-                )}
-              </button>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track?.title || 'Nothing playing'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track?.artist || 'Open Music to start'}
+      {/* Widget drawer: opt-in; opens away from the nearest edge. */}
+      {showDrawer && (
+        <div
+          className="dex-liquid-glass dex-drawer-in"
+          onPointerDown={stop}
+          style={{
+            position: 'absolute', left: '50%', marginLeft: -186, width: 372,
+            [drawerUp ? 'bottom' : 'top']: DOCK_ROW + 8,
+            borderRadius: 14, overflow: 'hidden',
+          } as React.CSSProperties}
+        >
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <div style={{ width: 178, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                <button
+                  type="button" aria-label="Open Music" onClick={() => openApp('audio')}
+                  style={{
+                    width: 42, height: 42, flexShrink: 0, borderRadius: 10, padding: 0, cursor: 'pointer',
+                    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
+                    background: track?.artwork ? `center/cover no-repeat url(${JSON.stringify(track.artwork)})` : 'var(--color-bg-inset, #101012)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                  }}
+                >
+                  {!track?.artwork && (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                    </svg>
+                  )}
+                </button>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track?.title || 'Nothing playing'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track?.artist || 'Open Music to start'}</div>
                 </div>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button type="button" aria-label="Previous" onClick={prev} disabled={!track} style={{ ...ctrl, opacity: track ? 1 : 0.4 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+                </button>
+                <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={toggle} disabled={!track}
+                  style={{ ...ctrl, background: track ? 'var(--color-accent-fill)' : 'rgba(255,255,255,0.08)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5 }}>
+                  {isPlaying
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>}
+                </button>
+                <button type="button" aria-label="Next" onClick={next} disabled={!track} style={{ ...ctrl, opacity: track ? 1 : 0.4 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zm-2 6L6 6v12z" /></svg>
+                </button>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button type="button" aria-label="Previous" onClick={prev} disabled={!track} style={{ ...ctrlBtn, width: 30, height: 28, opacity: track ? 1 : 0.4, cursor: track ? 'pointer' : 'default' }} onMouseEnter={track ? hoverIn : undefined} onMouseLeave={track ? hoverOut : undefined}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <button type="button" onClick={() => openApp('calendar')} style={{ display: 'flex', alignItems: 'baseline', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>{monthLabel}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{new Date().getFullYear()}</span>
               </button>
-              <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={toggle} disabled={!track}
-                style={{ ...ctrlBtn, width: 32, height: 30, borderRadius: 10, background: track ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)', color: track ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', opacity: track ? 1 : 0.5, cursor: track ? 'pointer' : 'default' }}>
-                {isPlaying
-                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
-                  : <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>}
-              </button>
-              <button type="button" aria-label="Next" onClick={next} disabled={!track} style={{ ...ctrlBtn, width: 30, height: 28, opacity: track ? 1 : 0.4, cursor: track ? 'pointer' : 'default' }} onMouseEnter={track ? hoverIn : undefined} onMouseLeave={track ? hoverOut : undefined}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zm-2 6L6 6v12z" /></svg>
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, textAlign: 'center' }}>
+                {week.map((d, i) => <div key={`l-${i}`} style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>{d.letter}</div>)}
+                {week.map((d, i) => (
+                  <div key={`d-${i}`} style={{ fontSize: 11, padding: '3px 0', borderRadius: 6, fontWeight: d.isToday ? 700 : 400, color: d.isToday ? 'var(--color-accent-text, #fff)' : 'var(--color-text-primary)', background: d.isToday ? 'var(--color-accent-fill)' : 'transparent' }}>{d.day}</div>
+                ))}
+              </div>
+              <div style={{ paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.08)', minHeight: 18 }}>
+                {today.length === 0
+                  ? <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Nothing for today</div>
+                  : today.slice(0, 2).map(ev => (
+                    <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0', minWidth: 0 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: ev.color || 'var(--color-accent)' }} />
+                      <span style={{ fontSize: 11, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={ev.title}>{ev.title}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{ev.time}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
-
-          <div style={vDivider(8)} />
-
-          {/* Calendar */}
-          <div style={{ width: 184, padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <button
-              type="button" onClick={() => openApp('calendar')}
-              style={{ display: 'flex', alignItems: 'baseline', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-            >
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>{monthLabel}</span>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{new Date().getFullYear()}</span>
+          {recentApps.length > 0 && (
+            <div role="group" aria-label="Suggested apps" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              {recentApps.map(app => (
+                <button key={app.id} type="button" title={app.name} aria-label={`Open ${app.name}`} onClick={() => openApp(app.id)}
+                  style={{ ...ctrl, width: 30, height: 30, background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={hoverIn} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}>
+                  <DexIcon name={app.icon} size={16} color="currentColor" />
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <button type="button" className="dex-pill" onClick={() => setEnabled(false)} title="Hide the Dock (Ctrl+Shift+B brings it back)" aria-label="Hide Dock" style={{ height: 24, fontSize: 11 }}>
+              Hide Dock
             </button>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, textAlign: 'center' }}>
-              {week.map((d, i) => (
-                <div key={`l-${i}`} style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>{d.letter}</div>
-              ))}
-              {week.map((d, i) => (
-                <div key={`d-${i}`} style={{
-                  fontSize: 11, padding: '3px 0', borderRadius: 6,
-                  fontWeight: d.isToday ? 700 : 400,
-                  color: d.isToday ? 'var(--color-accent-text, #fff)' : 'var(--color-text-primary)',
-                  background: d.isToday ? 'var(--color-accent-fill)' : 'transparent',
-                }}>{d.day}</div>
-              ))}
-            </div>
-            <div style={{ paddingTop: 6, borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))', minHeight: 18 }}>
-              {today.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Nothing for today</div>
-              ) : today.slice(0, 2).map(ev => (
-                <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0', minWidth: 0 }}>
-                  {ev.icon
-                    ? <span style={{ color: ev.color || 'var(--color-accent)', display: 'inline-flex', flexShrink: 0 }}><DexIcon name={ev.icon} size={12} color="currentColor" /></span>
-                    : <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: ev.color || 'var(--color-accent)' }} />}
-                  <span style={{ fontSize: 11, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={ev.title}>{ev.title}</span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{ev.time}</span>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
-
-        {/* Suggested apps -- learned quick-launch. Renders nothing without data. */}
-        {recentApps.length > 0 && (
-          <div
-            role="group"
-            aria-label="Suggested apps"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 10px',
-              borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
-            }}
-          >
-            {recentApps.map(app => (
-              <button
-                key={app.id}
-                type="button"
-                title={app.name}
-                aria-label={`Open ${app.name}`}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={() => openRecent(app.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, flexShrink: 0, borderRadius: 10, padding: 0,
-                  border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
-                  background: 'var(--color-bg-inset, #101012)', cursor: 'pointer',
-                  color: app.color && app.color.startsWith('var(') ? app.color : (app.color || 'var(--color-text-secondary)'),
-                  transition: 'background 0.12s ease, border-color 0.12s ease',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-inset, #101012)'; }}
-              >
-                <DexIcon name={app.icon} size={17} color="currentColor" />
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Hide the bar. Re-show from Settings > Shell & Dock > Show DEX Bar. */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 10px', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
-          <button
-            type="button"
-            onPointerDown={e => e.stopPropagation()}
-            onClick={() => setEnabled(false)}
-            title="Hide the DEX Bar (re-enable in Settings > Shell & Dock)"
-            aria-label="Hide DEX Bar"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 6,
-              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
-              background: 'transparent', cursor: 'pointer', fontSize: 11,
-              color: 'var(--color-text-secondary)', transition: 'background 0.12s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <DexIcon name="close" size={12} color="currentColor" /> Hide bar
-          </button>
-        </div>
         </div>
       )}
     </div>

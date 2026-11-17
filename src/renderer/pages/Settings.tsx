@@ -1671,6 +1671,8 @@ export const Settings: React.FC = () => {
   const uiSoundVolume = useSyncExternalStore(subscribeSoundEnabled, getSoundVolume);
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
+  const dockAutoCollapse = useFloatingLauncher((s) => s.autoCollapse);
+  const setDockAutoCollapse = useFloatingLauncher((s) => s.setAutoCollapse);
   const dnd = useNotificationCenterStore((s) => s.doNotDisturb);
   const setDnd = useNotificationCenterStore((s) => s.setDoNotDisturb);
 
@@ -2400,17 +2402,29 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        <h3 style={styles.sectionTitle}>DEX Bar</h3>
+        <h3 style={styles.sectionTitle}>Dock</h3>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Show DEX Bar</span>
-            <span style={styles.settingDesc}>The floating command bar (search, UKI, suggestions). Hide it for a cleaner desktop; re-enable here anytime.</span>
+            <span style={styles.settingLabel}>Show Dock</span>
+            <span style={styles.settingDesc}>The floating Dock: a search icon that opens into your pinned and running apps, DEX Search and UKI. Ctrl+Shift+B also shows or hides it.</span>
           </div>
           <input
             type="checkbox"
             checked={dexBarEnabled}
             onChange={(e) => setDexBarEnabled(e.target.checked)}
-            aria-label="Show DEX Bar"
+            aria-label="Show Dock"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Collapse to the search icon when idle</span>
+            <span style={styles.settingDesc}>Folds the open Dock back after a few seconds untouched. Never while you point at it, type in it or drag it.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={dockAutoCollapse}
+            onChange={(e) => setDockAutoCollapse(e.target.checked)}
+            aria-label="Collapse the Dock when idle"
           />
         </div>
 

@@ -81,3 +81,51 @@ export function clampBarToBounds(
   const maxY = Math.max(EDGE_PAD, vh - barH - EDGE_PAD);
   return { x: clamp(px, EDGE_PAD, maxX), y: clamp(py, EDGE_PAD, maxY) };
 }
+
+// ---------------------------------------------------------------------------
+// Morphing Dock geometry (compact pass)
+// ---------------------------------------------------------------------------
+// The Dock is one 36 px row anchored by its centre x and top y. Collapsed it is
+// a 36 px search icon; expanded the strip grows around the same centre. The
+// placement clamp keeps the whole row inside the viewport and below the top bar
+// whatever its current width, without moving the saved anchor.
+
+/** Row height of the Dock in both states (36 px: a comfortable touch target). */
+export const DOCK_ROW = 36;
+/** Gap kept between the Dock and the viewport edges / top bar. */
+export const DOCK_PAD = 10;
+
+/** Default anchor: horizontally centred, resting on the bottom edge. */
+export function defaultDockAnchor(vw: number, vh: number): { cx: number; y: number } {
+  return { cx: Math.round(vw / 2), y: Math.max(DOCK_PAD, vh - DOCK_ROW - DOCK_PAD) };
+}
+
+/**
+ * Where to draw a row of `width` px for anchor (cx, y): fully inside the
+ * viewport, never over the top bar. Pure and idempotent.
+ */
+export function placeDock(
+  cx: number, y: number, width: number, vw: number, vh: number, topBar = 0,
+): { left: number; top: number } {
+  const w = Math.min(width, Math.max(DOCK_ROW, vw - DOCK_PAD * 2));
+  const minLeft = DOCK_PAD, maxLeft = Math.max(DOCK_PAD, vw - w - DOCK_PAD);
+  const minTop = topBar + DOCK_PAD, maxTop = Math.max(minTop, vh - DOCK_ROW - DOCK_PAD);
+  return {
+    left: Math.round(clamp(cx - w / 2, minLeft, maxLeft)),
+    top: Math.round(clamp(y, minTop, maxTop)),
+  };
+}
+
+/**
+ * Edge magnet for a released Dock anchor: near the bottom/top edge it rests on
+ * it, near the horizontal centre it centres. Keeps placement tidy without a
+ * grid.
+ */
+export function magnetDockAnchor(cx: number, y: number, vw: number, vh: number, topBar = 0, magnet = 24): { cx: number; y: number } {
+  let ncx = cx, ny = y;
+  if (Math.abs(cx - vw / 2) < magnet) ncx = Math.round(vw / 2);
+  const bottom = vh - DOCK_ROW - DOCK_PAD, top = topBar + DOCK_PAD;
+  if (Math.abs(y - bottom) < magnet) ny = bottom;
+  else if (Math.abs(y - top) < magnet) ny = top;
+  return { cx: Math.round(ncx), y: Math.round(ny) };
+}

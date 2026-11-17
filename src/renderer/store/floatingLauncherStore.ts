@@ -5,86 +5,73 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Floating Launcher position store. The launcher is "The DEX Bar" -- a single
-// draggable command bar the user can place ANYWHERE on screen (not a
-// content-width dock that shifts as apps open/close). Its position persists
-// across restarts. `x < 0` means "unset" -> the bar resolves a sensible default
-// placement (bottom-centre) at render time.
+// DEX Dock store. The Dock is a floating overlay that morphs between a compact
+// search icon (collapsed) and the full strip (pinned + running apps + search).
 //
-// KEY is v2: the v6 redesign changed the launcher from a vertical orb stack to a
-// horizontal bar, so a fresh default placement is wanted rather than a stale
-// orb-anchor coordinate.
+// Position is an ANCHOR: the horizontal centre (`cx`) and the top edge (`y`) of
+// the 36 px row. Both states share that row, so morphing only changes the width
+// around a fixed centre -- the icon grows into the strip in place. `cx < 0`
+// means "unset": bottom-centre by default.
 
 import { create } from 'zustand';
 
-const KEY = 'dex-floating-launcher-v2';
+const KEY = 'dex-dock-v3';
+const LEGACY_KEY = 'dex-floating-launcher-v2';
 
 export interface FloatingLauncherState {
-  /** Top-left x in px. < 0 = unset (use default corner). */
-  x: number;
-  /** Top-left y in px. < 0 = unset. */
+  /** Anchor centre x in px. < 0 = unset (bottom-centre). */
+  cx: number;
+  /** Anchor top y in px. < 0 = unset (bottom edge). */
   y: number;
-  /** Whether the floating launcher is shown. */
+  /** Whether the Dock is shown at all. */
   enabled: boolean;
-  setPosition: (x: number, y: number) => void;
+  /** Expanded = the full strip; collapsed = the search icon. Runtime only. */
+  expanded: boolean;
+  /** Collapse back to the search icon after an idle period. Persisted. */
+  autoCollapse: boolean;
+  setAnchor: (cx: number, y: number) => void;
   setEnabled: (enabled: boolean) => void;
-  /**
-   * Px the bar takes from the bottom of the viewport when it sits docked at the
-   * bottom edge (0 when folded, floating elsewhere, hidden or disabled). The
-   * window manager subtracts it from the work area so maximized / tiled apps
-   * stop above the bar instead of sliding under it. Runtime only, not saved.
-   */
-  reserveBottom: number;
-  setReserveBottom: (px: number) => void;
-  /** Folded = the bar collapsed into a single search orb. Persisted. */
-  folded: boolean;
-  setFolded: (folded: boolean) => void;
+  setExpanded: (expanded: boolean) => void;
+  setAutoCollapse: (on: boolean) => void;
 }
 
-const FOLD_KEY = 'dex-bar-folded';
-function loadFolded(): boolean {
-  try { return localStorage.getItem(FOLD_KEY) === '1'; } catch { return false; }
-}
+interface Saved { cx: number; y: number; enabled: boolean; autoCollapse: boolean }
 
-function load(): { x: number; y: number; enabled: boolean } {
+function load(): Saved {
+  const d: Saved = { cx: -1, y: -1, enabled: true, autoCollapse: true };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const v = JSON.parse(raw);
-      if (v && typeof v.x === 'number' && typeof v.y === 'number') {
-        return { x: v.x, y: v.y, enabled: v.enabled !== false };
+      if (v && typeof v.cx === 'number' && typeof v.y === 'number') {
+        return { cx: v.cx, y: v.y, enabled: v.enabled !== false, autoCollapse: v.autoCollapse !== false };
       }
     }
+    // Carry over "hidden" from the previous bar; its position is re-derived.
+    const old = localStorage.getItem(LEGACY_KEY);
+    if (old) { const v = JSON.parse(old); if (v && v.enabled === false) d.enabled = false; }
   } catch { /* corrupt / unavailable -> defaults */ }
-  return { x: -1, y: -1, enabled: true };
+  return d;
 }
 
-function save(s: { x: number; y: number; enabled: boolean }): void {
+function save(s: Saved): void {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* quota */ }
 }
 
+const persist = (s: FloatingLauncherState) => save({ cx: s.cx, y: s.y, enabled: s.enabled, autoCollapse: s.autoCollapse });
+
 export const useFloatingLauncher = create<FloatingLauncherState>((set, get) => ({
   ...load(),
-  setPosition: (x, y) => { set({ x, y }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
-  setEnabled: (enabled) => { set({ enabled }); const s = get(); save({ x: s.x, y: s.y, enabled: s.enabled }); },
-  reserveBottom: 0,
-  setReserveBottom: (px) => {
-    const v = Math.max(0, Math.round(px));
-    if (v !== get().reserveBottom) set({ reserveBottom: v });
-  },
-  folded: loadFolded(),
-  setFolded: (folded) => {
-    set({ folded });
-    try { localStorage.setItem(FOLD_KEY, folded ? '1' : '0'); } catch { /* quota */ }
-  },
+  expanded: false,
+  setAnchor: (cx, y) => { set({ cx, y }); persist(get()); },
+  setEnabled: (enabled) => { set({ enabled }); persist(get()); },
+  setExpanded: (expanded) => { if (get().expanded !== expanded) set({ expanded }); },
+  setAutoCollapse: (autoCollapse) => { set({ autoCollapse }); persist(get()); },
 }));
 
-// Always-available recovery: a global shortcut toggles the DEX Bar even when it
-// is hidden (the bar renders null when disabled, so it can't host its own
-// re-show control). Lives in the store module -- which is always imported -- so
-// the listener survives with the bar hidden. Ctrl/Cmd + Shift + B. Also exposed
-// on window for the command palette / Settings to call. Guarded against the
-// HMR / double-import re-register.
+// Always-available recovery: Ctrl/Cmd + Shift + B toggles the Dock even when
+// it is hidden (it renders null then). Registered once in this always-imported
+// module; also exposed for the palette / Settings.
 if (typeof window !== 'undefined' && !(window as { __dexBarToggleWired?: boolean }).__dexBarToggleWired) {
   (window as { __dexBarToggleWired?: boolean }).__dexBarToggleWired = true;
   const toggleBar = () => {
@@ -98,6 +85,5 @@ if (typeof window !== 'undefined' && !(window as { __dexBarToggleWired?: boolean
       toggleBar();
     }
   });
-  // Let any UI dispatch a re-show without importing the store.
   window.addEventListener('dex-toggle-bar', toggleBar);
 }

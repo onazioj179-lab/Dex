@@ -4,10 +4,12 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Pinned apps stay here when closed; a dot marks the running ones. Only
-// pinned apps are shown, so the bar does not grow or shift as apps open and
-// close. Drag icons to reorder, drag one out of the App Menu to pin it, or
-// right-click for the shared app menu.
+// Pinned apps stay here when closed; a dot marks the running ones. With
+// `showRunning`, apps that are open but not pinned follow after a hairline, so
+// every running app is one click away (each app appears once: pinned wins).
+// Drag icons to reorder, drag one out of the App Menu (or a running icon) onto
+// the pinned group to pin it, or right-click for the shared app menu (Pin /
+// Unpin, Open, New window, Quit).
 
 import React, { useRef, useState } from 'react';
 import DexIcon from './DexIcon';
@@ -16,9 +18,8 @@ import { appPinning, useDockAppIds } from '../services/appPinning';
 import { openAppContextMenu, sendAppCommand } from './AppContextMenu';
 import { DEX_APP_DRAG_TYPE } from './AppMenuPanel';
 
-const SIZE = 30;
-
-export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) => {
+export const DockPins: React.FC<{ maxWidth?: number; size?: number; showRunning?: boolean }> = ({ maxWidth = 360, size = 30, showRunning = false }) => {
+  const SIZE = size;
   const ids = useDockAppIds();
   const running = useRunningApps(s => s.runningApps);
   const current = useRunningApps(s => s.currentAppId);
@@ -61,7 +62,12 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
     }
   };
 
-  if (!ids.length) {
+  const pinnedSet = new Set(ids);
+  const runningOnly = showRunning
+    ? running.filter(a => a.id !== 'home' && !pinnedSet.has(a.id) && APP_DEFINITIONS[a.id]).map(a => a.id)
+    : [];
+
+  if (!ids.length && !runningOnly.length) {
     // Still a drop target, so an app can be pinned by dragging it here.
     return (
       <div
@@ -77,18 +83,7 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
     );
   }
 
-  return (
-    <div
-      ref={stripRef}
-      role="toolbar"
-      aria-label="Dock"
-      onPointerDown={e => e.stopPropagation()}
-      onKeyDown={onKey}
-      onDragOver={e => { if (isDexDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = dragging ? 'move' : 'copy'; } }}
-      onDrop={e => drop(e, null)}
-      style={{ display: 'flex', alignItems: 'center', gap: 2, maxWidth, overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 1, minWidth: 0, padding: '0 2px' }}
-    >
-      {ids.map((id, i) => {
+  const icon = (id: string, i: number, pinned: boolean) => {
         const def = APP_DEFINITIONS[id];
         const run = running.find(a => a.id === id);
         const isCurrent = current === id && !!run && !run.isMinimized;
@@ -98,6 +93,7 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
             key={id}
             type="button"
             data-dock-app={id}
+            data-pinned={pinned ? '' : undefined}
             draggable
             tabIndex={i === 0 ? 0 : -1}
             aria-label={label}
@@ -111,7 +107,7 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
             onDrop={e => drop(e, id)}
             onFocus={e => { e.currentTarget.tabIndex = 0; }}
             style={{
-              position: 'relative', width: SIZE, height: SIZE, flexShrink: 0, borderRadius: 10, padding: 0,
+              position: 'relative', width: SIZE, height: SIZE, flexShrink: 0, borderRadius: 9999, padding: 0,
               border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: isCurrent ? 'var(--color-bg-hover, #1e1e22)' : 'transparent',
               color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -122,7 +118,7 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = isCurrent ? 'var(--color-bg-hover, #1e1e22)' : 'transparent'; e.currentTarget.style.color = isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'; }}
           >
-            <DexIcon name={def?.icon || id} size={17} color="currentColor" />
+            <DexIcon name={def?.icon || id} size={Math.round(SIZE * 0.57)} color="currentColor" />
             {run && (
               <span aria-hidden="true" style={{
                 position: 'absolute', bottom: 1, left: '50%', marginLeft: -2, width: 4, height: 4, borderRadius: '50%',
@@ -131,7 +127,22 @@ export const DockPins: React.FC<{ maxWidth?: number }> = ({ maxWidth = 360 }) =>
             )}
           </button>
         );
-      })}
+  };
+
+  return (
+    <div
+      ref={stripRef}
+      role="toolbar"
+      aria-label="Dock"
+      onPointerDown={e => e.stopPropagation()}
+      onKeyDown={onKey}
+      onDragOver={e => { if (isDexDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = dragging ? 'move' : 'copy'; } }}
+      onDrop={e => drop(e, null)}
+      style={{ display: 'flex', alignItems: 'center', gap: 2, maxWidth, overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 1, minWidth: 0, padding: '0 2px' }}
+    >
+      {ids.map((id, i) => icon(id, i, true))}
+      {runningOnly.length > 0 && <span aria-hidden="true" style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.12)', margin: '0 3px', flexShrink: 0 }} />}
+      {runningOnly.map((id, i) => icon(id, ids.length + i, false))}
     </div>
   );
 };

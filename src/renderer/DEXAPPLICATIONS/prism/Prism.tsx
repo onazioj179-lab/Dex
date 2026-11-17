@@ -4617,7 +4617,7 @@ const Prism: React.FC = () => {
                 className="prism-btn"
                 style={{ ...styles.btn, marginTop: 8, width: '100%', justifyContent: 'center' }}
               >
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: foregroundColor, border: '1px solid var(--color-border)' }} />
+                <span style={{ width: 12, height: 12, borderRadius: 4, background: foregroundColor, border: '1px solid var(--color-border)' }} />
                 {savedSwatches.includes(normalizeHex(foregroundColor) ?? '') ? 'Current colour is saved' : 'Save current colour'}
               </button>
             )}
