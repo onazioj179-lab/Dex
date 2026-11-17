@@ -9,6 +9,7 @@
  * Supports icons, shortcut hints, dividers, disabled items, danger styling, submenus.
  */
 
+import { useOverlay } from '../services/overlayStack';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AIM_GRACE_MS, isAimingAtRect, type Pt } from '../utils/safeTriangle';
@@ -54,6 +55,9 @@ export function useContextMenu() {
 
 const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  // Shared overlay stack: only the top overlay reacts to Escape / outside
+  // clicks, and focus returns to where it was when the menu closes.
+  const overlay = useOverlay(true, onClose, { ref: menuRef, ownEscape: true });
   const [focusIdx, setFocusIdx] = useState(-1);
   const [openSub, setOpenSub] = useState<string | null>(null);
   // Submenu opens rightward by default, but flips left when the parent item is
@@ -135,7 +139,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && overlay.isTop()) onClose();
     };
     // Use mousedown for instant close — no click-delay
     document.addEventListener('mousedown', handleClick);
@@ -164,6 +168,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
       };
       switch (e.key) {
         case 'Escape':
+          if (!overlay.isTop()) return; // a menu or dialog above handles it
           e.preventDefault();
           e.stopPropagation();
           if (sub) { setOpenSub(null); setSubFocus(-1); } else onClose();

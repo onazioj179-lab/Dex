@@ -16,6 +16,7 @@
  * - z-index from token system
  */
 
+import { useOverlay } from '../services/overlayStack';
 import React, {
   forwardRef,
   useCallback,
@@ -328,6 +329,10 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    // Shared overlay stack: a submenu (its own dropdown) sits above its parent,
+    // so Escape closes the submenu only. Outside clicks stay with the handler
+    // below (it knows about portaled submenus).
+    const overlay = useOverlay(open, onClose, { ref: containerRef, anchorRef: triggerRef as React.RefObject<HTMLElement>, ownEscape: true, dismissOnOutside: false });
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [actualPlacement, setActualPlacement] = useState(placement);
     const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -559,6 +564,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
       const handleKeyDown = (e: KeyboardEvent) => {
         switch (e.key) {
           case 'Escape':
+            if (!overlay.isTop()) return; // a submenu or dialog above takes it
             e.preventDefault();
             onClose();
             triggerRef.current?.focus();
