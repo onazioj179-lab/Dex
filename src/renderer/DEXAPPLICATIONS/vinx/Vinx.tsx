@@ -823,6 +823,8 @@ const VinxEditor: React.FC = () => {
     const fileName = (proj.name || 'vinx-export').replace(/[\\/:*?"<>|]+/g, '_');
 
     setQuickExport({ active: true, percent: 0, elapsedMs: 0, totalMs: (durationFrames / fps) * 1000 });
+    // Export renders the originals, never the editing proxies.
+    useVinxStore.getState().setExportingOriginals(true);
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Quick Export started — recording timeline playback to WebM' } }));
 
     quickExportRef.current = runQuickExport({
@@ -857,11 +859,13 @@ const VinxEditor: React.FC = () => {
       },
       onComplete: () => {
         quickExportRef.current = null;
+        useVinxStore.getState().setExportingOriginals(false);
         setQuickExport({ active: false, percent: 100, elapsedMs: 0, totalMs: 0 });
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Exported "${fileName}.webm"` } }));
       },
       onError: (message) => {
         quickExportRef.current = null;
+        useVinxStore.getState().setExportingOriginals(false);
         setQuickExport({ active: false, percent: 0, elapsedMs: 0, totalMs: 0 });
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Quick Export failed: ${message}` } }));
       },
@@ -871,6 +875,7 @@ const VinxEditor: React.FC = () => {
   const handleCancelQuickExport = useCallback(() => {
     quickExportRef.current?.cancel();
     quickExportRef.current = null;
+    useVinxStore.getState().setExportingOriginals(false);
     setQuickExport({ active: false, percent: 0, elapsedMs: 0, totalMs: 0 });
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Quick Export cancelled' } }));
   }, []);

@@ -10,6 +10,7 @@
  * Grid/list view, search, bins, hover scrub preview.
  */
 
+import { hasDiskPath, makeProxy } from './mediaProxy';
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from 'react';
 import { clampEventToViewport } from '../../utils/menuPosition';
 import { useVinxStore } from './VinxStore';
@@ -146,6 +147,25 @@ const MediaTab: React.FC = memo(() => {
   const setSelectedMedia = useVinxStore(s => s.setSelectedMedia);
   const addMedia = useVinxStore(s => s.addMedia);
   const removeMedia = useVinxStore(s => s.removeMedia);
+  const updateMediaItem = useVinxStore(s => s.updateMediaItem);
+  const proxySettings = useVinxStore(s => s.project.proxySettings);
+  const setProxySettings = useVinxStore(s => s.setProxySettings);
+  const mediaById = useVinxStore(s => s.project.mediaBin);
+  // Editing proxies (native ffmpeg). Progress is "working" (0 < p < 1) while it runs.
+  const buildProxy = useCallback(async (mediaId: string) => {
+    const item = mediaById.find(m => m.id === mediaId);
+    if (!item) return;
+    updateMediaItem(mediaId, { proxyProgress: 0.5 });
+    const r = await makeProxy(item, { resolution: proxySettings?.resolution ?? '1/2' });
+    if (r.ok && r.proxyPath) {
+      updateMediaItem(mediaId, { proxyPath: r.proxyPath, proxyProgress: 1 });
+      if (!proxySettings?.enabled) setProxySettings({ enabled: true });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Proxy ready for ${item.name}` } }));
+    } else {
+      updateMediaItem(mediaId, { proxyProgress: 0 });
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Proxy failed: ${r.error}` } }));
+    }
+  }, [mediaById, updateMediaItem, proxySettings, setProxySettings]);
   const viewMode = useVinxStore(s => s.mediaViewMode);
   const setMediaViewMode = useVinxStore(s => s.setMediaViewMode);
   const search = useVinxStore(s => s.mediaBrowserSearch);
@@ -382,6 +402,13 @@ const MediaTab: React.FC = memo(() => {
           <BinIcon />
         </button>
         <div style={{ flex: 1 }} />
+        <button
+          aria-label="Use proxies for playback"
+          aria-pressed={!!proxySettings?.enabled}
+          title={proxySettings?.enabled ? 'Playing proxies (export always uses originals)' : 'Play originals'}
+          onClick={() => setProxySettings({ enabled: !proxySettings?.enabled })}
+          style={{ background: proxySettings?.enabled ? 'rgba(255,255,255,0.10)' : 'none', border: 'none', cursor: 'pointer', padding: '0 6px', height: 22, borderRadius: 9999, fontSize: 10, fontWeight: 600, color: proxySettings?.enabled ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}
+        >Proxy</button>
         <button aria-label={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`} onClick={() => setMediaViewMode(viewMode === 'list' ? 'grid' : 'list')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 22, width: 22, borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }}>
           {viewMode === 'list' ? <GridIcon /> : <ListIcon />}
@@ -472,6 +499,34 @@ const MediaTab: React.FC = memo(() => {
             fontSize: 12, color: 'var(--color-text-primary)',
           }}
         >
+          {(() => {
+            const it = mediaById.find(m => m.id === ctxMenu.mediaId);
+            if (!it || it.type !== 'video') return null;
+            const can = hasDiskPath(it);
+            const busy = it.proxyProgress > 0 && it.proxyProgress < 1;
+            return (
+              <>
+                <button
+                  role="menuitem"
+                  disabled={!can || busy}
+                  title={can ? undefined : 'Only clips imported from disk can have a proxy'}
+                  onClick={() => { void buildProxy(ctxMenu.mediaId); setCtxMenu(null); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 'var(--space-2) 14px', color: can ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: can && !busy ? 'pointer' : 'default' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >{busy ? 'Making proxy…' : it.proxyPath ? `Remake proxy (${proxySettings?.resolution ?? '1/2'})` : `Make proxy (${proxySettings?.resolution ?? '1/2'})`}</button>
+                {it.proxyPath && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { updateMediaItem(ctxMenu.mediaId, { proxyPath: null, proxyProgress: 0 }); setCtxMenu(null); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 'var(--space-2) 14px', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >Remove proxy</button>
+                )}
+              </>
+            );
+          })()}
           <button
             role="menuitem"
             onClick={() => { handleDelete(ctxMenu.mediaId); setCtxMenu(null); }}
@@ -523,6 +578,7 @@ const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () 
         <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
           {item.duration > 0 ? formatTimecode(Math.round(item.duration * 30), 30) : item.type}
           {item.width > 0 && ` / ${item.width}x${item.height}`}
+          {item.proxyPath && ' · proxy'}
         </div>
       </div>
     </div>
