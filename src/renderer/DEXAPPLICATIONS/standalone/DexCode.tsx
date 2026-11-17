@@ -255,6 +255,69 @@ const DexCode: React.FC = () => {
   // Track original content for modified detection
   const originalCodeRef = useRef(code);
 
+  // -- Editor tabs: several files open at once. The active tab's text lives in
+  // the normal editor state (code / fileName / path); the others are kept as
+  // snapshots and swapped in on switch, so every existing feature (run, save,
+  // find, outline, UKI context) keeps working on whatever tab is in front.
+  interface EditorTab { key: string; path: string | null; name: string; code: string; original: string; modified: boolean }
+  const newKey = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  const [tabs, setTabs] = useState<EditorTab[]>(() => [{ key: 'first', path: null, name: fileName, code, original: code, modified: false }]);
+  const [activeTab, setActiveTab] = useState('first');
+  const liveRef = useRef({ code, fileName, currentFilePath, isModified });
+  liveRef.current = { code, fileName, currentFilePath, isModified };
+  const snapshotActive = useCallback((list: EditorTab[]): EditorTab[] => list.map(t => t.key === activeTab
+    ? { ...t, path: liveRef.current.currentFilePath, name: liveRef.current.fileName, code: liveRef.current.code, original: originalCodeRef.current, modified: liveRef.current.isModified }
+    : t), [activeTab]);
+  const showTab = useCallback((t: EditorTab) => {
+    setCode(t.code);
+    setCurrentFilePath(t.path);
+    setFileName(t.name);
+    originalCodeRef.current = t.original;
+    setIsModified(t.modified);
+    setActiveTab(t.key);
+  }, []);
+  /** Open text in a tab: an already-open path is focused, otherwise a new tab. */
+  const openInTab = useCallback((doc: { path: string | null; name: string; code: string }) => {
+    setTabs(prev => {
+      const list = snapshotActive(prev);
+      const existing = doc.path ? list.find(t => t.path && t.path.toLowerCase() === doc.path!.toLowerCase()) : undefined;
+      if (existing) { showTab(existing); return list; }
+      // An untouched, empty-path first tab is replaced instead of piling up.
+      const cur = list.find(t => t.key === activeTab);
+      const tab: EditorTab = { key: newKey(), path: doc.path, name: doc.name, code: doc.code, original: doc.code, modified: false };
+      showTab(tab);
+      if (cur && !cur.path && !cur.modified && list.length === 1) return [tab];
+      return [...list, tab];
+    });
+  }, [snapshotActive, showTab, activeTab]);
+  const switchTab = useCallback((key: string) => {
+    if (key === activeTab) return;
+    setTabs(prev => {
+      const list = snapshotActive(prev);
+      const t = list.find(x => x.key === key);
+      if (t) showTab(t);
+      return list;
+    });
+  }, [activeTab, snapshotActive, showTab]);
+  const closeTab = useCallback((key: string) => {
+    setTabs(prev => {
+      const list = snapshotActive(prev);
+      const t = list.find(x => x.key === key);
+      if (t?.modified && !window.confirm(`Close ${t.name} without saving?`)) return list;
+      const rest = list.filter(x => x.key !== key);
+      if (!rest.length) {
+        const blank: EditorTab = { key: newKey(), path: null, name: 'untitled.dex', code: '', original: '', modified: false };
+        showTab(blank);
+        return [blank];
+      }
+      if (key === activeTab) {
+        const i = list.findIndex(x => x.key === key);
+        showTab(rest[Math.max(0, i - 1)]);
+      }
+      return rest;
+    });
+  }, [activeTab, snapshotActive, showTab]);
+
   // UKI dev-workspace awareness (DEX 5.6): expose the open file + language +
   // dirty state + cursor so UKI knows what code the user is editing. A ref keeps
   // the resolver reading live state without re-registering on every keystroke.
@@ -340,15 +403,11 @@ const DexCode: React.FC = () => {
     let result: { path: string; content: string } | null = null;
     try { result = await openFileDialog(); } catch (e) { fileError('Could not open the file', e); return; }
     if (result) {
-      setCode(result.content);
-      setCurrentFilePath(result.path);
-      setFileName(result.path.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = result.content;
-      setIsModified(false);
+      openInTab({ path: result.path, name: result.path.split(/[\\/]/).pop() || 'file.dex', code: result.content });
       addRecentFile(result.path);
       setRecentFiles(getRecentFiles());
     }
-  }, [fileError]);
+  }, [fileError, openInTab]);
 
   const handleSaveFile = useCallback(async () => {
     if (currentFilePath) {
@@ -388,21 +447,13 @@ const DexCode: React.FC = () => {
   }, [code, fileName, fileError]);
 
   const handleNewFile = useCallback(() => {
-    setCode(DEFAULT_CODE);
-    setCurrentFilePath(null);
-    setFileName('untitled.dex');
-    originalCodeRef.current = DEFAULT_CODE;
-    setIsModified(false);
-  }, []);
+    openInTab({ path: null, name: 'untitled.dex', code: DEFAULT_CODE });
+  }, [openInTab]);
 
   const handleOpenRecent = useCallback(async (filePath: string) => {
     try {
       const content = await readTextFile(filePath);
-      setCode(content);
-      setCurrentFilePath(filePath);
-      setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = content;
-      setIsModified(false);
+      openInTab({ path: filePath, name: filePath.split(/[\\/]/).pop() || 'file.dex', code: content });
       addRecentFile(filePath);
       setRecentFiles(getRecentFiles());
       setShowRecentFiles(false);
@@ -735,11 +786,7 @@ const DexCode: React.FC = () => {
   const loadEditorFromPath = useCallback(async (filePath: string, line?: number) => {
     const content = await readProjectFile(filePath);
     if (content == null) return;
-    setCode(content);
-    setCurrentFilePath(filePath);
-    setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');
-    originalCodeRef.current = content;
-    setIsModified(false);
+    openInTab({ path: filePath, name: filePath.split(/[\\/]/).pop() || 'file.dex', code: content });
     addRecentFile(filePath);
     setRecentFiles(getRecentFiles());
     if (line && line > 0) setTimeout(() => jumpToLine(line), 60);
@@ -1548,6 +1595,31 @@ const DexCode: React.FC = () => {
             <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Ctrl+Enter to run</span>
           </div>
         </div>
+
+        {/* Editor tabs */}
+        {tabs.length > 1 && (
+          <div role="tablist" aria-label="Open files" style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px', overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0 }}>
+            {tabs.map(t => {
+              const on = t.key === activeTab;
+              const name = on ? fileName : t.name;
+              const dirty = on ? isModified : t.modified;
+              return (
+                <div key={t.key} role="tab" aria-selected={on} tabIndex={0} title={(on ? currentFilePath : t.path) || 'Unsaved file'}
+                  onClick={() => switchTab(t.key)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(t.key); } }}
+                  onAuxClick={e => { if (e.button === 1) closeTab(t.key); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 6px 0 10px', borderRadius: 9999, cursor: 'pointer', flexShrink: 0, fontSize: 12,
+                    background: on ? 'var(--color-bg-hover)' : 'transparent', color: on ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+                  <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}{dirty ? ' •' : ''}</span>
+                  <button type="button" aria-label={`Close ${name}`} onClick={e => { e.stopPropagation(); closeTab(t.key); }}
+                    style={{ width: 18, height: 18, borderRadius: 9999, border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Quick Open (Ctrl/Cmd+P) — fuzzy file finder over the project + recents */}
         {showQuickOpen && (
