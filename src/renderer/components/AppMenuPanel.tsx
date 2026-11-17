@@ -15,6 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from './DexIcon';
 import { searchApps, type AppSearchHit } from '../services/appRegistry';
+import { spotlightEngine, type SpotlightResult } from '../shell/SpotlightEngine';
 import { appPinning, useMenuPinnedIds } from '../services/appPinning';
 import { openAppContextMenu, runAppAction } from './AppContextMenu';
 
@@ -49,6 +50,21 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   const ids = useMemo(() => apps.map(a => a.id), [apps]);
   const hits = useMemo(() => searchApps(query, ids), [query, ids]);
   const q = query.trim();
+  // DEX Search beyond apps: Settings, indexed files, notes, UKI commands --
+  // real results from the shared Spotlight index (no AI provider needed).
+  // Apps and app actions already come from the registry above.
+  const more = useMemo<SpotlightResult[]>(() => {
+    if (!q) return [];
+    try {
+      // The engine promotes its best hit to category "top", so filter on the
+      // id; scores under 30 are loose fuzzy noise ("dark" -> "Password").
+      const KEEP = /^(setting-|file-|fs-|note-|cmd-|command-|dexcmd-)/;
+      return spotlightEngine.search(q)
+        .filter(r => r.score >= 30 && (KEEP.test(r.id) || ['settings', 'files', 'notes', 'commands'].includes(r.category)))
+        .slice(0, 8);
+    } catch { return []; }
+  }, [q]);
+  const total = hits.length + more.length;
 
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(t); }, []);
   useEffect(() => { setActive(0); }, [query]);
@@ -56,6 +72,11 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   const pinned = pinnedIds.map(id => byId.get(id)).filter((a): a is MenuApp => !!a);
   const recent = history.filter(id => id !== 'home' && !pinnedIds.includes(id)).map(id => byId.get(id)).filter((a): a is MenuApp => !!a).slice(0, 6);
 
+  const runAt = (i: number) => {
+    if (i < hits.length) { runHit(hits[i]); return; }
+    const m = more[i - hits.length];
+    if (m) { try { m.action(); } finally { onClose(); } }
+  };
   const runHit = (h: AppSearchHit | undefined) => {
     if (!h) return;
     if (h.kind === 'action' && h.actionId) { runAppAction(h.appId, h.actionId); onClose(); }
@@ -66,9 +87,9 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     if (e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation();
       if (query) setQuery(''); else onClose();
-    } else if (q && e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, hits.length - 1)); }
+    } else if (q && e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, total - 1)); }
     else if (q && e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
-    else if (q && e.key === 'Enter') { e.preventDefault(); runHit(hits[active]); }
+    else if (q && e.key === 'Enter') { e.preventDefault(); runAt(active); }
     else if (!q && e.key === 'ArrowDown') { e.preventDefault(); gridRef.current?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus(); }
   };
 
@@ -175,7 +196,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           role="combobox"
           aria-expanded={!!q}
           aria-controls="dex-app-menu-results"
-          aria-activedescendant={q && hits[active] ? `dex-app-hit-${active}` : undefined}
+          aria-activedescendant={q && active < total ? `dex-app-hit-${active}` : undefined}
           aria-autocomplete="list"
           aria-label="Search apps and actions"
           placeholder="Search apps and actions"
@@ -204,8 +225,8 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
 
       {q ? (
         <div id="dex-app-menu-results" role="listbox" aria-label="Results">
-          {hits.length === 0 && (
-            <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps or actions match &ldquo;{q}&rdquo;</div>
+          {total === 0 && (
+            <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>Nothing matches &ldquo;{q}&rdquo;</div>
           )}
           {hits.map((h, i) => (
             <div
@@ -231,6 +252,31 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
               {runningIds.has(h.appId) && h.kind === 'app' && <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>Running</span>}
             </div>
           ))}
+          {more.map((m, k) => {
+            const i = hits.length + k;
+            const kind = m.category === 'settings' || m.id.startsWith('setting-') ? 'Setting'
+              : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'File'
+              : m.category === 'notes' || m.id.startsWith('note-') ? 'Note' : 'Command';
+            return (
+              <div
+                key={m.id}
+                id={`dex-app-hit-${i}`}
+                role="option"
+                aria-selected={i === active}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => runAt(i)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', background: i === active ? 'rgba(255,255,255,0.08)' : 'transparent' }}
+              >
+                <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)' }}>
+                  <DexIcon name={m.icon || 'search'} size={14} color="currentColor" />
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kind}{m.subtitle ? ` · ${m.subtitle}` : ''}</span>
+                </span>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }} aria-label="Applications" data-launchpad-grid="" onKeyDown={onGridKey}>
