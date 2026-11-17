@@ -260,7 +260,12 @@ export const LEDGER_CSS = `
 .lg-collapsed .lg-nav-label, .lg-collapsed .lg-nav-meta, .lg-collapsed .lg-side-head, .lg-collapsed .lg-side-accounts { display: none; }
 .lg-collapsed .lg-nav-row { justify-content: center; padding: 0; }
 .lg-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.lg-toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--color-border-subtle); min-height: 48px; flex-wrap: wrap; }
+.lg-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; margin: 8px 8px 4px; border-radius: 14px; min-height: 44px; flex-wrap: wrap;
+  /* Floating toolbar on the shared frosted material; the tables below stay opaque. */
+  background: color-mix(in srgb, var(--color-bg-base, #0c0c0e) 72%, transparent); backdrop-filter: blur(24px) saturate(170%); -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 6px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.10); }
+@media (prefers-reduced-transparency: reduce) { .lg-toolbar { backdrop-filter: none; background: var(--color-bg-elevated); } }
+.lg-toolbar .lg-btn, .lg-toolbar .lg-input, .lg-toolbar select.lg-input { border-radius: 9999px; }
 .lg-toolbar h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.01em; color: var(--color-text-primary); }
 .lg-toolbar .lg-sub { color: var(--color-text-tertiary); font-size: 12px; }
 .lg-spacer { flex: 1; }
