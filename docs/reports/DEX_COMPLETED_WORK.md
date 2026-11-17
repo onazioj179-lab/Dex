@@ -598,3 +598,12 @@ A scan of every channel the renderer calls by name against native arms that answ
 |---|---|---|---|---|---|---|---|
 | 14 | Offline speech recognition | CLOSED (owner 2026-11-17: voice is online, always; UKI uses Windows online dictation, #306) | Web Speech API may use an online service | Voice | Evaluate an on-device ASR (e.g. a small Whisper build) | — | P3 |
 | 39 | UI sound effects | DONE (only a listen-test in the packaged app is left) | Interface sounds are synthesized Web Audio (`shell/SpatialAudio.ts`), mute persists, Settings toggle synced. Windows notification toasts were always silent (WinRT writes `<audio silent>` when no sound is set); Settings › Notifications › Sound now reaches the toast. Not done: listen-test in the packaged app | Listen-test | — | P3 |
+
+### Session 2026-11-17 (`claude/dock-overlay-followup`): owner "codable parts" pass
+
+| # | App | Item | Priority | Status | What changed | Next check |
+|---|---|---|---|---|---|---|
+| 309 | Shell | No first-run onboarding; `applyEssentials` and the account flow were orphaned | HIGH | FIXED (3 unit tests) | `shell/SetupAssistant.tsx`: macOS-style Hello → Look (Dark/Light, applied live) → Apps (Everything / Essentials, wires `applyEssentials`) → UKI & notifications → Ready. Fresh profiles only (existing profiles are marked done silently), skippable, Escape skips, never shown to automated browsers. Local only: no account or cloud step | Fresh-profile run in the packaged app |
+| 310 | Maps | Reopened at San Francisco every time; no way to undo rotation or tilt | MEDIUM | FIXED (unit) | Reopens at the last view (centre, zoom, rotation, tilt, basemap; corrupt values rejected); compass that shows rotation and resets north-up; 3D tilt toggle; Reduce Motion respected | — |
+| 311 | Shell / large data | Audit: lists that render every row | MEDIUM | DONE (audit) | Gallery is virtualized (+ paged), Notes and Files page their lists, Task Manager uses VirtualList; nothing left rendering thousands of rows | — |
+
