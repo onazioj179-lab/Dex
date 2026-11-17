@@ -481,18 +481,65 @@ fn files_organize_by_type(dir: &str) -> Value {
 /// 0% CPU. The structured `cpu`/`memory`/`disk`/`network`/`uptime` fields are
 /// what the Task Manager reads; the flat `memory*MB`/`uptimeSec` fields are kept
 /// for the older power/diagnostics consumers that still read them.
-fn system_status() -> Value {
-    use std::time::Instant;
+/// One long-lived sampler for Task Manager / Nexus polling. Each call used to
+/// build a fresh `System::new_all()` (every process, disk and component), sleep,
+/// then `refresh_all()` again: two full process scans per second just to read
+/// global CPU and memory — measured at 12-18% of a core with Task Manager open.
+/// Now CPU and memory refresh alone against the previous sample (no sleep after
+/// the first call), network rates use the previous refresh, disks every 30 s.
+struct StatusSampler {
+    sys: sysinfo::System,
+    networks: sysinfo::Networks,
+    disks: sysinfo::Disks,
+    last_cpu: std::time::Instant,
+    last_net: std::time::Instant,
+    disks_at: std::time::Instant,
+}
 
-    let mut sys = sysinfo::System::new_all();
-    // Baseline network counters; received()/transmitted() then report the bytes
-    // moved since this point, which we divide by the elapsed time for a rate.
-    let mut networks = sysinfo::Networks::new_with_refreshed_list();
-    let t0 = Instant::now();
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
-    networks.refresh();
-    let elapsed = t0.elapsed().as_secs_f64().max(0.001);
+fn status_sampler() -> &'static std::sync::Mutex<StatusSampler> {
+    static S: std::sync::OnceLock<std::sync::Mutex<StatusSampler>> = std::sync::OnceLock::new();
+    S.get_or_init(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_cpu();
+        sys.refresh_memory();
+        let now = std::time::Instant::now();
+        std::sync::Mutex::new(StatusSampler {
+            sys,
+            networks: sysinfo::Networks::new_with_refreshed_list(),
+            disks: sysinfo::Disks::new_with_refreshed_list(),
+            last_cpu: now,
+            last_net: now,
+            disks_at: now,
+        })
+    })
+}
+
+/// Wait out the rest of sysinfo's minimum CPU interval since `last` (usually 0).
+fn wait_cpu_interval(last: std::time::Instant) {
+    let min = sysinfo::MINIMUM_CPU_UPDATE_INTERVAL;
+    let since = last.elapsed();
+    if since < min { std::thread::sleep(min - since); }
+}
+
+fn system_status() -> Value {
+    use crate::util::LockSafe;
+    use std::time::{Duration, Instant};
+
+    let mut guard = status_sampler().lock_safe();
+    let st = &mut *guard;
+    wait_cpu_interval(st.last_cpu);
+    st.sys.refresh_cpu();
+    st.sys.refresh_memory();
+    st.last_cpu = Instant::now();
+    st.networks.refresh();
+    let elapsed = st.last_net.elapsed().as_secs_f64().max(0.001);
+    st.last_net = Instant::now();
+    if st.disks_at.elapsed() > Duration::from_secs(30) {
+        st.disks.refresh();
+        st.disks_at = Instant::now();
+    }
+    let sys = &st.sys;
+    let networks = &st.networks;
 
     let cpu_usage = sys.global_cpu_info().cpu_usage();
     let cores = sys.cpus().len() as u64;
@@ -504,7 +551,7 @@ fn system_status() -> Value {
     let (swap_used, swap_total) = (sys.used_swap(), sys.total_swap());
 
     let (mut rx, mut tx, mut iface_count) = (0u64, 0u64, 0u64);
-    for (_iface, data) in &networks {
+    for (_iface, data) in networks {
         rx += data.received();
         tx += data.transmitted();
         iface_count += 1;
@@ -512,9 +559,8 @@ fn system_status() -> Value {
     let rx_bps = (rx as f64 / elapsed) as u64;
     let tx_bps = (tx as f64 / elapsed) as u64;
 
-    let disks = sysinfo::Disks::new_with_refreshed_list();
     let (mut disk_total, mut disk_avail) = (0u64, 0u64);
-    for d in &disks {
+    for d in &st.disks {
         disk_total += d.total_space();
         disk_avail += d.available_space();
     }
@@ -575,11 +621,20 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
 /// UKI) and `global.d.ts` expect `any[]`; the old `{ success, processes }`
 /// wrapper made all of them show an empty list.
 fn system_processes() -> Value {
-    let mut sys = sysinfo::System::new_all();
-    // Per-process CPU% is a delta between two samples; without the sleep every
-    // process reads 0% and the ranking collapses to memory only.
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
+    use crate::util::LockSafe;
+    // One persistent process table: per-process CPU% is the delta since the
+    // previous refresh (the previous poll), so no second scan or sleep per call
+    // except the very first (and only processes are refreshed, not everything).
+    static P: std::sync::OnceLock<std::sync::Mutex<(sysinfo::System, std::time::Instant)>> = std::sync::OnceLock::new();
+    let mut guard = P.get_or_init(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes();
+        std::sync::Mutex::new((sys, std::time::Instant::now()))
+    }).lock_safe();
+    wait_cpu_interval(guard.1);
+    guard.0.refresh_processes();
+    guard.1 = std::time::Instant::now();
+    let sys = &guard.0;
     let all: Vec<ProcInfo> = sys
         .processes()
         .iter()
