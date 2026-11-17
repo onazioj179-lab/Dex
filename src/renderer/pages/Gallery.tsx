@@ -1887,7 +1887,7 @@ export const Gallery: React.FC = () => {
                 </button>
               )}
               {selectedMedia.type === 'video' && (
-                <button style={{...styles.lightboxBtn, color: 'var(--color-tag-purple, #BF5AF2)'}} aria-label="Open in VINX" title="Open in VINX" onClick={() => {
+                <button style={{...styles.lightboxBtn, color: 'var(--color-text-primary)'}} aria-label="Open in VINX" title="Open in VINX" onClick={() => {
                   sendToApp({ name: selectedMedia.name, kind: 'video', data: selectedMedia.src, sourceApp: 'gallery' }, 'videoeditor');
                   const def = APP_DEFINITIONS['videoeditor'];
                   launchApp({ id: 'videoeditor', name: def.name, icon: def.icon, color: def.color });

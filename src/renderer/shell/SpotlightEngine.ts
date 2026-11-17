@@ -1329,16 +1329,34 @@ export class SpotlightEngine {
 
   registerAction(action: SpotlightAction): void {
     this._actions.set(action.id, action);
+    this._scheduleReindex();
   }
 
   unregisterAction(id: string): void {
     this._actions.delete(id);
+    this._scheduleReindex();
   }
 
   registerActions(actions: SpotlightAction[]): void {
     for (const a of actions) {
       this._actions.set(a.id, a);
     }
+    this._scheduleReindex();
+  }
+
+  // Apps and actions register AFTER the index is first built (AppManager mounts
+  // after Search starts), and the index only refreshed every 60 s -- so a
+  // search for "notes" found no Notes app for the first minute. Re-index once,
+  // batched, whenever the action set changes.
+  private _reindexQueued = false;
+  private _scheduleReindex(): void {
+    if (this._reindexQueued) return;
+    this._reindexQueued = true;
+    queueMicrotask(() => {
+      this._reindexQueued = false;
+      this._refreshIndex();
+      this._onRefresh?.();
+    });
   }
 
   // -- Search --------------------------------------------------------------
@@ -1510,8 +1528,11 @@ export class SpotlightEngine {
     const seen = new Set<string>();
 
     // Check against app names and common actions
+    const qn = query.trim().toLowerCase();
     for (const item of this._index) {
       if (seen.has(item.id)) continue;
+      // An exact title is not a typo: it is already the top hit.
+      if (item.title.trim().toLowerCase() === qn) continue;
       if (isLikelyTypo(query, item.title)) {
         seen.add(item.id);
         results.push({
