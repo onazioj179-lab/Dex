@@ -611,4 +611,7 @@ A scan of every channel the renderer calls by name against native arms that answ
 | 314 | Maps | Reference app: floating controls | MEDIUM | FIXED | Search is a frosted floating pill; zoom stack, compass, 3D and basemap buttons on the shared frosted material over the full-bleed map | — |
 | 315 | UKI (Nexus home) | Composer was a boxed footer | MEDIUM | FIXED (tests) | Floating frosted composer (max 760 px, centred); conversation scrolls beneath it; softer 18 px bubbles with tails | — |
 | 316 | AXL, Imosion | Creative toolbars as boxed strips | LOW | FIXED | AXL viewport rail is a floating rounded toolbar (opaque material: creative apps stay no-glass); Imosion zoom group is a pill. VINX transport bar left as is (pro layout) | — |
+| 317 | Dock | Owner: auto-collapse on | MEDIUM | FIXED (unit + e2e 9/10, reorder flakes only under build load) | Default is folded with auto-collapse; prefs saved before the change migrate once (`acV2` mark), later choices stick | — |
+| 318 | Docs | Active version references still said 7.0.1 | LOW | FIXED | README, RELEASE.md and the version helper say 7.0.2 (001z); 7.0.1 release notes/records kept. The in-app privacy policy still says 7.0.1 (policy text waits on owner approval) | Owner: approve policy version line |
+| 319 | Files, Browser, Settings | Boxed strips and loud labels | LOW | FIXED | Files toolbar is an inset rounded frosted bar with pill batch actions; Browser address field is a true pill with a quiet lock (no green); Settings group titles are 13 px sentence case | — |
 
