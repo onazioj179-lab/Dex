@@ -139,14 +139,31 @@ test.describe('Morphing Dock', () => {
     await boot(page);
     const before = await page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
     expect(before.length).toBeGreaterThanOrEqual(3);
-    const a = (await box(page, `[data-dock-item="${before[0]}"]`))!;
-    const c = (await box(page, `[data-dock-item="${before[2]}"]`))!;
-    await page.mouse.move(a.x + a.w / 2, a.y + a.h / 2);
-    await page.mouse.down();
-    for (let i = 1; i <= 8; i++) { await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2); await page.waitForTimeout(16); }
-    await page.mouse.up();
-    // Wait for the reorder to land (a fixed 200 ms sleep flaked under load).
     const order = () => page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
+    // Measure only once the Dock has stopped moving: boxes read during the
+    // entrance animation put the drag in the wrong place (CI flake, #34).
+    const stableBox = async (sel: string) => {
+      let prev = '';
+      for (let i = 0; i < 40; i++) {
+        const b = await box(page, sel);
+        const k = JSON.stringify(b);
+        if (b && k === prev) return b;
+        prev = k;
+        await page.waitForTimeout(50);
+      }
+      return (await box(page, sel))!;
+    };
+    const drag = async () => {
+      const a = await stableBox(`[data-dock-item="${before[0]}"]`);
+      const c = await stableBox(`[data-dock-item="${before[2]}"]`);
+      await page.mouse.move(a.x + a.w / 2, a.y + a.h / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 8; i++) { await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2); await page.waitForTimeout(16); }
+      await page.mouse.up();
+    };
+    await drag();
+    // A loaded runner can drop the drag's first moves; one re-measured retry.
+    if ((await order())[0] === before[0]) { await page.waitForTimeout(300); if ((await order())[0] === before[0]) await drag(); }
     await expect.poll(async () => (await order())[0], { timeout: 4000 }).toBe(before[1]);
     const after = await order();
     expect(after.indexOf(before[0]!)).toBeGreaterThan(0);
