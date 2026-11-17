@@ -1879,7 +1879,7 @@ const AXL: React.FC = () => {
           )}
 
           {/* ── Blender-style Viewport Header Bar ──────────────────── */}
-          <div className="dex-axl-rail" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 var(--space-2)', borderRadius: 0, borderBottom: '1px solid var(--color-border-subtle)', zIndex: 10 }}>
+          <div className="dex-axl-rail dex-mat-opaque" role="toolbar" aria-label="Viewport" style={{ position: 'absolute', top: 6, left: 8, right: 8, height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 6px', borderRadius: 9999, zIndex: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {/* Viewport Mode */}
             <div style={{ display: 'flex', background: 'var(--color-bg-hover)', borderRadius: 9999, padding: 2 }}>
               {[
