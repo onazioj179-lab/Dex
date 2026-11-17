@@ -13,7 +13,14 @@
 >   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
 > - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
 >   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.
-> - **Open:** Resource Coordinator (batch 3), downloads/security (7), app passes (8–12), UKI (13), stress set (15), release (16).
+> - **Open:** Resource Coordinator (batch 3), app passes (8–12), stress set (15), release (16).
+>
+> **Part 22 (2026-11-17, security-first) status:** onboarding integrity in Rust (#330), UKI terminal broker with
+> risk classes and the "Run shell commands" grant (#331), Background tasks view (#332), native background
+> downloads (#333), DEX Capsule notifications (#334), tooltip audit (#335), idle-CPU fixes (#329). Packaged
+> security run: `scripts/perf/packaged-security.mjs` → `docs/reports/perf/2026-11-17-security.json`.
+> Not done: 90/120 Hz frame-time measurement on real high-refresh hardware (this PC is 60 Hz), C++ review
+> (owner decision #75/#143), ToS legal review (#19), signing (#30).
 
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
