@@ -122,8 +122,12 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const collapsedLen = layout.collapsedLen;
   const anchor = edge === 'bottom' ? vp.w / 2 : area.desktop.y + area.desktop.h / 2;
   const open = expanded || !!drag?.active;
+  // Owner (2026-11-17): the Dock sits at the absolute centre of its edge in
+  // both states -- open, the whole strip is centred (not the search button);
+  // collapsed, the button is. Still clamped inside the screen.
+  const openLen = Math.min(expandedLen, area.dockMaxLength);
   const placed = open
-    ? placeDockAroundTrigger(area, edge, expandedLen, triggerCenter, anchor, DOCK_MARGIN)
+    ? placeDockAroundTrigger(area, edge, expandedLen, openLen / 2, anchor, DOCK_MARGIN)
     : { start: anchor - collapsedLen / 2, length: collapsedLen };
   // Collapsed, the track slides so its trigger sits in the middle of the button.
   const trackShift = open ? 0 : -(triggerCenter - collapsedLen / 2);

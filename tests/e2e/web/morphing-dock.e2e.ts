@@ -51,13 +51,16 @@ function inside(b: Box, v: { w: number; h: number }) {
 }
 
 test.describe('Morphing Dock', () => {
-  test('morphs from the trigger: the search button stays put, collapse is faster, nothing leaves the screen', async ({ page }) => {
+  test('stays centred open and collapsed, collapse is faster, nothing leaves the screen', async ({ page }) => {
     await boot(page);
     const v = await vp(page);
     const dockOpen = (await box(page, '.dex-mdock'))!;
     const trigOpen = (await box(page, '[data-dock-item="__trigger"]'))!;
     inside(dockOpen, v);
     expect(dockOpen.y + dockOpen.h).toBe(v.h - 8);
+    // Absolute centre of the bottom edge (owner, 2026-11-17).
+    expect(Math.abs(dockOpen.x + dockOpen.w / 2 - v.w / 2)).toBeLessThanOrEqual(1);
+    void trigOpen;
 
     await page.locator('[data-dock-item="__trigger"]').focus();
     await page.keyboard.press('Escape');
@@ -67,15 +70,11 @@ test.describe('Morphing Dock', () => {
     const trigClosed = (await box(page, '[data-dock-item="__trigger"]'))!;
     expect(dockClosed.w).toBe(52);
     expect(dockClosed.h).toBe(52);
-    // Icon continuity: the trigger is the same element in the same place.
-    expect(Math.abs(trigClosed.x - trigOpen.x)).toBeLessThanOrEqual(1);
+    // Collapsed, the search button is centred too.
+    expect(Math.abs(dockClosed.x + dockClosed.w / 2 - v.w / 2)).toBeLessThanOrEqual(1);
     expect(Math.abs(trigClosed.y - trigOpen.y)).toBeLessThanOrEqual(1);
 
-    // Mid-morph the trigger does not move either.
     await page.locator('[data-dock-item="__trigger"]').click();
-    await page.waitForTimeout(110);
-    const mid = (await box(page, '[data-dock-item="__trigger"]'))!;
-    expect(Math.abs(mid.x - trigClosed.x)).toBeLessThanOrEqual(1);
     await settled(page);
     expect(await page.locator('.dex-mdock').getAttribute('data-state')).toBe('expanded');
 
