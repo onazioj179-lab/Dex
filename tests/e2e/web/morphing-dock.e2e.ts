@@ -139,11 +139,12 @@ test.describe('Morphing Dock', () => {
     const c = (await box(page, `[data-dock-item="${before[2]}"]`))!;
     await page.mouse.move(a.x + a.w / 2, a.y + a.h / 2);
     await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2);
+    for (let i = 1; i <= 8; i++) { await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2); await page.waitForTimeout(16); }
     await page.mouse.up();
-    await page.waitForTimeout(200);
-    const after = await page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
-    expect(after[0]).toBe(before[1]);
+    // Wait for the reorder to land (a fixed 200 ms sleep flaked under load).
+    const order = () => page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
+    await expect.poll(async () => (await order())[0], { timeout: 4000 }).toBe(before[1]);
+    const after = await order();
     expect(after.indexOf(before[0]!)).toBeGreaterThan(0);
     await page.reload();
     await page.waitForFunction(() => !!document.querySelector('.dex-mdock [data-group="pinned"]'));
