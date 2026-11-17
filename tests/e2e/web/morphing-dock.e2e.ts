@@ -13,7 +13,11 @@ type Box = { x: number; y: number; w: number; h: number };
 const PREFS = 'dex-dock-prefs-v1';
 
 async function boot(page: Page, prefs?: Record<string, unknown>): Promise<void> {
-  if (prefs) await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(prefs)] as const);
+  // The shipped default is folded + auto-collapse (owner 2026-11-17); these
+  // geometry tests start from an open Dock that stays open, marked as a
+  // deliberate choice (acV2) so the one-time migration leaves it alone.
+  const seeded = { expanded: true, autoCollapse: false, ...prefs, acV2: true };
+  await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(seeded)] as const);
   await page.goto('/');
   await page.waitForFunction(() => !!window.__dexRunningApps && !!document.querySelector('.dex-mdock'), null, { timeout: 120_000 });
   await page.waitForTimeout(500);
