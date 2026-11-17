@@ -39,7 +39,6 @@ const Switch: React.FC<{ on: boolean; label: string; onChange: (v: boolean) => v
 
 export const SpatialDesktopPanel: React.FC = () => {
   const enabled = useSpatialStore((s) => s.enabled);
-  const minimap = useSpatialStore((s) => s.minimap);
   const snapGrid = useSpatialStore((s) => s.snapGrid);
   const mod = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? 'Cmd+Opt' : 'Ctrl+Alt';
   return (
@@ -54,13 +53,6 @@ export const SpatialDesktopPanel: React.FC = () => {
           </div>
         </div>
         <Switch on={enabled} label="Spatial desktop" onChange={(v) => window.dispatchEvent(new CustomEvent('dex-spatial-toggle', { detail: { enabled: v } }))} />
-      </div>
-      <div style={row}>
-        <div>
-          <div style={label}>Minimap</div>
-          <div style={desc}>Show an overview of the canvas in the top-right corner ({mod}+M). Click or drag on it to move the view.</div>
-        </div>
-        <Switch on={minimap} label="Minimap" onChange={() => useSpatialStore.getState().toggleMinimap()} />
       </div>
       <div style={row}>
         <div>

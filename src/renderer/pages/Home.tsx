@@ -33,7 +33,7 @@ import { CreatorMark } from '../shell/CreatorMark';
 
 const SPATIAL_MENU_ICONS: Record<string, string> = {
   enter: 'maximize', fit: 'maximize', 'zoom-in': 'zoom-in', 'zoom-out': 'minus', actual: 'search',
-  back: 'arrow-left', windows: 'layers', minimap: 'grid', leave: 'close',
+  back: 'arrow-left', windows: 'layers', leave: 'close',
 };
 
 // App icon images

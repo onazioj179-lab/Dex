@@ -24,20 +24,19 @@ describe('spatial desktop: no persistent bottom controls', () => {
     expect(hud.style.top).toBe('16px');
   });
 
-  it('opens the Windows panel from the shortcut event and the minimap on demand', () => {
+  it('opens the Windows panel from the shortcut event; the minimap is gone (owner, 2026-11-17)', () => {
     render(<SpatialHud />);
     act(() => { window.dispatchEvent(new CustomEvent('dex-spatial-windows')); });
     expect(screen.getByRole('dialog', { name: 'Spatial desktop panel' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'Layout' }));
     expect(screen.getByRole('button', { name: 'Grid' })).toBeTruthy();
     act(() => { useSpatialStore.getState().toggleMinimap(); });
-    fireEvent.click(screen.getByRole('button', { name: 'Hide minimap' }));
-    expect(useSpatialStore.getState().minimap).toBe(false);
+    expect(screen.queryByRole('img', { name: /Minimap/ })).toBeNull();
   });
 
   it('exposes every former toolbar action through the desktop menu', () => {
     const ids = spatialMenuActions().map((a) => a.id);
-    expect(ids).toEqual(['fit', 'zoom-in', 'zoom-out', 'actual', 'back', 'windows', 'minimap', 'leave']);
+    expect(ids).toEqual(['fit', 'zoom-in', 'zoom-out', 'actual', 'back', 'windows', 'leave']);
     useSpatialStore.setState({ enabled: false });
     expect(spatialMenuActions().map((a) => a.id)).toEqual(['enter']);
   });

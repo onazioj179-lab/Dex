@@ -204,6 +204,7 @@ mod read_later;
 mod recycle_bin;
 mod rewind;
 mod terminal;
+mod speech_ctl;
 mod workflows;
 mod security;
 mod relationship_graph;
@@ -2436,6 +2437,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("prerender:") { return prerender_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("privacy:") { return privacy_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("pty:") { return terminal::dispatch(&app, &channel, &args); }
+    if channel.starts_with("speech:") { return speech_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("quickactions:") { return quickactions_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("recovery:") { return recovery_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("reliability:") { return reliability_ctl::dispatch(&app, &channel, &args); }
@@ -2990,6 +2992,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // Piped-stdio shell sessions; output streams back as pty:data/pty:exit
         // events. Needs the AppHandle (for emit + managed session state).
         ch if ch.starts_with("pty:") => terminal::dispatch(&app, ch, &args),
+        // UKI voice: Windows online dictation (speech:start/stop/status).
+        ch if ch.starts_with("speech:") => speech_ctl::dispatch(&app, ch, &args),
 
         // --- HTTP file transfer (LAN QR/link share) ------------------------
         // Self-contained HTTP server for download/upload over the LAN (the DTP

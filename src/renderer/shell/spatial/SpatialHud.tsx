@@ -66,7 +66,6 @@ export function spatialMenuActions(): SpatialMenuAction[] {
     { id: 'actual', label: `Actual Size (${Math.round(s.camera.z * 100)}%)`, shortcut: KEY('0'), run: () => s.setZoom(1) },
     { id: 'back', label: 'Previous View', shortcut: KEY('Backspace'), disabled: s.history.length === 0, run: () => s.back() },
     { id: 'windows', label: 'Windows, Zones & Layout…', shortcut: KEY('W'), run: () => window.dispatchEvent(new CustomEvent('dex-spatial-windows')) },
-    { id: 'minimap', label: s.minimap ? 'Hide Minimap' : 'Show Minimap', shortcut: KEY('M'), run: () => s.toggleMinimap() },
     { id: 'leave', label: 'Leave Spatial Desktop', shortcut: KEY('S'), run: () => window.dispatchEvent(new CustomEvent('dex-spatial-toggle', { detail: { enabled: false } })) },
   ];
 }
@@ -76,7 +75,6 @@ export function spatialMenuActions(): SpatialMenuAction[] {
  *  region announcing the zoom for screen readers. Nothing here is persistent. */
 export const SpatialHud: React.FC = () => {
   const zoom = useSpatialStore((s) => s.camera.z);
-  const minimap = useSpatialStore((s) => s.minimap);
   const [panelOpen, setPanelOpen] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
   const pct = Math.round(zoom * 100);
@@ -100,7 +98,6 @@ export const SpatialHud: React.FC = () => {
         opacity: showZoom ? 1 : 0, transition: 'opacity 160ms var(--ease-standard, ease)',
       }}>{pct}%</div>
       {panelOpen && <WindowsPanel onClose={() => setPanelOpen(false)} />}
-      {minimap && <Minimap />}
       <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{`Zoom ${pct}%`}</span>
     </div>
   );
@@ -108,54 +105,8 @@ export const SpatialHud: React.FC = () => {
 
 // ---------------------------------------------------------------------------
 
-const MM_W = 220, MM_H = 140;
-
-const Minimap: React.FC = () => {
-  const windows = useSpatialStore((s) => s.windows);
-  const groups = useSpatialStore((s) => s.groups);
-  const camera = useSpatialStore((s) => s.camera);
-  const viewport = useSpatialStore((s) => s.viewport);
-  const ref = useRef<SVGSVGElement>(null);
-  const visible = Object.values(windows).filter((w) => !w.minimized);
-  const view = viewRect(camera, viewport.w, viewport.h);
-  const world = boundsOf([...visible, view]) ?? view;
-  const pad = 0.08 * Math.max(world.w, world.h);
-  const box = { x: world.x - pad, y: world.y - pad, w: world.w + pad * 2, h: world.h + pad * 2 };
-  const k = Math.min(MM_W / box.w, MM_H / box.h);
-  const ox = (MM_W - box.w * k) / 2, oy = (MM_H - box.h * k) / 2;
-  const toMM = (x: number, y: number) => ({ x: ox + (x - box.x) * k, y: oy + (y - box.y) * k });
-  const groupOf = new Map<string, string>();
-  for (const g of groups) for (const a of g.appIds) groupOf.set(a, g.color);
-
-  // Click / drag: centre the view on the pointed world position.
-  const navigate = (e: React.PointerEvent) => {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    const wx = box.x + (e.clientX - r.left - ox) / k;
-    const wy = box.y + (e.clientY - r.top - oy) / k;
-    const s = useSpatialStore.getState();
-    s.setCamera({ x: wx - s.viewport.w / 2 / s.camera.z, y: wy - s.viewport.h / 2 / s.camera.z, z: s.camera.z });
-  };
-
-  const v = toMM(view.x, view.y);
-  return (
-    <div style={{ ...panel, padding: 6, pointerEvents: 'auto', position: 'relative' }}>
-      <button className="dex-spatial-btn" onClick={() => useSpatialStore.getState().toggleMinimap()} aria-label="Hide minimap" title={`Hide minimap (${KEY('M')})`}
-        style={{ ...btn, position: 'absolute', top: 8, right: 8, height: 22, minWidth: 22, padding: 0, background: 'var(--color-bg-glass-strong)' }}><Icon d={I.close} size={12} /></button>
-      <svg ref={ref} width={MM_W} height={MM_H} role="img" aria-label={`Minimap: ${visible.length} windows`} style={{ display: 'block', cursor: 'pointer', touchAction: 'none' }}
-        onPointerDown={(e) => { (e.currentTarget as Element).setPointerCapture(e.pointerId); navigate(e); }}
-        onPointerMove={(e) => { if (e.buttons & 1) navigate(e); }}>
-        <rect x={0} y={0} width={MM_W} height={MM_H} rx={6} fill="var(--color-bg-inset)" />
-        {visible.map((w) => {
-          const p = toMM(w.x, w.y);
-          return <rect key={w.id} x={p.x} y={p.y} width={Math.max(2, w.w * k)} height={Math.max(2, w.h * k)} rx={1.5}
-            fill={groupOf.get(w.id) ?? 'var(--color-text-tertiary)'} opacity={0.55} />;
-        })}
-        <rect x={v.x} y={v.y} width={view.w * k} height={view.h * k} fill="none" stroke="var(--color-accent)" strokeWidth={1.5} rx={2} />
-      </svg>
-    </div>
-  );
-};
+// The minimap was removed (owner, 2026-11-17): Show All Windows, the
+// Windows panel and zoom-to-fit groups cover overview and navigation.
 
 // ---------------------------------------------------------------------------
 
@@ -274,7 +225,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <button type="submit" style={{ ...btn, background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)' }}>Group</button>
                 </form>
                 <div role="group" aria-label="Align selected windows" style={{ display: 'flex', flexWrap: 'wrap', gap: 2, padding: '4px' }}>
-                  {([['left', 'Align left'], ['center-x', 'Align centres'], ['right', 'Align right'], ['top', 'Align top'], ['center-y', 'Align middles'], ['bottom', 'Align bottom']] as Array<[AlignKind, string]>).map(([k, label]) => (
+                  {([['left', 'Align left'], ['center-x', 'Align centres'], ['right', 'Align right'], ['top', 'Align top'], ['center-y', 'Align middles'], ['bottom', 'Align bottom'], ['same-width', 'Same width'], ['same-height', 'Same height'], ['same-size', 'Same size']] as Array<[AlignKind, string]>).map(([k, label]) => (
                     <button key={k} className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} disabled={sel.size < 2} onClick={() => st().alignWindows(ids, k)}>{label}</button>
                   ))}
                   <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)', opacity: sel.size < 3 ? 0.45 : 1 }} disabled={sel.size < 3} onClick={() => st().distributeWindows(ids, 'x')}>Distribute across</button>

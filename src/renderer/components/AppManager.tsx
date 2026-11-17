@@ -3792,6 +3792,24 @@ export const AppManager: React.FC = () => {
     };
     const inHud = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-spatial-hud]');
     const inWindow = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-floating-window]');
+    // Can some scroll container between the target and its window still move
+    // in this direction? Text fields and editors count as scrollable.
+    const canScrollInside = (target: EventTarget | null, dx: number, dy: number): boolean => {
+      let n = target as HTMLElement | null;
+      while (n && !n.hasAttribute?.('data-floating-window')) {
+        if (n.isContentEditable || /^(TEXTAREA|SELECT)$/.test(n.tagName)) return true;
+        const cs = getComputedStyle(n);
+        const oy = /(auto|scroll|overlay)/.test(cs.overflowY), ox = /(auto|scroll|overlay)/.test(cs.overflowX);
+        if (dy && oy && n.scrollHeight > n.clientHeight + 1) {
+          if ((dy > 0 && n.scrollTop + n.clientHeight < n.scrollHeight - 1) || (dy < 0 && n.scrollTop > 0)) return true;
+        }
+        if (dx && ox && n.scrollWidth > n.clientWidth + 1) {
+          if ((dx > 0 && n.scrollLeft + n.clientWidth < n.scrollWidth - 1) || (dx < 0 && n.scrollLeft > 0)) return true;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    };
     const onWheel = (e: WheelEvent) => {
       if (inHud(e.target)) return;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
@@ -3808,7 +3826,10 @@ export const AppManager: React.FC = () => {
         st().zoomAtPoint(p.x, p.y, Math.min(1.25, Math.max(0.8, Math.exp(-dy * 0.0025))));
         return;
       }
-      if (!inWindow(e.target)) {
+      // Scroll chaining (owner, 2026-11-17): over an app the wheel scrolls the
+      // app first; once the app cannot scroll any further that way (or has
+      // nothing to scroll), the same wheel pans the canvas.
+      if (!inWindow(e.target) || !canScrollInside(e.target, e.shiftKey ? dy : dx, e.shiftKey ? 0 : dy)) {
         e.preventDefault();
         e.stopPropagation();
         st().pan(-(e.shiftKey ? dy : dx), e.shiftKey ? 0 : -dy);
@@ -3923,7 +3944,6 @@ export const AppManager: React.FC = () => {
         case 'actualSize': claim(); st.setZoom(1); return;
         case 'fitAll': claim(); st.fitAll(); return;
         case 'back': claim(); st.back(); return;
-        case 'minimap': claim(); st.toggleMinimap(); return;
         case 'windows': claim(); window.dispatchEvent(new CustomEvent('dex-spatial-windows')); return;
         case 'saveView': claim(); st.saveView(); return;
         case 'focusFront': {
