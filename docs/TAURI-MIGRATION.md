@@ -16,6 +16,11 @@
 - `SpotlightEngine` re-indexes when actions register (apps were missing for the first 60 s). App Menu search appends score-filtered Spotlight results (settings/files/notes/commands).
 - VINX proxies: `video:transcode` `scale` (`proxy_scale_filter`, cargo-tested), `vinx/mediaProxy.ts`, `exportingOriginals` store flag.
 - Packaged test recipe used: `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` scratch dirs, CDP port 9371, scripts drive `window.__dexRunningApps` / `__dexDockStore`.
+- Onboarding gate (`onboarding.rs`): protected channels are listed in `PROTECTED_PREFIXES` and refused in `dex_ipc` until Terms + Privacy are acknowledged for the current versions; bump `TERMS_VERSION` / `PRIVACY_VERSION` when those documents change materially (existing profiles then get the review step). Isolated test profiles start not-started: call `onboarding:accept` with `onboarding:status().current` first.
+- UKI commands go only through `uki_terminal.rs` (`ukiterm:*`, own window only). Add refusals to `classify()` PRIVILEGED, never loosen the env scrub. UKI side: `run_command` needs the `shell` grant and always confirms.
+- Window ids: `notes~2` resolves through `byAppId` maps (`services/appWindows.ts`); a new per-app map keyed by app id must be wrapped too, and a source-parsing test must look for `APP_DEFINITIONS_RAW`.
+- Polling native stats: keep one persistent sysinfo sampler (`status_sampler()`); never `System::new_all()` per call.
+- Packaged checks: `scripts/perf/packaged-probe.mjs` (perf) and `scripts/perf/packaged-security.mjs` (security, 21 checks) against a release exe on an isolated profile.
 - Overlays: any popup/dialog registers with `useOverlay(open, onClose, { ref, dismissOnOutside, ownEscape })` from `services/overlayStack.ts`; never add a window `keydown` Escape listener of your own (it fires alongside the overlay above and closes two layers). Pass `dismissOnOutside: false` when a backdrop handles clicks, or a `ref` (without one, every click counts as outside). The stack wires at import. Migrated: ContextMenu, UnifiedDropdown, `ui/Modal`, Control Center, Permissions, Quick Actions, Flow send, Learn, payment picker, Quick Controls (#325, #326).
 
 ## Apps UI/UX + Liquid Glass pass (2026-11-14)
