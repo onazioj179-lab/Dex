@@ -181,9 +181,11 @@ export function locationErrorMessage(code: number): string {
   return 'Your location is not available right now.';
 }
 
+// Map controls sit on the shared frosted material (.dex-mat-frosted on their
+// group), so the buttons themselves are transparent.
 const ctrlBtn: React.CSSProperties = {
   width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
+  background: 'transparent', border: '1px solid transparent',
   color: 'var(--color-text-primary)', cursor: 'pointer', padding: 0,
   transition: 'background 0.12s ease, color 0.12s ease',
 };
@@ -616,7 +618,8 @@ const DexMaps: React.FC = () => {
 
       {/* Search */}
       <div
-        style={{ position: 'absolute', top: 12, left: 12, width: 'min(320px, calc(100% - 24px))', zIndex: 6 }}
+        className="dex-maps-search"
+        style={{ position: 'absolute', top: 12, left: 12, width: 'min(340px, calc(100% - 24px))', zIndex: 6 }}
         onFocus={() => setFocused(true)}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false); }}
       >
@@ -824,17 +827,17 @@ const DexMaps: React.FC = () => {
       )}
 
       {/* Vertical control stack (custom, DEX-styled) */}
-      <div style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border)', zIndex: 5 }}>
+      <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', zIndex: 5 }}>
         <button aria-label="Zoom in" title="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="plus" size={16} />
         </button>
         <button aria-label="Zoom out" title="Zoom out" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="minus" size={16} />
         </button>
         <button aria-label="My location" title="My location" style={{ ...ctrlBtn, borderWidth: 0 }}
-          onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="navigation" size={15} />
         </button>
       </div>
@@ -843,10 +846,10 @@ const DexMaps: React.FC = () => {
       <div style={{ position: 'absolute', right: 12, bottom: 146, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 5 }}>
         <button aria-label={pitch > 1 ? 'Flat view' : '3D view'} title={pitch > 1 ? 'Flat view' : 'Tilt to 3D'} aria-pressed={pitch > 1}
           onClick={() => mapRef.current?.easeTo({ pitch: pitch > 1 ? 0 : 60, duration: isReduceMotion() ? 0 : 400 })}
-          style={{ ...ctrlBtn, borderRadius: 9999, fontSize: 11, fontWeight: 700, color: pitch > 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>3D</button>
+          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 9999, fontSize: 11, fontWeight: 700, color: pitch > 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>3D</button>
         <button aria-label="Reset to north" title="North up" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
           onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: isReduceMotion() ? 0 : 400 })}
-          style={{ ...ctrlBtn, borderRadius: 9999, opacity: Math.abs(bearing) < 0.5 && pitch < 1 ? 0.55 : 1 }}>
+          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 9999, opacity: Math.abs(bearing) < 0.5 && pitch < 1 ? 0.55 : 1 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)`, transition: 'transform 0.1s linear' }}>
             <path d="M12 2l4 10h-8z" fill="#ff453a" /><path d="M12 22l-4-10h8z" fill="currentColor" opacity="0.6" />
           </svg>
@@ -857,9 +860,9 @@ const DexMaps: React.FC = () => {
       <button aria-label={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
         title={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
         onClick={cycleStyle}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}
+        className="dex-mat-frosted"
         style={{ position: 'absolute', left: 12, bottom: 28, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10,
+          borderRadius: 9999,
           color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'background 0.12s ease', zIndex: 5 }}>
         <DexIcon name={MAP_STYLES[styleKey].icon} size={14} />
         {MAP_STYLES[styleKey].label}
