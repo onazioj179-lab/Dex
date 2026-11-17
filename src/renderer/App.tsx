@@ -17,6 +17,7 @@
  * ===========================================================================
  */
 
+import { SetupAssistant } from './shell/SetupAssistant';
 import { installSelectionGuard } from './shell/selectionGuard';
 import { GlassFilters } from './components/GlassFilters';
 import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
@@ -522,6 +523,8 @@ export const App: React.FC = () => {
       {/* The shell's own global rules (html, body, *). App style blocks must stay scoped. */}
       <style data-dex-shell-style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
       <GlassFilters />
+      {/* First run only (fresh profile); existing profiles never see it. */}
+      <SetupAssistant />
       
       {/* Window drag region for frameless window (Windows) */}
       <div className="dex-window-titlebar" aria-hidden="true" />
