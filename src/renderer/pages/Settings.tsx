@@ -3451,6 +3451,9 @@ export const Settings: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 14 }}>
+          <button style={styles.linkBtn} onClick={() => window.dispatchEvent(new Event('dex-open-onboarding-review'))} aria-label="Review the Terms of Service and Privacy Notice decision">
+            Review terms decision
+          </button>
           {POLICY_METADATA.map(policy => (
             <button key={policy.slug} style={styles.linkBtn} onClick={() => openPolicyViewer(policy.slug)} aria-label={`Open ${policy.title}`}>
               {policy.title}

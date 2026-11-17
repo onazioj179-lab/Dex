@@ -13,6 +13,8 @@
 // nothing is estimated or decorative. Data stays on this device.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppLifecycle } from '../hooks/useAppLifecycle';
+import { useAppWindowId } from '../services/appWindows';
 import DexIcon from '../components/DexIcon';
 import { openAppContextMenu } from '../components/AppContextMenu';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
@@ -233,8 +235,13 @@ const TaskManager: React.FC = () => {
   }, []);
 
   // Polling: status at the chosen speed; the process list (heavier) at 3x that,
-  // and only while the Processes view is open. Stops while DEX is hidden.
+  // and only while the Processes view is open. Stops while DEX is hidden AND
+  // while Task Manager is behind other apps: measured in the release build,
+  // a background Task Manager kept the native host at ~13% of a core idle.
+  const phase = useAppLifecycle(useAppWindowId('taskmanager')); // Nexus renders this too, under its own id
+  const onScreen = phase === 'foreground';
   useEffect(() => {
+    if (!onScreen) return;
     void refreshStatus();
     void refreshProcesses();
     if (speed === 0) return;
@@ -252,7 +259,7 @@ const TaskManager: React.FC = () => {
     start();
     document.addEventListener('visibilitychange', onVis);
     return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
-  }, [speed, view, refreshStatus, refreshProcesses]);
+  }, [speed, view, refreshStatus, refreshProcesses, onScreen]);
 
   const refreshNow = useCallback(() => { void refreshStatus(); void refreshProcesses(); }, [refreshStatus, refreshProcesses]);
 

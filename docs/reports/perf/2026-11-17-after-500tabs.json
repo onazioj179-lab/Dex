@@ -1,0 +1,176 @@
+{
+  "label": "after-500tabs",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/after-exe/dex-tauri.exe",
+  "at": "2026-11-17T21:40:31.619Z",
+  "machine": {
+    "os": "Windows 10.0.26300",
+    "cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+    "logicalCores": 8,
+    "ramGB": 16
+  },
+  "method": "release exe, isolated DEX_DATA_DIR + WebView2 profile, driven over CDP; timings are wall clock from process spawn",
+  "cold": {
+    "spawnToCdpMs": 737,
+    "spawnToDesktopUsableMs": 1453,
+    "domContentLoadedMs": 500,
+    "loadMs": 506,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 161
+  },
+  "idleShell": {
+    "cpuPctOfOneCore": 54.6,
+    "processes": 7,
+    "workingSetMB": 1725,
+    "privateMB": 1398
+  },
+  "appLaunchMs": {
+    "notes": null,
+    "files": 35,
+    "settings": 38,
+    "ledger": 55,
+    "calendar": 603,
+    "tasks": 39,
+    "dexcode": 44,
+    "taskmanager": 37,
+    "games": 49,
+    "calculator": null
+  },
+  "idleWithApps": {
+    "apps": 10,
+    "cpuPctOfOneCore": 21.5,
+    "processes": 8,
+    "workingSetMB": 705,
+    "privateMB": 390
+  },
+  "idleProfile": {
+    "busyMsIn10s": 58,
+    "topSelfTime": [
+      [
+        "Xa react-vendor-BbBaDjqq.js:40:12469",
+        9
+      ],
+      [
+        "mC dex-app-core-B5d6UoBY.js:579:5642",
+        6
+      ],
+      [
+        "Ps react-vendor-BbBaDjqq.js:37:7515",
+        6
+      ],
+      [
+        "where :3:21",
+        6
+      ],
+      [
+        "s react-vendor-BbBaDjqq.js:38:7082",
+        4
+      ],
+      [
+        "(garbage collector) :0:0",
+        4
+      ],
+      [
+        "fs react-vendor-BbBaDjqq.js:17:239",
+        4
+      ],
+      [
+        "requestAnimationFrame :0:0",
+        3
+      ],
+      [
+        "(anon) app-standalone-nexus-BAr1GrEv.js:2:7154",
+        2
+      ],
+      [
+        "ge app-standalone-nexus-BAr1GrEv.js:1:1611",
+        2
+      ],
+      [
+        "Lu react-vendor-BbBaDjqq.js:40:3069",
+        1
+      ],
+      [
+        "(anon) :1:1",
+        1
+      ],
+      [
+        "ea react-vendor-BbBaDjqq.js:37:26474",
+        1
+      ],
+      [
+        "E react-vendor-BbBaDjqq.js:25:1370",
+        1
+      ],
+      [
+        "lc react-vendor-BbBaDjqq.js:40:39476",
+        1
+      ]
+    ],
+    "scheduled": {
+      "raf": [
+        [
+          "at mC (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:579:5722)",
+          92
+        ],
+        [
+          "at g (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:232:8751)",
+          61
+        ],
+        [
+          "at http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:14884",
+          3
+        ],
+        [
+          "at l (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:232:8855)",
+          2
+        ],
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:31657)",
+          2
+        ],
+        [
+          "at Cw (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:579:5954)",
+          1
+        ]
+      ],
+      "timeout": [
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:14865)",
+          3
+        ]
+      ],
+      "interval": []
+    }
+  },
+  "warm": {
+    "spawnToCdpMs": 876,
+    "spawnToDesktopUsableMs": 1999,
+    "domContentLoadedMs": 796,
+    "loadMs": 801,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 134
+  },
+  "browser": {
+    "savedTabs": 500,
+    "tabsKeptAfterRestore": 500,
+    "openMs": 54,
+    "livePageTargets": 1,
+    "mountedWebviewHosts": 1,
+    "settleMs": 10081,
+    "cpuPctOfOneCore": 4.9,
+    "processes": 8,
+    "workingSetMB": 918,
+    "privateMB": 574
+  },
+  "browserAfterVisits": {
+    "visited": 20,
+    "livePageTargets": 0,
+    "mountedWebviewHosts": 9,
+    "cpuPctOfOneCore": 4.3,
+    "processes": 7,
+    "workingSetMB": 616,
+    "privateMB": 335
+  }
+}

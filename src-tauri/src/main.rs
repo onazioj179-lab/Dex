@@ -17,6 +17,7 @@ mod browser_block;
 mod paths;
 mod ledger_ctl;
 mod download_ctl;
+mod onboarding;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -2294,6 +2295,26 @@ fn fit_main_webview(app: &tauri::AppHandle) {
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
 async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::Webview, channel: String, args: Value) -> Value {
+    // Onboarding decisions are recorded only by DEX's own window, never by a
+    // child webview (a browser tab) — a web page cannot accept terms for the user.
+    if channel.starts_with("onboarding:") {
+        let own_webview = webview.label() == webview.window().label() && !webview.label().starts_with("dexbrowser-");
+        if !own_webview {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || onboarding::dispatch(&app, &channel, &args))
+            .await
+            .unwrap_or(Value::Null);
+    }
+    // Protected functionality (sends data off this PC, or runs commands for
+    // UKI) waits for the required onboarding decision, checked here in Rust —
+    // a renderer flag cannot unlock it.
+    if !onboarding::allows(&app, &channel) {
+        return json!({
+            "ok": false, "success": false, "error": "onboarding-required",
+            "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        });
+    }
     // DEX Ledger holds financial data: only a DEX window's own webview (the
     // main shell or a detached DEX app window, both loading the local bundle)
     // may reach it — never a child webview such as a browser tab.

@@ -407,10 +407,10 @@ const TIER_LABELS: Record<DeviceTier, string> = {
 };
 
 const TIER_DESCRIPTIONS: Record<DeviceTier, string> = {
-  low: 'Opaque surfaces, no blur, shadows or animation, smaller caches, 2 awake background browser tabs. For older or budget hardware.',
-  mid: 'Light blur and full animation, 5 awake background browser tabs. For mainstream hardware.',
-  high: 'Full blur, live wallpapers and effects, 8 awake background browser tabs. For powerful hardware.',
-  ultra: 'Strongest blur and every effect, 12 awake background browser tabs. For high-end hardware.',
+  low: 'Opaque surfaces, no blur, shadows or animation, smaller caches, 1 awake background browser tab. For older or budget hardware.',
+  mid: 'Light blur and full animation, 3 awake background browser tabs. For mainstream hardware.',
+  high: 'Full blur, live wallpapers and effects, 5 awake background browser tabs. For powerful hardware.',
+  ultra: 'Strongest blur and every effect, 8 awake background browser tabs. For high-end hardware.',
 };
 
 export function getTierLabel(tier: DeviceTier): string {

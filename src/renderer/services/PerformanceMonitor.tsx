@@ -21,6 +21,7 @@
  */
 
 import React from 'react';
+import { userRecentlyActive } from './userActivity';
 import { create } from 'zustand';
 import { useSystemEvents, usePowerService } from './SystemServices';
 import { useLifecycleManager } from './LifecycleManager';
@@ -169,6 +170,9 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
     if (frameSampleTimer) return;
     const doSample = () => {
       if (typeof document !== 'undefined' && document.hidden) { lastSample = null; return; }
+      // No input for 15 s: keep the last sample instead of waking the GPU to
+      // measure an idle screen (services/userActivity.ts).
+      if (!userRecentlyActive()) return;
       let frames = 0;
       let drops = 0;
       let first = 0;

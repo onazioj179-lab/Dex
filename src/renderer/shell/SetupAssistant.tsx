@@ -18,6 +18,21 @@ import { applyTheme } from '../utils/theme';
 import { useInstalledAppsStore, RECOMMENDED_APP_IDS } from '../store/installedAppsStore';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { isReduceMotion } from '../utils/MotionController';
+import PolicyViewer from '../components/PolicyViewer';
+
+/** Native onboarding state (src-tauri/src/onboarding.rs). null = no native bridge (web preview). */
+interface OnboardingStatus {
+  ok: boolean;
+  status: 'not-started' | 'in-progress' | 'awaiting-required-decision' | 'requires-review' | 'declined' | 'completed';
+  requiredDone: boolean;
+  current: { terms: number; privacy: number; flow: number };
+}
+const onboardingCall = async (channel: string, ...args: unknown[]): Promise<OnboardingStatus | null> => {
+  try {
+    const r = await (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex?.invoke?.(channel, ...args);
+    return r && typeof r === 'object' && 'status' in (r as object) ? (r as OnboardingStatus) : null;
+  } catch { return null; }
+};
 
 export const SETUP_DONE_KEY = 'dex-setup-done';
 
@@ -38,8 +53,8 @@ export function shouldShowSetup(storage: Storage = localStorage): boolean {
   } catch { return false; }
 }
 
-type Step = 'hello' | 'look' | 'apps' | 'uki' | 'ready';
-const STEPS: Step[] = ['hello', 'look', 'apps', 'uki', 'ready'];
+type Step = 'hello' | 'terms' | 'look' | 'apps' | 'uki' | 'ready';
+const ALL_STEPS: Step[] = ['hello', 'terms', 'look', 'apps', 'uki', 'ready'];
 
 const pill = (primary: boolean): React.CSSProperties => ({
   height: 36, padding: '0 22px', borderRadius: 9999, border: 'none', cursor: 'pointer',
@@ -70,7 +85,28 @@ const Choice: React.FC<{ on: boolean; title: string; desc: string; onPick: () =>
 
 export const SetupAssistant: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
   const [open, setOpen] = useState(() => shouldShowSetup());
+  // 'review': an existing profile that has not acknowledged the current Terms
+  // and Privacy Notice sees only that step (and Settings can reopen it).
+  const [mode, setMode] = useState<'full' | 'review'>('full');
+  const [native, setNative] = useState<OnboardingStatus | null>(null);
+  const [policy, setPolicy] = useState<'terms' | 'privacy' | null>(null);
+  const [termsError, setTermsError] = useState('');
+  const STEPS: Step[] = useMemo(() => (mode === 'review' ? ['terms'] : native ? ALL_STEPS : ALL_STEPS.filter((x) => x !== 'terms')), [mode, native]);
   const [step, setStep] = useState<Step>('hello');
+
+  // The required decision is read from (and recorded in) Rust, not localStorage.
+  useEffect(() => {
+    let alive = true;
+    void onboardingCall('onboarding:status').then((st) => {
+      if (!alive || !st) return;
+      setNative(st);
+      const needsReview = !st.requiredDone && st.status !== 'declined';
+      if (needsReview && !shouldShowSetup()) { setMode('review'); setStep('terms'); setOpen(true); }
+    });
+    const reopen = () => { void onboardingCall('onboarding:status').then((st) => { if (st) setNative(st); setMode('review'); setStep('terms'); setTermsError(''); setOpen(true); }); };
+    window.addEventListener('dex-open-onboarding-review', reopen);
+    return () => { alive = false; window.removeEventListener('dex-open-onboarding-review', reopen); };
+  }, []);
   const [dark, setDark] = useState<boolean>(() => document.documentElement.getAttribute('data-theme') !== 'light');
   const [apps, setApps] = useState<'essentials' | 'everything'>('everything');
   const [uki, setUki] = useState<boolean>(() => readDexSetting('ukiEnabled', true));
@@ -96,30 +132,55 @@ export const SetupAssistant: React.FC<{ onDone?: () => void }> = ({ onDone }) =>
       writeDexSetting('enableNotifications', notify);
     }
     try { localStorage.setItem(SETUP_DONE_KEY, applyChoices ? 'done' : 'skipped'); } catch { /* storage blocked */ }
+    if (native) void onboardingCall(native.requiredDone ? 'onboarding:complete' : 'onboarding:preferencesDone');
     setOpen(false);
     onDone?.();
-  }, [dark, apps, uki, notify, allIds, onDone]);
+  }, [dark, apps, uki, notify, allIds, onDone, native]);
+
+  // Skipping setup skips the optional steps only: the Terms and Privacy step
+  // must be answered (Agree, Not now, or Quit) before setup can close.
+  const decided = !native || native.requiredDone || native.status === 'declined';
+  const skip = useCallback(() => {
+    if (!decided) { setStep('terms'); return; }
+    finish(false);
+  }, [decided, finish]);
+
+  const decide = useCallback(async (choice: 'accept' | 'decline' | 'quit') => {
+    if (!native) return;
+    setTermsError('');
+    const res = choice === 'accept'
+      ? await onboardingCall('onboarding:accept', { terms: native.current.terms, privacy: native.current.privacy })
+      : choice === 'decline' ? await onboardingCall('onboarding:decline') : await onboardingCall('onboarding:quit');
+    if (choice === 'quit') return;
+    if (!res || !res.ok) { setTermsError('That could not be saved. Try again.'); return; }
+    setNative(res);
+    if (mode === 'review') { setOpen(false); return; }
+    setStep('look');
+  }, [native, mode]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      if (policy) return; // the document viewer handles its own keys
+      if (e.key === 'Escape') { e.preventDefault(); if (step !== 'terms') skip(); }
       else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
         e.preventDefault();
+        if (step === 'terms') return; // a required decision is never made by a stray Enter
         if (step === 'ready') finish(true); else setStep(STEPS[idx + 1]);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, step, idx, finish]);
+  }, [open, step, idx, finish, skip, STEPS, policy]);
 
   if (!open) return null;
 
   const title: Record<Step, string> = {
-    hello: 'Hello', look: 'Choose your look', apps: 'Your apps', uki: 'UKI and privacy', ready: 'You are all set',
+    hello: 'Hello', terms: mode === 'review' ? 'Updated terms and privacy' : 'Terms and privacy', look: 'Choose your look', apps: 'Your apps', uki: 'UKI and privacy', ready: 'You are all set',
   };
   const sub: Record<Step, string> = {
     hello: 'Welcome to DEX. A few quick choices and your desktop is ready. Everything here can be changed later in Settings.',
+    terms: 'Please read the Terms of Service and the Privacy Notice. DEX keeps your data on this computer; nothing is sent anywhere unless you turn on a feature that needs to.',
     look: 'Pick a look. You can switch any time in Settings > Appearance.',
     apps: 'Start with everything, or keep the essentials and add more from the Store later.',
     uki: 'UKI is the DEX assistant. It runs on this computer and only reaches the internet when you connect a provider.',
@@ -152,6 +213,20 @@ export const SetupAssistant: React.FC<{ onDone?: () => void }> = ({ onDone }) =>
         </div>
         <h1 style={{ margin: 0, fontSize: step === 'hello' ? 44 : 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{title[step]}</h1>
         <p style={{ margin: '10px 0 22px', fontSize: 14, lineHeight: 1.5, color: 'var(--color-text-secondary)', maxWidth: 460 }}>{sub[step]}</p>
+
+        {step === 'terms' && native && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" style={{ ...pill(false), flex: 1 }} onClick={() => setPolicy('terms')}>Read the Terms of Service</button>
+              <button type="button" style={{ ...pill(false), flex: 1 }} onClick={() => setPolicy('privacy')}>Read the Privacy Notice</button>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
+              If you choose Not now, DEX still works on this computer. Sharing with other devices (DDrop), cloud sync,
+              connected storage and UKI running commands stay off until you agree. You can review this later in Settings › About.
+            </p>
+            {termsError && <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--color-error)' }}>{termsError}</p>}
+          </div>
+        )}
 
         {step === 'look' && (
           <div role="radiogroup" aria-label="Appearance" style={{ display: 'flex', gap: 12 }}>
@@ -190,16 +265,28 @@ export const SetupAssistant: React.FC<{ onDone?: () => void }> = ({ onDone }) =>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 30 }}>
-          {step !== 'ready'
-            ? <button type="button" onClick={() => finish(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 13, cursor: 'pointer', padding: 0 }}>Skip setup</button>
-            : <span />}
-          <span style={{ flex: 1 }} />
-          {idx > 0 && step !== 'ready' && <button type="button" style={pill(false)} onClick={() => setStep(STEPS[idx - 1])}>Back</button>}
-          <button type="button" autoFocus style={pill(true)} onClick={() => (step === 'ready' ? finish(true) : setStep(STEPS[idx + 1]))}>
-            {step === 'hello' ? 'Get started' : step === 'ready' ? 'Start using DEX' : 'Continue'}
-          </button>
+          {step === 'terms' ? (
+            <>
+              <button type="button" onClick={() => { void decide('quit'); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 13, cursor: 'pointer', padding: 0 }}>Quit DEX</button>
+              <span style={{ flex: 1 }} />
+              <button type="button" style={pill(false)} onClick={() => { void decide('decline'); }}>Not now</button>
+              <button type="button" style={pill(true)} onClick={() => { void decide('accept'); }}>Agree</button>
+            </>
+          ) : (
+            <>
+              {step !== 'ready'
+                ? <button type="button" onClick={skip} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 13, cursor: 'pointer', padding: 0 }}>Skip setup</button>
+                : <span />}
+              <span style={{ flex: 1 }} />
+              {idx > 0 && step !== 'ready' && <button type="button" style={pill(false)} onClick={() => setStep(STEPS[idx - 1])}>Back</button>}
+              <button type="button" autoFocus style={pill(true)} onClick={() => (step === 'ready' ? finish(true) : setStep(STEPS[idx + 1]))}>
+                {step === 'hello' ? 'Get started' : step === 'ready' ? 'Start using DEX' : 'Continue'}
+              </button>
+            </>
+          )}
         </div>
       </div>
+      {policy && <PolicyViewer open initialPolicy={policy} onClose={() => setPolicy(null)} />}
     </div>
   );
 };

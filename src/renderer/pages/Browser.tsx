@@ -282,10 +282,30 @@ interface DownloadItem {
   url: string;
   fileName: string;
   progress: number;
-  status: 'downloading' | 'completed' | 'error';
+  status: 'downloading' | 'completed' | 'error' | 'cancelled';
   size?: number;
   path?: string;
+  received?: number;
+  total?: number | null;
+  error?: string;
+  finishedAt?: number;
 }
+
+// Finished downloads (not in-flight ones) survive a restart; newest 100.
+const DOWNLOADS_KEY = 'dex-browser-downloads';
+const loadDownloadHistory = (): DownloadItem[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(DOWNLOADS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((d) => d && typeof d.id === 'string' && d.status !== 'downloading').slice(0, 100) : [];
+  } catch { return []; }
+};
+const formatBytes = (n?: number | null): string => {
+  if (!n || n < 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(2)} GB`;
+};
 
 // ===============================================================================
 // COMPONENT
@@ -419,7 +439,7 @@ export const Browser: React.FC = () => {
     () => ({ blockTrackers, blockAds, forceHttps, defaultSearchEngine }),
     [blockTrackers, blockAds, forceHttps, defaultSearchEngine],
   );
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [downloads, setDownloads] = useState<DownloadItem[]>(loadDownloadHistory);
   const [showDownloads, setShowDownloads] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showTabMenu, setShowTabMenu] = useState(false);
@@ -1233,20 +1253,7 @@ export const Browser: React.FC = () => {
       // Detect downloadable extensions — trigger IPC download directly
       const isDownload = /\.(exe|msi|zip|tar|gz|7z|pdf|dmg|pkg|deb|rpm|iso|bin|apk|mp3|mp4|wav|flac|avi|mkv|mov|epub|docx|xlsx|pptx|csv)(\?.*)?$/i.test(url);
       if (isDownload) {
-        const fileName = url.split('/').pop()?.split('?')[0] || 'download';
-        setDownloads(prev => [...prev, { id: Date.now().toString(), url, fileName, progress: 0, status: 'downloading' }]);
-        setShowDownloads(true);
-        window.dex?.invoke?.('download:start', url).then((result: any) => {
-          if (result?.success) {
-            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'completed', progress: 100, path: result.path } : d));
-          } else {
-            // No answer or a refusal used to leave the row "downloading" forever.
-            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
-            window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
-          }
-        }).catch(() => {
-          setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
-        });
+        void startDownloadRef.current?.(url);
       } else if (url.startsWith('http://') || url.startsWith('https://')) {
         // target=_blank / window.open -> a new foreground tab.
         if (tabsRef.current.length >= MAX_TABS) return;
@@ -1349,15 +1356,26 @@ export const Browser: React.FC = () => {
     }
   }, [attachWebviewEvents, detachWebviewEvents]);
 
-  // Listen for download progress
+  // Live progress from the native downloader (download_ctl.rs), by id.
   useEffect(() => {
     const handleProgress = (data: any) => {
-      if (!data?.url) return;
-      setDownloads(prev => prev.map(d => 
-        d.url === data.url 
-          ? { ...d, progress: data.percent, fileName: data.fileName }
-          : d
-      ));
+      if (!data?.id || typeof data.id !== 'string') return;
+      if (data.state === 'failed') {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${data.error || 'no response'}` } }));
+      }
+      setDownloads(prev => prev.map(d => {
+        if (d.id !== data.id) return d;
+        if (data.state === 'progressing') {
+          return { ...d, received: data.received, total: data.total, progress: typeof data.percent === 'number' ? data.percent : d.progress };
+        }
+        const status: DownloadItem['status'] = data.state === 'completed' ? 'completed' : data.state === 'cancelled' ? 'cancelled' : 'error';
+        return {
+          ...d, status, finishedAt: Date.now(),
+          progress: status === 'completed' ? 100 : d.progress,
+          path: data.path ?? d.path, size: data.size ?? d.size,
+          fileName: data.fileName || d.fileName, error: status === 'error' ? String(data.error || 'failed') : undefined,
+        };
+      }));
     };
     window.dex?.on?.('download:progress', handleProgress);
     return () => {
@@ -1399,11 +1417,24 @@ export const Browser: React.FC = () => {
     });
   }, [downloads]);
 
-  // Fast download function
+  // Persist finished downloads (history), newest first.
+  useEffect(() => {
+    try {
+      const done = downloads.filter(d => d.status !== 'downloading').slice(-100).reverse();
+      localStorage.setItem(DOWNLOADS_KEY, JSON.stringify(done));
+    } catch { /* storage full or blocked */ }
+  }, [downloads]);
+
+  const cancelDownload = useCallback((id: string) => {
+    void window.dex?.invoke?.('download:cancel', id);
+  }, []);
+
+  // Downloads run natively in the background and report progress by id.
+  const startDownloadRef = useRef<((url: string) => Promise<void>) | null>(null);
   const startDownload = useCallback(async (url: string) => {
-    const id = Date.now().toString();
-    const fileName = url.split('/').pop() || 'download';
-    
+    const id = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const fileName = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop() || '') || 'download';
+
     setDownloads(prev => [...prev, {
       id,
       url,
@@ -1414,7 +1445,8 @@ export const Browser: React.FC = () => {
     setShowDownloads(true);
     
     try {
-      const result = await window.dex?.invoke?.('download:start', url);
+      const result = await window.dex?.invoke?.('download:start', url, id);
+      if (result?.success && result.started) return; // progress + completion arrive as events
       if (result?.success) {
         setDownloads(prev => prev.map(d => 
           d.id === id 
@@ -1423,6 +1455,7 @@ export const Browser: React.FC = () => {
         ));
       } else {
         setDownloads(prev => prev.map(d => d.id === id ? { ...d, status: 'error' } : d));
+        setDownloads(prev => prev.map(d => d.id === id ? { ...d, error: String(result?.error || 'no response') } : d));
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
       }
     } catch (err) {
@@ -1431,6 +1464,8 @@ export const Browser: React.FC = () => {
       ));
     }
   }, []);
+
+  startDownloadRef.current = startDownload;
 
   const currentTab = useMemo(() => tabs.find(t => t.id === activeTab), [tabs, activeTab]);
 
@@ -2401,11 +2436,29 @@ export const Browser: React.FC = () => {
                   <div style={{
                     ...styles.downloadBar,
                     width: `${d.progress}%`,
-                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent-fill)',
+                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-text-tertiary)' : 'var(--color-accent-fill)',
                   }} />
                 </div>
-                <span style={styles.downloadStatus}>
-                  {d.status === 'downloading' ? `${d.progress}%` : d.status}
+                <span style={styles.downloadStatus} title={d.error || undefined}>
+                  {d.status === 'downloading'
+                    ? (d.total ? `${d.progress}% · ${formatBytes(d.received)} of ${formatBytes(d.total)}` : d.received ? formatBytes(d.received) : 'Starting…')
+                    : d.status === 'completed' ? (formatBytes(d.size) || 'Done')
+                    : d.status === 'cancelled' ? 'Cancelled'
+                    : `Failed${d.error ? `: ${d.error}` : ''}`}
+                </span>
+                <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  {d.status === 'downloading' && (
+                    <button style={styles.downloadBtn} onClick={() => cancelDownload(d.id)} aria-label={`Cancel download of ${d.fileName}`}>Cancel</button>
+                  )}
+                  {d.status === 'completed' && d.path && (
+                    <>
+                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:openPath', d.path); }} aria-label={`Open ${d.fileName}`}>Open</button>
+                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:showItemInFolder', d.path); }} aria-label={`Show ${d.fileName} in folder`}>Show</button>
+                    </>
+                  )}
+                  {(d.status === 'error' || d.status === 'cancelled') && (
+                    <button style={styles.downloadBtn} onClick={() => { setDownloads(prev => prev.filter(x => x.id !== d.id)); void startDownload(d.url); }} aria-label={`Retry download of ${d.fileName}`}>Retry</button>
+                  )}
                 </span>
               </div>
             ))
@@ -3521,6 +3574,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
     transition: 'filter 0.12s',
+  },
+  downloadBtn: {
+    padding: '2px 8px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+    borderRadius: 6, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
   },
   errorBtnAlt: {
     padding: 'var(--space-2) 18px',

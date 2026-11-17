@@ -43,7 +43,7 @@ const APPS = (args.apps || 'notes,files,settings,ledger,calculator,calendar,task
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- tiny local page server (offline, deterministic tab content) ------------
-function startPageServer() {
+function startPageServer(host = '127.0.0.1', port = 0) {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' });
@@ -51,7 +51,7 @@ function startPageServer() {
       res.end(`<!doctype html><title>Tab ${req.url}</title><body><h1>${req.url}</h1>
 <script>window.__blob=new Array(1<<20).fill(1);document.body.insertAdjacentHTML('beforeend','<p>x</p>'.repeat(20000));</script>`);
     });
-    srv.listen(0, '127.0.0.1', () => resolve(srv));
+    srv.listen(port, host, () => resolve(srv));
   });
 }
 
@@ -103,10 +103,11 @@ function processSample(rootPid, profileDir) {
   // exe + every msedgewebview2 whose command line names our private profile.
   const ps = `
 $p = Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq ${rootPid} -or ($_.Name -eq 'msedgewebview2.exe' -and $_.CommandLine -like '*${basename(profileDir)}*') }
-$p | ForEach-Object { "{0}|{1}|{2}|{3}" -f $_.ProcessId, ($_.KernelModeTime + $_.UserModeTime), $_.WorkingSetSize, $_.PrivatePageCount }`;
+$p | ForEach-Object { $t = if ($_.CommandLine -match '--type=([a-z-]+)') { $Matches[1] } elseif ($_.ProcessId -eq ${rootPid}) { 'dex-tauri' } else { 'browser' }; "{0}|{1}|{2}|{3}|{4}" -f $_.ProcessId, ($_.KernelModeTime + $_.UserModeTime), $_.WorkingSetSize, $_.PrivatePageCount, $t }`;
   const out = execFileSync('powershell', ['-NoProfile', '-Command', ps], { encoding: 'utf8' });
-  const rows = out.trim().split(/\r?\n/).filter(Boolean).map((l) => l.split('|').map(Number));
+  const rows = out.trim().split(/\r?\n/).filter(Boolean).map((l) => { const p = l.split('|'); return [...p.slice(0, 4).map(Number), p[4]]; });
   return {
+    rows,
     count: rows.length,
     cpu100ns: rows.reduce((s, r) => s + r[1], 0),
     workingSetMB: Math.round(rows.reduce((s, r) => s + r[2], 0) / 1048576),
@@ -119,7 +120,12 @@ async function idleCost(pid, profile, seconds = 15) {
   await sleep(seconds * 1000);
   const b = processSample(pid, profile);
   const wall = (Date.now() - t) * 1e4; // ms -> 100 ns
-  return { cpuPctOfOneCore: +(((b.cpu100ns - a.cpu100ns) / wall) * 100).toFixed(1), processes: b.count, workingSetMB: b.workingSetMB, privateMB: b.privateMB };
+  // Per process: which one burns the CPU (dex-tauri = native host; renderer / gpu-process / utility = WebView2).
+  const before = new Map(a.rows.map((r) => [r[0], r[1]]));
+  const perProcess = b.rows
+    .map((r) => ({ type: r[4], pid: r[0], cpuPct: +(((r[1] - (before.get(r[0]) ?? r[1])) / wall) * 100).toFixed(1), privateMB: Math.round(r[3] / 1048576) }))
+    .sort((x, y) => y.cpuPct - x.cpuPct);
+  return { cpuPctOfOneCore: +(((b.cpu100ns - a.cpu100ns) / wall) * 100).toFixed(1), processes: b.count, workingSetMB: b.workingSetMB, privateMB: b.privateMB, perProcess };
 }
 
 // ---- one launch -------------------------------------------------------------
@@ -186,8 +192,15 @@ const report = {
   machine: { os: `Windows ${release()}`, cpu: cpus()[0]?.model, logicalCores: cpus().length, ramGB: Math.round(totalmem() / 2 ** 30) },
   method: 'release exe, isolated DEX_DATA_DIR + WebView2 profile, driven over CDP; timings are wall clock from process spawn',
 };
+// Each tab's page comes from its own loopback address (127.0.0.1-30), so each
+// is a separate site with its own WebView2 renderer, as real tabs would be.
+const SITES = 30;
 const srv = await startPageServer();
-const base = `http://127.0.0.1:${srv.address().port}`;
+const sitePort = srv.address().port;
+const servers = [srv];
+for (let k = 2; k <= SITES; k++) servers.push(await startPageServer(`127.0.0.${k}`, sitePort).catch(() => null));
+const base = `http://127.0.0.1:${sitePort}`;
+const isProbePage = (u) => u.startsWith('http://127.0.0.') && u.includes(`:${sitePort}/`);
 try {
   // Cold
   let run = await launch(dataDir, wvDir);
@@ -211,7 +224,12 @@ try {
     await run.cdp.send('Profiler.enable');
     await run.cdp.send('Profiler.setSamplingInterval', { interval: 500 });
     await evaluate(run.cdp, `(() => {
-      const c = window.__probeCounts = { raf: {}, timeout: {}, interval: {} };
+      const c = window.__probeCounts = { raf: {}, timeout: {}, interval: {}, ipc: {} };
+      // Native work the renderer asks for while idle: count dex_ipc calls by channel.
+      if (window.dex && window.dex.invoke && !window.__orig_invoke) {
+        const inv = window.dex.invoke; window.__orig_invoke = inv;
+        window.dex.invoke = function (ch, ...a) { c.ipc[ch] = (c.ipc[ch] || 0) + 1; return inv.call(this, ch, ...a); };
+      }
       const where = () => { const l = (new Error().stack || '').split('\\n')[3] || ''; return l.trim().slice(0, 160); };
       const wrap = (name, key) => { const o = window[name]; window['__orig_' + name] = o; window[name] = function (fn, ...a) { const w = where(); c[key][w] = (c[key][w] || 0) + 1; return o.call(window, fn, ...a); }; };
       wrap('requestAnimationFrame', 'raf'); wrap('setTimeout', 'timeout'); wrap('setInterval', 'interval');
@@ -235,7 +253,8 @@ try {
     }
     const counts = await evaluate(run.cdp, `(() => { const c = window.__probeCounts; const top = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 8);
       for (const n of ['requestAnimationFrame','setTimeout','setInterval']) window[n] = window['__orig_' + n];
-      return { raf: top(c.raf), timeout: top(c.timeout), interval: top(c.interval) }; })()`).catch(() => null);
+      if (window.__orig_invoke) { window.dex.invoke = window.__orig_invoke; delete window.__orig_invoke; }
+      return { raf: top(c.raf), timeout: top(c.timeout), interval: top(c.interval), ipc: Object.entries(c.ipc).sort((a, b) => b[1] - a[1]).slice(0, 15) }; })()`).catch(() => null);
     report.idleProfile = {
       busyMsIn10s: Math.round(total / 1000),
       topSelfTime: [...byFn.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, us]) => [k, Math.round(us / 1000)]),
@@ -253,7 +272,7 @@ try {
   // Seed a saved browser session of TABS tabs, then reload so the Browser
   // reads it fresh (an already-mounted Browser would save over it).
   await evaluate(run.cdp, `(() => {
-    const tabs = Array.from({ length: ${TABS} }, (_, i) => ({ id: 'probe' + i, title: 'Tab ' + i, url: '${base}/t' + i }));
+    const tabs = Array.from({ length: ${TABS} }, (_, i) => ({ id: 'probe' + i, title: 'Tab ' + i, url: 'http://127.0.0.' + ((i % ${SITES}) + 1) + ':${sitePort}/t' + i }));
     localStorage.setItem('dex-browser-session', JSON.stringify({ tabs, activeTab: 'probe0' }));
     return true;
   })()`);
@@ -274,7 +293,7 @@ try {
     savedTabs: TABS,
     tabsKeptAfterRestore: restoredTabs,
     openMs: browserOpen,
-    livePageTargets: targets.filter((t) => t.url.startsWith(base)).length,
+    livePageTargets: targets.filter((t) => isProbePage(t.url)).length,
     mountedWebviewHosts: await evaluate(run.cdp, "document.querySelectorAll('[data-native-webview]').length").catch(() => null),
     settleMs: Date.now() - tB,
     ...(await idleCost(run.child.pid, wvDir, 10)),
@@ -297,7 +316,7 @@ try {
   const after = await json('/json/list');
   report.browserAfterVisits = {
     visited,
-    livePageTargets: after.filter((t) => t.url.startsWith(base)).length,
+    livePageTargets: after.filter((t) => isProbePage(t.url)).length,
     mountedWebviewHosts: await evaluate(run.cdp, "document.querySelectorAll('[data-native-webview]').length").catch(() => null),
     ...(await idleCost(run.child.pid, wvDir, 10)),
   };
@@ -306,7 +325,7 @@ try {
 } catch (e) {
   report.error = String(e?.stack || e);
 } finally {
-  srv.close();
+  for (const x of servers) x?.close();
   try { rmSync(profile, { recursive: true, force: true }); } catch { /* WebView2 may still hold files */ }
 }
 

@@ -41,7 +41,7 @@ export interface ResidencyInput {
 }
 
 /** Live background pages per tier (the active tab is extra). */
-export const LIVE_TAB_BUDGET: Record<DeviceTier, number> = { low: 2, mid: 5, high: 8, ultra: 12 };
+export const LIVE_TAB_BUDGET: Record<DeviceTier, number> = { low: 1, mid: 3, high: 5, ultra: 8 };
 
 export function liveTabBudget(tier: DeviceTier | null | undefined, setting: 'auto' | number = 'auto'): number {
   if (typeof setting === 'number' && Number.isFinite(setting)) return Math.max(0, Math.min(50, Math.floor(setting)));
