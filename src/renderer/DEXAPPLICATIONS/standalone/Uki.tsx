@@ -720,7 +720,7 @@ export default function Uki(): React.ReactElement {
           )}
         </div>
 
-        <div style={S.composer}>
+        <div style={S.composer} className="dex-mat-frosted">
           <textarea
             ref={inputRef}
             style={S.textarea}
@@ -746,7 +746,7 @@ export default function Uki(): React.ReactElement {
                 padding: '0 10px', flexShrink: 0, cursor: 'pointer',
                 background: lookAtScreen ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
                 color: lookAtScreen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                border: '1px solid var(--color-border)', borderRadius: 10,
+                border: 'none', borderRadius: 9999,
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -766,7 +766,7 @@ export default function Uki(): React.ReactElement {
                 padding: '0 10px', flexShrink: 0, cursor: 'pointer',
                 background: lookWithCamera ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
                 color: lookWithCamera ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                border: '1px solid var(--color-border)', borderRadius: 10,
+                border: 'none', borderRadius: 9999,
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -802,16 +802,18 @@ const S: Record<string, React.CSSProperties> = {
   convTitle: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 },
   editInput: { flex: 1, minWidth: 0, fontSize: 13, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', outline: 'none' },
   convDelete: { background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' },
-  main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
-  thread: { flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-5) 18px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' },
+  main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' },
+  // The conversation runs under the floating composer (content-under-glass):
+  // bottom padding keeps the last message scrollable clear of it.
+  thread: { flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-5) max(18px, calc((100% - 760px) / 2)) 120px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', scrollPaddingBottom: 120 },
   welcome: { margin: 'auto', textAlign: 'center', maxWidth: 420 },
   welcomeMark: { fontSize: 40, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.03em' },
   welcomeTitle: { fontSize: 22, fontWeight: 600, marginTop: 'var(--space-2)' },
   welcomeSub: { fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 },
   row: { display: 'flex', width: '100%' },
-  bubble: { maxWidth: '76%', padding: '10px 14px', borderRadius: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  bubbleUser: { background: 'var(--color-accent-fill)', color: '#fff', borderBottomRightRadius: 3 },
-  bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 3 },
+  bubble: { maxWidth: '76%', padding: '9px 14px', borderRadius: 18, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  bubbleUser: { background: 'var(--color-accent-fill)', color: '#fff', borderBottomRightRadius: 6 },
+  bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', borderBottomLeftRadius: 6 },
   bubbleSystem: { background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', fontSize: 13, fontStyle: 'italic' },
   caret: { opacity: 0.6, marginLeft: 1 },
   actionCard: { alignSelf: 'flex-start', maxWidth: '80%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 'var(--space-3)', boxShadow: 'var(--pg-shadow-panel)' },
@@ -820,8 +822,9 @@ const S: Record<string, React.CSSProperties> = {
   actionRow: { display: 'flex', gap: 'var(--space-2)', marginTop: 10 },
   runBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '6px var(--space-4)', fontSize: 13, cursor: 'pointer' },
-  composer: { display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', padding: 14, borderTop: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
-  textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '10px var(--space-3)', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
-  sendBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  // Floating composer (DEX Floating Surface System, frosted material).
+  composer: { position: 'absolute', left: 0, right: 0, bottom: 14, margin: '0 auto', width: 'min(760px, calc(100% - 28px))', display: 'flex', gap: 6, alignItems: 'flex-end', padding: 6, borderRadius: 24, zIndex: 2 },
+  textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '9px 12px', borderRadius: 14, border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
+  sendBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 9999, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   sendBtnDisabled: { opacity: 0.5, cursor: 'default' },
 };
