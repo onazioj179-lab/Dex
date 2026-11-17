@@ -4,9 +4,9 @@ How to build, verify and publish a DEX OS release (Tauri, Windows x64).
 
 ## Build serials (owner rule, 2026-11-06)
 
-The version number (`7.0.1`) only changes when the owner decides the release is
+The version number (`7.0.2`) only changes when the owner decides the release is
 finished. Every update before that carries a **build serial**, shown next to the
-version everywhere DEX reports it: `7.0.1 (18a)`.
+version everywhere DEX reports it: `7.0.2 (001z)`.
 
 - Source of truth: `"dexBuild"` in `package.json` (format `<number><letter>`).
   Vite passes it to the interface (`getDisplayVersion()` / `formatDisplayVersion()`
@@ -15,7 +15,7 @@ version everywhere DEX reports it: `7.0.1 (18a)`.
 - Each merged update moves the letter (`18a` → `18b`). A new Part of work moves
   the number and restarts the letter (`19a`).
 - Record what each serial adds under "Build serials" in the release notes.
-- Installer files keep the plain version (`DEX_7.0.1_x64-setup.exe`) because
+- Installer files keep the plain version (`DEX_7.0.2_x64-setup.exe`) because
   Windows installers only accept numeric versions.
 
 ## 0. Before you start
