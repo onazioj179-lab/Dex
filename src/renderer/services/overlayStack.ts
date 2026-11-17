@@ -62,6 +62,11 @@ function wire(): void {
   window.addEventListener('pointerdown', onPointer, true);
 }
 
+// Wire at import (the shell imports this through ContextMenu at boot) so the
+// stack's capture listeners run before window-level Escape handlers that
+// register later; those then never see an Escape meant for an overlay.
+wire();
+
 /** Register an open overlay; returns its z-index and an unregister function. */
 export function pushOverlay(entry: OverlayEntry): { z: number; release: () => void } {
   wire();

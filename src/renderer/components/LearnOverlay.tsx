@@ -15,7 +15,8 @@
  * appears on its own.
  */
 
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { getLearnContent, GLOBAL_LEARN_TIPS, type LearnSection } from '../services/learnRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 
@@ -57,12 +58,9 @@ export const LearnOverlay: React.FC = () => {
     return () => window.removeEventListener('dex-open-learn', onOpen as EventListener);
   }, []);
 
-  useEffect(() => {
-    if (!appId) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setAppId(null); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [appId]);
+  // Escape through the shared overlay stack (top-only).
+  const closeLearn = useCallback(() => setAppId(null), []);
+  useOverlay(!!appId, closeLearn, { dismissOnOutside: false });
 
   if (!appId) return null;
 

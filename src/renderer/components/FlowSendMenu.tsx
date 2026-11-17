@@ -18,6 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback, memo } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { getFlowTargets, sendFlow, type FlowPayload } from '../services/FlowTransfer';
 import { useClipboardStore, detectClipKind } from '../store/clipboardStore';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
@@ -69,12 +70,8 @@ export const FlowSendMenu: React.FC = () => {
     setPayload(null);
   }, [payload]);
 
-  useEffect(() => {
-    if (!payload) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [payload, close]);
+  // Escape goes through the shared overlay stack: only the top overlay closes.
+  useOverlay(!!payload, close, { dismissOnOutside: false });
 
   if (!payload) return null;
 

@@ -16,6 +16,7 @@
 - `SpotlightEngine` re-indexes when actions register (apps were missing for the first 60 s). App Menu search appends score-filtered Spotlight results (settings/files/notes/commands).
 - VINX proxies: `video:transcode` `scale` (`proxy_scale_filter`, cargo-tested), `vinx/mediaProxy.ts`, `exportingOriginals` store flag.
 - Packaged test recipe used: `DEX_DATA_DIR` + `WEBVIEW2_USER_DATA_FOLDER` scratch dirs, CDP port 9371, scripts drive `window.__dexRunningApps` / `__dexDockStore`.
+- Overlays: any popup/dialog registers with `useOverlay(open, onClose, { ref, dismissOnOutside, ownEscape })` from `services/overlayStack.ts`; never add a window `keydown` Escape listener of your own (it fires alongside the overlay above and closes two layers). Pass `dismissOnOutside: false` when a backdrop handles clicks, or a `ref` (without one, every click counts as outside). The stack wires at import. Migrated: ContextMenu, UnifiedDropdown, `ui/Modal`, Control Center, Permissions, Quick Actions, Flow send, Learn, payment picker, Quick Controls (#325, #326).
 
 ## Apps UI/UX + Liquid Glass pass (2026-11-14)
 

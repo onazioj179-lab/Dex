@@ -12,6 +12,7 @@
 // to the Settings page where finer-grained controls live.
 // ===========================================================================
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { useNetworkStore, NETWORK_MODE_LABELS, NETWORK_MODE_DESCRIPTIONS, type NetworkMode } from '../store/networkStore';
 import {
   usePermissionStore,
@@ -150,18 +151,8 @@ interface PopoverProps {
 const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
+  // Escape and outside clicks through the shared overlay stack (top-only).
+  useOverlay(!!anchorRect, onClose, { ref });
 
   if (!anchorRect) return null;
 

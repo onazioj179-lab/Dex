@@ -20,7 +20,8 @@
  * machine can pre-fill the amount.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useOverlay } from '../../services/overlayStack';
 import { Button } from '../../ui/Button';
 import { space, radius, fontSize } from '../../styles/tokens';
 import {
@@ -57,14 +58,9 @@ export function PaymentMethodPicker(props: PaymentMethodPickerProps) {
     cfg,
   ), [props.planId, props.period, props.seats, props.email, cfg]);
 
-  const closeRef = useRef(props.onClose);
-  closeRef.current = props.onClose;
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  // Mounted = open. Escape goes through the shared overlay stack, so a
+  // dropdown inside the picker closes first and the picker stays.
+  useOverlay(true, props.onClose, { dismissOnOutside: false });
 
   const handleContinue = useCallback((m: PaymentMethod) => { props.onContinue(m, plan); }, [plan, props]);
 

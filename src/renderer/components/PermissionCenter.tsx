@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useEffect, useCallback, memo } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { describeCapabilities, grant, revoke, type CapabilityInfo } from '../uki/permissions';
 import { useFocusTrap } from '../utils/useFocusTrap';
 
@@ -35,12 +36,9 @@ const PermissionCenter: React.FC = () => {
     return () => window.removeEventListener('dex-permission-center', onOpen);
   }, [refresh]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setVisible(false); } };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [visible]);
+  // Escape goes through the shared overlay stack: only the top overlay closes.
+  const hide = useCallback(() => setVisible(false), []);
+  useOverlay(visible, hide, { dismissOnOutside: false });
 
   const toggle = useCallback(async (info: CapabilityInfo) => {
     if (info.status === 'hard-denied') return;
