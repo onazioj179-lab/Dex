@@ -18,6 +18,7 @@ import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
+import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
@@ -3798,6 +3799,9 @@ export const Settings: React.FC = () => {
         'Predictive Pre-warm',
         'Use your recent app-switching history to pre-warm the next likely app while the device is idle.',
       )}
+
+      <h3 style={styles.sectionTitle}>Browser tabs</h3>
+      <BrowserTabsSetting />
     </div>
   );
 

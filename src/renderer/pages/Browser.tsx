@@ -28,6 +28,9 @@ import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { NativeWebview } from '../components/NativeWebview';
+import ContextMenu, { useContextMenu } from '../components/ContextMenu';
+import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
+import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
@@ -46,6 +49,7 @@ interface Tab {
   loading: boolean;
   background?: boolean;  // Run in background
   pinned?: boolean;      // Pinned tab
+  keepAwake?: boolean;   // User asked this tab never to sleep
   navHistory: string[];  // Navigation history stack
   navIndex: number;      // Current position in history
 }
@@ -151,8 +155,9 @@ const filterBtn: React.CSSProperties = {
 // ENTERPRISE SCALE CONSTANTS - Supports 1B+ users
 // ===========================================================================
 
-const MAX_TABS = 100; // Maximum tabs per session
-const TAB_MEMORY_LIMIT = 40; // Unload background tabs after this many are open
+// Saved tabs are metadata only; live pages are bounded by tabResidency.ts,
+// so a large session costs one page plus the live budget, not 500 pages.
+const MAX_TABS = 500;
 const HISTORY_LIMIT = 2000; // Max history entries — auto-trims beyond this
 const BOOKMARK_LIMIT = 5000; // Max bookmarks
 const KEYCHAIN_STORAGE_KEY = 'dex-browser-keychain';
@@ -217,6 +222,7 @@ const loadSession = (): { tabs: Tab[]; activeTab: string } => {
         url: typeof t.url === 'string' ? t.url : '',
         loading: false,
         pinned: t.pinned === true ? true : undefined,
+        keepAwake: t.keepAwake === true ? true : undefined,
         navHistory: typeof t.url === 'string' && t.url ? [t.url] : [],
         navIndex: typeof t.url === 'string' && t.url ? 0 : -1,
       }));
@@ -224,7 +230,8 @@ const loadSession = (): { tabs: Tab[]; activeTab: string } => {
     const activeTab = typeof parsed.activeTab === 'string' && tabs.some(t => t.id === parsed.activeTab)
       ? parsed.activeTab
       : tabs[0].id;
-    return { tabs, activeTab };
+    // Restored tabs sleep until selected: a large session opens one page.
+    return { tabs: tabs.map(t => (t.id === activeTab || !t.url ? t : { ...t, background: true })), activeTab };
   } catch {
     return fallback;
   }
@@ -522,53 +529,51 @@ export const Browser: React.FC = () => {
     };
   }, []);
 
-  // Keep the active and pinned tabs resident; unload older background tabs once
-  // the tab count exceeds the memory budget so the browser stays responsive.
+  // Tab residency (services/browser/tabResidency.ts): the active tab, protected
+  // tabs (audible media, edited fields, Keep awake) and the most recently used
+  // tabs up to the tier budget keep a live page; every other tab sleeps (no
+  // WebView2 page, no timers). Before a tab sleeps its page is asked whether it
+  // is playing sound or holds edited fields; if so it stays awake.
+  const tabMenu = useContextMenu();
+  const toggleKeepAwake = useCallback((id: string) => {
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, keepAwake: t.keepAwake ? undefined : true, ...(t.keepAwake ? {} : { background: false }) } : t));
+  }, []);
+  const lastActiveRef = useRef<Map<string, number>>(new Map());
+  const busyTabsRef = useRef<Set<string>>(new Set());
+  const liveTabSetting = useDexSetting<'auto' | number>('browser.liveTabs', 'auto');
   useEffect(() => {
-    setTabs(prev => {
-      let changed = false;
-
-      if (prev.length <= TAB_MEMORY_LIMIT) {
-        const restored = prev.map(tab => {
-          if (tab.background && (tab.id === activeTab || !tab.url || tab.pinned)) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        });
-        return changed ? restored : prev;
+    lastActiveRef.current.set(activeTab, Date.now());
+    let cancelled = false;
+    void (async () => {
+      const cur = tabsRef.current;
+      const ids = new Set(cur.map(t => t.id));
+      for (const id of [...lastActiveRef.current.keys()]) if (!ids.has(id)) lastActiveRef.current.delete(id);
+      const budget = liveTabBudget(getStoredTier(), liveTabSetting);
+      const base = { tabs: cur, activeId: activeTab, lastActiveAt: lastActiveRef.current, budget };
+      // Live now, over budget without protection: ask those pages first.
+      const wouldSleep = computeLiveTabs({ ...base, busy: new Set() });
+      for (const t of cur) {
+        if (t.background || !t.url || wouldSleep.has(t.id)) { busyTabsRef.current.delete(t.id); continue; }
+        const wv = webviewRefs.current.get(t.id);
+        let busy = false;
+        try { const b = parseBusyCheck(await wv?.executeJavaScript?.(PAGE_BUSY_CHECK)); busy = b.media || b.edited; } catch { /* page gone or navigating */ }
+        if (busy) busyTabsRef.current.add(t.id); else busyTabsRef.current.delete(t.id);
       }
-
-      let remainingToUnload = prev.length - TAB_MEMORY_LIMIT;
-      const next = prev.map(tab => {
-        const shouldKeepLoaded = tab.id === activeTab || tab.pinned || !tab.url;
-        if (shouldKeepLoaded) {
-          if (tab.background) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        }
-
-        if (remainingToUnload > 0) {
-          remainingToUnload -= 1;
-          if (!tab.background) {
-            changed = true;
-            return { ...tab, background: true };
-          }
-          return tab;
-        }
-
-        if (tab.background) {
+      if (cancelled) return;
+      const live = computeLiveTabs({ ...base, busy: busyTabsRef.current });
+      setTabs(prev => {
+        let changed = false;
+        const next = prev.map(tab => {
+          const sleep = !!tab.url && !live.has(tab.id) && tab.id !== activeTab;
+          if (!!tab.background === sleep) return tab;
           changed = true;
-          return { ...tab, background: false };
-        }
-        return tab;
+          return { ...tab, background: sleep };
+        });
+        return changed ? next : prev;
       });
-
-      return changed ? next : prev;
-    });
-  }, [activeTab, tabs.length]);
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, tabs.length, liveTabSetting]);
 
   // Find-in-page
   const [showFindBar, setShowFindBar] = useState(false);
@@ -897,6 +902,7 @@ export const Browser: React.FC = () => {
             title: t.title,
             url: t.url,
             ...(t.pinned ? { pinned: true } : {}),
+            ...(t.keepAwake ? { keepAwake: true } : {}),
           })),
           activeTab,
         };
@@ -2005,9 +2011,11 @@ export const Browser: React.FC = () => {
           </div>
         )}
 
+        {tabMenu.menuState && <ContextMenu items={tabMenu.menuState.items} position={tabMenu.menuState.position} onClose={tabMenu.close} />}
         {/* Tab strip */}
-        <div style={styles.tabStrip} ref={tabContainerRef}>
+        <div style={styles.tabStrip} ref={tabContainerRef} role="tablist" aria-label="Tabs">
           {tabs.map((tab) => {
+            const sleeping = !!tab.background && tab.id !== activeTab && !!tab.url;
             const tabGroup = Array.from(tabGroups.entries()).find(([_, g]) => g.tabIds.includes(tab.id));
             return (
             <div
@@ -2025,15 +2033,38 @@ export const Browser: React.FC = () => {
                 ...(draggingTab === tab.id ? { opacity: 0.5 } : {}),
                 ...(dragOverTab === tab.id ? { borderLeft: '2px solid var(--color-accent)' } : {}),
               }}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              data-tab-id={tab.id}
+              data-tab-state={tab.id === activeTab ? 'active' : sleeping ? 'sleeping' : 'live'}
               onClick={() => {
                 setActiveTab(tab.id);
                 setUrlInput(tab.url);
                 setTabErrors(prev => ({ ...prev, [tab.id]: null }));
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(tab.id); setUrlInput(tab.url); return; }
+                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+                e.preventDefault();
+                const i = tabs.findIndex(t => t.id === tab.id);
+                const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+                if (n) {
+                  setActiveTab(n.id);
+                  setUrlInput(n.url);
+                  (tabContainerRef.current?.querySelector(`[data-tab-id="${n.id}"]`) as HTMLElement | null)?.focus();
+                }
+              }}
+              onContextMenu={(e) => tabMenu.show(e, [
+                { label: tab.keepAwake ? 'Let this tab sleep' : 'Keep awake', onClick: () => toggleKeepAwake(tab.id) },
+                { label: 'Sleep now', disabled: tab.id === activeTab || sleeping || !tab.url || !!tab.keepAwake, onClick: () => { lastActiveRef.current.delete(tab.id); moveTabToBackground(tab.id); } },
+                { label: tab.pinned ? 'Unpin tab' : 'Pin tab', onClick: () => pinTab(tab.id), dividerAfter: true },
+                { label: 'Close tab', disabled: !!tab.pinned, onClick: () => closeTab(tab.id) },
+              ])}
               onDoubleClick={() => pinTab(tab.id)}
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}
-              title={`${tab.title}\n${tab.url}${tabGroup ? `\nGroup: ${tabGroup[1].name}` : ''}`}
+              title={`${tab.title}\n${tab.url}${tabGroup ? `\nGroup: ${tabGroup[1].name}` : ''}${sleeping ? '\nSleeping: loads again when selected' : ''}${tab.keepAwake ? '\nKept awake' : ''}`}
             >
               {tab.pinned && <span style={styles.pinDot} />}
               {tab.loading ? (
@@ -2045,7 +2076,7 @@ export const Browser: React.FC = () => {
                   <span style={styles.tabGlobe}>{Icon.globe}</span>
                 ) : null
               )}
-              <span style={styles.tabLabel}>{tab.title || 'New Tab'}</span>
+              <span style={{ ...styles.tabLabel, ...(sleeping ? { opacity: 0.55 } : {}) }}>{tab.title || 'New Tab'}</span>
               {!tab.pinned && (activeTab === tab.id || hoveredTab === tab.id) && (
                 <button
                   style={{...styles.tabCloseBtn, opacity: 0.7}}
