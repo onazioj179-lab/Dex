@@ -1015,14 +1015,12 @@ export const AppManager: React.FC = () => {
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
     // Desktop Work Area Manager: the content surface already starts below the
-    // top bar, so the top bar is never covered. The active Dock keeps its strip:
-    // the Morphing Dock on its edge, or a DEX Bar docked at the bottom (0 when
-    // it floats). Workspace padding and display scale come from the same place
-    // for drag, resize from every edge, maximize, snap and recovery.
-    const spatial = isSpatialEnabled();
-    const dock = dockStyle === 'morphing'
-      ? { edge: dockEdge, reserve: spatial ? 0 : dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) }
-      : { edge: 'bottom' as const, reserve: spatial ? 0 : barReserve };
+    // top bar, so the top bar is never covered. The Dock is a floating overlay
+    // (owner spec, 2026-11-17): it never shrinks the work area, so maximized
+    // windows fill from the top bar to the bottom edge with no empty strip.
+    // Workspace padding and display scale come from the same place for drag,
+    // resize from every edge, maximize, snap and recovery.
+    const dock = { edge: dockEdge, reserve: 0 };
     const { windows } = computeWorkArea({
       viewport: { width: w, height: h },
       topBar: 0,
@@ -1033,19 +1031,18 @@ export const AppManager: React.FC = () => {
     });
     if (stageOffset) { windows.x += stageOffset; windows.w = Math.max(320, windows.w - stageOffset); }
     return windows;
-  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, dockStyle, dockHidden, workspacePadding, barReserve]);
+  }, [stageOffset, showAppTabBar, runningApps.length, dockEdge, workspacePadding]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
   // creative app (Prism/Flux/Forge/Imosion/Axl) from spilling its bottom toolbar
   // under the dock and off the screen edge.
   const getMaximizedWindowBounds = useCallback(() => {
-    // Inset by the snap gutter on every side: a maximized app is a floating
-    // stage with the same margin as tiled halves, clear of the top bar and the
-    // docked DEX Bar -- never edge-to-edge under chrome.
+    // Maximized = the whole usable work area: from just below the top bar to
+    // the bottom edge (inside any workspace padding the user set). No inset,
+    // no strip left for the floating Dock.
     const ws = getShellWorkspace(0);
-    const inset = snapPrefsRef.current.gutter;
-    return { x: ws.x + inset, y: ws.y + inset, w: ws.w - inset * 2, h: ws.h - inset * 2 };
+    return { x: ws.x, y: ws.y, w: ws.w, h: ws.h };
   }, [getShellWorkspace]);
   getMaximizedWindowBoundsRef.current = getMaximizedWindowBounds;
 
@@ -1270,8 +1267,8 @@ export const AppManager: React.FC = () => {
   //    the way), so all insets are zero -- windows fill the whole work area. --
   useEffect(() => {
     const root = document.documentElement;
-    const morph = dockStyle === 'morphing' ? dockReserve({ style: dockStyle, hiddenForFullscreen: dockHidden }) : 0;
-    const edgeOf = (e: 'bottom' | 'left' | 'right') => (dockStyle === 'morphing' ? (dockEdge === e ? morph : 0) : e === 'bottom' ? barReserve : 0);
+    // The Dock is an overlay: no edge is reserved for it.
+    const edgeOf = (_e: 'bottom' | 'left' | 'right') => 0;
     root.style.setProperty('--dex-reserved-top', '0px');
     root.style.setProperty('--dex-reserved-right', `${edgeOf('right')}px`);
     root.style.setProperty('--dex-reserved-bottom', `${edgeOf('bottom')}px`);
@@ -4015,7 +4012,7 @@ export const AppManager: React.FC = () => {
               height: visibleBounds.h,
               zIndex: detBounds.z,
               display: isMinimized ? 'none' : 'flex', flexDirection: 'column',
-              borderRadius: 14, overflow: 'hidden',
+              borderRadius: isMaximized ? 0 : 14, overflow: 'hidden',
               background: useGlass
                 ? 'var(--color-bg-glass-strong, rgba(26,26,30,0.85))'
                 : 'var(--color-bg-base, #0C0C0E)',
@@ -4024,8 +4021,8 @@ export const AppManager: React.FC = () => {
               // Focus hierarchy (Apple-style depth): the active window LIFTS with a
               // deeper shadow + a faint accent edge; inactive windows recede with a
               // softer, lower shadow. Animates via the box-shadow transition below.
-              border: `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
-              ...adaptiveShadow(isMaximized ? '0 8px 28px rgba(0,0,0,0.38), inset 0 0.5px 0 rgba(255,255,255,0.08)' : isFocused
+              border: isMaximized ? 'none' : `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+              ...adaptiveShadow(isMaximized ? 'none' : isFocused
                 ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(74,158,255,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)'
                 : '0 10px 28px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.05)'),
               contain: 'layout style paint',
@@ -4857,18 +4854,14 @@ export const AppManager: React.FC = () => {
                   const kept = !showInline ? spatialTabSizeRef.current.get(appId) : undefined;
                   if (showInline) spatialTabSizeRef.current.delete(appId);
                   if (kept) return { left: 0, top: 0, width: kept.w, height: kept.h };
-                  // A tab sits in the same inset stage as a maximized window:
-                  // gutter on every side, inside the work area (so above or
-                  // beside the Dock, and inside the workspace padding).
+                  // A tab fills the work area like a maximized window (inside
+                  // any workspace padding); the floating Dock sits over it.
                   if (spatialEnabled || immersive) return { left: 0, top: 0, width: 'var(--dex-content-w, 100%)', height: 'var(--dex-content-h, 100%)' };
                   return {
-                    left: 'calc(var(--dex-work-x, 0px) + var(--dex-win-inset, 8px))',
-                    top: 'calc(var(--dex-work-y, 0px) + var(--dex-win-inset, 8px))',
-                    width: 'calc(var(--dex-work-w, var(--dex-content-w, 100%)) - 2 * var(--dex-win-inset, 8px))',
-                    height: 'calc(var(--dex-work-h, var(--dex-content-h, 100%)) - 2 * var(--dex-win-inset, 8px))',
-                    borderRadius: 14, overflow: 'hidden',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    boxShadow: '0 8px 28px rgba(0,0,0,0.38), inset 0 0.5px 0 rgba(255,255,255,0.08)',
+                    left: 'var(--dex-work-x, 0px)',
+                    top: 'var(--dex-work-y, 0px)',
+                    width: 'var(--dex-work-w, var(--dex-content-w, 100%))',
+                    height: 'var(--dex-work-h, var(--dex-content-h, 100%))',
                   };
                 })()),
             display: 'flex',
