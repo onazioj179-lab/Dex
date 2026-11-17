@@ -1402,7 +1402,7 @@ const Calendar: React.FC = () => {
                     </button>
                     {current && (
                       <>
-                        <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event" title="Duplicate">Duplicate</button>
+                        <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event">Duplicate</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 1); closeModal(); }} aria-label="Move to tomorrow" title="Reschedule +1 day">+1 Day</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 7); closeModal(); }} aria-label="Move to next week" title="Reschedule +1 week">+1 Week</button>
                         <button style={styles.cancelBtn} onClick={() => exportEventICS(current)} aria-label="Export this event" title="Export this event (.ics)">Export</button>
