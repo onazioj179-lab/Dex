@@ -1727,7 +1727,7 @@ const Forge: React.FC = () => {
 
                 <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Audio</div>
                 <div style={styles.checkbox} onClick={() => setAudioNormalize(!audioNormalize)}>
-                  <div style={{ width: '14px', height: '14px', background: audioNormalize ? '#bf5af2' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: audioNormalize ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {audioNormalize && Icons.check}
                   </div>
                   <span>Audio Normalization</span>
@@ -2168,7 +2168,7 @@ const Forge: React.FC = () => {
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
               } catch (err: any) { console.error('[Forge] audio extraction failed:', err); toast.error('Could not extract audio. Try a different file or format.'); try { audioCtx?.close(); } catch { /* */ } setMediaBusy(false); }
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: mediaBusy ? 'not-allowed' : 'pointer', opacity: mediaBusy ? 0.5 : 1 }}>{mediaBusy ? `${extractPhrase}…` : 'Extract Audio'}</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: mediaBusy ? 'not-allowed' : 'pointer', opacity: mediaBusy ? 0.5 : 1 }}>{mediaBusy ? `${extractPhrase}…` : 'Extract Audio'}</button>
           </div>
         </div>
       )}
@@ -2696,7 +2696,7 @@ const Forge: React.FC = () => {
         <span>{Icons.layers} {parallelJobs} parallel jobs</span>
         <span>|</span>
         <span>{Icons.hardDrive} {storageInfo}</span>
-        {audioNormalize && <><span>|</span><span style={{ color: '#bf5af2' }}>{Icons.audioWave} Normalize: {audioNormTarget} LUFS</span></>}
+        {audioNormalize && <><span>|</span><span style={{ color: 'var(--color-text-secondary)' }}>{Icons.audioWave} Normalize: {audioNormTarget} LUFS</span></>}
         <div style={{ flex: 1 }} />
         <span style={{ color: isEncoding ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{isEncoding ? 'Encoding...' : 'Ready'}</span>
       </div>
