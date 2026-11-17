@@ -68,7 +68,29 @@ interface NotificationBannersProps {
 // ---------------------------------------------------------------------------
 
 const MAX_VISIBLE = 3;
-const DEFAULT_DURATION = 4000;
+/** Routine notices: about 5 s (pauses while hovered or focused). */
+const DEFAULT_DURATION = 5000;
+const UNDO_DURATION = 8000;
+
+/**
+ * How long a capsule stays. Errors, urgent items and anything asking for a
+ * decision (action buttons) stay until handled; Undo gets a little longer.
+ */
+export function capsuleDuration(n: Pick<BannerNotification, 'duration' | 'icon' | 'priority' | 'actions' | 'undoAction'>): number {
+  if (typeof n.duration === 'number') return n.duration;
+  if (n.icon === 'error' || n.priority === 'urgent') return 0;
+  if (n.actions && n.actions.length > 0) return 0;
+  if (n.undoAction) return UNDO_DURATION;
+  return DEFAULT_DURATION;
+}
+
+const timeLabel = (ts?: number): string => {
+  if (!ts) return '';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 45) return 'now';
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 const BANNER_WIDTH = 320;
 const MAX_HISTORY = 50;
 
@@ -151,47 +173,24 @@ const Banner: React.FC<{
 }> = ({ notification, index, onDismiss, onClick }) => {
   const [hovered, setHovered] = useState(false);
   const [swipeX, setSwipeX] = useState(0);
-  const rafRef = useRef<number | null>(null);
-  const startTimeRef = useRef(performance.now());
-  const pausedAtRef = useRef<number | null>(null);
-  const duration = notification.duration ?? DEFAULT_DURATION;
   const bannerRef = useRef<HTMLDivElement>(null);
+  const [focused, setFocused] = useState(false);
+  const expanded = hovered || focused;
+  const duration = capsuleDuration(notification);
+  const remainingRef = useRef(duration);
+  const startedRef = useRef(0);
 
-  // Auto dismiss with progress (rAF -- auto-throttles when hidden, smoother
-  // than a 250ms interval, no extra wake-ups when paused).
+  // Auto-dismiss: a single timeout (no per-frame timer). Hover or keyboard
+  // focus pauses it and keeps the time left; duration <= 0 = stays until handled.
   useEffect(() => {
-    // duration <= 0 means "persistent" (critical urgency / alarm / incoming-call
-    // scenarios per the freedesktop+MS notification model): never auto-dismiss,
-    // keep the progress bar full, and rely on manual dismissal.
-    if (duration <= 0) return;
-    startTimeRef.current = performance.now();
-    const tick = () => {
-      if (pausedAtRef.current !== null) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-      const elapsed = performance.now() - startTimeRef.current;
-      const remaining = 1 - elapsed / duration;
-      if (remaining <= 0) {
-        onDismiss(notification.id);
-        return;
-      }
-      rafRef.current = requestAnimationFrame(tick);
+    if (duration <= 0 || expanded) return;
+    startedRef.current = performance.now();
+    const t = window.setTimeout(() => onDismiss(notification.id), Math.max(0, remainingRef.current));
+    return () => {
+      window.clearTimeout(t);
+      remainingRef.current -= performance.now() - startedRef.current;
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
-  }, [notification.id, duration, onDismiss]);
-
-  // Pause on hover
-  useEffect(() => {
-    if (hovered) {
-      pausedAtRef.current = performance.now();
-    } else if (pausedAtRef.current !== null) {
-      const pausedDuration = performance.now() - pausedAtRef.current;
-      startTimeRef.current += pausedDuration;
-      pausedAtRef.current = null;
-    }
-  }, [hovered]);
+  }, [notification.id, duration, expanded, onDismiss]);
 
   // Play sound on mount (Settings > Notifications > Sound)
   useEffect(() => {
@@ -266,68 +265,78 @@ const Banner: React.FC<{
     }
   })();
 
+  const reduce = isReduceMotion();
+  const hasActions = !!(notification.undoAction || (notification.actions && notification.actions.length > 0));
   return (
     <div
       ref={bannerRef}
-      role="alert"
-      className="dex-liquid-glass dex-glass-specular dex-glass-refract dex-notif-card"
+      role={notification.icon === 'error' ? 'alert' : 'status'}
+      tabIndex={0}
+      className="dex-liquid-glass dex-glass-specular dex-notif-card dex-capsule"
+      data-expanded={expanded || undefined}
       aria-live={notification.icon === 'error' ? 'assertive' : 'polite'}
-      aria-label={`${notification.icon || 'info'} notification: ${notification.title}`}
+      aria-label={`${notification.title}${notification.body ? `. ${notification.body}` : ''}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); onClick?.(notification); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onDismiss(notification.id); }
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onClick={handleClick}
       style={{
-        // Floating notification card: Liquid Glass (refraction + specular edge
-        // from the classes), soft elevation, compact. Swipe right to dismiss.
-        width: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
-        minHeight: 60,
+        // DEX Capsule: a compact pill that opens into a card while hovered or
+        // focused (full message, time, actions, dismiss). Swipe right to dismiss.
+        width: expanded ? `min(${BANNER_WIDTH}px, calc(100vw - 48px))` : 'auto',
+        maxWidth: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
+        minWidth: 180,
+        borderRadius: expanded ? 18 : 9999,
         cursor: 'pointer',
         position: 'relative',
         transform: `translateX(${swipeX}px)`,
         opacity: swipeX > 0 ? Math.max(0, 1 - swipeX / BANNER_WIDTH) : 1,
-        transition: (swipeX === 0 || leaving) && !isReduceMotion()
-          ? `transform ${leaving ? '0.2s' : '0.42s'} cubic-bezier(0.34,1.36,0.64,1), opacity 0.2s ease`
-          : 'none',
-        // Spring entrance: drops in from above with a small overshoot.
-        animation: isReduceMotion() ? 'none' : 'dexNotifIn 0.46s cubic-bezier(0.34,1.3,0.64,1) backwards',
-        animationDelay: isReduceMotion() ? undefined : `${Math.min(index, 3) * 40}ms`,
+        transition: reduce ? 'none' : [
+          (swipeX === 0 || leaving) ? `transform ${leaving ? '0.18s' : '0.3s'} cubic-bezier(0.2,0.8,0.2,1)` : null,
+          'opacity 0.18s ease', 'border-radius 0.2s cubic-bezier(0.2,0.8,0.2,1)',
+        ].filter(Boolean).join(', '),
+        animation: reduce ? 'none' : 'dexNotifIn 0.32s cubic-bezier(0.2,0.8,0.2,1) backwards',
+        animationDelay: reduce ? undefined : `${Math.min(index, 3) * 30}ms`,
         touchAction: 'pan-y',
-        userSelect: 'none',
+        userSelect: expanded ? 'text' : 'none',
+        outlineOffset: 2,
       }}
     >
-      <div style={{ padding: '11px 14px', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-        <div style={{
-          width: 30, height: 30, borderRadius: 10, flexShrink: 0,
-          background: 'rgba(255,255,255,0.10)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16)',
+      <div style={{ padding: expanded ? '10px 12px 10px 10px' : '6px 14px 6px 6px', display: 'flex', gap: 10, alignItems: expanded ? 'flex-start' : 'center' }}>
+        <div aria-hidden="true" style={{
+          width: 28, height: 28, borderRadius: 9999, flexShrink: 0,
+          background: notification.icon === 'error' ? 'color-mix(in srgb, var(--color-error) 18%, transparent)' : 'rgba(255,255,255,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {iconSvg}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: expanded ? 'normal' : 'nowrap' }}>
               {notification.title}
             </div>
-            {notification.source && (
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0, textTransform: 'capitalize' }}>
-                {notification.source}
+            {expanded && (notification.source || notification.timestamp) && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                {[notification.source, timeLabel(notification.timestamp)].filter(Boolean).join(' · ')}
               </span>
             )}
           </div>
-          {notification.body && (
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+          {expanded && notification.body && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 3, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {notification.body}
             </div>
           )}
-          {/* Actions (and Undo) on hover, as glass pills; the first real
-              action is the tinted one. */}
-          {hovered && (notification.undoAction || (notification.actions && notification.actions.length > 0)) && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {expanded && hasActions && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               {notification.undoAction && (
                 <button
                   type="button"
@@ -338,9 +347,6 @@ const Banner: React.FC<{
                     onDismiss(notification.id);
                   }}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 10h11a6 6 0 0 1 0 12h-3" /><polyline points="7 6 3 10 7 14" />
-                  </svg>
                   Undo
                 </button>
               )}
@@ -357,6 +363,16 @@ const Banner: React.FC<{
             </div>
           )}
         </div>
+        {expanded && (
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={(e) => { e.stopPropagation(); onDismiss(notification.id); }}
+            style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 9999, border: 'none', background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -405,6 +421,8 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
       zIndex: 'var(--z-notification)',
       display: 'flex',
       flexDirection: 'column',
+      // Capsules hug the right edge: a compact pill opens leftward into its card.
+      alignItems: 'flex-end',
       gap: 'var(--space-2)',
       pointerEvents: 'auto',
     }}>
