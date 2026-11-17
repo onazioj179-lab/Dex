@@ -638,7 +638,7 @@ const ControlCenter: React.FC = () => {
             options={ALL_TIERS.map((t) => ({ id: t, label: getTierLabel(t) }))}
           />
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            {tier ? `Tier: ${getTierLabel(tier)}` : 'Auto-detecting'}
+            {tier ? `Mode: ${getTierLabel(tier)}` : 'Auto-detecting'}
             {tierManual ? ' (manual)' : ' (auto)'}
           </span>
         </CollapsibleSection>

@@ -1,5 +1,20 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-17) — Owner mandate "Performance, multi-window, Browser, system-wide UI/UX, UKI" (7.0.2, 16 batches).**
+> Rule: measure in the release exe on an isolated profile before and after (`scripts/perf/packaged-probe.mjs`; results in
+> `docs/reports/perf/`). Nothing estimated. Status:
+> - **Batch 1 baseline: DONE.** i7-8665U / 16 GB / Windows 26300, release exe 2026-11-17 11:11: desktop usable 2.3 s cold,
+>   1.1 s warm; idle 4.6% of a core (7 processes, ~490 MB private); **20.6% of a core idle with 10 apps open** (open lead).
+>   Old Browser: every tab mounted a page host (250 ms timer each), visited tabs stayed live up to 40, a 500-tab session
+>   restored only 100 tabs. Not done: low-end/high-end hardware (one machine here), memory-pressure runs.
+> - **Batch 2 multi-window: SHIPPED (first slice, #328).** `services/appWindows.ts`: window ids `notes~2` resolve to their
+>   app in every shell map, each window mounts its own app copy (own document/navigation/scroll), shared stores stay
+>   shared. Notes, Files, Terminal, Calculator, Ledger, DEX Code, Browser; "New Window" in the app menu. Not done: window
+>   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
+> - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
+>   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.
+> - **Open:** Resource Coordinator (batch 3), downloads/security (7), app passes (8–12), UKI (13), stress set (15), release (16).
+
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
 > Rust backend (`src-tauri` + `core/*`), **userspace** is everything that calls it over `dex_ipc` channels
