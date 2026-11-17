@@ -617,7 +617,7 @@ const s: Record<string, React.CSSProperties> = {
   section: { display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flexShrink: 0 },
   sectionLabel: {
     fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase', letterSpacing: 0.5,
+    textTransform: 'none', letterSpacing: 0.5,
   },
   linkRow: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' },
   linkBtn: {

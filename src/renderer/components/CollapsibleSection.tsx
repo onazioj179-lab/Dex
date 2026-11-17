@@ -61,7 +61,7 @@ const headerLabel: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
   letterSpacing: '0.02em',
-  textTransform: 'uppercase',
+  textTransform: 'none',
   color: 'var(--color-text-tertiary)',
   display: 'flex',
   alignItems: 'center',

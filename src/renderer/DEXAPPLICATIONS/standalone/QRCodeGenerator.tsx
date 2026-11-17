@@ -819,7 +819,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   settingLabel: {
     fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
-    textTransform: 'uppercase', color: 'var(--color-text-muted)',
+    textTransform: 'none', color: 'var(--color-text-muted)',
   },
   segmented: {
     display: 'flex', gap: 2, padding: 2, borderRadius: 10,

@@ -37,7 +37,7 @@ import {
 
 const hair = '1px solid var(--color-border-subtle)';
 const label: React.CSSProperties = {
-  fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.text.tertiary,
+  fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', textTransform: 'none', color: colors.text.tertiary,
 };
 const input: React.CSSProperties = {
   height: 26, padding: '0 8px', fontSize: 12, color: colors.text.primary, background: 'var(--color-bg-inset)',

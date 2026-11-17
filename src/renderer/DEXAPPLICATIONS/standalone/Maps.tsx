@@ -615,7 +615,7 @@ const DexMaps: React.FC = () => {
         {showRecentPanel && (
           <div role="listbox" aria-label="Recent searches" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Recent</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: 0.4 }}>Recent</span>
               <button onMouseDown={(e) => { e.preventDefault(); setRecent([]); }} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
             </div>
             {recent.map((r, i) => (

@@ -563,7 +563,7 @@ const S: Record<string, React.CSSProperties> = {
   main: { flex: 1, minWidth: 0, overflow: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   head: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minHeight: 28 },
   title: { margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' },
-  h3: { margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  h3: { margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em' },
   subtle: { fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 },
   caption: { margin: 0, fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 },
   empty: { margin: 0, padding: '6px 0', fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 },

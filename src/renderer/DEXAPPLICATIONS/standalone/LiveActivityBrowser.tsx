@@ -446,7 +446,7 @@ const LiveActivityBrowser: React.FC = () => {
       }}>
         {/* Time range segmented control */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Range</span>
+          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'none', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Range</span>
           {TIME_RANGES.map(r => {
             const active = range === r.key;
             return (
@@ -469,7 +469,7 @@ const LiveActivityBrowser: React.FC = () => {
 
         {/* Group-by segmented control */}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Group</span>
+          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'none', letterSpacing: 0.4, color: 'var(--color-text-tertiary)' }}>Group</span>
           {([['none', 'None'], ['app', 'App'], ['time', 'Time']] as [GroupMode, string][]).map(([mode, label]) => {
             const active = groupMode === mode;
             return (
@@ -535,7 +535,7 @@ const LiveActivityBrowser: React.FC = () => {
                 background: 'var(--color-bg-surface)',
                 borderBottom: '1px solid var(--color-border-subtle)',
               }}>
-                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>{g.key}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'none', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>{g.key}</span>
                 <span className="dex-tnum" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)' }}>{g.rows.length}</span>
               </div>
               {g.rows.map(renderRow)}

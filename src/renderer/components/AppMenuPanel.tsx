@@ -35,7 +35,7 @@ export interface AppMenuPanelProps {
 }
 
 const header: React.CSSProperties = {
-  gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase',
+  gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', textTransform: 'none',
   color: 'var(--color-text-tertiary)', padding: 'var(--space-2) 4px 2px', display: 'flex', alignItems: 'center', gap: 6,
 };
 
@@ -290,7 +290,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           <div role="presentation" style={header}>All apps</div>
           {categories.map(cat => (
             <React.Fragment key={cat.label}>
-              <div role="presentation" style={{ ...header, fontSize: 10, letterSpacing: '0.04em', textTransform: 'none', fontWeight: 500, padding: '6px 4px 0' }}>{cat.label}</div>
+              <div role="presentation" style={{ ...header, fontSize: 10, letterSpacing: '0.01em', textTransform: 'none', fontWeight: 500, padding: '6px 4px 0' }}>{cat.label}</div>
               {cat.apps.map(a => tile(a, 'all'))}
             </React.Fragment>
           ))}

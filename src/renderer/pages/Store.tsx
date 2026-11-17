@@ -1038,7 +1038,7 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   } as React.CSSProperties,
   detailSection: { display: 'flex', flexDirection: 'column', gap: 8 },
-  sectionTitle: { margin: 0, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' },
+  sectionTitle: { margin: 0, fontSize: 13, fontWeight: 700, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-secondary)' },
   detailDesc: { margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-primary)' },
   metaDim: { fontSize: 12, color: 'var(--color-text-tertiary)' },
   permGrid: { display: 'flex', flexWrap: 'wrap', gap: 8 },

@@ -2562,9 +2562,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10.5px',
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     padding: 'var(--space-3) 10px 4px',
-    letterSpacing: '0.8px',
+    letterSpacing: '0.01em',
   },
   sidebarItem: {
     display: 'flex',

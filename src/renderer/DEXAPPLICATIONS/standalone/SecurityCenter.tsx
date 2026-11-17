@@ -162,12 +162,12 @@ const SecurityCenter: React.FC = () => {
               <span style={{ color: colors.text.tertiary, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(e.ts)}</span>
               <span style={{
                 justifySelf: 'start', padding: '2px 8px', borderRadius: radius.full, fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.04em', textTransform: 'uppercase',
+                letterSpacing: '0.01em', textTransform: 'none',
                 color: OUTCOME_COLOR[e.outcome], background: `color-mix(in srgb, ${OUTCOME_COLOR[e.outcome]} 16%, transparent)`,
               }}>{OUTCOME_LABEL[e.outcome]}</span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ color: colors.text.primary, fontWeight: 600, fontFamily: fontStack.mono }}>{e.id}</span>
-                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 4, padding: '0 4px', textTransform: 'uppercase' }}>write</span>}
+                {e.mutates && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, color: colors.semantic.warning, border: `1px solid ${colors.semantic.warning}`, borderRadius: 4, padding: '0 4px', textTransform: 'none' }}>write</span>}
                 <span style={{ display: 'block', color: colors.text.secondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.result}</span>
               </span>
               <span style={{ color: colors.text.tertiary }}>{e.appId}</span>

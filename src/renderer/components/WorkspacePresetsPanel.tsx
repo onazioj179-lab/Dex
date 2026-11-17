@@ -42,7 +42,7 @@ const ProjectSpacesSection: React.FC<{ btn: React.CSSProperties }> = memo(({ btn
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Project Spaces</div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--color-text-tertiary)', textTransform: 'none' }}>Project Spaces</div>
         <button style={{ ...btn, borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }} onClick={addSpace}>+ New space</button>
       </div>
       {stages.map((s) => {
@@ -190,7 +190,7 @@ const WorkspacePresetsPanel: React.FC = () => {
 
           {/* Built-in starter workspaces — open a ready-made multi-app Project
               Space (kind-tagged, apps tiled). Always available, even with no saves. */}
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', padding: 'var(--space-2) 2px 0' }}>Starter workspaces</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--color-text-tertiary)', textTransform: 'none', padding: 'var(--space-2) 2px 0' }}>Starter workspaces</div>
           {WORKFLOW_TEMPLATES.map(t => (
             <div
               key={t.id}
@@ -207,7 +207,7 @@ const WorkspacePresetsPanel: React.FC = () => {
               <button style={{ ...btn, borderColor: 'var(--color-accent)', color: 'var(--color-accent)', flexShrink: 0 }} onClick={() => applyTemplate(t)}>Open</button>
             </div>
           ))}
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', padding: 'var(--space-2) 2px 0' }}>Saved</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--color-text-tertiary)', textTransform: 'none', padding: 'var(--space-2) 2px 0' }}>Saved</div>
           {presets.length === 0 ? (
             <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
               No saved layouts yet. Use “Save Workspace Layout” from the command palette (Ctrl+K).

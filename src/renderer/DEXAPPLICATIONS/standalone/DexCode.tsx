@@ -1326,7 +1326,7 @@ const DexCode: React.FC = () => {
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, width: 22, flexShrink: 0, textTransform: 'uppercase' }}>{SYMBOL_TAG[s.kind]}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, width: 22, flexShrink: 0, textTransform: 'none' }}>{SYMBOL_TAG[s.kind]}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                         <span style={{ marginLeft: 'auto', opacity: 0.4, fontSize: 10 }}>{s.line}</span>
                       </button>
@@ -1980,8 +1980,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   eyebrow: {
     fontSize: 10,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.08em',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
     color: 'var(--color-text-tertiary)',
   },
   title: {
@@ -1999,8 +1999,8 @@ const S: Record<string, React.CSSProperties> = {
   sectionHeading: {
     fontSize: 10,
     fontWeight: 700,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase' as const,
+    letterSpacing: '0.01em',
+    textTransform: 'none' as const,
     color: 'var(--color-text-tertiary)',
   },
   templateBtn: {
@@ -2067,7 +2067,7 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border)',
     alignItems: 'center',
   },
-  statLabel: { fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
+  statLabel: { fontSize: 9, color: 'var(--color-text-tertiary)', textTransform: 'none' as const, letterSpacing: '0.01em' },
   statValue: { fontSize: 13, fontWeight: 700 },
   workspace: {
     display: 'flex',
@@ -2146,8 +2146,8 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
     borderBottom: '1px solid var(--color-border)',
     background: 'var(--color-bg-secondary)',
     flexShrink: 0,

@@ -2008,7 +2008,7 @@ const UkiOverlay: React.FC = () => {
               <div style={{ marginBottom: 4 }}>
                 <div style={{
                   fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                  letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 2,
+                  letterSpacing: '0.01em', textTransform: 'none', marginBottom: 2,
                 }}>You</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>{turn.userText}</div>
               </div>
@@ -2016,7 +2016,7 @@ const UkiOverlay: React.FC = () => {
                 <div style={{
                   fontSize: 10, fontWeight: 600,
                   color: turn.success ? 'var(--color-accent)' : 'var(--color-error)',
-                  letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 2,
+                  letterSpacing: '0.01em', textTransform: 'none', marginBottom: 2,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   UKI
@@ -2079,7 +2079,7 @@ const UkiOverlay: React.FC = () => {
             <div style={{ marginBottom: response ? 10 : 0 }}>
               <div style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 4,
+                letterSpacing: '0.01em', textTransform: 'none', marginBottom: 4,
               }}>
                 You
               </div>
@@ -2131,7 +2131,7 @@ const UkiOverlay: React.FC = () => {
             <div>
               <div style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-accent)',
-                letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 4,
+                letterSpacing: '0.01em', textTransform: 'none', marginBottom: 4,
               }}>
                 UKI
               </div>
@@ -2178,7 +2178,7 @@ const UkiOverlay: React.FC = () => {
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                letterSpacing: '0.4px', textTransform: 'uppercase',
+                letterSpacing: '0.4px', textTransform: 'none',
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: 0,
               }}

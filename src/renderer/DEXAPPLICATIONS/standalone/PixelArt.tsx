@@ -863,7 +863,7 @@ const PixelArt: React.FC = () => {
           {paletteLock && (
             <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Locked</span>
+                <span style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0.5 }}>Locked</span>
                 <button
                   onClick={lockToCurrentColors}
                   style={{ ...toolBtn, padding: '2px 6px', fontSize: 10 }}
@@ -913,7 +913,7 @@ const PixelArt: React.FC = () => {
           />
           {tilePreview && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>3x3 Tile</span>
+              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0.5 }}>3x3 Tile</span>
               <canvas
                 ref={tileCanvasRef}
                 width={tilePx}

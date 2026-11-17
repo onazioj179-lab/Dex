@@ -805,7 +805,7 @@ const S: Record<string, React.CSSProperties> = {
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   thread: { flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-5) 18px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' },
   welcome: { margin: 'auto', textAlign: 'center', maxWidth: 420 },
-  welcomeMark: { fontSize: 40, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.03em' },
+  welcomeMark: { fontSize: 40, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.03em' },
   welcomeTitle: { fontSize: 22, fontWeight: 600, marginTop: 'var(--space-2)' },
   welcomeSub: { fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 },
   row: { display: 'flex', width: '100%' },

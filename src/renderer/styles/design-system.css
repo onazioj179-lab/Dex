@@ -2201,8 +2201,8 @@ img, svg {
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .section-action {
@@ -2228,8 +2228,8 @@ img, svg {
 .card-title {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--color-text-secondary);
 }
 
@@ -3798,8 +3798,8 @@ button[aria-disabled="true"],
 .tahoe-section-label {
   font-size: 11px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--color-text-tertiary);
   margin-bottom: 16px;
   padding: 0 4px;
@@ -3971,8 +3971,8 @@ button[aria-disabled="true"],
   padding: 4px 12px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--color-text-tertiary);
   cursor: default;
 }
@@ -4442,8 +4442,8 @@ button[aria-disabled="true"],
   color: var(--text-tertiary, rgba(255,255,255,0.35));
   text-align: center;
   padding: 4px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .tahoe-date-picker-grid {
@@ -5110,7 +5110,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.05); }
 .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .data-table th {
   text-align: left; font-size: var(--text-xs); font-weight: var(--weight-semibold);
-  color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: var(--tracking-label);
+  color: var(--color-text-tertiary); text-transform: none; letter-spacing: var(--tracking-label);
   padding: 8px 12px; border-bottom: 1px solid var(--color-border);
   position: sticky; top: 0; background: var(--color-bg-surface); z-index: 1;
 }
@@ -5797,8 +5797,8 @@ input[type="range"]::-webkit-slider-thumb:active {
   padding: 6px 12px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -5931,8 +5931,8 @@ html, body {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--color-text-tertiary);
 }
 

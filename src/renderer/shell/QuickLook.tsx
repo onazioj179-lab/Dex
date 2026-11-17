@@ -242,7 +242,7 @@ const AudioAnalysis: React.FC<{ source: string }> = ({ source }) => {
       {metrics.map(m => (
         <div key={m.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>{m.value}</span>
-          <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' }}>{m.label}</span>
+          <span style={{ fontSize: 10, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-muted)' }}>{m.label}</span>
         </div>
       ))}
     </div>

@@ -259,7 +259,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   headerTitle: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 4 },
   body: { padding: 'var(--space-4) var(--space-5)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 },
-  label: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
+  label: { fontSize: 11, fontWeight: 600, textTransform: 'none' as const, letterSpacing: '0.01em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
   input: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
   select: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
   addBtn: { padding: '6px 14px', borderRadius: 10, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },

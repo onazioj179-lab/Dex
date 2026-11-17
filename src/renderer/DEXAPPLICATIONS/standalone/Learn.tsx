@@ -310,8 +310,8 @@ const CARD: React.CSSProperties = {
 // Subtle row dividers shared across cards.
 const ROW_DIVIDER = '1px solid var(--color-border-subtle, rgba(255,255,255,.04))';
 const CARD_TITLE: React.CSSProperties = {
-  fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const,
-  letterSpacing: '0.04em', opacity: 0.5, marginBottom: 'var(--space-3)',
+  fontSize: 12, fontWeight: 600, textTransform: 'none' as const,
+  letterSpacing: '0.01em', opacity: 0.5, marginBottom: 'var(--space-3)',
 };
 const STAT_ROW: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -651,7 +651,7 @@ const Learn: React.FC = () => {
             </div>
           </div>
           {done && (
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-text-primary)', background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 4 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none', color: 'var(--color-text-primary)', background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 4 }}>
               Done
             </span>
           )}

@@ -138,7 +138,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
       <div style={{ overflowY: 'auto', flex: 1, padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {/* Memory row */}
         <section aria-label="Memory">
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Memory</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>Memory</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             <Stat label="Heap used" value={heap ? formatMB(heap.value) : '--'} />
             <Stat label="Heartbeats" value={heartbeat ? String(heartbeat.value) : '--'} />
@@ -149,7 +149,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         {/* Render budgets */}
         {renderBudgets.length > 0 && (
           <section aria-label="Render budgets">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Render Budgets</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>Render Budgets</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
               {renderBudgets.map(s => (
                 <Stat key={s.name} label={s.name.replace('renderer.render.', '')} value={`${s.value.toFixed(1)} ms`} warn={s.value > 16.67} />
@@ -161,7 +161,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         {/* Startup timeline */}
         {timeline && timeline.phases.length > 0 && (
           <section aria-label="Startup timeline">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>
               Startup Timeline ({timeline.totalMs} ms total)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
@@ -182,7 +182,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
 
         {/* Crash reports */}
         <section aria-label="Crash reports">
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>
             Crash Reports{crashes.length > 0 ? ` (${crashes.length})` : ''}
           </div>
           {crashes.length === 0 ? (
@@ -208,7 +208,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
 
         {/* Live logs */}
         <section aria-label="Live logs">
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Live Logs</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>Live Logs</div>
           <LogsPanel height={220} maxEntries={200} />
         </section>
       </div>

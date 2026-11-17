@@ -298,7 +298,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
         padding: 'var(--space-3) 10px 4px',
         fontSize: 10.5,
         fontWeight: 600,
-        textTransform: 'uppercase',
+        textTransform: 'none',
         letterSpacing: 0.8,
         color: 'var(--color-text-tertiary)',
         ...style,

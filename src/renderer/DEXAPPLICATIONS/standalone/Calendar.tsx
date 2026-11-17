@@ -979,7 +979,7 @@ const Calendar: React.FC = () => {
                     key={day}
                     style={{ ...styles.weekDayPill, ...(idx === todayDow ? styles.weekDayPillToday : {}) }}
                   >
-                    {day.toUpperCase()}
+                    {day}
                   </div>
                 ))}
               </div>
@@ -1464,7 +1464,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     letterSpacing: '0.3px',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   navBtns: {
     display: 'flex',
@@ -1550,7 +1550,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     letterSpacing: '0.3px',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   viewBtnActive: {
     background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
@@ -1608,7 +1608,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '9px',
     color: 'var(--color-text-muted)',
     fontWeight: 600,
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   miniGrid: {
     display: 'grid',
@@ -1679,7 +1679,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     letterSpacing: '0.3px',
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   eventsList: {
     display: 'flex',
@@ -1915,8 +1915,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
   },
   weekViewDayNum: {
     fontSize: '18px',
@@ -1958,7 +1958,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '9px',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
     letterSpacing: '0.3px',
     whiteSpace: 'nowrap' as const,
   },
@@ -2046,7 +2046,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
     letterSpacing: '0.4px',
     padding: '4px 2px',
     position: 'sticky' as const,

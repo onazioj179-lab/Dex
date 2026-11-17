@@ -147,8 +147,8 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
     borderBottom: '1px solid var(--color-bg-hover)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.6px',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
   },
 };
 

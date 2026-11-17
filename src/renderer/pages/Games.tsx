@@ -296,8 +296,8 @@ export default function Games(): React.ReactElement {
               background: G_PANEL, border: `1px solid ${G_BORDER}`,
             }}>
               <div>
-                <div style={{ fontSize: 11, color: G_DIM, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Total playtime</div>
-                <div style={{ fontSize: 30, fontWeight: 800, marginTop: 4, letterSpacing: '-0.02em' }}>{formatHours(totalPlaySec)}</div>
+                <div style={{ fontSize: 11, color: G_DIM, textTransform: 'none', letterSpacing: '0.01em', fontWeight: 700 }}>Total playtime</div>
+                <div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, letterSpacing: '-0.02em' }}>{formatHours(totalPlaySec)}</div>
                 <div style={{ fontSize: 12, color: G_DIM, marginTop: 2 }}>{games.length} games · {playedCount} played</div>
               </div>
               {topGames.length > 0 && (
@@ -310,9 +310,9 @@ export default function Games(): React.ReactElement {
                       <div style={{
                         width: 36, height: 36, borderRadius: 10, margin: '0 auto 8px',
                         background: coverGradient(g.title), display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontSize: 15,
+                        fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontSize: 15,
                       }}>{g.title.charAt(0).toUpperCase()}</div>
-                      <div style={{ fontSize: 14, fontWeight: 800 }}>{formatHours(sec)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{formatHours(sec)}</div>
                       <div style={{ fontSize: 10, color: G_DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 76 }}>{g.title}</div>
                     </div>
                   ))}

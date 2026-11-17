@@ -210,7 +210,7 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 'var(--space-2)' }}>
         Network Mode
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 'var(--space-2)' }}>
@@ -325,7 +325,7 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>
         {PERMISSION_LABELS[id]}
       </div>
       <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '0 0 10px', lineHeight: 1.45 }}>

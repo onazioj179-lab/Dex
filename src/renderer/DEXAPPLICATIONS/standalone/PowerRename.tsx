@@ -37,7 +37,7 @@ const inputStyle: React.CSSProperties = {
 };
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
-  textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5, display: 'block',
+  textTransform: 'none', letterSpacing: '0.01em', marginBottom: 5, display: 'block',
 };
 
 const Toggle: React.FC<{ on: boolean; onClick: () => void; label: string }> = ({ on, onClick, label }) => (

@@ -84,7 +84,7 @@ export const EasterEggHost: React.FC = () => {
         .dex-easter-card { animation: dexEggIn 320ms cubic-bezier(0.23, 1, 0.32, 1) both; }
         @media (prefers-reduced-motion: reduce) { .dex-easter-card { animation: none; } }
       `}</style>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.01em', textTransform: 'none', color: 'var(--color-accent)' }}>
         {card.isNew ? 'Easter egg found' : 'You found this one already'}
       </div>
       <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em', marginTop: 8, color: 'var(--color-text-primary)', textWrap: 'balance' } as React.CSSProperties}>

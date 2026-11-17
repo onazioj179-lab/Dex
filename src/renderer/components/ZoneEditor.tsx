@@ -318,7 +318,7 @@ const ZoneEditor: React.FC = () => {
 
           {/* Saved layouts sidebar */}
           <div style={{ width: 230, display: 'flex', flexDirection: 'column', gap: 8, borderLeft: border, paddingLeft: 14 }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: textTertiary }}>Saved Layouts</div>
+            <div style={{ fontSize: 11, textTransform: 'none', letterSpacing: '0.01em', color: textTertiary }}>Saved Layouts</div>
             <button
               style={{ ...btn, textAlign: 'left', background: activeLayoutId === null ? 'rgba(74,158,255,0.16)' : btn.background }}
               onClick={() => setActiveLayout(null)}

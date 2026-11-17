@@ -521,7 +521,7 @@ const UpdateManagerSection: React.FC = () => {
   const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border-subtle)' };
   const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' };
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
-  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
+  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'none' as const };
   const pill = (on: boolean): React.CSSProperties => ({
     width: 44, height: 24, borderRadius: 10, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
@@ -4377,7 +4377,7 @@ export const Settings: React.FC = () => {
           >
             <div style={{
               padding: '6px 10px', fontSize: 10, fontWeight: 600,
-              color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const,
+              color: 'var(--color-text-tertiary)', textTransform: 'none' as const,
               letterSpacing: 'var(--dex-tracking-label, 0.08em)',
               borderBottom: '1px solid var(--color-border-subtle)',
               position: 'sticky', top: 0, background: 'var(--color-bg-surface)', zIndex: 1,
@@ -4439,7 +4439,7 @@ export const Settings: React.FC = () => {
                       )}
                       <span style={{
                         display: 'inline-block', marginTop: 3, fontSize: 9.5, fontWeight: 600,
-                        textTransform: 'uppercase' as const, letterSpacing: '0.04em',
+                        textTransform: 'none' as const, letterSpacing: '0.01em',
                         color: 'var(--color-text-tertiary)',
                         padding: '1px 6px', borderRadius: 4,
                         background: 'var(--color-bg-hover)',
@@ -4525,7 +4525,7 @@ export const Settings: React.FC = () => {
               }
               return (
                 <React.Fragment>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>
                     Sections ({filtered.length})
                   </div>
                   {filtered.map(section => (
@@ -4563,7 +4563,7 @@ export const Settings: React.FC = () => {
                     onClick={() => toggleCat(cat.label)}
                     aria-expanded={!catCollapsed}
                     aria-label={`${catCollapsed ? 'Expand' : 'Collapse'} ${cat.label}`}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}
                   >
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: catCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s ease', opacity: 0.7 }}><polyline points="6 9 12 15 18 9" /></svg>
                     <span>{cat.label}</span>
@@ -4760,7 +4760,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: 'var(--dex-tracking-label, 0.08em)',
     marginTop: '28px',
     marginBottom: '10px',
@@ -4769,7 +4769,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: 'var(--dex-tracking-label, 0.08em)',
     marginTop: 'var(--space-3)',
     marginBottom: '10px',

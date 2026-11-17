@@ -196,8 +196,8 @@ const ResultItem: React.FC<{
         <span style={{
           fontSize: 10, fontWeight: 600,
           color: isSelected ? 'var(--color-text-primary)' : 'var(--color-accent)',
-          opacity: 0.7, flexShrink: 0, letterSpacing: '0.04em',
-          textTransform: 'uppercase',
+          opacity: 0.7, flexShrink: 0, letterSpacing: '0.01em',
+          textTransform: 'none',
         }}>
           Top
         </span>

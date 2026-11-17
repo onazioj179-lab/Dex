@@ -90,7 +90,7 @@ export const FlowSendMenu: React.FC = () => {
     head: { padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' },
     title: { fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' },
     preview: { fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-    kindTag: { display: 'inline-block', fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginRight: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' },
+    kindTag: { display: 'inline-block', fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginRight: '6px', textTransform: 'none', letterSpacing: '0.01em' },
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: 'var(--space-3)' },
     target: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderRadius: '10px', border: '1px solid var(--color-border-subtle)', background: 'transparent', cursor: 'pointer', textAlign: 'left' },
     swatch: { width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0 },

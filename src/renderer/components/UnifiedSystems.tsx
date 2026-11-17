@@ -156,8 +156,8 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                     color: 'var(--color-text-secondary)',
                     fontSize: '11px',
                     fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+                    textTransform: 'none',
+                    letterSpacing: '0.01em',
                   }}
                 >
                   {group.source} ({group.totalCount})

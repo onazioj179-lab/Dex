@@ -148,7 +148,7 @@ const SystemIntegrityPanel: React.FC = () => {
       {alerts.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em', flex: 1 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.02em', flex: 1 }}>
               Performance alerts
             </span>
             <button

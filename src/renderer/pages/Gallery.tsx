@@ -1405,7 +1405,7 @@ export const Gallery: React.FC = () => {
                     {favorites.includes(item.id) && <span style={styles.favoriteIcon}>{Icons.heart}</span>}
                     {starRatings[item.id] > 0 && <span style={{ position: 'absolute', bottom: 6, left: 6, display: 'flex', gap: 1 }}>{Array.from({ length: starRatings[item.id] }).map((_, si) => <svg key={si} width="10" height="10" viewBox="0 0 24 24" fill="var(--color-warning)" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>)}</span>}
                     {colorLabels[item.id] && <span style={{ position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: '50%', background: colorLabels[item.id], boxShadow: `0 0 4px ${colorLabels[item.id]}` }} />}
-                    <span style={{ position: 'absolute', top: 6, left: 6, padding: '1px 5px', borderRadius: 2, background: 'rgba(0,0,0,0.75)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' as const }}>
+                    <span style={{ position: 'absolute', top: 6, left: 6, padding: '1px 5px', borderRadius: 2, background: 'rgba(0,0,0,0.75)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, letterSpacing: 0.3, textTransform: 'none' as const }}>
                       {getMediaFormat(item)}
                     </span>
                   </div>
@@ -2141,7 +2141,7 @@ export const Gallery: React.FC = () => {
 
               {/* Star Rating */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>Rating</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'none', letterSpacing: 0.5 }}>Rating</span>
                 <div style={{ display: 'flex', gap: 2 }}>
                   {[1,2,3,4,5].map(star => (
                     <button
@@ -2156,7 +2156,7 @@ export const Gallery: React.FC = () => {
 
               {/* Color Label */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>Label</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'none', letterSpacing: 0.5 }}>Label</span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {[
                     { color: 'var(--color-error)', name: 'Red' },
@@ -2195,7 +2195,7 @@ export const Gallery: React.FC = () => {
                   ['Path', selectedMedia.src],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'none', letterSpacing: 0.5 }}>{label}</span>
                     <span style={{ fontSize: 13, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{value}</span>
                   </div>
                 ))}
@@ -2226,7 +2226,7 @@ const styles: Record<string, React.CSSProperties> = {
   sidebarHeader: { height: 36, display: 'flex', alignItems: 'center', padding: '0 14px', borderBottom: '1px solid var(--pg-border)' },
   sidebarTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' },
   albumList: { flex: 1, overflow: 'auto', padding: 'var(--space-2)' },
-  sectionLabel: { fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, padding: 'var(--space-3) 10px 4px', letterSpacing: 0.8 },
+  sectionLabel: { fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none' as const, padding: 'var(--space-3) 10px 4px', letterSpacing: 0.8 },
   albumItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px var(--space-3)', height: 'var(--pg-row-height)' as any, borderRadius: 'var(--pg-row-radius)' as any, border: 'none', cursor: 'pointer', fontSize: 12.5, width: '100%', textAlign: 'left' as const, transition: 'background-color 0.12s ease, color 0.12s ease' },
   albumCount: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
 

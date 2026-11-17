@@ -1300,7 +1300,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none',
               color: 'var(--color-text-tertiary, #8a8a8a)',
             }}>
               <span>Outline</span>

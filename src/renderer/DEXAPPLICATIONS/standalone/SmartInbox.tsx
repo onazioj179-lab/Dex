@@ -832,7 +832,7 @@ const S: Record<string, React.CSSProperties> = {
   section: { marginBottom: 'var(--space-4)' },
   sectionLabel: {
     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-    fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6,
+    fontSize: 11, fontWeight: 700, textTransform: 'none', letterSpacing: 0.6,
     color: 'var(--color-text-muted)', padding: '0 var(--space-2)',
     margin: 'var(--space-2) 0',
   },
