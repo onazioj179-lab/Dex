@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppLifecycle } from '../hooks/useAppLifecycle';
+import { BackgroundTasksPanel } from '../components/BackgroundTasksPanel';
 import { useAppWindowId } from '../services/appWindows';
 import DexIcon from '../components/DexIcon';
 import { openAppContextMenu } from '../components/AppContextMenu';
@@ -31,11 +32,12 @@ import { LineChart, canvasColor } from '../components/telemetry/LineChart';
 
 // -- types + persisted preferences --------------------------------------------
 
-type View = 'processes' | 'performance' | 'apps' | 'diagnostics' | 'system';
+type View = 'processes' | 'performance' | 'apps' | 'background' | 'diagnostics' | 'system';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'processes', label: 'Processes' },
   { id: 'performance', label: 'Performance' },
   { id: 'apps', label: 'DEX Apps' },
+  { id: 'background', label: 'Background' },
   { id: 'diagnostics', label: 'Diagnostics' },
   { id: 'system', label: 'System' },
 ];
@@ -416,6 +418,7 @@ const TaskManager: React.FC = () => {
             onQuit={id => closeApp(id)}
           />
         )}
+        {view === 'background' && <BackgroundTasksPanel />}
         {view === 'diagnostics' && (
           <NexusDiagnostics />
         )}

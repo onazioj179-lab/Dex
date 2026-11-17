@@ -18,6 +18,7 @@ mod paths;
 mod ledger_ctl;
 mod download_ctl;
 mod onboarding;
+mod uki_terminal;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -2314,6 +2315,19 @@ async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::W
             "ok": false, "success": false, "error": "onboarding-required",
             "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
         });
+    }
+    // UKI's terminal broker: only DEX's own window, never a web page in a tab.
+    if channel.starts_with("ukiterm:") {
+        let own_webview = webview.label() == webview.window().label() && !webview.label().starts_with("dexbrowser-");
+        if !own_webview {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| uki_terminal::dispatch(&app, &channel, &args)))
+                .unwrap_or_else(|_| json!({ "ok": false, "error": "the command broker hit an internal error" }))
+        })
+        .await
+        .unwrap_or(Value::Null);
     }
     // DEX Ledger holds financial data: only a DEX window's own webview (the
     // main shell or a detached DEX app window, both loading the local bundle)

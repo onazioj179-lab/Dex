@@ -31,6 +31,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { NativeWebview } from '../components/NativeWebview';
 import ContextMenu, { useContextMenu } from '../components/ContextMenu';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
+import { useBackgroundTasks } from '../services/backgroundTasks';
 import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
@@ -1415,6 +1416,20 @@ export const Browser: React.FC = () => {
         completeActivity(`browser-${id}`, true);
       }
     });
+  }, [downloads]);
+
+  // Mirror downloads into the shared background-task list (Task Manager › Background).
+  useEffect(() => {
+    const bg = useBackgroundTasks.getState();
+    for (const d of downloads) {
+      bg.upsert({
+        id: `download:${d.id}`, kind: 'download', title: d.fileName, detail: d.url,
+        status: d.status === 'downloading' ? 'running' : d.status === 'error' ? 'failed' : d.status,
+        progress: d.progress, startedAt: Number(d.id.split('_')[1] ? parseInt(d.id.split('_')[1], 36) : 0) || d.finishedAt || Date.now(),
+        endedAt: d.finishedAt, error: d.error,
+        cancel: d.status === 'downloading' ? () => { void window.dex?.invoke?.('download:cancel', d.id); } : undefined,
+      });
+    }
   }, [downloads]);
 
   // Persist finished downloads (history), newest first.

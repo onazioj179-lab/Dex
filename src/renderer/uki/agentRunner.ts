@@ -38,6 +38,7 @@ import { decideToolCall, toolRisk, reasoningBudget, type ReasoningBudget } from 
 import { getProcessingMode, getReasoningPreference } from './providers/modelPrefs';
 import { listGrants } from './permissions';
 import { runFileTool, FILE_TOOL_NAMES } from './fileTools';
+import { runTerminalTool, TERMINAL_TOOL_NAMES, classifyCommand, commandConfirmReason } from './terminalTools';
 import { scheduleTaskTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduleTools';
 
 /** Asks the user to approve a risky core-tool call; resolves true to proceed. */
@@ -58,6 +59,7 @@ export function setUkiToolConfirmHandler(fn: ToolConfirmHandler): void {
 }
 
 const FILE_TOOLS: ReadonlySet<string> = new Set(FILE_TOOL_NAMES);
+const TERMINAL_TOOLS: ReadonlySet<string> = new Set(TERMINAL_TOOL_NAMES);
 
 async function grantedCapabilities(): Promise<Set<string>> {
   try {
@@ -149,6 +151,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
     return runUkiAction(name, args);
   }
   if (FILE_TOOLS.has(name)) return runFileTool(name, args);
+  if (TERMINAL_TOOLS.has(name)) return runTerminalTool(name, args);
   switch (name as ToolName) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
@@ -215,8 +218,20 @@ async function runGatedTool(name: string, args: Record<string, unknown>, signal:
     recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
     return result;
   }
+  // A command is classified by the native broker before the user is asked, so
+  // the prompt says what it does; privileged commands never reach the prompt.
+  let reason = decision.kind === 'confirm' ? decision.reason : '';
+  if (name === 'run_command') {
+    const cls = await classifyCommand(String(args.command ?? ''));
+    if (!cls.ok || cls.risk === 'privileged') {
+      const result = `Not performed: ${cls.risk === 'privileged' ? 'UKI does not run commands that need administrator rights or change system settings' : cls.error || 'the command was rejected'}.`;
+      recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
+      return result;
+    }
+    reason = commandConfirmReason(cls.risk, String(args.cwd ?? ''));
+  }
   if (decision.kind === 'confirm') {
-    const ok = await toolConfirm(name, args, decision.reason);
+    const ok = await toolConfirm(name, args, reason);
     if (!ok) {
       const result = `The user declined ${name}. Not performed.`;
       recordUkiToolAudit({ tool: name, args, outcome: 'denied', result, risk: spec.risk, mutates });
@@ -258,6 +273,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
     web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
     find_files: 4, read_file: 6, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
     schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
+    run_command: 3, command_status: 6, cancel_command: 2,
   });
 
   // One controller per run: the caller's signal and the task's Cancel button

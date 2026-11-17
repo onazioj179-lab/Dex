@@ -160,7 +160,7 @@ export function reasoningBudget(text: string, preference: ReasoningPreference = 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 /** Capabilities a tool may need (mirrors UKI's permission capabilities). */
-export type ToolCapability = 'network' | 'file-read' | 'file-write' | 'notifications';
+export type ToolCapability = 'network' | 'file-read' | 'file-write' | 'notifications' | 'shell';
 
 export interface ToolRiskSpec {
   risk: RiskLevel;
@@ -189,6 +189,11 @@ export const TOOL_RISK: Record<string, ToolRiskSpec> = {
   schedule_task: { risk: 'medium', confirmReason: 'creates a task that runs on its own later' },
   list_scheduled_tasks: { risk: 'low' },
   cancel_scheduled_task: { risk: 'medium', confirmReason: 'deletes a scheduled task' },
+  // Terminal broker (src-tauri/src/uki_terminal.rs). High risk: always asks;
+  // the "shell" grant is never assumed; privileged commands are refused natively.
+  run_command: { risk: 'high', capability: 'shell' },
+  command_status: { risk: 'low' },
+  cancel_command: { risk: 'medium', confirmReason: 'stops a running command' },
 };
 
 export function toolRisk(tool: string, mutatesAppAction?: boolean): ToolRiskSpec {
