@@ -3752,7 +3752,13 @@ export const AppManager: React.FC = () => {
       cullTimer = setTimeout(cull, 120);
     };
     apply(useSpatialStore.getState());
-    const unsub = useSpatialStore.subscribe(apply);
+    // Only camera, enable or window-set changes matter here. Every other
+    // store write (zones refitting, groups, guides, selection) used to re-run
+    // this and push the level-of-detail pass back each time.
+    const unsub = useSpatialStore.subscribe((st, prev) => {
+      if (st.camera === prev.camera && st.enabled === prev.enabled && st.windows === prev.windows && st.viewport === prev.viewport) return;
+      apply(st);
+    });
     return () => { unsub(); if (cullTimer) clearTimeout(cullTimer); if (motionTimer) clearTimeout(motionTimer); };
   }, [splitMode, spatialEnabled]);
 
