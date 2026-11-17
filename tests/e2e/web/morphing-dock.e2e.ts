@@ -100,13 +100,19 @@ test.describe('Morphing Dock', () => {
     await ctx.close();
   });
 
-  test('a full-size app stays clear of the top bar and the Dock; the wallpaper shows under the Dock', async ({ page }) => {
+  // Owner spec (2026-11-17): the Dock is a floating overlay. A full-size app
+  // starts below the top bar and fills to the bottom edge; the Dock floats
+  // over it (no reserved strip, no black band).
+  test('a full-size app starts below the top bar and fills to the bottom edge; the Dock floats over it', async ({ page }) => {
     await boot(page);
     await open(page, 'notes');
+    const v = await vp(page);
     const app = (await box(page, '[data-app-id="notes"]'))!;
     const dock = (await box(page, '.dex-mdock'))!;
     expect(app.y).toBeGreaterThanOrEqual(await topBar(page));
-    expect(app.y + app.h).toBeLessThanOrEqual(dock.y);
+    expect(Math.abs(app.y + app.h - v.h)).toBeLessThanOrEqual(1);
+    const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.dex-mdock'), [dock.x + dock.w / 2, dock.y + dock.h / 2]);
+    expect(onTop).toBe(true);
   });
 
   test('keyboard: Tab reaches the Dock once, arrows move, Escape collapses and keeps focus', async ({ page }) => {
@@ -146,7 +152,7 @@ test.describe('Morphing Dock', () => {
   });
 
   for (const edge of ['left', 'right'] as const) {
-    test(`${edge} Dock: below the top bar, on screen, apps clear of it`, async ({ page }) => {
+    test(`${edge} Dock: below the top bar, on screen, floating over full-width apps`, async ({ page }) => {
       await boot(page, { edge, expanded: true });
       await open(page, 'notes');
       const v = await vp(page);
@@ -154,8 +160,8 @@ test.describe('Morphing Dock', () => {
       inside(dock, v);
       expect(dock.y).toBeGreaterThanOrEqual(await topBar(page));
       const app = (await box(page, '[data-app-id="notes"]'))!;
-      if (edge === 'left') expect(app.x).toBeGreaterThanOrEqual(dock.x + dock.w);
-      else expect(app.x + app.w).toBeLessThanOrEqual(dock.x);
+      expect(app.x).toBeLessThanOrEqual(1);
+      expect(Math.abs(app.x + app.w - v.w)).toBeLessThanOrEqual(1);
     });
   }
 
