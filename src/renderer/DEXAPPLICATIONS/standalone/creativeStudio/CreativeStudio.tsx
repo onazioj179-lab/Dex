@@ -15,8 +15,10 @@
 
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { SegmentedControl } from '../../../components/controls/SegmentedControl';
-import Canvas from '../Canvas';
 
+// Both editors load lazily: Canvas and Slides import this folder's helpers,
+// so a static import here would make a chunk cycle.
+const Canvas = lazy(() => import('../Canvas'));
 const PresentationBuilder = lazy(() => import('../PresentationBuilder'));
 
 import { setStudioMode, storedStudioMode as storedMode, STUDIO_MODE_EVENT, type StudioMode } from './studioMode';
@@ -54,7 +56,9 @@ const CreativeStudio: React.FC = () => {
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
         {mounted.board && (
           <div hidden={mode !== 'board'} style={{ position: 'absolute', inset: 0 }}>
-            <Canvas />
+            <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>Opening Board…</div>}>
+              <Canvas />
+            </Suspense>
           </div>
         )}
         {mounted.slides && (
