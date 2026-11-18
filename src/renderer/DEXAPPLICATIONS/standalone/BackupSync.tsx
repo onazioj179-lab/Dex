@@ -12,6 +12,7 @@
  * No server. The UI just orchestrates the backupSync service.
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import {
   exportEncrypted,
   importEncrypted,
@@ -302,23 +303,15 @@ const BackupSync: React.FC = () => {
                 app v{pending.payload.appVersion}
               </div>
 
-              <div style={styles.segRow} role="radiogroup" aria-label="Restore mode">
-                {(['merge', 'replace'] as RestoreMode[]).map((m) => (
-                  <button
-                    key={m}
-                    className="bks-seg"
-                    role="radio"
-                    aria-checked={restoreMode === m}
-                    onClick={() => setRestoreMode(m)}
-                    style={{
-                      ...styles.seg,
-                      ...(restoreMode === m ? styles.segActive : {}),
-                    }}
-                  >
-                    {m === 'merge' ? 'Merge (keep newer)' : 'Replace (overwrite)'}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                aria-label="Restore mode"
+                size="md"
+                fill
+                options={[{ value: 'merge', label: 'Merge (keep newer)' }, { value: 'replace', label: 'Replace (overwrite)' }] as { value: RestoreMode; label: string }[]}
+                value={restoreMode}
+                onChange={(m) => setRestoreMode(m)}
+                style={{ marginBottom: 6 }}
+              />
               <p style={styles.segHelp}>
                 {restoreMode === 'merge'
                   ? 'Per key, keeps whichever value is newer. Local data not in the backup is left alone.'

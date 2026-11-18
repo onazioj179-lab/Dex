@@ -16,6 +16,7 @@
  * puts a numbers-only summary on the clipboard when you ask for it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { SegmentedControl } from './controls';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useUkiTasks } from '../store/ukiTasksStore';
 import {
@@ -469,11 +470,7 @@ const ResourcesPane: React.FC<ResourcesPaneProps> = ({ available, visible, self,
         title="DEX resource use"
         sub={!visible ? 'Paused while hidden' : last ? `Every ${SAMPLE_MS / 1000} s · last sample ${fmtClock(last)}` : hint}
         action={
-          <div role="radiogroup" aria-label="Time range" style={S.segment}>
-            {RANGES.map((x) => (
-              <button key={x.id} type="button" role="radio" aria-checked={x.id === range} onClick={() => onRange(x.id)} style={{ ...S.segBtn, ...(x.id === range ? S.segBtnOn : null) }}>{x.label}</button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Time range" size="sm" options={RANGES.map((x) => ({ value: x.id, label: x.label }))} value={range} onChange={(v) => onRange(v)} />
         }
       />
       {sampleError && <p role="alert" style={{ ...S.empty, color: 'var(--color-warning)' }}>The native sampler did not answer. Figures resume on the next successful sample.</p>}

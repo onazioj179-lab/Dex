@@ -8,6 +8,7 @@
  * "Save to Vault" hands one to the encrypted Vault.
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { useVaultStore } from '../../store/useVaultStore';
@@ -279,34 +280,10 @@ const PasswordGenerator: React.FC = () => {
       `}</style>
 
       <div style={S.header}>
-        <div role="tablist" aria-label="Section" style={S.segmented}>
-          {VIEWS.map(v => (
-            <button
-              key={v.id}
-              role="tab"
-              aria-selected={view === v.id}
-              className="pwg-seg"
-              style={{ ...S.seg, ...(view === v.id ? S.segOn : {}) }}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-        {view === 'generate' && <div role="tablist" aria-label="Type" style={S.segmented}>
-          {(['password', 'passphrase'] as Mode[]).map(m => (
-            <button
-              key={m}
-              role="tab"
-              aria-selected={prefs.mode === m}
-              className="pwg-seg"
-              style={{ ...S.seg, ...(prefs.mode === m ? S.segOn : {}) }}
-              onClick={() => setPrefs(p => ({ ...p, mode: m }))}
-            >
-              {m === 'password' ? 'Password' : 'Passphrase'}
-            </button>
-          ))}
-        </div>}
+        <SegmentedControl semantics="tabs" size="md" aria-label="Section" options={VIEWS.map(v => ({ value: v.id, label: v.label }))} value={view} onChange={(v) => setView(v)} />
+        {view === 'generate' && (
+          <SegmentedControl size="md" aria-label="Type" options={[{ value: 'password', label: 'Password' }, { value: 'passphrase', label: 'Passphrase' }] as { value: Mode; label: string }[]} value={prefs.mode} onChange={(m) => setPrefs(p => ({ ...p, mode: m }))} />
+        )}
       </div>
 
       {view !== 'generate' ? (
