@@ -17,7 +17,7 @@ import { AutosaveIndicator, type AutosaveState } from '../../components/Autosave
 import { downloadText } from '../../improvements500/downloadBlob';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import {
-  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
+  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck, parseOutline, mergeOutlineSlides,
   historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
 } from './presentationDeck';
 import { colorInputValue } from '../../utils/canvasTheme';
@@ -144,6 +144,11 @@ const makeSlideForLayout = (layout: SlideLayout, theme: Theme, title?: string, b
 
 const makeBlankSlide = (theme: Theme = THEMES[0]): Slide =>
   makeSlideForLayout('title-content', theme, 'Click to edit title');
+
+/** The starter slide nobody has edited yet (its default title, nothing else). */
+const isUntouchedStarter = (sl: Slide): boolean =>
+  !sl.notes && sl.blocks.every(b => b.type === 'text') && sl.blocks.some(b => b.content === 'Click to edit title')
+  && sl.blocks.every(b => b.content === 'Click to edit title' || !b.content.trim() || /^Click to /.test(b.content));
 
 // Backward-compatible migration: ensure notes/layout exist, keep stored blocks intact.
 const migrateSlide = (s: any): Slide => ({
@@ -376,9 +381,20 @@ const PresentationBuilder: React.FC = () => {
         return `${i + 1}. ${t.slice(0, 80)}`;
       }).join('\n');
     });
+    registerUkiAppAction('presentation', {
+      id: 'presentation.addSlides',
+      description: 'add slides from an outline: each unindented line is a slide title, indented or "- " lines are its bullets. Appends to the deck (undoable).',
+      args: [{ name: 'outline', type: 'string' }],
+      example: '{"outline": "Q3 review\\n- Revenue up\\n- Two launches\\nNext steps\\n- Hire"}',
+      mutates: true,
+    }, (args) => {
+      const n = addOutlineSlidesRef.current(String(args.outline ?? ''));
+      return n ? `Added ${n} slide${n === 1 ? '' : 's'} to the deck. The user can undo with Ctrl+Z.` : 'No slides: the outline had no lines.';
+    });
     return () => {
       unregisterUkiAppContext('presentation');
       unregisterUkiAppAction('presentation.outline');
+      unregisterUkiAppAction('presentation.addSlides');
     };
   }, []);
 
@@ -535,37 +551,32 @@ const PresentationBuilder: React.FC = () => {
   // ---- Outline import ----
   // Each non-indented / heading line becomes a slide title; indented or "- " /
   // "* " bullet lines become content on the current slide.
-  const importOutline = useCallback(() => {
-    const lines = outlineText.split(/\r?\n/);
-    const groups: { title: string; bullets: string[] }[] = [];
-    let cur: { title: string; bullets: string[] } | null = null;
-    for (const raw of lines) {
-      if (!raw.trim()) continue;
-      const indented = /^\s+/.test(raw) || /^\s*[-*•]\s+/.test(raw);
-      const text = raw.replace(/^\s*[-*•#]+\s*/, '').trim();
-      if (!text) continue;
-      if (!indented || !cur) {
-        cur = { title: text, bullets: [] };
-        groups.push(cur);
-      } else {
-        cur.bullets.push(text);
-      }
-    }
-    if (groups.length === 0) {
-      toast('error', 'No outline content found');
-      return;
-    }
+  // Outline → slides, appended (an untouched starter deck is replaced). Undoable.
+  const addOutlineSlides = useCallback((text: string): number => {
+    const groups = parseOutline(text);
+    if (!groups.length) return 0;
     const built = groups.map(g => {
       const body = g.bullets.map(b => `• ${b}`).join('\n');
       return makeSlideForLayout(g.bullets.length ? 'title-content' : 'title', theme, g.title, body || undefined);
     });
-    setSlides(built);
-    setCurrentIdx(0);
+    setSlides(prev => {
+      const m = mergeOutlineSlides(prev, built, isUntouchedStarter);
+      setCurrentIdx(m.firstNew);
+      return m.slides;
+    });
     setSelectedBlockId(null);
+    return built.length;
+  }, [theme]);
+  const addOutlineSlidesRef = useRef(addOutlineSlides);
+  addOutlineSlidesRef.current = addOutlineSlides;
+
+  const importOutline = useCallback(() => {
+    const n = addOutlineSlides(outlineText);
+    if (!n) { toast('error', 'No outline content found'); return; }
     setShowOutline(false);
     setOutlineText('');
-    toast('success', `Imported ${built.length} slide${built.length === 1 ? '' : 's'}`);
-  }, [outlineText, theme]);
+    toast('success', `Added ${n} slide${n === 1 ? '' : 's'} (Undo to remove them)`);
+  }, [outlineText, addOutlineSlides]);
 
   // ---- Block drag (canvas) ----
   const onBlockMouseDown = useCallback((e: React.MouseEvent, b: SlideBlock) => {

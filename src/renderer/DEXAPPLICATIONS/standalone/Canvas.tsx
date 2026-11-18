@@ -19,6 +19,7 @@ import AutosaveIndicator from '../../components/AutosaveIndicator';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -617,6 +618,46 @@ const Canvas: React.FC = () => {
     commitObjects(objectsRef.current, [...objectsRef.current, obj]);
     setSelectedObj(obj.id);
   };
+
+  // UKI: read the open board (text of every object, grouped by frame) and send it to Slides.
+  useEffect(() => {
+    registerUkiAppAction('canvas', {
+      id: 'canvas.readBoard',
+      description: 'read the board open in Creative Studio: each frame and the sticky notes, text and shapes inside it (text only; images are named).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const objs = objectsRef.current.filter((o) => o.kind !== 'connector');
+      const name = boardsRef.current?.boards.find((b) => b.id === boardsRef.current?.activeId)?.name ?? 'Board';
+      if (!objs.length) return `"${name}" has no objects.`;
+      const frames = objs.filter((o) => o.kind === 'frame');
+      const inFrame = (o: BoardObject, f: BoardObject) => o.x + o.w / 2 >= f.x && o.x + o.w / 2 <= f.x + f.w && o.y + o.h / 2 >= f.y && o.y + o.h / 2 <= f.y + f.h;
+      const line = (o: BoardObject) => `- ${o.kind}${o.kind === 'image' ? '' : `: ${o.text.trim().replace(/\s+/g, ' ').slice(0, 200) || '(empty)'}`}`;
+      const out = [`Board "${name}": ${objs.length} objects, ${frames.length} frames.`];
+      for (const f of frames) out.push(`Frame "${f.text || 'Untitled'}":`, ...objs.filter((o) => o.kind !== 'frame' && inFrame(o, f)).map(line));
+      const loose = objs.filter((o) => o.kind !== 'frame' && !frames.some((f) => inFrame(o, f)));
+      if (loose.length) out.push('Outside frames:', ...loose.map(line));
+      return out.join('\n').slice(0, 6000);
+    });
+    registerUkiAppAction('canvas', {
+      id: 'canvas.sendToSlides',
+      description: 'turn the open board into slides (each frame becomes a slide) and add them to the deck in Slides. Undoable there.',
+      args: [],
+      example: '{}',
+      mutates: true,
+    }, () => {
+      const { slides, report } = boardToSlides(objectsRef.current, { hasDrawing: layersRef.current.some((l) => l.visible && hasInk(l.canvas)) });
+      if (!sendSlidesToPresentation(slides)) return 'Nothing to send: the board has no sticky notes, text, shapes or images.';
+      setStudioMode('slides');
+      const extra = describeNotCarried(report);
+      return `Added ${report.slides} slide(s) with ${report.carried} objects to Slides.${extra ? ` ${extra}` : ''}`;
+    });
+    return () => {
+      unregisterUkiAppAction('canvas.readBoard');
+      unregisterUkiAppAction('canvas.sendToSlides');
+    };
+  }, []);
 
   // Requests from the Creative Hub: open a board, or start one from a template.
   const handleRequestRef = useRef<() => Promise<void>>(async () => {});

@@ -550,9 +550,22 @@ export const Files: React.FC = () => {
       const names = c.files.slice(0, 200).map((f) => f.name).join(', ');
       return `${c.files.length} items in ${c.currentPath || c.selectedLocation}: ${names}`.slice(0, 4000);
     });
+    registerUkiAppAction('files', {
+      id: 'files.getSelection',
+      description: 'list the items the user has selected in Files, with full paths, kinds, sizes and dates (use before moving or renaming them).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      const picked = c.files.filter((f) => c.selectedFiles.has(f.path) || f.path === c.selectedFile);
+      if (!picked.length) return 'Nothing is selected in Files.';
+      return picked.slice(0, 200).map((f) => `${f.isDirectory ? 'folder' : f.extension || 'file'} · ${f.path} · ${f.isDirectory ? '' : `${f.size} bytes · `}modified ${f.modified instanceof Date && !Number.isNaN(f.modified.getTime()) ? f.modified.toISOString().slice(0, 10) : 'unknown'}`).join('\n').slice(0, 6000);
+    });
     return () => {
       unregisterUkiAppContext('files');
       unregisterUkiAppAction('files.listCurrentFolder');
+      unregisterUkiAppAction('files.getSelection');
     };
   }, [winId]);
 

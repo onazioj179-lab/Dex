@@ -601,9 +601,58 @@ export const Gallery: React.FC = () => {
       const names = c.sortedMedia.slice(0, 100).map((m) => m.name).join(', ');
       return `${c.sortedMedia.length} items in "${c.selectedAlbum}": ${names}`.slice(0, 4000);
     });
+    registerUkiAppAction('gallery', {
+      id: 'gallery.findMedia',
+      description: 'find photos and videos in the current album by name text, date range (YYYY-MM-DD), type (image/video), format or favourite; uses only metadata Gallery has.',
+      args: [
+        { name: 'text', type: 'string', optional: true },
+        { name: 'from', type: 'string', optional: true },
+        { name: 'to', type: 'string', optional: true },
+        { name: 'type', type: 'string', optional: true },
+        { name: 'format', type: 'string', optional: true },
+        { name: 'favorite', type: 'string', optional: true },
+      ],
+      example: '{"text": "beach", "from": "2026-06-01"}',
+      mutates: false,
+    }, (args) => {
+      const c = ukiCtxRef.current;
+      const text = String(args.text ?? '').trim().toLowerCase();
+      const parse = (v: unknown, end: boolean) => { const s = String(v ?? '').trim(); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null; const d = new Date(`${s}T${end ? '23:59:59' : '00:00:00'}`); return Number.isNaN(d.getTime()) ? null : d.getTime(); };
+      const from = parse(args.from, false), to = parse(args.to, true);
+      if ((args.from && from === null) || (args.to && to === null)) return 'Dates must be YYYY-MM-DD.';
+      const type = String(args.type ?? '').trim().toLowerCase();
+      const format = String(args.format ?? '').trim().toLowerCase().replace(/^\./, '');
+      const fav = String(args.favorite ?? '').trim().toLowerCase();
+      const hits = c.sortedMedia.filter((m) => {
+        const t = m.date instanceof Date ? m.date.getTime() : NaN;
+        if (text && !m.name.toLowerCase().includes(text)) return false;
+        if (from !== null && !(t >= from)) return false;
+        if (to !== null && !(t <= to)) return false;
+        if (type && m.type !== type) return false;
+        if (format && (m.format ?? m.name.split('.').pop() ?? '').toLowerCase() !== format) return false;
+        if ((fav === 'true' || fav === 'yes') && !m.favorite) return false;
+        return true;
+      });
+      if (!hits.length) return `No items in "${c.selectedAlbum}" match.`;
+      return `${hits.length} match in "${c.selectedAlbum}":\n` + hits.slice(0, 80).map((m) => `${m.name} · ${m.type}${m.width && m.height ? ` · ${m.width}×${m.height}` : ''} · ${m.date instanceof Date && !Number.isNaN(m.date.getTime()) ? m.date.toISOString().slice(0, 10) : 'no date'}${m.favorite ? ' · favourite' : ''}`).join('\n');
+    });
+    registerUkiAppAction('gallery', {
+      id: 'gallery.getSelection',
+      description: 'list the photos and videos the user has selected in Gallery.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      const picked = c.sortedMedia.filter((m) => c.selectedItems.has(m.id));
+      if (!picked.length) return 'Nothing is selected in Gallery.';
+      return picked.slice(0, 100).map((m) => `${m.name} · ${m.type} · ${m.src}`).join('\n').slice(0, 6000);
+    });
     return () => {
       unregisterUkiAppContext('gallery');
       unregisterUkiAppAction('gallery.listMedia');
+      unregisterUkiAppAction('gallery.findMedia');
+      unregisterUkiAppAction('gallery.getSelection');
     };
   }, []);
 
