@@ -32,6 +32,7 @@ export interface SettingIndexEntry {
 export const SETTINGS_INDEX: SettingIndexEntry[] = [
   // ---------------- General ----------------
   { label: 'Launch at Login', section: 'general', desc: 'Start DEX when you sign in to Windows', keywords: 'startup boot autostart' },
+  { label: 'Reopen apps and windows', section: 'general', desc: 'Open the apps and extra windows from your last session when DEX starts', keywords: 'restore session continuity windows reopen startup' },
   { label: 'Reset All Settings to Defaults', section: 'general', desc: 'Restore every setting to its default value', keywords: 'reset factory defaults clear' },
 
   // ---------------- Appearance ----------------

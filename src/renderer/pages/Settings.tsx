@@ -65,6 +65,7 @@ import { withViewTransition } from '../utils/viewTransition';
 import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
+import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 
 // ===========================================================================
 // TYPES
@@ -1670,6 +1671,7 @@ export const Settings: React.FC = () => {
 
   // Launch at Login reflects the real per-user Run entry, not a stored flag.
   const [launchAtLogin, setLaunchAtLogin] = useState({ supported: false, enabled: false, busy: false });
+  const reopenApps = useDexSetting<boolean>('session.reopenApps', false);
   useEffect(() => {
     let alive = true;
     (window as any).dex?.system?.getLaunchAtLogin?.()
@@ -2275,14 +2277,16 @@ export const Settings: React.FC = () => {
 
   const renderGeneralSettings = () => (
     <div style={styles.settingsContent}>
-      {launchAtLogin.supported && (
-        <>
-          <h3 style={styles.sectionTitleFirst}>Startup</h3>
-          {renderLiveToggle('Launch at Login', 'Start DEX when you sign in to Windows', launchAtLogin.enabled, toggleLaunchAtLogin, launchAtLogin.busy)}
-        </>
+      <h3 style={styles.sectionTitleFirst}>Startup</h3>
+      {launchAtLogin.supported && renderLiveToggle('Launch at Login', 'Start DEX when you sign in to Windows', launchAtLogin.enabled, toggleLaunchAtLogin, launchAtLogin.busy)}
+      {renderLiveToggle(
+        'Reopen apps and windows',
+        'When DEX starts, open the apps and extra windows (such as Notes 2) that were open when you last closed it. Up to 12. Not after an unexpected close.',
+        reopenApps,
+        () => writeDexSetting('session.reopenApps', !reopenApps),
       )}
 
-      <h3 style={launchAtLogin.supported ? styles.sectionTitle : styles.sectionTitleFirst}>Reset</h3>
+      <h3 style={styles.sectionTitle}>Reset</h3>
       <button
         style={styles.dangerBtn}
         aria-label="Reset all settings to defaults"
