@@ -139,6 +139,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
   { label: 'Memory Recording', section: 'uki', desc: 'Allow UKI to remember conversations and learn', keywords: 'memory ai uki recall privacy' },
   { label: 'Retention Period', section: 'uki', desc: 'How long to keep memory records', keywords: 'memory retention uki' },
   { label: 'Auto Cleanup', section: 'uki', desc: 'Automatically remove expired memory records', keywords: 'memory cleanup uki' },
+  { label: 'Indexed folders', section: 'uki', desc: 'Choose extra folders (like a code workspace) for search and UKI to index', keywords: 'index folder search umari project workspace code files context' },
 
   // ---------------- AI Providers ----------------
   { label: 'AI Providers', section: 'aiproviders', desc: 'Configure AI models, API keys, and routing', keywords: 'ai artificial intelligence openai anthropic claude gpt model api key llm provider smart router' },

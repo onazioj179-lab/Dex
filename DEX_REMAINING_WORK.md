@@ -130,6 +130,8 @@ The work in these rows is finished; what is left is a run in the packaged/instal
 | # | Item | Needs |
 |---|---|---|
 | 309 | Setup Assistant (first run) | Packaged-app run (fresh profile) |
+| 350 | Umari: Indexed folders (pick a folder, see its projects, UKI find_context) | Packaged-app click-through (native folder picker) |
+| 351 | UKI approval sheet + Security Center Xack view | Packaged click-through with a provider key (#4) |
 | 39 | UI sound effects (listen-test) | Packaged-app run |
 | 22 | Dock/taskbar visual rework | Packaged-app run |
 | 231 | Browser: A page opened while DEX was minimized stayed blank after restore | Packaged-app run |

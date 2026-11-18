@@ -10,8 +10,8 @@
 //! - the working folder must exist, be absolute, and not be a Windows system folder;
 //! - commands are classified: `privileged` (elevation, boot/disk/service/firewall/
 //!   registry-machine changes, shutdown, wiping) is REFUSED; `external` (network
-//!   tools) and `modify`/`execute` run only after the user approved in DEX (the
-//!   renderer's action gate), and the class is reported back;
+//!   tools) and `modify`/`execute`/`read` run only with a single-use Xack ticket
+//!   (`xack.rs`) approved for this exact command in this exact folder;
 //! - runs non-elevated in Windows PowerShell with -NoProfile -NonInteractive and
 //!   no execution-policy bypass, with secret-looking environment variables removed;
 //! - at most 3 tasks at once, a timeout (default 10 min, max 60), cancel kills the
@@ -216,6 +216,14 @@ fn run(app: &tauri::AppHandle, args: &Value) -> Value {
             return json!({ "ok": false, "error": "three UKI commands are already running; wait or cancel one" });
         }
     }
+    // Xack: nothing runs without an approval ticket for THIS command in THIS
+    // folder (single use, expires). The renderer cannot mint one; only the
+    // approval surface's `xack:decide` (or a grant the user made) can.
+    let ticket = a.get("xackRequest").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let pending_id = format!("ut_{:x}_pending", now_ms());
+    if let Err(e) = crate::xack::consume_for(app, &ticket, "terminal.run", &json!({ "command": command, "cwd": cwd }), &pending_id) {
+        return json!({ "ok": false, "error": format!("not approved: {e}"), "needsApproval": true });
+    }
 
     let mut cmd = Command::new("powershell.exe");
     cmd.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", &command])
@@ -231,10 +239,17 @@ fn run(app: &tauri::AppHandle, args: &Value) -> Value {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
-    let mut child = match cmd.spawn() { Ok(c) => c, Err(e) => return json!({ "ok": false, "error": format!("couldn't start PowerShell: {e}") }) };
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            crate::xack::finish(app, &pending_id, "failed", &format!("couldn't start PowerShell: {e}"));
+            return json!({ "ok": false, "error": format!("couldn't start PowerShell: {e}") });
+        }
+    };
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let id = format!("ut_{:x}_{}", now_ms(), child.id());
+    crate::xack::rekey(&pending_id, &id);
     let child = Arc::new(Mutex::new(child));
     {
         let mut t = tasks().lock_safe();
@@ -298,6 +313,7 @@ fn run(app: &tauri::AppHandle, args: &Value) -> Value {
             }
         }
         persist(&app2);
+        crate::xack::finish(&app2, &id2, status, &match code { Some(c) => format!("exit code {c}"), None => status.to_string() });
         emit(&app2, json!({ "id": id2, "kind": "done", "status": status, "exitCode": code }));
     });
 

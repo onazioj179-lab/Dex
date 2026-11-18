@@ -47,7 +47,11 @@ export function commandConfirmReason(cls: CommandClass | undefined, cwd: string)
 const tail = (s: string, n = 4000) => (s.length > n ? `…${s.slice(-n)}` : s);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function runTerminalTool(name: string, args: Record<string, unknown>): Promise<string> {
+/**
+ * Run a terminal tool. `xackRequest` is the Xack request the user approved for
+ * this exact command and folder; the broker refuses `run_command` without it.
+ */
+export async function runTerminalTool(name: string, args: Record<string, unknown>, xackRequest?: string): Promise<string> {
   switch (name) {
     case 'run_command': {
       const command = String(args.command ?? '').trim();
@@ -55,7 +59,7 @@ export async function runTerminalTool(name: string, args: Record<string, unknown
       if (!command) return 'Not performed: no command given.';
       if (!cwd) return 'Not performed: give the full path of the folder to run in (cwd).';
       const timeoutSec = Number(args.timeout_sec ?? 600) || 600;
-      const r = await invoke('ukiterm:run', { command, cwd, timeoutSec, label: String(args.label ?? '') }).catch(() => null);
+      const r = await invoke('ukiterm:run', { command, cwd, timeoutSec, label: String(args.label ?? ''), xackRequest: xackRequest ?? '' }).catch(() => null);
       if (!r) return 'Not performed: the command broker is not available (desktop app only).';
       if (!r.ok) return `Not performed: ${r.message || r.error || 'refused'}`;
       // Short commands: wait up to 15 s so the answer can include the result.

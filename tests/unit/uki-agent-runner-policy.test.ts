@@ -52,7 +52,7 @@ describe('runUkiAgent policy gate', () => {
     setUkiToolConfirmHandler(confirm);
     replies.push('TOOL trash_file {"path": "C:\\\\Users\\\\me\\\\Downloads\\\\x.zip"}', 'Okay, left it alone.');
     await runUkiAgent({ userText: 'delete x.zip', systemPrompt: 'sys' });
-    expect(confirm).toHaveBeenCalledWith('trash_file', expect.any(Object), 'high-risk action');
+    expect(confirm).toHaveBeenCalledWith('trash_file', expect.any(Object), 'high-risk action', expect.anything());
     expect(fileCalls).toEqual([]);
     expect(getUkiActionAudit().at(-1)).toMatchObject({ id: 'trash_file', outcome: 'denied', risk: 'high' });
   });

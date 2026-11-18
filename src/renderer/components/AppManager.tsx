@@ -42,6 +42,7 @@ import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionC
 import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
+import { UkiApprovalHost } from './UkiApprovalHost';
 import AskUkiSelection from './AskUkiSelection';
 import AskUkiContextMenu from './AskUkiContextMenu';
 // Deep import (not the '../uki' barrel): AppManager only needs these two static
@@ -5586,6 +5587,8 @@ export const AppManager: React.FC = () => {
 
       {/* UKI Voice Assistant Transcript Overlay (Settings > UKI > Enable UKI) */}
       {ukiEnabled && <UkiOverlay />}
+      {/* UKI approvals (Xack): always mounted so scheduled and Nexus runs can ask too. */}
+      <UkiApprovalHost />
       <AskUkiSelection />
 
       {/* FancyZones-style custom snap-zone editor (opens on dex-open-zone-editor) */}

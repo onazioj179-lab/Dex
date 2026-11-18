@@ -102,8 +102,48 @@ const SKIP_DIRS: &[&str] = &[
     "coverage", "vendor", "__pycache__",
 ];
 
+/// Files whose CONTENTS are never indexed (their name still is, so the user can
+/// find them): credentials, keys, keystores and environment files. Content that
+/// looks like a private key is dropped too, whatever the file is called.
+pub fn is_sensitive_file(path: &Path) -> bool {
+    let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    if name.is_empty() {
+        return false;
+    }
+    const EXACT: &[&str] = &[
+        ".env", ".npmrc", ".pypirc", ".netrc", "_netrc", ".git-credentials", ".htpasswd", "id_rsa", "id_dsa",
+        "id_ecdsa", "id_ed25519", "known_hosts", "authorized_keys", "credentials", "credentials.json",
+        "secrets.json", "secrets.yaml", "secrets.yml", "secrets.toml", "service-account.json", "wallet.dat",
+        "keystore.json", "local.settings.json", "appsettings.secrets.json", ".dockercfg",
+    ];
+    if EXACT.contains(&name.as_str()) || name.starts_with(".env.") || name.ends_with(".env") {
+        return true;
+    }
+    const EXTS: &[&str] = &["pem", "key", "pfx", "p12", "jks", "keystore", "kdbx", "ppk", "asc", "gpg", "ovpn", "der", "crt", "cer"];
+    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    if EXTS.contains(&ext.as_str()) {
+        return true;
+    }
+    ["secret", "password", "passwd", "credential", "private_key", "privatekey", "api_key", "apikey", "access_token", "auth_token"]
+        .iter()
+        .any(|w| name.contains(w))
+}
+
+/// True when text carries a private key or a well-known access-token prefix.
+pub fn looks_like_secret(text: &str) -> bool {
+    text.contains("PRIVATE KEY-----")
+        || text.contains("-----BEGIN OPENSSH")
+        || text.contains("-----BEGIN PGP PRIVATE")
+        || ["ghp_", "github_pat_", "xoxb-", "xoxp-", "sk-ant-", "AKIA", "AIza", "glpat-"].iter().any(|p| {
+            text.match_indices(p).any(|(i, _)| {
+                // A token prefix followed by a long run of token characters.
+                text[i + p.len()..].chars().take(16).filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').count() >= 16
+            })
+        })
+}
+
 fn read_text_content(path: &Path, size: u64) -> String {
-    if size == 0 || size > MAX_CONTENT_BYTES {
+    if size == 0 || size > MAX_CONTENT_BYTES || is_sensitive_file(path) {
         return String::new();
     }
     let is_text = path
@@ -114,7 +154,11 @@ fn read_text_content(path: &Path, size: u64) -> String {
     if !is_text {
         return String::new();
     }
-    std::fs::read_to_string(path).unwrap_or_default()
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    if looks_like_secret(&text) {
+        return String::new();
+    }
+    text
 }
 
 /// Build the indexable field tuple for one file: (path, name, ext, modified,
@@ -542,6 +586,34 @@ fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn secret_files_are_findable_by_name_but_their_contents_are_not_indexed() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let env = data.path().join(".env.local");
+        let creds = data.path().join("credentials.json");
+        let key_in_txt = data.path().join("notes.txt");
+        let token_md = data.path().join("readme.md");
+        let normal = data.path().join("plan.md");
+        std::fs::write(&env, b"OPENAI=quokkasecret").unwrap();
+        std::fs::write(&creds, b"{\"password\":\"quokkasecret\"}").unwrap();
+        std::fs::write(&key_in_txt, b"-----BEGIN RSA PRIVATE KEY-----
+quokkasecret
+-----END RSA PRIVATE KEY-----").unwrap();
+        std::fs::write(&token_md, b"token ghp_abcdefghijklmnopqrstuvwxyz0123 quokkasecret").unwrap();
+        std::fs::write(&normal, b"quokka roadmap").unwrap();
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        assert_eq!(idx.index_path(data.path(), 100).unwrap(), 5);
+        assert!(idx.search("quokkasecret", 10).is_empty(), "secret content leaked into the index");
+        assert!(idx.search("quokka", 10).iter().any(|h| h.name == "plan.md"));
+        assert!(idx.search("credentials", 10).iter().any(|h| h.name == "credentials.json"));
+        assert!(is_sensitive_file(Path::new("C:/x/id_ed25519")));
+        assert!(is_sensitive_file(Path::new("C:/x/server.pem")));
+        assert!(!is_sensitive_file(Path::new("C:/x/token_budget_notes.txt")));
+        assert!(!is_sensitive_file(Path::new("C:/x/report.md")));
+        assert!(!looks_like_secret("the AKIA prefix alone"));
+    }
 
     #[test]
     fn apply_file_changes_batches_upserts_and_removals_in_one_commit() {

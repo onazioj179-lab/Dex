@@ -56,6 +56,7 @@ import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
+import { UmariFoldersSection } from './settingsPanels/UmariFoldersSection';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { applyMotionDurations } from '../styles/motionDurations';
@@ -4009,6 +4010,8 @@ export const Settings: React.FC = () => {
       {renderToggle('ukiMemoryEnabled', 'Memory Recording', 'Allow UKI to remember conversations and learn from interactions')}
       {renderSlider('ukiRetentionDays', 'Retention Period', 'How long to keep memory records before cleanup', 1, 365, ' days')}
       {renderToggle('ukiAutoCleanup', 'Auto Cleanup', 'Automatically remove expired memory records')}
+
+      <UmariFoldersSection styles={styles} />
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
       <UkiArchiveStats styles={styles} />

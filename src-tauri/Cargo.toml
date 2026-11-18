@@ -67,3 +67,6 @@ incremental = false
 [features]
 # Tauri's default release feature for the embedded asset protocol.
 custom-protocol = ["tauri/custom-protocol"]
+
+[dev-dependencies]
+tempfile = "3"
