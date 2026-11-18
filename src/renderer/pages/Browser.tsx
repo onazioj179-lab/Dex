@@ -31,7 +31,8 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { NativeWebview } from '../components/NativeWebview';
 import ContextMenu, { useContextMenu } from '../components/ContextMenu';
 import { TabSearch } from '../components/browser/TabSearch';
-import { DexSwitch } from '../components/controls';
+import { DexSwitch, DexCapsuleButton } from '../components/controls';
+import { pickFolder } from '../services/nativeFiles';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
 import { useBackgroundTasks } from '../services/backgroundTasks';
 import { getStoredTier } from '../services/TierManager';
@@ -576,6 +577,11 @@ export const Browser: React.FC = () => {
   const lastActiveRef = useRef<Map<string, number>>(new Map());
   const busyTabsRef = useRef<Set<string>>(new Set());
   const liveTabSetting = useDexSetting<'auto' | number>('browser.liveTabs', 'auto');
+  // Download destination: a chosen folder (validated natively) or Downloads; optionally ask each time.
+  const downloadDir = useDexSetting<string>('browser.downloadDir', '');
+  const downloadAsk = useDexSetting<boolean>('browser.downloadAsk', false);
+  const downloadPrefsRef = useRef({ downloadDir, downloadAsk });
+  downloadPrefsRef.current = { downloadDir, downloadAsk };
   useEffect(() => {
     lastActiveRef.current.set(activeTab, Date.now());
     let cancelled = false;
@@ -1457,6 +1463,12 @@ export const Browser: React.FC = () => {
   const startDownload = useCallback(async (url: string) => {
     const id = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const fileName = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop() || '') || 'download';
+    let dest = downloadPrefsRef.current.downloadDir || '';
+    if (downloadPrefsRef.current.downloadAsk) {
+      const picked = await pickFolder(`Save ${fileName} to`, dest || undefined).catch(() => null);
+      if (!picked) return; // cancelled: nothing is downloaded
+      dest = picked;
+    }
 
     setDownloads(prev => [...prev, {
       id,
@@ -1468,7 +1480,7 @@ export const Browser: React.FC = () => {
     setShowDownloads(true);
     
     try {
-      const result = await window.dex?.invoke?.('download:start', url, id);
+      const result = await window.dex?.invoke?.('download:start', url, id, dest || undefined);
       if (result?.success && result.started) return; // progress + completion arrive as events
       if (result?.success) {
         setDownloads(prev => prev.map(d => 
@@ -2619,6 +2631,23 @@ export const Browser: React.FC = () => {
                 onChange={v => writeDexSetting('defaultSearchEngine', v)}
               />
             </div>
+            <div style={{ ...styles.settingRow, flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Save downloads to</span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={downloadDir || undefined}>
+                {downloadDir || 'Downloads folder'}
+              </span>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <DexCapsuleButton size="sm" style={{ border: '1px solid var(--color-border-subtle)' }}
+                  onClick={async () => { const d = await pickFolder('Save downloads to', downloadDir || undefined).catch(() => null); if (d) writeDexSetting('browser.downloadDir', d); }}>
+                  Change…
+                </DexCapsuleButton>
+                {downloadDir && <DexCapsuleButton size="sm" onClick={() => writeDexSetting('browser.downloadDir', '')}>Use Downloads</DexCapsuleButton>}
+              </span>
+            </div>
+            <label style={styles.settingRow}>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Ask where to save each file</span>
+              <DexSwitch size="sm" checked={downloadAsk} label="Ask where to save each file" onChange={(v) => writeDexSetting('browser.downloadAsk', v)} />
+            </label>
 
             {/* Shields for the open site: off = no blocking or hiding on this host. */}
             <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-3)' }}>
