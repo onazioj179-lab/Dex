@@ -103,6 +103,7 @@ import FeatureTree from './components/FeatureTree';
 import PropertiesPanel from './components/PropertiesPanel';
 import { ResizablePanel } from '../../components/ResizablePanel';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
+import { useResourcePressure } from '../../services/resourcePressure';
 
 // ==================== APP IDENTITY ====================
 export const AXL_VERSION = '1.0.0';
@@ -1400,6 +1401,11 @@ const AXL: React.FC = () => {
     const renderer = new AXLRenderer();
     renderer.init(canvas);
     rendererRef.current = renderer;
+    // DEX memory pressure: drop off-screen GPU meshes (on-screen parts stay).
+    renderer.setMemoryPressure(useResourcePressure.getState().level);
+    const unsubPressure = useResourcePressure.subscribe((st, prev) => {
+      if (st.level !== prev.level) renderer.setMemoryPressure(st.level);
+    });
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -1446,6 +1452,7 @@ const AXL: React.FC = () => {
       cancelAnimationFrame(animRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
       ro.disconnect();
+      unsubPressure();
       renderer.dispose();
       rendererRef.current = null;
     };

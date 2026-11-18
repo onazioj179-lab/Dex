@@ -11,8 +11,10 @@
 // sysinfo sampler, so a reading costs a memory refresh, not a process scan).
 // Sampled every 30 s, only while DEX is visible. Levels:
 //   normal    below 80% of RAM in use
-//   high      80-90%: optional work shrinks (Browser keeps 1 background tab awake)
-//   critical  90%+:   only what is on screen stays live (Browser: the open tab only)
+//   high      80-90%: optional work shrinks (Browser keeps 1 background tab awake,
+//                      AXL keeps 16 spare GPU meshes)
+//   critical  90%+:   only what is on screen stays live (Browser: the open tab only;
+//                      AXL: only the meshes it is drawing)
 // Hysteresis (3 points) keeps the level from flapping at a boundary. Nothing is
 // ever closed or discarded because of this: background tabs SLEEP and reload on
 // selection, and protected tabs (sound, edited fields, Keep awake) stay awake.
@@ -65,8 +67,8 @@ export function startResourceCoordinator(): void {
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: {
           type: 'info',
           message: level === 'critical'
-            ? `Memory is ${Math.round(pct)}% used: Browser keeps only the open tab awake until it eases.`
-            : `Memory is ${Math.round(pct)}% used: Browser keeps fewer tabs awake.`,
+            ? `Memory is ${Math.round(pct)}% used: Browser keeps only the open tab awake and AXL frees off-screen models until it eases.`
+            : `Memory is ${Math.round(pct)}% used: Browser keeps fewer tabs awake and AXL frees spare models.`,
         } }));
       }
     } catch { /* bridge busy: try next time */ }

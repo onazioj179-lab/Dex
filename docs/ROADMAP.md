@@ -13,7 +13,8 @@
 >   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
 > - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
 >   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.
-> - **Open:** Resource Coordinator (batch 3), app passes (8–12), stress set (15), release (16).
+> - **Resource Coordinator (batch 3): SHIPPED** (#344 Browser tabs, #348 AXL GPU meshes). **Window restore:** opt-in Reopen apps and windows (#347).
+> - **Open:** app passes (8–12), stress set (15), release (16).
 >
 > **Part 22 (2026-11-17, security-first) status:** onboarding integrity in Rust (#330), UKI terminal broker with
 > risk classes and the "Run shell commands" grant (#331), Background tasks view (#332), native background
