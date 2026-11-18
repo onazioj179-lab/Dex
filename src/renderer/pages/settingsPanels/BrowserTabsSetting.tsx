@@ -25,7 +25,7 @@ export const BrowserTabsSetting: React.FC = () => {
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Awake background tabs</div>
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', maxWidth: 420 }}>
           Browser tabs beyond this sleep and load again when you select them. Tabs playing sound, tabs with
-          edited fields and tabs set to Keep awake never sleep. Fewer awake tabs use less memory.
+          edited fields and tabs set to Keep awake never sleep. Fewer awake tabs use less memory. When memory runs low (80% used), DEX keeps one background tab awake; at 90%, only the open tab.
         </div>
       </div>
       <Select

@@ -35,6 +35,7 @@ import { DexSwitch, DexCapsuleButton } from '../components/controls';
 import { pickFolder } from '../services/nativeFiles';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
 import { useBackgroundTasks } from '../services/backgroundTasks';
+import { useResourcePressure, budgetUnderPressure } from '../services/resourcePressure';
 import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
@@ -577,6 +578,7 @@ export const Browser: React.FC = () => {
   const lastActiveRef = useRef<Map<string, number>>(new Map());
   const busyTabsRef = useRef<Set<string>>(new Set());
   const liveTabSetting = useDexSetting<'auto' | number>('browser.liveTabs', 'auto');
+  const pressureLevel = useResourcePressure(st => st.level);
   // Download destination: a chosen folder (validated natively) or Downloads; optionally ask each time.
   const downloadDir = useDexSetting<string>('browser.downloadDir', '');
   const downloadAsk = useDexSetting<boolean>('browser.downloadAsk', false);
@@ -589,7 +591,8 @@ export const Browser: React.FC = () => {
       const cur = tabsRef.current;
       const ids = new Set(cur.map(t => t.id));
       for (const id of [...lastActiveRef.current.keys()]) if (!ids.has(id)) lastActiveRef.current.delete(id);
-      const budget = liveTabBudget(getStoredTier(), liveTabSetting);
+      // Memory pressure (services/resourcePressure.ts) only ever lowers the budget.
+      const budget = budgetUnderPressure(liveTabBudget(getStoredTier(), liveTabSetting), pressureLevel);
       const base = { tabs: cur, activeId: activeTab, lastActiveAt: lastActiveRef.current, budget };
       // Live now, over budget without protection: ask those pages first.
       const wouldSleep = computeLiveTabs({ ...base, busy: new Set() });
@@ -614,7 +617,7 @@ export const Browser: React.FC = () => {
       });
     })();
     return () => { cancelled = true; };
-  }, [activeTab, tabs.length, liveTabSetting]);
+  }, [activeTab, tabs.length, liveTabSetting, pressureLevel]);
 
   // Find-in-page
   const [showFindBar, setShowFindBar] = useState(false);

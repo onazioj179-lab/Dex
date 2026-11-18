@@ -19,6 +19,7 @@
 
 import { SetupAssistant } from './shell/SetupAssistant';
 import { wireUkiCommandTasks, wireDdropTasks, wireIndexTasks } from './services/backgroundTasks';
+import { startResourceCoordinator } from './services/resourcePressure';
 import { installSelectionGuard } from './shell/selectionGuard';
 import { GlassFilters } from './components/GlassFilters';
 import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
@@ -233,7 +234,7 @@ export const App: React.FC = () => {
   useEffect(() => installSelectionGuard(), []);
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
   // Background tasks (UKI commands): listen from boot so a finished command is reported once.
-  useEffect(() => { wireUkiCommandTasks(); wireDdropTasks(); wireIndexTasks(); }, []);
+  useEffect(() => { wireUkiCommandTasks(); wireDdropTasks(); wireIndexTasks(); startResourceCoordinator(); }, []);
   // Local-file links (dexmedia) download instead of navigating DEX away.
   useEffect(() => installMediaLinkGuard(), []);
   // Local diagnostics (Nexus > Diagnostics): counters only, nothing leaves this computer.
