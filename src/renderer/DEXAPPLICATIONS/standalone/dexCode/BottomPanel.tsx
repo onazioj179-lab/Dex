@@ -13,10 +13,11 @@
 import React, { Suspense, lazy } from 'react';
 import { SegmentedControl, DexCapsuleButton, CapsuleGlyph } from '../../../components/controls';
 import type { Diagnostic } from './diagnostics';
+import { TestsPanel } from './TestsPanel';
 
 const Terminal = lazy(() => import('../../../components/Terminal'));
 
-export type BottomTab = 'problems' | 'terminal';
+export type BottomTab = 'problems' | 'terminal' | 'tests';
 
 export const BottomPanel: React.FC<{
   tab: BottomTab;
@@ -36,7 +37,7 @@ export const BottomPanel: React.FC<{
         variant="subtle"
         size="sm"
         aria-label="Bottom panel"
-        options={[{ value: 'problems', label: `Problems ${problems.length}` }, { value: 'terminal', label: 'Terminal' }]}
+        options={[{ value: 'problems', label: `Problems ${problems.length}` }, { value: 'terminal', label: 'Terminal' }, { value: 'tests', label: 'Tests', testId: 'dexcode-tab-tests' }]}
         value={tab}
         onChange={(v) => onTab(v as BottomTab)}
       />
@@ -63,6 +64,7 @@ export const BottomPanel: React.FC<{
           </button>
         ))}
       </div>
+      {tab === 'tests' && <TestsPanel root={cwd} />}
       {terminalStarted && (
         <div style={{ position: 'absolute', inset: 0, visibility: tab === 'terminal' ? 'visible' : 'hidden' }}>
           <Suspense fallback={<div style={{ fontSize: 12, padding: 8, color: 'var(--color-text-tertiary)' }}>Starting the shell…</div>}>
