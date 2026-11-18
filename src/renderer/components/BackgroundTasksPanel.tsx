@@ -40,7 +40,7 @@ export const BackgroundTasksPanel: React.FC = () => {
   return (
     <div style={{ padding: '12px 16px', overflowY: 'auto', height: '100%' }}>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--color-text-secondary)', maxWidth: 640 }}>
-        Downloads and commands UKI ran for you. Routine work runs quietly; everything is listed here. UKI only runs a command after you approve it.
+        Downloads, DDrop transfers and commands UKI ran for you. Routine work runs quietly; everything is listed here. UKI only runs a command after you approve it.
       </p>
       {list.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: '24px 0' }}>Nothing is running in the background.</div>
@@ -49,7 +49,7 @@ export const BackgroundTasksPanel: React.FC = () => {
           {list.map((t) => (
             <div role="listitem" key={t.id} style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 92, flexShrink: 0 }}>{t.kind === 'download' ? 'Download' : 'UKI command'}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 92, flexShrink: 0 }}>{t.kind === 'download' ? 'Download' : t.kind === 'ddrop' ? 'DDrop' : 'UKI command'}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                 <span style={{ fontSize: 12, color: t.status === 'failed' || t.status === 'timed-out' ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>
                   {STATUS[t.status]}{t.status === 'running' && typeof t.progress === 'number' ? ` · ${Math.round(t.progress)}%` : ''}{t.error ? ` · ${t.error}` : ''}

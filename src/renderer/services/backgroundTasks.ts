@@ -5,14 +5,14 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Background tasks, in one inspectable list: Browser downloads and UKI
+// Background tasks, in one inspectable list: Browser downloads, DDrop transfers and UKI
 // commands (src-tauri/src/uki_terminal.rs). Routine work runs quietly; this is
 // where the user sees what is running, what finished or failed, and cancels.
 // Event-driven: the store updates from native events, it does not poll.
 
 import { create } from 'zustand';
 
-export type BgKind = 'download' | 'uki-command';
+export type BgKind = 'download' | 'uki-command' | 'ddrop';
 export type BgStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timed-out' | 'interrupted';
 
 export interface BgTask {
@@ -66,7 +66,49 @@ const fromNative = (t: any): BgTask => ({
   cancel: t.status === 'running' ? () => { void dex()?.invoke?.('ukiterm:cancel', t.id); } : undefined,
 });
 
-const STATUS_WORD: Record<string, string> = { failed: 'failed', cancelled: 'was cancelled', 'timed-out': 'timed out' };
+// ---- DDrop transfers (src-tauri/src/dtp_transfer.rs events) -------------------
+
+let ddropWired = false;
+/** Mirror DDrop sends/receives into the list, with Cancel while they run. */
+export function wireDdropTasks(): void {
+  if (ddropWired || typeof window === 'undefined' || !dex()?.on) return;
+  ddropWired = true;
+  const key = (id: string) => `ddrop:${id}`;
+  const on = (ch: string, cb: (p: any) => void) => dex()!.on!(ch, cb);
+  on('dtp:transfer-progress', (p) => {
+    if (!p?.transferId) return;
+    const s = useBackgroundTasks.getState();
+    const id = key(p.transferId);
+    const existing = s.tasks[id];
+    const recv = p.direction === 'receive';
+    s.upsert({
+      id, kind: 'ddrop',
+      title: `${recv ? 'Receiving from' : 'Sending to'} ${p.deviceName || 'a nearby device'}`,
+      detail: typeof p.totalBytes === 'number' ? `${(p.totalBytes / 1048576).toFixed(1)} MB` : undefined,
+      status: p.status === 'complete' ? 'completed' : 'running',
+      progress: typeof p.progress === 'number' ? p.progress : existing?.progress,
+      startedAt: existing?.startedAt ?? Date.now(),
+      endedAt: p.status === 'complete' ? Date.now() : undefined,
+      cancel: p.status === 'complete' ? undefined : () => { void dex()?.invoke?.(recv ? 'dtp:cancelReceive' : 'dtp:cancelSend', p.transferId); },
+    });
+  });
+  const finish = (status: BgStatus) => (p: any) => {
+    if (!p?.transferId) return;
+    const s = useBackgroundTasks.getState();
+    const id = key(p.transferId);
+    if (!s.tasks[id]) s.upsert({ id, kind: 'ddrop', title: `DDrop ${p.deviceName ? `with ${p.deviceName}` : 'transfer'}`, status, startedAt: Date.now() });
+    s.patch(id, {
+      status: p.cancelled || p.declined ? 'cancelled' : status, endedAt: Date.now(), cancel: undefined,
+      progress: status === 'completed' ? 100 : s.tasks[id]?.progress,
+      error: status === 'failed' && !p.cancelled && !p.declined ? String(p.error || 'failed') : undefined,
+    });
+  };
+  on('dtp:transfer-complete', finish('completed'));
+  on('dtp:send-complete', finish('completed'));
+  on('dtp:transfer-error', finish('failed'));
+}
+
+const STATUS_WORD: Record<string, string> ={ failed: 'failed', cancelled: 'was cancelled', 'timed-out': 'timed out' };
 
 let wired = false;
 /** Start listening for UKI command events (idempotent; call once from the shell). */
