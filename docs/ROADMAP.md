@@ -19,6 +19,13 @@
 > risk classes and the "Run shell commands" grant (#331), Background tasks view (#332), native background
 > downloads (#333), DEX Capsule notifications (#334), tooltip audit (#335), idle-CPU fixes (#329). Packaged
 > security run: `scripts/perf/packaged-security.mjs` → `docs/reports/perf/2026-11-17-security.json`.
+> **Part 23 (2026-11-18, capsule UI + app completion) status:** shared capsule kit (`components/controls`:
+> capsuleTokens, SegmentedControl rebuilt, DexSwitch, DexCapsuleGroup/Button/FloatingSearch/DisclosureGroup) with
+> geometry tests; adopted in Task Manager (real process categories + Startup view, native), Settings, Notification
+> Center, Ledger (packaged-measured), Maps, Canvas, Kanban (List + CSV), Rewards (catalog browser), DEX Code
+> (palette, acorn diagnostics, docked terminal: packaged), Notes multi-window (per-window store), Browser download
+> destination, Presentation presenting keys + blanking, Imosion one-layer Escape, indexing in Background tasks.
+> Packaged checks: `scripts/perf/packaged-apps-check.mjs`. Rows #336-#343.
 > Not done: 90/120 Hz frame-time measurement on real high-refresh hardware (this PC is 60 Hz), C++ review
 > (owner decision #75/#143), ToS legal review (#19), signing (#30).
 
