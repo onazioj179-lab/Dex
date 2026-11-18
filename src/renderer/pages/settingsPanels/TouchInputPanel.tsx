@@ -12,7 +12,7 @@
 //
 
 import React, { useEffect, useRef, useState } from 'react';
-import { DexSwitch } from '../../components/controls';
+import { DexSwitch, SegmentedControl } from '../../components/controls';
 import { ContactTracker, touchCapabilities, MAX_CONTACTS, type Contact } from '../../shell/input/touchContacts';
 import { hapticSupport, hapticsEnabled, setHapticsEnabled, subscribeHaptics, haptic } from '../../shell/input/haptics';
 import { getDensityChoice, setDensityChoice, subscribeDensity, resolveDensity, type DensityChoice } from '../../utils/touchDensity';
@@ -163,19 +163,14 @@ export const TouchInputPanel: React.FC = () => {
             {density === 'auto' && ` Automatic is using ${resolveDensity('auto', caps.coarsePrimary) === 'touch' ? 'Touch' : 'Precision'} on this device.`}
           </div>
         </div>
-        <div role="radiogroup" aria-label="Control size" style={{ display: 'flex', border: '1px solid var(--color-border-control)', borderRadius: 'var(--radius-sm, 6px)', overflow: 'hidden', flexShrink: 0 }}>
-          {DENSITY_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              role="radio"
-              aria-checked={density === o.value}
-              onClick={() => setDensityChoice(o.value)}
-              style={{ height: 28, padding: '0 10px', border: 'none', borderLeft: o.value === 'auto' ? 'none' : '1px solid var(--color-border-control)', background: density === o.value ? 'var(--color-accent-fill, var(--color-accent))' : 'var(--color-bg-surface)', color: density === o.value ? '#fff' : 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="Control size"
+          size="md"
+          options={DENSITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          value={density}
+          onChange={(v) => setDensityChoice(v as typeof density)}
+          style={{ flexShrink: 0 }}
+        />
       </div>
       {caps.maxTouchPoints > 0 && <TouchTestPad />}
       <div style={row}>

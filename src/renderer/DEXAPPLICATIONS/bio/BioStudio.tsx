@@ -10,6 +10,7 @@
 // =============================================================================
 
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { AppShell } from '../../components/appShell';
 import type { MenuGroup } from '../../components/appShell/menuTypes';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
@@ -530,17 +531,16 @@ const BioStudio: React.FC = () => {
 
           {/* Workspace */}
           <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div role="tablist" aria-label="Analysis" style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: hair }}>
-              {TABS.map((t) => (
-                <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} title={`Alt+${t.key}`}
-                  disabled={!active && !FREE_TABS.includes(t.id)}
-                  style={{
-                    height: 26, padding: '0 10px', fontSize: 12, borderRadius: radius.sm, border: 'none', cursor: 'pointer',
-                    background: tab === t.id ? colors.accent.light : 'transparent',
-                    color: tab === t.id ? colors.accent.default : colors.text.secondary, fontWeight: tab === t.id ? 600 : 500,
-                    opacity: !active && !FREE_TABS.includes(t.id) ? 0.4 : 1,
-                  }}>{t.label}</button>
-              ))}
+            <div style={{ padding: '6px 10px', borderBottom: hair, overflowX: 'auto' }}>
+              <SegmentedControl
+                semantics="tabs"
+                variant="subtle"
+                size="md"
+                aria-label="Analysis"
+                options={TABS.map((t) => ({ value: t.id, label: t.label, title: `Alt+${t.key}`, disabled: !active && !FREE_TABS.includes(t.id) }))}
+                value={tab}
+                onChange={(v) => setTab(v as typeof tab)}
+              />
             </div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {tab === 'bench' ? <BenchPanel /> : tab === 'primers' ? (

@@ -13,6 +13,7 @@
 //                           "Creative Full Access" surface (single owner)
 //
 import React, { useEffect, useState, useCallback } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { resolvePlan, limitsFor, planLabel } from '../../../shared/plan';
 import {
   describeCapabilities,
@@ -284,19 +285,14 @@ export const PermissionsPanel: React.FC = () => {
                   {r.lastRequestedAt ? ` · Last requested ${ago(r.lastRequestedAt)}` : ''}
                 </div>
               </div>
-              <div role="radiogroup" aria-label={`${r.label} permission`} style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                {(['allow', 'ask', 'deny'] as WebPolicy[]).map(p => (
-                  <button
-                    key={p}
-                    role="radio"
-                    aria-checked={r.policy === p}
-                    style={r.policy === p ? BTN_PRIMARY : BTN}
-                    onClick={() => { if (r.policy !== p) void setPolicy(r.id, p); }}
-                  >
-                    {POLICY_LABEL[p]}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                aria-label={`${r.label} permission`}
+                size="sm"
+                options={(['allow', 'ask', 'deny'] as WebPolicy[]).map(p => ({ value: p, label: POLICY_LABEL[p] }))}
+                value={r.policy}
+                onChange={(p) => { if (r.policy !== p) void setPolicy(r.id, p as WebPolicy); }}
+                style={{ flexShrink: 0 }}
+              />
             </div>
           ))}
         </div>

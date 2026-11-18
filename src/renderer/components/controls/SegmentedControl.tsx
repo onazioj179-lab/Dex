@@ -129,7 +129,7 @@ export function SegmentedControl<T extends string>({
             aria-checked={semantics === 'tabs' ? undefined : active}
             aria-selected={semantics === 'tabs' ? active : undefined}
             aria-label={typeof o === 'object' && o.label === undefined && o.icon !== undefined ? (title ?? v) : undefined}
-            title={typeof o === 'object' && o.label === undefined ? title : undefined}
+            title={typeof o === 'object' ? title : undefined}
             disabled={!enabled(i)}
             tabIndex={active || (!values.includes(value) && i === 0) ? 0 : -1}
             onClick={() => onChange(v)}
