@@ -1017,3 +1017,25 @@ mod note_import_tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+mod write_base64_tests {
+    use super::write_base64;
+    use serde_json::json;
+
+    #[test]
+    fn writes_bytes_atomically_and_refuses_bad_input() {
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
+        std::fs::create_dir_all(&base).unwrap();
+        let d = tempfile::tempdir_in(&base).unwrap();
+        let p = d.path().join("photo-edited.png");
+        // "\x89PNG" + 2 bytes
+        let r = write_base64(&json!([p.to_string_lossy(), "iVBORwAB"]));
+        assert_eq!(r["ok"], true, "{r}");
+        assert_eq!(std::fs::read(&p).unwrap(), vec![0x89, b'P', b'N', b'G', 0x00, 0x01]);
+        assert!(std::fs::read_dir(d.path()).unwrap().all(|e| !e.unwrap().file_name().to_string_lossy().contains("dex-tmp")));
+        assert_eq!(write_base64(&json!([p.to_string_lossy(), "not base64!!"]))["ok"], false);
+        assert_eq!(write_base64(&json!(["relative.png", "iVBORwAB"]))["ok"], false);
+        assert_eq!(write_base64(&json!(["", "iVBORwAB"]))["ok"], false);
+    }
+}
