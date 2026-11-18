@@ -864,6 +864,8 @@ export const AppManager: React.FC = () => {
         priority: PRIOS.includes(d.priority) ? d.priority : 'normal',
         source: d.source != null ? String(d.source) : undefined,
         actions: Array.isArray(d.actions) ? d.actions : undefined,
+        undoAction: typeof d.undoAction === 'function' ? d.undoAction : undefined,
+        duration: typeof d.duration === 'number' ? d.duration : undefined,
       });
     };
     window.addEventListener('dex-notification', onNotify as EventListener);

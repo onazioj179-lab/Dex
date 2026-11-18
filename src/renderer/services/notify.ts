@@ -76,6 +76,8 @@ export interface NotifyInput {
   action?: NotifyAction;
   /** Transient action buttons for the banner (NOT persisted — closures). */
   actions?: { label: string; onClick: () => void }[];
+  /** An Undo for what just happened: shown on the banner for a little longer than usual (NOT persisted). */
+  undo?: () => void;
   /**
    * When true, only show the transient banner and skip hub persistence
    * (e.g. ultra-ephemeral UI feedback). Defaults to false.
@@ -209,6 +211,7 @@ export function emitBanner(input: NotifyInput, icon: NotificationIcon, priority:
           source: input.source,
           duration: input.duration,
           actions: input.actions,
+          undoAction: input.undo,
           // Marks events that notify() already persists to the hub directly, so
           // the UnifiedSystemsProvider bridge does not persist them a second
           // time. Legacy dispatchers (without this flag) get persisted there.

@@ -6,6 +6,7 @@
  * drag-to-create slots, recurring events, and ICS import/export.
  */
 import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
+import { notify } from '../../services/notify';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
@@ -326,8 +327,18 @@ const Calendar: React.FC = () => {
   };
 
   const deleteEvent = (id: string) => {
+    const idx = events.findIndex(e => e.id === id);
+    if (idx < 0) return;
+    const removed = events[idx];
     setEvents(prev => prev.filter(e => e.id !== id));
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event deleted' } }));
+    // Recoverable: Undo puts the event back.
+    void notify({
+      title: 'Event deleted',
+      body: removed.title,
+      source: 'Calendar',
+      priority: 'low',
+      undo: () => setEvents(prev => prev.some(e => e.id === removed.id) ? prev : [...prev.slice(0, idx), removed, ...prev.slice(idx)]),
+    });
   };
 
   const toggleCategory = (id: string) => {

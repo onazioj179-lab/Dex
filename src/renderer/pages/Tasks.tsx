@@ -14,6 +14,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from '
 import { AssistedTextarea } from '../components/AssistedTextarea';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
+import { notify } from '../services/notify';
 import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
@@ -907,7 +908,18 @@ export const Tasks: React.FC = () => {
   };
 
   const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
+    const idx = tasks.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    const removed = tasks[idx];
+    setTasks(prev => prev.filter(t => t.id !== id));
+    // Recoverable: Undo puts the task back where it was.
+    void notify({
+      title: 'Task deleted',
+      body: removed.title,
+      source: 'Tasks',
+      priority: 'low',
+      undo: () => setTasks(prev => prev.some(t => t.id === removed.id) ? prev : [...prev.slice(0, idx), removed, ...prev.slice(idx)]),
+    });
   };
 
   const addSubtask = (taskId: string) => {
