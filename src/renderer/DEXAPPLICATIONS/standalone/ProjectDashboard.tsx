@@ -21,10 +21,13 @@
  * contract AppManager listens on), and feedback uses `dex-toast`.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState , useRef} from 'react';
 import { useStageStore, STAGE_KIND_META, type StageKind } from '../../store/stageStore';
 import { ContextBus, type ContextChannel } from '../../services/ContextBus';
 import { frameScheduler } from '../../services/FrameScheduler';
+import { buildProjectReport, dueMs as reportDueMs, type ReportTask } from './projectReport';
+import { sendToNotes } from '../../services/sendTo';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 // ---------------------------------------------------------------------------
 // Cross-app helpers (match the standalone-app conventions)
@@ -76,14 +79,7 @@ function startOfDay(d: Date): number {
 
 /** Resolve a task's effective due timestamp (folding in the optional time-of-day). */
 function taskDueMs(t: RawTask): number | null {
-  if (!t.dueDate) return null;
-  const d = new Date(t.dueDate);
-  if (isNaN(d.getTime())) return null;
-  if (t.dueTime) {
-    const [h, m] = String(t.dueTime).split(':').map(Number);
-    if (!isNaN(h) && !isNaN(m)) d.setHours(h, m, 0, 0);
-  }
-  return d.getTime();
+  return reportDueMs(t); // local-day parsing (shared with the report)
 }
 
 function isSnoozed(t: RawTask, now: number): boolean {
@@ -218,6 +214,14 @@ function readActivity(limit: number): ActivityItem[] {
   } catch {
     return [];
   }
+}
+
+/** The report from the same sources the dashboard shows, read fresh. */
+function currentReport(projectName: string, kindLabel: string) {
+  let tasks: ReportTask[] | null = null;
+  try { const raw = localStorage.getItem('dex-tasks'); const v = raw ? JSON.parse(raw) : []; tasks = Array.isArray(v) ? v : null; } catch { tasks = null; }
+  const notes = readNotesSummary();
+  return buildProjectReport({ projectName, kindLabel, tasks, notes: notes.available ? notes.recent : null, activity: readActivity(20), now: Date.now() });
 }
 
 // ---------------------------------------------------------------------------
@@ -365,11 +369,25 @@ const ProjectDashboard: React.FC = () => {
     };
   }, [refresh]);
 
+  // UKI: "summarise my project status" from the same real data.
+  const reportCtxRef = useRef({ name: 'No active project', label: 'General workspace' });
+  useEffect(() => {
+    registerUkiAppAction('projectdash', {
+      id: 'projects.status',
+      description: 'status report for the active project space: open, overdue, due-today and upcoming tasks, recent notes and recent activity (real data only).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => currentReport(reportCtxRef.current.name, reportCtxRef.current.label).markdown);
+    return () => unregisterUkiAppAction('projects.status');
+  }, []);
+
   const kind: StageKind = (activeStage?.kind as StageKind) || 'general';
   const kindMeta = STAGE_KIND_META[kind] ?? STAGE_KIND_META.general;
   const accent = activeStage?.accent || kindMeta.accent || 'var(--color-accent)';
 
   const projectName = activeStage?.name?.trim() || 'No active project';
+  reportCtxRef.current = { name: projectName, label: `${kindMeta.label} workspace` };
   const appCount = activeStage?.windows?.length ?? 0;
 
   // Fraction of open tasks that are clear (not due today / not overdue) — drives
@@ -440,6 +458,18 @@ const ProjectDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        <button
+          type="button"
+          style={{ ...s.refreshBtn, marginRight: 8 }}
+          onClick={() => {
+            const r = currentReport(projectName, `${kindMeta.label} workspace`);
+            void sendToNotes(r.markdown, `${projectName} — status ${new Date().toISOString().slice(0, 10)}`);
+            toast('success', 'Status report added to Notes');
+          }}
+          title="Write a status report from your tasks, notes and recent activity into a new note"
+          aria-label="Create status report in Notes"
+          data-testid="projdash-report"
+        >Report</button>
         <button
           type="button"
           style={s.refreshBtn}

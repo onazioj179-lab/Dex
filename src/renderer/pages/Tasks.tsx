@@ -24,6 +24,7 @@ import { searchLines } from '../../shared/search/textSearch';
 import { DexSearchInput } from '../styles/components';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
+import { parseLocalDate, toLocalDateInput, repairPickedDay } from '../utils/localDate';
 
 // ===========================================================================
 // TYPES
@@ -381,7 +382,7 @@ const loadTasksFromBackend = async (): Promise<Task[]> => {
       if (stored && Array.isArray(stored)) {
         return stored.map((t: Omit<Task, 'dueDate'> & { dueDate: string | null }) => ({
           ...t,
-          dueDate: t.dueDate ? new Date(t.dueDate) : null,
+          dueDate: repairPickedDay(t.dueDate),
         }));
       }
     }
@@ -398,7 +399,7 @@ const loadTasksFromStorage = (): Task[] => {
       const parsed = JSON.parse(saved);
       return parsed.map((t: Omit<Task, 'dueDate'> & { dueDate: string | null }) => ({
         ...t,
-        dueDate: t.dueDate ? new Date(t.dueDate) : null,
+        dueDate: repairPickedDay(t.dueDate),
       }));
     }
   } catch { /* localStorage unavailable */ }
@@ -878,7 +879,7 @@ export const Tasks: React.FC = () => {
 
     // The explicit date picker, when set, wins over any parsed phrase.
     const dueDate = newTaskDue
-      ? new Date(newTaskDue)
+      ? parseLocalDate(newTaskDue)
       : (parsedDue ?? (selectedList === 'today' || selectedList === 'overdue' || selectedList === 'scheduled' || selectedList === 'upcoming' ? new Date() : null));
 
     // Resolve the destination list: an inline #list wins, otherwise the current
@@ -1962,7 +1963,7 @@ export const Tasks: React.FC = () => {
                       <input
                         type="date"
                         aria-label="Snooze until a specific date"
-                        value={isSnoozed(task) ? new Date(task.snoozedUntil!).toISOString().slice(0, 10) : ''}
+                        value={isSnoozed(task) ? toLocalDateInput(new Date(task.snoozedUntil!)) : ''}
                         onChange={(e) => { if (e.target.value) snoozeTask(task.id, new Date(e.target.value + 'T00:00:00')); }}
                         style={{ padding: '4px var(--space-2)', borderRadius: 4, fontSize: 12, fontFamily: 'inherit', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', outline: 'none', colorScheme: 'dark' }}
                       />
