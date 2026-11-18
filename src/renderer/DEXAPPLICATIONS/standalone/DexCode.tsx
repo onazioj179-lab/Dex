@@ -39,6 +39,9 @@ import {
   type DexProject, type WorkspaceHit, type ProjectSymbol, type ProjectFile,
 } from './dexCode/project';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
+import { diagnose, type Diagnostic } from './dexCode/diagnostics';
+import { CommandPalette, type PaletteCommand } from './dexCode/CommandPalette';
+import { BottomPanel, type BottomTab } from './dexCode/BottomPanel';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../../services/appIntents';
 import { persistOrWarn } from '../../utils/persistOrWarn';
@@ -252,6 +255,15 @@ const DexCode: React.FC = () => {
   const [quickOpenQuery, setQuickOpenQuery] = useState('');
   const [quickOpenIndex, setQuickOpenIndex] = useState(0);
   const quickOpenRef = useRef<HTMLInputElement>(null);
+  // Command palette (Ctrl+Shift+P) and the bottom panel (Problems | Terminal).
+  const [showPalette, setShowPalette] = useState(false);
+  const [panel, setPanel] = useState<BottomTab | null>(null);
+  const [terminalStarted, setTerminalStarted] = useState(false);
+  const openPanel = useCallback((t: BottomTab) => { if (t === 'terminal') setTerminalStarted(true); setPanel(t); }, []);
+  const togglePanel = useCallback((t: BottomTab) => {
+    setPanel((p) => { if (p === t) return null; if (t === 'terminal') setTerminalStarted(true); return t; });
+  }, []);
+  const closePanel = useCallback(() => { setPanel(null); }, []);
   // Output -> ecosystem (copy / send via DEX Flow).
   const [outputCopied, setOutputCopied] = useState(false);
   // Track original content for modified detection
@@ -653,6 +665,23 @@ const DexCode: React.FC = () => {
         e.preventDefault();
         handleOpenFile();
       }
+      // Command palette (Ctrl/Cmd+Shift+P).
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setShowPalette(v => !v);
+        return;
+      }
+      // Integrated terminal (Ctrl+`), problems (Ctrl+Shift+M).
+      if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) {
+        e.preventDefault();
+        togglePanel('terminal');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        togglePanel('problems');
+        return;
+      }
       // Quick Open fuzzy file finder (Ctrl/Cmd+P) -- VS Code convention.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
@@ -724,7 +753,7 @@ const DexCode: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, showGoToLine, showQuickOpen, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen]);
+  }, [code, fileName, runCode, showFind, showGoToLine, showQuickOpen, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen, togglePanel]);
 
   // Tab key, bracket auto-close, auto-indent
   // Live symbol map of the current file (functions / classes / top-level vars).
@@ -1121,8 +1150,33 @@ const DexCode: React.FC = () => {
     return { lines, chars, words };
   }, [code]);
 
+  // Real syntax diagnostics for the open file, 400 ms after typing stops.
+  const [problems, setProblems] = useState<Diagnostic[]>([]);
+  useEffect(() => {
+    const t = window.setTimeout(() => setProblems(diagnose(fileName, code)), 400);
+    return () => window.clearTimeout(t);
+  }, [code, fileName]);
+
+  const paletteCommands = useMemo<PaletteCommand[]>(() => [
+    { id: 'new', label: 'New file', shortcut: 'Ctrl+N', run: handleNewFile },
+    { id: 'open', label: 'Open file…', shortcut: 'Ctrl+O', run: () => { void handleOpenFile(); } },
+    { id: 'folder', label: 'Open folder (project)…', run: () => { void openFolder(); } },
+    { id: 'save', label: 'Save', shortcut: 'Ctrl+S', run: () => { void handleSaveFile(); } },
+    { id: 'saveas', label: 'Save as…', shortcut: 'Ctrl+Shift+S', run: () => { void handleSaveAs(); } },
+    { id: 'run', label: 'Run', shortcut: 'Ctrl+Enter', run: runCode },
+    { id: 'quickopen', label: 'Go to file…', shortcut: 'Ctrl+P', run: () => { setQuickOpenQuery(''); setQuickOpenIndex(0); setShowQuickOpen(true); requestAnimationFrame(() => quickOpenRef.current?.focus()); } },
+    { id: 'find', label: 'Find', shortcut: 'Ctrl+F', run: () => { setShowFind(true); setShowReplace(false); requestAnimationFrame(() => findInputRef.current?.focus()); } },
+    { id: 'replace', label: 'Find and replace', shortcut: 'Ctrl+H', run: () => { setShowFind(true); setShowReplace(true); requestAnimationFrame(() => findInputRef.current?.focus()); } },
+    { id: 'goto', label: 'Go to line…', shortcut: 'Ctrl+G', run: () => { setShowGoToLine(true); setGoToLineInput(''); requestAnimationFrame(() => goToLineRef.current?.focus()); } },
+    { id: 'problems', label: 'Show problems', shortcut: 'Ctrl+Shift+M', run: () => openPanel('problems') },
+    { id: 'terminal', label: 'Open terminal', shortcut: 'Ctrl+`', run: () => openPanel('terminal') },
+    { id: 'sidebar', label: 'Toggle sidebar', shortcut: 'Ctrl+B', run: toggleSidebar },
+    { id: 'fullscreen', label: 'Toggle full screen', run: toggleFullscreen },
+  ], [handleNewFile, handleOpenFile, openFolder, handleSaveFile, handleSaveAs, runCode, openPanel, toggleSidebar, toggleFullscreen]);
+
   const shell = (
-    <div style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)', ...(fullscreen ? { height: '100vh', width: '100vw' } : null) }}>
+    <div style={{ position: 'relative', ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)', ...(fullscreen ? { height: '100vh', width: '100vw' } : null) }}>
+      {showPalette && <CommandPalette commands={paletteCommands} onClose={() => { setShowPalette(false); editorRef.current?.focus(); }} />}
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
         <button
@@ -1873,8 +1927,31 @@ const DexCode: React.FC = () => {
           )}
         </div>
 
+        {panel && (
+          <BottomPanel
+            tab={panel}
+            onTab={openPanel}
+            onClose={closePanel}
+            problems={problems}
+            fileName={fileName}
+            onJump={(line) => jumpToLine(line)}
+            cwd={project?.root}
+            terminalStarted={terminalStarted}
+            height={240}
+          />
+        )}
+
         {/* Status bar */}
         <div style={S.statusBar}>
+          <button
+            type="button"
+            onClick={() => togglePanel('problems')}
+            aria-label={`${problems.length} problem${problems.length === 1 ? '' : 's'}, show problems`}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', color: problems.length ? 'var(--color-error)' : 'inherit' }}
+          >
+            {problems.length ? `${problems.length} problem${problems.length === 1 ? '' : 's'}` : 'No problems'}
+          </button>
+          <button type="button" onClick={() => togglePanel('terminal')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', color: 'inherit' }}>Terminal</button>
           <span>DexScript</span>
           <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
           {selStats ? (
