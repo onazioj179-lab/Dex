@@ -13,7 +13,7 @@
  * unit-testable; the live send reuses the orchestrator's injectable `fetch`.
  */
 
-import { getProvider, providerForModel, allModels, allProviders } from './registry';
+import { getProvider, providerForModel, allModels, allProviders, findModel } from './registry';
 import { chatWithFallback, assertModelAllowed, type FetchLike, type ChatOptions } from './orchestrator';
 import { createStreamParser, type StreamFormat } from './stream';
 import { getPreferredModel, getRoutingGoal, getProcessingMode, getManualModel } from './modelPrefs';
@@ -21,6 +21,7 @@ import { filterModelsForMode, type ProcessingMode } from '../../../shared/uki/as
 import { configuredProviders, getApiKey } from '../keystore';
 import { ollamaInstalledModels, nativeOllamaFetch, isLocalAiEnabled } from './ollama';
 import { assertWithinCap, recordUsage, estimateTokens } from './usage';
+import { budgetMessages, type BudgetReport } from '../../../shared/uki/contextBudget';
 import { routeModels, classifyTask, preferOnDeviceFirst, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import { detectBrowserRuntime, canRunLocalModel, type DeviceRuntime } from '../../../shared/uki/deviceRuntime';
 import type { ChatMessage, ProviderId } from './types';
@@ -166,6 +167,10 @@ function visionModelIds(goal: RoutingGoal): Set<string> {
  * text, or null if no provider is configured or the call fails (the caller then
  * degrades to the existing local/HF fallback — UKI never hard-fails on this).
  */
+let lastBudget: BudgetReport | null = null;
+/** How the last request was fitted to its model's context (null before any). */
+export function getLastContextBudget(): BudgetReport | null { return lastBudget; }
+
 export async function askConfiguredLLM(
   userText: string,
   systemPrompt: string,
@@ -189,11 +194,18 @@ export async function askConfiguredLLM(
   }
   if (modelIds.length === 0) return null;
 
-  const messages: ChatMessage[] = [
+  const fullMessages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...(opts.history ?? []),
     { role: 'user', content: userText, ...(opts.images && opts.images.length ? { images: opts.images } : {}) },
   ];
+  // Context Budget Manager: fit the smallest window among the models that may
+  // answer (8K local to 1M hosted), keeping the system prompt and this turn.
+  const { messages, report } = budgetMessages(fullMessages, {
+    windows: modelIds.map((id) => findModel(id)?.contextWindow ?? 0),
+    responseTokens: opts.chatOptions?.maxTokens ?? 600,
+  });
+  lastBudget = report;
 
   try {
     const res = await chatWithFallback(
