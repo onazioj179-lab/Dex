@@ -37,6 +37,9 @@ import { useDexSetting } from '../hooks/useDexSetting';
 // gate every document-changing action behind an explicit yes/no.
 setUkiActionConfirmHandler((entry, args) => {
   const argStr = Object.keys(args).length ? `\n\n${JSON.stringify(args)}` : '';
+  if (entry.spec.sendsContent && !entry.spec.mutates) {
+    return window.confirm(`UKI wants to read content from ${entry.appId} into this conversation:\n\n${entry.spec.description}${argStr}\n\nAllow UKI to read it this once?`);
+  }
   return window.confirm(`UKI wants to: ${entry.spec.description}${argStr}\n\nAllow this change to ${entry.appId}?`);
 });
 

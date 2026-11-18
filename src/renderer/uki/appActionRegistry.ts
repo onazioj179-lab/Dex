@@ -204,7 +204,9 @@ export async function runUkiAction(
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
     return result;
   }
-  if (entry.spec.mutates && !opts.preApproved) {
+  // sendsContent (e.g. reading the open web page into the conversation) asks every
+  // time: a scheduled pre-approval cannot know what that content will be.
+  if (entry.spec.sendsContent || (entry.spec.mutates && !opts.preApproved)) {
     let allowed = false;
     if (confirmHandler) {
       try {
@@ -214,7 +216,8 @@ export async function runUkiAction(
       }
     }
     if (!allowed) {
-      const result = `"${id}" changes ${entry.appId} and needs the user's confirmation, which was not given. Not performed.`;
+      const what = entry.spec.mutates ? `changes ${entry.appId}` : `shares content from ${entry.appId}`;
+      const result = `"${id}" ${what} and needs the user's confirmation, which was not given. Not performed.`;
       recordAudit({ id, appId: entry.appId, mutates: true, args: redacted, outcome: 'denied', result });
       return result;
     }

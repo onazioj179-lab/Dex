@@ -34,6 +34,11 @@ export interface AppActionSpec {
   example: string;
   /** True when the action changes app state (drives confirm gating). */
   mutates: boolean;
+  /**
+   * Hands content (a page, a document) to the model: a cloud provider would
+   * receive it, so the user is always asked first, like a mutating action.
+   */
+  sendsContent?: boolean;
   /** Permissions the action needs (checked against the app's grants). */
   permissions?: string[];
 }
