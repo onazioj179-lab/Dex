@@ -22,3 +22,4 @@ export {
   type DexCapsuleGroupProps, type DexCapsuleButtonProps, type DexFloatingSearchProps, type DexDisclosureGroupProps,
 } from './Capsule';
 export * from './capsuleTokens';
+export { DexSwitch, switchGeometry, type DexSwitchProps } from './Switch';
