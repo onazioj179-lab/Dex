@@ -1,6 +1,6 @@
 {
-  "at": "2026-11-17T22:44:57.432Z",
-  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p22-exe/dex-tauri.exe",
+  "at": "2026-11-18T03:59:12.206Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p22b-exe/dex-tauri.exe",
   "passed": 21,
   "failed": 0,
   "results": [
@@ -133,14 +133,14 @@
         "events": 2,
         "final": {
           "size": 3145728,
-          "fileName": "dex-sectest-1794955495063.bin"
+          "fileName": "dex-sectest-1794974349638.bin"
         }
       }
     },
     {
       "name": "test download removed again",
       "pass": true,
-      "observed": "dex-sectest-1794955495063.bin"
+      "observed": "dex-sectest-1794974349638.bin"
     }
   ]
 }
