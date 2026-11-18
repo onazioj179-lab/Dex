@@ -24,6 +24,7 @@
 //     pseudoconsole's screen is never written behind the shell's back.
 // ===========================================================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CAPSULE_HEIGHT, CAPSULE_SELECTED_BG } from './controls/capsuleTokens';
 import { Terminal as XTerm, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -132,10 +133,11 @@ const THEME: ITheme = {
 };
 
 const toolbarBtn = (active = false): React.CSSProperties => ({
-  background: active ? 'rgba(255,255,255,0.10)' : 'transparent',
+  // DEX Capsule geometry: 24 px tall, fully rounded (icon buttons are circles), shared accent tint when on.
+  background: active ? CAPSULE_SELECTED_BG : 'transparent',
   color: active ? 'var(--color-text-primary, #f2f2f7)' : 'var(--color-text-tertiary, #8e8e93)',
   border: 'none', fontSize: 11, cursor: 'pointer', padding: '2px 8px', fontWeight: 500,
-  fontFamily: 'inherit', borderRadius: 6, height: 22,
+  fontFamily: 'inherit', borderRadius: CAPSULE_HEIGHT.sm / 2, height: CAPSULE_HEIGHT.sm,
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
 });
 /** Square icon button for the header toolbar (labels live in title/aria). */
