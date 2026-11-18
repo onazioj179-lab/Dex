@@ -10,6 +10,7 @@
 //
 
 import React, { useEffect, useState } from 'react';
+import { DexSwitch } from '../../components/controls';
 import { useSpatialStore, SPATIAL_ACTION_LABELS, RESERVED_CODES, type SpatialAction } from '../../store/spatialStore';
 
 /** 'KeyF' -> 'F', 'Digit0' -> '0', 'Equal' -> '='. */
@@ -24,17 +25,8 @@ const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justif
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' };
 const desc: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.4 };
 
-const Switch: React.FC<{ on: boolean; label: string; onChange: (v: boolean) => void }> = ({ on, label: aria, onChange }) => (
-  <button role="switch" aria-checked={on} aria-label={aria} onClick={() => onChange(!on)} style={{
-    width: 44, height: 24, borderRadius: 9999, border: on ? 'none' : '1px solid var(--color-border-control)', padding: 0,
-    background: on ? 'var(--color-accent)' : 'var(--color-bg-hover)', position: 'relative', cursor: 'pointer', flexShrink: 0,
-    transition: 'background var(--duration-normal, 150ms) ease',
-  }}>
-    <span style={{
-      position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: 9999, background: 'var(--color-accent-text)',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left var(--duration-normal, 150ms) ease',
-    }} />
-  </button>
+const Switch: React.FC<{ on: boolean; label: string; onChange: (v: boolean) => void }> = ({ on, label, onChange }) => (
+  <DexSwitch checked={on} label={label} onChange={onChange} />
 );
 
 export const SpatialDesktopPanel: React.FC = () => {

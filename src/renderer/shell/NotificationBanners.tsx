@@ -11,6 +11,7 @@
  */
 
 import { rubberBand, shouldDismiss, type SwipeSample } from '../utils/swipeDismiss';
+import { SegmentedControl, DexCapsuleButton } from '../components/controls';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
 import { playNotification } from './SpatialAudio';
@@ -805,50 +806,15 @@ export const NotificationCenter: React.FC<{
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* View mode toggle */}
-            <div style={{
-              display: 'flex', background: 'var(--color-bg-hover)',
-              borderRadius: 4, padding: 2,
-            }}>
-              <button
-                onClick={() => setViewMode('timeline')}
-                style={{
-                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
-                  background: viewMode === 'timeline' ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: viewMode === 'timeline' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                  fontSize: 10, fontWeight: 500, cursor: 'pointer',
-                }}
-                title="Timeline view"
-              >
-                Timeline
-              </button>
-              <button
-                onClick={() => setViewMode('grouped')}
-                style={{
-                  padding: '3px var(--space-2)', borderRadius: 4, border: 'none',
-                  background: viewMode === 'grouped' ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: viewMode === 'grouped' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                  fontSize: 10, fontWeight: 500, cursor: 'pointer',
-                }}
-                title="Grouped by app"
-              >
-                Grouped
-              </button>
-            </div>
+            <SegmentedControl
+              aria-label="Notification view"
+              size="sm"
+              options={[{ value: 'timeline', label: 'Timeline' }, { value: 'grouped', label: 'Grouped' }]}
+              value={viewMode}
+              onChange={(v) => setViewMode(v as 'timeline' | 'grouped')}
+            />
             {notifications.length > 0 && (
-              <button
-                onClick={onClearAll}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 11, color: 'var(--color-text-tertiary)',
-                  fontWeight: 500, padding: '2px 6px', borderRadius: 4,
-                  transition: 'color 0.1s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-              >
-                Clear All
-              </button>
+              <DexCapsuleButton size="sm" onClick={onClearAll}>Clear all</DexCapsuleButton>
             )}
             <button
               onClick={onClose}
