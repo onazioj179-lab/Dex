@@ -20,6 +20,8 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { colorInputValue } from '../../utils/canvasTheme';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { collectComponent, instantiateComponent, loadComponents, saveComponents, newComponentId, type BoardComponent } from './creativeStudio/componentLibrary';
+import { dexPrompt as askName } from '../../components/dexConfirm';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -601,6 +603,31 @@ const Canvas: React.FC = () => {
     return { x: Math.min(CANVAS_W - 60, Math.max(60, (w / 2 - p.x) / z)), y: Math.min(CANVAS_H - 60, Math.max(60, (h / 2 - p.y) / z)) };
   };
 
+  // ---- Component library (reusable objects across boards) --------------------
+  const [components, setComponents] = useState<BoardComponent[]>([]);
+  useEffect(() => { void loadComponents().then(setComponents); }, []);
+  const saveSelectionAsComponent = async () => {
+    if (!selectedObj) return;
+    const objs = collectComponent(objectsRef.current, selectedObj);
+    if (!objs.length) return;
+    const root = objectsRef.current.find(o => o.id === selectedObj);
+    const name = await askName({ title: 'Save as component', label: 'Name', defaultValue: root?.text?.trim().slice(0, 40) || 'Component', confirmLabel: 'Save' });
+    if (!name?.trim()) return;
+    const next = [{ id: newComponentId(), name: name.trim().slice(0, 60), createdAt: Date.now(), objects: objs }, ...components];
+    try { await saveComponents(next); setComponents(next); toast('success', `Saved component "${name.trim()}" (${objs.length} object${objs.length > 1 ? 's' : ''})`); }
+    catch { toast('error', 'Could not save the component (storage is full or unavailable)'); }
+  };
+  const insertComponent = (c: BoardComponent) => {
+    const at = viewCenter();
+    const placed = instantiateComponent(c, { x: Math.round(at.x - 60), y: Math.round(at.y - 60) });
+    commitObjects(objectsRef.current, [...objectsRef.current, ...placed]);
+    setSelectedObj(placed.find(o => o.kind !== 'connector')?.id ?? null);
+  };
+  const deleteComponent = async (id: string) => {
+    const next = components.filter(c => c.id !== id);
+    try { await saveComponents(next); setComponents(next); } catch { toast('error', 'Could not update the library'); }
+  };
+
   const addObject = (kind: 'sticky' | 'text' | 'rect' | 'ellipse' | 'frame') => {
     const c = viewCenter();
     const jitter = (objectsRef.current.length % 6) * 16;
@@ -692,6 +719,10 @@ const Canvas: React.FC = () => {
         boardsRef.current = named;
         setBoards(named);
         await saveIndexReported(named);
+        // Store it now: restoring only loads it into the editor, and nothing
+        // would write it until the next edit.
+        try { await saveBoard(named.activeId, imp.payload); }
+        catch { toast('error', "Couldn't store the imported board (storage is full or unavailable)."); }
       }
       restorePayloadRef.current(imp.payload);
       return;
@@ -1470,6 +1501,22 @@ const Canvas: React.FC = () => {
               )}
             </div>
           )}
+          <div style={s.layersHeader}>
+            <span style={s.layersTitle}>Components</span>
+            <button style={s.smallBtn} onClick={() => void saveSelectionAsComponent()} disabled={!selectedObj} title={selectedObj ? 'Save the selected object as a component (a frame brings what is inside it)' : 'Select an object to save it as a component'} aria-label="Save selection as component" data-testid="canvas-save-component">
+              <DexIcon name="plus" size={14} />
+            </button>
+          </div>
+          <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 160, overflowY: 'auto' }} data-testid="canvas-components">
+            {components.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '2px 2px 4px' }}>Select an object (or a frame) and press + to reuse it on any board.</div>
+            ) : components.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button style={{ ...s.textBtn, flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => insertComponent(c)} title={`Insert "${c.name}" (${c.objects.length} objects)`} aria-label={`Insert component ${c.name}`}>{c.name}</button>
+                <button style={s.smallBtn} onClick={() => void deleteComponent(c.id)} title="Remove from the library" aria-label={`Remove component ${c.name}`}><DexIcon name="close" size={12} /></button>
+              </div>
+            ))}
+          </div>
           <div style={s.layersHeader}>
             <span style={s.layersTitle}>Layers</span>
             <button style={s.smallBtn} onClick={addLayer} title="Add layer" aria-label="Add layer">
