@@ -49,7 +49,7 @@ export const BackgroundTasksPanel: React.FC = () => {
           {list.map((t) => (
             <div role="listitem" key={t.id} style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 92, flexShrink: 0 }}>{t.kind === 'download' ? 'Download' : t.kind === 'ddrop' ? 'DDrop' : 'UKI command'}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 92, flexShrink: 0 }}>{t.kind === 'download' ? 'Download' : t.kind === 'ddrop' ? 'DDrop' : t.kind === 'index' ? 'Search index' : 'UKI command'}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                 <span style={{ fontSize: 12, color: t.status === 'failed' || t.status === 'timed-out' ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>
                   {STATUS[t.status]}{t.status === 'running' && typeof t.progress === 'number' ? ` · ${Math.round(t.progress)}%` : ''}{t.error ? ` · ${t.error}` : ''}

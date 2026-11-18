@@ -41,3 +41,18 @@ describe('background tasks: DDrop transfers', () => {
     expect(sortedTasks(useBackgroundTasks.getState().tasks)[0].id).toBe('ddrop:t4'); // running first
   });
 });
+
+describe('background tasks: search indexing', () => {
+  it('a sync run shows as running, then completed with its count and time', async () => {
+    const handlers: Record<string, (p: unknown) => void> = {};
+    (window as any).dex = { on: (ch: string, cb: (p: unknown) => void) => { handlers[ch] = cb; }, invoke: async () => null };
+    const { wireIndexTasks, useBackgroundTasks } = await import('../../src/renderer/services/backgroundTasks');
+    wireIndexTasks();
+    handlers['index:task']({ state: 'started', kind: 'sync' });
+    expect(useBackgroundTasks.getState().tasks['index:sync']).toMatchObject({ kind: 'index', status: 'running', title: 'Updating the search index' });
+    handlers['index:task']({ state: 'completed', kind: 'sync', indexed: 12345, ms: 4200 });
+    expect(useBackgroundTasks.getState().tasks['index:sync']).toMatchObject({ status: 'completed', detail: '12,345 items · 4.2 s' });
+    handlers['index:task']({ state: 'failed', kind: 'rebuild', error: 'index unavailable' });
+    expect(useBackgroundTasks.getState().tasks['index:rebuild']).toBeUndefined(); // a failure without a start is not invented
+  });
+});

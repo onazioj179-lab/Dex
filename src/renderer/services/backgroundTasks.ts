@@ -12,7 +12,7 @@
 
 import { create } from 'zustand';
 
-export type BgKind = 'download' | 'uki-command' | 'ddrop';
+export type BgKind = 'download' | 'uki-command' | 'ddrop' | 'index';
 export type BgStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'timed-out' | 'interrupted';
 
 export interface BgTask {
@@ -108,7 +108,33 @@ export function wireDdropTasks(): void {
   on('dtp:transfer-error', finish('failed'));
 }
 
-const STATUS_WORD: Record<string, string> ={ failed: 'failed', cancelled: 'was cancelled', 'timed-out': 'timed out' };
+// ---- Search indexing (main.rs report_index_task, `index:task`) ---------------
+
+let indexWired = false;
+/** List the file search index's runs (first launch, background sync, rebuild). */
+export function wireIndexTasks(): void {
+  if (indexWired || typeof window === 'undefined' || !dex()?.on) return;
+  indexWired = true;
+  const title: Record<string, string> = { sync: 'Updating the search index', rebuild: 'Rebuilding the search index' };
+  dex()!.on!('index:task', (p: any) => {
+    if (!p?.kind) return;
+    const s = useBackgroundTasks.getState();
+    const id = `index:${p.kind}`;
+    if (p.state === 'started') {
+      s.upsert({ id, kind: 'index', title: title[p.kind] ?? 'Indexing files', detail: 'Documents, Desktop and Downloads', status: 'running', startedAt: Date.now() });
+      return;
+    }
+    const done = p.state === 'completed';
+    s.patch(id, {
+      status: done ? 'completed' : 'failed',
+      endedAt: Date.now(),
+      detail: done && typeof p.indexed === 'number' ? `${p.indexed.toLocaleString()} items · ${(p.ms / 1000).toFixed(1)} s` : undefined,
+      error: done ? undefined : String(p.error || 'failed'),
+    });
+  });
+}
+
+const STATUS_WORD: Record<string, string> = { failed: 'failed', cancelled: 'was cancelled', 'timed-out': 'timed out' };
 
 let wired = false;
 /** Start listening for UKI command events (idempotent; call once from the shell). */

@@ -1573,6 +1573,10 @@ fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Val
 
 /// Clear + rebuild the index from the user's document folders.
 fn index_rebuild(app: &tauri::AppHandle) -> Value {
+    report_index_task(app, "rebuild", || index_rebuild_inner(app))
+}
+
+fn index_rebuild_inner(app: &tauri::AppHandle) -> Value {
     // Take a clone of the index handle, then DROP the lock before the multi-second
     // clear + walk so searches stay responsive during a rebuild. The clone shares
     // the same underlying Tantivy index (internally synchronized).
@@ -1684,7 +1688,27 @@ fn save_snapshot(app: &tauri::AppHandle, snap: &dex_scanner::Snapshot) {
     }
 }
 
+/// Search indexing is background work the user can see: Task Manager ›
+/// Background lists it (renderer: services/backgroundTasks.ts, `index:task`).
+fn report_index_task(app: &tauri::AppHandle, kind: &str, work: impl FnOnce() -> Value) -> Value {
+    let started = std::time::Instant::now();
+    crate::native_ops::emit_event(app, "index:task", &json!({ "state": "started", "kind": kind }));
+    let res = work();
+    let ok = res.get("success").and_then(|v| v.as_bool()) == Some(true);
+    crate::native_ops::emit_event(app, "index:task", &json!({
+        "state": if ok { "completed" } else { "failed" }, "kind": kind,
+        "indexed": res.get("indexed").cloned().unwrap_or(Value::Null),
+        "error": res.get("error").cloned().unwrap_or(Value::Null),
+        "ms": started.elapsed().as_millis() as u64,
+    }));
+    res
+}
+
 fn index_sync(app: &tauri::AppHandle) -> Value {
+    report_index_task(app, "sync", || index_sync_inner(app))
+}
+
+fn index_sync_inner(app: &tauri::AppHandle) -> Value {
     // Clone the (Arc-backed) index handle and release the search lock immediately.
     let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
     let idx = {
