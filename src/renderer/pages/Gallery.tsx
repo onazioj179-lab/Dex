@@ -692,11 +692,33 @@ export const Gallery: React.FC = () => {
     }
   }, [selectionMode, sortedMedia, toggleItemSelection]);
 
+  // "Delete" used to only hide items from this view; the files stayed on disk
+  // and came back on the next scan. Local files now go to the Recycle Bin (the
+  // user can restore them there); items without a file on disk are removed
+  // from Gallery only, and the message says which happened.
+  const trashMedia = useCallback(async (items: MediaItem[]) => {
+    if (!items.length) return;
+    const invoke = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<any> } }).dex?.invoke;
+    const moved: string[] = [], viewOnly: string[] = [], failed: string[] = [];
+    for (const it of items) {
+      const path = fileUrlToPath(it.src);
+      const onDisk = /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith('\\\\');
+      if (!invoke || !onDisk) { viewOnly.push(it.id); continue; }
+      const r = await invoke('files:trash', path).catch(() => null);
+      if (r?.success) moved.push(it.id); else failed.push(it.name);
+    }
+    const gone = new Set([...moved, ...viewOnly]);
+    setMedia(prev => prev.filter(m => !gone.has(m.id)));
+    if (moved.length) toast.success(`Moved ${moved.length} item${moved.length > 1 ? 's' : ''} to the Recycle Bin`, 'Restore from the Recycle Bin if you change your mind.');
+    if (viewOnly.length) toast.info(`Removed ${viewOnly.length} item${viewOnly.length > 1 ? 's' : ''} from Gallery`, 'Not files on this PC, so nothing was deleted from disk.');
+    if (failed.length) toast.error(`Could not move ${failed.length} item${failed.length > 1 ? 's' : ''} to the Recycle Bin`, failed.slice(0, 3).join(', '));
+  }, [toast]);
+
   const batchDelete = useCallback(() => {
     if (selectedItems.size === 0) return;
-    setMedia(prev => prev.filter(m => !selectedItems.has(m.id)));
+    void trashMedia(media.filter(m => selectedItems.has(m.id)));
     clearSelection();
-  }, [selectedItems, clearSelection]);
+  }, [selectedItems, clearSelection, trashMedia, media]);
 
   // Batch favorite: if any selected item is not yet a favorite, favorite them
   // all; otherwise (all already favorited) toggle them all off.
@@ -1179,9 +1201,9 @@ export const Gallery: React.FC = () => {
   }, [selectedMedia, sortedMedia]);
 
   const deleteMedia = useCallback((item: MediaItem) => {
-    setMedia(prev => prev.filter(m => m.id !== item.id));
+    void trashMedia([item]);
     setSelectedMedia(null);
-  }, []);
+  }, [trashMedia]);
 
   // Context menu
   const { menuState, show: showCtxMenu, close: closeCtxMenu } = useContextMenu();
@@ -1195,7 +1217,7 @@ export const Gallery: React.FC = () => {
         { id: 'fav-sel', label: allFav ? `Unfavorite ${count} items` : `Favorite ${count} items`, icon: Icons.heart, onSelect: batchFavorite },
         { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport, dividerAfter: true },
         { id: 'deselect', label: 'Clear selection', icon: Icons.close, onSelect: clearSelection, dividerAfter: true },
-        { id: 'delete-sel', label: `Delete ${count} items`, icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: batchDelete },
+        { id: 'delete-sel', label: `Move ${count} items to Recycle Bin`, icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: batchDelete },
       ];
     }
     return [
@@ -1212,7 +1234,7 @@ export const Gallery: React.FC = () => {
         { id: 'forge', label: 'Send to Forge', icon: Icons.settings, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'forge') },
       ] : []),
       { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { void openWithShell('reveal', item.src, item.name); }, dividerAfter: true },
-      { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
+      { id: 'delete', label: 'Move to Recycle Bin', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
   }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
 
@@ -1971,7 +1993,7 @@ export const Gallery: React.FC = () => {
                 </button>
               )}
               <button style={styles.lightboxBtn} onClick={() => setShowMediaInfo(prev => !prev)} aria-label="Info">{Icons.info}</button>
-              <button style={styles.lightboxBtn} onClick={() => deleteMedia(selectedMedia)} aria-label="Delete">{Icons.trash}</button>
+              <button style={styles.lightboxBtn} onClick={() => deleteMedia(selectedMedia)} aria-label="Move to Recycle Bin" title="Move to Recycle Bin">{Icons.trash}</button>
             </div>
           </div>
 

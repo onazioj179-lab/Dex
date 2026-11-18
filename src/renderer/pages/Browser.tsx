@@ -2781,7 +2781,7 @@ ${text}
                       <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>{p.username}</div>
                     </div>
                     <button
-                      onClick={() => deletePassword(p.id)}
+                      onClick={() => { if (window.confirm(`Delete the saved password for ${p.username || 'this account'} on ${p.domain}? This cannot be undone.`)) deletePassword(p.id); }}
                       style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px' }}
                       aria-label="Delete password"
                     >{Icon.close}</button>
@@ -2838,7 +2838,7 @@ ${text}
                       <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>{c.name} — exp {c.expiry}</div>
                     </div>
                     <button
-                      onClick={() => deleteCard(c.id)}
+                      onClick={() => { if (window.confirm(`Delete the saved card "${c.label}"? This cannot be undone.`)) deleteCard(c.id); }}
                       style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px' }}
                       aria-label="Delete card"
                     >{Icon.close}</button>
