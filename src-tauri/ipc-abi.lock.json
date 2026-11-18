@@ -1615,6 +1615,7 @@
     "system:getInfo",
     "system:getLaunchAtLogin",
     "system:getProcesses",
+    "system:getStartupItems",
     "system:getStatus",
     "system:getUserInfo",
     "system:killProcess",

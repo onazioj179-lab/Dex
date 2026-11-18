@@ -15,6 +15,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppLifecycle } from '../hooks/useAppLifecycle';
 import { BackgroundTasksPanel } from '../components/BackgroundTasksPanel';
+import { StartupItemsView } from '../components/StartupItemsView';
+import { SegmentedControl, DexCapsuleGroup, DexCapsuleButton, CapsuleGlyph } from '../components/controls';
 import { useAppWindowId } from '../services/appWindows';
 import DexIcon from '../components/DexIcon';
 import { openAppContextMenu } from '../components/AppContextMenu';
@@ -32,11 +34,12 @@ import { LineChart, canvasColor } from '../components/telemetry/LineChart';
 
 // -- types + persisted preferences --------------------------------------------
 
-type View = 'processes' | 'performance' | 'apps' | 'background' | 'diagnostics' | 'system';
+type View = 'processes' | 'performance' | 'apps' | 'startup' | 'background' | 'diagnostics' | 'system';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'processes', label: 'Processes' },
   { id: 'performance', label: 'Performance' },
   { id: 'apps', label: 'DEX Apps' },
+  { id: 'startup', label: 'Startup' },
   { id: 'background', label: 'Background' },
   { id: 'diagnostics', label: 'Diagnostics' },
   { id: 'system', label: 'System' },
@@ -70,7 +73,12 @@ const loadPinned = (): number[] => {
   return [];
 };
 
-interface SystemProcess { pid: number; name: string; cpu?: number; memory?: number }
+/** kind comes from the native classifier (proc_classify.rs): DEX's own tree, apps with a window, background. */
+interface SystemProcess { pid: number; name: string; cpu?: number; memory?: number; parent?: number | null; kind?: 'app' | 'background' | 'dex' }
+type ProcKind = 'app' | 'dex' | 'background';
+const KIND_ORDER: ProcKind[] = ['app', 'dex', 'background'];
+const KIND_LABEL: Record<ProcKind, string> = { app: 'Apps', dex: 'DEX', background: 'Background processes' };
+const CAT_COLLAPSE_KEY = 'dex-tm-category-collapsed';
 interface SystemStatusInfo {
   cpu?: { usage: number; cores: number };
   memory?: { total: number; used: number; percent: number };
@@ -339,20 +347,16 @@ const TaskManager: React.FC = () => {
       />
 
       {/* Toolbar: views on the left, update controls on the right. */}
+      {/* Floating capsule toolbar: views, then status and update controls. */}
       <div style={S.toolbar}>
-        <div role="tablist" aria-label="Task Manager views" style={S.segment}>
-          {VIEWS.map(v => (
-            <button
-              key={v.id}
-              role="tab"
-              aria-selected={view === v.id}
-              onClick={() => setView(v.id)}
-              style={{ ...S.segBtn, ...(view === v.id ? S.segBtnOn : null) }}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          semantics="tabs"
+          size="md"
+          aria-label="Task Manager views"
+          options={VIEWS.map(v => ({ value: v.id, label: v.label }))}
+          value={view}
+          onChange={setView}
+        />
         <div style={{ flex: 1 }} />
         <span style={S.updated} aria-live="off" title={lastError ? `Last error: ${lastError}` : undefined}>
           {bridge === 'missing' ? 'System data unavailable in this build'
@@ -360,21 +364,21 @@ const TaskManager: React.FC = () => {
             : speed === 0 ? (updatedAt ? `Paused · ${fmtClock(updatedAt)}` : 'Paused')
             : updatedAt ? `Updated ${fmtClock(updatedAt)}` : 'Reading…'}
         </span>
-        <select
-          value={speed}
-          onChange={e => setSpeed(Number(e.target.value))}
-          aria-label="Update speed"
-          title="Update speed"
-          style={S.select}
-        >
-          {SPEEDS.map(s => <option key={s.ms} value={s.ms}>{s.label}</option>)}
-        </select>
-        <button type="button" style={S.iconBtn} onClick={refreshNow} aria-label="Refresh now" title="Refresh now">
-          <DexIcon name="refresh" size={14} />
-        </button>
-        <button type="button" style={S.iconBtn} onClick={exportSnapshot} disabled={processes.length === 0} aria-label="Send a snapshot to Notes" title="Send a snapshot of the top processes to Notes">
-          <DexIcon name="file-text" size={14} />
-        </button>
+        <DexCapsuleGroup label="Update" size="md">
+          <SegmentedControl
+            variant="subtle"
+            size="sm"
+            aria-label="Update speed"
+            options={SPEEDS.map(s => ({ value: String(s.ms), label: s.ms === 0 ? 'Pause' : `${s.ms / 1000} s` }))}
+            value={String(speed)}
+            onChange={v => setSpeed(Number(v))}
+            style={{ background: 'transparent' }}
+          />
+          <DexCapsuleButton size="md" onClick={refreshNow} aria-label="Refresh now" title="Refresh now"
+            icon={<CapsuleGlyph><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></CapsuleGlyph>} />
+          <DexCapsuleButton size="md" onClick={exportSnapshot} disabled={processes.length === 0} aria-label="Send a snapshot to Notes" title="Send a snapshot of the top processes to Notes"
+            icon={<CapsuleGlyph><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></CapsuleGlyph>} />
+        </DexCapsuleGroup>
       </div>
 
       {bridge === 'error' && lastError && (
@@ -418,6 +422,7 @@ const TaskManager: React.FC = () => {
             onQuit={id => closeApp(id)}
           />
         )}
+        {view === 'startup' && <StartupItemsView />}
         {view === 'background' && <BackgroundTasksPanel />}
         {view === 'diagnostics' && (
           <NexusDiagnostics />
@@ -464,6 +469,10 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
   const [pinned, setPinned] = useState<number[]>(loadPinned);
   const [groupBy, setGroupBy] = useState<boolean>(() => readPref(GROUP_BY_KEY, () => true, false, v => v === '1'));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [catCollapsed, setCatCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(CAT_COLLAPSE_KEY) || '{}') || {}; } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem(CAT_COLLAPSE_KEY, JSON.stringify(catCollapsed)); } catch { /* storage blocked */ } }, [catCollapsed]);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
   useEffect(() => writePref(PINNED_KEY, JSON.stringify(pinned)), [pinned]);
   useEffect(() => writePref(GROUP_BY_KEY, groupBy ? '1' : '0'), [groupBy]);
@@ -482,10 +491,32 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
   }, [processes, filter, sortKey, sortDir]);
 
   interface Group { key: string; procs: SystemProcess[]; cpu: number; memory: number }
-  type Row = { kind: 'group'; group: Group } | { kind: 'proc'; proc: SystemProcess; nested: boolean; pinned: boolean };
+  type Row =
+    | { kind: 'category'; cat: ProcKind; count: number; cpu: number; memory: number }
+    | { kind: 'group'; group: Group }
+    | { kind: 'proc'; proc: SystemProcess; nested: boolean; pinned: boolean };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const p of visible) if (pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: false, pinned: true });
+    // Categories only when the native side classifies (older builds: flat list).
+    const categorized = visible.some(p => p.kind);
+    const cats: Array<{ cat: ProcKind | null; list: SystemProcess[] }> = categorized
+      ? KIND_ORDER.map(cat => ({ cat, list: visible.filter(p => (p.kind ?? 'background') === cat) })).filter(c => c.list.length > 0)
+      : [{ cat: null, list: visible }];
+    for (const { cat, list } of cats) {
+      if (cat) {
+        const cpu = list.reduce((a, p) => a + (p.cpu || 0), 0);
+        const memory = list.reduce((a, p) => a + (p.memory || 0), 0);
+        out.push({ kind: 'category', cat, count: list.length, cpu, memory });
+        if (catCollapsed[cat]) continue;
+      }
+      out.push(...buildRows(list));
+    }
+    return out;
+  }, [visible, pinnedSet, groupBy, collapsed, sortKey, sortDir, catCollapsed]);
+
+  function buildRows(visible: SystemProcess[]): Row[] {
+    const out: Row[] = [];
     if (!groupBy) {
       for (const p of visible) if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: false, pinned: false });
       return out;
@@ -509,7 +540,7 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
       if (!collapsed[g.key]) for (const p of g.procs) if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: true, pinned: false });
     }
     return out;
-  }, [visible, pinnedSet, groupBy, collapsed, sortKey, sortDir]);
+  }
 
   const virt = useVirtualList({ itemCount: rows.length, rowHeight: PROCESS_ROW_H, bufferRows: 8 });
   const selected = selectedPid == null ? null : processes.find(p => p.pid === selectedPid) || null;
@@ -561,9 +592,9 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
             aria-label="Filter processes"
             style={{ width: 220 }}
           />
-          <button type="button" aria-pressed={groupBy} onClick={() => setGroupBy(g => !g)} style={{ ...S.pill, ...(groupBy ? S.pillOn : null) }} title="Group processes by application">
-            Group by app
-          </button>
+          <DexCapsuleButton size="sm" active={groupBy} onClick={() => setGroupBy(g => !g)} style={{ border: '1px solid var(--color-border-subtle)' }}>
+            Group by name
+          </DexCapsuleButton>
           <span style={S.subtle}>{filter ? `${visible.length} of ${processes.length}` : `${processes.length} processes`}{pinned.length ? ` · ${pinned.length} pinned` : ''}</span>
         </div>
         <div role="row" style={S.thead}>
@@ -589,6 +620,26 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
             <>
               <div style={{ height: virt.slice.padTop }} aria-hidden="true" />
               {rows.slice(virt.slice.start, virt.slice.end).map(row => {
+                if (row.kind === 'category') {
+                  const isCollapsed = !!catCollapsed[row.cat];
+                  return (
+                    <button
+                      type="button"
+                      key={`c-${row.cat}`}
+                      aria-expanded={!isCollapsed}
+                      onClick={() => setCatCollapsed(c => ({ ...c, [row.cat]: !c[row.cat] }))}
+                      style={{ ...S.tr, ...S.categoryRow }}
+                    >
+                      <span style={S.cellName}>
+                        <span aria-hidden="true" style={{ ...S.chevron, transform: isCollapsed ? 'none' : 'rotate(90deg)' }}>›</span>
+                        {KIND_LABEL[row.cat]} <span style={S.subtle}>{row.count}</span>
+                      </span>
+                      <span />
+                      <span style={{ ...S.cellNum, color: cpuColor(row.cpu) }}>{row.cpu.toFixed(1)}%</span>
+                      <span style={S.cellNum}>{fmtMB(row.memory)}</span>
+                    </button>
+                  );
+                }
                 if (row.kind === 'group') {
                   const g = row.group;
                   const isCollapsed = !!collapsed[g.key];
@@ -856,13 +907,13 @@ const PROC_COLS = 'minmax(140px, 1fr) 72px 72px 92px';
 const APP_COLS = 'minmax(160px, 1fr) 110px 90px 200px';
 
 const S: Record<string, React.CSSProperties> = {
+  categoryRow: {
+    border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', fontWeight: 600,
+    color: 'var(--color-text-primary)', background: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
+  },
   root: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', color: 'var(--color-text-primary)', background: 'var(--color-bg-base)', overflow: 'hidden', fontSize: 12 },
-  toolbar: { display: 'flex', alignItems: 'center', gap: 8, height: 44, flexShrink: 0, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)' },
-  segment: { display: 'inline-flex', padding: 2, gap: 2, borderRadius: 10, background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-subtle)' },
-  segBtn: { height: 24, padding: '0 12px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' },
-  segBtnOn: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' },
+  toolbar: { display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, flexShrink: 0, padding: '8px 12px', flexWrap: 'wrap' },
   updated: { fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
-  select: { height: 26, borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', fontSize: 11.5, padding: '0 6px' },
   iconBtn: { width: 26, height: 26, display: 'grid', placeItems: 'center', borderRadius: 6, border: '1px solid transparent', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0, flexShrink: 0 },
   errorBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', fontSize: 12, color: 'var(--color-warning)', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)' },
   textBtn: { border: 'none', background: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, padding: 0 },
@@ -872,8 +923,6 @@ const S: Record<string, React.CSSProperties> = {
   tableWrap: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   subbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexShrink: 0 },
   subtle: { fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 },
-  pill: { height: 24, padding: '0 10px', borderRadius: 9999, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11.5, cursor: 'pointer' },
-  pillOn: { borderColor: 'var(--color-accent)', color: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)' },
   thead: { display: 'grid', gridTemplateColumns: PROC_COLS, gap: 8, height: 26, alignItems: 'center', padding: '0 12px', borderTop: '1px solid var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 },
   th: { display: 'flex', alignItems: 'center', height: '100%', padding: 0, border: 'none', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left' },
   thStatic: { color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600 },

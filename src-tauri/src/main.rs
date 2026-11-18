@@ -19,6 +19,7 @@ mod ledger_ctl;
 mod download_ctl;
 mod onboarding;
 mod uki_terminal;
+mod proc_classify;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -600,7 +601,9 @@ struct ProcInfo {
 
 /// Number of processes returned to the UI. A task list wants the resource hogs,
 /// not an unsorted dump of every PID on the machine.
-const PROCESS_LIMIT: usize = 60;
+// Enough for every process on a normal PC, so Task Manager's category counts are
+// true (the list is virtualized in the renderer).
+const PROCESS_LIMIT: usize = 500;
 
 /// Rank by resource pressure — CPU% descending, memory as the tiebreaker — and
 /// keep the top `limit`. Pure and deterministic.
@@ -645,6 +648,11 @@ fn system_processes() -> Value {
             memory_mb: p.memory() / (1024 * 1024),
         })
         .collect();
+    // Categories (proc_classify.rs): DEX's own tree, apps with a window, background.
+    let parents: std::collections::HashMap<u32, u32> = sys.processes().iter()
+        .filter_map(|(pid, p)| p.parent().map(|pp| (pid.as_u32(), pp.as_u32()))).collect();
+    let pids: Vec<u32> = all.iter().map(|p| p.pid).collect();
+    let kinds = proc_classify::categorize(&pids, &parents, &proc_classify::windowed_pids(), std::process::id());
     let procs: Vec<Value> = rank_processes(all, PROCESS_LIMIT)
         .iter()
         .map(|p| {
@@ -653,6 +661,8 @@ fn system_processes() -> Value {
                 "name": p.name,
                 "cpu": p.cpu,
                 "memory": p.memory_mb,
+                "parent": parents.get(&p.pid),
+                "kind": kinds.get(&p.pid).copied().unwrap_or("background"),
             })
         })
         .collect();
@@ -2643,6 +2653,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "log:renderer" | "render-error:report" | "renderer:memory-critical" => renderer_log::dispatch(&channel, &args),
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
+        "system:getStartupItems" => proc_classify::startup_items(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
         "system:getLaunchAtLogin" => launch_at_login_get(),
         "system:setLaunchAtLogin" => launch_at_login_set(args.get(0).and_then(|v| v.as_bool()).unwrap_or(false)),
